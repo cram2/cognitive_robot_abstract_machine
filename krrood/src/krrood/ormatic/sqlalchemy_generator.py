@@ -36,7 +36,7 @@ class SQLAlchemyGenerator:
     """
 
     def __post_init__(self):
-        template_dir = os.path.join(os.path.dirname(__file__), "templates")
+        template_dir = os.path.join(os.path.dirname(__file__), "..", "jinja_templates")
         self.env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(template_dir),
             trim_blocks=True,

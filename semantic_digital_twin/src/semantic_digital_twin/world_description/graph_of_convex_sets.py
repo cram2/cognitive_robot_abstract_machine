@@ -1,52 +1,52 @@
 from __future__ import annotations
 
 import logging
+import time
+from functools import reduce
+from operator import or_
 
 import matplotlib.pyplot as plt
-from semantic_digital_twin.world_description.geometry import BoundingBox
-from semantic_digital_twin.world_description.shape_collection import (
-    BoundingBoxCollection,
+import numpy as np
+import plotly.graph_objects as go
+import rustworkx as rx
+
+from rtree import index
+from sortedcontainers import SortedSet
+from typing_extensions import List, Optional, Dict, Sequence
+from typing_extensions import Self
+
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.operators.core_logical_operators import (
+    OR,
+    AND,
+    chained_logic,
 )
+from random_events.interval import reals, Interval, SimpleInterval, closed, Bound
+from random_events.product_algebra import Event
+from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.exceptions import PointOccupiedError
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     SemanticEnvironmentAnnotation,
+    Body,
+    Region,
+    Agent,
 )
+from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import (
+    BoundingBox,
+    Color,
+)
+from semantic_digital_twin.world_description.shape_collection import (
+    BoundingBoxCollection,
+)
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 logger = logging.getLogger(__name__)
-
-import time
-from functools import reduce
-from operator import or_
-from typing_extensions import List, Optional, Dict, Sequence
-
-# typing.Self is available starting with Python 3.11
-from typing_extensions import Self
-
-import numpy as np
-import plotly.graph_objects as go
-import rustworkx as rx
-from random_events.interval import reals
-from random_events.product_algebra import SimpleEvent, Event
-from rtree import index
-from sortedcontainers import SortedSet
-
-from semantic_digital_twin.spatial_types import Point3, HomogeneousTransformationMatrix
-
-
-class PoseOccupiedError(Exception):
-    """
-    Error that is raised when a pose is occupied or not in the search space of a Connectivity Graphs.
-    """
-
-    def __init__(self, point: Point3):
-        """
-        Construct a new pose occupied error.
-        :param pose: The pose that is occupied.
-        """
-        super().__init__(f"The pose {point} is occupied.")
-        self.point = point
 
 
 class GraphOfConvexSets:
@@ -184,8 +184,8 @@ class GraphOfConvexSets:
         Plot the free space of the environment in blue.
         :return: A list of traces that can be put into a plotly figure.
         """
-        free_space = Event.from_simple_sets(*[node.simple_event for node in self.graph.nodes()])
-        return free_space.plot(color="blue")
+
+        return self.free_space_event.plot(color="blue")
 
     def plot_and_show_free_space(self) -> None:
         import plotly.graph_objects as go
@@ -197,7 +197,9 @@ class GraphOfConvexSets:
         Plot the occupied space of the environment in red.
         :return: A list of traces that can be put into a plotly figure.
         """
-        free_space = Event.from_simple_sets(*[node.simple_event for node in self.graph.nodes()])
+        free_space = Event.from_simple_sets(
+            *[node.simple_event for node in self.graph.nodes()]
+        )
         occupied_space = ~free_space & self.search_space.event
         return occupied_space.plot(color="red")
 
@@ -232,9 +234,9 @@ class GraphOfConvexSets:
 
         # validate if the poses are part of the graph
         if start_node is None:
-            raise PoseOccupiedError(start)
+            raise PointOccupiedError(start)
         if goal_node is None:
-            raise PoseOccupiedError(goal)
+            raise PointOccupiedError(goal)
 
         if start_node == goal_node:
             return [start, goal]
@@ -325,14 +327,34 @@ class GraphOfConvexSets:
                 return bb.bloat(0, bloat_walls, 0.01)
 
         world_root = search_space.reference_frame
+        world = world_root._world
 
-        bloated_obstacles: BoundingBoxCollection = BoundingBoxCollection(
-            [
-                bloat_obstacle(bb)
-                for bb in semantic_obstacle_annotation.as_bounding_box_collection_at_origin(
-                    HomogeneousTransformationMatrix(reference_frame=world_root)
-                )
-            ],
+        agents = world.get_semantic_annotations_by_type(Agent)
+        agent_entities = set()
+        for agent in agents:
+            agent_entities.update(agent.kinematic_structure_entities)
+
+        entities_to_consider = [
+            entity
+            for entity in semantic_obstacle_annotation.kinematic_structure_entities
+            if isinstance(entity, Body)
+            and entity.has_collision()
+            and entity not in agent_entities
+        ]
+
+        collections = [
+            entity.collision.as_bounding_box_collection_at_origin(
+                HomogeneousTransformationMatrix(reference_frame=world_root)
+            )
+            for entity in entities_to_consider
+        ]
+
+        bbs = BoundingBoxCollection([], world_root)
+        for bb_collection in collections:
+            bbs = bbs.merge(bb_collection)
+
+        bloated_obstacles = BoundingBoxCollection(
+            [bloat_obstacle(bb) for bb in bbs],
             world_root,
         )
 
@@ -563,7 +585,9 @@ class GraphOfConvexSets:
 
         SimpleEvent.from_data({SpatialVariables.z.value: reals()})
         # create floor level
-        z_event = SimpleEvent.from_data({SpatialVariables.z.value: reals()}).as_composite_set()
+        z_event = SimpleEvent.from_data(
+            {SpatialVariables.z.value: reals()}
+        ).as_composite_set()
         z_event.fill_missing_variables(SpatialVariables.xy)
         free_space.fill_missing_variables(SortedSet([SpatialVariables.z.value]))
         free_space &= z_event
@@ -615,3 +639,194 @@ class GraphOfConvexSets:
             tolerance=tolerance,
             bloat_obstacles=bloat_obstacles,
         )
+
+    @property
+    def free_space_event(self) -> Event:
+        return Event.from_simple_sets(
+            *[node.simple_event for node in self.graph.nodes()]
+        )
+
+    def spawn_as_region(
+        self,
+        name: Optional[PrefixedName] = None,
+        color: Color = Color(0.5, 1.0, 0.5, 0.5),
+    ) -> Region:
+        """
+        Spawn the GCS as a region (world_entity) connected with a fixed connection with the root of the GCS search space.
+        The geometry should be all boxes extracted from its free space.
+
+        :param name: The name of the region.
+        :param color: The color of the region.
+        :return: The region.
+        """
+        if name is None:
+            name = PrefixedName("gcs_region")
+
+        bbox_collection = BoundingBoxCollection(
+            shapes=list(self.graph.nodes()),
+            reference_frame=self.search_space.reference_frame,
+        )
+
+        shapes = bbox_collection.as_shapes()
+        shapes.dye_shapes(color)
+        region = Region.from_shape_collection(name, shapes)
+
+        with self.world.modify_world():
+            self.world.add_region(region)
+
+            self.world.add_connection(
+                FixedConnection(
+                    parent=self.search_space.reference_frame,
+                    child=region,
+                )
+            )
+        return region
+
+
+def translate_event_to(
+    event: Event,
+    position: Point3,
+) -> Event:
+    """
+    Translates an event by a given position.
+    A translation is a change in the position of an entity in space without altering its shape or orientation.
+
+    :param event: The event to translate.
+    :param position: The position to translate the event by.
+    :return: The translated event.
+    """
+    variable_to_offset = {
+        SpatialVariables.x.value: position.x,
+        SpatialVariables.y.value: position.y,
+        SpatialVariables.z.value: position.z,
+    }
+    results = []
+    for simple_event in event.simple_sets:
+        data = dict()
+        for v, offset in variable_to_offset.items():
+            data[v] = Interval.from_simple_sets(
+                *[
+                    SimpleInterval.from_data(
+                        lower=simple_interval.lower + offset,
+                        upper=simple_interval.upper + offset,
+                        left=simple_interval.left,
+                        right=simple_interval.right,
+                    )
+                    for simple_interval in simple_event[v]
+                ]
+            )
+        results.append(SimpleEvent.from_data(data))
+    return Event.from_simple_sets(*results)
+
+
+def navigation_map_at_target(
+    target: Body,
+    search_range_x: float = 2.0,
+    search_range_y: float = 2.0,
+    max_height: float = 2.0,
+    bloat_obstacles: float = 0.02,
+) -> GraphOfConvexSets:
+    """
+    Create a navigation map around the target.
+    The navigation map is a Graph of Convex Sets that represents the navigable space around the target.
+    The search space is constructed as a box around the target with the specified search ranges in the x and y directions.
+
+    :param target: The target around which the navigation map is created.
+    :param search_range_x: The search range in the x-direction.
+    :param search_range_y: The search range in the y-direction.
+    :param max_height: The maximum height of the navigation map from the floor.
+    :param bloat_obstacles: The amount to bloat obstacles in the navigation map.
+    :return: The navigation map as a Graph of Convex Sets.
+    """
+    search_space = BoundingBoxCollection.from_simple_event(
+        reference_frame=target,
+        simple_event=SimpleEvent.from_data(
+            {
+                SpatialVariables.x.value: closed(
+                    -search_range_x / 2, search_range_x / 2
+                ),
+                SpatialVariables.y.value: closed(
+                    -search_range_y / 2, search_range_y / 2
+                ),
+                SpatialVariables.z.value: closed(
+                    -target.global_pose.z, max_height - target.global_pose.z
+                ),
+            }
+        ),
+    )
+
+    gcs = GraphOfConvexSets.navigation_map_from_world(
+        world=target._world, search_space=search_space, bloat_obstacles=bloat_obstacles
+    )
+    return gcs
+
+
+def translate_free_space_to_where_condition(
+    free_space: Event,
+    expression: SymbolicExpression,
+    x_variable_name: str = "x",
+    y_variable_name: str = "y",
+) -> OR:
+    """
+    Translate the free space event generated by a GCS to a where condition describing the constraints of X and Y
+    variables.
+    This results in an OR statement containing a union over all simple events in the free space.
+    The components of the OR statement are conjunctions of constraints on the X and Y variables extracted from the simple
+    events.
+
+    :param free_space: The free space to parse
+    :param expression: The expression where to get the variables from
+    :param x_variable_name: The name of the X variable in the expression
+    :param y_variable_name: The name of the Y variable in the expression
+    :return: The where condition describing the constraints of X and Y variables
+    """
+
+    def resolve_variable(expr: SymbolicExpression, name: str) -> SymbolicExpression:
+        if hasattr(expr, "selected_variable"):
+            var = expr.selected_variable
+            if name.startswith(var._name_ + "."):
+                name = name[len(var._name_) + 1 :]
+                expr = var
+
+        for part in name.split("."):
+            expr = getattr(expr, part)
+        return expr
+
+    x_var = resolve_variable(expression, x_variable_name)
+    y_var = resolve_variable(expression, y_variable_name)
+
+    free_space = free_space.marginal(SpatialVariables.xy)
+
+    simple_event_conditions = []
+
+    for simple_event in free_space.simple_sets:
+        x_interval = simple_event[SpatialVariables.x.value]
+        y_interval = simple_event[SpatialVariables.y.value]
+
+        for si_x in x_interval.simple_sets:
+            for si_y in y_interval.simple_sets:
+                x_low = (
+                    x_var >= si_x.lower
+                    if si_x.left == Bound.CLOSED
+                    else x_var > si_x.lower
+                )
+                x_high = (
+                    x_var <= si_x.upper
+                    if si_x.right == Bound.CLOSED
+                    else x_var < si_x.upper
+                )
+                y_low = (
+                    y_var >= si_y.lower
+                    if si_y.left == Bound.CLOSED
+                    else y_var > si_y.lower
+                )
+                y_high = (
+                    y_var <= si_y.upper
+                    if si_y.right == Bound.CLOSED
+                    else y_var < si_y.upper
+                )
+                simple_event_conditions.append(
+                    chained_logic(AND, x_low, x_high, y_low, y_high)
+                )
+
+    return chained_logic(OR, *simple_event_conditions)

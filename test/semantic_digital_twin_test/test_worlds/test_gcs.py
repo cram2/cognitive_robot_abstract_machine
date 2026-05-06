@@ -13,8 +13,8 @@ from semantic_digital_twin.world_description.shape_collection import (
 )
 from semantic_digital_twin.world_description.graph_of_convex_sets import (
     GraphOfConvexSets,
-    PoseOccupiedError,
 )
+from semantic_digital_twin.exceptions import PointOccupiedError
 from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -127,7 +127,7 @@ class GCSFromWorldTestCase(unittest.TestCase):
         self.assertIsNotNone(path)
         self.assertGreater(len(path), 1)
 
-        with self.assertRaises(PoseOccupiedError):
+        with self.assertRaises(PointOccupiedError):
             start = Point3(-10, -10, -10, reference_frame=self.world.root)
             target = Point3(10, 10, 10, reference_frame=self.world.root)
             gcs.path_from_to(start, target)

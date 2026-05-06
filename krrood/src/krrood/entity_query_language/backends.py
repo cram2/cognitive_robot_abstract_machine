@@ -149,7 +149,9 @@ class EntityQueryLanguageBackend(SelectiveBackend):
         if isinstance(
             attribute_match.assigned_value, type(Ellipsis)
         ) and not issubclass(attribute_match.assigned_variable._type_, enum.Enum):
-            raise UnderspecifiedStatementInfeasibleForEQLGeneration(attribute_match)
+            raise UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
+                attribute_match
+            )
 
     def _convert_attribute_match_to_variable(self, attribute_match: AttributeMatch):
         """
@@ -211,6 +213,7 @@ class ProbabilisticBackend(GenerativeBackend):
     number_of_samples: int = field(kw_only=True, default=50)
     """
     The number of samples to generate.
+    This is only used if the query does not specify a limit.
     """
 
     def _evaluate(self, expression: Match[T]) -> Iterable[T]:
@@ -235,7 +238,12 @@ class ProbabilisticBackend(GenerativeBackend):
         else:
             truncated = conditioned
 
-        samples = truncated.sample(self.number_of_samples)
+        number_of_samples = expression.expression._limit_ or self.number_of_samples
+
+        # sample and sort by log likelihood
+        samples = truncated.sample(number_of_samples)
+        log_likelihoods = truncated.log_likelihood(samples)
+        samples = samples[log_likelihoods.argsort()[::-1]]
 
         # create new objects with the values from the samples
         for sample in samples:

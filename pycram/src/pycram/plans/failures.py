@@ -6,6 +6,7 @@ from typing_extensions import TYPE_CHECKING
 
 from krrood.exceptions import DataclassException
 from pycram.datastructures.enums import Arms
+from semantic_digital_twin.robots.abstract_robot import Manipulator
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -107,3 +108,16 @@ class BodyUnfetchable(PlanFailure):
 
     def __post_init__(self):
         self.message = f"Body {self.body} not fetchable from arm {self.arm}"
+
+
+@dataclass
+class ManipulatorDidNotReachTarget(PlanFailure):
+
+    manipulator: Manipulator
+
+    target: Pose
+
+    def __post_init__(self):
+        self.message = (
+            f"Manipulator {self.manipulator} did not reach target {self.target}"
+        )

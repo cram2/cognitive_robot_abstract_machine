@@ -5,6 +5,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
+from pathlib import Path
 from types import FunctionType
 from typing import Set, Generic
 
@@ -42,7 +43,7 @@ class KRROODPosition(Symbol):
     z: float
 
     @classmethod
-    def from_abc(cls, a: float, b: float, c: float) -> Position:
+    def from_abc(cls, a: float, b: float, c: float) -> KRROODPosition:
         return KRROODPosition(a, b, c)
 
 
@@ -703,3 +704,8 @@ class GenericClassAssociation:
     associated_value_not_parametrized_list: List[GenericClass] = field(
         default_factory=list
     )
+
+
+@dataclass
+class PathAssociation:
+    path: Path

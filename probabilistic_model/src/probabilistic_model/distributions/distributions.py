@@ -295,6 +295,12 @@ class DiscreteDistribution(UnivariateDistribution):
     A dict that maps from integers (hash(symbol) for symbols) to probabilities.
     """
 
+    def __post_init__(self):
+        if not isinstance(self.probabilities, MissingDict):
+            missing_dict = MissingDict(float)
+            missing_dict.update(self.probabilities)
+            self.probabilities = missing_dict
+
     def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
         events = events[:, 0]
 
@@ -598,6 +604,51 @@ class IntegerDistribution(ContinuousDistribution, DiscreteDistribution):
         for key, value in self.probabilities.items():
             new_probabilities[key * scaling[self.variable]] = value
         self.probabilities = new_probabilities
+
+
+@dataclass(eq=False)
+class BernoulliDistribution(IntegerDistribution):
+    """
+    Bernoulli distribution over the integer domain {0, 1}.
+    :param
+
+    """
+
+    variable: Integer
+
+    def __init__(
+        self,
+        variable: Integer,
+        p: Optional[float] = None,
+        probabilities: Optional[MissingDict[Union[int, SetElement], float]] = None,
+    ):
+        if probabilities is None:
+            if p is None:
+                p = 0.5
+            if not (0.0 <= p <= 1.0):
+                raise ValueError("Parameter p must be in [0, 1].")
+            probs = MissingDict(float)
+            probs[0] = 1.0 - p
+            probs[1] = p
+            probabilities = probs
+
+        super().__init__(variable=variable, probabilities=probabilities)
+
+    @property
+    def p(self) -> float:
+        """Return probability of 1."""
+        return float(self.probabilities[1])
+
+    @property
+    def representation(self) -> str:
+        return f"B({self.variable.name} | p={self.p})"
+
+    @property
+    def abbreviated_symbol(self) -> str:
+        return "B"
+
+    def __repr__(self):
+        return f"B({self.variable.name})"
 
 
 @dataclass

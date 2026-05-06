@@ -65,6 +65,12 @@ class PlaceAction(ActionDescription):
             )
         )
 
+        object_height = (
+            self.object_designator.collision.max_point[2]
+            - self.object_designator.collision.min_point[2]
+        )
+        self.target_location.z += object_height / 2
+
         self.add_subplan(
             sequential(
                 [

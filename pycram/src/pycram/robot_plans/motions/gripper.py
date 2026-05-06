@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, List
 
+from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
@@ -159,6 +160,7 @@ class MoveToolCenterPointMotion(BaseMotion):
                 tip_link=tip,
                 goal_point=self.target.to_position(),
                 name="MoveTCP",
+                weight=DefaultWeights.WEIGHT_BELOW_CA,
             )
         else:
             task = CartesianPose(
@@ -166,6 +168,7 @@ class MoveToolCenterPointMotion(BaseMotion):
                 tip_link=tip,
                 goal_pose=self.target,
                 name="MoveTCP",
+                weight=DefaultWeights.WEIGHT_BELOW_CA,
             )
         return task
 

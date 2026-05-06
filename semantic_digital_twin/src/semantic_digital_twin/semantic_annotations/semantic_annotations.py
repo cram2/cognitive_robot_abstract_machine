@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Iterable, Optional, Self, Tuple
+from typing import Iterable, Optional, Self, Tuple, List
 
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
@@ -37,6 +37,7 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -46,7 +47,7 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.world_description.geometry import Scale, Mesh
+from semantic_digital_twin.world_description.geometry import Scale, Mesh, Color
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
     ShapeCollection,
@@ -115,13 +116,13 @@ class Handle(HasRootBody):
         :param thickness: The thickness of the handle walls.
         """
 
-        x_interval = closed(0, scale.x - thickness)
-        y_interval = closed(
-            -scale.y / 2 + thickness,
-            scale.y / 2 - thickness,
+        x_interval = closed(-scale.x + thickness, 0)
+        z_interval = closed(
+            -scale.z / 2 + thickness,
+            scale.z / 2 - thickness,
         )
 
-        z_interval = closed(-scale.z / 2, scale.z / 2)
+        y_interval = closed(-scale.y / 2, scale.y / 2)
 
         return SimpleEvent.from_data(
             {
@@ -130,6 +131,17 @@ class Handle(HasRootBody):
                 SpatialVariables.z.value: z_interval,
             }
         )
+
+    def pre_grasp_pose(self) -> Pose:
+        """
+        The pre grasp pose of the handle.
+
+        :return: The pre grasp pose.
+        """
+        return Pose.from_xyz_rpy(
+            reference_frame=self.root, x=(self.root.collision.min_point.x - 0.05)
+        )
+
 
 @dataclass(eq=False)
 class Dishwasher(HasCaseAsRootBody, HasDoors, HasDrawers):
@@ -259,10 +271,12 @@ class Door(HasHandle, HasHinge):
         entry_way_region_name = PrefixedName(
             name.name + "entry_way_region", name.prefix
         )
+
         entry_way_region = Region(
             name=entry_way_region_name,
             area=ShapeCollection([Mesh.from_trimesh(mesh=door_body.combined_mesh)]),
         )
+        entry_way_region.area.dye_shapes(Color(R=1.0, G=1.0, B=1.0, A=0.2))
         entry_way = EntryWay(name=entry_way_name, root=entry_way_region)
         world.add_region(entry_way.root)
         world.add_connection(FixedConnection(door_body, entry_way.root))
@@ -396,8 +410,10 @@ class Cabinet(Furniture, HasCaseAsRootBody):
 @dataclass(eq=False)
 class Fridge(Cabinet, HasDoors, HasDrawers): ...
 
+
 @dataclass(eq=False)
 class Oven(HasRootBody): ...
+
 
 @dataclass(eq=False)
 class Dresser(Cabinet, HasDrawers, HasDoors): ...
@@ -827,6 +843,7 @@ class Salt(Food):
     A pack or container of salt (e.g., salt shaker or salt can).
     """
 
+
 @dataclass(eq=False)
 class CoffeeTable(Table):
     """
@@ -1052,3 +1069,34 @@ class LiquidCap(HasRootBody):
     """
     A liquid cap.
     """
+
+
+@dataclass(eq=False)
+class RoomWithWallsAndDoors(Room):
+    """
+    A room with a type description (e.g., Ktichen) and walls and doors.
+    """
+
+    room_type: Optional[str] = field(kw_only=True, default=None)
+    """
+    Description of the type of the room in natural language.
+    """
+
+    walls: List[Wall] = field(kw_only=True, default_factory=list)
+    """
+    The walls enclosing this room.
+    """
+
+    doors: List[Door] = field(kw_only=True, default_factory=list)
+    """
+    The doors of the room.
+    """
+
+
+@dataclass(eq=False)
+class DoorWithType(Door):
+    """
+    A Door that has a type description, e.g. "main entrance"
+    """
+
+    type_description: Optional[str] = field(kw_only=True, default=None)

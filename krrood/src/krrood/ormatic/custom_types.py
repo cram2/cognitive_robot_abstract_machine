@@ -1,5 +1,6 @@
-import importlib
 import enum
+import importlib
+import pathlib
 
 from sqlalchemy import TypeDecorator
 from sqlalchemy import types
@@ -56,3 +57,24 @@ class PolymorphicEnumType(TypeDecorator):
         module = importlib.import_module(module_name)
         enum_class = getattr(module, class_name)
         return enum_class[member_name]
+
+
+class PathType(TypeDecorator):
+    """
+    Type decorator for pathlib.Path objects.
+    """
+
+    impl = types.Text
+    cache_ok = True
+
+    def process_bind_param(self, value: pathlib.Path, dialect) -> Optional[str]:
+        if value is not None:
+            return str(value)
+        return value
+
+    def process_result_value(
+        self, value: Optional[str], dialect
+    ) -> Optional[pathlib.Path]:
+        if value is not None:
+            return pathlib.Path(value)
+        return value
