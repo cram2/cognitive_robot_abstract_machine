@@ -1,25 +1,25 @@
 """
-Normaliser that converts Python type objects to consistent string representations.
+Normaliser that converts Python type objects to source code strings.
 """
 
 from __future__ import annotations
 
 import dataclasses
-import sys
-from typing import Any, TypeVar, get_origin, get_args
+from typing import Any, TypeVar, get_origin, get_args, Callable
 
 from krrood.class_diagrams import ClassDiagram
-from krrood.patterns.role.import_name_resolver import ImportNameResolver
+from krrood.patterns.code_generation.import_name_resolver import ImportNameResolver
 
 
 @dataclasses.dataclass
-class TypeNameNormaliser:
+class TypeNormaliser:
     """
     Normalises Python type objects to consistent string names for code generation.
     """
 
     resolver: ImportNameResolver
     class_diagram: ClassDiagram
+    class_name_getter: Callable[[type], str] | None = None
 
     def normalise(self, type_obj: Any) -> str:
         """Return a consistent string representation of a type for use in generated code.
@@ -48,17 +48,6 @@ class TypeNameNormaliser:
         :param type_str: The forward-reference string to normalise.
         :return: The resolved or unchanged type name string.
         """
-        # Avoid importing Role here to prevent circular imports — use duck typing.
-        if type_str.startswith("T"):
-            class_name = type_str[1:]
-            for wrapped in self.class_diagram.wrapped_classes:
-                if wrapped.clazz.__name__ == class_name:
-                    from krrood.patterns.role.role import Role
-                    if issubclass(wrapped.clazz, Role):
-                        return type_str
-                    else:
-                        return class_name
-
         if type_str not in self.resolver.name_to_module_map:
             resolved_module = self.resolver.resolve(type_str)
             if resolved_module:
@@ -91,17 +80,14 @@ class TypeNameNormaliser:
         """Return a normalised name for a TypeVar.
 
         :param type_var: The TypeVar to normalise.
-        :return: The TypeVar name or its bound type's name.
+        :return: The TypeVar name.
         """
         if hasattr(type_var, "__module__"):
             self.resolver.name_to_module_map[type_var.__name__] = type_var.__module__
 
         if type_var.__bound__ is not None:
             self.normalise(type_var.__bound__)
-            from krrood.patterns.role.role import Role
-            if issubclass(type_var.__bound__, Role):
-                return type_var.__name__
-            return type_var.__bound__.__name__
+
         return type_var.__name__
 
     def _handle_class_type(self, clazz: type) -> str:
@@ -114,9 +100,8 @@ class TypeNameNormaliser:
             return "None"
 
         self.resolver.name_to_module_map[clazz.__name__] = clazz.__module__
-        from krrood.patterns.role.role import Role
-        if issubclass(clazz, Role):
-            return self.get_type_name(clazz)
+        if self.class_name_getter is not None:
+            return self.class_name_getter(clazz)
         return clazz.__name__
 
     def _handle_fallback_type(self, type_obj: Any) -> str:
@@ -128,15 +113,3 @@ class TypeNameNormaliser:
         if hasattr(type_obj, "__name__") and hasattr(type_obj, "__module__"):
             self.resolver.name_to_module_map[type_obj.__name__] = type_obj.__module__
         return str(type_obj)
-
-    def get_type_name(self, clazz: type) -> str:
-        """Return the TypeVar name for a class if one exists, otherwise the plain class name.
-
-        :param clazz: The class whose name to retrieve.
-        :return: The TypeVar name or the plain class name.
-        """
-        type_var_name = f"T{clazz.__name__}"
-        class_module = sys.modules[clazz.__module__]
-        if type_var_name in class_module.__dict__:
-            return type_var_name
-        return clazz.__name__

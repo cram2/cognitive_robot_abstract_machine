@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
 )
-from typing import Any, Dict, Iterable, List, Optional, Self, Tuple, Type
+from typing import Any, Dict, List, Optional, Self, Type
 from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -17,18 +17,23 @@ if TYPE_CHECKING:
         WorldEntityWithIDKwargsTracker,
     )
     from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-    from semantic_digital_twin.mixin import SimulatorAdditionalProperty
+    from semantic_digital_twin.mixin import (
+        HasSimulatorProperties,
+        SimulatorAdditionalProperty,
+    )
     from semantic_digital_twin.semantic_annotations.mixins import (
         HasCaseAsRootBody,
         HasRootBody,
         HasRootKinematicStructureEntity,
         HasStorageSpace,
         HasSupportingSurface,
+        TBody,
         TKinematicStructureEntity,
     )
     from semantic_digital_twin.semantic_annotations.semantic_annotations import (
         Bottle,
         THasRootBody,
+        TLiquid,
         TinCan,
     )
     from semantic_digital_twin.spatial_types.spatial_types import (
@@ -54,10 +59,32 @@ if TYPE_CHECKING:
 
 
 @dataclass(eq=False)
+class RoleForHasSimulatorProperties(ABC):
+    @property
+    @abstractmethod
+    def role_taker(self) -> HasSimulatorProperties: ...
+    @property
+    def simulator_additional_properties(self) -> list[SimulatorAdditionalProperty]:
+        return self.role_taker.simulator_additional_properties
+
+    @simulator_additional_properties.setter
+    def simulator_additional_properties(self, value: list[SimulatorAdditionalProperty]):
+        self.role_taker.simulator_additional_properties = value
+
+
+@dataclass(eq=False)
 class RoleForWorldEntity(ABC):
     @property
     @abstractmethod
     def role_taker(self) -> WorldEntity: ...
+    @property
+    def name(self) -> PrefixedName:
+        return self.role_taker.name
+
+    @name.setter
+    def name(self, value: PrefixedName):
+        self.role_taker.name = value
+
     def remove_from_world(self):
         return self.role_taker.remove_from_world()
 
@@ -67,6 +94,14 @@ class RoleForWorldEntityWithID(RoleForWorldEntity, ABC):
     @property
     @abstractmethod
     def role_taker(self) -> WorldEntityWithID: ...
+    @property
+    def id(self) -> UUID:
+        return self.role_taker.id
+
+    @id.setter
+    def id(self, value: UUID):
+        self.role_taker.id = value
+
     def _track_object_in_from_json(
         self, from_json_kwargs
     ) -> WorldEntityWithIDKwargsTracker:
@@ -123,11 +158,19 @@ class RoleForHasRootKinematicStructureEntity(RoleForSemanticAnnotation, ABC):
     @abstractmethod
     def role_taker(self) -> HasRootKinematicStructureEntity: ...
     @property
+    def root(self) -> TKinematicStructureEntity:
+        return self.role_taker.root
+
+    @root.setter
+    def root(self, value: TKinematicStructureEntity):
+        self.role_taker.root = value
+
+    @property
     def global_transform(self) -> HomogeneousTransformationMatrix:
         return self.role_taker.global_transform
 
     @property
-    def min_max_points(self) -> Tuple[Point3, Point3]:
+    def min_max_points(self) -> tuple[Point3, Point3]:
         return self.role_taker.min_max_points
 
     @property
@@ -168,7 +211,15 @@ class RoleForHasRootBody(RoleForHasRootKinematicStructureEntity, ABC):
     @abstractmethod
     def role_taker(self) -> HasRootBody: ...
     @property
-    def bodies(self) -> Iterable[Body]:
+    def root(self) -> TBody:
+        return self.role_taker.root
+
+    @root.setter
+    def root(self, value: TBody):
+        self.role_taker.root = value
+
+    @property
+    def bodies(self) -> list[Body]:
         return self.role_taker.bodies
 
 
@@ -177,6 +228,14 @@ class RoleForHasStorageSpace(RoleForHasRootBody, ABC):
     @property
     @abstractmethod
     def role_taker(self) -> HasStorageSpace: ...
+    @property
+    def objects(self) -> list[THasRootBody]:
+        return self.role_taker.objects
+
+    @objects.setter
+    def objects(self, value: list[THasRootBody]):
+        self.role_taker.objects = value
+
     @synchronized_attribute_modification
     def add_object(self, object: HasRootBody):
         return self.role_taker.add_object(object)
@@ -192,6 +251,14 @@ class RoleForHasSupportingSurface(RoleForHasStorageSpace, ABC):
     @property
     @abstractmethod
     def role_taker(self) -> HasSupportingSurface: ...
+    @property
+    def supporting_surface(self) -> Region:
+        return self.role_taker.supporting_surface
+
+    @supporting_surface.setter
+    def supporting_surface(self, value: Region):
+        self.role_taker.supporting_surface = value
+
     def _2d_gaussian_sampler_from_2d_sample_space(
         self,
         objects_of_interest: List[HasRootBody],
@@ -256,54 +323,6 @@ class RoleForHasCaseAsRootBody(RoleForHasSupportingSurface, ABC):
     @property
     @abstractmethod
     def role_taker(self) -> HasCaseAsRootBody: ...
-    @property
-    def simulator_additional_properties(self) -> list[SimulatorAdditionalProperty]:
-        return self.role_taker.simulator_additional_properties
-
-    @simulator_additional_properties.setter
-    def simulator_additional_properties(self, value: list[SimulatorAdditionalProperty]):
-        self.role_taker.simulator_additional_properties = value
-
-    @property
-    def name(self) -> PrefixedName:
-        return self.role_taker.name
-
-    @name.setter
-    def name(self, value: PrefixedName):
-        self.role_taker.name = value
-
-    @property
-    def id(self) -> UUID:
-        return self.role_taker.id
-
-    @id.setter
-    def id(self, value: UUID):
-        self.role_taker.id = value
-
-    @property
-    def root(self) -> TKinematicStructureEntity:
-        return self.role_taker.root
-
-    @root.setter
-    def root(self, value: TKinematicStructureEntity):
-        self.role_taker.root = value
-
-    @property
-    def objects(self) -> List[THasRootBody]:
-        return self.role_taker.objects
-
-    @objects.setter
-    def objects(self, value: List[THasRootBody]):
-        self.role_taker.objects = value
-
-    @property
-    def supporting_surface(self) -> Region:
-        return self.role_taker.supporting_surface
-
-    @supporting_surface.setter
-    def supporting_surface(self, value: Region):
-        self.role_taker.supporting_surface = value
-
     def hole_direction(self) -> Vector3:
         return self.role_taker.hole_direction()
 
@@ -313,6 +332,14 @@ class RoleForBottle(RoleForHasCaseAsRootBody, ABC):
     @property
     @abstractmethod
     def role_taker(self) -> Bottle: ...
+    @property
+    def objects(self) -> list[TLiquid]:
+        return self.role_taker.objects
+
+    @objects.setter
+    def objects(self, value: list[TLiquid]):
+        self.role_taker.objects = value
+
     def _apply_diff(self, diff: JSONAttributeDiff, **kwargs) -> None:
         return self.role_taker._apply_diff(diff, kwargs)
 
@@ -325,6 +352,14 @@ class RoleForTinCan(RoleForHasStorageSpace, ABC):
     @property
     @abstractmethod
     def role_taker(self) -> TinCan: ...
+    @property
+    def objects(self) -> list[THasRootBody]:
+        return self.role_taker.objects
+
+    @objects.setter
+    def objects(self, value: list[THasRootBody]):
+        self.role_taker.objects = value
+
     def _apply_diff(self, diff: JSONAttributeDiff, **kwargs) -> None:
         return self.role_taker._apply_diff(diff, kwargs)
 

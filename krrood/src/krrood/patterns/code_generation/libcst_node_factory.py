@@ -1,5 +1,5 @@
 """
-Factory for constructing libcst nodes used in role pattern code generation.
+Factory for constructing libcst nodes for code generation.
 """
 
 from __future__ import annotations
@@ -11,9 +11,9 @@ import libcst
 
 
 @dataclasses.dataclass
-class RoleNodeFactory:
+class LibCSTNodeFactory:
     """
-    Builds libcst nodes for the role pattern code generation pipeline.
+    Builds libcst nodes for code generation pipelines.
     All methods are pure: they depend only on their arguments.
     """
 
@@ -231,12 +231,6 @@ class RoleNodeFactory:
         return libcst.Arg(value=libcst.parse_expression(value))
 
     @classmethod
-    def _is_role_base(cls, base_node: libcst.BaseExpression) -> bool:
-        """Return True if the base node represents the Role class or Role[T]."""
-        name = cls.get_name_from_base_node(base_node)
-        return name == "Role"
-
-    @classmethod
     def get_name_from_base_node(cls, base_node: libcst.BaseExpression) -> str:
         """
         Extract the class name from a base class CST node.
@@ -265,4 +259,15 @@ class RoleNodeFactory:
             and isinstance(field_name := ann_assign.target, libcst.Name)
         ):
             return field_name.value
+        return None
+
+    @classmethod
+    def _get_decorator_name(cls, decorator_node: libcst.BaseExpression) -> str | None:
+        """Return the simple name from a decorator expression node, or None."""
+        if isinstance(decorator_node, libcst.Name):
+            return decorator_node.value
+        if isinstance(decorator_node, libcst.Call) and isinstance(
+            decorator_node.func, libcst.Name
+        ):
+            return decorator_node.func.value
         return None

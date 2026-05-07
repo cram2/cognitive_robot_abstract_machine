@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import List
 
+import trimesh
+
 from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
 from semantic_digital_twin.world_description.geometry import Mesh
 
@@ -125,3 +127,8 @@ class VHACDMeshDecomposer(MeshDecomposer):
             for decomposed_part in decomposed
         ]
         return new_geometry
+
+    def apply_to_mesh_and_save(self, mesh: Mesh, output_path: str) -> str:
+        parts = self.apply_to_mesh(mesh)
+        trimesh.Scene([p.mesh for p in parts]).export(output_path, file_type="obj")
+        return output_path

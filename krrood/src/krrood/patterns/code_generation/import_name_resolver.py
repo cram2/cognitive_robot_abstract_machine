@@ -23,7 +23,7 @@ class ImportNameResolver:
     """
 
     source_module: ModuleType
-    taker_modules: list[ModuleType]
+    companion_modules: list[ModuleType]
     class_diagram: ClassDiagram
     name_to_module_map: dict[str, str] = dataclasses.field(default_factory=dict)
 
@@ -33,7 +33,7 @@ class ImportNameResolver:
 
     def _initialise_map(self) -> None:
         """Populate name_to_module_map from runtime module dicts and diagram type hints."""
-        for module in [self.source_module] + list(self.taker_modules):
+        for module in [self.source_module] + list(self.companion_modules):
             for name, obj in module.__dict__.items():
                 if name.startswith("_"):
                     continue

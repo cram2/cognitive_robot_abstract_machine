@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, Field, fields
+from dataclasses import dataclass, field
 
 from typing_extensions import Set, List, TypeVar
 

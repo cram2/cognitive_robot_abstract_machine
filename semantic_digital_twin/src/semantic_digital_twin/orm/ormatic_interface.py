@@ -40,6 +40,7 @@ import semantic_digital_twin.orm.model
 import semantic_digital_twin.pipeline.gltf_loader
 import semantic_digital_twin.pipeline.mesh_decomposition.base
 import semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer
+import semantic_digital_twin.pipeline.mesh_decomposition.bullet_vhacd
 import semantic_digital_twin.pipeline.mesh_decomposition.coacd
 import semantic_digital_twin.pipeline.mesh_decomposition.vhacd
 import semantic_digital_twin.pipeline.pipeline
@@ -72,6 +73,7 @@ import semantic_digital_twin.semantic_annotations.role_mixins.semantic_annotatio
 import semantic_digital_twin.semantic_annotations.semantic_annotations
 import semantic_digital_twin.spatial_computations.ik_solver
 import semantic_digital_twin.spatial_types.derivatives
+import semantic_digital_twin.spatial_types.role_mixins.spatial_types_role_mixins
 import semantic_digital_twin.spatial_types.spatial_types
 import semantic_digital_twin.world
 import semantic_digital_twin.world_description.connection_properties
@@ -3236,6 +3238,64 @@ class QPProblemDAO(
     )
 
 
+class RoleForHasSimulatorPropertiesDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.role_mixins.semantic_annotations_role_mixins.RoleForHasSimulatorProperties
+    ],
+):
+
+    __tablename__ = "RoleForHasSimulatorPropertiesDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class RoleForSpatialTypeDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.spatial_types.role_mixins.spatial_types_role_mixins.RoleForSpatialType
+    ],
+):
+
+    __tablename__ = "RoleForSpatialTypeDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "RoleForSpatialTypeDAO",
+    }
+
+
+class RoleForPoseDAO(
+    RoleForSpatialTypeDAO,
+    DataAccessObject[
+        semantic_digital_twin.spatial_types.role_mixins.spatial_types_role_mixins.RoleForPose
+    ],
+):
+
+    __tablename__ = "RoleForPoseDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoleForSpatialTypeDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "RoleForPoseDAO",
+        "inherit_condition": database_id == RoleForSpatialTypeDAO.database_id,
+    }
+
+
 class RoleForWorldEntityDAO(
     Base,
     DataAccessObject[
@@ -4662,6 +4722,52 @@ class BoxDecomposerDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "BoxDecomposerDAO",
+        "inherit_condition": database_id == MeshDecomposerDAO.database_id,
+    }
+
+
+class BulletVHACDMeshDecomposerDAO(
+    MeshDecomposerDAO,
+    DataAccessObject[
+        semantic_digital_twin.pipeline.mesh_decomposition.bullet_vhacd.BulletVHACDMeshDecomposer
+    ],
+):
+
+    __tablename__ = "BulletVHACDMeshDecomposerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MeshDecomposerDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    concavity: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    alpha: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    beta: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    gamma: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    min_volume_per_convex_hull: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    resolution: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    max_vertices_per_convex_hull: Mapped[builtins.int] = mapped_column(
+        use_existing_column=True
+    )
+    depth: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    plane_downsampling: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    convex_hull_downsampling: Mapped[builtins.int] = mapped_column(
+        use_existing_column=True
+    )
+    pca: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    mode: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    convex_hull_approximation: Mapped[builtins.int] = mapped_column(
+        use_existing_column=True
+    )
+    log_path: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "BulletVHACDMeshDecomposerDAO",
         "inherit_condition": database_id == MeshDecomposerDAO.database_id,
     }
 
@@ -6323,6 +6429,19 @@ class BulletCollisionDetectorDAO(
         use_existing_column=True,
     )
 
+    mesh_decomposer_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("MeshDecomposerDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    mesh_decomposer: Mapped[MeshDecomposerDAO] = relationship(
+        "MeshDecomposerDAO",
+        uselist=False,
+        foreign_keys=[mesh_decomposer_id],
+        post_update=True,
+    )
+
     __mapper_args__ = {
         "polymorphic_identity": "BulletCollisionDetectorDAO",
         "inherit_condition": database_id == CollisionDetectorDAO.database_id,
@@ -7965,27 +8084,6 @@ class BottleDAO(
     }
 
 
-class Bottle_LiquidSoapDAO(
-    BottleDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Bottle[
-            semantic_digital_twin.semantic_annotations.semantic_annotations.LiquidSoap
-        ]
-    ],
-):
-
-    __tablename__ = "Bottle_LiquidSoapDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(BottleDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "Bottle_LiquidSoapDAO",
-        "inherit_condition": database_id == BottleDAO.database_id,
-    }
-
-
 class Bottle_WineDAO(
     BottleDAO,
     DataAccessObject[
@@ -8003,6 +8101,27 @@ class Bottle_WineDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "Bottle_WineDAO",
+        "inherit_condition": database_id == BottleDAO.database_id,
+    }
+
+
+class Bottle_LiquidSoapDAO(
+    BottleDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Bottle[
+            semantic_digital_twin.semantic_annotations.semantic_annotations.LiquidSoap
+        ]
+    ],
+):
+
+    __tablename__ = "Bottle_LiquidSoapDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(BottleDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Bottle_LiquidSoapDAO",
         "inherit_condition": database_id == BottleDAO.database_id,
     }
 

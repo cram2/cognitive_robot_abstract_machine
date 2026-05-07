@@ -621,21 +621,30 @@ def get_generic_type_param(cls, generic_base: Type[T]) -> Optional[List[Type[T]]
     Example:
         get_generic_type_param(Employee, Role) -> (<class '__main__.Person'>,)
 
+    Direct parameterizations (e.g. ``class C(B, Generic[U])``) take priority over
+    an inherited binding discovered by recursing into an unparameterized base.
+
     :param cls: The subclass to check.
     :param generic_base: The generic base class to check against.
     :return: A list of concrete type parameters, or None if not found.
     """
-    for base in getattr(cls, "__orig_bases__", []):
+    orig_bases = getattr(cls, "__orig_bases__", [])
+    # First pass: explicit parameterizations have priority.
+    for base in orig_bases:
         base_origin = get_origin(base)
-        if base_origin is None:
-            if isclass(base) and issubclass(base, generic_base):
-                res = get_generic_type_param(base, generic_base)
-                if res:
-                    return res
-            continue
-        if issubclass(base_origin, generic_base):
+        if base_origin is not None and issubclass(base_origin, generic_base):
             args = get_args(base)
             return list(args) if args else None
+    # Second pass: recurse into unparameterized bases.
+    for base in orig_bases:
+        if (
+            get_origin(base) is None
+            and isclass(base)
+            and issubclass(base, generic_base)
+        ):
+            res = get_generic_type_param(base, generic_base)
+            if res:
+                return res
     return None
 
 
@@ -851,7 +860,6 @@ def _handle_import_from_node(
             logger.warning(
                 f"Could not import {resolved_module_name}: {e} while extracting imports from {file_path}"
             )
-            raise e
 
     return package_name
 

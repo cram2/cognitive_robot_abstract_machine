@@ -587,6 +587,27 @@ class Mesh(Shape):
             pass
 
     @classmethod
+    def box(
+        cls,
+        extents: Tuple[float, float, float] = (1.0, 1.0, 1.0),
+        origin: Optional[HomogeneousTransformationMatrix] = None,
+        scale: Optional[Scale] = None,
+    ) -> "Mesh":
+        """
+        Create a box-shaped Mesh.
+
+        :param extents: Side lengths of the box along x, y, z.
+        :param origin: Origin of the mesh.
+        :param scale: Scale of the mesh.
+        :return: Mesh wrapping a box trimesh.
+        """
+        return cls.from_trimesh(
+            mesh=trimesh.creation.box(extents=extents),
+            origin=origin,
+            scale=scale,
+        )
+
+    @classmethod
     def from_vertices_and_faces(
         cls,
         vertices: np.ndarray,

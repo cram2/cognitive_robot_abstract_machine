@@ -1,10 +1,11 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Self, Tuple
+from typing import Any, Dict, List, Optional, Self, Tuple, Union
 from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from casadi.casadi import SX
     from collections.abc import Iterable
     from krrood.adapters.json_serializer import JSONAttributeDiff
     from krrood.symbolic_math.symbolic_math import (
@@ -23,9 +24,7 @@ if TYPE_CHECKING:
         Quaternion,
         RotationMatrix,
         SpatialType,
-        ca,
         np,
-        sm,
     )
     from semantic_digital_twin.world_description.world_entity import (
         KinematicStructureEntity,
@@ -39,19 +38,19 @@ class RoleForSpatialType(ABC):
     @abstractmethod
     def role_taker(self) -> SpatialType: ...
     @property
-    def casadi_sx(self) -> ca.SX:
+    def casadi_sx(self) -> SX:
         return self.role_taker.casadi_sx
 
     @casadi_sx.setter
-    def casadi_sx(self, value: ca.SX):
+    def casadi_sx(self, value: SX):
         self.role_taker.casadi_sx = value
 
     @property
-    def reference_frame(self) -> Optional[KinematicStructureEntity]:
+    def reference_frame(self) -> Union[KinematicStructureEntity, None]:
         return self.role_taker.reference_frame
 
     @reference_frame.setter
-    def reference_frame(self, value: Optional[KinematicStructureEntity]):
+    def reference_frame(self, value: Union[KinematicStructureEntity, None]):
         self.role_taker.reference_frame = value
 
     def __deepcopy__(self, memo) -> Self:
@@ -72,39 +71,39 @@ class RoleForPose(RoleForSpatialType, ABC):
     @abstractmethod
     def role_taker(self) -> Pose: ...
     @property
-    def casadi_sx(self) -> ca.SX:
+    def casadi_sx(self) -> SX:
         return self.role_taker.casadi_sx
 
     @casadi_sx.setter
-    def casadi_sx(self, value: ca.SX):
+    def casadi_sx(self, value: SX):
         self.role_taker.casadi_sx = value
 
     @property
-    def shape(self) -> Tuple[int, int]:
+    def shape(self) -> tuple[int, int]:
         return self.role_taker.shape
 
     @property
-    def x(self) -> sm.Scalar:
+    def x(self) -> Scalar:
         return self.role_taker.x
 
     @x.setter
-    def x(self, value: sm.Scalar):
+    def x(self, value: Scalar):
         self.role_taker.x = value
 
     @property
-    def y(self) -> sm.Scalar:
+    def y(self) -> Scalar:
         return self.role_taker.y
 
     @y.setter
-    def y(self, value: sm.Scalar):
+    def y(self, value: Scalar):
         self.role_taker.y = value
 
     @property
-    def z(self) -> sm.Scalar:
+    def z(self) -> Scalar:
         return self.role_taker.z
 
     @z.setter
-    def z(self, value: sm.Scalar):
+    def z(self, value: Scalar):
         self.role_taker.z = value
 
     def __abs__(self) -> Self:

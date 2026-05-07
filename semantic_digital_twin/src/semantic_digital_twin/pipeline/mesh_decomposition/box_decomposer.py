@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import List
 
 import numpy as np
+import trimesh
 from scipy import ndimage
 
 from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
@@ -646,3 +647,15 @@ class BoxDecomposer(MeshDecomposer):
             )
             for box in all_boxes
         ]
+
+    def apply_to_mesh_and_save(self, mesh: Mesh, output_path: str) -> str:
+        boxes = self.apply_to_mesh(mesh)
+        trimesh_boxes = []
+        for box in boxes:
+            box_mesh = trimesh.creation.box(
+                extents=(box.scale.x, box.scale.y, box.scale.z)
+            )
+            box_mesh.apply_transform(box.origin.to_np())
+            trimesh_boxes.append(box_mesh)
+        trimesh.Scene(trimesh_boxes).export(output_path, file_type="obj")
+        return output_path

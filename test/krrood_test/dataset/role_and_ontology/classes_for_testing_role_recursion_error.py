@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from krrood.entity_query_language.factories import variable_from
 from krrood.patterns.role.role import Role, HasRoles
+from krrood.patterns.role import HasRoles
+from test.krrood_test.dataset.role_and_ontology.role_mixins.classes_for_testing_role_recursion_error_role_mixins import RoleForBaseForRoleRecursion, RoleForIntermediateForRoleRecursion, RoleForPersonForRoleRecursion
 
 # ---------------------------------------------------------------------------
 # Simple two-role / one-taker scenario

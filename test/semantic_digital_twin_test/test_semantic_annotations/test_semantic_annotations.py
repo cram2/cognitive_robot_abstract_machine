@@ -5,6 +5,7 @@ from numpy.ma.testutils import (
 )  # You could replace this with numpy's regular assert for better compatibility
 
 from krrood.entity_query_language.factories import entity, variable, in_, inference, an
+from krrood.patterns.role.predicates import HasRole
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
@@ -283,3 +284,40 @@ def test_minimal_robot_annotation(pr2_world_state_reset):
     pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(AbstractRobot)[0]
     assert len(robot.bodies) == len(pr2.bodies)
     assert len(robot.connections) == len(pr2.connections)
+
+
+def test_bottle_roles():
+    bottle = Bottle(root=Body(name=PrefixedName("bottle_supporting_surface")))
+    mustard_bottle = MustardBottle(bottle=bottle)
+
+    # Test ability to access Bottle properties
+    assert bottle.root is mustard_bottle.root
+
+    # Test correct caching of roles
+    assert MustardBottle in bottle.roles
+    assert bottle.roles[MustardBottle] == mustard_bottle
+    assert Role.has_role(bottle, MustardBottle)
+    assert HasRole(bottle, MustardBottle)()
+
+    wine_bottle = WineBottle(bottle=bottle)
+
+    # Test correct caching of roles
+    assert WineBottle in bottle.roles
+    assert bottle.roles[WineBottle] == wine_bottle
+    assert len(bottle.roles) == 2
+    assert Role.has_role(bottle, WineBottle)
+    assert HasRole(bottle, WineBottle)()
+
+
+def test_tincan_roles():
+    tin_can = TinCan(root=Body(name=PrefixedName("tin_can")))
+    tuna_can = TunaCan(can=tin_can)
+
+    # Test ability to access TinCan properties
+    assert tuna_can.root == tin_can.root
+
+    # Test correct caching of roles
+    assert TunaCan in tin_can.roles
+    assert tin_can.roles[TunaCan] == tuna_can
+    assert Role.has_role(tin_can, TunaCan)
+    assert HasRole(tin_can, TunaCan)()

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, Field, fields
+from dataclasses import dataclass, field
 
 from typing_extensions import Set, List, TypeVar
 
-from .role_takers_in_another_module import (
+from test.krrood_test.dataset.role_and_ontology.role_takers_in_another_module import (
     RoleTakerInAnotherModule,
 )
 from krrood.entity_query_language.factories import variable_from
@@ -67,7 +67,9 @@ class SubclassOfARoleTaker(PersonInRoleAndOntology):
     introduced_attribute: str = field(default="", kw_only=True)
 
 
-TPersonInRoleAndOntology = TypeVar("TPersonInRoleAndOntology", bound=PersonInRoleAndOntology)
+TPersonInRoleAndOntology = TypeVar(
+    "TPersonInRoleAndOntology", bound=PersonInRoleAndOntology
+)
 
 
 @dataclass(eq=False)
@@ -88,7 +90,9 @@ class SubclassOfRoleThatUpdatesRoleTakerType(CEOAsFirstRole[TSubclassOfARoleTake
 
 
 @dataclass(eq=False)
-class DirectDiamondShapedInheritanceWhereOneIsRole(Role[TPersonInRoleAndOntology], HasName):
+class DirectDiamondShapedInheritanceWhereOneIsRole(
+    Role[TPersonInRoleAndOntology], HasName
+):
     person: TPersonInRoleAndOntology = field(kw_only=True)
 
     @classmethod
@@ -97,7 +101,9 @@ class DirectDiamondShapedInheritanceWhereOneIsRole(Role[TPersonInRoleAndOntology
 
 
 @dataclass(eq=False)
-class InDirectDiamondShapedInheritanceWhereOneIsRole(RecognizedGroup, Role[TPersonInRoleAndOntology]):
+class InDirectDiamondShapedInheritanceWhereOneIsRole(
+    RecognizedGroup, Role[TPersonInRoleAndOntology]
+):
     person: TPersonInRoleAndOntology = field(kw_only=True)
 
     @classmethod

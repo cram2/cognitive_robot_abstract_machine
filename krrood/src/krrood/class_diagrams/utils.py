@@ -120,20 +120,69 @@ def resolve_name_in_hierarchy(name: str, start_object: Any) -> Any:
 T = TypeVar("T")
 
 
+def _trace_generic_params(cls: type, generic_base: type):
+    """Trace how cls parameterizes generic_base by walking its __orig_bases__.
+
+    Handles both subscripted bases (e.g. ``B[T]``) and plain bases (e.g. ``B``),
+    recursively resolving TypeVar substitutions at each level of the hierarchy.
+
+    :param cls: The class whose hierarchy is searched.
+    :param generic_base: The target generic base whose parameters should be resolved.
+    :return: A tuple of type arguments for generic_base as seen from cls, or None.
+    """
+    for base in getattr(cls, "__orig_bases__", []):
+        origin = get_origin(base)
+        if origin is None:
+            if isinstance(base, type) and issubclass(base, generic_base):
+                result = _trace_generic_params(base, generic_base)
+                if result is not None:
+                    return result
+        elif issubclass(origin, generic_base):
+            args = get_args(base)
+            if origin is generic_base:
+                return args
+            inner = _trace_generic_params(origin, generic_base)
+            if inner is None:
+                return args
+            params = getattr(origin, "__parameters__", ())
+            if not params:
+                return inner
+            sub = {p: a for p, a in zip(params, args) if isinstance(p, TypeVar)}
+            return tuple(sub.get(p, p) if isinstance(p, TypeVar) else p for p in inner)
+    return None
+
+
 def get_generic_type_param(cls, generic_base):
     """
     Given a subclass and its generic base, return the concrete type parameter(s).
+
+    Correctly traces TypeVar substitutions through transitive subclass relationships.
+    When a direct base is a subscripted transitive subclass of generic_base (e.g.
+    ``B[T]`` where ``B`` is a subclass of ``generic_base`` but not ``generic_base``
+    itself), the substitution is resolved through the full inheritance chain rather
+    than returning ``B``'s type arguments directly.
 
     Example:
         get_generic_type_param(Employee, Role) -> (<class '__main__.Person'>,)
     """
     orig_bases = cls.__orig_bases__ if hasattr(cls, "__orig_bases__") else []
     for base in orig_bases:
-        base_origin = get_origin(base)
-        if base_origin is None:
+        origin = get_origin(base)
+        if origin is None:
             continue
-        if issubclass(get_origin(base), generic_base):
-            return get_args(base)
+        if not issubclass(origin, generic_base):
+            continue
+        args = get_args(base)
+        if origin is generic_base:
+            return args
+        inner = _trace_generic_params(origin, generic_base)
+        if inner is None:
+            return args
+        params = getattr(origin, "__parameters__", ())
+        if not params:
+            return inner
+        sub = {p: a for p, a in zip(params, args) if isinstance(p, TypeVar)}
+        return tuple(sub.get(p, p) if isinstance(p, TypeVar) else p for p in inner)
     return None
 
 
@@ -187,6 +236,81 @@ def get_and_resolve_generic_type_hints_of_object_using_substitutions(
     """
     type_hints = get_type_hints_of_object(object_)
     return {name: resolve_type(hint, substitution) for name, hint in type_hints.items()}
+
+
+def _resolve_annotation_typevar(param: TypeVar, generic_base: type) -> TypeVar:
+    """
+    Return the annotation-level TypeVar that param corresponds to in generic_base.
+
+    When a class inherits from a generic like ``SubClassSafeGeneric[TSpecific]``,
+    Python's ``__parameters__`` may expose the *defining* TypeVar (e.g. ``T`` from
+    ``SubClassSafeGeneric``) rather than ``TSpecific``.  This function walks
+    ``generic_base.__orig_bases__`` to find the actual TypeVar used in annotations.
+
+    :param param: A TypeVar from ``generic_base.__parameters__``.
+    :param generic_base: The class whose bases are searched.
+    :return: The annotation-level TypeVar, or param if no aliasing is found.
+    """
+    for base in getattr(generic_base, "__orig_bases__", []):
+        base_origin = get_origin(base)
+        if base_origin is None:
+            continue
+        for bp, ba in zip(getattr(base_origin, "__parameters__", ()), get_args(base)):
+            if bp is param and isinstance(ba, TypeVar):
+                return ba
+    return param
+
+
+@dataclass(frozen=True)
+class GenericTypeSubstitution:
+    """
+    Represents the TypeVar-to-type mappings produced by specializing a generic class.
+
+    :param substitution: A mapping of TypeVars to their substitutions.
+    """
+
+    substitution: Dict[TypeVar, Any]
+
+    @classmethod
+    def from_specialization(
+        cls, concrete_class: type, generic_base: type
+    ) -> GenericTypeSubstitution:
+        """
+        Build a substitution from how concrete_class specializes generic_base.
+
+        Resolves TypeVar aliasing that arises when ``generic_base`` inherits from
+        another generic (e.g. ``SubClassSafeGeneric[TSpecific]``): in that case
+        ``__parameters__`` may expose the *defining* TypeVar rather than the
+        annotation-level one, so the mapping is adjusted via the base's
+        ``__orig_bases__``.
+
+        :param concrete_class: The class that specializes generic_base.
+        :param generic_base: The generic base class being specialized.
+        :return: A GenericTypeSubstitution representing the TypeVar mappings.
+        """
+        params = getattr(generic_base, "__parameters__", ())
+        args = get_generic_type_param(concrete_class, generic_base) or ()
+        substitution = {
+            _resolve_annotation_typevar(p, generic_base): a
+            for p, a in zip(params, args)
+        }
+        return cls(substitution)
+
+    def apply(self, type_hint: Any) -> TypeHintResolutionResult:
+        """
+        Apply the substitution to a type hint.
+
+        :param type_hint: The type hint to resolve.
+        :return: A TypeHintResolutionResult with the resolved type and a flag indicating if substitution occurred.
+        """
+        return resolve_type(type_hint, self.substitution)
+
+    @property
+    def has_substitutions(self) -> bool:
+        """
+        Return True if any TypeVar is actually mapped to a different type.
+        """
+        return any(key is not value for key, value in self.substitution.items())
 
 
 def resolve_type(
@@ -309,6 +433,20 @@ def _all_nearest_common_ancestors_from_classes_method_resolution_order(
         if all(candidate in mro for mro in method_resolution_orders_values[1:]):
             seen_candidates.add(candidate)
             yield candidate
+
+
+def get_property_return_type(property_value: property) -> Any:
+    """Return the return-type annotation of a property.
+
+    :param property_value: The property descriptor.
+    :return: The resolved return type, or None if unavailable.
+    """
+    try:
+        hints = get_type_hints_of_object(property_value.fget)
+        return hints.get("return")
+    except Exception:
+        raw = property_value.fget.__annotations__.get("return")
+        return raw if raw else None
 
 
 @lru_cache

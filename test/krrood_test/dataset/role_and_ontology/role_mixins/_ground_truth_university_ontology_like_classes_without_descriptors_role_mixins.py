@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from test.krrood_test.dataset.role_and_ontology.university_ontology_like_classes_without_descriptors import (
         HasName,
         RecognizedGroup,
-        PersonInRoleAndOntology,
         TPersonInRoleAndOntology,
         TSubclassOfARoleTaker,
         TCEOAsFirstRole,
@@ -101,11 +100,11 @@ class RoleForCEOAsFirstRole(RoleForPersonInRoleAndOntology, ABC):
     def role_taker(self) -> TCEOAsFirstRole: ...
 
     @property
-    def person(self) -> PersonInRoleAndOntology:
+    def person(self) -> TPersonInRoleAndOntology:
         return self.role_taker.person
 
     @person.setter
-    def person(self, value: PersonInRoleAndOntology):
+    def person(self, value: TPersonInRoleAndOntology):
         self.role_taker.person = value
 
     @property

@@ -51,7 +51,6 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
@@ -74,6 +73,7 @@ from semantic_digital_twin.world_description.world_modification import (
 )
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.world import World
     from semantic_digital_twin.semantic_annotations.semantic_annotations import (
         Drawer,
         Door,
@@ -311,7 +311,7 @@ TBody = TypeVar("TBody", bound=Body)
 
 
 @dataclass(eq=False)
-class HasRootBody(HasRootKinematicStructureEntity, ABC):
+class HasRootBody(HasRootKinematicStructureEntity[TBody], ABC):
     """
     Abstract base class for all household objects. Each semantic annotation refers to a single Body.
     Each subclass automatically derives a MatchRule from its own class name and
@@ -320,7 +320,7 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
     """
 
     @property
-    def bodies(self) -> Iterable[Body]:
+    def bodies(self) -> List[Body]:
         """
         The bodies that are part of the semantic annotation.
         """
