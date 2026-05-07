@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from time import sleep
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, List
 
 import rclpy
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
 from rclpy import Parameter
-from semantic_digital_twin.world_description.world_entity import KinematicStructureEntity
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
 from visualization_msgs.msg import InteractiveMarker, InteractiveMarkerControl, Marker
 from visualization_msgs.msg import InteractiveMarkerFeedback
 
@@ -20,15 +22,6 @@ from giskardpy.middleware.ros2 import rospy
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
-# Configuration constants
-MARKER_SCALE = 0.25
-MARKER_BOX_SIZE = 0.175
-MARKER_COLOR_VALUE = 0.5
-MARKER_COLOR_ALPHA = 0.5
-MOTION_TIMEOUT_SECONDS = 20
-WORLD_ENTITY_RETRY_ATTEMPTS = 100
-WORLD_ENTITY_RETRY_DELAY = 0.5
-
 
 @dataclass
 class InteractiveMarkerNode:
@@ -39,30 +32,62 @@ class InteractiveMarkerNode:
     users to manipulate them via RViz. When a marker is moved, it generates motion
     goals that are sent to Giskard for execution.
 
-    Parameters are read from ROS parameter server:
+    Node parameters for launching the node:
 
     - root_links: List of root link names for kinematic chains
     - tip_links: List of tip link names corresponding to root_links
 
-    :var giskard: Wrapper for Giskard motion planner (computed)
-    :var markers: Dictionary mapping marker names to KinematicChainMarker instances (computed)
-    :var server: Interactive marker server for RViz (computed)
-    :var root_links: List of root link names (computed from parameters)
-    :var tip_links: List of tip link names (computed from parameters)
+    Example Node for .launch.py:
+
+    .. code-block:: python
+
+        Node(
+            package="giskardpy_ros",
+            executable="interactive_marker",
+            name="giskard_interactive_marker",
+            parameters=[
+                {
+                    "root_links": ["map", "map", "map"],
+                    "tip_links": [
+                        "r_gripper_tool_frame",
+                        "l_gripper_tool_frame",
+                        "base_footprint",
+                    ],
+                }
+            ],
+            output="screen",
+        ),
     """
 
+    motion_timeout_seconds: float = 20
+    """
+    Timeout in seconds for motion execution.
+    """
     giskard: GiskardWrapper = field(init=False)
+    """
+    Wrapper for Giskard motion planner.
+    """
     markers: Dict[str, KinematicChainMarker] = field(init=False)
+    """
+    Dictionary mapping marker names to KinematicChainMarker instances.
+    """
     server: InteractiveMarkerServer | None = field(init=False)
-    root_links: list = field(init=False)
-    tip_links: list = field(init=False)
+    """
+    Interactive marker server for RViz.
+    """
+    root_links: List[str] = field(init=False)
+    """
+    List of root link names from parameters.
+    """
+    tip_links: List[str] = field(init=False)
+    """
+    List of tip link names from parameters.
+    """
 
     def __post_init__(self) -> None:
         """
-        Initialize the interactive marker node after dataclass initialization.
-
         Sets up the Giskard wrapper, reads parameters, creates kinematic chain markers,
-        and initializes the interactive marker server. Retries up to WORLD_ENTITY_RETRY_ATTEMPTS
+        and initializes the interactive marker server. Retries up to world_entity_retry_attempts
         times if world entities are not found initially.
 
         :raises WorldEntityNotFoundError: If kinematic structure entities cannot be found
@@ -89,40 +114,17 @@ class InteractiveMarkerNode:
 
     def _initialize_markers(self) -> None:
         """
-        Initialize kinematic chain markers with retry logic.
-
         Attempts to find kinematic structure entities and create markers for them.
-        Retries up to WORLD_ENTITY_RETRY_ATTEMPTS times with WORLD_ENTITY_RETRY_DELAY
-        between attempts.
 
         :raises WorldEntityNotFoundError: If entities cannot be found after all retries.
         """
-        last_error: WorldEntityNotFoundError | None = None
+        for root, tip in zip(self.root_links, self.tip_links):
+            root_body = self.giskard.world.get_kinematic_structure_entity_by_name(root)
+            tip_body = self.giskard.world.get_kinematic_structure_entity_by_name(tip)
+            kinematic_chain = KinematicChainMarker(root, tip, root_body, tip_body)
+            self.markers[kinematic_chain.name] = kinematic_chain
 
-        for attempt in range(WORLD_ENTITY_RETRY_ATTEMPTS):
-            try:
-                for root, tip in zip(self.root_links, self.tip_links):
-                    root_body = (
-                        self.giskard.world.get_kinematic_structure_entity_by_name(root)
-                    )
-                    tip_body = (
-                        self.giskard.world.get_kinematic_structure_entity_by_name(tip)
-                    )
-                    kinematic_chain = KinematicChainMarker(root, tip, root_body, tip_body)
-                    self.markers[kinematic_chain.name] = kinematic_chain
-
-                return  # Success
-            except WorldEntityNotFoundError as error:
-                last_error = error
-                self.markers.clear()
-                sleep(WORLD_ENTITY_RETRY_DELAY)
-                self.giskard.node_handle.get_logger().error(
-                    f"Failed to find bodies in world (attempt {attempt + 1}/{WORLD_ENTITY_RETRY_ATTEMPTS}), "
-                    f"retrying in {WORLD_ENTITY_RETRY_DELAY}s..."
-                )
-
-        if last_error is not None:
-            raise last_error
+        return
 
     def _setup_marker_server(self) -> None:
         """
@@ -178,10 +180,12 @@ class InteractiveMarkerNode:
                     tip_link=kinematic_chain_marker.tip_body,
                     goal_pose=goal_transformation,
                 ),
-                motion_timeout := CountSeconds(seconds=MOTION_TIMEOUT_SECONDS),
+                motion_timeout := CountSeconds(seconds=self.motion_timeout_seconds),
             ]
         )
-        motion_statechart.add_node(EndMotion.when_any_true([goal_transformation, motion_timeout]))
+        motion_statechart.add_node(
+            EndMotion.when_any_true([goal_transformation, motion_timeout])
+        )
         self.giskard.execute_async(motion_statechart)
 
         # Reset marker pose
@@ -200,26 +204,51 @@ class KinematicChainMarker:
     This dataclass encapsulates all data and functionality needed to create and manage
     an interactive marker for a robot kinematic chain. It handles marker visualization,
     control setup (translation and rotation), and pose representation.
-
-    :var root_link: Name of the root link in the kinematic chain
-    :var tip_link: Name of the tip/end-effector link in the kinematic chain
-    :var root_body: Kinematic structure entity representing the root body
-    :var tip_body: Kinematic structure entity representing the tip body
-    :var name: Formatted name combining root and tip links (computed)
-    :var interactive_marker_message: ROS InteractiveMarker message object (computed)
     """
 
     root_link: str
+    """
+    Name of the root link in the kinematic chain.
+    """
     tip_link: str
+    """
+    Name of the tip/end-effector link in the kinematic chain.
+    """
     root_body: KinematicStructureEntity
+    """
+    Kinematic structure entity representing the root body.
+    """
     tip_body: KinematicStructureEntity
+    """
+    Kinematic structure entity representing the tip body.
+    """
+    marker_scale: float = 0.25
+    """
+    Scale of the interactive marker in meters.
+    """
+    marker_box_size: float = 0.175
+    """
+    Size of the marker box along each axis in meters.
+    """
+    marker_color_value: float = 0.5
+    """
+    RGB color value for the marker box (0.0 to 1.0).
+    """
+    marker_color_alpha: float = 0.5
+    """
+    Alpha transparency value for the marker box (0.0 to 1.0).
+    """
     name: str = field(init=False)
+    """
+    Formatted name combining root and tip links.
+    """
     interactive_marker_message: InteractiveMarker = field(init=False)
+    """
+    ROS InteractiveMarker message object.
+    """
 
     def __post_init__(self) -> None:
         """
-        Initialize computed attributes after dataclass initialization.
-
         Creates the name attribute and initializes an empty InteractiveMarker object.
         """
         self.name = f"{self.root_link}/{self.tip_link}"
@@ -243,7 +272,7 @@ class KinematicChainMarker:
         """
         self.interactive_marker_message.header.frame_id = str(self.tip_body.name)
         self.interactive_marker_message.name = self.name
-        self.interactive_marker_message.scale = MARKER_SCALE
+        self.interactive_marker_message.scale = self.marker_scale
         self.interactive_marker_message.pose.orientation.w = 1.0
 
     def _add_box_control(self) -> None:
@@ -252,13 +281,13 @@ class KinematicChainMarker:
         """
         box_marker = Marker()
         box_marker.type = Marker.CUBE
-        box_marker.scale.x = MARKER_BOX_SIZE
-        box_marker.scale.y = MARKER_BOX_SIZE
-        box_marker.scale.z = MARKER_BOX_SIZE
-        box_marker.color.r = MARKER_COLOR_VALUE
-        box_marker.color.g = MARKER_COLOR_VALUE
-        box_marker.color.b = MARKER_COLOR_VALUE
-        box_marker.color.a = MARKER_COLOR_ALPHA
+        box_marker.scale.x = self.marker_box_size
+        box_marker.scale.y = self.marker_box_size
+        box_marker.scale.z = self.marker_box_size
+        box_marker.color.r = self.marker_color_value
+        box_marker.color.g = self.marker_color_value
+        box_marker.color.b = self.marker_color_value
+        box_marker.color.a = self.marker_color_alpha
 
         box_control = InteractiveMarkerControl()
         box_control.always_visible = True
