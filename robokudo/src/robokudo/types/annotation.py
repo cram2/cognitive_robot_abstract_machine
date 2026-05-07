@@ -6,27 +6,36 @@ All annotation types inherit from the base Annotation class.
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 
-from typing_extensions import TYPE_CHECKING, Optional, Any, List
+import cv2
+from semantic_digital_twin.world_description.geometry import (
+    Box as SemDTBox,
+)
+from semantic_digital_twin.world_description.geometry import (
+    Cylinder as SemDTCylinder,
+)
+from semantic_digital_twin.world_description.geometry import (
+    Shape as SemDTShape,
+)
+from semantic_digital_twin.world_description.geometry import (
+    Sphere as SemDTSphere,
+)
+from typing_extensions import TYPE_CHECKING, Any, List, Optional, Sequence
 
 from robokudo.types.core import Annotation
 from robokudo.types.cv import BoundingBox3D, Points3D
 from robokudo.types.tf import (
-    Position,
     Pose,
+    Position,
     StampedPose,
     StampedPosition,
     StampedTransform,
 )
-from semantic_digital_twin.world_description.geometry import (
-    Shape as SemDTShape,
-    Box as SemDTBox,
-    Sphere as SemDTSphere,
-    Cylinder as SemDTCylinder,
-)
 
 if TYPE_CHECKING:
+    import numpy as np
     import numpy.typing as npt
     from semantic_digital_twin.world_description.world_entity import Region
 
@@ -301,3 +310,14 @@ class TextAnnotation(Annotation):
     """
     Text content of the annotation
     """
+
+
+@dataclass
+class SIFTAnnotation(Annotation):
+    """SIF feature annotation."""
+
+    keypoints: Sequence[cv2.KeyPoint] = field(default_factory=list)
+    """The SIFT keypoints."""
+
+    descriptors: Sequence[npt.NDArray[np.float32]] = field(default_factory=list)
+    """The SIFT descriptors."""

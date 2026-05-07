@@ -3,7 +3,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 from scipy.spatial.distance import euclidean
-from typing_extensions import TYPE_CHECKING, List, Any, Union, Iterable
+from typing_extensions import TYPE_CHECKING, Any, Iterable, List, Union
 
 from robokudo.types.annotation import PositionAnnotation
 from robokudo.types.tf import Pose
@@ -11,13 +11,14 @@ from robokudo.utils.non_maxima_suppression import _iou
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
     from robokudo.types.annotation import (
         BoundingBox3DAnnotation,
         Classification,
         ColorHistogram,
         SemanticColor,
     )
-    from robokudo.types.cv import Rect, ImageROI
+    from robokudo.types.cv import ImageROI, Rect
 
 
 class FeatureComparator:
@@ -189,6 +190,31 @@ class ClassificationComparator(FeatureComparator):
             return 0.0
 
         return 1.0 - abs(query_value.confidence - obj_value.confidence)
+
+
+class SIFTComparator(FeatureComparator):
+    """Extended `FeatureComparator` that computes similarity based on SIFT features."""
+
+    def __init__(self, weight: float = 1.0, distance_threshold: float = 0.75) -> None:
+        super().__init__(weight)
+
+        self._matcher: cv2.BFMatcher = cv2.BFMatcher()
+        """SIFT feature matcher."""
+
+        self.distance_threshold = distance_threshold
+        """Distance threshold for Lowe's ratio test."""
+
+    def compute_similarity(self, query_value: Any, obj_value: Any) -> float:
+        """Compute similarity between SIFT annotations based on Lowe's ratio test and kNN matching ratio."""
+        all_matches = self._matcher.knnMatch(
+            query_value.descriptor, obj_value.descriptors, k=2
+        )
+        matches = [
+            m
+            for m, n in all_matches
+            if m.distance < self.distance_threshold * n.distance
+        ]
+        return len(matches) / max(len(obj_value.descriptors), 1.0)
 
 
 class AdditionalDataComparator(FeatureComparator):
