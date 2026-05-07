@@ -3,7 +3,7 @@
 import os
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field, InitVar
-from typing import Optional, List, Set, Dict, Union, Any
+from typing import Optional, List, Dict, Union, Any
 
 import mujoco
 import mujoco.viewer
@@ -61,17 +61,12 @@ class MujocoSimulator(BaseSimulator):
         self._file_path = file_path
         root = ET.parse(file_path).getroot()
         self._name = root.attrib.get("model", self.name)
-        self._mj_spec = mujoco.MjSpec.from_file(filename=self._file_path)
-        self._mj_spec.option.integrator = getattr(
-            mujoco.mjtIntegrator, f"mjINT_{self.config.get('integrator', 'RK4')}"
-        )
+        self._mj_spec: mujoco.MjSpec = mujoco.MjSpec.from_file(filename=self._file_path)
+        self._mj_spec.compiler.inertiafromgeom = self.config.get("inertiafromgeom", mujoco.mjtInertiaFromGeom.mjINERTIAFROMGEOM_TRUE)
+        self._mj_spec.option.integrator = self.config.get("integrator", mujoco.mjtIntegrator.mjINT_RK4)
         self._mj_spec.option.noslip_iterations = int(self.config.get("noslip_iterations", 0))
-        self._mj_spec.option.noslip_tolerance = float(
-            self.config.get("noslip_tolerance", 1e-6)
-        )
-        self._mj_spec.option.cone = getattr(
-            mujoco.mjtCone, f"mjCONE_{self.config.get('cone', 'PYRAMIDAL')}"
-        )
+        self._mj_spec.option.noslip_tolerance = float(self.config.get("noslip_tolerance", 1e-6))
+        self._mj_spec.option.cone = self.config.get('cone', mujoco.mjtCone.mjCONE_PYRAMIDAL)
         self._mj_spec.option.impratio = float(self.config.get("impratio", 1))
         self._mj_spec.option.timestep = self.step_size
         if self.config.get("multiccd", False):

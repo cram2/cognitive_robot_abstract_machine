@@ -531,7 +531,7 @@ class Mesh(Shape):
             visual=trimesh.visual.TextureVisuals(uv=uv_unindexed, image=texture_image),
         )
 
-        return Mesh.from_trimesh(mesh=mesh, origin=origin, scale=scale, file_type="obj")
+        return Mesh.from_trimesh(mesh=mesh, origin=origin, scale=scale, file_type="obj", texture_file_path=texture_file_path)
 
     @classmethod
     def from_trimesh(
@@ -556,7 +556,7 @@ class Mesh(Shape):
 
         # Each export gets its own subdir so material.mtl files never collide
         subdir = tempfile.mkdtemp(dir=dirname)
-        tmp_path = os.path.join(subdir, f"mesh.{file_type}")
+        tmp_path = os.path.join(subdir, f"{os.path.basename(subdir)}.{file_type}")
 
         try:
             mesh.export(tmp_path, file_type=file_type)
@@ -585,6 +585,27 @@ class Mesh(Shape):
             shutil.rmtree(subdir, ignore_errors=True)
         except OSError:
             pass
+
+    @classmethod
+    def box(
+        cls,
+        extents: Tuple[float, float, float] = (1.0, 1.0, 1.0),
+        origin: Optional[HomogeneousTransformationMatrix] = None,
+        scale: Optional[Scale] = None,
+    ) -> "Mesh":
+        """
+        Create a box-shaped Mesh.
+
+        :param extents: Side lengths of the box along x, y, z.
+        :param origin: Origin of the mesh.
+        :param scale: Scale of the mesh.
+        :return: Mesh wrapping a box trimesh.
+        """
+        return cls.from_trimesh(
+            mesh=trimesh.creation.box(extents=extents),
+            origin=origin,
+            scale=scale,
+        )
 
     @classmethod
     def from_vertices_and_faces(

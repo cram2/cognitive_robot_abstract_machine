@@ -187,3 +187,8 @@ class COACDMeshDecomposer(MeshDecomposer):
             )
 
         return new_geometry
+
+    def apply_to_mesh_and_save(self, mesh: Mesh, output_path: str) -> str:
+        parts = self.apply_to_mesh(mesh)
+        trimesh.Scene([p.mesh for p in parts]).export(output_path, file_type="obj")
+        return output_path

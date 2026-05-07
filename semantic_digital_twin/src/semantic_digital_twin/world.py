@@ -106,6 +106,9 @@ from semantic_digital_twin.world_description.world_modification import (
 from semantic_digital_twin.world_description.world_state import WorldState
 from krrood.utils import memoize, clear_memoization_cache
 
+from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
+from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
+
 if TYPE_CHECKING:
     from semantic_digital_twin.spatial_types import GenericSpatialType
 
@@ -392,6 +395,15 @@ class World(HasSimulatorProperties):
     Class that manages collision detection related stuff for this world.
     """
 
+    mesh_decomposer: Optional[MeshDecomposer] = field(
+        default_factory=VHACDMeshDecomposer, kw_only=True
+    )
+    """
+    Decomposer used by the Bullet collision detector to split non-convex meshes into
+    convex parts. Defaults to VHACD; pass ``None`` to skip decomposition (non-convex
+    meshes will then be treated as their convex hulls).
+    """
+
     _current_active_atomic_world_modification: Optional[Callable] = field(
         init=False, default=None
     )
@@ -436,7 +448,10 @@ class World(HasSimulatorProperties):
         self.state = WorldState(_world=self)
         self._forward_kinematic_manager = ForwardKinematicsManager(_world=self)
         self.collision_manager = CollisionManager(
-            _world=self, collision_detector=BulletCollisionDetector(_world=self)
+            _world=self,
+            collision_detector=BulletCollisionDetector(
+                _world=self, mesh_decomposer=self.mesh_decomposer
+            ),
         )
 
     def __hash__(self):
@@ -1207,12 +1222,14 @@ class World(HasSimulatorProperties):
         new_parent: KinematicStructureEntity,
     ):
         """
-        Moves a branch of the kinematic structure starting at branch_root to a new parent.
-        Useful for example to "attach" an object (branch_root) to the gripper of the robot (new_parent), when picking up
-        an object.
-        ..warning:: the old connection is lost after calling this method
+        Destroys the connection between branch_root and its parent, and moves it to a new parent using a new connection
+        of the same type. The pose of body with respect to root stays the same.
 
-        :param branch_root: The root of the branch to move.
+        ..warning::
+
+            Move branch only works if the world structure is not currently fucked.
+
+        :param branch_root: The root of the branch to be moved.
         :param new_parent: The new parent of the branch.
         """
         new_parent_T_child = self.compute_forward_kinematics(new_parent, branch_root)
@@ -1291,6 +1308,10 @@ class World(HasSimulatorProperties):
         :param branch_root: The root of the branch to be moved.
         :param new_parent: The new parent of the branch.
         """
+        # Ensure FK is up to date before computing the relative pose
+        # can be problematic in a large merge world block
+        self.update_forward_kinematics()
+
         new_connection = None
         new_parent_T_root = self.compute_forward_kinematics(new_parent, branch_root)
         old_connection = branch_root.parent_connection

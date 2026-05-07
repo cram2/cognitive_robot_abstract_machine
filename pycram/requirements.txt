@@ -7,6 +7,7 @@ typing_extensions>=4.10.0
 probabilistic_model>=7.1.0 # just until semantic world is integrated
 random_events>=4.1.18
 numpy
+objgraph
 pint>=0.21.1
 transforms3d
 python-box
