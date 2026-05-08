@@ -34,7 +34,7 @@ from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
     ActiveConnection1DOF,
     FixedConnection,
-    Connection6DoF,
+    Connection6DoF, ActiveConnection, OmniDrive, DifferentialDrive,
 )
 from semantic_digital_twin.world_description.geometry import (
     Box,
@@ -1686,6 +1686,15 @@ class MujocoBuilder(MultiSimBuilder):
     def _build_connection(self, connection: Connection):
         if isinstance(connection, FixedConnection):
             return
+        if isinstance(connection, OmniDrive) or isinstance(connection, DifferentialDrive):
+            self._build_special_connection(connection=connection)
+        else:
+            self._build_mujoco_connection(connection=connection)
+
+    def _build_special_connection(self, connection: Connection):
+        raise NotImplementedError(f"{type(connection)} not supported in Mujoco.") # TODO: Implement this
+
+    def _build_mujoco_connection(self, connection: Connection):
         joint_props = MujocoJointConverter.convert(connection)
         if "equality_joint" in joint_props:
             equality_joint = joint_props.pop("equality_joint")
@@ -2087,7 +2096,31 @@ class FixedConnectionSpawner(ConnectionSpawner, ABC):
 
 
 @dataclass
-class Connection1DOFSpawner(ConnectionSpawner, ABC):
+class ActiveConnectionSpawner(ConnectionSpawner, ABC):
+    """
+    A spawner to spawn an ActiveConnection object in the simulator.
+    """
+
+    entity_type: ClassVar[Type[Connection]] = ActiveConnection
+    """
+    The type of the entity to spawn.
+    """
+
+
+@dataclass
+class OmniDriveSpawner(ActiveConnectionSpawner, ABC):
+    """
+    A spawner to spawn an OmniDrive object in the simulator.
+    """
+
+    entity_type: ClassVar[Type[Connection]] = OmniDrive
+    """
+    The type of the entity to spawn.
+    """
+
+
+@dataclass
+class Connection1DOFSpawner(ActiveConnectionSpawner, ABC):
     """
     A spawner to spawn an ActiveConnection1DOF object in the simulator.
     """
@@ -2099,7 +2132,7 @@ class Connection1DOFSpawner(ConnectionSpawner, ABC):
 
 
 @dataclass
-class ConnectionPrismaticSpawner(ConnectionSpawner, ABC):
+class ConnectionPrismaticSpawner(Connection1DOFSpawner, ABC):
     """
     A spawner to spawn a PrismaticConnection object in the simulator.
     """
@@ -2111,7 +2144,7 @@ class ConnectionPrismaticSpawner(ConnectionSpawner, ABC):
 
 
 @dataclass
-class ConnectionRevoluteSpawner(ConnectionSpawner, ABC):
+class ConnectionRevoluteSpawner(Connection1DOFSpawner, ABC):
     """
     A spawner to spawn a RevoluteConnection object in the simulator.
     """
@@ -2123,7 +2156,7 @@ class ConnectionRevoluteSpawner(ConnectionSpawner, ABC):
 
 
 @dataclass
-class Connection6DOFSpawner(ConnectionSpawner, ABC):
+class Connection6DOFSpawner(Connection1DOFSpawner, ABC):
     """
     A spawner to spawn a Connection6DoF object in the simulator.
     """
@@ -2258,6 +2291,17 @@ class MujocoConnectionSpawner(MujocoEntitySpawner, ConnectionSpawner):
     def _spawn_connection(
         self, simulator: MujocoSimulator, connection: Connection
     ) -> bool:
+        if isinstance(connection, OmniDrive) or isinstance(connection, DifferentialDrive):
+            return self._spawn_special_connection(simulator, connection)
+        else:
+            return self._spawn_mujoco_connection(simulator, connection)
+
+    @staticmethod
+    def _spawn_special_connection(simulator: MujocoSimulator, connection: Connection) -> bool:
+        return False # TODO: Implement this
+
+    @staticmethod
+    def _spawn_mujoco_connection(simulator: MujocoSimulator, connection: Connection) -> bool:
         joint_props = Mujoco1DOFJointConverter.convert(connection)
         joint_name = joint_props.pop("name")
         result = simulator.add_entity(
@@ -2281,7 +2325,7 @@ class MujocoFixedConnectionSpawner(MujocoEntitySpawner, FixedConnectionSpawner):
     def _spawn_connection(
         self, simulator: MujocoSimulator, connection: Connection
     ) -> bool:
-        return True
+        return True # TODO: Implement this
 
 
 @dataclass
@@ -2325,6 +2369,18 @@ class MujocoFreejointSpawner(MujocoEntitySpawner, Connection6DOFSpawner):
             result.type
             == SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
         )
+
+
+@dataclass
+class MujocoOmniDriveSpawner(MujocoEntitySpawner, OmniDriveSpawner):
+    """
+    A spawner to spawn an OmniDriveSpawner object in the MuJoCo simulator.
+    """
+
+    def _spawn_connection(
+        self, simulator: MujocoSimulator, connection: Connection
+    ) -> bool:
+        return False # TODO: Implement this
 
 
 @dataclass
