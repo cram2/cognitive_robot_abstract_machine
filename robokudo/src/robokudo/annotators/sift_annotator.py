@@ -15,7 +15,6 @@ from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.annotation import SIFTAnnotation
 from robokudo.types.scene import ObjectHypothesis
-from robokudo.utils.decorators import timer_decorator
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -113,7 +112,6 @@ class SIFTAnnotator(ThreadedAnnotator):
         ]
         return matches
 
-    @timer_decorator
     def compute(self) -> Status:
         """Compute the SIFT features of the current image and match them to the last image.
 
