@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.mixins import (
         HasRootBody,
         HasSupportingSurface,
+        TBody,
     )
     from semantic_digital_twin.semantic_annotations.semantic_annotations import (
         Bottle,
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
         Floor,
         Room,
         THasRootBody,
+        TLiquid,
         TinCan,
     )
     from semantic_digital_twin.spatial_types.spatial_types import Point3
@@ -148,6 +150,21 @@ class RoleForBottle(RoleForHasSupportingSurface, ABC):
     @property
     @abstractmethod
     def role_taker(self) -> Bottle: ...
+    @property
+    def root(self) -> TBody:
+        return self.role_taker.root
+
+    @root.setter
+    def root(self, value: TBody):
+        self.role_taker.root = value
+
+    @property
+    def objects(self) -> list[TLiquid]:
+        return self.role_taker.objects
+
+    @objects.setter
+    def objects(self, value: list[TLiquid]):
+        self.role_taker.objects = value
 
 
 @dataclass(eq=False)
@@ -155,3 +172,18 @@ class RoleForTinCan(RoleForHasStorageSpace, RoleForHasRootBody, ABC):
     @property
     @abstractmethod
     def role_taker(self) -> TinCan: ...
+    @property
+    def root(self) -> TBody:
+        return self.role_taker.root
+
+    @root.setter
+    def root(self, value: TBody):
+        self.role_taker.root = value
+
+    @property
+    def objects(self) -> list[THasRootBody]:
+        return self.role_taker.objects
+
+    @objects.setter
+    def objects(self, value: list[THasRootBody]):
+        self.role_taker.objects = value

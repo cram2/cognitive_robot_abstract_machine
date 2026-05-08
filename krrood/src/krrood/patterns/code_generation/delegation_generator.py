@@ -145,7 +145,7 @@ class DelegationGenerator:
         for field_ in wrapped_class.fields:
             if field_.name in taker_fields:
                 self._maybe_add_narrowing_redecl_for_covered_field(
-                    field_, wrapped_class, groups
+                    field_, wrapped_class, module_name, groups
                 )
                 continue
             if not (field_.field.kw_only or field_.field.init):
@@ -262,16 +262,20 @@ class DelegationGenerator:
         self,
         field_: Any,
         wrapped_class: WrappedClass,
+        module_name: str,
         groups: dict[type | None, dict[str, list]],
     ) -> None:
-        """Add a narrowing re-declaration if the current class further narrows a covered field's type.
+        """Add narrowing re-declarations for a covered field when intermediate or current class narrows the type.
 
-        Called for fields already delegated by a parent RoleFor class. Generates a re-declaration
-        under groups[None] only when the current class specializes the defining base with a more
-        specific TypeVar than the nearest covered ancestor already provides.
+        Called for fields already delegated by a parent RoleFor class. Walks intermediate
+        non-covered same-package ancestors between the nearest covered base and the defining
+        base, adding narrowing re-declarations for each. Also adds one under groups[None] when
+        the current class specializes the defining base more specifically than the nearest
+        covered ancestor.
 
         :param field_: The WrappedField object for the covered field.
         :param wrapped_class: The class being processed.
+        :param module_name: The source module name for package comparison.
         :param groups: The accumulator dict to populate.
         """
         if not (field_.field.kw_only or field_.field.init):
@@ -304,14 +308,15 @@ class DelegationGenerator:
             else:
                 base_type = field_.field.type
 
-        # Determine the type the nearest covered ancestor already provides so we can
-        # skip re-declaration when the current class adds no additional narrowing.
+        # Find the nearest covered ancestor and record the type it already provides.
+        nearest_covered_base: type | None = None
         nearest_covered_type = base_type
         for klass in wrapped_class.clazz.__mro__[1:]:
             if klass is object or klass is defining_base:
                 break
             if klass not in self.already_covered_bases:
                 continue
+            nearest_covered_base = klass
             sub = GenericTypeSubstitution.from_specialization(klass, defining_base)
             if sub.has_substitutions:
                 result = sub.apply(base_type)
@@ -319,6 +324,23 @@ class DelegationGenerator:
                     nearest_covered_type = result.resolved_type
             break
 
+        # Walk intermediate non-covered same-package ancestors between nearest_covered_base
+        # and defining_base, adding narrowing re-declarations for each (e.g. HasRootBody).
+        walk_start = nearest_covered_base if nearest_covered_base is not None else wrapped_class.clazz
+        for ancestor in walk_start.__mro__[1:]:
+            if ancestor is object or ancestor is defining_base:
+                break
+            if ancestor in self.already_covered_bases:
+                continue
+            if ancestor.__module__ != module_name and not same_package(
+                ancestor.__module__, module_name
+            ):
+                continue
+            self._add_narrowing_redeclaration(
+                field_.name, base_type, ancestor, defining_base, groups
+            )
+
+        # Check if the current class itself further narrows beyond nearest_covered_base.
         substitution = GenericTypeSubstitution.from_specialization(
             wrapped_class.clazz, defining_base
         )

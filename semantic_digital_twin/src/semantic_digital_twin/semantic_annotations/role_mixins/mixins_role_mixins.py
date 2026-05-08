@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         HasRootBody,
         HasRootKinematicStructureEntity,
         HasStorageSpace,
+        TBody,
         THasRootBody,
         TKinematicStructureEntity,
     )
@@ -197,6 +198,14 @@ class RoleForHasRootBody(RoleForHasRootKinematicStructureEntity, ABC):
     @property
     @abstractmethod
     def role_taker(self) -> HasRootBody: ...
+    @property
+    def root(self) -> TBody:
+        return self.role_taker.root
+
+    @root.setter
+    def root(self, value: TBody):
+        self.role_taker.root = value
+
     @property
     def bodies(self) -> list[Body]:
         return self.role_taker.bodies

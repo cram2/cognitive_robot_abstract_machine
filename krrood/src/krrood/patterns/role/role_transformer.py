@@ -205,6 +205,7 @@ class RoleTransformer:
         if self.module not in all_modules:
             all_modules.append(self.module)
 
+        all_modules = _sort_modules_by_dependency(all_modules, self.class_diagram)
         for module in all_modules:
             importlib.reload(module)
         self._refresh_diagram()
