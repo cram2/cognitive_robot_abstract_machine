@@ -1,10 +1,9 @@
 import sys
 
+import pytest
 from krrood.class_diagrams import ClassDiagram
-from krrood.class_diagrams.class_diagram import WrappedSpecializedGeneric
-from krrood.patterns.role.helpers import transform_roles_in_class_diagram
-from krrood.patterns.role.role import Role
-from krrood.patterns.role.role_transformer import RoleTransformer
+from krrood.patterns.role.exceptions import MissingRoleMixinsError
+from krrood.patterns.role.helpers import check_role_mixin_files
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
@@ -33,4 +32,7 @@ def pytest_configure(config):
     )
     SymbolGraph(_class_diagram=class_diagram)
 
-    transform_roles_in_class_diagram(class_diagram)
+    try:
+        check_role_mixin_files(class_diagram, ["semantic_digital_twin"])
+    except MissingRoleMixinsError as exc:
+        raise pytest.UsageError(str(exc)) from None

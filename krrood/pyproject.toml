@@ -34,6 +34,9 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 
+[project.scripts]
+krrood-generate-role-mixins = "krrood.generate_role_mixins:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",

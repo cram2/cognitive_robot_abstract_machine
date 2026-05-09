@@ -4,9 +4,6 @@ from functools import partial
 
 import pytest
 
-from pycram import logger
-from pycram.datastructures.grasp import GraspPose
-
 try:
     import rclpy
 except ModuleNotFoundError:
@@ -16,7 +13,8 @@ from sqlalchemy.orm import sessionmaker
 import pycram
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.utils import create_engine, drop_database, classes_of_package
-from krrood.patterns.role.helpers import transform_roles_in_class_diagram
+from krrood.patterns.role.exceptions import MissingRoleMixinsError
+from krrood.patterns.role.helpers import check_role_mixin_files
 
 try:
     from pycram.datastructures.dataclasses import Context
@@ -93,12 +91,15 @@ def pycram_testing_session():
 
 def pytest_configure(config):
     """
-    Configures pytest to generate a class diagram for all dataclasses in pycram. Then
-    apply role transformation all role classes in the class diagram
+    Verify that role mixin files for pycram are present on disk.
+
+    Mixin files are generated offline.  If any are missing, run::
+
+        krrood-generate-role-mixins pycram
     """
     all_classes = [c for c in classes_of_package(pycram) if is_dataclass(c)]
     class_diagram = ClassDiagram(all_classes)
     try:
-        transform_roles_in_class_diagram(class_diagram)
-    except Exception as e:
-        logger.warning(f"Failed to transform roles in class diagram: {e}")
+        check_role_mixin_files(class_diagram, ["pycram"])
+    except MissingRoleMixinsError as exc:
+        raise pytest.UsageError(str(exc)) from None
