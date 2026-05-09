@@ -1,9 +1,8 @@
 import sys
+from pathlib import Path
+import runpy
 
-import pytest
 from krrood.class_diagrams import ClassDiagram
-from krrood.patterns.role.exceptions import MissingRoleMixinsError
-from krrood.patterns.role.helpers import check_role_mixin_files
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
@@ -11,8 +10,6 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
 from krrood.utils import recursive_subclasses
 
 from semantic_digital_twin.world import World
-import runpy
-from pathlib import Path
 
 
 def pytest_configure(config):
@@ -21,7 +18,6 @@ def pytest_configure(config):
     generate_orm_path = (
         repo_root / "semantic_digital_twin" / "scripts" / "generate_orm.py"
     )
-    # Execute the ORM generation script as a standalone module
     runpy.run_path(str(generate_orm_path), run_name="__main__")
 
     # Build the symbol graph
@@ -32,7 +28,9 @@ def pytest_configure(config):
     )
     SymbolGraph(_class_diagram=class_diagram)
 
-    try:
-        check_role_mixin_files(class_diagram, ["semantic_digital_twin"])
-    except MissingRoleMixinsError as exc:
-        raise pytest.UsageError(str(exc)) from None
+    # Ensure role mixin files for semantic_digital_twin are semantically current.
+    # If any are missing or outdated, regenerates them in a subprocess and
+    # restarts pytest automatically (up to KRROOD_PYTEST_RERUN_COUNT times, default 2).
+    from krrood.generate_role_mixins import ensure_role_mixins_current_for_pytest
+
+    ensure_role_mixins_current_for_pytest(["semantic_digital_twin"])

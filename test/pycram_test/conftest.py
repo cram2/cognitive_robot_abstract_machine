@@ -1,5 +1,4 @@
 from copy import deepcopy
-from dataclasses import is_dataclass
 from functools import partial
 
 import pytest
@@ -10,11 +9,7 @@ except ModuleNotFoundError:
     pass
 from sqlalchemy.orm import sessionmaker
 
-import pycram
-from krrood.class_diagrams import ClassDiagram
-from krrood.ormatic.utils import create_engine, drop_database, classes_of_package
-from krrood.patterns.role.exceptions import MissingRoleMixinsError
-from krrood.patterns.role.helpers import check_role_mixin_files
+from krrood.ormatic.utils import create_engine, drop_database
 
 try:
     from pycram.datastructures.dataclasses import Context
@@ -90,16 +85,12 @@ def pycram_testing_session():
 
 
 def pytest_configure(config):
-    """
-    Verify that role mixin files for pycram are present on disk.
+    """Ensure role mixin files for pycram are semantically current.
 
-    Mixin files are generated offline.  If any are missing, run::
-
-        krrood-generate-role-mixins pycram
+    If any are missing or outdated, regenerates them in a subprocess and
+    restarts pytest automatically (up to ``KRROOD_PYTEST_RERUN_COUNT`` times,
+    default 2).
     """
-    all_classes = [c for c in classes_of_package(pycram) if is_dataclass(c)]
-    class_diagram = ClassDiagram(all_classes)
-    try:
-        check_role_mixin_files(class_diagram, ["pycram"])
-    except MissingRoleMixinsError as exc:
-        raise pytest.UsageError(str(exc)) from None
+    from krrood.generate_role_mixins import ensure_role_mixins_current_for_pytest
+
+    ensure_role_mixins_current_for_pytest(["pycram"])
