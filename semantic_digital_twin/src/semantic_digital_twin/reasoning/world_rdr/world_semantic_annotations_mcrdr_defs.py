@@ -14,6 +14,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Fridge,
     Handle,
+    Cabinet,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -84,7 +85,9 @@ def conclusion_35528769484583703815352905256802298589(case) -> List[Wardrobe]:
         return (
             entity(
                 inference(Wardrobe)(
-                    root=prismatic_connection.parent,
+                    cabinet=inference(Cabinet)(
+                        root=prismatic_connection.parent,
+                    ),
                     drawers=drawer,
                 )
             )
@@ -133,7 +136,12 @@ def conclusion_10840634078579061471470540436169882059(case) -> List[Fridge]:
         door = variable(Door, case.semantic_annotations)
         revolute_connection = variable(RevoluteConnection, case.connections)
         return (
-            entity(inference(Fridge)(root=revolute_connection.parent, doors=door))
+            entity(
+                inference(Fridge)(
+                    cabinet=inference(Cabinet)(root=revolute_connection.parent),
+                    doors=door,
+                )
+            )
             .where(
                 revolute_connection.child == door.root,
                 contains(door.root.name.name.lower(), "fridge"),

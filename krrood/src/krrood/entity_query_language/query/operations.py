@@ -24,7 +24,11 @@ from typing_extensions import (
     Hashable,
 )
 
-from krrood.entity_query_language.core.variable import Literal, ExternallySetVariable
+from krrood.entity_query_language.core.variable import (
+    Literal,
+    ExternallySetVariable,
+    InstantiatedVariable,
+)
 from krrood.entity_query_language.operators.aggregators import (
     Aggregator,
     Count,
