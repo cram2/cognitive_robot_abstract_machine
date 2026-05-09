@@ -11,7 +11,7 @@ from krrood.symbolic_math.exceptions import (
     NotSquareMatrixError,
 )
 from krrood.symbolic_math.symbolic_math import VariableParameters
-from test.krrood_test.test_symbolic_math.reference_implementations import (
+from .reference_implementations import (
     normalize_angle_positive,
     shortest_angular_distance,
     normalize_angle,
