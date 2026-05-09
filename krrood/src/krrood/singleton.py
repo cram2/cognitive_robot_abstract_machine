@@ -30,8 +30,10 @@ class SingletonMeta(type):
             )
         if cls not in cls._instances:
             cls._is_being_created.append(cls)
-            cls._instances[cls] = super().__call__(*args, **kwargs)
-            cls._is_being_created.remove(cls)
+            try:
+                cls._instances[cls] = super().__call__(*args, **kwargs)
+            finally:
+                cls._is_being_created.remove(cls)
         return cls._instances[cls]
 
     def clear_instance(cls):

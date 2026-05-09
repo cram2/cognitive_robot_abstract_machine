@@ -16,7 +16,8 @@ from typing_extensions import (
     Dict,
     DefaultDict,
     Callable,
-    ClassVar, TypeVar,
+    ClassVar,
+    TypeVar,
 )
 
 from krrood import logger
@@ -50,6 +51,7 @@ class Symbol:
 
 
 TSymbol = TypeVar("TSymbol", bound=Symbol)
+
 
 @dataclass
 class PredicateClassRelation(SubClassSafeGeneric[TSymbol]):
@@ -97,7 +99,9 @@ class PredicateClassRelation(SubClassSafeGeneric[TSymbol]):
         return "red" if self.inferred else "black"
 
     def __hash__(self):
-        return hash((self.__class__, self.source.index, self.wrapped_field, self.target.index))
+        return hash(
+            (self.__class__, self.source.index, self.wrapped_field, self.target.index)
+        )
 
     def __eq__(self, other):
         return hash(self) == hash(other)
@@ -231,7 +235,13 @@ class SymbolGraph(metaclass=SingletonMeta):
                 for cls in recursive_subclasses(Symbol)
                 if hasattr(cls, "__module__")
                 and (cls.__module__ in sys.modules)
-                and not self.packages or any(cls.__module__.startswith(pkg_name) for pkg_name in self.packages)
+                and (
+                    (not self.packages)
+                    or any(
+                        cls.__module__.startswith(pkg_name)
+                        for pkg_name in self.packages
+                    )
+                )
                 and not (
                     getattr(sys.modules[cls.__module__], "__file__", "").endswith(
                         ".pyi"
@@ -490,4 +500,3 @@ class SymbolGraph(metaclass=SingletonMeta):
                 os.remove(tmp_filepath)
             except Exception as e:
                 logger.error(e)
-
