@@ -338,3 +338,152 @@ class TestStaleFilesEmptyMixinLogic:
         mixin_path.write_text("class OldMixin:\n    pass\n")
         stale = _stale_files_for_package("fake_pkg")
         assert mixin_path in stale
+
+
+# ── error visibility: _format_source ────────────────────────────────────────────
+
+
+class TestFormatSourceErrorVisibility:
+    def test_logs_warning_when_formatting_fails(self, caplog, monkeypatch):
+        """When ruff/black fails, a WARNING with traceback is logged."""
+        import krrood.generate_role_mixins as grm
+
+        monkeypatch.setattr(grm, "run_ruff_on_file", lambda p: (_ for _ in ()).throw(RuntimeError("ruff failed")))
+        result = _format_source("x = 1\n")
+        assert result == "x = 1\n"
+        assert any(
+            r.levelname == "WARNING"
+            and "Formatting generated source failed" in r.message
+            for r in caplog.records
+        )
+
+    def test_logs_warning_when_black_fails(self, caplog, monkeypatch):
+        """When black fails after ruff succeeds, a WARNING is logged."""
+        import krrood.generate_role_mixins as grm
+
+        monkeypatch.setattr(grm, "run_ruff_on_file", lambda p: None)
+        monkeypatch.setattr(grm, "run_black_on_file", lambda p: (_ for _ in ()).throw(RuntimeError("black failed")))
+        result = _format_source("x = 1\n")
+        assert result == "x = 1\n"
+        assert any(
+            r.levelname == "WARNING"
+            and "Formatting generated source failed" in r.message
+            for r in caplog.records
+        )
+
+
+# ── error visibility: main() traceback logging ──────────────────────────────────
+
+
+class TestMainErrorVisibility:
+    def test_generate_mode_logs_exception_with_traceback(self, caplog, monkeypatch):
+        """main() must log full exception (with traceback) when generation fails."""
+        monkeypatch.setattr(
+            _GENERATE_FN,
+            lambda name, write: (_ for _ in ()).throw(ValueError("something went wrong")),
+        )
+        main(["mypkg"])
+        assert any(
+            r.levelname == "ERROR"
+            and "Failed: mypkg" in r.message
+            and r.exc_info is not None
+            for r in caplog.records
+        )
+
+    def test_check_mode_logs_exception_with_traceback(self, caplog, monkeypatch):
+        """--check mode must log full exception when checking fails."""
+        monkeypatch.setattr(
+            _STALE_FN,
+            lambda name: (_ for _ in ()).throw(RuntimeError("import exploded")),
+        )
+        main(["--check", "badpkg"])
+        assert any(
+            r.levelname == "ERROR"
+            and "Failed to check badpkg" in r.message
+            and r.exc_info is not None
+            for r in caplog.records
+        )
+
+
+# ── error visibility: _stale_files_for_package per-module resilience ────────────
+
+
+class TestStaleFilesPerModuleResilience:
+    def test_continues_after_module_error(self, monkeypatch, tmp_path, caplog):
+        """One failing module must not prevent other modules from being checked."""
+        from unittest.mock import MagicMock
+        import types
+        import krrood.generate_role_mixins as grm
+        import krrood.patterns.role.helpers as helpers_mod
+        import krrood.patterns.role.role_transformer as rt_mod
+
+        # Module 1: will fail
+        bad_module = types.ModuleType("bad_module")
+        bad_module.__file__ = str(tmp_path / "bad.py")
+        bad_module.__name__ = "bad_module"
+
+        # Module 2: will succeed and report a stale mixin
+        good_module_path = tmp_path / "good.py"
+        good_module_path.write_text("x = 1\n")
+        good_module = types.ModuleType("good_module")
+        good_module.__file__ = str(good_module_path)
+        good_module.__name__ = "good_module"
+
+        mixin_path = tmp_path / "role_mixins" / "good_role_mixins.py"
+        good_mixin_src = "class FooMixin:\n    pass\n"
+
+        good_transformer = MagicMock()
+        good_transformer.transform.return_value = {good_module: ("x = 1\n", good_mixin_src)}
+        good_transformer.get_generated_file_path.return_value = mixin_path
+
+        def make_transformer(module):
+            if module is bad_module:
+                raise RuntimeError(f"cannot transform {module.__name__}")
+            return good_transformer
+
+        fake_transformer_cls = MagicMock(side_effect=make_transformer)
+        fake_transformer_cls.get_module_file_path = staticmethod(lambda m: Path(m.__file__))
+
+        monkeypatch.setattr(grm.importlib, "import_module", lambda name: MagicMock())
+        monkeypatch.setattr(grm, "classes_of_package", lambda pkg: [])
+        monkeypatch.setattr(grm, "ClassDiagram", MagicMock(return_value=MagicMock()))
+        monkeypatch.setattr(
+            helpers_mod,
+            "_modules_with_roles",
+            lambda cd: [bad_module, good_module],
+        )
+        monkeypatch.setattr(rt_mod, "RoleTransformer", fake_transformer_cls)
+
+        stale = _stale_files_for_package("fake_pkg")
+        assert mixin_path in stale
+        assert any(
+            r.levelname == "ERROR"
+            and "bad_module" in r.message
+            and r.exc_info is not None
+            for r in caplog.records
+        )
+
+
+# ── error visibility: ensure_role_mixins stderr ─────────────────────────────────
+
+
+class TestEnsureRoleMixinsStderr:
+    def test_prints_check_stderr_on_failure(self, capsys, monkeypatch):
+        """When check fails, captured stderr must be printed to the terminal."""
+        check_result = MagicMock(returncode=1, stderr=b"Error: module not found\n")
+        gen_result = MagicMock(returncode=0)
+
+        def fake_run(cmd, **kwargs):
+            if "--check" in cmd:
+                return check_result
+            return gen_result
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+        monkeypatch.setenv("KRROOD_PYTEST_RERUN_COUNT", "2")
+
+        import pytest as _pytest
+        with _pytest.raises(SystemExit):
+            ensure_role_mixins_current_for_pytest(["mypkg"])
+
+        captured = capsys.readouterr()
+        assert "Error: module not found" in captured.err

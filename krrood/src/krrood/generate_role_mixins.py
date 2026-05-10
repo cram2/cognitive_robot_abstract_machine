@@ -80,10 +80,11 @@ from types import ModuleType
 from krrood import logger as krrood_logger
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.utils import classes_of_package
-from krrood.patterns.code_generation.generated_code_file_writer import has_class_definitions
+from krrood.patterns.code_generation.generated_code_file_writer import (
+    has_class_definitions,
+)
 from krrood.patterns.role.helpers import transform_roles_in_class_diagram
 from krrood.utils import run_black_on_file, run_ruff_on_file
-
 
 # ── source normalisation ──────────────────────────────────────────────────────
 
@@ -110,14 +111,24 @@ def _format_source(source: str) -> str:
         run_black_on_file(tmp_path)
         with open(tmp_path, encoding="utf-8") as f:
             return f.read()
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).warning(
+            "Formatting generated source failed with error: %s, returning unformatted source",
+            e,
+            exc_info=True,
+        )
         return source
     finally:
         try:
             import os
+
             os.unlink(tmp_path)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger(__name__).debug(
+                "Failed to delete temporary file %s: %s",
+                tmp_path,
+                e,
+            )
 
 
 # ── semantic comparison ───────────────────────────────────────────────────────
@@ -165,10 +176,19 @@ def _stale_files_for_package(package_name: str) -> list[Path]:
     all_classes = [c for c in classes_of_package(package) if is_dataclass(c)]
     class_diagram = ClassDiagram(all_classes)
 
+    log = logging.getLogger(__name__)
     stale: list[Path] = []
     for module in _modules_with_roles(class_diagram):
-        transformer = RoleTransformer(module)
-        result = transformer.transform(write=False)
+        try:
+            transformer = RoleTransformer(module)
+            result = transformer.transform(write=False)
+        except Exception as e:
+            log.exception(
+                "  Failed to transform module %s for staleness check with error: %s",
+                module.__name__,
+                e,
+            )
+            continue
         for m, (transformed_source, mixin_content) in result.items():
             mixin_path = transformer.get_generated_file_path(m, is_mixin=True)
             if has_class_definitions(mixin_content):
@@ -227,6 +247,10 @@ def ensure_role_mixins_current_for_pytest(packages: list[str]) -> None:
     )
     if check_result.returncode == 0:
         return
+
+    # Print captured stderr so errors from the check run are visible to the user.
+    if check_result.stderr:
+        print(check_result.stderr.decode(), file=sys.stderr)
 
     gen_result = subprocess.run(
         [sys.executable, "-m", "krrood.generate_role_mixins"] + packages,
@@ -356,8 +380,8 @@ def main(argv: list[str] | None = None) -> int:
                 stale = _stale_files_for_package(package_name)
                 if stale:
                     stale_by_pkg[package_name] = stale
-            except Exception as exc:
-                log.error("  Failed to check %s — %s", package_name, exc)
+            except Exception as e:
+                log.exception("  Failed to check %s, with error: %s", package_name, e)
                 stale_by_pkg[package_name] = []
 
         if stale_by_pkg:
@@ -380,8 +404,8 @@ def main(argv: list[str] | None = None) -> int:
             generate_role_mixins_for_package(package_name, write=not args.dry_run)
             action = "Dry-run complete" if args.dry_run else "Done"
             log.info("  %s: %s", action, package_name)
-        except Exception as exc:
-            log.error("  Failed: %s — %s", package_name, exc)
+        except Exception as e:
+            log.exception("  Failed: %s, with error: %s", package_name, e)
             failed.append(package_name)
 
     if failed:
