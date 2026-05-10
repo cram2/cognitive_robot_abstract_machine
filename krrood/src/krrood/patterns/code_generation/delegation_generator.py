@@ -11,6 +11,8 @@ from typing import Any, Callable
 
 import libcst
 
+from krrood.patterns.role.meta_data import MethodType
+
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.utils import (
     GenericTypeSubstitution,
@@ -232,7 +234,11 @@ class DelegationGenerator:
                 last_narrowed_type = narrowed
 
         self._maybe_add_concrete_narrowing(
-            field_.name, base_type, concrete_class, defining_base, groups,
+            field_.name,
+            base_type,
+            concrete_class,
+            defining_base,
+            groups,
             reference_type=last_narrowed_type,
         )
 
@@ -265,14 +271,16 @@ class DelegationGenerator:
             return
 
         base_type = field_.type_at_definer(defining_base)
-        nearest_covered_base, nearest_covered_type = self._nearest_covered_base_and_type(
-            wrapped_class, defining_base, base_type
+        nearest_covered_base, nearest_covered_type = (
+            self._nearest_covered_base_and_type(wrapped_class, defining_base, base_type)
         )
 
         # Walk intermediate non-covered same-package ancestors between nearest_covered_base
         # and defining_base, adding narrowing re-declarations for each (e.g. HasRootBody).
         walk_start = (
-            nearest_covered_base if nearest_covered_base is not None else wrapped_class.clazz
+            nearest_covered_base
+            if nearest_covered_base is not None
+            else wrapped_class.clazz
         )
         for ancestor in walk_start.__mro__[1:]:
             if ancestor is object or ancestor is defining_base:
@@ -288,7 +296,11 @@ class DelegationGenerator:
             )
 
         self._maybe_add_concrete_narrowing(
-            field_.name, base_type, wrapped_class.clazz, defining_base, groups,
+            field_.name,
+            base_type,
+            wrapped_class.clazz,
+            defining_base,
+            groups,
             reference_type=nearest_covered_type,
         )
 
@@ -573,10 +585,43 @@ class DelegationGenerator:
                 f"Expected FunctionDef, got {type(method_node).__name__}"
             )
 
+        method_type = self._get_method_type(method, method_node)
+
         self._resolve_signature_types(method)
         self._register_decorator_imports(method_node, method)
 
         return self._generate_delegation_body(method_node, name, method, source_class)
+
+    def _get_method_type(
+        self, method: Callable, method_node: libcst.FunctionDef
+    ) -> MethodType:
+        """Classify the method type based on its AST node and runtime object.
+
+        :param method: The live method object.
+        :param method_node: The parsed FunctionDef node.
+        :return: The detected MethodType.
+        """
+        is_classmethod = False
+        for decorator in method_node.decorators:
+            name = self.node_factory._get_decorator_name(decorator.decorator)
+            if name == "classmethod":
+                is_classmethod = True
+                break
+
+        if not is_classmethod:
+            return MethodType.NORMAL
+
+        # Check for Factory Method: classmethod + return type hint of 'Self'
+        return_annotation = method_node.returns
+        if return_annotation:
+            annotation_node = return_annotation.annotation
+            if (
+                isinstance(annotation_node, libcst.Name)
+                and annotation_node.value == "Self"
+            ):
+                return MethodType.FACTORY_METHOD
+
+        return MethodType.CLASS_METHOD
 
     def _resolve_signature_types(self, method: Callable) -> None:
         """Register name-to-module mappings for all types in a method's signature.

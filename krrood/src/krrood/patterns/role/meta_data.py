@@ -11,6 +11,23 @@ from krrood.patterns.property_delegator import PropertyDelegator
 from krrood.patterns.role.role import Role
 
 
+class MethodType(enum.Enum):
+    """Classification of a method's type."""
+
+    NORMAL = enum.auto()
+    """A standard instance method."""
+
+    CLASS_METHOD = enum.auto()
+    """A method decorated with @classmethod."""
+
+    FACTORY_METHOD = enum.auto()
+    """A @classmethod that returns Self."""
+
+    def is_class_method(self) -> bool:
+        """Return True if this is a class method or factory method."""
+        return self in (MethodType.CLASS_METHOD, MethodType.FACTORY_METHOD)
+
+
 class RoleType(enum.Enum):
     """Classification of a class within the role or delegation hierarchy."""
 
