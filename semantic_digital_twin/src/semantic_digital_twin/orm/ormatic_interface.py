@@ -67,6 +67,7 @@ import semantic_digital_twin.robots.turtlebot
 import semantic_digital_twin.robots.unitree_g1
 import semantic_digital_twin.robots.ur5
 import semantic_digital_twin.robots.ur5e_controlled
+import semantic_digital_twin.role_mixins.mixin_role_mixins
 import semantic_digital_twin.semantic_annotations.mixins
 import semantic_digital_twin.semantic_annotations.position_descriptions
 import semantic_digital_twin.semantic_annotations.role_mixins.mixins_role_mixins
@@ -83,6 +84,7 @@ import semantic_digital_twin.world_description.connections
 import semantic_digital_twin.world_description.degree_of_freedom
 import semantic_digital_twin.world_description.geometry
 import semantic_digital_twin.world_description.inertial_properties
+import semantic_digital_twin.world_description.role_mixins.world_entity_role_mixins
 import semantic_digital_twin.world_description.shape_collection
 import semantic_digital_twin.world_description.world_entity
 import semantic_digital_twin.world_description.world_modification
@@ -2075,11 +2077,39 @@ class DegreeOfFreedomLimitsDAO(
 class DelegatorForHasSimulatorPropertiesDAO(
     Base,
     DataAccessObject[
+        semantic_digital_twin.role_mixins.mixin_role_mixins.DelegatorForHasSimulatorProperties
+    ],
+):
+
+    __tablename__ = "DelegatorForHasSimulatorPropertiesDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class DelegatorForHasSimulatorPropertiesDAO(
+    Base,
+    DataAccessObject[
         semantic_digital_twin.semantic_annotations.role_mixins.mixins_role_mixins.DelegatorForHasSimulatorProperties
     ],
 ):
 
     __tablename__ = "DelegatorForHasSimulatorPropertiesDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class DelegatorForSemanticAnnotationDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.role_mixins.world_entity_role_mixins.DelegatorForSemanticAnnotation
+    ],
+):
+
+    __tablename__ = "DelegatorForSemanticAnnotationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
@@ -2133,6 +2163,20 @@ class DelegatorForPoseDAO(
 class DelegatorForWorldEntityDAO(
     Base,
     DataAccessObject[
+        semantic_digital_twin.world_description.role_mixins.world_entity_role_mixins.DelegatorForWorldEntity
+    ],
+):
+
+    __tablename__ = "DelegatorForWorldEntityDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class DelegatorForWorldEntityDAO(
+    Base,
+    DataAccessObject[
         semantic_digital_twin.semantic_annotations.role_mixins.mixins_role_mixins.DelegatorForWorldEntity
     ],
 ):
@@ -2151,6 +2195,20 @@ class DelegatorForWorldEntityDAO(
         "polymorphic_on": "polymorphic_type",
         "polymorphic_identity": "DelegatorForWorldEntityDAO",
     }
+
+
+class DelegatorForWorldEntityWithIDDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.role_mixins.world_entity_role_mixins.DelegatorForWorldEntityWithID
+    ],
+):
+
+    __tablename__ = "DelegatorForWorldEntityWithIDDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
 
 
 class DelegatorForWorldEntityWithIDDAO(
@@ -2429,6 +2487,20 @@ class BedroomDAO(
         "polymorphic_identity": "BedroomDAO",
         "inherit_condition": database_id == DelegatorForRoomDAO.database_id,
     }
+
+
+class DelegatorForWorldEntityWithSimulatorPropertiesDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.role_mixins.world_entity_role_mixins.DelegatorForWorldEntityWithSimulatorProperties
+    ],
+):
+
+    __tablename__ = "DelegatorForWorldEntityWithSimulatorPropertiesDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
 
 
 class DerivativeMapDAO(
@@ -8471,27 +8543,6 @@ class Bottle_LiquidSoapDAO(
     }
 
 
-class Bottle_WineDAO(
-    BottleDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Bottle[
-            semantic_digital_twin.semantic_annotations.semantic_annotations.Wine
-        ]
-    ],
-):
-
-    __tablename__ = "Bottle_WineDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(BottleDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "Bottle_WineDAO",
-        "inherit_condition": database_id == BottleDAO.database_id,
-    }
-
-
 class Bottle_MustardDAO(
     BottleDAO,
     DataAccessObject[
@@ -8509,6 +8560,27 @@ class Bottle_MustardDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "Bottle_MustardDAO",
+        "inherit_condition": database_id == BottleDAO.database_id,
+    }
+
+
+class Bottle_WineDAO(
+    BottleDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Bottle[
+            semantic_digital_twin.semantic_annotations.semantic_annotations.Wine
+        ]
+    ],
+):
+
+    __tablename__ = "Bottle_WineDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(BottleDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Bottle_WineDAO",
         "inherit_condition": database_id == BottleDAO.database_id,
     }
 

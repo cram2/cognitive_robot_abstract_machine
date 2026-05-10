@@ -28,6 +28,7 @@ from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
 from krrood.class_diagrams.utils import (
     classes_of_module,
     topological_sort_by_inheritance,
+    same_package,
 )
 from krrood.patterns.code_generation import (
     LibCSTNodeFactory,
@@ -69,6 +70,32 @@ class TransformationMode(str, enum.Enum):
 
     GROUND_TRUTH = "_ground_truth_"
     TRANSFORMED = "transformed_"
+
+
+def _compute_all_delegatees(
+    class_diagram: ClassDiagram,
+    pd_only_delegatees: set[type],
+) -> set[type]:
+    """Return the set of all delegatee types including transitive same-package ancestors.
+
+    Direct role takers and pd_only delegatees are the starting set.  For each of
+    those, same-package ancestors discovered through the MRO are transitively
+    added so that every ancestor module gets a chance to generate the
+    ``DelegatorFor`` mixin for its own classes before a derived module would
+    otherwise claim ownership.
+    """
+    from krrood.class_diagrams.utils import same_package
+
+    direct = set(class_diagram.role_takers) | pd_only_delegatees
+    result = set(direct)
+    for delegatee in direct:
+        for ancestor in delegatee.__mro__:
+            if ancestor is object or ancestor is delegatee:
+                continue
+            if not same_package(ancestor.__module__, delegatee.__module__):
+                continue
+            result.add(ancestor)
+    return result
 
 
 def _mixin_module_dotted_name(module_dotted_name: str) -> str:
@@ -183,7 +210,8 @@ class RoleTransformer:
         classes = classes_of_module(module)
         role_classes = [clazz for clazz in classes if issubclass(clazz, Role)]
         pd_only_classes = [
-            clazz for clazz in classes
+            clazz
+            for clazz in classes
             if issubclass(clazz, PropertyDelegator) and not issubclass(clazz, Role)
         ]
         updated_taker_modules = list(taker_modules)
@@ -205,6 +233,21 @@ class RoleTransformer:
             if delegatee_type not in classes:
                 add_delegatee_class(delegatee_type)
             pd_only_delegatees.add(delegatee_type)
+
+        # Discover transitive same-package ancestors of all delegatee classes so
+        # their modules also get a RoleModuleTransformer and can generate the
+        # DelegatorFor mixins for their own classes.
+        delegatee_classes = [
+            c for c in classes if c not in role_classes and c not in pd_only_classes
+        ]
+        for delegatee in list(delegatee_classes):
+            for ancestor in delegatee.__mro__:
+                if ancestor is object or ancestor is delegatee:
+                    continue
+                if not same_package(ancestor.__module__, delegatee.__module__):
+                    continue
+                if ancestor not in classes:
+                    add_delegatee_class(ancestor)
 
         return ClassDiagram(classes), updated_taker_modules, pd_only_delegatees
 
@@ -346,11 +389,15 @@ class RoleModuleTransformer(ContextAwareTransformer):
         self.role_for: dict[WrappedClass, libcst.ClassDef] = {}
         self._base_class_role_for_nodes: dict[type, libcst.ClassDef] = {}
         self._global_base_class_ownership: dict[type, ModuleType] = (
-            global_base_class_ownership if global_base_class_ownership is not None else {}
+            global_base_class_ownership
+            if global_base_class_ownership is not None
+            else {}
         )
         self._cross_module_rolefor_bases: dict[type, str] = {}
         self._pd_only_delegatees: set[type] = pd_only_delegatees or set()
-        self._all_delegatees: set[type] = set(class_diagram.role_takers) | self._pd_only_delegatees
+        self._all_delegatees: set[type] = _compute_all_delegatees(
+            class_diagram, self._pd_only_delegatees
+        )
         self.transformed_module: libcst.Module | None = None
         self.original_context = CodemodContext()
         self.current_class: type | None = None
@@ -378,7 +425,9 @@ class RoleModuleTransformer(ContextAwareTransformer):
             already_covered_bases=self._all_delegatees,
             excluded_method_names=_ALWAYS_EXCLUDED_METHODS,
             excluded_member_predicate=_is_from_property_delegator_class,
-            is_excluded_defining_class=lambda klass: issubclass(klass, PropertyDelegator),
+            is_excluded_defining_class=lambda klass: issubclass(
+                klass, PropertyDelegator
+            ),
             name_resolver=self._resolver,
         )
 
@@ -689,8 +738,12 @@ class RoleModuleTransformer(ContextAwareTransformer):
         :param wrapped_class: The wrapped class of the role taker.
         :return: True only for root Role-pattern takers that do not already inherit HasRoles.
             Non-Role PropertyDelegator delegatees never receive HasRoles.
+            Transitive same-package ancestors that are not direct role takers also never
+            receive HasRoles — they only need DelegatorFor mixins, not HasRoles injection.
         """
         if wrapped_class.clazz in self._pd_only_delegatees:
+            return False
+        if wrapped_class.clazz not in self.class_diagram.role_takers:
             return False
         return not (
             any(_is_role_base_node(base.value) for base in node.bases)
@@ -811,7 +864,10 @@ class RoleModuleTransformer(ContextAwareTransformer):
             return []
         sorted_bases = topological_sort_by_inheritance(base_classes)
         for base_class in sorted_bases:
-            if base_class in self._base_class_role_for_nodes or base_class in self._cross_module_rolefor_bases:
+            if (
+                base_class in self._base_class_role_for_nodes
+                or base_class in self._cross_module_rolefor_bases
+            ):
                 continue
             owner_module = self._global_base_class_ownership.get(base_class)
             if owner_module is not None and owner_module is not self.source_module:
@@ -870,14 +926,20 @@ class RoleModuleTransformer(ContextAwareTransformer):
                 in_local = ancestor in self._base_class_role_for_nodes
                 in_cross = ancestor in self._cross_module_rolefor_bases
                 owner_module = self._global_base_class_ownership.get(ancestor)
-                if (in_local or in_cross or owner_module is not None) and ancestor not in seen:
+                if (
+                    in_local or in_cross or owner_module is not None
+                ) and ancestor not in seen:
                     if owner_module is not None and not in_local and not in_cross:
                         role_for_name = self.get_delegator_for_name(ancestor)
                         if owner_module is not self.source_module:
-                            mixin_module = _mixin_module_dotted_name(owner_module.__name__)
+                            mixin_module = _mixin_module_dotted_name(
+                                owner_module.__name__
+                            )
                             self._cross_module_rolefor_bases[ancestor] = mixin_module
                             self.require_import(mixin_module, role_for_name)
-                            self._resolver.name_to_module_map[role_for_name] = mixin_module
+                            self._resolver.name_to_module_map[role_for_name] = (
+                                mixin_module
+                            )
                     rolefor_bases.append(self.get_delegator_for_name(ancestor))
                     seen.add(ancestor)
                     break
@@ -925,12 +987,25 @@ class RoleModuleTransformer(ContextAwareTransformer):
                         self._cross_module_rolefor_bases[taker_type] = mixin_module
                         self.require_import(mixin_module, role_for_name)
                         self._resolver.name_to_module_map[role_for_name] = mixin_module
+            elif self._get_owned_delegatee_for_name(base_name) is not None:
+                delegatee_type = self._get_owned_delegatee_for_name(base_name)
+                role_for_name = self.get_delegator_for_name(delegatee_type)
+                role_for_bases.append(LibCSTNodeFactory.make_argument(role_for_name))
+                owner_module = self._global_base_class_ownership.get(delegatee_type)
+                if owner_module is not None and owner_module is not self.source_module:
+                    mixin_module = _mixin_module_dotted_name(owner_module.__name__)
+                    if delegatee_type not in self._cross_module_rolefor_bases:
+                        self._cross_module_rolefor_bases[delegatee_type] = mixin_module
+                        self.require_import(mixin_module, role_for_name)
+                        self._resolver.name_to_module_map[role_for_name] = mixin_module
             elif _is_role_base_node(base.value) and issubclass(
                 wrapped_class.clazz, Role
             ):
                 taker_type = wrapped_class.clazz.get_role_taker_type()
                 role_for_bases.append(
-                    LibCSTNodeFactory.make_argument(self.get_delegator_for_name(taker_type))
+                    LibCSTNodeFactory.make_argument(
+                        self.get_delegator_for_name(taker_type)
+                    )
                 )
 
         for base_type in uncovered_segregated:
@@ -999,6 +1074,17 @@ class RoleModuleTransformer(ContextAwareTransformer):
     def get_delegator_for_name(cls, delegatee_class: type) -> str:
         """Return the name of the DelegatorFor class for the given delegatee class."""
         return f"DelegatorFor{delegatee_class.__name__}"
+
+    def _get_owned_delegatee_for_name(self, name: str) -> type | None:
+        """Return the delegatee type whose ``__name__`` matches *name*, looking first
+        in ``_global_base_class_ownership`` and then in ``_all_delegatees``."""
+        for delegatee_type in self._global_base_class_ownership:
+            if delegatee_type.__name__ == name:
+                return delegatee_type
+        for delegatee_type in self._all_delegatees:
+            if delegatee_type.__name__ == name:
+                return delegatee_type
+        return None
 
     def require_import(self, module: str, names: str | list[str]):
         """Record an import that must appear in the generated mixin module.

@@ -67,7 +67,7 @@ class DelegatorForShelf(DelegatorForCargoCrate, ABC):
 
 
 @dataclass(eq=False)
-class DelegatorForRack(DelegatorForShelf, DelegatorForCargoCrate, ABC):
+class DelegatorForRack(DelegatorForShelf, ABC):
 
     @property
     @abstractmethod

@@ -161,16 +161,22 @@ def test_typing_alias_imported_from_base_method():
 
     Reproduction: BaseTaker.to_dict() -> Dict[str, str] (Dict imported in
     base_taker.py only).  reproduction_module.py does NOT import Dict.
-    """
-    transformer = RoleTransformer(reproduction_module, file_name_prefix=TRANSFORMED)
-    _, mixin_source = transformer.transform()[reproduction_module]
 
-    # The delegation method must appear in the mixin
-    assert "def to_dict" in mixin_source, "to_dict delegation missing from mixin"
+    BaseTaker is a transitive same-package ancestor of Taker; its DelegatorFor
+    mixin is generated in the base_taker module's mixin, not reproduction_module's.
+    """
+    from test.krrood_test.dataset.role_and_ontology import base_taker as base_taker_module
+
+    transformer = RoleTransformer(reproduction_module, file_name_prefix=TRANSFORMED)
+    all_sources = transformer.transform()
+    _, base_mixin = all_sources[base_taker_module]
+
+    # The delegation method must appear in the base module's mixin
+    assert "def to_dict" in base_mixin, "to_dict delegation missing from base module mixin"
     # Dict must be imported at the top level (it is a typing alias → top-level import)
     assert (
-        "import Dict" in mixin_source
-    ), f"'Dict' not imported in mixin.\nMixin source:\n{mixin_source}"
+        "import Dict" in base_mixin
+    ), f"'Dict' not imported in base module mixin.\nMixin source:\n{base_mixin}"
 
 
 def test_no_init_or_post_init_in_role_for():
