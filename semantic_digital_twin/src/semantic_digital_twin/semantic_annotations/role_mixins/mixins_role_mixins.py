@@ -52,24 +52,12 @@ class DelegatorForHasRootKinematicStructureEntity(DelegatorForSemanticAnnotation
         self.delegatee.root = value
 
     @property
-    def bodies(self) -> list[Body]:
-        return self.delegatee.bodies
-
-    @property
     def global_transform(self) -> HomogeneousTransformationMatrix:
         return self.delegatee.global_transform
 
     @property
-    def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
-        return self.delegatee.kinematic_structure_entities
-
-    @property
     def min_max_points(self) -> tuple[Point3, Point3]:
         return self.delegatee.min_max_points
-
-    @property
-    def regions(self) -> list[Region]:
-        return self.delegatee.regions
 
     @property
     def scale(self) -> Scale:
@@ -120,26 +108,6 @@ class DelegatorForHasRootBody(DelegatorForHasRootKinematicStructureEntity, ABC):
     def bodies(self) -> list[Body]:
         return self.delegatee.bodies
 
-    @property
-    def global_transform(self) -> HomogeneousTransformationMatrix:
-        return self.delegatee.global_transform
-
-    @property
-    def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
-        return self.delegatee.kinematic_structure_entities
-
-    @property
-    def min_max_points(self) -> tuple[Point3, Point3]:
-        return self.delegatee.min_max_points
-
-    @property
-    def regions(self) -> list[Region]:
-        return self.delegatee.regions
-
-    @property
-    def scale(self) -> Scale:
-        return self.delegatee.scale
-
 
 @dataclass(eq=False)
 class DelegatorForHasStorageSpace(DelegatorForHasRootBody, ABC):
@@ -153,30 +121,6 @@ class DelegatorForHasStorageSpace(DelegatorForHasRootBody, ABC):
     @objects.setter
     def objects(self, value: List[THasRootBody]):
         self.delegatee.objects = value
-
-    @property
-    def bodies(self) -> list[Body]:
-        return self.delegatee.bodies
-
-    @property
-    def global_transform(self) -> HomogeneousTransformationMatrix:
-        return self.delegatee.global_transform
-
-    @property
-    def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
-        return self.delegatee.kinematic_structure_entities
-
-    @property
-    def min_max_points(self) -> tuple[Point3, Point3]:
-        return self.delegatee.min_max_points
-
-    @property
-    def regions(self) -> list[Region]:
-        return self.delegatee.regions
-
-    @property
-    def scale(self) -> Scale:
-        return self.delegatee.scale
 
     @synchronized_attribute_modification
     def add_object(self, object: HasRootBody):
@@ -200,30 +144,6 @@ class DelegatorForHasSupportingSurface(DelegatorForHasStorageSpace, ABC):
     @supporting_surface.setter
     def supporting_surface(self, value: Region):
         self.delegatee.supporting_surface = value
-
-    @property
-    def bodies(self) -> list[Body]:
-        return self.delegatee.bodies
-
-    @property
-    def global_transform(self) -> HomogeneousTransformationMatrix:
-        return self.delegatee.global_transform
-
-    @property
-    def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
-        return self.delegatee.kinematic_structure_entities
-
-    @property
-    def min_max_points(self) -> tuple[Point3, Point3]:
-        return self.delegatee.min_max_points
-
-    @property
-    def regions(self) -> list[Region]:
-        return self.delegatee.regions
-
-    @property
-    def scale(self) -> Scale:
-        return self.delegatee.scale
 
     def _2d_gaussian_sampler_from_2d_sample_space(
         self,
@@ -287,26 +207,3 @@ class DelegatorForHasCaseAsRootBody(DelegatorForHasSupportingSurface, ABC):
     @property
     @abstractmethod
     def delegatee(self) -> HasCaseAsRootBody: ...
-    @property
-    def bodies(self) -> list[Body]:
-        return self.delegatee.bodies
-
-    @property
-    def global_transform(self) -> HomogeneousTransformationMatrix:
-        return self.delegatee.global_transform
-
-    @property
-    def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
-        return self.delegatee.kinematic_structure_entities
-
-    @property
-    def min_max_points(self) -> tuple[Point3, Point3]:
-        return self.delegatee.min_max_points
-
-    @property
-    def regions(self) -> list[Region]:
-        return self.delegatee.regions
-
-    @property
-    def scale(self) -> Scale:
-        return self.delegatee.scale

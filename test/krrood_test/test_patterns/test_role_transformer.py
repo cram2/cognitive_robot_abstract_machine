@@ -95,30 +95,46 @@ def test_missing_imports_in_mixins():
     """
     Tests that missing imports in role mixins are resolved.
     In reproduction_module, Taker inherits from BaseTaker.
-    BaseTaker.get_external() returns ExternalType.
-    TakerRoleAttributes should include get_external() and import ExternalType.
+    BaseTaker.get_external() returns ExternalType and external_list is a property
+    returning List[ExternalType].  With correct base-class segregation, these members
+    are delegated by DelegatorForBaseTaker (in base_taker_role_mixins), and
+    DelegatorForTaker inherits them — so ExternalType must be imported in the
+    base_taker_role_mixins module, not in reproduction_module's mixin.
     """
     transformer = RoleTransformer(reproduction_module, file_name_prefix=TRANSFORMED)
     results = transformer.transform()
 
-    # reproduction_module should be in results
     assert reproduction_module in results
     transformed_source, mixin_source = results[reproduction_module]
 
-    # Check mixin_source for ExternalType import
+    # DelegatorForTaker inherits from DelegatorForBaseTaker, which is imported
+    # from the base_taker role mixins module.
+    assert "DelegatorForBaseTaker" in mixin_source
+
+    # DelegatorForTaker must NOT re-declare base members — it should only have
+    # the abstract delegatee property.
+    assert "def get_external" not in mixin_source
+    assert "def external_list" not in mixin_source
+    assert "def to_dict" not in mixin_source
+
+    # ExternalType is NOT imported in reproduction_module's mixin because it is
+    # only used by DelegatorForBaseTaker (which lives in base_taker_role_mixins).
     assert (
         "from test.krrood_test.dataset.role_and_ontology.external_types import ExternalType"
-        in mixin_source
-    )
-
-    # Check for generic type handling: List[ExternalType] should NOT have full path
-    # and ExternalType should be imported (covered above)
-    print(f"DEBUG: mixin_source:\n{mixin_source}")
-    assert (
-        "List[test.krrood_test.dataset.role_and_ontology.external_types.ExternalType]"
         not in mixin_source
     )
-    assert "list[ExternalType]" in mixin_source or "List[ExternalType]" in mixin_source
+    assert "List[ExternalType]" not in mixin_source
+    assert "list[ExternalType]" not in mixin_source
+
+    # Check that the base_taker mixin has the ExternalType import.
+    import test.krrood_test.dataset.role_and_ontology.base_taker as base_taker_mod
+    assert base_taker_mod in results
+    _, base_mixin_source = results[base_taker_mod]
+    assert (
+        "from test.krrood_test.dataset.role_and_ontology.external_types import ExternalType"
+        in base_mixin_source
+    )
+    assert "list[ExternalType]" in base_mixin_source or "List[ExternalType]" in base_mixin_source
 
 
 def test_transformation_idempotency():

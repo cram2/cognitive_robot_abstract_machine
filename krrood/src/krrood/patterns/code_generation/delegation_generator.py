@@ -89,6 +89,38 @@ def _find_defining_class(
     return None
 
 
+def _is_member_already_covered(
+    name: str,
+    clazz: type,
+    already_covered_bases: set[type],
+    is_member: Callable[[type], bool],
+    is_excluded_defining_class: Callable[[type], bool] | None = None,
+) -> bool:
+    """Return True if the first class in clazz's MRO that defines name is in already_covered_bases.
+
+    Unlike ``_find_defining_class``, this function ignores package boundaries and
+    reports the covered status so callers can decide whether to suppress a
+    re-declaration.
+
+    :param name: The attribute name to find.
+    :param clazz: The class whose MRO is walked.
+    :param already_covered_bases: Set of base types whose members are already delegated.
+    :param is_member: Callable that returns True when a class defines name.
+    :param is_excluded_defining_class: Optional predicate that excludes a class.
+    :return: True when the name's defining class is in ``already_covered_bases``.
+    """
+    for klass in clazz.__mro__[1:]:
+        if klass is object:
+            return False
+        if is_member(klass):
+            if is_excluded_defining_class is not None and is_excluded_defining_class(
+                klass
+            ):
+                return False
+            return klass in already_covered_bases
+    return False
+
+
 @dataclasses.dataclass
 class DelegationGenerator:
     """
@@ -304,6 +336,59 @@ class DelegationGenerator:
             reference_type=nearest_covered_type,
         )
 
+    def _maybe_add_narrowing_redecl_for_covered_property(
+        self,
+        property_name: str,
+        base_return_type: Any,
+        wrapped_class: WrappedClass,
+        has_setter: bool,
+        groups: dict[type | None, dict[str, list]],
+    ) -> None:
+        """Add a narrowing re-declaration for a property already delegated by a parent DelegatorFor.
+
+        Only adds a re-declaration when the current class genuinely narrows the
+        property's return type (i.e., substitutes a TypeVar with a strictly more
+        specific type).  Reuses ``_nearest_covered_base_and_type`` and
+        ``GenericTypeSubstitution`` to determine whether narrowing has occurred.
+
+        :param property_name: The property name.
+        :param base_return_type: The raw return-type annotation of the property.
+        :param wrapped_class: The class being processed.
+        :param has_setter: Whether the property has a setter.
+        :param groups: The accumulator dict to populate.
+        """
+        raw_defining_base = self._find_raw_property_defining_base(
+            property_name, wrapped_class
+        )
+        if raw_defining_base is None or base_return_type is None:
+            return
+
+        nearest_covered_base, nearest_covered_type = (
+            self._nearest_covered_base_and_type(
+                wrapped_class, raw_defining_base, base_return_type
+            )
+        )
+
+        substitution = GenericTypeSubstitution.from_specialization(
+            wrapped_class.clazz, raw_defining_base
+        )
+        if not substitution.has_genuine_substitutions:
+            return
+        result = substitution.apply(base_return_type)
+        if not result.resolved:
+            return
+        if (
+            nearest_covered_type is not None
+            and result.resolved_type is nearest_covered_type
+        ):
+            return
+
+        concrete_annotation = self._normalise_type_name(result.resolved_type)
+        redeclared_nodes = self._make_property_delegation_nodes(
+            property_name, concrete_annotation, has_setter
+        )
+        groups.setdefault(None, {})[property_name] = redeclared_nodes
+
     def _add_narrowing_redeclaration(
         self,
         field_name: str,
@@ -354,6 +439,34 @@ class DelegationGenerator:
             if klass is object:
                 return None
             if _is_original_field_definer(klass, field_.name):
+                return klass
+        return None
+
+    def _find_raw_property_defining_base(
+        self,
+        property_name: str,
+        wrapped_class: WrappedClass,
+    ) -> type | None:
+        """Return the first class in wrapped_class's MRO that defines property_name, ignoring coverage.
+
+        Unlike ``_find_defining_class``, this method does NOT check
+        ``already_covered_bases`` or package boundaries.  It is used by
+        ``_maybe_add_narrowing_redecl_for_covered_property`` to find the original
+        definer so that TypeVar narrowing can be computed.
+
+        :param property_name: The property name to look up.
+        :param wrapped_class: The class whose MRO is searched.
+        :return: The defining class, or None if not found.
+        """
+        for klass in wrapped_class.clazz.__mro__[1:]:
+            if klass is object:
+                return None
+            if property_name in vars(klass):
+                if (
+                    self.is_excluded_defining_class is not None
+                    and self.is_excluded_defining_class(klass)
+                ):
+                    return None
                 return klass
         return None
 
@@ -472,22 +585,45 @@ class DelegationGenerator:
             prop_nodes = self._make_property_delegation_nodes(
                 property_name, return_annotation, has_setter
             )
-            groups.setdefault(defining_base, {})[property_name] = prop_nodes
 
-            if defining_base is not None and base_return_type is not None:
-                substitution = GenericTypeSubstitution.from_specialization(
-                    wrapped_class.clazz, defining_base
-                )
-                if substitution.has_substitutions:
-                    result = substitution.apply(base_return_type)
-                    if result.resolved:
-                        concrete_annotation = self._normalise_type_name(
-                            result.resolved_type
-                        )
-                        redeclared_nodes = self._make_property_delegation_nodes(
-                            property_name, concrete_annotation, has_setter
-                        )
-                        groups.setdefault(None, {})[property_name] = redeclared_nodes
+            if defining_base is not None:
+                # Property defined in a same-package, non-covered base class.
+                groups.setdefault(defining_base, {})[property_name] = prop_nodes
+
+                if base_return_type is not None:
+                    substitution = GenericTypeSubstitution.from_specialization(
+                        wrapped_class.clazz, defining_base
+                    )
+                    if substitution.has_substitutions:
+                        result = substitution.apply(base_return_type)
+                        if result.resolved:
+                            concrete_annotation = self._normalise_type_name(
+                                result.resolved_type
+                            )
+                            redeclared_nodes = self._make_property_delegation_nodes(
+                                property_name, concrete_annotation, has_setter
+                            )
+                            groups.setdefault(None, {})[property_name] = redeclared_nodes
+            else:
+                # defining_base is None — disambiguate the reason.
+                if property_name in vars(wrapped_class.clazz):
+                    groups.setdefault(None, {})[property_name] = prop_nodes
+                elif _is_member_already_covered(
+                    property_name,
+                    wrapped_class.clazz,
+                    self.already_covered_bases,
+                    lambda klass: property_name in vars(klass),
+                    self.is_excluded_defining_class,
+                ):
+                    self._maybe_add_narrowing_redecl_for_covered_property(
+                        property_name,
+                        base_return_type,
+                        wrapped_class,
+                        has_setter,
+                        groups,
+                    )
+                else:
+                    groups.setdefault(None, {})[property_name] = prop_nodes
 
     def _make_property_delegation_nodes(
         self,
