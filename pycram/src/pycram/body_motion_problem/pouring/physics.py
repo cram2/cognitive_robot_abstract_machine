@@ -120,7 +120,7 @@ class PouringMSCModel(PhysicsModel):
             root_link=self.root_link,
             tip_link=self.tip_link,
             goal_value=effect.goal_value,
-            tolerance=effect.tolerance,
+            fill_level_tolerance=effect.tolerance,
             reference_velocity=self.reference_velocity,
         )
         msc.add_node(task)

@@ -40,8 +40,11 @@ class PouringTask(Task):
     goal_value: float
     """Target fill level to achieve in terms of percentage."""
 
-    tolerance: float
+    fill_level_tolerance: float
     """tolerance threshold around goal_value."""
+
+    outflow_tolerance: float = field(default=0.001, kw_only=True)
+    """tolerance threshold around zero for final outflow rate."""
 
     reference_velocity: float = field(default=0.05, kw_only=True)
     """Desired rate of decrease for the normalized fill level."""
@@ -51,7 +54,23 @@ class PouringTask(Task):
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
-        Creates the constraints for the fill level and the tilt angle.
+        Creates the equality constraint that drives the arm to tilt the cup until the goal fill level is reached.
+
+        The fill-level DOF is physics-driven (passive in the QP), so the constraint cannot command fill velocity
+        directly. Instead it drives arm joint velocities via the gradient of :attr:`fill_vel_ode` with respect to
+        the tilt angle.
+
+        The constraint is formulated as::
+
+            d(fill_vel_ode)/dt = (goal - fill) - fill_vel_ode
+
+        whose steady state is ``fill_vel_ode = goal - fill``, meaning outflow is proportional to the remaining
+        error and reaches zero exactly when fill equals the goal. The ``-fill_vel_ode`` term on the right-hand side
+        acts as proportional damping: when the cup is already pouring fast enough (or has overshot the goal), the
+        QP immediately drives the arm to reduce tilt rather than waiting for the fill error to accumulate.
+
+        Without this damping term the equality bound would be ``goal - fill``, which evaluates to zero at the goal
+        and therefore commands the QP to hold outflow *constant* rather than stop it, causing sustained overshoot.
 
         :param context: The build context.
         :return: The generated task artifacts.
@@ -62,15 +81,17 @@ class PouringTask(Task):
         root_T_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
-        tilt_expr = tilt_expression_from_fk(root_T_tip)
-        self.fill_vel_ode = self.fill_equation.symbolic_velocity(tilt_expr, fill_sym)
+        # TODO the tilt expression only works properly when the root link is the world.root
+        self.tilt_expr = tilt_expression_from_fk(root_T_tip)
+        self.fill_vel_ode = self.fill_equation.symbolic_velocity(
+            self.tilt_expr, fill_sym
+        )
 
         artifacts.constraints.add_equality_constraint(
             name=f"{self.fill_connection.name}",
-            equality_bound=sm.Scalar(self.goal_value) - fill_sym,
+            equality_bound=(sm.Scalar(self.goal_value) - fill_sym) - self.fill_vel_ode,
             quadratic_weight=self.weight,
-            task_expression=fill_sym
-            + self.fill_vel_ode,  # This is a linear approximation of fill sym as a function of fill and tilt.
+            task_expression=self.fill_vel_ode,
             reference_velocity=self.reference_velocity,
         )
         return artifacts
@@ -86,6 +107,9 @@ class PouringTask(Task):
         """
         fill = float(self.fill_connection.position)
         outflow = float(self.fill_vel_ode.evaluate()[0])
-        if fill <= self.goal_value + self.tolerance and outflow >= 0.0:
+        if (
+            fill <= self.goal_value + self.fill_level_tolerance
+            and -self.outflow_tolerance < outflow < self.outflow_tolerance
+        ):
             return ObservationStateValues.TRUE
         return None
