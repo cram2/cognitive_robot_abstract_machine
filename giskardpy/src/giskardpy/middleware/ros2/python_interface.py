@@ -112,7 +112,6 @@ class GiskardWrapper:
         """
         try:
             future = self._client._goal_handle.cancel_goal_async()
-        #Bad design, {AttributeError}AttributeError("'GiskardWrapper' object has no attribute '_world'") error here!
         except AttributeError as e:
             raise ExecutionException(
                 "Can't cancel goals, because there is no active one"
