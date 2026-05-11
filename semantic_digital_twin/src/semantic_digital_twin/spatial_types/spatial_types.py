@@ -21,6 +21,7 @@ from typing_extensions import (
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
+from krrood.patterns.role.predicates import isinstance_or_role
 from krrood.symbolic_math.exceptions import (
     WrongDimensionsError,
     UnsupportedOperationError,
@@ -422,14 +423,14 @@ class HomogeneousTransformationMatrix(
     def dot(
         self, other: GenericHomogeneousSpatialType
     ) -> GenericHomogeneousSpatialType:
-        if isinstance(
+        if isinstance_or_role(
             other,
             (Vector3, Point3, RotationMatrix, HomogeneousTransformationMatrix, Pose),
         ):
             result_sx = ca.mtimes(self.casadi_sx, other.casadi_sx)
             result = type(other).from_casadi_sx(casadi_sx=result_sx)
             result.reference_frame = self.reference_frame
-            if isinstance(other, HomogeneousTransformationMatrix):
+            if isinstance_or_role(other, HomogeneousTransformationMatrix):
                 result.child_frame = other.child_frame
             return result
         raise UnsupportedOperationError("dot", self, other)
@@ -659,7 +660,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         )
 
     def dot(self, other: GenericRotatableSpatialType) -> GenericRotatableSpatialType:
-        if isinstance(
+        if isinstance_or_role(
             other, (Vector3, RotationMatrix, HomogeneousTransformationMatrix, Pose)
         ):
             result_sx = ca.mtimes(self.casadi_sx, other.casadi_sx)
@@ -1336,7 +1337,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return result
 
     def dot(self, other: Vector3) -> sm.Scalar:
-        if isinstance(other, Vector3):
+        if isinstance_or_role(other, Vector3):
             return sm.Scalar(ca.mtimes(sm.to_sx(self[:3]).T, sm.to_sx(other[:3])))
         raise UnsupportedOperationError("dot", self, other)
 
