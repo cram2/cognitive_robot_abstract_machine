@@ -487,6 +487,14 @@ class ConnectionConverter(EntityConverter, ABC):
         """
         return EntityConverter._convert(self, entity)
 
+@dataclass
+class OmniDriveConverter(ConnectionConverter, ABC):
+    """
+
+    """
+
+    entity_type: ClassVar[Type[OmniDrive]] = OmniDrive
+
 
 @dataclass
 class Connection1DOFConverter(ConnectionConverter, ABC):
@@ -1209,6 +1217,11 @@ class MujocoJointConverter(ConnectionConverter, ABC):
 
 
 @dataclass
+class MujocoSpecialJointConverter(ConnectionConverter, ABC):
+    ...
+
+
+@dataclass
 class Mujoco1DOFJointConverter(MujocoJointConverter, Connection1DOFConverter):
     axis_str: str = "axis"
     range_str: str = "range"
@@ -1251,6 +1264,52 @@ class MujocoPrismaticJointConverter(
 @dataclass
 class Mujoco6DOFJointConverter(MujocoJointConverter, Connection6DOFConverter):
     type: mujoco.mjtJoint = mujoco.mjtJoint.mjJNT_FREE
+
+
+@dataclass
+class MujocoOmniDriveConverter(MujocoSpecialJointConverter, OmniDriveConverter):
+    def _post_convert(
+        self, entity: OmniDrive, joint_props: Dict[str, Any], **kwargs
+    ) -> Dict[str, Any]:
+        joint_name = entity.name.name
+        joint_props["joints"] = [
+            {
+                "name": f"{joint_name}_x_id",
+                "axis": [1, 0, 0],
+                "type": mujoco.mjtJoint.mjJNT_SLIDE,
+            },
+            {
+                "name": f"{joint_name}_y_id",
+                "axis": [0, 1, 0],
+                "type": mujoco.mjtJoint.mjJNT_SLIDE
+            },
+            {
+                "name": f"{joint_name}_roll_id",
+                "axis": [1, 0, 0],
+                "type": mujoco.mjtJoint.mjJNT_HINGE,
+            },
+            {
+                "name": f"{joint_name}_pitch_id",
+                "axis": [0, 1, 0],
+                "type": mujoco.mjtJoint.mjJNT_HINGE,
+            },
+            {
+                "name": f"{joint_name}_yaw_id",
+                "axis": [0, 0, 1],
+                "type": mujoco.mjtJoint.mjJNT_HINGE,
+            },
+            {
+                "name": f"{joint_name}_x_velocity_id",
+                "axis": [1, 0, 0],
+                "type": mujoco.mjtJoint.mjJNT_SLIDE,
+            },
+            {
+                "name": f"{joint_name}_y_velocity_id",
+                "axis": [0, 1, 0],
+                "type": mujoco.mjtJoint.mjJNT_SLIDE
+            },
+        ]
+        return joint_props
 
 
 @dataclass
@@ -1550,7 +1609,7 @@ class MujocoBuilder(MultiSimBuilder):
         qpos = []
         for body in self.world.bodies:
             parent_connection = body.parent_connection
-            if isinstance(parent_connection, FixedConnection) or parent_connection is None:
+            if isinstance(parent_connection, FixedConnection) or isinstance(parent_connection, OmniDrive) or parent_connection is None:
                 continue
             qpos += [self.world.state[dof.id].position for dof in parent_connection.active_dofs + parent_connection.passive_dofs]
         key_element.set("qpos", " ".join(map(str, qpos)))
@@ -1686,13 +1745,32 @@ class MujocoBuilder(MultiSimBuilder):
     def _build_connection(self, connection: Connection):
         if isinstance(connection, FixedConnection):
             return
-        if isinstance(connection, OmniDrive) or isinstance(connection, DifferentialDrive):
-            self._build_special_connection(connection=connection)
+        if isinstance(connection, OmniDrive):
+            return
         else:
             self._build_mujoco_connection(connection=connection)
 
     def _build_special_connection(self, connection: Connection):
-        raise NotImplementedError(f"{type(connection)} not supported in Mujoco.") # TODO: Implement this
+        pass
+        # joint_props = MujocoSpecialJointConverter.convert(connection)
+        # child_body_name = connection.child.name.name
+        # child_body_spec = self._find_entity(
+        #     entity_type=mujoco.mjtObj.mjOBJ_BODY, entity_name=child_body_name
+        # )
+        # if child_body_spec is None:
+        #     raise MujocoEntityNotFoundError(
+        #         entity_name=child_body_name,
+        #         entity_type=mujoco.mjtObj.mjOBJ_BODY,
+        #     )
+        # for joint_prop in joint_props["joints"]:
+        #     joint_name = joint_prop.pop("name")
+        #     joint_spec = child_body_spec.add_joint(**joint_prop)
+        #     if joint_spec is None:
+        #         raise MujocoEntityNotFoundError(
+        #             entity_name=joint_name,
+        #             entity_type=mujoco.mjtObj.mjOBJ_JOINT,
+        #             action="add",
+        #         )
 
     def _build_mujoco_connection(self, connection: Connection):
         joint_props = MujocoJointConverter.convert(connection)
