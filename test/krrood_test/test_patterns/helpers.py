@@ -10,6 +10,20 @@ TRANSFORMED = TransformationMode.TRANSFORMED.value
 
 import libcst as cst
 
+
+def _resolve_relative_import(package: str, num_dots: int, module: str) -> str:
+    """Resolve a relative import like ``from .foo import X`` to absolute form
+    ``from pkg.foo import X`` given the *package* of the module containing it.
+
+    ``.`` means the package itself, ``..`` means the parent package, etc.
+    """
+    parts = package.split(".")
+    if num_dots > len(parts) + 1:
+        return module  # too many dots — leave unresolved
+    base_parts = parts[: len(parts) - (num_dots - 1)]
+    base = ".".join(base_parts)
+    return f"{base}.{module}" if base else module
+
 # ---------------------------------------------------------------------------
 # Comparator
 # ---------------------------------------------------------------------------
@@ -23,6 +37,7 @@ class ModuleComparator:
 
     generated_tree: cst.Module
     expected_tree: cst.Module
+    ground_truth_package: Optional[str] = None
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -172,14 +187,16 @@ class ModuleComparator:
         """Verifies that all imports match between modules."""
         import pprint
         gen_imports = self._get_imports(self.generated_tree)
-        exp_imports = self._get_imports(self.expected_tree)
+        exp_imports = self._get_imports(self.expected_tree, package=self.ground_truth_package)
         assert gen_imports == exp_imports, (
             f"Imports mismatch:\n"
             f"got: {pprint.pformat(gen_imports)}\n"
             f"expected: {pprint.pformat(exp_imports)}"
         )
 
-    def _get_imports(self, tree: cst.Module) -> Dict[str, Set[str]]:
+    def _get_imports(
+        self, tree: cst.Module, package: Optional[str] = None
+    ) -> Dict[str, Set[str]]:
         from collections import defaultdict
 
         def normalize(text: str) -> str:
@@ -201,9 +218,15 @@ class ModuleComparator:
                     self.imports["import"].add(mod_name)
 
             def visit_ImportFrom(self, node: cst.ImportFrom) -> None:
-                dots = "." * len(node.relative)
                 mod_name = normalize(_code(node.module)) if node.module else ""
-                key = f"from {dots}{mod_name}"
+                if node.relative and package:
+                    mod_name = _resolve_relative_import(
+                        package, len(node.relative), mod_name
+                    )
+                    key = f"from {mod_name}"
+                else:
+                    dots = "." * len(node.relative)
+                    key = f"from {dots}{mod_name}"
                 for name in node.names:
                     if isinstance(name.name, cst.ImportStar):
                         self.imports[key].add("*")
@@ -225,40 +248,53 @@ def get_module_comparators(
 
     for module, (transformed_code, mixin_code) in generated_modules.items():
         # Transformed module
-        expected_transformed = get_ground_truth_module_source(module, is_mixin=False)
+        expected_transformed, transformed_package = get_ground_truth_module_source(
+            module, is_mixin=False
+        )
         comparators.append(
-            get_comparator_for_modules(transformed_code, expected_transformed)
+            get_comparator_for_modules(
+                transformed_code, expected_transformed, transformed_package
+            )
         )
 
         # Mixin module
-        expected_mixin = get_ground_truth_module_source(module, is_mixin=True)
-        comparators.append(get_comparator_for_modules(mixin_code, expected_mixin))
+        expected_mixin, mixin_package = get_ground_truth_module_source(
+            module, is_mixin=True
+        )
+        comparators.append(
+            get_comparator_for_modules(mixin_code, expected_mixin, mixin_package)
+        )
 
     return comparators  # no cleanup needed — no sys.modules pollution
 
 
 def get_ground_truth_module_source(
     generated_module: ModuleType, is_mixin: bool = False
-) -> str:
+) -> Tuple[str, str]:
     path = Path(generated_module.__file__)
     module_name = path.stem
+    package = generated_module.__package__
     if is_mixin:
         ground_truth_name = f"{GROUND_TRUTH}{module_name}_role_mixins.py"
         ground_truth_path = path.parent / "role_mixins" / ground_truth_name
+        package = f"{package}.role_mixins"
     else:
         ground_truth_name = f"{GROUND_TRUTH}{TRANSFORMED}{module_name}.py"
         ground_truth_path = path.parent / ground_truth_name
 
     with open(ground_truth_path, "r") as f:
-        return f.read()
+        return f.read(), package
 
 
 def get_comparator_for_modules(
-    source_of_module_to_be_validated: str, source_of_ground_truth_module: str
+    source_of_module_to_be_validated: str,
+    source_of_ground_truth_module: str,
+    ground_truth_package: Optional[str] = None,
 ):
     return ModuleComparator(
         parse_module(source_of_module_to_be_validated),
         parse_module(source_of_ground_truth_module),
+        ground_truth_package=ground_truth_package,
     )
 
 

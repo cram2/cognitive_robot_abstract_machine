@@ -7,7 +7,7 @@ from krrood.entity_query_language.factories import variable_from
 from krrood.patterns.role.role import Role
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.patterns.role import HasRoles
-from test.krrood_test.dataset.role_and_ontology.role_mixins.two_role_taker_narrowing_role_mixins import (
+from .role_mixins.two_role_taker_narrowing_role_mixins import (
     RoleForBaseHolder,
     RoleForDerivedHolder,
 )

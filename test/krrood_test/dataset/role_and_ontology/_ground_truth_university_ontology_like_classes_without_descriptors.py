@@ -13,10 +13,10 @@ from krrood.entity_query_language.predicate import (
 )
 from krrood.patterns.role.role import Role
 from krrood.patterns.role import HasRoles
-from test.krrood_test.dataset.role_and_ontology.role_mixins.role_takers_in_another_module_role_mixins import (
+from .role_mixins.role_takers_in_another_module_role_mixins import (
     RoleForRoleTakerInAnotherModule,
 )
-from test.krrood_test.dataset.role_and_ontology.role_mixins.university_ontology_like_classes_without_descriptors_role_mixins import (
+from .role_mixins.university_ontology_like_classes_without_descriptors_role_mixins import (
     RoleForCEOAsFirstRole,
     RoleForPersonInRoleAndOntology,
     RoleForRepresentativeAsSecondRole,

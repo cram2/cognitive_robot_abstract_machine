@@ -258,8 +258,8 @@ def generic_typevar_mixin_source():
 
 @pytest.fixture
 def generic_typevar_mixin_comparator(generic_typevar_mixin_source):
-    expected = get_ground_truth_module_source(generic_typevar_takers, is_mixin=True)
-    return get_comparator_for_modules(generic_typevar_mixin_source, expected)
+    expected, package = get_ground_truth_module_source(generic_typevar_takers, is_mixin=True)
+    return get_comparator_for_modules(generic_typevar_mixin_source, expected, package)
 
 
 def test_typevar_preserved_in_base_rolefor(generic_typevar_mixin_source):
@@ -321,8 +321,8 @@ def subclass_safe_generic_mixin_source():
 
 @pytest.fixture
 def subclass_safe_generic_mixin_comparator(subclass_safe_generic_mixin_source):
-    expected = get_ground_truth_module_source(subclass_safe_generic_takers, is_mixin=True)
-    return get_comparator_for_modules(subclass_safe_generic_mixin_source, expected)
+    expected, package = get_ground_truth_module_source(subclass_safe_generic_takers, is_mixin=True)
+    return get_comparator_for_modules(subclass_safe_generic_mixin_source, expected, package)
 
 
 def test_subclasssafegeneric_base_rolefor_uses_base_typevar(subclass_safe_generic_mixin_source):
@@ -368,8 +368,8 @@ def independent_typevar_mixin_source():
 
 @pytest.fixture
 def independent_typevar_mixin_comparator(independent_typevar_mixin_source):
-    expected = get_ground_truth_module_source(independent_typevar_takers, is_mixin=True)
-    return get_comparator_for_modules(independent_typevar_mixin_source, expected)
+    expected, package = get_ground_truth_module_source(independent_typevar_takers, is_mixin=True)
+    return get_comparator_for_modules(independent_typevar_mixin_source, expected, package)
 
 
 def test_independent_typevar_root_not_overwritten_by_content_typevar(independent_typevar_mixin_source):
@@ -427,8 +427,8 @@ def two_role_taker_narrowing_mixin_source():
 
 @pytest.fixture
 def two_role_taker_narrowing_comparator(two_role_taker_narrowing_mixin_source):
-    expected = get_ground_truth_module_source(two_role_taker_narrowing, is_mixin=True)
-    return get_comparator_for_modules(two_role_taker_narrowing_mixin_source, expected)
+    expected, package = get_ground_truth_module_source(two_role_taker_narrowing, is_mixin=True)
+    return get_comparator_for_modules(two_role_taker_narrowing_mixin_source, expected, package)
 
 
 def test_two_role_taker_narrowing_entity_redeclared_in_derived(two_role_taker_narrowing_mixin_source):
@@ -489,8 +489,8 @@ def unsubscripted_intermediate_mixin_source():
 
 @pytest.fixture
 def unsubscripted_intermediate_mixin_comparator(unsubscripted_intermediate_mixin_source):
-    expected = get_ground_truth_module_source(unsubscripted_intermediate_taker, is_mixin=True)
-    return get_comparator_for_modules(unsubscripted_intermediate_mixin_source, expected)
+    expected, package = get_ground_truth_module_source(unsubscripted_intermediate_taker, is_mixin=True)
+    return get_comparator_for_modules(unsubscripted_intermediate_mixin_source, expected, package)
 
 
 def test_unsubscripted_intermediate_item_not_redeclared_in_rack(unsubscripted_intermediate_mixin_source):

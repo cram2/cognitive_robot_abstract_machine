@@ -4,7 +4,7 @@ from typing import Generic, TypeVar
 from krrood.entity_query_language.factories import variable_from
 from krrood.patterns.role.role import Role
 from krrood.patterns.role import HasRoles
-from test.krrood_test.dataset.role_and_ontology.role_mixins.generic_typevar_takers_role_mixins import (
+from .role_mixins.generic_typevar_takers_role_mixins import (
     RoleForConcreteTypeTaker,
     RoleForNarrowedTypeVarTaker,
     RoleForUnspecializedSubTaker,
