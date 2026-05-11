@@ -531,6 +531,13 @@ class TestGenerateRoleMixinsForPackageModuleType:
 
         generate_role_mixins_for_package(pkg, write=False)
 
+    def test_accepts_plain_module_dry_run(self):
+        """Passing a plain module (no __path__) with write=False must not raise."""
+        import krrood.exceptions
+
+        assert not hasattr(krrood.exceptions, "__path__")
+        generate_role_mixins_for_package(krrood.exceptions, write=False)
+
 
 # ── ensure_role_mixins_current_for_pytest with ModuleType ──────────────────────
 
