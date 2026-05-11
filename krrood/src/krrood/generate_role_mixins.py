@@ -70,6 +70,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import enum
 import importlib
 import logging
 import sys
@@ -155,24 +156,45 @@ def _are_semantically_equal(a: str, b: str) -> bool:
         return a == b
 
 
+# ── package resolution ─────────────────────────────────────────────────────────
+
+
+def _resolve_package(package: str | ModuleType) -> ModuleType:
+    """Resolve a package specifier to a :class:`ModuleType`.
+
+    :param package: Dotted package name or an already-imported module object.
+    :return: The imported package module.
+    :raises TypeError: If *package* is neither a string nor a ModuleType.
+    :raises ImportError: If *package* is a string and cannot be imported.
+    """
+    if isinstance(package, ModuleType):
+        return package
+    if isinstance(package, str):
+        return importlib.import_module(package)
+    raise TypeError(
+        f"Expected a package name (str) or ModuleType, got {type(package).__name__}"
+    )
+
+
 # ── staleness check ───────────────────────────────────────────────────────────
 
 
-def _stale_files_for_package(package_name: str) -> list[Path]:
+def _stale_files_for_package(package: str | ModuleType) -> list[Path]:
     """Return every mixin or transformed-source path that is missing or semantically stale.
 
     Runs ``transform(write=False)`` (in the current process, reloads happen) to
     obtain the *would-be* generated content, then compares it semantically with
     what is on disk.
 
-    :param package_name: Fully-qualified import name of the package to check.
+    :param package: Dotted package name or an already-imported module object.
     :return: List of :class:`~pathlib.Path` objects for files that need writing.
-    :raises ImportError: If *package_name* cannot be imported.
+    :raises ImportError: If *package* is a string and cannot be imported.
+    :raises TypeError: If *package* is neither a string nor a ModuleType.
     """
     from krrood.patterns.role.helpers import _modules_with_roles
     from krrood.patterns.role.role_transformer import RoleTransformer
 
-    package = importlib.import_module(package_name)
+    package = _resolve_package(package)
     all_classes = [c for c in classes_of_package(package) if is_dataclass(c)]
     class_diagram = ClassDiagram(all_classes)
 
@@ -209,7 +231,84 @@ def _stale_files_for_package(package_name: str) -> list[Path]:
 # ── pytest helper ─────────────────────────────────────────────────────────────
 
 
-def ensure_role_mixins_current_for_pytest(packages: list[str]) -> None:
+class _ActionResult(enum.Enum):
+    """Return-code for :func:`_ensure_role_mixins_current`."""
+
+    RETURN = enum.auto()  # all current, return immediately
+    RESTART = enum.auto()  # regenerated, restart pytest
+    ERROR = enum.auto()  # regeneration failed or retries exhausted
+
+
+def _ensure_role_mixins_current(
+    packages: list[str | ModuleType],
+) -> tuple[_ActionResult, int | str]:
+    """Core logic — pure decision, never exits the process.
+
+    Runs ``--check`` and regenerate subprocesses, then returns a decision
+    tuple of ``(action, payload)``:
+
+    * ``(RETURN, 0)`` — all files are current; caller should return.
+    * ``(RESTART, exitcode)`` — files were regenerated; caller should restart
+      pytest and exit with *exitcode*.
+    * ``(ERROR, msg)`` — regeneration failed or retry count exhausted; caller
+      should raise ``pytest.UsageError(msg)``.
+
+    This function is safe to call from tests because it neither calls
+    :func:`os._exit` nor raises :class:`pytest.UsageError` directly.
+    """
+    import os
+    import subprocess
+
+    _package_names: list[str] = []
+    for p in packages:
+        if isinstance(p, ModuleType):
+            _package_names.append(p.__name__)
+        elif isinstance(p, str):
+            _package_names.append(p)
+        else:
+            raise TypeError(
+                f"Expected package name (str) or ModuleType, got {type(p).__name__}"
+            )
+
+    remaining = int(os.environ.get("KRROOD_PYTEST_RERUN_COUNT", "2"))
+
+    check_result = subprocess.run(
+        [sys.executable, "-m", "krrood.generate_role_mixins", "--check"]
+        + _package_names,
+        capture_output=True,
+    )
+    if check_result.returncode == 0:
+        return _ActionResult.RETURN, 0
+
+    if check_result.stderr:
+        print(check_result.stderr.decode(), file=sys.stderr)
+
+    gen_result = subprocess.run(
+        [sys.executable, "-m", "krrood.generate_role_mixins"] + _package_names,
+    )
+    if gen_result.returncode != 0:
+        cmd = "krrood-generate-role-mixins " + " ".join(_package_names)
+        return (
+            _ActionResult.ERROR,
+            f"Role mixin regeneration failed.\nRun manually:\n\n    {cmd}",
+        )
+
+    if remaining <= 0:
+        cmd = "krrood-generate-role-mixins " + " ".join(_package_names)
+        return (
+            _ActionResult.ERROR,
+            f"Role mixin files are still outdated after regeneration attempts.\n"
+            f"Run manually:\n\n    {cmd}",
+        )
+
+    os.environ["KRROOD_PYTEST_RERUN_COUNT"] = str(remaining - 1)
+    result = subprocess.run([sys.executable, "-m", "pytest"] + sys.argv[1:])
+    return _ActionResult.RESTART, result.returncode
+
+
+def ensure_role_mixins_current_for_pytest(
+    packages: list[str | ModuleType],
+) -> None:
     """Ensure role mixin files are semantically current; auto-restart pytest if not.
 
     Designed for use in ``pytest_configure`` hooks.  All checking and
@@ -226,12 +325,14 @@ def ensure_role_mixins_current_for_pytest(packages: list[str]) -> None:
        a. Spawns ``krrood-generate-role-mixins <packages>`` to regenerate.
        b. Decrements ``KRROOD_PYTEST_RERUN_COUNT`` (default ``2``).
        c. Replaces the current process with a fresh pytest run via
-          ``os.execv`` so tests see the updated files in a clean import state.
+          ``os._exit`` so tests see the updated files in a clean import state.
 
     If *KRROOD_PYTEST_RERUN_COUNT* reaches 0 or regeneration fails, raises
     ``pytest.UsageError`` with a manual-run command in the message.
 
-    :param packages: Package names to check (e.g. ``["pycram"]``).
+    :param packages: Package names or module objects to check
+        (e.g. ``["pycram"]`` or ``[import pycram; pycram]``).
+    :raises TypeError: If any element is neither a string nor a ModuleType.
     :raises pytest.UsageError: On regeneration failure or exceeded retry limit.
     """
     import os
@@ -239,36 +340,11 @@ def ensure_role_mixins_current_for_pytest(packages: list[str]) -> None:
 
     import pytest
 
-    remaining = int(os.environ.get("KRROOD_PYTEST_RERUN_COUNT", "2"))
-
-    check_result = subprocess.run(
-        [sys.executable, "-m", "krrood.generate_role_mixins", "--check"] + packages,
-        capture_output=True,
-    )
-    if check_result.returncode == 0:
+    action, payload = _ensure_role_mixins_current(packages)
+    if action is _ActionResult.RETURN:
         return
-
-    # Print captured stderr so errors from the check run are visible to the user.
-    if check_result.stderr:
-        print(check_result.stderr.decode(), file=sys.stderr)
-
-    gen_result = subprocess.run(
-        [sys.executable, "-m", "krrood.generate_role_mixins"] + packages,
-    )
-    if gen_result.returncode != 0:
-        cmd = "krrood-generate-role-mixins " + " ".join(packages)
-        raise pytest.UsageError(
-            f"Role mixin regeneration failed.\nRun manually:\n\n    {cmd}"
-        )
-
-    if remaining <= 0:
-        cmd = "krrood-generate-role-mixins " + " ".join(packages)
-        raise pytest.UsageError(
-            f"Role mixin files are still outdated after regeneration attempts.\n"
-            f"Run manually:\n\n    {cmd}"
-        )
-
-    os.environ["KRROOD_PYTEST_RERUN_COUNT"] = str(remaining - 1)
+    if action is _ActionResult.ERROR:
+        raise pytest.UsageError(payload)
     result = subprocess.run([sys.executable, "-m", "pytest"] + sys.argv[1:])
     os._exit(result.returncode)
 
@@ -276,8 +352,8 @@ def ensure_role_mixins_current_for_pytest(packages: list[str]) -> None:
 # ── generation ────────────────────────────────────────────────────────────────
 
 
-def generate_role_mixins_for_package(package_name: str, write: bool = True) -> None:
-    """Scan *package_name* and generate (or preview) its role mixin stub files.
+def generate_role_mixins_for_package(package: str | ModuleType, write: bool = True) -> None:
+    """Scan *package* and generate (or preview) its role mixin stub files.
 
     Imports the package, collects every dataclass defined in it (recursively),
     builds a :class:`~krrood.class_diagrams.ClassDiagram`, and delegates to
@@ -287,15 +363,16 @@ def generate_role_mixins_for_package(package_name: str, write: bool = True) -> N
     already-imported modules in the calling process because it is designed to
     run in a fresh process (e.g. a CI step or a dedicated pre-test script).
 
-    :param package_name: Fully-qualified import name of the package to scan
-        (e.g. ``"pycram"`` or ``"semantic_digital_twin"``).
+    :param package: Dotted package name or an already-imported module object
+        (e.g. ``"pycram"`` or ``import pycram; pycram``).
     :param write: When *True* (default) write mixin and transformed source
         files to disk.  When *False* compute the content without writing
         (dry-run mode).
-    :raises ImportError: If *package_name* cannot be imported.
+    :raises ImportError: If *package* is a string and cannot be imported.
+    :raises TypeError: If *package* is neither a string nor a ModuleType.
     :raises Exception: Propagates any error raised during transformation.
     """
-    package = importlib.import_module(package_name)
+    package = _resolve_package(package)
     all_classes = [c for c in classes_of_package(package) if is_dataclass(c)]
     class_diagram = ClassDiagram(all_classes)
     transform_roles_in_class_diagram(class_diagram, write=write)

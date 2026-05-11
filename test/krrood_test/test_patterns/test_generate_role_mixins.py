@@ -15,7 +15,10 @@ import pytest
 
 from krrood.generate_role_mixins import (
     _are_semantically_equal,
+    _ensure_role_mixins_current,
+    _ActionResult,
     _format_source,
+    _resolve_package,
     _stale_files_for_package,
     ensure_role_mixins_current_for_pytest,
     generate_role_mixins_for_package,
@@ -191,10 +194,19 @@ class TestMainCheck:
 
 
 class TestEnsureRoleMixinsCurrentForPytest:
+    """Tests for :func:`_ensure_role_mixins_current` — the pure-decision core.
+
+    The outer wrapper (:func:`ensure_role_mixins_current_for_pytest`) is a thin
+    shell that acts on the returned decision tuple; the core never calls
+    :func:`os._exit`, so these tests do not kill the pytest runner.
+    """
+
     def test_returns_immediately_when_check_passes(self, monkeypatch):
         mock_run = MagicMock(return_value=MagicMock(returncode=0))
         monkeypatch.setattr("subprocess.run", mock_run)
-        ensure_role_mixins_current_for_pytest(["mypkg"])
+        action, payload = _ensure_role_mixins_current(["mypkg"])
+        assert action is _ActionResult.RETURN
+        assert payload == 0
         mock_run.assert_called_once()
 
     def test_regenerates_and_restarts_when_check_fails(self, monkeypatch):
@@ -211,9 +223,9 @@ class TestEnsureRoleMixinsCurrentForPytest:
         monkeypatch.setattr("subprocess.run", mock_run)
         monkeypatch.setenv("KRROOD_PYTEST_RERUN_COUNT", "2")
 
-        with pytest.raises(SystemExit):
-            ensure_role_mixins_current_for_pytest(["mypkg"])
-
+        action, payload = _ensure_role_mixins_current(["mypkg"])
+        assert action is _ActionResult.RESTART
+        assert payload == 0
         assert any("--check" in c for c in run_calls)
         assert any("-m" in c and "pytest" in c for c in run_calls)
 
@@ -226,8 +238,7 @@ class TestEnsureRoleMixinsCurrentForPytest:
 
         import os
 
-        with pytest.raises(SystemExit):
-            ensure_role_mixins_current_for_pytest(["mypkg"])
+        _ensure_role_mixins_current(["mypkg"])
         assert os.environ["KRROOD_PYTEST_RERUN_COUNT"] == "1"
 
     def test_raises_usage_error_when_counter_exhausted(self, monkeypatch):
@@ -237,10 +248,9 @@ class TestEnsureRoleMixinsCurrentForPytest:
         )
         monkeypatch.setenv("KRROOD_PYTEST_RERUN_COUNT", "0")
 
-        import pytest as _pytest
-
-        with _pytest.raises(_pytest.UsageError, match="still outdated"):
-            ensure_role_mixins_current_for_pytest(["mypkg"])
+        action, payload = _ensure_role_mixins_current(["mypkg"])
+        assert action is _ActionResult.ERROR
+        assert "still outdated" in payload
 
     def test_raises_usage_error_when_generation_fails(self, monkeypatch):
         monkeypatch.setattr(
@@ -249,10 +259,9 @@ class TestEnsureRoleMixinsCurrentForPytest:
         )
         monkeypatch.setenv("KRROOD_PYTEST_RERUN_COUNT", "2")
 
-        import pytest as _pytest
-
-        with _pytest.raises(_pytest.UsageError, match="regeneration failed"):
-            ensure_role_mixins_current_for_pytest(["mypkg"])
+        action, payload = _ensure_role_mixins_current(["mypkg"])
+        assert action is _ActionResult.ERROR
+        assert "regeneration failed" in payload
 
 
 # ── integration: actual generation (dry-run / check) ─────────────────────────
@@ -481,9 +490,84 @@ class TestEnsureRoleMixinsStderr:
         monkeypatch.setattr("subprocess.run", fake_run)
         monkeypatch.setenv("KRROOD_PYTEST_RERUN_COUNT", "2")
 
-        import pytest as _pytest
-        with _pytest.raises(SystemExit):
-            ensure_role_mixins_current_for_pytest(["mypkg"])
+        _ensure_role_mixins_current(["mypkg"])
 
         captured = capsys.readouterr()
         assert "Error: module not found" in captured.err
+
+
+# ── _resolve_package ───────────────────────────────────────────────────────────
+
+
+class TestResolvePackage:
+    def test_str_imports_module(self):
+        result = _resolve_package("krrood")
+        from types import ModuleType
+
+        assert isinstance(result, ModuleType)
+
+    def test_moduletype_returns_same_object(self):
+        import krrood
+
+        result = _resolve_package(krrood)
+        assert result is krrood
+
+    def test_int_raises_typeerror(self):
+        with pytest.raises(TypeError, match="Expected a package name"):
+            _resolve_package(42)  # type: ignore[arg-type]
+
+    def test_bad_name_raises_importerror(self):
+        with pytest.raises(ImportError):
+            _resolve_package("krrood.__nonexistent_package__")
+
+
+# ── generate_role_mixins_for_package with ModuleType ───────────────────────────
+
+
+class TestGenerateRoleMixinsForPackageModuleType:
+    def test_accepts_moduletype_dry_run(self):
+        """Passing a ModuleType with write=False must not raise."""
+        import test.krrood_test.dataset.role_and_ontology as pkg
+
+        generate_role_mixins_for_package(pkg, write=False)
+
+
+# ── ensure_role_mixins_current_for_pytest with ModuleType ──────────────────────
+
+
+class TestEnsureRoleMixinsCurrentForPytestModuleType:
+    def test_extracts_name_from_moduletype(self, monkeypatch):
+        """ModuleType elements must have __name__ extracted for CLI args."""
+        import types
+
+        mock_run = MagicMock(return_value=MagicMock(returncode=0))
+        monkeypatch.setattr("subprocess.run", mock_run)
+
+        fake_pkg = types.ModuleType("mypkg")
+        _ensure_role_mixins_current([fake_pkg])
+
+        cmd = mock_run.call_args[0][0]
+        assert "--check" in cmd
+        assert "mypkg" in cmd
+
+    def test_extracts_name_from_mixed_list(self, monkeypatch):
+        """A mix of str and ModuleType must all be normalized."""
+        import types
+
+        mock_run = MagicMock(return_value=MagicMock(returncode=0))
+        monkeypatch.setattr("subprocess.run", mock_run)
+
+        fake_pkg = types.ModuleType("otherpkg")
+        _ensure_role_mixins_current(["mypkg", fake_pkg])
+
+        cmd = mock_run.call_args[0][0]
+        assert "mypkg" in cmd
+        assert "otherpkg" in cmd
+
+    def test_rejects_invalid_type_in_list(self, monkeypatch):
+        """Non-str, non-ModuleType elements must raise TypeError."""
+        mock_run = MagicMock(return_value=MagicMock(returncode=0))
+        monkeypatch.setattr("subprocess.run", mock_run)
+
+        with pytest.raises(TypeError, match="Expected package name"):
+            _ensure_role_mixins_current(["ok", 42])  # type: ignore[list-item]
