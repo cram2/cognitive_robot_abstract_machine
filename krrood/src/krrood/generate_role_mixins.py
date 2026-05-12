@@ -231,6 +231,17 @@ def _stale_files_for_package(package: str | ModuleType) -> list[Path]:
 # ── pytest helper ─────────────────────────────────────────────────────────────
 
 
+def _get_env_with_pythonpath() -> dict[str, str]:
+    """Return a copy of the current environment with PYTHONPATH set to sys.path."""
+    import os
+    import sys
+
+    env = os.environ.copy()
+    current_path = os.pathsep.join(sys.path)
+    env["PYTHONPATH"] = current_path
+    return env
+
+
 class _ActionResult(enum.Enum):
     """Return-code for :func:`_ensure_role_mixins_current`."""
 
@@ -258,6 +269,7 @@ def _ensure_role_mixins_current(
     """
     import os
     import subprocess
+    import sys
 
     _package_names: list[str] = []
     for p in packages:
@@ -276,6 +288,7 @@ def _ensure_role_mixins_current(
         [sys.executable, "-m", "krrood.generate_role_mixins", "--check"]
         + _package_names,
         capture_output=True,
+        env=_get_env_with_pythonpath(),
     )
     if check_result.returncode == 0:
         return _ActionResult.RETURN, 0
@@ -285,6 +298,7 @@ def _ensure_role_mixins_current(
 
     gen_result = subprocess.run(
         [sys.executable, "-m", "krrood.generate_role_mixins"] + _package_names,
+        env=_get_env_with_pythonpath(),
     )
     if gen_result.returncode != 0:
         cmd = "krrood-generate-role-mixins " + " ".join(_package_names)
@@ -302,7 +316,10 @@ def _ensure_role_mixins_current(
         )
 
     os.environ["KRROOD_PYTEST_RERUN_COUNT"] = str(remaining - 1)
-    result = subprocess.run([sys.executable, "-m", "pytest"] + sys.argv[1:])
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest"] + sys.argv[1:],
+        env=_get_env_with_pythonpath(),
+    )
     return _ActionResult.RESTART, result.returncode
 
 
@@ -345,7 +362,10 @@ def ensure_role_mixins_current_for_pytest(
         return
     if action is _ActionResult.ERROR:
         raise pytest.UsageError(payload)
-    result = subprocess.run([sys.executable, "-m", "pytest"] + sys.argv[1:])
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest"] + sys.argv[1:],
+        env=_get_env_with_pythonpath(),
+    )
     os._exit(result.returncode)
 
 

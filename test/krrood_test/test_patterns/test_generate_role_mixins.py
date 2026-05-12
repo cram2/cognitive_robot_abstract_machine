@@ -20,6 +20,7 @@ from krrood.generate_role_mixins import (
     _format_source,
     _resolve_package,
     _stale_files_for_package,
+    _get_env_with_pythonpath,
     ensure_role_mixins_current_for_pytest,
     generate_role_mixins_for_package,
     main,
@@ -578,3 +579,26 @@ class TestEnsureRoleMixinsCurrentForPytestModuleType:
 
         with pytest.raises(TypeError, match="Expected package name"):
             _ensure_role_mixins_current(["ok", 42])  # type: ignore[list-item]
+
+
+class TestPythonPathPropagation:
+    def test_get_env_with_pythonpath_includes_sys_path(self):
+        import sys
+        import os
+        env = _get_env_with_pythonpath()
+        assert "PYTHONPATH" in env
+        assert os.pathsep.join(sys.path) == env["PYTHONPATH"]
+
+    def test_ensure_role_mixins_passes_env_to_run(self, monkeypatch):
+        mock_run = MagicMock()
+        mock_run.returncode = 0
+        monkeypatch.setattr("subprocess.run", mock_run)
+
+        _ensure_role_mixins_current(["dummy"])
+
+        # Check all subprocess.run calls in _ensure_role_mixins_current
+        # There should be at least one call to --check
+        assert mock_run.called
+        for call in mock_run.call_args_list:
+            assert "env" in call.kwargs
+            assert "PYTHONPATH" in call.kwargs["env"]
