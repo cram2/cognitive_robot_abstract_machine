@@ -6,7 +6,7 @@ from semantic_digital_twin.role_mixins.mixin_role_mixins import (
     DelegatorForHasSimulatorProperties,
     RoleForHasSimulatorProperties,
 )
-from typing import Any, Dict, List, Self, Set, Type
+from typing import Any, Dict, List, Optional, Self, Set, Type
 from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -40,6 +40,14 @@ class DelegatorForWorldEntity(ABC):
     @property
     @abstractmethod
     def delegatee(self) -> WorldEntity: ...
+    @property
+    def _world(self) -> Optional[World]:
+        return self.delegatee._world
+
+    @_world.setter
+    def _world(self, value: Optional[World]):
+        self.delegatee._world = value
+
     @property
     def name(self) -> PrefixedName:
         return self.delegatee.name

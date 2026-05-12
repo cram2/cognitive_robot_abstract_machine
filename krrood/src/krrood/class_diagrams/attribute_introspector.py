@@ -68,3 +68,17 @@ class DataclassOnlyIntrospector(AttributeIntrospector):
 
     def skip_field(self, field_: Field) -> bool:
         return field_.name.startswith("_") or not field_.init
+
+
+@dataclass
+class AllFieldsIntrospector(AttributeIntrospector):
+    """Discover all dataclass fields without filtering."""
+
+    def discover(self, owner_cls: Type) -> List[DiscoveredAttribute]:
+        if is_dataclass(owner_cls):
+            return [
+                DiscoveredAttribute(public_name=f.name, field=f)
+                for f in dc_fields(owner_cls)
+            ]
+        else:
+            return []

@@ -24,7 +24,7 @@ from libcst.codemod.visitors import AddImportsVisitor
 from typing_extensions import Dict, Type, get_args, get_origin
 
 from krrood import logger
-from krrood.class_diagrams import ClassDiagram
+from krrood.class_diagrams import AllFieldsIntrospector, ClassDiagram
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
 from krrood.class_diagrams.utils import (
@@ -263,7 +263,7 @@ class RoleTransformer:
                 if ancestor not in classes:
                     add_delegatee_class(ancestor)
 
-        return ClassDiagram(classes), updated_taker_modules, pd_only_delegatees
+        return ClassDiagram(classes, introspector=AllFieldsIntrospector()), updated_taker_modules, pd_only_delegatees
 
     def transform(self, write: bool = False) -> dict[ModuleType, tuple[str, str]]:
         """Transform the module and its taker modules, generating mixins for each role taker.

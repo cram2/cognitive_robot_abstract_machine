@@ -79,7 +79,7 @@ from pathlib import Path
 from types import ModuleType
 
 from krrood import logger as krrood_logger
-from krrood.class_diagrams import ClassDiagram
+from krrood.class_diagrams import AllFieldsIntrospector, ClassDiagram
 from krrood.ormatic.utils import classes_of_package
 from krrood.patterns.code_generation.generated_code_file_writer import (
     has_class_definitions,
@@ -196,7 +196,7 @@ def _stale_files_for_package(package: str | ModuleType) -> list[Path]:
 
     package = _resolve_package(package)
     all_classes = [c for c in classes_of_package(package) if is_dataclass(c)]
-    class_diagram = ClassDiagram(all_classes)
+    class_diagram = ClassDiagram(all_classes, introspector=AllFieldsIntrospector())
 
     log = logging.getLogger(__name__)
     stale: list[Path] = []
@@ -394,7 +394,7 @@ def generate_role_mixins_for_package(package: str | ModuleType, write: bool = Tr
     """
     package = _resolve_package(package)
     all_classes = [c for c in classes_of_package(package) if is_dataclass(c)]
-    class_diagram = ClassDiagram(all_classes)
+    class_diagram = ClassDiagram(all_classes, introspector=AllFieldsIntrospector())
     transform_roles_in_class_diagram(class_diagram, write=write)
 
 
