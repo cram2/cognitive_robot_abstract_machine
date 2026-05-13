@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
+from anyio.functools import lru_cache
+from functools import cached_property
 
 from rustworkx import rustworkx
 from typing_extensions import TYPE_CHECKING
 
+from krrood.utils import memoize
 from semantic_digital_twin.collision_checking.collision_manager import (
     CollisionManager,
     CollisionConsumer,
@@ -55,6 +58,10 @@ class CollisionGroup:
         return item == self.root or item in self.bodies
 
     def __hash__(self):
+        return self._cached_hash
+
+    @cached_property
+    def _cached_hash(self):
         return hash((self.root, tuple(sorted(self.bodies, key=lambda b: b.id))))
 
     def add_body(self, body: Body):
@@ -79,7 +86,7 @@ class CollisionGroup:
         return max(max_avoided_bodies, default=1)
 
 
-@dataclass
+@dataclass(eq=False)
 class CollisionGroupConsumer(CollisionConsumer, ABC):
     """
     A collision consumer that keeps track of collision groups instead of individual bodies.
@@ -128,6 +135,7 @@ class CollisionGroupConsumer(CollisionConsumer, ABC):
             group for group in self.collision_groups if len(group.bodies) > 0
         ]
 
+    @memoize
     def get_collision_group(self, body: KinematicStructureEntity) -> CollisionGroup:
         """
         Ever body belongs to at most one collision group.

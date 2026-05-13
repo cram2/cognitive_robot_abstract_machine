@@ -24,6 +24,7 @@ class CollisionViolatedError(DataclassException):
         self.message = f"Violated collision constraints: \n"
         for collision, threshold in zip(self.violated_collisions, self.thresholds):
             self.message += f"{str(collision.body_a.name), str(collision.body_b.name)}: {collision.distance} < {threshold}\n"
+        super().__post_init__()
 
 
 @dataclass
@@ -38,6 +39,7 @@ class NodeInitializationError(MotionStatechartError):
 
     def __post_init__(self):
         self.message = f'Failed to initialize Goal "{self.node.unique_name}". Reason: {self.reason}'
+        super().__post_init__()
 
 
 @dataclass
@@ -73,6 +75,7 @@ class NodeNotFoundError(MotionStatechartError):
 
     def __post_init__(self):
         self.message = f"Node '{self.name}' not found in MotionStatechart."
+        super().__post_init__()
 
 
 @dataclass
@@ -81,6 +84,7 @@ class NotInMotionStatechartError(MotionStatechartError):
 
     def __post_init__(self):
         self.message = f"Operation can't be performed because node '{self.name}' does not belong to a MotionStatechart."
+        super().__post_init__()
 
 
 @dataclass
@@ -90,6 +94,7 @@ class InvalidConditionError(MotionStatechartError):
 
     def __post_init__(self):
         self.message = f'Invalid {self.condition.kind.name} condition of node "{self.condition.owner.unique_name}": "{self.new_expression}". Reason: "{self.message}"'
+        super().__post_init__()
 
 
 @dataclass
@@ -113,6 +118,7 @@ class NonObservationVariableError(InvalidConditionError):
 
     def __post_init__(self):
         self.message = f'Contains "{self.non_observation_variable}", which is not an observation variable.'
+        super().__post_init__()
 
 
 @dataclass
@@ -123,6 +129,7 @@ class MissingContextExtensionError(MotionStatechartError):
         self.message = (
             f'Missing context extension "{self.expected_extension.__name__}".'
         )
+        super().__post_init__()
 
 
 @dataclass
@@ -131,3 +138,4 @@ class DuplicateContextExtensionError(MotionStatechartError):
 
     def __post_init__(self):
         self.message = f"Extension of type {self.extension_type.__name__} already exists. You cannot add it twice."
+        super().__post_init__()

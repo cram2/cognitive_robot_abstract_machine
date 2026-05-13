@@ -598,6 +598,7 @@ class AbstractRobot(Agent, ABC):
         The method iterates through all connections of type `ActiveConnection1DOF`
         and configures their velocity limits by overwriting the existing
         lower and upper limit values with the provided ones.
+        Only applies if the new limits are more restrictive.
 
         :param new_limits: A dictionary linking 1DOF connections to their corresponding
             new velocity limits. The keys are of type `ActiveConnection1DOF`, and the

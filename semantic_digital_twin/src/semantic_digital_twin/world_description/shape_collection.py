@@ -204,6 +204,27 @@ class ShapeCollection(SubclassJSONSerializer):
     def max_point(self) -> Point3:
         return Point3.from_iterable(self.combined_mesh.bounds[1])
 
+    @property
+    def depth(self) -> float:
+        """
+        :return: The depth of the bounding box containing all shapes in this collection.
+        """
+        return self.scale.x
+
+    @property
+    def width(self) -> float:
+        """
+        :return: The width of the bounding box containing all shapes in this collection.
+        """
+        return self.scale.y
+
+    @property
+    def height(self) -> float:
+        """
+        :return: The height of the bounding box containing all shapes in this collection.
+        """
+        return self.scale.z
+
 
 @dataclass
 class BoundingBoxCollection(ShapeCollection):
