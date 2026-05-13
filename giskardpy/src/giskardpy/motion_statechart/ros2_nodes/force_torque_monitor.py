@@ -59,3 +59,22 @@ class ForceImpactMonitor(ForceTorqueNode):
         if self.force_magnitude() > self.threshold:
             return ObservationStateValues.TRUE
         return ObservationStateValues.FALSE
+
+@dataclass(eq=False, repr=False)
+class ForceZMonitor(ForceTorqueNode):
+    """
+    Returns TRUE when the Z component of the force crosses a threshold.
+    Use a negative threshold to detect downward resistance (e.g. threshold=-100
+    triggers when force.z < -100 N).
+    """
+    threshold: float = field(kw_only=True)
+    def on_tick(
+        self, context: MotionStatechartContext
+    ) -> Optional[ObservationStateValues]:
+        super().on_tick(context)
+        if not self.has_msg():
+            return ObservationStateValues.UNKNOWN
+        fz = self.force_as_np()[2]
+        if fz < self.threshold:
+            return ObservationStateValues.TRUE
+        return ObservationStateValues.FALSE
