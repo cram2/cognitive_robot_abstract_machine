@@ -851,3 +851,9 @@ def kitchen_environment_fixture():
             world.add_connection(conn)
 
     return world
+
+@pytest.fixture(scope="function")
+def hsr_world_copy(hsr_world_setup):
+    result = deepcopy(hsr_world_setup)
+    HSRB.from_world(result)
+    return result
