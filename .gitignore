@@ -139,3 +139,12 @@ doc/doc_out
 /.ijwb/
 /.aswb/
 /.clwb/
+
+
+# segmind gitignore
+rgb/
+__pycache__/
+*.stl
+*.dae
+/.idea/*
+

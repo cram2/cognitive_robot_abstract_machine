@@ -37,6 +37,7 @@ jobs:
           - lib: probabilistic_model
           - lib: physics_simulators
           - lib: robokudo
+          - lib: segmind
     uses: ./.github/workflows/ci_reusable.yml
     with:
       lib: ${{ matrix.lib }}
