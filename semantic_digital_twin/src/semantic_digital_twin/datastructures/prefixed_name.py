@@ -38,3 +38,14 @@ class PrefixedName(Symbol):
 
     def __ge__(self, other):
         return str(self) >= str(other)
+
+    @classmethod
+    def from_string(cls, full_name: str) -> Self:
+        """
+        Creates a PrefixedName from a string. If the string contains a slash,
+        the part before the first slash is used as the prefix.
+        """
+        if "/" in full_name:
+            prefix, name = full_name.split("/", 1)
+            return cls(name=name, prefix=prefix)
+        return cls(name=full_name)
