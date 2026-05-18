@@ -16,8 +16,9 @@ from krrood.entity_query_language.core.base_expressions import (
     UnaryExpression,
     Bindings,
     OperationResult,
-    BinaryExpression,
+    BinaryExpression, SymbolicExpression,
 )
+from krrood.entity_query_language.core.variable import Literal
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.factories import ConditionType
@@ -122,7 +123,7 @@ class OR(LogicalBinaryOperator):
 
 def chained_logic(
     operator: Type[LogicalBinaryOperator], *conditions: ConditionType
-) -> LogicalOperator:
+) -> SymbolicExpression:
     """
     A chian of logic operation over multiple conditions, e.g. cond1 | cond2 | cond3.
 
@@ -135,4 +136,6 @@ def chained_logic(
             prev_operation = condition
             continue
         prev_operation = operator(prev_operation, condition)
+    if not isinstance(prev_operation, SymbolicExpression):
+        prev_operation = Literal(_value_=True)
     return prev_operation

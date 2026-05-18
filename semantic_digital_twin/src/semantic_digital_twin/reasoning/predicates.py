@@ -1,10 +1,12 @@
 from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
+from typing import Optional, Any
 
 import numpy as np
 import math
 import trimesh.boolean
+from krrood.utils import inheritance_path_length
 from trimesh.collision import CollisionManager
 
 from krrood.entity_query_language.predicate import (
@@ -35,7 +37,7 @@ from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     Region,
-    KinematicStructureEntity,
+    KinematicStructureEntity, SemanticAnnotation,
 )
 
 if TYPE_CHECKING:
@@ -305,6 +307,28 @@ def is_supporting(supporting_body: Body, max_intersection_height: float = 0.1) -
             return True
 
     return False
+
+
+
+
+
+@symbolic_function
+def inheritance_path_length_(child_class: Type, parent_class: Type) -> Optional[int]:
+    """
+    Calculates the inheritance path length between a child class and a parent class.
+
+    :param child_class: The class for which the inheritance path length will be calculated.
+    :param parent_class: The class to which the inheritance path length is calculated.
+
+    :return: The inheritance path length as an integer, None if not found.
+    """
+    result = None
+    for t in parent_class.__mro__:
+        result = inheritance_path_length(child_class, t)
+        if result is not None:
+            break
+    return result if result is not None else math.inf
+
 
 
 @symbolic_function

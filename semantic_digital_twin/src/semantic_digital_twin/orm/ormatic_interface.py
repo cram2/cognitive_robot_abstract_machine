@@ -73,6 +73,7 @@ import semantic_digital_twin.semantic_annotations.semantic_annotations
 import semantic_digital_twin.spatial_computations.ik_solver
 import semantic_digital_twin.spatial_types.derivatives
 import semantic_digital_twin.spatial_types.spatial_types
+import semantic_digital_twin.utils
 import semantic_digital_twin.world
 import semantic_digital_twin.world_description.connection_properties
 import semantic_digital_twin.world_description.connections
@@ -3070,6 +3071,41 @@ class MismatchingIDsInWorldModificationDAO(
     )
     actual_uuids: Mapped[typing.List[uuid.UUID]] = mapped_column(
         JSON, nullable=False, use_existing_column=True
+    )
+
+
+class MockedNodeClassDAO(
+    Base, DataAccessObject[semantic_digital_twin.utils.MockedNodeClass]
+):
+
+    __tablename__ = "MockedNodeClassDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class MockedNodeModuleDAO(
+    Base, DataAccessObject[semantic_digital_twin.utils.MockedNodeModule]
+):
+
+    __tablename__ = "MockedNodeModuleDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    Node: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+
+class MockedRCLPYDAO(Base, DataAccessObject[semantic_digital_twin.utils.MockedRCLPY]):
+
+    __tablename__ = "MockedRCLPYDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
     )
 
 
@@ -7614,25 +7650,6 @@ class TomatoDAO(
     }
 
 
-class PotatoDAO(
-    ProduceDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Potato
-    ],
-):
-
-    __tablename__ = "PotatoDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(ProduceDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "PotatoDAO",
-        "inherit_condition": database_id == ProduceDAO.database_id,
-    }
-
-
 class VegetableDAO(
     ProduceDAO,
     DataAccessObject[
@@ -7686,6 +7703,25 @@ class LettuceDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "LettuceDAO",
+        "inherit_condition": database_id == VegetableDAO.database_id,
+    }
+
+
+class PotatoDAO(
+    VegetableDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Potato
+    ],
+):
+
+    __tablename__ = "PotatoDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(VegetableDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PotatoDAO",
         "inherit_condition": database_id == VegetableDAO.database_id,
     }
 

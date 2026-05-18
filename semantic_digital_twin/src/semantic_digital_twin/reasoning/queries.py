@@ -1,14 +1,13 @@
-import math
-from typing import List, Union, Optional
-from krrood.entity_query_language.factories import variable_from, entity, flat_variable, in_, the, contains, variable, \
-    an, or_, and_, distinct
+from typing import List, Optional
+from krrood.entity_query_language.factories import variable_from, entity, contains, variable, \
+    an, and_, exists, not_, set_of, type_
 from krrood.entity_query_language.query.query import Entity
 from krrood.entity_query_language.predicate import symbolic_function, length
-from krrood.utils import inheritance_path_length, recursive_subclasses
+from krrood.utils import recursive_subclasses
 
 from semantic_digital_twin.reasoning.predicates import (
     is_supported_by,
-    is_supporting, compute_euclidean_planar_distance,
+    is_supporting, compute_euclidean_planar_distance, inheritance_path_length_,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasSupportingSurface, IsPerceivable, HasRootBody
 from semantic_digital_twin.world import World
@@ -21,7 +20,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 def semantic_annotations_on_surfaces(
-    supporting_surfaces: List[HasSupportingSurface], world: World
+        supporting_surfaces: List[HasSupportingSurface], world: World
 ) -> List[HasRootBody]:
     """
     Queries a list of Semantic annotations that are on top of a given list of other annotations (ex. Tables).
@@ -37,10 +36,11 @@ def semantic_annotations_on_surfaces(
 
     return objects
 
+
 def get_next_object_using_planar_distance(
-    main_body: Body,
-    supporting_surface,
-    ignore_dimension,
+        main_body: Body,
+        supporting_surface,
+        ignore_dimension,
 ) -> Entity[SemanticAnnotation]:
     """
     Queries the next object based on Euclidean distance in x and y coordinates
@@ -69,9 +69,9 @@ def get_next_object_using_planar_distance(
 
 
 def goal_surface_of_object(
-    object_of_interest: SemanticAnnotation,
-    supporting_surfaces: List[HasSupportingSurface],
-    threshold: int = 1,
+        object_of_interest: SemanticAnnotation,
+        supporting_surfaces: List[HasSupportingSurface],
+        threshold: int = 1,
 ) -> Optional[HasSupportingSurface]:
     """
     Finds the most similar object to a given semantic annotation among a list of tables
@@ -88,41 +88,24 @@ def goal_surface_of_object(
     """
     if not supporting_surfaces:
         return None
-
-    # Find the surface that is not supporting anything
-    non_supporting_table = None
-    for supporting_surface in supporting_surfaces:
-        if not is_supporting(supporting_surface.bodies[0]):
-            non_supporting_table = supporting_surface
-            break
+    supporting_surface = variable(HasSupportingSurface, supporting_surfaces)
+    supporting_body = supporting_surface.bodies[0]
+    non_supporting_table = entity(supporting_surface).where(
+        exists(supporting_surface, not_(is_supporting(supporting_body))))
 
     # Query annotations on the surfaces of the tables
-    objects = semantic_annotations_on_surfaces(
+    obj = variable(SemanticAnnotation, semantic_annotations_on_surfaces(
         supporting_surfaces, object_of_interest._world
-    )
+    ))
 
-    best_distance = math.inf
-    most_similar = None
+    inheritance_distance = lambda obj_: inheritance_path_length_(type(object_of_interest), type_(obj_))
 
-    # Iterate over each object to find the most similar based on inheritance path length
-    for obj in objects:
-        for cls in type(obj).__mro__:
-            dist = inheritance_path_length(type(object_of_interest), cls)
-            if dist is None:
-                continue
-            if dist < best_distance:
-                best_distance = dist
-                most_similar = obj
-            break  # Once a match is found, no need to check further classes for this object
+    query = set_of(obj, supporting_surface).where(
+                                                    (distance:=inheritance_distance(obj)) <= threshold,
+                                             is_supported_by(obj.bodies[0],
+                                                             supporting_body)).ordered_by(distance)
+    return next(query[supporting_surface].evaluate(), next(non_supporting_table.evaluate(), None))
 
-    # Apply threshold to determine if the match is acceptable
-    if best_distance > threshold or most_similar is None:
-        return non_supporting_table
-
-    # Find the table supporting the most similar object
-    for supporting_surface in supporting_surfaces:
-        if is_supported_by(most_similar.bodies[0], supporting_surface.bodies[0]):
-            return supporting_surface
 
 def filter_annotations_by_color(color: Color, objects: list[SemanticAnnotation]) -> Entity[SemanticAnnotation]:
     """
@@ -142,17 +125,12 @@ def filter_annotations_by_color(color: Color, objects: list[SemanticAnnotation])
     body = object_var.bodies[0]
 
     matching_body = entity(body).where(
-        or_(
-            and_(
-                body.visual != None,
-                length(body.visual.shapes) > 0,
-                body.visual.shapes[0].color == color,
-            ),
-            and_(body.collision != None,
-            length(body.collision.shapes) > 0,
-            body.collision.shapes[0].color == color,
+        and_(
+            body.visual != None,
+            length(body.visual.shapes) > 0,
+            body.visual.shapes[0].color == color,
         )
-    ))
+    )
     semantic_annotation = variable(HasRootBody, world.semantic_annotations)
     return entity(semantic_annotation).where(semantic_annotation.root == matching_body)
 
@@ -170,7 +148,7 @@ def annotation_class_by_label(label: str) -> Optional[type]:
     return next(matching_class.evaluate(), None)
 
 
-def sort_annotations_by_volume(annotations: List[HasRootBody], order: Optional[bool]=True) -> List[HasRootBody]:
+def sort_annotations_by_volume(annotations: List[HasRootBody], order: Optional[bool] = True) -> List[HasRootBody]:
     """
     Sorts a list of SemanticAnnotations by volume in descending order (largest to smallest).
     Volume is calculated by multiplying the scale dimensions (x * y * z) of the object's shape.

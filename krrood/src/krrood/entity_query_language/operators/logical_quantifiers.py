@@ -107,15 +107,14 @@ class Exists(QuantifiedConditional):
     """
 
     def _evaluate__(
-        self,
-        sources: Bindings,
+            self,
+            sources: Bindings,
     ) -> Iterable[OperationResult]:
-        seen_var_values = []
         for val in self.condition._evaluate_(sources, parent=self):
-            var_val = val[self.variable._id_]
-            if val.is_true and var_val not in seen_var_values:
-                seen_var_values.append(var_val)
+            if val.is_true and self.variable._id_ in val:
                 yield OperationResult(val.bindings, False, self)
+                return
+        yield OperationResult(sources, True, self)
 
     def _invert_(self):
         return ForAll(self.variable, self.condition._invert_())
