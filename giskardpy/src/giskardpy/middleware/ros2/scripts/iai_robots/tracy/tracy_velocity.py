@@ -32,7 +32,7 @@ def main():
         robot_interface_config=TracyVelocityInterface(),
         behavior_tree_config=ClosedLoopBTConfig(),
         qp_controller_config=QPControllerConfig(
-            target_frequency=80, prediction_horizon=30
+            target_frequency=80, prediction_horizon=50
         ),
     )
     giskard.live()

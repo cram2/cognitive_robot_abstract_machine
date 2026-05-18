@@ -141,7 +141,7 @@ class MotionExecutor:
         from giskardpy.middleware.ros2.python_interface import GiskardWrapper
 
         if MotionExecutor._giskard_wrapper is None:
-            MotionExecutor._giskard_wrapper = GiskardWrapper(self.ros_node)
+            MotionExecutor._giskard_wrapper = GiskardWrapper(self.ros_node, world=self.world)
         giskard = MotionExecutor._giskard_wrapper
 
         kill_event = threading.Event()

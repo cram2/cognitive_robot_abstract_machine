@@ -471,7 +471,7 @@ class CartesianOrientation(CartesianTask):
     .. warning:: This task does not constrain position.
     """
 
-    default_reference_velocity: ClassVar[float] = 0.2
+    default_reference_velocity: ClassVar[float] = 0.05
 
     goal_orientation: RotationMatrix = field(kw_only=True)
     """Target rotation matrix to match."""
