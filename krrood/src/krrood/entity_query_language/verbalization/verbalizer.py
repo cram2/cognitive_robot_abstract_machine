@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import ast
 import datetime as _dt
+import inspect
 import operator
 import re
+from dataclasses import dataclass
+from textwrap import dedent
 from typing import Optional
 
-import inflect
-
-_engine = inflect.engine()
+from krrood.entity_query_language.exceptions import WrongPropertyReturnStatementImplementation
+from krrood.entity_query_language.verbalization.utils import inflect_engine, _camel_to_words, _ordinal, _ensure_plural, \
+    _apply_binding_aliases
+from krrood.patterns.code_parsing_utils import get_accessed_attribute_name_in_return_statement_of_property
+from krrood.singleton import SingletonMeta
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import (
@@ -35,7 +41,7 @@ from krrood.entity_query_language.operators.aggregators import (
 from krrood.entity_query_language.operators.comparator import Comparator, not_contains
 from krrood.entity_query_language.operators.core_logical_operators import AND, OR, Not
 from krrood.entity_query_language.operators.logical_quantifiers import Exists, ForAll
-from krrood.entity_query_language.predicate import Predicate
+from krrood.entity_query_language.predicate import Verbalizable, Triple
 from krrood.entity_query_language.query.operations import (
     GroupedBy,
     Having,
@@ -43,7 +49,7 @@ from krrood.entity_query_language.query.operations import (
     Where,
 )
 from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier, The
-from krrood.entity_query_language.query.query import Entity, SetOf
+from krrood.entity_query_language.query.query import Entity, SetOf, Query
 from krrood.entity_query_language.verbalization.context import VerbalizationContext, _article
 from krrood.entity_query_language.verbalization.rule_analysis import (
     AggregationStatus,
@@ -132,33 +138,8 @@ _NEGATED_OP_WORDS_TEMPORAL_COMPACT = {
 }
 
 
-def _camel_to_words(name: str) -> str:
-    """Convert a CamelCase class name to space-separated lowercase words.
-
-    Examples: ``"HasRole"`` → ``"has role"``, ``"IsReachable"`` → ``"is reachable"``.
-    """
-    return re.sub(r"([A-Z])", r" \1", name).strip().lower()
-
-def _ordinal(n: int) -> str:
-    return _engine.ordinal(_engine.number_to_words(n + 1))
-
-
-def _ensure_plural(word: str) -> str:
-    """Return *word* in plural form, without double-pluralising already-plural words."""
-    return word if _engine.singular_noun(word) else _engine.plural(word)
-
-
-def _apply_binding_aliases(text: str, alias_map: dict[str, str]) -> str:
-    """Replace each verbalized binding value in *text* with its established field reference.
-
-    Longer aliases are tried first to avoid partial replacements.
-    """
-    for value, field_ref in sorted(alias_map.items(), key=lambda kv: -len(kv[0])):
-        text = text.replace(value, field_ref)
-    return text
-
-
-class EQLVerbalizer:
+@dataclass
+class EQLVerbalizer(metaclass=SingletonMeta):
     """
     Visitor-based verbalizer: maps an EQL expression tree to readable English.
 
@@ -227,7 +208,7 @@ class EQLVerbalizer:
             ctx.seen[expr._id_] = label
             if label != type_name:
                 return label
-            return _engine.plural(type_name)
+            return inflect_engine.plural(type_name)
 
         if isinstance(expr, Attribute):
             # Walk the chain to find root variable and single attribute hop.
@@ -241,7 +222,7 @@ class EQLVerbalizer:
                 type_name = root._type_.__name__
                 label = ctx.disambiguation_map.get(root._id_, type_name)
                 ctx.seen[root._id_] = label
-                root_plural = label if label != type_name else _engine.plural(type_name)
+                root_plural = label if label != type_name else inflect_engine.plural(type_name)
                 attr_plural = _ensure_plural(chain[0]._attribute_name_)
                 return f"{attr_plural} of {root_plural}"
 
@@ -337,24 +318,36 @@ class EQLVerbalizer:
     def _v_InstantiatedVariable_(
         self, expr: InstantiatedVariable, ctx: VerbalizationContext
     ) -> str:
-        template: Optional[str] = getattr(expr._type_, "_verbalization_template_", None)
-        if template is not None:
-            return self._verbalize_template_predicate_(expr, ctx, template)
-
-        if isinstance(expr._type_, type) and issubclass(expr._type_, Predicate):
-            return self._verbalize_predicate_no_template_(expr, ctx)
-
+        """
+        Verbalize an InstantiatedVariable (Predicate, or an Inferred Class) using the given template.
+        """
+        try:
+            if isinstance(expr._type_, type) and issubclass(expr._type_, Verbalizable):
+                template = expr._type_._verbalization_template_()
+                return self._verbalize_template_(expr, ctx, template)
+        except NotImplementedError:
+            # Means that the `_verbalization_template_` is not implemeted for this Predicate type.
+            pass
         return self._verbalize_instantiated_natural_(expr, ctx)
 
-    def _verbalize_template_predicate_(
+    def _verbalize_template_(
         self, expr: InstantiatedVariable, ctx: VerbalizationContext, template: str
     ) -> str:
+        """
+        Verbalize an expression using the given template.
+
+        :param expr: The expression to be verbalized.
+        :param ctx: VerbalizationContext.
+        :param template: The template to be verbalized.
+        :return: The verbalized expression as a string.
+        """
+        if issubclass(expr._type_, Triple):
+            subject_name = get_accessed_attribute_name_in_return_statement_of_property(expr._type_.subject, expr._type_)
+            object_name = get_accessed_attribute_name_in_return_statement_of_property(expr._type_.object, expr._type_)
+            template = template.replace("{subject}", f"{subject_name}")
+            template = template.replace("{object}", f"{object_name}")
         kwargs = {
-            name: (
-                ctx.type_name_of_value(child._value_)
-                if isinstance(child, Literal)
-                else self.verbalize(child, ctx)
-            )
+            name: self.verbalize(child, ctx)
             for name, child in expr._child_vars_.items()
         }
         return template.format(**kwargs)
@@ -367,20 +360,12 @@ class EQLVerbalizer:
             items = list(expr._child_vars_.items())
             left, right = items[0][1], items[1][1]
             predicate_text = _camel_to_words(type_name)
-            left_text = (
-                ctx.type_name_of_value(left._value_)
-                if isinstance(left, Literal)
-                else self.verbalize(left, ctx)
-            )
-            right_text = (
-                ctx.type_name_of_value(right._value_)
-                if isinstance(right, Literal)
-                else self.verbalize(right, ctx)
-            )
+            left_text = self.verbalize(left, ctx)
+            right_text = self.verbalize(right, ctx)
             return f"{left_text} {predicate_text} {right_text}"
         if expr._child_vars_:
             args_str = ", ".join(
-                f"{name}={ctx.type_name_of_value(child._value_) if isinstance(child, Literal) else self.verbalize(child, ctx)}"
+                f"{name}={self.verbalize(child, ctx)}"
                 for name, child in expr._child_vars_.items()
             )
             return f"{_article(type_name)} {type_name}({args_str})"
@@ -401,15 +386,11 @@ class EQLVerbalizer:
         binding_alias_map: dict[str, str] = {}
         for field_name, child_expr in expr._child_vars_.items():
             field_ref = f"the {field_name} of the {type_name}"
-            if _engine.singular_noun(field_name):
+            if inflect_engine.singular_noun(field_name):
                 plural_value = self._verbalize_plural_(child_expr, ctx)
                 binding_parts.append(f"{field_ref} are {plural_value}")
             else:
-                value_text = (
-                    ctx.type_name_of_value(child_expr._value_)
-                    if isinstance(child_expr, Literal)
-                    else self.verbalize(child_expr, ctx)
-                )
+                value_text = self.verbalize(child_expr, ctx)
                 binding_parts.append(f"{field_ref} is {value_text}")
                 definite_value = re.sub(r"\b(a|an) ([A-Z])", r"the \2", value_text)
                 if re.search(r"\bthe [A-Z]", definite_value) and definite_value not in binding_alias_map:
@@ -593,7 +574,7 @@ class EQLVerbalizer:
 
             # Introduce the antecedent
             if ant.aggregation_status == AggregationStatus.AGGREGATED:
-                intro = f"there are {_engine.plural(type_name)}"
+                intro = f"there are {inflect_engine.plural(type_name)}"
             else:
                 intro = f"there's {_article(type_name)} {type_name}"
 
@@ -752,7 +733,7 @@ class EQLVerbalizer:
         """
         Render a GROUP_KEY binding value as ``"the common {attr} of the {PluralRoot}"``.
         """
-        from krrood.entity_query_language.core.mapped_variable import MappedVariable, Attribute
+        from krrood.entity_query_language.core.mapped_variable import MappedVariable
         from krrood.entity_query_language.core.variable import Variable
 
         chain: list = []
@@ -766,7 +747,7 @@ class EQLVerbalizer:
             return self.verbalize(expr, ctx)
 
         root_type = current._type_.__name__ if getattr(current, "_type_", None) else "entity"
-        root_plural = _engine.plural(root_type)
+        root_plural = inflect_engine.plural(root_type)
         # Mark root as seen (plural mention)
         ctx.seen[current._id_] = root_type
 
@@ -1005,9 +986,9 @@ class EQLVerbalizer:
                 if isinstance(root, Variable) and root._id_ in group_key_root_ids:
                     continue
                 texts.append(self._verbalize_plural_(child_expr, ctx))
-        else:
-            for var in getattr(query_expr, "_selected_variables_", []):
-                if hasattr(var, "_id_") and var._id_ not in group_key_root_ids:
+        elif isinstance(query_expr, Query):
+            for var in query_expr._selected_variables_:
+                if var._id_ not in group_key_root_ids:
                     texts.append(self._verbalize_plural_(var, ctx))
 
         return texts
@@ -1016,3 +997,19 @@ class EQLVerbalizer:
 
     def _v_default_(self, expr: SymbolicExpression, ctx: VerbalizationContext) -> str:
         return expr._name_
+
+
+_default_verbalizer = EQLVerbalizer()
+
+
+def verbalize_expression(expr) -> str:
+    """
+    Verbalize any EQL expression — including sub-expressions, conditions, predicates,
+    and aggregators — into a human-readable English phrase.
+
+    :param expr: Any ``SymbolicExpression`` instance.
+    :return: A natural-language description of the expression.
+    """
+    if isinstance(expr, Query):
+        expr.build()
+    return _default_verbalizer.verbalize(expr)

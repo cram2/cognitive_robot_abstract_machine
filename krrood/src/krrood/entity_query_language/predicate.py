@@ -26,6 +26,8 @@ from typing_extensions import (
 from krrood.entity_query_language.utils import T, merge_args_and_kwargs
 from krrood.entity_query_language.core.variable import Variable, InstantiatedVariable
 from krrood.entity_query_language.core.base_expressions import Selectable
+from krrood.entity_query_language.verbalization.utils import _camel_to_words
+from krrood.ormatic.utils import classproperty
 from krrood.symbol_graph.symbol_graph import Symbol
 
 
@@ -57,7 +59,34 @@ def symbolic_function(
 
 
 @dataclass(eq=False)
-class Predicate(Symbol, ABC):
+class Verbalizable(ABC):
+    """
+    A mixin for classes that want to add custom verbalization, such that when a query that is using them is verbalized,
+    the final output text is more correct or intuitivie.
+    """
+
+    @classmethod
+    def _verbalization_template_(cls) -> str:
+        """
+        Optional natural-language template for verbalizing this predicate.
+
+        Slot names must match the predicate's field names. Example::
+
+        @dataclass(eq=False)
+        class Loves(Predicate):
+            person_1: Person
+            person_2: Person
+
+        @classmethod
+        def _verbalization_template_(cls) -> str:
+            return "{person_1} loves {person_2}"
+        """
+        raise NotImplementedError()
+
+
+
+@dataclass(eq=False)
+class Predicate(Symbol, Verbalizable, ABC):
     """
     The super predicate class that represents a filtration operation or asserts a relation.
     """
@@ -65,13 +94,6 @@ class Predicate(Symbol, ABC):
     _cache_instances_: ClassVar[bool] = False
     """
     Predicates should not be cached for now as they are not persisting.
-    """
-    _verbalization_template_: ClassVar[Optional[str]] = None
-    """
-    Optional natural-language template for verbalizing this predicate.
-    Slot names must match the predicate's field names. Example::
-
-        _verbalization_template_ = "{subject} works at {organization}"
     """
 
     def __new__(cls, *args, **kwargs):
@@ -98,8 +120,40 @@ class Predicate(Symbol, ABC):
         return bool(self.__call__())
 
 
+
 @dataclass(eq=False)
-class HasType(Predicate):
+class Triple(Predicate):
+    """
+    A Triple is a type predicate that represents a relation between two entities.
+    To know if your predicate is a Triple or not ask yourself can I say "subject" "predicate_name" "object" and it
+    makes sense? if so then yes. Check the verbalization function below as a reference.
+    """
+
+    @property
+    @abstractmethod
+    def subject(self) -> Any:
+        """
+        The subject of the predicate.
+        """
+
+    @property
+    @abstractmethod
+    def object(self) -> Any:
+        """
+        The object of the predicate.
+        """
+
+    @classmethod
+    def _verbalization_template_(cls) -> str:
+        """
+        Verbalization of a Triple is a subject - predicate - object.
+        """
+        predicate_name = _camel_to_words(cls.__name__)
+        return "{subject} " + predicate_name + " {object}"
+
+
+@dataclass(eq=False)
+class HasType(Triple):
     """
     Represents a predicate to check if a given variable is an instance of a specified type.
 
@@ -107,8 +161,6 @@ class HasType(Predicate):
     Python's built-in `isinstance` functionality. It provides methods to retrieve the domain and
     range values and perform direct checks.
     """
-
-    _verbalization_template_: ClassVar[Optional[str]] = "{variable} is of type {types_}"
 
     variable: Any
     """
@@ -121,6 +173,18 @@ class HasType(Predicate):
 
     def __call__(self) -> bool:
         return isinstance(self.variable, self.types_)
+
+    @property
+    def subject(self):
+        return self.variable
+
+    @property
+    def object(self) -> Any:
+        return self.types_
+
+    @classmethod
+    def _verbalization_template_(cls) -> str:
+        return "{variable} is of type {types_}"
 
 
 @dataclass(eq=False)

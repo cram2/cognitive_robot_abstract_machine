@@ -131,8 +131,6 @@ class ContainsType(Predicate):
     Predicate that checks if any object in the iterable is of the given type.
     """
 
-    _verbalization_template_: ClassVar[str] = "{iterable} contains an instance of {obj_type}"
-
     iterable: Iterable
     """
     Iterable to check for objects of the given type.
@@ -145,3 +143,8 @@ class ContainsType(Predicate):
 
     def __call__(self) -> bool:
         return any(isinstance(obj, self.obj_type) for obj in self.iterable)
+
+    @classmethod
+    def _verbalization_template_(cls) -> str:
+        return "{iterable} contains an instance of {obj_type}"
+

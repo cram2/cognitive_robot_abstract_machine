@@ -39,8 +39,8 @@ from krrood.entity_query_language.factories import (
     and_,
     or_,
 )
-from krrood.entity_query_language.predicate import HasType, Predicate
-from krrood.entity_query_language.verbalization import (
+from krrood.entity_query_language.predicate import HasType, Predicate, Triple
+from krrood.entity_query_language.verbalization.verbalizer import (
     EQLVerbalizer,
     VerbalizationContext,
     verbalize_expression,
@@ -533,11 +533,14 @@ def test_verbalize_contains_type_template():
 def test_verbalize_custom_predicate_robotics_domain(handles_and_containers_world):
     @dataclass(eq=False)
     class IsReachable(Predicate):
-        _verbalization_template_ = "{body} is reachable"
         body: Any
 
         def __call__(self) -> bool:
             return True
+
+        @classmethod
+        def _verbalization_template_(cls) -> str:
+            return "{body} is reachable"
 
     world = handles_and_containers_world
     handle = variable(Handle, world.bodies)
@@ -550,12 +553,15 @@ def test_verbalize_custom_predicate_robotics_domain(handles_and_containers_world
 def test_verbalize_custom_predicate_employee_domain():
     @dataclass(eq=False)
     class WorksInDepartment(Predicate):
-        _verbalization_template_ = "{employee} works in {department}"
         employee: Any
         department: Any
 
         def __call__(self) -> bool:
             return self.employee.department == self.department
+
+        @classmethod
+        def _verbalization_template_(cls) -> str:
+            return "{employee} works in {department}"
 
     emp = variable(Employee, [])
     dept = variable(Department, [])
@@ -578,9 +584,8 @@ def test_verbalize_predicate_no_template_fallback():
     emp = variable(Employee, [])
     pred = HasHighSalary(emp, 50000.0)
     text = verbalize_expression(pred)
-    # 2-arg predicate without template → triple form "subject predicate-words object"
     assert "Employee" in text
-    assert "has high salary" in text
+    assert "HasHighSalary" in text
     assert "50000.0" in text
 
 
@@ -832,11 +837,19 @@ def test_verbalize_double_nested_with_outer_entity(doors_and_drawers_world):
 # ── 2-argument Predicate triple form ─────────────────────────────────────────
 
 
-def test_verbalize_2arg_predicate_triple_form():
+def test_verbalize_triple():
     @dataclass(eq=False)
-    class ConnectsTo(Predicate):
+    class ConnectsTo(Triple):
         source: Any
         target: Any
+
+        @property
+        def subject(self) -> Any:
+            return self.source
+
+        @property
+        def object(self) -> Any:
+            return self.target
 
         def __call__(self) -> bool:
             return True
@@ -851,26 +864,6 @@ def test_verbalize_2arg_predicate_triple_form():
     assert "Handle" in text
     # Subject–predicate–object order
     assert text.index("Body") < text.index("Handle")
-
-
-def test_verbalize_2arg_predicate_camel_converted():
-    @dataclass(eq=False)
-    class IsDirectlyAbove(Predicate):
-        upper: Any
-        lower: Any
-
-        def __call__(self) -> bool:
-            return True
-
-    a_var = variable(Body, [])
-    b_var = variable(Container, [])
-    pred = IsDirectlyAbove(a_var, b_var)
-    text = verbalize_expression(pred)
-
-    assert "is directly above" in text
-    assert "Body" in text
-    assert "Container" in text
-
 
 def test_verbalize_1arg_predicate_generic_fallback():
     """1-arg Predicate without template still uses generic constructor-like fallback."""
