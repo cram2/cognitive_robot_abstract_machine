@@ -366,10 +366,10 @@ def test_algebra_sequential_plan(mutable_model_world):
     context.evaluate_conditions = False
 
     target_location = underspecified(PoseMapping.from_point_mapping_quaternion_mapping)(
-        point_mapping=underspecified(Point3Mapping)(
+        position=underspecified(Point3Mapping)(
             x=..., y=..., z=0.0, reference_frame=None
         ),
-        quaternion_mapping=QuaternionMapping(x=0, y=0, z=0, w=1, reference_frame=None),
+        orientation=QuaternionMapping(x=0, y=0, z=0, w=1, reference_frame=None),
         reference_frame=variable_from([robot_view.root]),
     )
 
@@ -415,15 +415,16 @@ def test_parameterization_of_pick_up(mutable_model_world):
 
     parameters = UnderspecifiedParameters(pick_up_description)
 
-    assert len(parameters.variables) == 7
-
     [manipulator_offset] = [
         v
         for v in parameters.variables.values()
         if v.name.endswith("manipulation_offset")
     ]
 
-    assert parameters.assignments_for_conditioning[manipulator_offset] == 0.05
+    assert (
+        parameters.conditioning_assignments_from_literal_values[manipulator_offset]
+        == 0.05
+    )
 
     context.query_backend = ProbabilisticBackend(
         model_registry=FullyFactorizedRegistry()

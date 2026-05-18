@@ -31,6 +31,7 @@ from typing_extensions import (
 
 from krrood.adapters.json_serializer import list_like_classes
 from krrood.class_diagrams.class_diagram import WrappedClass
+from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     SymbolicExpression,
@@ -59,6 +60,12 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.query.query import Entity, Query
 
 from typing import get_type_hints
+
+
+import builtins
+import importlib
+from typing import get_type_hints, get_origin, get_args
+from inspect import isclass
 
 
 import builtins
@@ -408,18 +415,23 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         for attribute_match in self.matches_with_variables:
             attribute_match._update_kwargs_from(self)
 
-    def _get_mapped_variable_by_name(self, name: str) -> MappedVariable:
+    def _get_mapped_variable_by_name(self, name: str) -> Optional[MappedVariable]:
         """
         Get a mapped variable by its name in the path.
         :param name: The name
         :return: The mapped variable
         """
-        [result] = [
+        result = [
             attribute_match.assigned_variable
             for attribute_match in self.matches_with_variables
             if attribute_match.name_from_variable_access_path == name
         ]
-        return result
+        if len(result) == 0:
+            return None
+        elif len(result) == 1:
+            return result[0]
+        else:
+            raise KeyError(f"Multiple variables with name {name}")
 
 
 @dataclass(eq=False)
@@ -587,7 +599,6 @@ class AttributeMatch(AbstractMatchExpression[T]):
                 self.assigned_variable._value_
             )
         else:
-
             final_step._set_child_instance_value_(
                 current_value, self.assigned_variable._value_
             )
@@ -608,9 +619,15 @@ class AttributeMatch(AbstractMatchExpression[T]):
 
         if not isinstance(self.parent, AttributeMatch):
             return None
-        return get_field_type_endpoint(
-            self.parent.assigned_value.type, self.variable._attribute_name_
-        )
+
+        if isclass(self.parent.assigned_value.factory):
+            return get_field_type_endpoint(
+                self.parent.assigned_value.type, self.variable._attribute_name_
+            )
+        else:
+            return get_type_hints_of_object(self.parent.assigned_value.factory)[
+                self.variable._attribute_name_
+            ]
 
 
 def construct_graph_and_get_root(

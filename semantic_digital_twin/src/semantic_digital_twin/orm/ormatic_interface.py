@@ -20,6 +20,7 @@ import enum
 import krrood.adapters.json_serializer
 import krrood.ormatic.custom_types
 import krrood.ormatic.type_dict
+import pathlib
 import semantic_digital_twin.adapters.sage_10k_dataset.loader
 import semantic_digital_twin.adapters.sage_10k_dataset.schema
 import semantic_digital_twin.callbacks.callback
@@ -68,6 +69,7 @@ import semantic_digital_twin.robots.unitree_g1
 import semantic_digital_twin.robots.ur5
 import semantic_digital_twin.robots.ur5e_controlled
 import semantic_digital_twin.semantic_annotations.mixins
+import semantic_digital_twin.semantic_annotations.natural_language
 import semantic_digital_twin.semantic_annotations.position_descriptions
 import semantic_digital_twin.semantic_annotations.semantic_annotations
 import semantic_digital_twin.spatial_computations.ik_solver
@@ -106,6 +108,7 @@ class Base(DeclarativeBase):
         enum.Enum: krrood.ormatic.custom_types.PolymorphicEnumType,
         krrood.adapters.json_serializer.SubclassJSONSerializer: sqlalchemy.sql.sqltypes.JSON,
         uuid.UUID: sqlalchemy.sql.sqltypes.UUID,
+        pathlib.Path: krrood.ormatic.custom_types.PathType,
     }
 
 
@@ -1003,6 +1006,32 @@ class DrawerDAO_objects_association(Base, AssociationDataAccessObject):
     target: Mapped[HasRootBodyDAO] = relationship(
         "HasRootBodyDAO", foreign_keys=[target_hasrootbodydao_id]
     )
+
+
+class RoomWithWallsAndDoorsDAO_walls_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "_59279835155553331916320829121624451516437301546125700947447732"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_roomwithwallsanddoorsdao_id: Mapped[int] = mapped_column(
+        ForeignKey("RoomWithWallsAndDoorsDAO.database_id")
+    )
+    target_walldao_id: Mapped[int] = mapped_column(ForeignKey("WallDAO.database_id"))
+
+    target: Mapped[WallDAO] = relationship("WallDAO", foreign_keys=[target_walldao_id])
+
+
+class RoomWithWallsAndDoorsDAO_doors_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "_41651222075607285598093561901844381163868576790321323113299336"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_roomwithwallsanddoorsdao_id: Mapped[int] = mapped_column(
+        ForeignKey("RoomWithWallsAndDoorsDAO.database_id")
+    )
+    target_doordao_id: Mapped[int] = mapped_column(ForeignKey("DoorDAO.database_id"))
+
+    target: Mapped[DoorDAO] = relationship("DoorDAO", foreign_keys=[target_doordao_id])
 
 
 class AbstractRobotDAO_manipulators_association(Base, AssociationDataAccessObject):
@@ -3311,6 +3340,31 @@ class PipelineDAO(
     )
 
 
+class PointOccupiedErrorDAO(
+    Base, DataAccessObject[semantic_digital_twin.exceptions.PointOccupiedError]
+):
+
+    __tablename__ = "PointOccupiedErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    message: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    point_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    point: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO", uselist=False, foreign_keys=[point_id], post_update=True
+    )
+
+
 class PointSpatialRelationDAO(
     Base,
     DataAccessObject[semantic_digital_twin.reasoning.predicates.PointSpatialRelation],
@@ -3590,6 +3644,10 @@ class Sage10kDatasetLoaderDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
+    )
+
+    directory: Mapped[pathlib.Path] = mapped_column(
+        krrood.ormatic.custom_types.PathType, nullable=False, use_existing_column=True
     )
 
 
@@ -3913,6 +3971,10 @@ class Sage10kSceneDAO(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
     total_area: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    directory: Mapped[typing.Optional[pathlib.Path]] = mapped_column(
+        krrood.ormatic.custom_types.PathType, nullable=True, use_existing_column=True
+    )
 
     rooms: Mapped[builtins.list[Sage10kSceneDAO_rooms_association]] = relationship(
         "Sage10kSceneDAO_rooms_association",
@@ -5405,7 +5467,7 @@ class ViewDependentSpatialRelationDAO(
         use_existing_column=True
     )
 
-    point_of_semantic_annotation_id: Mapped[int] = mapped_column(
+    point_of_view_id: Mapped[int] = mapped_column(
         ForeignKey(
             "HomogeneousTransformationMatrixMappingDAO.database_id", use_alter=True
         ),
@@ -5413,13 +5475,11 @@ class ViewDependentSpatialRelationDAO(
         use_existing_column=True,
     )
 
-    point_of_semantic_annotation: Mapped[HomogeneousTransformationMatrixMappingDAO] = (
-        relationship(
-            "HomogeneousTransformationMatrixMappingDAO",
-            uselist=False,
-            foreign_keys=[point_of_semantic_annotation_id],
-            post_update=True,
-        )
+    point_of_view: Mapped[HomogeneousTransformationMatrixMappingDAO] = relationship(
+        "HomogeneousTransformationMatrixMappingDAO",
+        uselist=False,
+        foreign_keys=[point_of_view_id],
+        post_update=True,
     )
 
     __mapper_args__ = {
@@ -7933,6 +7993,29 @@ class DoorDAO(
     }
 
 
+class DoorWithTypeDAO(
+    DoorDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.DoorWithType
+    ],
+):
+
+    __tablename__ = "DoorWithTypeDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(DoorDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    type_description: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "DoorWithTypeDAO",
+        "inherit_condition": database_id == DoorDAO.database_id,
+    }
+
+
 class HasStorageSpaceDAO(
     HasRootBodyDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasStorageSpace],
@@ -8642,6 +8725,56 @@ class LiquidCapDAO(
     }
 
 
+class NaturalLanguageDescriptionDAO(
+    HasRootBodyDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.natural_language.NaturalLanguageDescription
+    ],
+):
+
+    __tablename__ = "NaturalLanguageDescriptionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    description: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NaturalLanguageDescriptionDAO",
+        "inherit_condition": database_id == HasRootBodyDAO.database_id,
+    }
+
+
+class NaturalLanguageWithTypeDescriptionDAO(
+    NaturalLanguageDescriptionDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.natural_language.NaturalLanguageWithTypeDescription
+    ],
+):
+
+    __tablename__ = "NaturalLanguageWithTypeDescriptionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(NaturalLanguageDescriptionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    type_description: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NaturalLanguageWithTypeDescriptionDAO",
+        "inherit_condition": database_id == NaturalLanguageDescriptionDAO.database_id,
+    }
+
+
 class OvenDAO(
     HasRootBodyDAO,
     DataAccessObject[
@@ -9174,6 +9307,46 @@ class LivingRoomDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "LivingRoomDAO",
+        "inherit_condition": database_id == RoomDAO.database_id,
+    }
+
+
+class RoomWithWallsAndDoorsDAO(
+    RoomDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.RoomWithWallsAndDoors
+    ],
+):
+
+    __tablename__ = "RoomWithWallsAndDoorsDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoomDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    room_type: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    walls: Mapped[builtins.list[RoomWithWallsAndDoorsDAO_walls_association]] = (
+        relationship(
+            "RoomWithWallsAndDoorsDAO_walls_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[RoomWithWallsAndDoorsDAO_walls_association.source_roomwithwallsanddoorsdao_id]",
+        )
+    )
+    doors: Mapped[builtins.list[RoomWithWallsAndDoorsDAO_doors_association]] = (
+        relationship(
+            "RoomWithWallsAndDoorsDAO_doors_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[RoomWithWallsAndDoorsDAO_doors_association.source_roomwithwallsanddoorsdao_id]",
+        )
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "RoomWithWallsAndDoorsDAO",
         "inherit_condition": database_id == RoomDAO.database_id,
     }
 

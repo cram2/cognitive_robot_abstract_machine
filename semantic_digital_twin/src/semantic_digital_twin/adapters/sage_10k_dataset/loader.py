@@ -68,7 +68,7 @@ class Sage10kDatasetLoader:
             zip_ref.extractall(extraction_directory)
 
         os.remove(str(zipped_scene))
-
+        logger.info(f"Downloaded and extracted {scene_url} to {extraction_directory}")
         return extraction_directory
 
     def _parse_json(self, extracted_dir: Path) -> Sage10kScene:

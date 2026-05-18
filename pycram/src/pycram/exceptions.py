@@ -6,6 +6,7 @@ from typing_extensions import TYPE_CHECKING, Type, List
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from krrood.entity_query_language.factories import ConditionType, get_false_statements
 from krrood.exceptions import DataclassException
+from pycram.plans.failures import PlanFailure
 
 if TYPE_CHECKING:
     from pycram.plans.designator import Designator
@@ -34,7 +35,7 @@ class ContextIsUnavailable(DataclassException):
 
 
 @dataclass
-class ConditionNotSatisfied(DataclassException):
+class ConditionNotSatisfied(PlanFailure):
 
     pre_condition: bool
     action: Type[ActionDescription]
@@ -50,7 +51,7 @@ class ConditionNotSatisfied(DataclassException):
 
 
 @dataclass
-class MotionDidNotFinish(DataclassException):
+class MotionDidNotFinish(PlanFailure):
 
     failed_motions: List[MotionStatechartNode]
 

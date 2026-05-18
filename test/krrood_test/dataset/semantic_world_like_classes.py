@@ -115,7 +115,7 @@ class Wardrobe(View):
     container: Container
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Apple(Body): ...
 
 

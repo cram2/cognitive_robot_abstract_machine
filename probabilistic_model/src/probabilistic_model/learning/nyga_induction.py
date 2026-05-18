@@ -401,12 +401,19 @@ class NygaInduction:
     The minimal number of samples per quantile.
     """
 
+    tolerance_at_extremes: float = 1e-6
+    """
+    The tolerance at the extremes of the entire distribution.
+    This makes the support of the distribution bigger by this value to ensure that there are no likelihood errors due to
+    float precision.
+    """
+
     probabilistic_circuit: ProbabilisticCircuit = field(
         init=False, default_factory=ProbabilisticCircuit, compare=False
     )
 
     def fit(
-        self, data: np.array, weights: Optional[np.array] = None
+        self, data: np.ndarray, weights: Optional[np.ndarray] = None
     ) -> ProbabilisticCircuit:
         """
         Fit the distribution to the data.
@@ -424,7 +431,9 @@ class NygaInduction:
         if len(sorted_unique_data) == 1:
             # mount a dirac delta distribution and return
             distribution = DiracDeltaDistribution(
-                variable=self.variable, location=sorted_unique_data[0]
+                variable=self.variable,
+                location=sorted_unique_data[0],
+                tolerance=self.tolerance_at_extremes,
             )
             UnivariateContinuousLeaf(
                 distribution, probabilistic_circuit=self.probabilistic_circuit
@@ -468,7 +477,31 @@ class NygaInduction:
             induction_steps.extend(new_induction_steps)
 
         self.probabilistic_circuit.normalize()
+        self.adjust_extreme_points()
         return self.probabilistic_circuit
+
+    def adjust_extreme_points(self):
+        """
+        Applies `epsilon_at_extremes` to the support of the distribution.
+        """
+        # skip if this distribution is a dirac delta distribution
+        if len(self.probabilistic_circuit.nodes()) == 1:
+            return
+
+        # get the left most side of the distribution
+        lowest_leaf = min(
+            self.probabilistic_circuit.leaves,
+            key=lambda leaf: leaf.distribution.interval.lower,
+        )
+
+        lowest_leaf.distribution.interval.lower -= self.tolerance_at_extremes
+
+        highest_leaf = max(
+            self.probabilistic_circuit.leaves,
+            key=lambda leaf: leaf.distribution.interval.upper,
+        )
+
+        highest_leaf.distribution.interval.upper += self.tolerance_at_extremes
 
     def empty_copy(self) -> Self:
         return self.__class__(

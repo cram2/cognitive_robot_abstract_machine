@@ -32,6 +32,7 @@ from typing_extensions import (
 )
 
 from krrood.adapters.json_serializer import to_json, from_json
+from krrood.ormatic.exceptions import UnsupportedColumnType
 
 
 class classproperty:
@@ -225,3 +226,31 @@ def _get_type_hints_cached(clazz: Type) -> Dict[str, Any]:
         return get_type_hints(clazz)
     except Exception:
         return {}
+
+
+def get_python_type_from_sqlalchemy_column(column: Column):
+    """
+    This function returns the python type of an sqlalchemy column.
+    :param column: The sqlalchemy column.
+    :return: The python type of the column.
+    """
+    from krrood.ormatic.ormatic import ORMatic
+
+    if type(column.type) in ORMatic.get_type_mappings().values():
+        python_type = [
+            key
+            for key, value in ORMatic.get_type_mappings().items()
+            if value == type(column.type)
+        ]
+    else:
+        try:
+            python_type = [column.type.python_type]
+        except NotImplementedError:
+            raise UnsupportedColumnType(column.type)
+
+    if len(python_type) > 1:
+        raise TypeError(f"Multiple types found for column {column.name}")
+
+    python_type = python_type[0]
+
+    return python_type

@@ -576,7 +576,7 @@ def test_transport(mutable_multiple_robot_apartment, rclpy_node):
     description = TransportAction(
         object_designator=world.get_body_by_name("milk.stl"),
         target_location=Pose(
-            Point3.from_iterable([3.2, 2.2, 0.95]),
+            Point3.from_iterable([3.1, 2.2, 0.95]),
             Quaternion.from_iterable([0.0, 0.0, 1.0, 0.0]),
             reference_frame=world.root,
         ),
@@ -586,7 +586,7 @@ def test_transport(mutable_multiple_robot_apartment, rclpy_node):
     with simulated_robot:
         plan.perform()
     milk_position = world.get_body_by_name("milk.stl").global_transform.to_np()[:3, 3]
-    dist = np.linalg.norm(milk_position - np.array([3.2, 2.2, 0.95]))
+    dist = np.linalg.norm(milk_position - np.array([3.1, 2.2, 0.95]))
     assert dist <= 0.02
 
     plan.plan.validate()
