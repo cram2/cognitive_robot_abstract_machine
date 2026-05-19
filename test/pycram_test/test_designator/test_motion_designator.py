@@ -35,11 +35,10 @@ except (ImportError, ModuleNotFoundError, AttributeError):
 def test_pick_up_motion(immutable_model_world):
     world, view, context = immutable_model_world
     test_world = deepcopy(world)
-    test_robot = PR2.from_world(test_world)
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,
-        test_robot.left_arm.manipulator,
+        view.left_arm.manipulator,
     )
     pick_up = PickUpAction(
         test_world.get_body_by_name("milk.stl"), Arms.LEFT, grasp_description

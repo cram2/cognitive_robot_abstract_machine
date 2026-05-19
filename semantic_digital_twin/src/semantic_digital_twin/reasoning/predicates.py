@@ -1,11 +1,13 @@
 from __future__ import annotations
+
 from abc import ABC
+from copy import deepcopy
 from dataclasses import dataclass
 
 import numpy as np
-import math
 import trimesh.boolean
 from trimesh.collision import CollisionManager
+from typing_extensions import List, TYPE_CHECKING, Iterable, Type
 
 from krrood.entity_query_language.predicate import (
     Predicate,
@@ -13,11 +15,6 @@ from krrood.entity_query_language.predicate import (
     symbolic_function,
 )
 from random_events.interval import Interval
-from typing_extensions import List, TYPE_CHECKING, Iterable, Type
-
-from semantic_digital_twin.collision_checking.trimesh_collision_detector import (
-    FCLCollisionDetector,
-)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.spatial_computations.ik_solver import (
@@ -29,7 +26,6 @@ from semantic_digital_twin.spatial_types import Vector3, Point3
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
 )
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
@@ -39,7 +35,8 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.robots.abstract_robot import (
+    from semantic_digital_twin.world import World
+    from semantic_digital_twin.robots.robot_parts import (
         Camera,
     )
 
@@ -135,9 +132,10 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     )
 
     # create a world only containing the target body
-    world_without_occlusion = World()
+    world_without_occlusion = deepcopy(body._world)
     root = Body(name=PrefixedName("root"))
     with world_without_occlusion.modify_world():
+        world_without_occlusion.clear()
         world_without_occlusion.add_body(root)
         copied_body = Body.from_json(body.to_json())
         root_T_body = body.global_transform

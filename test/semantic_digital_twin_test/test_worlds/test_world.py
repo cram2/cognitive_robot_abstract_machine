@@ -1,3 +1,4 @@
+import os
 from copy import deepcopy
 from dataclasses import dataclass
 from uuid import UUID
@@ -6,6 +7,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_raises
 
+from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     DuplicateWorldEntityError,
@@ -15,6 +17,7 @@ from semantic_digital_twin.exceptions import (
     WrongWorldModelVersion,
     NonMonotonicTimeError,
 )
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle, Milk
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
@@ -637,13 +640,35 @@ def test_copy_world(world_setup):
         == 0.0
     )
     assert float(bf.global_transform.to_np()[0, 3]) == 1.5
-    assert all(
-        hash(d) in world_copy._world_entity_hash_table.keys()
-        for d in world.degrees_of_freedom
+
+    assert set(world_copy._world_entity_hash_table.keys()) == set(
+        world._world_entity_hash_table.keys()
     )
-    assert all(
-        hash(k) in world_copy._world_entity_hash_table.keys()
-        for k in world.kinematic_structure_entities
+
+
+def test_copy_big_world():
+    pr2_world = URDFParser.from_file(
+        file_path="package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+    ).parse()
+    PR2.from_world(pr2_world)
+    apartment_world = URDFParser.from_file(
+        os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "..",
+            "pycram",
+            "resources",
+            "worlds",
+            "apartment.urdf",
+        )
+    ).parse()
+
+    apartment_world.merge_world(pr2_world)
+    apartment_world_copy = deepcopy(apartment_world)
+
+    assert set(apartment_world._world_entity_hash_table.keys()) == set(
+        apartment_world_copy._world_entity_hash_table.keys()
     )
 
 
@@ -755,12 +780,18 @@ def test_copy_connections(pr2_world_state_reset):
         pr2_copy.get_degree_of_freedom_by_name("torso_lift_joint").id
     ].position = 0.3
     pr2_copy.notify_state_change()
+    original_torso_state = pr2_world_state_reset.get_connection_by_name(
+        "torso_lift_joint"
+    ).origin
+    copied_and_updated_torso_state = pr2_copy.get_connection_by_name(
+        "torso_lift_joint"
+    ).origin
 
     assert_raises(
         AssertionError,
         np.testing.assert_array_almost_equal,
-        pr2_world_state_reset.get_connection_by_name("torso_lift_joint").origin.to_np(),
-        pr2_copy.get_connection_by_name("torso_lift_joint").origin.to_np(),
+        original_torso_state,
+        copied_and_updated_torso_state,
     )
 
 

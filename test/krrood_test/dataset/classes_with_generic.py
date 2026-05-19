@@ -80,3 +80,16 @@ class TwoGenericContainer(TwoGenericSubClassSafe[U, V]):
 
 @dataclass
 class TwoGenericContainerBoundToBuiltIns(TwoGenericContainer[int, str]): ...
+
+
+@dataclass(eq=False)
+class GenericListClass(SubClassSafeGeneric[T], ABC):
+    generic_list: list[T] = field(default_factory=list)
+
+
+@dataclass(eq=False)
+class ExampleClass: ...
+
+
+@dataclass(eq=False)
+class CombinedClass(ExampleClass, GenericListClass[str]): ...

@@ -31,7 +31,9 @@ def test_ref_chain_after_copy_with_execute(immutable_model_world):
     copy_world = deepcopy(world)
     copy_world.name = "copy_world"
 
-    copy_context = Context(copy_world, PR2.from_world(copy_world))
+    copy_context = Context(
+        copy_world, copy_world.get_semantic_annotation_by_id(view.id)
+    )
 
     plan = sequential(
         [NavigateAction(Pose.from_xyz_rpy(1, -1, 0, reference_frame=copy_world.root))],
@@ -51,7 +53,9 @@ def test_ref_chain_after_copy_with_execute_complex_plan(mutable_model_world):
     copy_world = deepcopy(world)
     copy_world.name = "copy_world"
 
-    copy_context = Context(copy_world, PR2.from_world(copy_world))
+    copy_context = Context(
+        copy_world, copy_world.get_semantic_annotation_by_id(view.id)
+    )
 
     description = TransportAction(
         copy_world.get_body_by_name("milk.stl"),

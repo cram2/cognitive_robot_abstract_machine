@@ -92,7 +92,7 @@ def immutable_tracy_block_world(tracy_block_world):
 @pytest.fixture
 def mutable_tracy_block_world(tracy_block_world):
     copy_world = deepcopy(tracy_block_world)
-    copy_view = Tracy.from_world(copy_world)
+    copy_view = copy_world.get_semantic_annotations_by_type(Tracy)[0]
     return copy_world, copy_view, Context(copy_world, copy_view)
 
 

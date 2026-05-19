@@ -87,7 +87,9 @@ class AbstractSubClassSafeGeneric(ABC):
                     setattr(field_, key, value)
                 setattr(cls, field_.name, field_)
             else:
-                setattr(cls, name, field(**kwargs))
+                field_kwargs = copy(kwargs)
+                field_kwargs.pop("type", None)
+                setattr(cls, name, field(**field_kwargs))
         if "type" in kwargs:
             cls.__annotations__[name] = kwargs["type"]
         elif type_ is not None:

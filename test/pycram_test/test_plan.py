@@ -42,8 +42,8 @@ from semantic_digital_twin.orm.model import (
     QuaternionMapping,
     PoseMapping,
 )
-from semantic_digital_twin.robots.abstract_robot import (
-    Manipulator,
+from semantic_digital_twin.robots.robot_parts import (
+    EndEffector,
 )
 
 
@@ -408,7 +408,7 @@ def test_parameterization_of_pick_up(mutable_model_world):
             vertical_alignment=...,
             rotate_gripper=...,
             manipulation_offset=0.05,
-            manipulator=variable(Manipulator, world.semantic_annotations),
+            manipulator=variable(EndEffector, world.semantic_annotations),
         ),
     )
     pick_up_description.resolve()

@@ -97,24 +97,6 @@ def urdf_joint_to_limits(
     lower_limits.velocity = -velocity if velocity is not None else None
     upper_limits.velocity = velocity if velocity is not None else None
 
-    if urdf_joint.mimic is not None:
-        multiplier = (
-            urdf_joint.mimic.multiplier
-            if urdf_joint.mimic.multiplier is not None
-            else 1
-        )
-        offset = urdf_joint.mimic.offset if urdf_joint.mimic.offset is not None else 0
-
-        for d2 in Derivatives.range(Derivatives.position, Derivatives.velocity):
-            lower_limits[d2] -= offset
-            upper_limits[d2] -= offset
-            if multiplier < 0:
-                upper_limits[d2], lower_limits[d2] = (
-                    lower_limits[d2],
-                    upper_limits[d2],
-                )
-            upper_limits[d2] /= multiplier
-            lower_limits[d2] /= multiplier
     return lower_limits, upper_limits
 
 
@@ -187,14 +169,23 @@ class URDFParser:
         world.name = self.prefix
         with world.modify_world():
             world.add_kinematic_structure_entity(root)
-            joints = []
+            main_joints = []
+            mimic_joints = []
+
             for joint in self.parsed.joints:
+                if joint.mimic is not None:
+                    mimic_joints.append(joint)
+                else:
+                    main_joints.append(joint)
+
+            parsed_joints = []
+            for joint in main_joints + mimic_joints:
                 parent = [link for link in links if link.name.name == joint.parent][0]
                 child = [link for link in links if link.name.name == joint.child][0]
                 parsed_joint = self.parse_joint(joint, parent, child, world, prefix)
-                joints.append(parsed_joint)
+                parsed_joints.append(parsed_joint)
 
-            [world.add_connection(joint) for joint in joints]
+            [world.add_connection(joint) for joint in parsed_joints]
 
         return world
 

@@ -20,6 +20,7 @@ from ..dataset.classes_with_generic import (
     SubClassGenericThatRecreatesAFieldWithAnotherVar,
     SubClassGenericThatRecreatesAFieldWithNonBuiltInType,
     TwoGenericContainerBoundToBuiltIns,
+    CombinedClass,
 )
 
 
@@ -115,3 +116,13 @@ def _assert_generic_type_is_resolved(cls):
         get_origin(nested_generic_type) is list
         and get_args(nested_generic_type)[0] is generic_type
     )
+
+
+def test_combined_class_with_generic_subclass_safe_generic_inheritance_second_doesnt_die_from_missing_type_and_is_still_updated():
+    cls = CombinedClass
+    resolved_hints = get_type_hints(cls, include_extras=True)
+    field_name = "generic_list"
+    assert resolved_hints[field_name] == list[str]
+
+    field_ = next(f for f in fields(cls) if f.name == field_name)
+    assert field_.type == list[str]

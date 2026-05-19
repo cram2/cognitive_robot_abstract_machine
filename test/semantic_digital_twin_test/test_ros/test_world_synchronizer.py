@@ -990,8 +990,10 @@ def test_attribute_update_modification_apply_direct():
     # Test single value update
     mod = AttributeUpdateModification(
         entity_id=anno.id,
-        updated_kwargs=[
-            JSONAttributeDiff(attribute_name="value", added_values=["direct_value"])
+        updated_kwargs_json_list=[
+            JSONAttributeDiff(
+                attribute_name="value", added_values=[to_json("direct_value")]
+            )
         ],
     )
     mod.apply(w)
@@ -1000,8 +1002,8 @@ def test_attribute_update_modification_apply_direct():
     # Test entity reference update
     mod = AttributeUpdateModification(
         entity_id=anno.id,
-        updated_kwargs=[
-            JSONAttributeDiff(attribute_name="entity", added_values=[b1.id])
+        updated_kwargs_json_list=[
+            JSONAttributeDiff(attribute_name="entity", added_values=[to_json(b1.id)])
         ],
     )
     mod.apply(w)
@@ -1010,8 +1012,8 @@ def test_attribute_update_modification_apply_direct():
     # Test list update (add)
     mod = AttributeUpdateModification(
         entity_id=anno.id,
-        updated_kwargs=[
-            JSONAttributeDiff(attribute_name="entities", added_values=[b1.id])
+        updated_kwargs_json_list=[
+            JSONAttributeDiff(attribute_name="entities", added_values=[to_json(b1.id)])
         ],
     )
     mod.apply(w)
@@ -1020,8 +1022,10 @@ def test_attribute_update_modification_apply_direct():
     # Test list update (remove)
     mod = AttributeUpdateModification(
         entity_id=anno.id,
-        updated_kwargs=[
-            JSONAttributeDiff(attribute_name="entities", removed_values=[b1.id])
+        updated_kwargs_json_list=[
+            JSONAttributeDiff(
+                attribute_name="entities", removed_values=[to_json(b1.id)]
+            )
         ],
     )
     mod.apply(w)

@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 
 from semantic_digital_twin.reasoning.predicates import visible
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot, Camera
+from semantic_digital_twin.robots.robot_parts import Camera, AbstractRobot
+
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (

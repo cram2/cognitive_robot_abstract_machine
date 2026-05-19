@@ -81,11 +81,15 @@ with world.modify_world():
             Spoon(root=world.get_body_by_name("spoon.stl")),
         ]
     )
-    world.add_semantic_annotation(
-        Drawer(
-            root=world.get_body_by_name("cabinet10_drawer_top"),
-            handle=Handle(root=world.get_body_by_name("handle_cab10_t")),
-        )
+    handle = Handle(root=world.get_body_by_name("handle_cab10_t"))
+    world.add_semantic_annotations(
+        [
+            handle,
+            Drawer(
+                root=world.get_body_by_name("cabinet10_drawer_top"),
+                handle=handle,
+            ),
+        ]
     )
 
 context.evaluate_conditions = False

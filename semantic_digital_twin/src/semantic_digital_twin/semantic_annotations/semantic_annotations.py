@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Iterable, Optional, Self, Tuple
+from typing import Iterable, Optional, Self, Tuple, Set, TYPE_CHECKING
 
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
@@ -37,7 +37,6 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
@@ -56,7 +55,11 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     Region,
     Connection,
+    KinematicStructureEntity,
 )
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.world import World
 
 
 @dataclass(eq=False)
@@ -744,16 +747,12 @@ class Milk(Food, IsPerceivable):
     A container of milk.
     """
 
-    ...
-
 
 @dataclass(eq=False)
 class SaltContainer(HasRootBody, IsPerceivable):
     """
     A container of salt.
     """
-
-    ...
 
 
 @dataclass(eq=False)
@@ -1051,4 +1050,36 @@ class Baseball(HasRootBody):
 class LiquidCap(HasRootBody):
     """
     A liquid cap.
+    """
+
+
+@dataclass(eq=False)
+class Agent(HasRootBody):
+    """
+    Represents an entity in the world that can act, move, or be controlled.
+
+    Agents are dynamic bodies with semantic meaning — they may have intent,
+    behavior, or be controlled by external or internal logic. Examples include
+    robots, humans, or other autonomous actors.
+
+    """
+
+
+@dataclass(eq=False)
+class Human(Agent):
+    """
+    Represents a human agent in the environment.
+
+    A Person is an Agent that is not robotically actuated and does not provide
+    kinematic chains, manipulators, or robot-specific components.
+
+    This class exists primarily for semantic distinction, so that algorithms
+    can treat human agents differently from robots if needed.
+    """
+
+
+@dataclass(eq=False)
+class SemanticEnvironmentAnnotation(HasRootBody):
+    """
+    Represents a semantic annotation of the environment.
     """

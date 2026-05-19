@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import pytest
 
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world_description.connections import FixedConnection
 
 
@@ -37,7 +38,6 @@ def urdf_paths():
         table=os.path.join(urdf_directory, "table.urdf"),
         kitchen=os.path.join(urdf_directory, "kitchen-small.urdf"),
         apartment=os.path.join(urdf_directory, "apartment.urdf"),
-        pr2=os.path.join(urdf_directory, "pr2_kinematic_tree.urdf"),
     )
 
 
@@ -66,11 +66,11 @@ def apartment_parser(urdf_paths):
 
 
 @pytest.fixture
-def pr2_parser(urdf_paths):
+def pr2_parser():
     """
     Fixture providing a URDFParser for the PR2 model.
     """
-    return URDFParser.from_file(file_path=urdf_paths.pr2)
+    return URDFParser.from_file(file_path=PR2.get_ros_file_path())
 
 
 def test_table_parsing(table_parser):

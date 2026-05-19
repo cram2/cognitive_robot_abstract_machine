@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing_extensions import List, Callable
 
 from krrood.entity_query_language.predicate import Predicate
-from semantic_digital_twin.robots.abstract_robot import Manipulator
+from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
     Body,
@@ -16,7 +16,7 @@ class GripperOccupancy:
     Base class for predicates that check the gripper occupancy.
     """
 
-    manipulator: Manipulator
+    manipulator: EndEffector
     """
     Semantic annotation for the gripper that should be evaluated.
     """

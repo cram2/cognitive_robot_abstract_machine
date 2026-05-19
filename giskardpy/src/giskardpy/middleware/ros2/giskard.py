@@ -34,7 +34,7 @@ from semantic_digital_twin.adapters.ros.world_synchronizer import (
     StateSynchronizer,
     ModelReloadSynchronizer,
 )
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world_description.connections import ActiveConnection
 
 logger = logging.getLogger(__name__)
