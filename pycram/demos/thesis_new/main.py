@@ -15,7 +15,7 @@ robots = (
     "armar7",
     "g1",
 )
-robots = ("garmi",)
+
 actions = ("mix", "wipe", "cut")
 # pr2,hsrb,stretch,tiago,g1,justin,armar7
 # apartment,kitchen,isr?, suturo, robocup, isr-testbed
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     Base.metadata.create_all(session.bind)
     session.commit()
 
-    for action in ["cut", "mix"]:
+    for action in ["cut", "mix", "wipe"]:
         for env in ["kitchen", "apartment", "isr"]:
             for robot in robots:
                 run_thesis_demo_isolated(

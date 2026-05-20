@@ -20,7 +20,7 @@ from thesis_new.ideas.spawn_breads_luca import setup_random_bread_world
 from thesis_new.src.spawn_random_breads import build_cutting_reachability_costmaps
 from thesis_new.src.tool_mounts import get_tool_mount_pose_kwargs
 from thesis_new.src.world_setup import resolve_robot_name
-from pycram.robot_plans.actions.composite.utils.demo_utils import (
+from demos.thesis_new.src.utils import (
     attach_available_tools,
     update_navigation_costmap_debug_publishers,
     collect_named_targets,
@@ -31,7 +31,7 @@ from pycram.robot_plans.actions.composite.utils.demo_utils import (
     shutdown_experiment_runtime,
     commit_plan_to_db,
 )
-from pycram.robot_plans.actions.composite.utils.experiment_logging import (
+from demos.thesis_new.src.utils import (
     body_name as _body_name,
     format_attempt_error as _format_attempt_error,
 )

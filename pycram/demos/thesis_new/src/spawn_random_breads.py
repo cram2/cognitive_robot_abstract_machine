@@ -2,6 +2,7 @@ import os
 import numpy as np
 import rclpy
 
+from demos.thesis_new.src.utils.demo_utils import build_navigation_costmaps
 from pycram.datastructures.dataclasses import Context
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
@@ -14,9 +15,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Tabl
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import Color, Scale
 
-from pycram.robot_plans.actions.composite.utils.demo_utils import (
-    build_navigation_costmaps,
-)
+
 from pycram.robot_plans.actions.composite.thesis_math import body_local_aabb
 from .world_setup import resolve_environment_name, setup_thesis_world
 
@@ -41,7 +40,7 @@ ENVIRONMENT_ALLOWED_SURFACE_NAME_KEYWORDS = {
 }
 MIN_SUPPORT_SURFACE_AREA_M2 = 0.025
 MIN_SUPPORT_SURFACE_SPAN_M = 0.18
-MAX_SUPPORT_SURFACE_TOP_Z_M = 1.55
+MAX_SUPPORT_SURFACE_TOP_Z_M = 1.10
 
 # Automatic count model: breads ~= usable_surface_area * BREADS_PER_SQM.
 # Keep this tunable when switching to a new environment.
@@ -185,26 +184,40 @@ def _collect_surfaces_by_geometry(world, seen):
 
 
 def _robot_body_identity_sets(world):
-    try:
-        robot = Context.from_world(world).robot
-    except Exception:
-        return set(), set()
+    robot_root = None
+    robot_bodies = []
 
-    robot_entities = [robot.root]
     try:
-        robot_entities.extend(
-            world.compute_descendent_child_kinematic_structure_entities(robot.root)
-        )
+        from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+        robot_annotations = [
+            a for a in getattr(world, "semantic_annotations", [])
+            if isinstance(a, AbstractRobot)
+        ]
+        if robot_annotations:
+            robot = robot_annotations[0]
+            robot_root = robot.root
+            # Use Robot.bodies directly instead of traversing the graph
+            robot_bodies = list(getattr(robot, "bodies", []))
+
     except Exception:
         pass
 
+    if not robot_bodies and robot_root is not None:
+        robot_bodies = [robot_root]
+
+    if not robot_bodies:
+        return set(), set()
+
     robot_ids = set()
     robot_names = set()
-    for entity in robot_entities:
-        robot_ids.add(getattr(entity, "id", None))
-        entity_name = _body_name(entity)
-        if entity_name:
-            robot_names.add(entity_name)
+    for body in robot_bodies:
+        name = _body_name(body)
+        if name:
+            robot_names.add(name)
+        bid = getattr(body, "id", None)
+        if bid is not None:
+            robot_ids.add(bid)
+
     robot_ids.discard(None)
     return robot_ids, robot_names
 
@@ -227,6 +240,8 @@ def _collect_surface_bodies(world):
         if _is_robot_body(body, name, robot_body_ids, robot_body_names):
             continue
         if name in seen:
+            continue
+        if not _surface_geometry_is_usable(body):
             continue
         surfaces.append(body)
         seen.add(name)
@@ -475,8 +490,10 @@ def _sample_random_surface_layout(
     if DEBUG_SPAWN_FRAMES:
         print(f"[spawn-debug] world_root={_frame_name(world.root)}")
 
-    spawn_context = Context.from_world(world)
-    spawn_robot = spawn_context.robot
+
+    spawn_robot = None
+    if not debug_disable_reachability:
+        spawn_robot = Context.from_world(world).robot
     placements = []
     surface_plan = []
     created_idx = 0
@@ -737,7 +754,7 @@ def setup_random_bread_world(
         radius_safety_factor=BREAD_RADIUS_SAFETY_FACTOR,
         min_clearance_m=MIN_BREAD_CLEARANCE_M,
         strict_clean_mode=STRICT_CLEAN_MODE,
-        z_offset=0.02,
+        z_offset=0.03,
         reachability_fn=_is_pose_reachable_for_cutting,
         debug_disable_reachability=DEBUG_DISABLE_REACHABILITY,
         debug_force_spawn_all_targets=DEBUG_FORCE_SPAWN_ALL_TARGETS,

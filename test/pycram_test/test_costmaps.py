@@ -12,7 +12,7 @@ from pycram.locations.costmaps import (
     OrientationGenerator,
     VisibilityCostmap,
 )
-from pycram.robot_plans.actions.composite.utils.rviz import CostmapHeatmapRviz
+from demos.thesis_new.src.utils import CostmapHeatmapRviz
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types import Vector3

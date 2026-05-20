@@ -24,8 +24,8 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 from semantic_digital_twin.world_description.connections import FixedConnection
 
-from pycram.robot_plans.actions.composite.utils.experiment_logging import body_name
-from pycram.robot_plans.actions.composite.utils.rviz import CostmapHeatmapRviz
+from demos.thesis_new.src.utils.experiment_logging import body_name
+from demos.thesis_new.src.utils.rviz import CostmapHeatmapRviz
 from pycram.tf_transformations import quaternion_from_euler
 
 KITCHEN_NAVIGATION_X_MAX = 1.5
@@ -48,7 +48,7 @@ def _load_thesis_world_setup():
             resolve_robot_name_from_annotation,
         )
     except ImportError:
-        from thesis_new.src.world_setup import (
+        from ..world_setup import (
             resolve_environment_name,
             resolve_robot_name_from_annotation,
         )

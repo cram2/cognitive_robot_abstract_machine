@@ -46,7 +46,7 @@ def _setup_world_with_bowl():
     bowl = STLParser(
         os.path.join(
             os.path.dirname(__file__),
-            "../../../../../../demos",
+            "../../..",
             "..",
             "resources",
             "objects",

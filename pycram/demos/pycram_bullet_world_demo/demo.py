@@ -4,13 +4,8 @@ import time
 import numpy as np
 
 from pycram.datastructures.dataclasses import Context
-from pycram.datastructures.enums import Arms
 from pycram.locations.costmaps import VisibilityCostmap
-from pycram.robot_plans.actions.composite.utils.rviz import CameraVisiblePointsRviz
-from pycram.motion_executor import simulated_robot
-from pycram.plans.factories import sequential
-from pycram.robot_plans.actions.composite.transporting import TransportAction
-from pycram.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
+from demos.thesis_new.src.utils import CameraVisiblePointsRviz
 from pycram.tf_transformations import quaternion_multiply
 from pycram.utils import get_quaternion_between_two_vectors
 

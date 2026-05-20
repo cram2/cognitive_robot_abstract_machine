@@ -88,10 +88,31 @@ BASE_RESULT_FIELDNAMES = [
     "cut_normal_world_y",
     "cut_normal_world_z",
     "cut_normal_world_yaw_rad",
+    "robot_world_x",
+    "robot_world_y",
+    "robot_world_z",
+    "robot_yaw_rad",
+    "robot_to_object_yaw_rad",
+    "object_yaw_relative_to_robot_rad",
+    "object_yaw_relative_to_approach_rad",
+    "cut_normal_relative_to_robot_rad",
+    "cut_normal_relative_to_approach_rad",
+    "cut_normal_approach_abs_angle_rad",
+    "cut_normal_approach_parallel_score",
+    "cut_normal_approach_perpendicular_score",
     "technique_name",
     "slice_thickness_m",
     "num_cuts_x",
     "pointer_stride",
+    "motion_approach_completed",
+    "motion_waypoint_count",
+    "motion_stopped_waypoint_index",
+    "motion_stopped_waypoint_fraction",
+    "motion_stopped_waypoint_x",
+    "motion_stopped_waypoint_y",
+    "motion_stopped_waypoint_z",
+    "motion_stopped_distance_m",
+    "motion_progress_note",
     "execution_time_s",
     "failure_count",
     "failure_reasons",
@@ -151,10 +172,28 @@ def initialize_csv(csv_path, fieldnames):
     if csv_dir:
         os.makedirs(csv_dir, exist_ok=True)
     if os.path.exists(csv_path) and os.path.getsize(csv_path) > 0:
+        ensure_csv_fieldnames(csv_path, fieldnames)
         return
     with open(csv_path, "w", newline="", encoding="utf-8") as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         writer.writeheader()
+
+
+def ensure_csv_fieldnames(csv_path, fieldnames):
+    with open(csv_path, "r", newline="", encoding="utf-8") as csv_file:
+        reader = csv.DictReader(csv_file)
+        existing_fieldnames = reader.fieldnames or []
+        if all(fieldname in existing_fieldnames for fieldname in fieldnames):
+            return
+        rows = list(reader)
+
+    with open(csv_path, "w", newline="", encoding="utf-8") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(
+                {fieldname: row.get(fieldname, "") for fieldname in fieldnames}
+            )
 
 
 def append_csv_row(csv_path, fieldnames, row):
@@ -163,6 +202,8 @@ def append_csv_row(csv_path, fieldnames, row):
         os.makedirs(csv_dir, exist_ok=True)
     file_exists = os.path.exists(csv_path)
     needs_header = (not file_exists) or os.path.getsize(csv_path) == 0
+    if file_exists and not needs_header:
+        ensure_csv_fieldnames(csv_path, fieldnames)
     with open(csv_path, "a", newline="", encoding="utf-8") as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         if needs_header:

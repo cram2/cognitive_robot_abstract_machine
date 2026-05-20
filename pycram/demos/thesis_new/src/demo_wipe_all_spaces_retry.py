@@ -11,13 +11,15 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 try:
     from demos.thesis.simulation_setup import BoxSpec, add_box
-    from thesis_new.src.spawn_random_bowls import sample_random_bowl_poses
-    from thesis_new.src.tool_mounts import get_tool_mount_pose_kwargs
+    from .spawn_random_bowls import sample_random_bowl_poses
+    from .tool_mounts import get_tool_mount_pose_kwargs
+    from .world_setup import resolve_environment_name
 except ModuleNotFoundError:
-    from thesis.simulation_setup import BoxSpec, add_box
-    from thesis_new.src.spawn_random_bowls import sample_random_bowl_poses
-    from thesis_new.src.tool_mounts import get_tool_mount_pose_kwargs
-from pycram.robot_plans.actions.composite.utils.demo_utils import (
+    from ...thesis.simulation_setup import BoxSpec, add_box
+    from .spawn_random_bowls import sample_random_bowl_poses
+    from .tool_mounts import get_tool_mount_pose_kwargs
+    from .world_setup import resolve_environment_name
+from .utils.demo_utils import (
     build_navigation_costmaps,
     get_available_arm_tool_frames,
     get_park_arms_argument,
@@ -28,7 +30,7 @@ from pycram.robot_plans.actions.composite.utils.demo_utils import (
     update_navigation_costmap_debug_publishers,
     commit_plan_to_db,
 )
-from pycram.robot_plans.actions.composite.utils.experiment_logging import (
+from .utils.experiment_logging import (
     BASE_RESULT_FIELDNAMES,
     append_csv_row,
     body_name as _body_name,
@@ -115,6 +117,7 @@ def _record_space_result(
     failures,
     *,
     spawn_pose_xyz,
+    environment_name,
     task_instance_id,
     experiment_condition,
     baseline_name,
@@ -161,6 +164,7 @@ def _record_space_result(
         failures,
         target_name=target_name,
         spawn_pose_xyz=spawn_pose_xyz,
+        environment_name=environment_name,
         task_name=task_name,
         run_id=run_id,
         task_instance_id=task_instance_id,
@@ -200,7 +204,12 @@ def _record_space_result(
 
 
 def _results_csv_fieldnames():
-    return ["target_name", "spawn_pose_xyz", *BASE_RESULT_FIELDNAMES]
+    return [
+        "target_name",
+        "spawn_pose_xyz",
+        "environment_name",
+        *BASE_RESULT_FIELDNAMES,
+    ]
 
 
 def _create_target_pose_marker_publisher(node):
@@ -531,7 +540,8 @@ def main_wiping(seed=None, robot_name=None, environment_name=None):
     context = Context.from_world(world)
     context.ros_node = node
     robot_name = _robot_name(context.robot)
-    world_name = _body_name(world.root)
+    logged_environment_name = resolve_environment_name(environment_name)
+    world_name = logged_environment_name
     run_id = new_run_id()
 
     with simulated_robot_without_collision:
@@ -580,6 +590,7 @@ def main_wiping(seed=None, robot_name=None, environment_name=None):
         ).tolist()
         common_result_kwargs = {
             "spawn_pose_xyz": spawn_xyz,
+            "environment_name": logged_environment_name,
             "task_instance_id": target_name,
             "experiment_condition": EXPERIMENT_CONDITION,
             "baseline_name": BASELINE_NAME,
@@ -744,6 +755,7 @@ def main_wiping(seed=None, robot_name=None, environment_name=None):
         ).tolist()
         common_result_kwargs = {
             "spawn_pose_xyz": spawn_xyz,
+            "environment_name": logged_environment_name,
             "task_instance_id": target_name,
             "experiment_condition": EXPERIMENT_CONDITION,
             "baseline_name": BASELINE_NAME,

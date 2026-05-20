@@ -68,7 +68,7 @@ try:
         setup_thesis_world,
     )
 except ImportError:
-    from thesis_new.src.demo_cut_all_breads_retry import (
+    from ..thesis_new.src.demo_cut_all_breads_retry import (
         CUTTING_NUM_CUTS_X,
         CUTTING_POINTER_STRIDE,
         CUTTING_SLICE_THICKNESS_M,
@@ -77,27 +77,27 @@ except ImportError:
         _cut_object_execution_config,
         _parse_stl,
     )
-    from thesis_new.src.demo_mix_all_bowls_retry import _try_mix
-    from thesis_new.src.demo_wipe_all_spaces_retry import (
+    from ..thesis_new.src.demo_mix_all_bowls_retry import _try_mix
+    from ..thesis_new.src.demo_wipe_all_spaces_retry import (
         _attach_sponges_for_available_arms,
         _create_target_pose_marker_publisher,
         _publish_target_pose_markers,
         _try_wipe,
     )
-    from thesis_new.src.spawn_random_bowls import _parse_stl as _parse_bowl_stl
-    from thesis_new.src.spawn_random_breads import (
+    from ..thesis_new.src.spawn_random_bowls import _parse_stl as _parse_bowl_stl
+    from ..thesis_new.src.spawn_random_breads import (
         _pose_xyz,
         _set_uniform_scale,
         get_cut_object_config,
     )
-    from thesis_new.src.tool_mounts import get_tool_mount_pose_kwargs
-    from thesis_new.src.world_setup import (
+    from ..thesis_new.src.tool_mounts import get_tool_mount_pose_kwargs
+    from ..thesis_new.src.world_setup import (
         resolve_environment_name,
         resolve_robot_name,
         setup_thesis_world,
     )
 from pycram.robot_plans.actions.composite.thesis_math import body_local_aabb
-from pycram.robot_plans.actions.composite.utils.demo_utils import (
+from demos.thesis_new.src.utils import (
     attach_available_tools,
     collect_named_targets,
     get_available_arm_tool_frames,

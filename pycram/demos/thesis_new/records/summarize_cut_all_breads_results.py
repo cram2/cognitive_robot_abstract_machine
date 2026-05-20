@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from pycram.robot_plans.actions.composite.utils.experiment_summary import (
+from demos.thesis_new.src.utils import (
     BASE_AGGREGATED_FIELDS,
     BASE_SUMMARY_FIELDS,
     append_csv,

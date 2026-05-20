@@ -7,7 +7,7 @@ from demos.thesis_new.old.Phasenbausteine import FixedFrameProvider, Pose
 from pycram.robot_plans.actions.composite.thesis_math import (
     build_default_sequence,
 )
-from pycram.robot_plans.actions.composite.utils.rviz import MotionSequenceRviz
+from demos.thesis_new.src.utils import MotionSequenceRviz
 
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.pose import PoseStamped

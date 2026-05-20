@@ -15,7 +15,12 @@ from pycram.robot_plans.actions.core.robot_body import (
     MoveTorsoAction,
     SetGripperAction,
 )
-from pycram.tf_transformations import euler_from_quaternion, quaternion_matrix
+from pycram.tf_transformations import (
+    euler_from_quaternion,
+    quaternion_from_euler,
+    quaternion_matrix,
+    quaternion_multiply,
+)
 
 
 from .spawn_random_breads import (
@@ -26,7 +31,7 @@ from .spawn_random_breads import build_cutting_reachability_costmaps
 from pycram.robot_plans.actions.composite.thesis_math import body_local_aabb
 from .tool_mounts import get_tool_mount_pose_kwargs
 from .world_setup import resolve_robot_name
-from pycram.robot_plans.actions.composite.utils.demo_utils import (
+from .utils.demo_utils import (
     attach_available_tools,
     update_navigation_costmap_debug_publishers,
     collect_named_targets,
@@ -34,13 +39,15 @@ from pycram.robot_plans.actions.composite.utils.demo_utils import (
     get_park_arms_argument,
     highlight_current_target,
     resolve_navigation_target_for_environment,
+    set_entity_global_pose,
     setup_experiment_runtime,
     shutdown_experiment_runtime,
+    body_name as _body_name,
 )
-from pycram.robot_plans.actions.composite.utils.experiment_logging import (
+from .utils.experiment_logging import (
     BASE_RESULT_FIELDNAMES,
     append_csv_row,
-    body_name as _body_name,
+
     build_base_result_row,
     format_attempt_error as _format_attempt_error,
     initialize_csv,
@@ -61,7 +68,7 @@ from semantic_digital_twin.adapters.mesh import STLParser
 
 from semantic_digital_twin.datastructures.definitions import TorsoState, GripperState
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Knife
-from semantic_digital_twin.spatial_types import Point3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.geometry import Color
 
@@ -75,7 +82,10 @@ ACTIVE_BREAD_COLOR = Color(R=0.52, G=0.82, B=0.98)
 FAILED_BREAD_COLOR = Color(R=0.95, G=0.20, B=0.20)
 SUCCESS_BREAD_COLOR = Color(R=0.62, G=0.92, B=0.62)
 RECORDS_DIR = os.path.join(os.path.dirname(__file__), "../records")
-RESULTS_CSV_PATH = os.path.join(RECORDS_DIR, "cut_all_breads_results.csv")
+RESULTS_CSV_PATH = os.environ.get(
+    "THESIS_CUT_RESULTS_CSV_PATH",
+    os.path.join(RECORDS_DIR, "cut_all_breads_results.csv"),
+)
 EXPERIMENT_CONDITION = "full_system"
 BASELINE_NAME = "base_system"
 TASK_NAME = "bread_cutting"
@@ -208,6 +218,7 @@ def _record_bread_result(
     perturbation_type,
     execution_time_s,
     geometry_binding,
+    motion_progress=None,
 ):
     return build_base_result_row(
         results,
@@ -252,12 +263,88 @@ def _record_bread_result(
         perturbation_applied=perturbation_applied,
         perturbation_type=perturbation_type,
         **geometry_binding,
+        **(motion_progress or _empty_motion_progress()),
         execution_time_s=round(execution_time_s, 4),
     )
 
 
 def _results_csv_fieldnames():
     return ["bread_name", *BASE_RESULT_FIELDNAMES]
+
+
+def _empty_motion_progress():
+    return {
+        "motion_approach_completed": False,
+        "motion_waypoint_count": "",
+        "motion_stopped_waypoint_index": "",
+        "motion_stopped_waypoint_fraction": "",
+        "motion_stopped_waypoint_x": "",
+        "motion_stopped_waypoint_y": "",
+        "motion_stopped_waypoint_z": "",
+        "motion_stopped_distance_m": "",
+        "motion_progress_note": "",
+    }
+
+
+def _motion_progress_from_action(action):
+    if action is None:
+        return _empty_motion_progress()
+
+    def value(name, default=""):
+        result = getattr(action, name, default)
+        return default if result is None else result
+
+    return {
+        "motion_approach_completed": True,
+        "motion_waypoint_count": value("logged_waypoint_count"),
+        "motion_stopped_waypoint_index": value("logged_stopped_waypoint_index"),
+        "motion_stopped_waypoint_fraction": value(
+            "logged_stopped_waypoint_fraction"
+        ),
+        "motion_stopped_waypoint_x": value("logged_stopped_waypoint_x"),
+        "motion_stopped_waypoint_y": value("logged_stopped_waypoint_y"),
+        "motion_stopped_waypoint_z": value("logged_stopped_waypoint_z"),
+        "motion_stopped_distance_m": value("logged_stopped_distance_m"),
+        "motion_progress_note": value("logged_motion_progress_note"),
+    }
+
+
+def _motion_progress_from_exception(exc):
+    return getattr(exc, "motion_progress", _empty_motion_progress())
+
+
+def _rotate_bread_z(world, bread, angle_rad):
+    pose = bread.global_pose
+    pos = np.asarray(pose.to_position().to_np(), dtype=float).reshape(-1)[:3]
+    quat = np.asarray(pose.to_quaternion().to_np(), dtype=float).reshape(-1)[:4]
+    rot_quat = quaternion_from_euler(0.0, 0.0, float(angle_rad))
+    new_quat = quaternion_multiply(rot_quat, quat)
+
+    rotated_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=float(pos[0]),
+        pos_y=float(pos[1]),
+        pos_z=float(pos[2]),
+        quat_x=float(new_quat[0]),
+        quat_y=float(new_quat[1]),
+        quat_z=float(new_quat[2]),
+        quat_w=float(new_quat[3]),
+        reference_frame=world.root,
+    )
+    set_entity_global_pose(world, bread, rotated_pose)
+    world.update_forward_kinematics()
+
+
+def _wrap_angle_rad(angle):
+    return float((float(angle) + np.pi) % (2.0 * np.pi) - np.pi)
+
+
+def _fold_abs_angle_rad(angle):
+    return float(abs(np.arctan2(np.sin(angle), np.cos(angle))))
+
+
+def _fold_parallel_angle_rad(angle):
+    folded = _fold_abs_angle_rad(angle)
+    return float(min(folded, abs(np.pi - folded)))
 
 
 def _try_cut(
@@ -310,24 +397,27 @@ def _try_cut(
         )
 
     current_plan = None
+    cutting_action = None
     try:
         with simulated_robot_with_collision:
-
+            cutting_action = CuttingAction(
+                container=bread,
+                arm=arm,
+                tool=tool,
+                technique=cutting_technique,
+                pointer_stride=CUTTING_POINTER_STRIDE,
+                num_cuts_x=num_cuts_x,
+                slice_thickness=CUTTING_SLICE_THICKNESS_M,
+            )
             current_plan = sequential(
-                [
-                    CuttingAction(
-                        container=bread,
-                        arm=arm,
-                        tool=tool,
-                        technique=cutting_technique,
-                        pointer_stride=CUTTING_POINTER_STRIDE,
-                        num_cuts_x=num_cuts_x,
-                        slice_thickness=CUTTING_SLICE_THICKNESS_M,
-                    ),
-                ],
+                [cutting_action],
                 context,
             )
             _, _ = _timed("cut/action_plan_perform", current_plan.perform)
+            return _motion_progress_from_action(cutting_action)
+    except Exception as exc:
+        exc.motion_progress = _motion_progress_from_action(cutting_action)
+        raise
     finally:
         if current_plan is not None:
             _, _ = _timed(
@@ -335,7 +425,7 @@ def _try_cut(
             )
 
 
-def _build_cut_geometry_binding(bread, *, cutting_technique, num_cuts_x):
+def _build_cut_geometry_binding(bread, *, cutting_technique, num_cuts_x, robot=None):
     mins, maxs = body_local_aabb(
         bread,
         use_visual=True,
@@ -358,6 +448,51 @@ def _build_cut_geometry_binding(bread, *, cutting_technique, num_cuts_x):
     cut_normal_local = np.array([1.0, 0.0, 0.0], dtype=float)
     cut_normal_world = rotation @ cut_normal_local
     cut_normal_world_yaw = float(np.arctan2(cut_normal_world[1], cut_normal_world[0]))
+    robot_pos = np.full(3, np.nan, dtype=float)
+    robot_yaw = float("nan")
+    robot_to_object_yaw = float("nan")
+    object_yaw_relative_to_robot = float("nan")
+    object_yaw_relative_to_approach = float("nan")
+    cut_normal_relative_to_robot = float("nan")
+    cut_normal_relative_to_approach = float("nan")
+    cut_normal_approach_abs_angle = float("nan")
+    cut_normal_approach_parallel_score = float("nan")
+    cut_normal_approach_perpendicular_score = float("nan")
+    if robot is not None:
+        try:
+            robot_pose_owner = getattr(robot, "base", None) or getattr(robot, "root", None)
+            robot_pose = robot_pose_owner.global_pose
+            robot_pos = np.asarray(
+                robot_pose.to_position().to_np(), dtype=float
+            ).reshape(-1)[:3]
+            robot_quat = np.asarray(
+                robot_pose.to_quaternion().to_np(), dtype=float
+            ).reshape(-1)[:4]
+            _, _, robot_yaw = euler_from_quaternion(robot_quat)
+            robot_to_object_yaw = float(
+                np.arctan2(float(pos[1] - robot_pos[1]), float(pos[0] - robot_pos[0]))
+            )
+            object_yaw_relative_to_robot = _wrap_angle_rad(yaw - robot_yaw)
+            object_yaw_relative_to_approach = _wrap_angle_rad(
+                yaw - robot_to_object_yaw
+            )
+            cut_normal_relative_to_robot = _wrap_angle_rad(
+                cut_normal_world_yaw - robot_yaw
+            )
+            cut_normal_relative_to_approach = _wrap_angle_rad(
+                cut_normal_world_yaw - robot_to_object_yaw
+            )
+            cut_normal_approach_abs_angle = _fold_parallel_angle_rad(
+                cut_normal_relative_to_approach
+            )
+            cut_normal_approach_parallel_score = float(
+                abs(np.cos(cut_normal_relative_to_approach))
+            )
+            cut_normal_approach_perpendicular_score = float(
+                abs(np.sin(cut_normal_relative_to_approach))
+            )
+        except Exception:
+            pass
 
     eps = 1e-9
     anchor_norm = np.array(
@@ -452,6 +587,58 @@ def _build_cut_geometry_binding(bread, *, cutting_technique, num_cuts_x):
         "cut_normal_world_y": round(float(cut_normal_world[1]), 6),
         "cut_normal_world_z": round(float(cut_normal_world[2]), 6),
         "cut_normal_world_yaw_rad": round(cut_normal_world_yaw, 6),
+        "robot_world_x": (
+            round(float(robot_pos[0]), 6) if np.isfinite(robot_pos[0]) else ""
+        ),
+        "robot_world_y": (
+            round(float(robot_pos[1]), 6) if np.isfinite(robot_pos[1]) else ""
+        ),
+        "robot_world_z": (
+            round(float(robot_pos[2]), 6) if np.isfinite(robot_pos[2]) else ""
+        ),
+        "robot_yaw_rad": (
+            round(float(robot_yaw), 6) if np.isfinite(robot_yaw) else ""
+        ),
+        "robot_to_object_yaw_rad": (
+            round(float(robot_to_object_yaw), 6)
+            if np.isfinite(robot_to_object_yaw)
+            else ""
+        ),
+        "object_yaw_relative_to_robot_rad": (
+            round(float(object_yaw_relative_to_robot), 6)
+            if np.isfinite(object_yaw_relative_to_robot)
+            else ""
+        ),
+        "object_yaw_relative_to_approach_rad": (
+            round(float(object_yaw_relative_to_approach), 6)
+            if np.isfinite(object_yaw_relative_to_approach)
+            else ""
+        ),
+        "cut_normal_relative_to_robot_rad": (
+            round(float(cut_normal_relative_to_robot), 6)
+            if np.isfinite(cut_normal_relative_to_robot)
+            else ""
+        ),
+        "cut_normal_relative_to_approach_rad": (
+            round(float(cut_normal_relative_to_approach), 6)
+            if np.isfinite(cut_normal_relative_to_approach)
+            else ""
+        ),
+        "cut_normal_approach_abs_angle_rad": (
+            round(float(cut_normal_approach_abs_angle), 6)
+            if np.isfinite(cut_normal_approach_abs_angle)
+            else ""
+        ),
+        "cut_normal_approach_parallel_score": (
+            round(float(cut_normal_approach_parallel_score), 6)
+            if np.isfinite(cut_normal_approach_parallel_score)
+            else ""
+        ),
+        "cut_normal_approach_perpendicular_score": (
+            round(float(cut_normal_approach_perpendicular_score), 6)
+            if np.isfinite(cut_normal_approach_perpendicular_score)
+            else ""
+        ),
         "technique_name": cutting_technique,
         "slice_thickness_m": round(float(CUTTING_SLICE_THICKNESS_M), 6),
         "num_cuts_x": int(num_cuts_x),
@@ -540,6 +727,8 @@ def main_cutting(
 
     success_primary = 0
     success_fallback = 0
+    success_rotated_90 = 0
+    success_rotated_180 = 0
     failed = 0
     failed_breads = set()
     successful_breads = set()
@@ -550,7 +739,12 @@ def main_cutting(
     total_breads = len(breads)
     for bread_index, bread in enumerate(breads, start=1):
         bread_name = _body_name(bread)
-        cut_count = success_primary + success_fallback
+        cut_count = (
+            success_primary
+            + success_fallback
+            + success_rotated_90
+            + success_rotated_180
+        )
         print(
             f"[Demo time] {cut_count}/{total_breads} cut breads "
             f"(next {bread_index}/{total_breads}: {bread_name})"
@@ -561,6 +755,7 @@ def main_cutting(
         collision_failure_count = 0
         perturbation_applied = False
         perturbation_type = ""
+        last_motion_progress = _empty_motion_progress()
         debug_costmap_publishers, preview_elapsed = _timed(
             f"bread/{bread_name}/costmap_preview",
             lambda: _update_costmap_debug_publishers(
@@ -663,7 +858,9 @@ def main_cutting(
                     bread,
                     cutting_technique=cut_cfg["technique"],
                     num_cuts_x=cut_cfg["num_cuts_x"],
+                    robot=context.robot,
                 ),
+                motion_progress=last_motion_progress,
             )
             append_csv_row(RESULTS_CSV_PATH, _results_csv_fieldnames(), result_row)
             print(
@@ -676,23 +873,68 @@ def main_cutting(
                     f"{time.perf_counter() - bread_start_time:.3f}s"
                 )
             continue
-        arm_attempt_groups = [("primary", arm_tools)]
+        arm_attempt_groups = [
+            ("primary", arm_tools, None),
+            ("rotated_90", arm_tools, np.pi / 2),
+            ("rotated_180", arm_tools, np.pi / 2),
+        ]
         attempt_succeeded = False
 
-        for group_index, (phase_name, current_arm_tools) in enumerate(
+        for group_index, (phase_name, current_arm_tools, rotation_delta) in enumerate(
             arm_attempt_groups
         ):
+            if rotation_delta is not None:
+                print(
+                    f"[retry] {bread_name}: rotate bread to "
+                    f"{90 if phase_name == 'rotated_90' else 180}deg around Z"
+                )
+                _rotate_bread_z(world, bread, rotation_delta)
+                perturbation_applied = True
+                perturbation_type = (
+                    "rotate_z_90deg"
+                    if phase_name == "rotated_90"
+                    else "rotate_z_180deg"
+                )
+                debug_costmap_publishers, _ = _timed(
+                    f"bread/{bread_name}/{phase_name}/costmap_preview",
+                    lambda: _update_costmap_debug_publishers(
+                        node,
+                        context.robot,
+                        world,
+                        bread,
+                        debug_costmap_publishers,
+                    ),
+                )
+
             for attempt_index, (arm, tool) in enumerate(current_arm_tools):
                 is_primary_phase = group_index == 0 and attempt_index == 0
                 is_fallback_phase = group_index == 0 and attempt_index > 0
-                decision = "cut" if attempt_index == 0 else "retry_with_left_arm"
-                decision_reason = (
-                    "primary_success" if attempt_index == 0 else "right_arm_failed"
+                is_rotated_phase = group_index > 0
+                decision = (
+                    "cut"
+                    if attempt_index == 0 and not is_rotated_phase
+                    else (
+                        "retry_after_rotation"
+                        if is_rotated_phase
+                        else "retry_with_left_arm"
+                    )
                 )
-                print(f"[cut] {bread_name}: try {arm.name} arm")
+                decision_reason = (
+                    "primary_success"
+                    if attempt_index == 0 and not is_rotated_phase
+                    else (
+                        phase_name
+                        if is_rotated_phase
+                        else "right_arm_failed"
+                    )
+                )
+                print(
+                    f"[cut] {bread_name}: try {arm.name} arm"
+                    + (f" after {phase_name}" if is_rotated_phase else "")
+                )
                 try:
                     attempt_count += 1
-                    _try_cut(
+                    last_motion_progress = _try_cut(
                         context,
                         bread,
                         pickup_pose,
@@ -706,7 +948,16 @@ def main_cutting(
                         success_primary += 1
                     elif is_fallback_phase:
                         success_fallback += 1
-                    cut_count = success_primary + success_fallback
+                    elif phase_name == "rotated_90":
+                        success_rotated_90 += 1
+                    elif phase_name == "rotated_180":
+                        success_rotated_180 += 1
+                    cut_count = (
+                        success_primary
+                        + success_fallback
+                        + success_rotated_90
+                        + success_rotated_180
+                    )
                     print(f"[Demo time] {cut_count}/{total_breads} cut breads")
                     successful_breads.add(bread)
                     result_row = _record_bread_result(
@@ -739,12 +990,18 @@ def main_cutting(
                             bread,
                             cutting_technique=cut_cfg["technique"],
                             num_cuts_x=cut_cfg["num_cuts_x"],
+                            robot=context.robot,
                         ),
+                        motion_progress=last_motion_progress,
                     )
                     append_csv_row(
                         RESULTS_CSV_PATH, _results_csv_fieldnames(), result_row
                     )
-                    suffix = " (fallback)" if attempt_index > 0 else ""
+                    suffix = (
+                        f" after {phase_name}"
+                        if is_rotated_phase
+                        else (" (fallback)" if attempt_index > 0 else "")
+                    )
                     print(f"[ok] {bread_name}: cut with {arm.name} arm{suffix}")
                     if DEBUG_PROFILE_CUTTING:
                         print(
@@ -757,6 +1014,7 @@ def main_cutting(
                     attempt_succeeded = True
                     break
                 except TimeoutError as exc:
+                    last_motion_progress = _motion_progress_from_exception(exc)
                     collision_failure_count += 1
                     attempt_failures.append(
                         f"{arm.name} {phase_name} -> {_format_attempt_error(exc)}"
@@ -764,9 +1022,11 @@ def main_cutting(
                     print(
                         f"[{'retry' if not (group_index == len(arm_attempt_groups) - 1 and attempt_index == len(current_arm_tools) - 1) else 'fail'}] "
                         f"{bread_name}: {arm.name}"
+                        + (f" after {phase_name}" if is_rotated_phase else "")
                         + f" timed out ({type(exc).__name__}: {exc})"
                     )
                 except Exception as exc:
+                    last_motion_progress = _motion_progress_from_exception(exc)
                     if _is_collision_like_failure(exc):
                         collision_failure_count += 1
                     attempt_failures.append(
@@ -775,6 +1035,7 @@ def main_cutting(
                     print(
                         f"[{'retry' if not (group_index == len(arm_attempt_groups) - 1 and attempt_index == len(current_arm_tools) - 1) else 'fail'}] "
                         f"{bread_name}: {arm.name}"
+                        + (f" after {phase_name}" if is_rotated_phase else "")
                         + f" failed ({type(exc).__name__}: {exc})"
                     )
             if attempt_succeeded:
@@ -816,7 +1077,9 @@ def main_cutting(
                 bread,
                 cutting_technique=cut_cfg["technique"],
                 num_cuts_x=cut_cfg["num_cuts_x"],
+                robot=context.robot,
             ),
+            motion_progress=last_motion_progress,
         )
         append_csv_row(RESULTS_CSV_PATH, _results_csv_fieldnames(), result_row)
         if DEBUG_PROFILE_CUTTING:
@@ -841,7 +1104,9 @@ def main_cutting(
     print(f"  total breads: {len(breads)}")
     print(f"  success primary (RIGHT): {success_primary}")
     print(f"  success fallback (LEFT): {success_fallback}")
-    print(f"  failed both arms: {failed}")
+    print(f"  success after 90deg rotation: {success_rotated_90}")
+    print(f"  success after 180deg rotation: {success_rotated_180}")
+    print(f"  failed all attempts: {failed}")
     print(f"  results csv: {RESULTS_CSV_PATH}")
 
     shutdown_experiment_runtime(node)

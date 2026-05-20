@@ -15,7 +15,7 @@ from .spawn_random_breads import (
     body_local_aabb,
 )
 from .world_setup import resolve_environment_name, setup_thesis_world
-from pycram.robot_plans.actions.composite.utils.demo_utils import (
+from .utils.demo_utils import (
     build_navigation_costmaps,
 )
 

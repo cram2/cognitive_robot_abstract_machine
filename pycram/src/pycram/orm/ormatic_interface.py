@@ -98,7 +98,7 @@ import pycram.robot_plans.actions.composite.thesis_math.motion_profiles
 import pycram.robot_plans.actions.composite.thesis_math.oaam
 import pycram.robot_plans.actions.composite.tool_based
 import pycram.robot_plans.actions.composite.transporting
-import pycram.robot_plans.actions.composite.visual.ros_mpl_viewer
+# import pycram.robot_plans.actions.composite.visual.ros_mpl_viewer
 import pycram.robot_plans.actions.composite.visual.trajectory_plotter
 import pycram.robot_plans.actions.core.container
 import pycram.robot_plans.actions.core.misc
@@ -6134,19 +6134,19 @@ class LowPassButterworthFilterDAO(
     order: Mapped[builtins.int] = mapped_column(use_existing_column=True)
 
 
-class MarkerStoreDAO(
-    Base,
-    DataAccessObject[
-        pycram.robot_plans.actions.composite.visual.ros_mpl_viewer.MarkerStore
-    ],
-):
-
-    __tablename__ = "MarkerStoreDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
+# class MarkerStoreDAO(
+#     Base,
+#     DataAccessObject[
+#         pycram.robot_plans.actions.composite.visual.ros_mpl_viewer.MarkerStore
+#     ],
+# ):
+#
+#     __tablename__ = "MarkerStoreDAO"
+#
+#     database_id: Mapped[builtins.int] = mapped_column(
+#         Integer, primary_key=True, use_existing_column=True
+#     )
+#
 
 class MaterialTransferArticulationModelDAO(
     ArticulationModelDAO,

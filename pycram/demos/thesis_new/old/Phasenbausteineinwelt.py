@@ -12,7 +12,7 @@ from pycram.robot_plans.actions.composite.thesis_math.motion_models import (
     Pose,
     FixedFrameProvider,
 )
-from pycram.robot_plans.actions.composite.utils.rviz import MotionSequenceRviz
+from demos.thesis_new.src.utils import MotionSequenceRviz
 from pycram.robot_plans.actions.composite.thesis_math import (
     try_get_body,
     make_identity_pose_stamped,
