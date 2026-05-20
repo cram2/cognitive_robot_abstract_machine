@@ -3,6 +3,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
+from itertools import groupby
 from typing import List, Any, ClassVar
 
 from typing_extensions import TYPE_CHECKING
@@ -10,7 +11,7 @@ from typing_extensions import TYPE_CHECKING
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.templates import Sequence
-from giskardpy.motion_statechart.graph_node import EndMotion
+from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNode
 from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
@@ -55,14 +56,38 @@ class MotionExecutor:
     The plan node that created this executor.
     """
 
+    execution_queue: List = field(default_factory=list)
+
     execution_type: ClassVar[ExecutionType] = None
 
-    def construct_msc(self):
-        self.motion_state_chart = MotionStatechart()
-        sequence_node = Sequence(nodes=self.motions)
-        self.motion_state_chart.add_node(sequence_node)
+    def construct_msc(self, motions):
+        motion_state_chart = MotionStatechart()
+        sequence_node = Sequence(nodes=motions)
+        motion_state_chart.add_node(sequence_node)
 
-        self.motion_state_chart.add_node(EndMotion.when_true(sequence_node))
+        motion_state_chart.add_node(EndMotion.when_true(sequence_node))
+        return motion_state_chart
+
+    def construct_execution_list(self):
+        from pycram.plans.attachment_nodes import ModelChangeNode
+
+        motion_groups = list(
+            (
+                list(g)
+                for _, g in groupby(
+                    self.motions, key=lambda m: isinstance(m, ModelChangeNode)
+                )
+            )
+        )
+
+        for g in motion_groups:
+            if isinstance(g[0], MotionStatechartNode):
+                msc_executor = MSCExecutable(
+                    self.construct_msc(g), self.world, self.plan_node, self.ros_node
+                )
+                self.execution_queue.append(msc_executor)
+            else:
+                self.execution_queue.append(g[0])
 
     def execute(self):
         """
@@ -71,22 +96,108 @@ class MotionExecutor:
         # If there are no motions to construct an msc, return
         if len(self.motions) == 0:
             return
-        match MotionExecutor.execution_type:
-            case ExecutionType.SIMULATED:
-                self._execute_for_simulation()
-            case ExecutionType.REAL:
-                self._execute_for_real()
-            case ExecutionType.NO_EXECUTION:
-                return
-            case _:
-                logger.error(f"Unknown execution type: {MotionExecutor.execution_type}")
 
-    def _execute_for_simulation(self):
-        """
-        Creates an executor and executes the motion state chart until it is done.
-        """
-        logger.debug(f"Executing {self.motions} motions in simulation")
-        executor = Ros2Executor(
+        self.construct_execution_list()
+        for e in self.execution_queue:
+            e.perform()
+
+        # match MotionExecutor.execution_type:
+        #     case ExecutionType.SIMULATED:
+        #         self._execute_for_simulation()
+        #     case ExecutionType.REAL:
+        #         self._execute_for_real()
+        #     case ExecutionType.NO_EXECUTION:
+        #         return
+        #     case _:
+        #         logger.error(f"Unknown execution type: {MotionExecutor.execution_type}")
+
+    # def _execute_for_simulation(self):
+    #     """
+    #     Creates an executor and executes the motion state chart until it is done.
+    #     """
+    #     logger.debug(f"Executing {self.motions} motions in simulation")
+    #     executor = Ros2Executor(
+    #         context=MotionStatechartContext(
+    #             world=self.world,
+    #             qp_controller_config=QPControllerConfig(
+    #                 target_frequency=50, prediction_horizon=4, verbose=False
+    #             ),
+    #         ),
+    #         ros_node=self.ros_node,
+    #     )
+    #     executor.compile(self.motion_state_chart)
+    #     # execute the motion state chart until it is done
+    #     counter = 0
+    #     while counter < 2000:
+    #         if self.plan_node.is_interrupted:
+    #             return
+    #         elif self.plan_node.is_paused:
+    #             time.sleep(0.01)
+    #             continue
+    #
+    #         executor.tick()
+    #         counter += 1
+    #         if executor.motion_statechart.is_end_motion():
+    #             break
+    #
+    #     executor._set_velocity_acceleration_jerk_to_zero()
+    #     executor.motion_statechart.cleanup_nodes(context=executor.context)
+    #     executor.context.cleanup()
+    #
+    #     if not executor.motion_statechart.is_end_motion():
+    #         failed_nodes = [
+    #             (
+    #                 node
+    #                 if node.life_cycle_state
+    #                 not in [LifeCycleValues.DONE, LifeCycleValues.NOT_STARTED]
+    #                 else None
+    #             )
+    #             for node in self.motion_state_chart.nodes
+    #         ]
+    #         failed_nodes = list(filter(None, failed_nodes))
+    #         logger.error(f"Failed Nodes: {failed_nodes}")
+    #         raise MotionDidNotFinish(failed_nodes)
+    #
+    # def _monitor_interrupt(self, giskard_wrapper, kill_event: threading.Event):
+    #     while True:
+    #         if self.plan_node.is_paused:
+    #             raise NotImplementedError("Pause not implemented for real execution")
+    #         elif self.plan_node.is_interrupted or kill_event.is_set():
+    #             giskard_wrapper.cancel_goal_async()
+    #         time.sleep(0.01)
+    #
+    # def _execute_for_real(self):
+    #     from giskardpy.middleware.ros2.python_interface import GiskardWrapper
+    #
+    #     giskard = GiskardWrapper(self.ros_node)
+    #
+    #     kill_event = threading.Event()
+    #     interrupt_thread = threading.Thread(
+    #         target=self._monitor_interrupt, args=(giskard, kill_event)
+    #     )
+    #     interrupt_thread.start()
+    #
+    #     giskard.execute(self.motion_state_chart)
+    #
+    #     kill_event.set()
+    #     interrupt_thread.join()
+
+
+@dataclass
+class MSCExecutable:
+
+    motion_state_chart: MotionStatechart
+
+    world: World
+
+    plan_node: PlanNode
+
+    ros_node: None
+
+    executor: Ros2Executor = field(init=False, default=None)
+
+    def __post_init__(self):
+        self.executor = Ros2Executor(
             context=MotionStatechartContext(
                 world=self.world,
                 qp_controller_config=QPControllerConfig(
@@ -95,48 +206,20 @@ class MotionExecutor:
             ),
             ros_node=self.ros_node,
         )
-        executor.compile(self.motion_state_chart)
-        # execute the motion state chart until it is done
-        counter = 0
-        while counter < 2000:
-            if self.plan_node.is_interrupted:
+        self.executor.compile(self.motion_state_chart)
+
+    def perform(self):
+        match MotionExecutor.execution_type:
+            case ExecutionType.SIMULATED:
+                self.perform_simulation()
+            case ExecutionType.REAL:
+                self.perform_real()
+            case ExecutionType.NO_EXECUTION:
                 return
-            elif self.plan_node.is_paused:
-                time.sleep(0.01)
-                continue
+            case _:
+                logger.error(f"Unknown execution type: {MotionExecutor.execution_type}")
 
-            executor.tick()
-            counter += 1
-            if executor.motion_statechart.is_end_motion():
-                break
-
-        executor._set_velocity_acceleration_jerk_to_zero()
-        executor.motion_statechart.cleanup_nodes(context=executor.context)
-        executor.context.cleanup()
-
-        if not executor.motion_statechart.is_end_motion():
-            failed_nodes = [
-                (
-                    node
-                    if node.life_cycle_state
-                    not in [LifeCycleValues.DONE, LifeCycleValues.NOT_STARTED]
-                    else None
-                )
-                for node in self.motion_state_chart.nodes
-            ]
-            failed_nodes = list(filter(None, failed_nodes))
-            logger.error(f"Failed Nodes: {failed_nodes}")
-            raise MotionDidNotFinish(failed_nodes)
-
-    def _monitor_interrupt(self, giskard_wrapper, kill_event: threading.Event):
-        while True:
-            if self.plan_node.is_paused:
-                raise NotImplementedError("Pause not implemented for real execution")
-            elif self.plan_node.is_interrupted or kill_event.is_set():
-                giskard_wrapper.cancel_goal_async()
-            time.sleep(0.01)
-
-    def _execute_for_real(self):
+    def perform_real(self):
         from giskardpy.middleware.ros2.python_interface import GiskardWrapper
 
         giskard = GiskardWrapper(self.ros_node)
@@ -151,6 +234,46 @@ class MotionExecutor:
 
         kill_event.set()
         interrupt_thread.join()
+
+    def _monitor_interrupt(self, giskard_wrapper, kill_event: threading.Event):
+        while True:
+            if self.plan_node.is_paused:
+                raise NotImplementedError("Pause not implemented for real execution")
+            elif self.plan_node.is_interrupted or kill_event.is_set():
+                giskard_wrapper.cancel_goal_async()
+            time.sleep(0.01)
+
+    def perform_simulation(self):
+        counter = 0
+        while counter < 2000:
+            if self.plan_node.is_interrupted:
+                return
+            elif self.plan_node.is_paused:
+                time.sleep(0.01)
+                continue
+
+            self.executor.tick()
+            counter += 1
+            if self.executor.motion_statechart.is_end_motion():
+                break
+
+        self.executor._set_velocity_acceleration_jerk_to_zero()
+        self.executor.motion_statechart.cleanup_nodes(context=self.executor.context)
+        self.executor.context.cleanup()
+
+        if not self.executor.motion_statechart.is_end_motion():
+            failed_nodes = [
+                (
+                    node
+                    if node.life_cycle_state
+                    not in [LifeCycleValues.DONE, LifeCycleValues.NOT_STARTED]
+                    else None
+                )
+                for node in self.motion_state_chart.nodes
+            ]
+            failed_nodes = list(filter(None, failed_nodes))
+            logger.error(f"Failed Nodes: {failed_nodes}")
+            raise MotionDidNotFinish(failed_nodes)
 
 
 @dataclass

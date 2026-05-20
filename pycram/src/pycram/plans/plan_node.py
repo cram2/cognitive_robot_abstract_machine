@@ -415,7 +415,13 @@ class ActionNode(DesignatorNode):
         """
         Executes the constructed Motion State Chart of this action node.
         """
-        self.construct_motion_state_chart()
+        # self.construct_motion_state_chart()
+        self.motion_executor = MotionExecutor(
+            self.collect_motions(),
+            self.plan.world,
+            plan_node=self,
+            ros_node=self.plan.context.ros_node,
+        )
         self.motion_executor.execute()
 
     def create_execution_data_pre_perform(self):

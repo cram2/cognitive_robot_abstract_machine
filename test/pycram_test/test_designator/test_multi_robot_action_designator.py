@@ -364,10 +364,12 @@ def test_grasping(immutable_multiple_robot_apartment):
     assert dist < 0.01
 
 
-def test_pick_up_multi(mutable_multiple_robot_apartment):
+def test_pick_up_multi(mutable_multiple_robot_apartment, rclpy_node):
     world, view, context = mutable_multiple_robot_apartment
 
-    # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+    VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+    context.evaluate_conditions = False
+
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
@@ -403,6 +405,12 @@ def test_pick_up_multi(mutable_multiple_robot_apartment):
             world.get_body_by_name("milk.stl"),
         )
         is not None
+    )
+
+    assert np.allclose(
+        world.get_body_by_name("milk.stl").global_pose.to_np(),
+        left_arm.manipulator.tool_frame.global_pose.to_np(),
+        atol=0.01,
     )
 
     assert len(root.plan.nodes) == len(root.plan.all_nodes)
