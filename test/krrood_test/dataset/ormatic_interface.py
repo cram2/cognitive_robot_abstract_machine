@@ -2481,6 +2481,67 @@ class RevoluteConnectionDAO(
     }
 
 
+class GraspConfigDAO(
+    WorldEntityDAO,
+    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.GraspConfig],
+):
+
+    __tablename__ = "GraspConfigDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldEntityDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    rotate_gripper: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    approach_direction: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    manipulation_offset: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GraspConfigDAO",
+        "inherit_condition": database_id == WorldEntityDAO.database_id,
+    }
+
+
+class MoveActionDAO(
+    WorldEntityDAO,
+    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.MoveAction],
+):
+
+    __tablename__ = "MoveActionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldEntityDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    robot_x: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    robot_y: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    hip_rotation: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    grasp_config_id: Mapped[int] = mapped_column(
+        ForeignKey("GraspConfigDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    grasp_config: Mapped[GraspConfigDAO] = relationship(
+        "GraspConfigDAO",
+        uselist=False,
+        foreign_keys=[grasp_config_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MoveActionDAO",
+        "inherit_condition": database_id == WorldEntityDAO.database_id,
+    }
+
+
 class ViewDAO(
     WorldEntityDAO,
     DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.View],
