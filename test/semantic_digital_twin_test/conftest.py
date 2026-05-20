@@ -18,6 +18,9 @@ def pytest_configure(config):
     )
     # Execute the ORM generation script as a standalone module
     runpy.run_path(str(generate_orm_path), run_name="__main__")
+
+    # Build the symbol graph
+    SymbolGraph.clear()
     class_diagram = ClassDiagram(
         recursive_subclasses(Symbol) + [World],
         introspector=DescriptorAwareIntrospector(),

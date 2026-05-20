@@ -20,6 +20,7 @@ from semantic_digital_twin.spatial_types import (
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
+from .example_classes import RoleForPose
 from .reference_implementations import (
     rotation_matrix_from_quaternion,
     axis_angle_from_rotation_matrix,
@@ -101,6 +102,7 @@ class TestRotationMatrix:
             rotation_matrix,
             HomogeneousTransformationMatrix(),
             Pose(),
+            RoleForPose(pose=Pose()),
         ]
         does_not_work = [
             sm.FloatVariable(name="s"),

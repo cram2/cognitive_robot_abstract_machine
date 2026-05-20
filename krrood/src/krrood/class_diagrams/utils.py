@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import sys
+from copy import copy
 from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
@@ -10,12 +11,21 @@ from uuid import UUID
 import builtins
 
 import typing_extensions
-from typing_extensions import Callable, get_args, get_origin
-from typing_extensions import List, Type, Any, Dict, Tuple, Generic
-from typing_extensions import TypeVar
+from typing_extensions import (
+    Iterable,
+    Iterator,
+    List,
+    Type,
+    Any,
+    Dict,
+    Tuple,
+    TypeVar,
+    Callable,
+)
 
+from krrood import logger
 from krrood.class_diagrams.exceptions import CouldNotResolveType
-from krrood.utils import get_scope_from_imports
+from krrood.utils import get_scope_from_imports, is_builtin_type
 
 
 def classes_of_module(module) -> List[Type]:
@@ -33,13 +43,13 @@ def classes_of_module(module) -> List[Type]:
     return result
 
 
-def behaves_like_a_built_in_class(
-        clazz: Type,
+def behaves_like_a_built_in_type(
+    clazz: Type,
 ) -> bool:
     return (
-            is_builtin_class(clazz)
-            or clazz == UUID
-            or (inspect.isclass(clazz) and issubclass(clazz, Enum))
+        is_builtin_type(clazz)
+        or clazz == UUID
+        or (inspect.isclass(clazz) and issubclass(clazz, Enum))
     )
 
 
@@ -110,31 +120,69 @@ def resolve_name_in_hierarchy(name: str, start_object: Any) -> Any:
 T = TypeVar("T")
 
 
-@dataclass
-class Role(Generic[T]):
-    """
-    Represents a role with generic typing. This is used in Role Design Pattern in OOP.
+def _trace_generic_params(cls: type, generic_base: type):
+    """Trace how cls parameterizes generic_base by walking its __orig_bases__.
 
-    This class serves as a container for defining roles with associated generic
-    types, enabling flexibility and type safety when modeling role-specific
-    behavior and data.
+    Handles both subscripted bases (e.g. ``B[T]``) and plain bases (e.g. ``B``),
+    recursively resolving TypeVar substitutions at each level of the hierarchy.
+
+    :param cls: The class whose hierarchy is searched.
+    :param generic_base: The target generic base whose parameters should be resolved.
+    :return: A tuple of type arguments for generic_base as seen from cls, or None.
     """
+    for base in getattr(cls, "__orig_bases__", []):
+        origin = get_origin(base)
+        if origin is None:
+            if isinstance(base, type) and issubclass(base, generic_base):
+                result = _trace_generic_params(base, generic_base)
+                if result is not None:
+                    return result
+        elif issubclass(origin, generic_base):
+            args = get_args(base)
+            if origin is generic_base:
+                return args
+            inner = _trace_generic_params(origin, generic_base)
+            if inner is None:
+                return args
+            params = getattr(origin, "__parameters__", ())
+            if not params:
+                return inner
+            sub = {p: a for p, a in zip(params, args) if isinstance(p, TypeVar)}
+            return tuple(sub.get(p, p) if isinstance(p, TypeVar) else p for p in inner)
+    return None
 
 
 def get_generic_type_param(cls, generic_base):
     """
     Given a subclass and its generic base, return the concrete type parameter(s).
 
+    Correctly traces TypeVar substitutions through transitive subclass relationships.
+    When a direct base is a subscripted transitive subclass of generic_base (e.g.
+    ``B[T]`` where ``B`` is a subclass of ``generic_base`` but not ``generic_base``
+    itself), the substitution is resolved through the full inheritance chain rather
+    than returning ``B``'s type arguments directly.
+
     Example:
         get_generic_type_param(Employee, Role) -> (<class '__main__.Person'>,)
     """
     orig_bases = cls.__orig_bases__ if hasattr(cls, "__orig_bases__") else []
     for base in orig_bases:
-        base_origin = get_origin(base)
-        if base_origin is None:
+        origin = get_origin(base)
+        if origin is None:
             continue
-        if issubclass(get_origin(base), generic_base):
-            return get_args(base)
+        if not issubclass(origin, generic_base):
+            continue
+        args = get_args(base)
+        if origin is generic_base:
+            return args
+        inner = _trace_generic_params(origin, generic_base)
+        if inner is None:
+            return args
+        params = getattr(origin, "__parameters__", ())
+        if not params:
+            return inner
+        sub = {p: a for p, a in zip(params, args) if isinstance(p, TypeVar)}
+        return tuple(sub.get(p, p) if isinstance(p, TypeVar) else p for p in inner)
     return None
 
 
@@ -177,7 +225,7 @@ class TypeHintResolutionResult:
 
 
 def get_and_resolve_generic_type_hints_of_object_using_substitutions(
-        object_: Any, substitution: Dict[TypeVar, Type]
+    object_: Any, substitution: Dict[TypeVar, Type]
 ) -> Dict[str, TypeHintResolutionResult]:
     """
     Resolve generic type hints of an object using a substitution dictionary.
@@ -190,9 +238,171 @@ def get_and_resolve_generic_type_hints_of_object_using_substitutions(
     return {name: resolve_type(hint, substitution) for name, hint in type_hints.items()}
 
 
+def _resolve_annotation_typevar(param: TypeVar, generic_base: type) -> TypeVar:
+    """
+    Return the annotation-level TypeVar that param corresponds to in generic_base.
+
+    When a class inherits from a generic like ``SubClassSafeGeneric[TSpecific]``,
+    Python's ``__parameters__`` may expose the *defining* TypeVar (e.g. ``T`` from
+    ``SubClassSafeGeneric``) rather than ``TSpecific``.  This function walks
+    ``generic_base.__orig_bases__`` to find the actual TypeVar used in annotations.
+
+    :param param: A TypeVar from ``generic_base.__parameters__``.
+    :param generic_base: The class whose bases are searched.
+    :return: The annotation-level TypeVar, or param if no aliasing is found.
+    """
+    for base in getattr(generic_base, "__orig_bases__", []):
+        base_origin = get_origin(base)
+        if base_origin is None:
+            continue
+        for bp, ba in zip(getattr(base_origin, "__parameters__", ()), get_args(base)):
+            if bp is param and isinstance(ba, TypeVar):
+                return ba
+    return param
+
+
+@dataclass(frozen=True)
+class GenericTypeSubstitution:
+    """
+    Represents the TypeVar-to-type mappings produced by specializing a generic class.
+
+    :param substitution: A mapping of TypeVars to their substitutions.
+    """
+
+    substitution: Dict[TypeVar, Any]
+
+    @classmethod
+    def from_specialization(
+        cls,
+        concrete_class: type,
+        generic_base: type,
+        *,
+        trace_unsubscripted: bool = False,
+    ) -> GenericTypeSubstitution:
+        """
+        Build a substitution from how concrete_class specializes generic_base.
+
+        Resolves TypeVar aliasing that arises when ``generic_base`` inherits from
+        another generic (e.g. ``SubClassSafeGeneric[TSpecific]``): in that case
+        ``__parameters__`` may expose the *defining* TypeVar rather than the
+        annotation-level one, so the mapping is adjusted via the base's
+        ``__orig_bases__``.
+
+        :param concrete_class: The class that specializes generic_base.
+        :param generic_base: The generic base class being specialized.
+        :param trace_unsubscripted: When True, fall back to ``_trace_generic_params``
+            when ``get_generic_type_param`` returns nothing.  This handles chains where
+            an intermediate class inherits the generic base *without* a subscript
+            (e.g. ``Shelf(CargoCrate)`` where ``CargoCrate(Box[Cargo])``).  The
+            fallback is not applied by default because it would incorrectly add
+            re-declarations for unsubscripted intermediates that already inherit the
+            narrowing from a more-base ancestor.
+        :return: A GenericTypeSubstitution representing the TypeVar mappings.
+        """
+        params = getattr(generic_base, "__parameters__", ())
+        args = get_generic_type_param(concrete_class, generic_base) or ()
+        if not args and params and trace_unsubscripted:
+            traced = _trace_generic_params(concrete_class, generic_base)
+            if traced:
+                args = traced
+        substitution = {
+            _resolve_annotation_typevar(p, generic_base): a
+            for p, a in zip(params, args)
+        }
+        return cls(substitution)
+
+    def apply(self, type_hint: Any) -> TypeHintResolutionResult:
+        """
+        Apply the substitution to a type hint.
+
+        :param type_hint: The type hint to resolve.
+        :return: A TypeHintResolutionResult with the resolved type and a flag indicating if substitution occurred.
+        """
+        return resolve_type(type_hint, self.substitution)
+
+    @property
+    def has_substitutions(self) -> bool:
+        """
+        Return True if any TypeVar is actually mapped to a different type.
+        """
+        return any(key is not value for key, value in self.substitution.items())
+
+    @property
+    def has_genuine_substitutions(self) -> bool:
+        """Return True if any TypeVar maps to a strictly more specific type.
+
+        Unlike ``has_substitutions``, this ignores TypeVar-to-TypeVar mappings
+        where both TypeVars share the same effective bound (e.g. two ``THasRootBody``
+        TypeVars from different modules with identical ``__bound__``).
+        """
+        return any(
+            is_genuine_narrowing(key, value) for key, value in self.substitution.items()
+        )
+
+
+def is_genuine_narrowing(original: Any, new_type: Any) -> bool:
+    """Return True iff new_type is strictly more specific than original.
+
+    Rules:
+    - same object → False (identity means no change)
+    - TypeVar → TypeVar with different name → True (intentional re-parameterization, e.g.
+      ``SpecificItemTaker(ItemHolder[TSpecificItem])`` where TItem→TSpecificItem)
+    - TypeVar → TypeVar with same name and same bound → False (module-collision artefact, e.g.
+      two modules each defining ``THasRootBody`` with the same ``__bound__``)
+    - TypeVar → TypeVar with same name but stricter bound → True
+    - TypeVar → ConcreteClass → True (always a genuine specialisation)
+    - ConcreteClass → ConcreteClass → True only if new_type is a proper subclass
+
+    :param original: The original type or TypeVar.
+    :param new_type: The candidate replacement type or TypeVar.
+    :return: True when the substitution represents a meaningful specialisation.
+    """
+    if original is new_type:
+        return False
+    from typing_extensions import TypeVar as _TypeVar
+
+    orig_is_tv = isinstance(original, _TypeVar)
+    new_is_tv = isinstance(new_type, _TypeVar)
+
+    if orig_is_tv and new_is_tv:
+        # Different-named TypeVars: intentional re-parameterization — always genuine.
+        if getattr(original, "__name__", None) != getattr(new_type, "__name__", None):
+            return True
+        # Same-named TypeVars (likely a module-collision artefact): genuine only when
+        # the new TypeVar's bound is strictly more specific.
+        orig_bound = getattr(original, "__bound__", None)
+        new_bound = getattr(new_type, "__bound__", None)
+        if orig_bound is new_bound:
+            return False
+        if orig_bound is None:
+            return True
+        try:
+            return (
+                isinstance(new_bound, type)
+                and issubclass(new_bound, orig_bound)
+                and new_bound is not orig_bound
+            )
+        except TypeError:
+            return False
+
+    if orig_is_tv and not new_is_tv:
+        # TypeVar → ConcreteClass: always genuine.
+        return True
+
+    # ConcreteClass → ConcreteClass
+    try:
+        return (
+            isinstance(new_type, type)
+            and issubclass(new_type, original)
+            and new_type is not original
+        )
+    except TypeError:
+        return False
+
+
 def resolve_type(
-        type_to_resolve: Any,
-        substitution: Dict[TypeVar, Any],
+    type_to_resolve: Any,
+    substitution: Dict[TypeVar, Any],
 ) -> TypeHintResolutionResult:
     """
     Resolve type variables in a type.
@@ -222,14 +432,113 @@ def resolve_type(
                 new_params.append(param)
         subscript_param = new_params[0] if len(new_params) == 1 else tuple(new_params)
         return TypeHintResolutionResult(
-            type_to_resolve[subscript_param], resolved, type_to_resolve)
+            type_to_resolve[subscript_param], resolved, type_to_resolve
+        )
 
     return TypeHintResolutionResult(type_to_resolve, False, type_to_resolve)
 
 
+def get_most_specific_types(types: Iterable[type]) -> List[type]:
+    ts = list(dict.fromkeys(types))  # stable unique
+    keep = []
+    for t in ts:
+        # drop t if there exists u that is a strict subtype of t
+        if not any(u is not t and issubclass_or_role(u, t) for u in ts):
+            keep.append(t)
+    return keep
+
+
+@lru_cache
+def issubclass_or_role(child: Type, parent: Type | Tuple[Type, ...]) -> bool:
+    """
+    Check if `child` is a subclass of `parent` or if `child` is a Role whose role taker is a subclass of `parent`.
+
+    :param child: The child class.
+    :param parent: The parent class.
+    :return: True if `child` is a subclass of `parent` or if `child` is a Role for `parent`, False otherwise.
+    """
+    from krrood.patterns.role import Role
+
+    if issubclass(child, parent):
+        return True
+    if issubclass(child, Role) and child is not Role:
+        role_taker_type = child.get_role_taker_type()
+        if issubclass_or_role(role_taker_type, parent):
+            return True
+    return False
+
+
+@lru_cache
+def nearest_common_ancestor(classes):
+    return next(all_nearest_common_ancestors(classes), None)
+
+
+def all_nearest_common_ancestors(classes) -> Iterator[Type]:
+    if not classes:
+        return
+    method_resolution_orders = {cls: copy(cls.mro()) for cls in classes}
+    yield from _all_nearest_common_ancestors_from_classes_method_resolution_order(
+        method_resolution_orders
+    )
+
+
+@lru_cache
+def role_aware_nearest_common_ancestor(classes):
+    return next(role_aware_all_nearest_common_ancestors(classes), None)
+
+
+def role_aware_all_nearest_common_ancestors(classes) -> Iterator[Type]:
+    if not classes:
+        return
+
+    from krrood.patterns.role import Role
+
+    # Get MROs as lists
+    method_resolution_orders = {cls: copy(cls.mro()) for cls in classes}
+    for cls, method_resolution_order in method_resolution_orders.items():
+        if Role not in method_resolution_order:
+            continue
+        rol_idx = method_resolution_order.index(Role)
+        method_resolution_order[rol_idx] = cls.get_role_taker_type()
+
+    yield from _all_nearest_common_ancestors_from_classes_method_resolution_order(
+        method_resolution_orders
+    )
+
+
+def _all_nearest_common_ancestors_from_classes_method_resolution_order(
+    method_resolution_orders: Dict[Type, List[Type]],
+) -> Iterator[Type]:
+    # Iterate in MRO order of the first class
+    method_resolution_orders_values = list(method_resolution_orders.values())
+    seen_candidates = set()
+    for candidate in method_resolution_orders_values[0]:
+        if any(
+            issubclass(seen_candidate, candidate) for seen_candidate in seen_candidates
+        ):
+            continue
+        if all(candidate in mro for mro in method_resolution_orders_values[1:]):
+            seen_candidates.add(candidate)
+            yield candidate
+
+
+def get_property_return_type(property_value: property) -> Any:
+    """Return the return-type annotation of a property.
+
+    :param property_value: The property descriptor.
+    :return: The resolved return type, or None if unavailable.
+    """
+    try:
+        hints = get_type_hints_of_object(property_value.fget)
+        return hints.get("return")
+    except Exception:
+        raw = property_value.fget.__annotations__.get("return")
+        return raw if raw else None
+
+
 @lru_cache
 def get_type_hints_of_object(
-        object_: Any, namespace: Tuple[Tuple[str, Any], ...] = ()
+    object_: Any, namespace: Tuple[Tuple[str, Any], ...] = ()
 ) -> Dict[str, Any]:
     """
     Get the type hints of an object. This is a workaround for the fact that get_type_hints() does not work with objects
@@ -262,8 +571,47 @@ def get_type_hints_of_object(
     return type_hints
 
 
+def same_package(module_a: str, module_b: str) -> bool:
+    """Return True when both module names belong to the same top-level package."""
+    top_a = module_a.split(".")[0]
+    top_b = module_b.split(".")[0]
+    return bool(top_a) and top_a == top_b
+
+
+def mixin_module_dotted_name(module_dotted_name: str, mixin_folder: str, suffix: str) -> str:
+    """Return the fully-qualified module name for a generated mixin module.
+
+    :param module_dotted_name: The dotted module name of the source module.
+    :param mixin_folder: The sub-folder name containing mixin modules.
+    :param suffix: The suffix appended to the leaf module name.
+    :return: The fully-qualified mixin module dotted name.
+    """
+    parts = module_dotted_name.split(".")
+    package = ".".join(parts[:-1])
+    leaf = parts[-1]
+    return f"{package}.{mixin_folder}.{leaf}{suffix}"
+
+
+def topological_sort_by_inheritance(classes: list[type]) -> list[type]:
+    """Return classes sorted so that ancestors come before their descendants."""
+    result: list[type] = []
+    remaining = list(classes)
+    while remaining:
+        for cls in remaining:
+            if not any(
+                issubclass(cls, other) and other is not cls for other in remaining
+            ):
+                result.append(cls)
+                remaining.remove(cls)
+                break
+        else:
+            result.extend(remaining)
+            break
+    return result
+
+
 def get_object_by_name_from_another_object_in_same_module(
-        name: str, object_: Any
+    name: str, object_: Any
 ) -> Any:
     """
     Get the object with the given name from another object in the same module.
@@ -290,5 +638,5 @@ def get_object_by_name_from_another_object_in_same_module(
         raise CouldNotResolveType(
             name,
             extra_information=f"Could not find {name} in {source_path}, could be a deprecated import statement or "
-                              f"a type defined in a module that is not imported in the source file.",
+            f"a type defined in a module that is not imported in the source file.",
         )

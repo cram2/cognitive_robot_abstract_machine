@@ -6,7 +6,7 @@ import pytest
 
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import ApproachDirection, VerticalAlignment
-from pycram.datastructures.grasp import GraspDescription
+from pycram.datastructures.grasp import GraspDescription, GraspPose
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
@@ -62,6 +62,13 @@ def immutable_simple_pr2_holding_world(simple_pr2_world_setup):
         copy_world.move_branch(milk, tcp)
     view = PR2.from_world(copy_world)
     return copy_world, view, Context(copy_world, view)
+
+
+def test_grasp_pose_structure():
+    grasp_pose = GraspPose(pose=Pose())
+    assert grasp_pose.x == 0.0
+    assert grasp_pose.y == 0.0
+    assert grasp_pose.z == 0.0
 
 
 def test_grasp_pose_front(immutable_simple_pr2_world):

@@ -9,7 +9,7 @@ from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from dataclasses import fields
-from functools import lru_cache, cached_property
+from functools import cached_property
 from uuid import UUID, uuid4
 
 import numpy as np
@@ -35,7 +35,6 @@ from krrood.adapters.json_serializer import (
 )
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.entity_query_language.predicate import Symbol
-from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math.symbolic_math import Matrix
 from krrood.utils import get_full_class_name, memoize
 from semantic_digital_twin.datastructures.joint_state import JointState
@@ -52,7 +51,6 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     ReferenceFrameMismatchError,
-    SemanticAnnotationNotInWorldError,
 )
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -125,7 +123,7 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
         The WorldEntity class is not meant to be instantiated directly.
     """
 
-    id: UUID = field(default_factory=uuid4)
+    id: UUID = field(default_factory=uuid4, kw_only=True)
     """
     A unique identifier for this world entity.
     """

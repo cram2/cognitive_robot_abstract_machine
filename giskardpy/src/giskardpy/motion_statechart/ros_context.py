@@ -1,6 +1,11 @@
 from dataclasses import dataclass
 
-from rclpy.node import Node
+from semantic_digital_twin.utils import MockedNodeClass
+
+try:
+    from rclpy.node import Node
+except ImportError:
+    Node = MockedNodeClass
 
 from giskardpy.motion_statechart.context import ContextExtension
 

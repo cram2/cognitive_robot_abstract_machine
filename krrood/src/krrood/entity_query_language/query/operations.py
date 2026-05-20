@@ -24,7 +24,11 @@ from typing_extensions import (
     Hashable,
 )
 
-from krrood.entity_query_language.core.variable import Literal, ExternallySetVariable
+from krrood.entity_query_language.core.variable import (
+    Literal,
+    ExternallySetVariable,
+    InstantiatedVariable,
+)
 from krrood.entity_query_language.operators.aggregators import (
     Aggregator,
     Count,
@@ -258,6 +262,14 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
                 groups[()][aggregator._child_._id_] = []
 
         return groups, group_key_count
+
+    @lru_cache
+    def get_group_key(self, result_values: FrozenSet[uuid.UUID]) -> GroupKey:
+        """
+        :param result_values: The values of the variables to group by in the current result.
+        :return: A tuple of the values of the variables to group by representing a group key.
+        """
+        return tuple(ensure_hashable(value) for value in result_values)
 
     def update_group_from_bindings(self, group: OperationResult, results: Bindings):
         """

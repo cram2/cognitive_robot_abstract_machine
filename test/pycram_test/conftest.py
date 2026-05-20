@@ -2,17 +2,30 @@ from copy import deepcopy
 from functools import partial
 
 import pytest
-import rclpy
+
+try:
+    import rclpy
+except ModuleNotFoundError:
+    pass
 from sqlalchemy.orm import sessionmaker
 
 from krrood.ormatic.utils import create_engine, drop_database
-from pycram.datastructures.dataclasses import Context
 
-from pycram.orm.ormatic_interface import Base
+try:
+    from pycram.datastructures.dataclasses import Context
+except ModuleNotFoundError:
+    pass
 
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
+try:
+    from pycram.orm.ormatic_interface import Base
+except ImportError:
+    pass
+try:
+    from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+        VizMarkerPublisher,
+    )
+except ModuleNotFoundError:
+    pass
 from semantic_digital_twin.robots.pr2 import PR2
 
 

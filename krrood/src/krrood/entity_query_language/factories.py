@@ -12,6 +12,7 @@ from typing_extensions import Union, Iterable, List
 from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
     TruthValueOperator,
+    OperationResult,
 )
 from krrood.entity_query_language.core.mapped_variable import (
     FlatVariable,
@@ -185,7 +186,9 @@ def deduced_variable(
     return ExternallySetVariable(_type_=type_, _domain_source_=DomainSource.DEDUCTION)
 
 
-def variable_from(domain: Union[Iterable[T], Selectable[T]]) -> Union[T, Selectable[T]]:
+def variable_from(
+    domain: Union[Iterable[T], Selectable[T], T],
+) -> Union[T, Variable[T]]:
     """
     Create a variable from a given domain.
 
@@ -259,7 +262,7 @@ def and_(*conditions: ConditionType) -> ConditionType:
     return chained_logic(AND, *conditions)
 
 
-def or_(*conditions) -> ConditionType:
+def or_(*conditions: ConditionType) -> ConditionType:
     """
     Logical disjunction of conditions.
 

@@ -6,13 +6,6 @@ from typing import Tuple
 
 import numpy as np
 import trimesh
-from krrood.entity_query_language.factories import variable_from, entity, variable, an
-from polytope import bounding_box
-from probabilistic_model.distributions.gaussian import GaussianDistribution
-from random_events.product_algebra import Event
-from random_events.set import Set
-from random_events.variable import Symbolic
-from semantic_digital_twin.reasoning.predicates import is_supported_by
 from typing_extensions import (
     TYPE_CHECKING,
     List,
@@ -20,9 +13,13 @@ from typing_extensions import (
     Self,
     Iterable,
     Type,
+    TypeVar,
 )
 
+from krrood.entity_query_language.factories import variable_from, entity, variable, an
 from krrood.ormatic.utils import classproperty
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     uniform_measure_of_event,
@@ -33,11 +30,15 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
+from random_events.product_algebra import Event
+from random_events.set import Set as RandomEventsSets
+from random_events.variable import Symbolic
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
     MismatchingWorld,
 )
+from semantic_digital_twin.reasoning.predicates import is_supported_by
 from semantic_digital_twin.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
@@ -88,13 +89,20 @@ class IsPerceivable:
     """
 
 
+TKinematicStructureEntity = TypeVar(
+    "TKinematicStructureEntity", bound=KinematicStructureEntity
+)
+
+
 @dataclass(eq=False)
-class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
+class HasRootKinematicStructureEntity(
+    SemanticAnnotation, SubClassSafeGeneric[TKinematicStructureEntity], ABC
+):
     """
     Base class for shared method for HasRootBody and HasRootRegion.
     """
 
-    root: KinematicStructureEntity = field(kw_only=True)
+    root: TKinematicStructureEntity = field(kw_only=True)
     """
     The root kinematic structure entity of the semantic annotation.
     """
@@ -130,7 +138,7 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         active_axis: Optional[Vector3] = None,
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
-    ):
+    ) -> Self:
         """
         Create a new instance and connect its root entity to the world's root.
 
@@ -292,8 +300,11 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         return self.root.global_transform
 
 
+TBody = TypeVar("TBody", bound=Body)
+
+
 @dataclass(eq=False)
-class HasRootBody(HasRootKinematicStructureEntity, ABC):
+class HasRootBody(HasRootKinematicStructureEntity[TBody], ABC):
     """
     Abstract base class for all household objects. Each semantic annotation refers to a single Body.
     Each subclass automatically derives a MatchRule from its own class name and
@@ -301,13 +312,8 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
     naturally more specific than their bases.
     """
 
-    root: Body = field(kw_only=True)
-    """
-    The root body of the semantic annotation.
-    """
-
     @property
-    def bodies(self) -> Iterable[Body]:
+    def bodies(self) -> List[Body]:
         """
         The bodies that are part of the semantic annotation.
         """
@@ -360,15 +366,13 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
         )
 
 
+TRegion = TypeVar("TRegion", bound=Region)
+
+
 @dataclass(eq=False)
-class HasRootRegion(HasRootKinematicStructureEntity, ABC):
+class HasRootRegion(HasRootKinematicStructureEntity[TRegion], ABC):
     """
     A mixin class for semantic annotations that have a region.
-    """
-
-    root: Region = field(kw_only=True)
-    """
-    The root region of the semantic annotation.
     """
 
     @property
@@ -517,7 +521,7 @@ class HasSlider(HasRootKinematicStructureEntity, ABC):
 
 
 @dataclass(eq=False)
-class HasDrawers(HasRootKinematicStructureEntity, ABC):
+class HasDrawers(HasRootBody, ABC):
     """
     A mixin class for semantic annotations that have drawers.
     """
@@ -543,7 +547,7 @@ class HasDrawers(HasRootKinematicStructureEntity, ABC):
 
 
 @dataclass(eq=False)
-class HasDoors(HasRootKinematicStructureEntity, ABC):
+class HasDoors(HasRootBody, ABC):
     """
     A mixin class for semantic annotations that have doors.
     """
@@ -595,14 +599,20 @@ class HasHandle(HasRootBody, ABC):
         self.handle = handle
 
 
+THasRootBody = TypeVar("THasRootBody", bound=HasRootBody)
+"""
+A type variable for HasRootBody.
+"""
+
+
 @dataclass(eq=False)
-class HasStorageSpace(HasRootBody, ABC):
+class HasStorageSpace(HasRootBody, SubClassSafeGeneric[THasRootBody], ABC):
     """
     A mixin class for semantic annotations that represent storage spaces. Used to afterthefact add object for example
     to a table, and have those objects move with the table when it is moved.
     """
 
-    objects: List[HasRootBody] = field(default_factory=list, hash=False, kw_only=True)
+    objects: List[THasRootBody] = field(default_factory=list, hash=False, kw_only=True)
     """
     The objects stored in the semantic annotation.
     """
@@ -749,9 +759,13 @@ class HasSupportingSurface(HasStorageSpace, ABC):
                 supporting_body=self.root,
             )
         )
-        objects = an(entity(
-            semantic_annotation := variable(HasRootBody, domain=self._world.semantic_annotations)
-        ).where(semantic_annotation.root == body)).evaluate()
+        objects = an(
+            entity(
+                semantic_annotation := variable(
+                    HasRootBody, domain=self._world.semantic_annotations
+                )
+            ).where(semantic_annotation.root == body)
+        ).evaluate()
         for obj in objects:
             if obj in self.objects:
                 continue
@@ -912,7 +926,8 @@ class HasSupportingSurface(HasStorageSpace, ABC):
         surface_circuit_root = SumUnit(probabilistic_circuit=surface_circuit)
 
         objects_of_interest_variable = Symbolic(
-            name="objects_of_interest", domain=Set.from_iterable(objects_of_interest)
+            name="objects_of_interest",
+            domain=RandomEventsSets.from_iterable(objects_of_interest),
         )
 
         for object_of_interest in objects_of_interest:

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from types import FunctionType
-from typing import Set, Generic
+from typing import Set, Generic, TypeVar as TypingTypeVar
 
 from sqlalchemy import types, TypeDecorator
 from typing_extensions import Dict, Any, Sequence, Self
@@ -703,3 +703,19 @@ class GenericClassAssociation:
     associated_value_not_parametrized_list: List[GenericClass] = field(
         default_factory=list
     )
+
+
+# %% Test TypeVar field resolution in DAO generation
+# Reproduces the issue where fields typed with a TypeVar (like
+# TKinematicStructureEntity in HasRootKinematicStructureEntity) were silently
+# skipped by WrappedTable.parse_field.
+
+TTestEntity = TypingTypeVar("TTestEntity", bound=KRROODPosition)
+
+
+@dataclass
+class TypeVarFieldHolder(Symbol):
+    """Domain class with a TypeVar-typed field to test parse_field resolution."""
+
+    typed_field: TTestEntity = field(kw_only=True)
+    name: str = ""

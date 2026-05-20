@@ -1,6 +1,5 @@
 import logging
 import os
-import traceback
 from dataclasses import is_dataclass
 
 import pytest
@@ -13,12 +12,13 @@ from krrood.entity_query_language.predicate import (
     HasTypes,
     HasType,
 )
-from krrood.symbol_graph.symbol_graph import SymbolGraph
 from krrood.ormatic.data_access_objects.alternative_mappings import *  # type: ignore
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import classes_of_module, create_engine
 from krrood.ormatic.utils import drop_database
+from krrood.patterns.role import Role
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 from krrood.utils import recursive_subclasses
 from .dataset import (
     example_classes,
@@ -32,6 +32,8 @@ from .dataset.example_classes import (
     ConceptType,
     JSONSerializableClass,
 )
+from .dataset.role_and_ontology import university_ontology_like_classes_without_descriptors, \
+    role_takers_in_another_module, classes_for_testing_role_recursion_error
 from .dataset.semantic_world_like_classes import *
 
 from .test_eql.conf.world.doors_and_drawers import DoorsAndDrawersWorld
@@ -50,7 +52,8 @@ def generate_sqlalchemy_interface():
     """
 
     # build the symbol graph
-    symbol_graph = SymbolGraph()
+    SymbolGraph.clear()
+    symbol_graph = SymbolGraph(packages=["krrood", "test.krrood"])
 
     # collect all classes that need persistence
     all_classes = {c.clazz for c in symbol_graph._class_diagram.wrapped_classes}
@@ -61,8 +64,11 @@ def generate_sqlalchemy_interface():
     all_classes |= set(classes_of_module(krrood.symbol_graph.symbol_graph))
     all_classes |= set(classes_of_module(example_classes))
     all_classes |= set(classes_of_module(semantic_world_like_classes))
+    all_classes |= set(classes_of_module(university_ontology_like_classes_without_descriptors))
+    all_classes |= set(classes_of_module(role_takers_in_another_module))
+    all_classes |= set(classes_of_module(classes_for_testing_role_recursion_error))
     all_classes |= set(classes_of_module(alternative_mappings_construction_order))
-    all_classes |= {Symbol}
+    all_classes |= {Symbol, Role}
 
     # remove classes that don't need persistence
     all_classes -= {HasType, HasTypes, ContainsType}
@@ -78,6 +84,7 @@ def generate_sqlalchemy_interface():
     all_classes |= {FunctionType}
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger("krrood").setLevel(logging.DEBUG)
+
     class_diagram = ClassDiagram(
         list(sorted(all_classes, key=lambda c: c.__name__, reverse=True))
     )
@@ -117,20 +124,12 @@ def pytest_configure(config):
 # This must happen here (not in a pytest hook) because hooks run after the
 # conftest module is fully imported, which means the import on the next line
 # would fail if the generated file is stale or missing.
+generate_sqlalchemy_interface()
+
 try:
-    generate_sqlalchemy_interface()
-except Exception as e:
-    traceback.print_exc()
-    import warnings
-
-    warnings.warn(
-        f"Failed to generate ormatic_interface.py. "
-        "Tests may fail or behave inconsistently if the file was not generated correctly. "
-        f"Error: {e}",
-        RuntimeWarning,
-    )
-
-from .dataset.ormatic_interface import *
+    from .dataset.ormatic_interface import *
+except ImportError:
+    pass
 
 
 @pytest.fixture

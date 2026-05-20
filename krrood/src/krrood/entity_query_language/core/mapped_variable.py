@@ -208,7 +208,7 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
 
 @dataclass(eq=False, repr=False)
-class Attribute(MappedVariable):
+class Attribute(MappedVariable[T]):
     """
     A symbolic attribute that can be used to access attributes of symbolic variables.
 

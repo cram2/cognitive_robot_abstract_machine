@@ -12,6 +12,12 @@ from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Handle,
+    Drawer,
+    Wardrobe,
+    Door,
+)
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -148,18 +154,24 @@ def test_handle_semantic_annotation_eql(apartment_world_setup):
 
 
 @pytest.mark.parametrize(
-    "semantic_annotation_type, update_existing_semantic_annotations, scenario",
+    "semantic_annotation_type, update_existing_semantic_annotations, scenario, expected_number",
     [
-        (Handle, False, None),
-        (Drawer, False, None),
-        (Wardrobe, False, None),
-        (Door, False, None),
+        (Handle, False, None, 29),
+        (Drawer, False, None, 19),
+        (Wardrobe, False, None, 8),
+        (
+            Door,
+            False,
+            None,
+            8,
+        ),  # Should be 11 as there are prismatically connected doors.
     ],
 )
 def test_infer_apartment_semantic_annotation(
     semantic_annotation_type,
     update_existing_semantic_annotations,
     scenario,
+    expected_number,
     apartment_world_setup,
 ):
     fit_rules_and_assert_semantic_annotations(
@@ -167,6 +179,7 @@ def test_infer_apartment_semantic_annotation(
         semantic_annotation_type,
         update_existing_semantic_annotations,
         scenario,
+        expected_number,
     )
 
 
@@ -202,7 +215,11 @@ def test_apartment_semantic_annotations(apartment_world_setup):
 
 
 def fit_rules_and_assert_semantic_annotations(
-    world, semantic_annotation_type, update_existing_semantic_annotations, scenario
+    world,
+    semantic_annotation_type,
+    update_existing_semantic_annotations,
+    scenario,
+    expected_number: int,
 ):
     world_reasoner = WorldReasoner(world)
     world_reasoner.fit_semantic_annotations(
@@ -213,8 +230,15 @@ def fit_rules_and_assert_semantic_annotations(
     )
 
     found_semantic_annotations = world_reasoner.infer_semantic_annotations()
-    assert any(
-        isinstance(v, semantic_annotation_type) for v in found_semantic_annotations
+    assert (
+        len(
+            [
+                v
+                for v in found_semantic_annotations
+                if isinstance(v, semantic_annotation_type)
+            ]
+        )
+        == expected_number
     )
 
 
@@ -259,3 +283,38 @@ def test_minimal_robot_annotation(pr2_world_state_reset):
     pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(AbstractRobot)[0]
     assert len(robot.bodies) == len(pr2.bodies)
     assert len(robot.connections) == len(pr2.connections)
+
+
+def test_room_roles():
+    floor = Floor(root=Body(name=PrefixedName("room_floor")))
+    room = Room(floor=floor)
+    kitchen = Kitchen.from_role_taker(room)
+
+    # Test ability to access Room properties
+    assert room.floor is kitchen.floor
+
+    # Test correct caching of roles
+    assert Role.roles_for(room, Kitchen)[0] == kitchen
+    assert Role.has_role(room, Kitchen)
+    assert not isinstance(room, Kitchen)
+    assert isinstance(kitchen, Room)
+
+    # Test correct caching of roles
+    living_room = LivingRoom.from_role_taker(room)
+    assert Role.roles_for(room, LivingRoom)[0] == living_room
+    assert len(Role.roles_for(room)) == 2
+    assert Role.has_role(room, LivingRoom)
+    assert not isinstance(room, LivingRoom)
+    assert isinstance(living_room, Room)
+
+    assert living_room == kitchen
+    assert hash(living_room) == hash(kitchen)
+
+    # Create the room implicitly
+    kitchen = Kitchen(floor=floor)
+    room = kitchen.room
+    assert Role.roles_for(room, Kitchen)[0] == kitchen
+    assert Role.has_role(room, Kitchen)
+    assert not isinstance(room, Kitchen)
+    assert isinstance(kitchen, Room)
+    assert kitchen.floor is room.floor
