@@ -1,3 +1,4 @@
+import time
 from copy import deepcopy
 
 import numpy as np
@@ -26,7 +27,7 @@ from pycram.plans.factories import sequential, execute_single
 from pycram.robot_plans.actions.composite.facing import FaceAtAction
 from pycram.robot_plans.actions.composite.transporting import TransportAction
 from pycram.robot_plans.actions.core.container import OpenAction, CloseAction
-from pycram.robot_plans.actions.core.misc import DetectAction
+from pycram.robot_plans.actions.core.misc import DetectAction, MoveToReach
 from pycram.robot_plans.actions.core.navigation import NavigateAction, LookAtAction
 from pycram.robot_plans.actions.core.pick_up import (
     ReachAction,
@@ -53,7 +54,7 @@ from semantic_digital_twin.datastructures.definitions import (
     JointStateType,
     StaticJointState,
 )
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot, Manipulator
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
@@ -64,7 +65,7 @@ from semantic_digital_twin.spatial_types import (
     Point3,
     Quaternion,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 
 
@@ -590,3 +591,25 @@ def test_transport(mutable_multiple_robot_apartment, rclpy_node):
     assert dist <= 0.02
 
     plan.plan.validate()
+
+
+def test_move_to_reach_empty_world(immutable_multiple_robot_apartment, rclpy_node):
+    world, robot, context = immutable_multiple_robot_apartment
+
+    move_to_reach = MoveToReach(
+        target_pose_robot=Pose2D(x=1.5, y=3.5),
+        target_pose_manipulator=Pose.from_xyz_rpy(z=0.77, reference_frame=world.root),
+        hip_rotation=-0.0,
+        grasp_description=GraspDescription(
+            approach_direction=ApproachDirection.FRONT,
+            vertical_alignment=VerticalAlignment.NoAlignment,
+            rotate_gripper=False,
+            manipulator=world.get_semantic_annotations_by_type(Manipulator)[0],
+        ),
+    )
+    VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+
+    plan = execute_single(move_to_reach, context=context)
+    with simulated_robot:
+        plan.perform()
+    time.sleep(1)

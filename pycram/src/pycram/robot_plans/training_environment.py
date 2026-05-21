@@ -191,7 +191,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         )
 
         move_to_reach = underspecified(MoveToReach)(
-            target_pose=target_pose,
+            target_pose_manipulator=target_pose,
             robot_x=...,
             robot_y=...,
             hip_rotation=...,

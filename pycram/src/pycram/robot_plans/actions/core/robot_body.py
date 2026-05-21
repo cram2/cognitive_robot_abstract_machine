@@ -15,6 +15,7 @@ from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
 )
+from semantic_digital_twin.reasoning.predicates import allclose
 from semantic_digital_twin.robots.abstract_robot import Manipulator
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from ... import MoveManipulatorMotion
@@ -283,7 +284,7 @@ class MoveManipulatorAction(ActionDescription):
     ) -> SymbolicExpression:
         manipulator = variables["manipulator"]
         target_pose = variables["target_pose"]
-        return np.allclose(
+        return allclose(
             manipulator.tool_frame.global_pose.to_np(),
             target_pose.to_np(),
             atol=0.1,

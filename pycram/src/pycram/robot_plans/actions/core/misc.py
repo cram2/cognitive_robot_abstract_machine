@@ -26,7 +26,12 @@ from semantic_digital_twin.spatial_types import (
     RotationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Quaternion
+from semantic_digital_twin.spatial_types.spatial_types import (
+    Pose,
+    Point3,
+    Quaternion,
+    Pose2D,
+)
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Region,
@@ -102,14 +107,9 @@ class MoveToReach(ActionDescription):
     Let the robot move to a position facing the target and reach with a manipulator.
     """
 
-    robot_x: float
+    target_pose_robot: Pose2D
     """
-    The x position where the robot should stand w. r. t. the target.
-    """
-
-    robot_y: float
-    """
-    The y position where the robot should stand w. r. t. the target.
+    The pose where the robot should stand with regard to the manipulator target pose. 2D since z-axis is not relevant.
     """
 
     hip_rotation: float
@@ -117,7 +117,7 @@ class MoveToReach(ActionDescription):
     Additional yaw applied to the orientation facing the target directly.
     """
 
-    target_pose: Pose
+    target_pose_manipulator: Pose
     """
     Pose that should be reached by the manipulator.
     """
@@ -130,12 +130,12 @@ class MoveToReach(ActionDescription):
     def execute(self):
         grasp_orientation = self.grasp_description.grasp_orientation()
         target_pose = Pose(
-            self.target_pose.to_position(),
+            self.target_pose_manipulator.to_position(),
             (
-                self.target_pose.to_rotation_matrix()
+                self.target_pose_manipulator.to_rotation_matrix()
                 @ grasp_orientation.to_rotation_matrix()
             ).to_quaternion(),
-            self.target_pose.reference_frame,
+            self.target_pose_manipulator.reference_frame,
         )
 
         self.add_subplan(
@@ -158,8 +158,10 @@ class MoveToReach(ActionDescription):
 
         :return: The calculated standing pose.
         """
-        reference_T_target = self.target_pose.to_homogeneous_matrix()
-        target_V_robot = -Vector3(x=self.robot_x, y=self.robot_y)
+        reference_T_target = self.target_pose_manipulator.to_homogeneous_matrix()
+        target_V_robot = -Vector3(
+            x=self.target_pose_robot.x, y=self.target_pose_robot.y
+        )
         target_V_robot.scale(1.0)
         world_z = Vector3.Z()
         target_R_robot_pointing_to_target = RotationMatrix.from_vectors(
@@ -168,12 +170,12 @@ class MoveToReach(ActionDescription):
 
         target_T_robot = HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=Point3(
-                x=self.robot_x,
-                y=self.robot_y,
-                z=-self.target_pose.reference_frame.global_transform.z,
+                x=self.target_pose_robot.x,
+                y=self.target_pose_robot.y,
+                z=-self.target_pose_manipulator.reference_frame.global_transform.z,
             ),
             rotation_matrix=target_R_robot_pointing_to_target,
-            reference_frame=self.target_pose.reference_frame,
+            reference_frame=self.target_pose_manipulator.reference_frame,
         )
         reference_T_robot = reference_T_target @ target_T_robot
         return reference_T_robot.to_pose()
