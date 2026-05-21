@@ -8,7 +8,6 @@ from typing_extensions import Optional, Type, Any
 
 from pycram.datastructures.enums import DetectionTechnique
 from pycram.plans.failures import PerceptionObjectNotFound
-from pycram.locations.locations import CostmapLocation
 from pycram.plans.factories import sequential, execute_single, try_in_order
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.core.misc import DetectAction

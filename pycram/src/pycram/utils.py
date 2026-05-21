@@ -27,12 +27,16 @@ from typing_extensions import (
     Iterable,
 )
 
+from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
+from semantic_digital_twin.collision_checking.collision_rules import AllowSelfCollisions
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
     Quaternion,
     HomogeneousTransformationMatrix,
     Point3,
 )
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from pycram.tf_transformations import (
     quaternion_about_axis,
@@ -42,6 +46,30 @@ from pycram.tf_transformations import (
 
 if TYPE_CHECKING:
     from pycram.view_manager import CameraDescription
+
+
+def collision_check(robot: AbstractRobot, world: World) -> List[ClosestPoints]:
+    """
+    This method checks if a given robot collides with any object within the world
+    which it is not allowed to collide with.
+    This is done checking iterating over every object within the world and checking
+    if the robot collides with it. Careful the floor will be ignored.
+    If there is a collision with an object that was not within the allowed collision
+    list the function will raise a RobotInCollision exception.
+
+    :param robot: The robot object in the (Bullet)World where it should be checked if it collides with something
+    :param allowed_collision: dict of objects with which the robot is allowed to collide each object correlates to a list of links of which this object consists
+    :param world: The world in which collision should be checked
+    :raises: RobotInCollision if the robot collides with an object it is not allowed to collide with.
+    """
+    world.collision_manager.clear_temporary_rules()
+    world.collision_manager.add_temporary_rule(AllowSelfCollisions(robot=robot))
+    world.collision_manager.update_collision_matrix(buffer=0.0)
+    return [
+        contact
+        for contact in world.collision_manager.compute_collisions().contacts
+        if contact.distance <= 0.0
+    ]
 
 
 def link_pose_for_joint_config(obj: Body, joint_config: Dict[str, float]) -> Pose:

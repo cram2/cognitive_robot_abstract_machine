@@ -1470,6 +1470,8 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         self.casadi_sx = sm.to_sx([x, y, z, w])
         self.reference_frame = reference_frame
         super().__post_init__()
+        if self.is_constant():
+            self.normalize()
 
     def _verify_type(self):
         if self.shape != (4, 1):
@@ -1889,8 +1891,6 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         p = Point3(x=pos_x, y=pos_y, z=pos_z)
         r = Quaternion(w=quat_w, x=quat_x, y=quat_y, z=quat_z)
-        if r.is_constant():
-            r.normalize()
         return cls(p, r, reference_frame=reference_frame)
 
     @classmethod

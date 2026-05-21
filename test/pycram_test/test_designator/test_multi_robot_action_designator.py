@@ -573,6 +573,8 @@ def test_facing(immutable_multiple_robot_apartment):
 def test_transport(mutable_multiple_robot_apartment, rclpy_node):
     world, robot, context = mutable_multiple_robot_apartment
 
+    VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+
     description = TransportAction(
         object_designator=world.get_body_by_name("milk.stl"),
         target_location=Pose(
@@ -581,6 +583,11 @@ def test_transport(mutable_multiple_robot_apartment, rclpy_node):
             reference_frame=world.root,
         ),
         arm=Arms.RIGHT,
+        grasp_description=GraspDescription(
+            ApproachDirection.FRONT,
+            VerticalAlignment.NoAlignment,
+            ViewManager.get_end_effector_view(Arms.RIGHT, robot),
+        ),
     )
     plan = sequential([MoveTorsoAction(TorsoState.HIGH), description], context)
     with simulated_robot:

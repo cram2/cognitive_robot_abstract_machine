@@ -32,7 +32,6 @@ from semantic_digital_twin.callbacks.callback import (
     ModelChangeCallback,
 )
 from semantic_digital_twin.exceptions import MissingPublishChangesKWARG
-from semantic_digital_twin.orm.ormatic_interface import *
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     WorldEntityWithID,
@@ -494,6 +493,8 @@ class ModelReloadSynchronizer(Synchronizer):
         Save the current world model to the database and publish the primary key to the ROS topic such that other
         processes can subscribe to the model changes and update their worlds.
         """
+        from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
         dao: WorldMappingDAO = to_dao(self._world)
         self.session.add(dao)
         self.session.commit()
@@ -506,6 +507,8 @@ class ModelReloadSynchronizer(Synchronizer):
 
         :param msg: The message containing the primary key of the model to be fetched.
         """
+        from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
         query = select(WorldMappingDAO).where(
             WorldMappingDAO.database_id == msg.primary_key
         )

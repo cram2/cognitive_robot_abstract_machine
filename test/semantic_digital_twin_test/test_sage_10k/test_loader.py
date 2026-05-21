@@ -27,7 +27,10 @@ from semantic_digital_twin.world import World
 
 from semantic_digital_twin.adapters.mesh import STLParser
 
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix, Pose
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose,
+)
 
 from pycram.motion_executor import simulated_robot
 
@@ -69,9 +72,7 @@ def verify_scene(world: World, scene: Sage10kScene):
 
 def get_body_height(body) -> float:
     return (
-        body.collision.as_bounding_box_collection_in_frame(body)
-        .bounding_box()
-        .height
+        body.collision.as_bounding_box_collection_in_frame(body).bounding_box().height
     )
 
 
@@ -87,9 +88,7 @@ def get_book_body_by_height(world: World, target_height: float, atol: float = 1e
     )
 
     if not candidates:
-        candidates = [
-            body for body in world.bodies if has_book_in_prefix(body)
-        ]
+        candidates = [body for body in world.bodies if has_book_in_prefix(body)]
 
     if not candidates:
         preview = [
@@ -116,7 +115,9 @@ def get_book_body_by_height(world: World, target_height: float, atol: float = 1e
             f"{[str(body.name) for body in exact_matches]}."
         )
 
-    closest_body = min(candidates, key=lambda body: abs(get_body_height(body) - target_height))
+    closest_body = min(
+        candidates, key=lambda body: abs(get_body_height(body) - target_height)
+    )
     closest_height = get_body_height(closest_body)
 
     print(
@@ -152,31 +153,40 @@ def test_loader(rclpy_node, sage10k_scene):
     pub.with_tf_publisher()
     verify_scene(world, scene)
 
+
 @pytest.mark.skipif(get_sage10k_scene() is None, reason="Sage10k dataset not available")
 def test_loader_with_robot(rclpy_node, sage10k_scene, pr2_world_copy):
     pr2_world = pr2_world_copy
 
     try:
         loader = Sage10kDatasetLoader()
-        scene= loader.create_scene(scene_url=Sage10kDatasetLoader.available_scenes()[0])
+        scene = loader.create_scene(
+            scene_url=Sage10kDatasetLoader.available_scenes()[0]
+        )
     except HTTPError as e:
         return "Sage10k dataset not available"
 
     world = scene.create_world()
 
-    cup  = STLParser(
+    cup = STLParser(
         os.path.join(
-            os.path.dirname(__file__), "..", "..","..", "pycram", "resources", "objects", "jeroen_cup.stl"
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "..",
+            "pycram",
+            "resources",
+            "objects",
+            "jeroen_cup.stl",
         )
     ).parse()
-
 
     with pr2_world.modify_world():
         pr2_world.merge_world(world)
         pr2_world.merge_world_at_pose(
             cup,
             HomogeneousTransformationMatrix.from_xyz_rpy(
-                4, 6.8, 0.87, reference_frame=world.root, yaw=np.pi/2
+                4, 6.8, 0.87, reference_frame=world.root, yaw=np.pi / 2
             ),
         )
 
@@ -184,8 +194,9 @@ def test_loader_with_robot(rclpy_node, sage10k_scene, pr2_world_copy):
         _world=pr2_world,
         node=rclpy_node,
     ).with_tf_publisher()
-    navigate_pose = HomogeneousTransformationMatrix.from_xyz_rpy(3.96,6.06,0,
-                                                                 yaw=np.pi/2, reference_frame=pr2_world.root)
+    navigate_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+        3.96, 6.06, 0, yaw=np.pi / 2, reference_frame=pr2_world.root
+    )
     context = Context.from_world(pr2_world)
     left_arm = ViewManager.get_arm_view(Arms.LEFT, context.robot)
     manipulator = left_arm.manipulator
@@ -196,31 +207,33 @@ def test_loader_with_robot(rclpy_node, sage10k_scene, pr2_world_copy):
         manipulator,
     )
     target_body = get_book_body_by_height(pr2_world, 1.22921)
-    root = sequential([ ParkArmsAction(arm=Arms.BOTH),
-                    NavigateAction(navigate_pose),
-                    MoveTorsoAction(TorsoState.HIGH),
-                    PickUpAction(
-                         object_designator=target_body,
-                         arm=Arms.LEFT,
-                         grasp_description=grasp_description,
-                     ),
-                     ParkArmsAction(arm=Arms.BOTH)]
-                   , context)
+    root = sequential(
+        [
+            ParkArmsAction(arm=Arms.BOTH),
+            NavigateAction(navigate_pose),
+            MoveTorsoAction(TorsoState.HIGH),
+            PickUpAction(
+                object_designator=target_body,
+                arm=Arms.LEFT,
+                grasp_description=grasp_description,
+            ),
+            ParkArmsAction(arm=Arms.BOTH),
+        ],
+        context,
+    )
     with simulated_robot:
         root.perform()
     assert (
-            pr2_world.get_connection(
-                left_arm.manipulator.tool_frame,
-                target_body,
-            )
-            is not None
+        pr2_world.get_connection(
+            left_arm.manipulator.tool_frame,
+            target_body,
+        )
+        is not None
     )
 
 
 @pytest.mark.skipif(get_sage10k_scene() is None, reason="Sage10k dataset not available")
-def test_different_decomposition_methods(
-    rclpy_node, sage10k_scene
-):
+def test_different_decomposition_methods(rclpy_node, sage10k_scene):
     scene = sage10k_scene
     if scene is None:
         return

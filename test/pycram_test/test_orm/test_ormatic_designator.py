@@ -8,7 +8,8 @@ from sqlalchemy import select
 import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
 import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
 from krrood.ormatic.data_access_objects.helper import to_dao
-from pycram.datastructures.enums import Arms
+from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+from pycram.datastructures.grasp import GraspDescription
 from pycram.motion_executor import simulated_robot
 from pycram.orm.ormatic_interface import *  # type: ignore
 from pycram.plans.factories import sequential, execute_single
@@ -99,6 +100,11 @@ def complex_plan(mutable_model_world):
                 2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
             ),
             arm=Arms.LEFT,
+            grasp_description=GraspDescription(
+                ApproachDirection.LEFT,
+                VerticalAlignment.NoAlignment,
+                robot_view.left_arm.manipulator,
+            ),
         ),
         context=context,
     ).plan

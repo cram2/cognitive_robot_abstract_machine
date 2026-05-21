@@ -28,6 +28,7 @@ from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import Vector3, Point3
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
+    Pose,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -203,7 +204,9 @@ def reachable(pose: HomogeneousTransformationMatrix, root: Body, tip: Body) -> b
 
 
 @symbolic_function
-def compute_euclidean_planar_distance(body1: Body, body2: Body, ignore_dimension: Vector3):
+def compute_euclidean_planar_distance(
+    body1: Body, body2: Body, ignore_dimension: Vector3
+):
     """
     Computes the Euclidean distance between two bodies in 2D space, ignoring a specific dimension
     specified by the user. The ignored dimension is set to zero before the distance calculation. This
@@ -234,10 +237,7 @@ def compute_euclidean_planar_distance(body1: Body, body2: Body, ignore_dimension
         body1_position.z = 0.0
         body2_position.z = 0.0
 
-
-    return body1_position.euclidean_distance(
-        body2_position
-    )
+    return body1_position.euclidean_distance(body2_position)
 
 
 @symbolic_function
@@ -280,6 +280,7 @@ def is_supported_by(
     z_intersection: Interval = intersection[SpatialVariables.z.value]
     size = sum([si.upper - si.lower for si in z_intersection.simple_sets])
     return size < max_intersection_height
+
 
 @symbolic_function
 def is_supporting(supporting_body: Body, max_intersection_height: float = 0.1) -> bool:
@@ -558,7 +559,7 @@ class ContainsType(Predicate):
 
 @symbolic_function
 def is_place_occupied(
-    box: BoundingBox, world: World, allowed_bodies: List[Body] = None
+    box: BoundingBox, pose: Pose, world: World, allowed_bodies: List[Body] = None
 ) -> bool:
     """
     Checks if the given region (as a box at its pose) intersects with any collidable
@@ -578,9 +579,7 @@ def is_place_occupied(
     region_box_shape = box.as_shape()  # returns a Box centered at the region
     region_mesh = region_box_shape.mesh.copy()
     # region_mesh.apply_transform(region_box_shape.origin.to_np())
-    region_mesh.apply_transform(
-        world.transform(region_box_shape.origin, world.root).to_np()
-    )
+    region_mesh.apply_transform(world.transform(pose, world.root).to_np())
 
     # Prepare collision manager with the region mesh
     cm = CollisionManager()

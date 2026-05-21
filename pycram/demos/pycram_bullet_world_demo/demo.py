@@ -70,7 +70,7 @@ except ImportError:
     node = None
 
 pr2 = PR2.from_world(world)
-context = Context(world=world, robot=pr2)
+context = Context(world=world, robot=pr2, _debug=True, ros_node=node)
 
 with world.modify_world():
     world_reasoner = WorldReasoner(world)

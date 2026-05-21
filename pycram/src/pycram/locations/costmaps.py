@@ -13,6 +13,7 @@ from matplotlib import colors
 from skimage.measure import label
 from typing_extensions import Tuple, List, Optional, Iterator, Callable
 
+from pycram.locations.base import PoseGeneratorBackend
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import (
@@ -24,7 +25,7 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vect
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pycram")
 
 
 class OrientationGenerator:
@@ -114,7 +115,7 @@ class Rectangle:
 
 
 @dataclass
-class Costmap:
+class Costmap(PoseGeneratorBackend):
     """
     The base class of all Costmaps.
     Costmaps describe regions in the world that are suitable for a certaint task.
@@ -308,6 +309,9 @@ class Costmap:
             raise ValueError(
                 f"Can only combine two locations other type was {type(other)}"
             )
+
+    def __and__(self, other):
+        return self.merge(other)
 
     def partitioning_rectangles(self) -> List[Rectangle]:
         """
@@ -580,22 +584,15 @@ class VisibilityCostmap(Costmap):
 
         r_t = RayTracer(self.world)
 
-        origin_copy = deepcopy(self.origin)
+        origin_copy = deepcopy(self.origin).to_homogeneous_matrix()
 
         for _ in range(4):
-            # this quaternion is invalid, as it is never normalized. But the test pass with it, and any 90° yaw fails for me
-            # finding out the error is super annoying in the current implementation, and it is not really used atm, so I dont
-            # think its worth the time to fix it. If you disagree, feel free to give it a shot.
-            rotated_origin_copy = (
-                HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                    rotation_matrix=Quaternion(0, 0, 1, 1).to_rotation_matrix()
-                )
-                @ origin_copy
+            origin_copy = origin_copy @ HomogeneousTransformationMatrix.from_xyz_rpy(
+                yaw=np.pi / 2
             )
             images.append(
                 r_t.create_depth_map(
-                    rotated_origin_copy,
-                    resolution=self.width,
+                    origin_copy, resolution=self.width, min_distance=0.1
                 )
             )
 
@@ -750,7 +747,13 @@ class VisibilityCostmap(Costmap):
         # the locations in itself is consistent and just needs to be flipped to fit the world coordinate system
         map = np.flip(map, axis=0)
         map = np.flip(map)
-        self.map = map
+
+        # Invert the map
+        inv_map = np.zeros(map.shape)
+        inv_map[map == 0] = 1
+        inv_map[map != 0] = 0
+
+        self.map = inv_map
 
 
 @dataclass

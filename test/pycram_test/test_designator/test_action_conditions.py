@@ -68,7 +68,7 @@ def test_pick_up_pre_conditions(mutable_model_world):
     false_statements = get_false_statements(pre_condition)
 
     assert len(false_statements) == 1
-    assert false_statements[0]._name_ == "pose_sequence_reachability_validator"
+    assert false_statements[0]._name_ == "ReachabilitySequenceValidator"
 
     with pytest.raises(ConditionNotSatisfied):
         pick_action.evaluate_pre_condition()

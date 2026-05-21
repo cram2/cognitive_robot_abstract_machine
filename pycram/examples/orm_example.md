@@ -54,7 +54,7 @@ pr2_view = PR2.from_world(world)
 context = Context(world, pr2_view)
 
 description = TransportAction(world.get_body_by_name("milk.stl"),
-                                         Pose.from_xyz_quaternion(3, 2.2, 0.95,
+                                         Pose.from_xyz_quaternion(3.1, 2.2, 0.95,
                                                                 0.0, 0.0, 1.0, 0.0, reference_frame=world.root),
                                          Arms.LEFT)
 plan = sequential([MoveTorsoAction(TorsoState.HIGH),
