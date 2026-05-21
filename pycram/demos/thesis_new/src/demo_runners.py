@@ -3,21 +3,15 @@ import json
 import subprocess
 import sys
 
-from .demo_cut_all_breads_retry import main_cutting
-
-from .demo_mix_all_bowls_retry import main_mixing
-
-from .demo_wipe_all_spaces_retry import main_wiping
 from .world_setup import resolve_robot_name
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 THESIS_DEMO_RUNNERS = {
-    "cut": main_cutting,
-    "cutting": main_cutting,
-    "mix": main_mixing,
-    "mixing": main_mixing,
-    "wipe": main_wiping,
-    "wiping": main_wiping,
+    "cut": ("demo_cut_all_breads_retry", "main_cutting"),
+    "cutting": ("demo_cut_all_breads_retry", "main_cutting"),
+    "mix": ("demo_mix_all_bowls_retry", "main_mixing"),
+    "mixing": ("demo_mix_all_bowls_retry", "main_mixing"),
+    "wipe": ("demo_wipe_all_spaces_retry", "main_wiping"),
+    "wiping": ("demo_wipe_all_spaces_retry", "main_wiping"),
 }
 
 
@@ -28,7 +22,9 @@ def get_thesis_demo_runner(task_name):
         raise ValueError(
             f"Unsupported thesis_new demo '{task_name}'. Supported: {supported}"
         )
-    return THESIS_DEMO_RUNNERS[normalized]
+    module_name, function_name = THESIS_DEMO_RUNNERS[normalized]
+    module = __import__(f"{__package__}.{module_name}", fromlist=[function_name])
+    return getattr(module, function_name)
 
 
 def run_thesis_demo(

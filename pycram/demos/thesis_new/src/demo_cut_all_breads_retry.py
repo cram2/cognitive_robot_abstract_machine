@@ -449,6 +449,9 @@ def _build_cut_geometry_binding(bread, *, cutting_technique, num_cuts_x, robot=N
     cut_normal_world = rotation @ cut_normal_local
     cut_normal_world_yaw = float(np.arctan2(cut_normal_world[1], cut_normal_world[0]))
     robot_pos = np.full(3, np.nan, dtype=float)
+    robot_quat = np.full(4, np.nan, dtype=float)
+    robot_roll = float("nan")
+    robot_pitch = float("nan")
     robot_yaw = float("nan")
     robot_to_object_yaw = float("nan")
     object_yaw_relative_to_robot = float("nan")
@@ -460,7 +463,12 @@ def _build_cut_geometry_binding(bread, *, cutting_technique, num_cuts_x, robot=N
     cut_normal_approach_perpendicular_score = float("nan")
     if robot is not None:
         try:
-            robot_pose_owner = getattr(robot, "base", None) or getattr(robot, "root", None)
+            robot_base = getattr(robot, "base", None)
+            robot_pose_owner = (
+                getattr(robot_base, "root", None)
+                or getattr(robot, "root", None)
+                or robot_base
+            )
             robot_pose = robot_pose_owner.global_pose
             robot_pos = np.asarray(
                 robot_pose.to_position().to_np(), dtype=float
@@ -468,7 +476,7 @@ def _build_cut_geometry_binding(bread, *, cutting_technique, num_cuts_x, robot=N
             robot_quat = np.asarray(
                 robot_pose.to_quaternion().to_np(), dtype=float
             ).reshape(-1)[:4]
-            _, _, robot_yaw = euler_from_quaternion(robot_quat)
+            robot_roll, robot_pitch, robot_yaw = euler_from_quaternion(robot_quat)
             robot_to_object_yaw = float(
                 np.arctan2(float(pos[1] - robot_pos[1]), float(pos[0] - robot_pos[0]))
             )
@@ -595,6 +603,24 @@ def _build_cut_geometry_binding(bread, *, cutting_technique, num_cuts_x, robot=N
         ),
         "robot_world_z": (
             round(float(robot_pos[2]), 6) if np.isfinite(robot_pos[2]) else ""
+        ),
+        "robot_quat_x": (
+            round(float(robot_quat[0]), 6) if np.isfinite(robot_quat[0]) else ""
+        ),
+        "robot_quat_y": (
+            round(float(robot_quat[1]), 6) if np.isfinite(robot_quat[1]) else ""
+        ),
+        "robot_quat_z": (
+            round(float(robot_quat[2]), 6) if np.isfinite(robot_quat[2]) else ""
+        ),
+        "robot_quat_w": (
+            round(float(robot_quat[3]), 6) if np.isfinite(robot_quat[3]) else ""
+        ),
+        "robot_roll_rad": (
+            round(float(robot_roll), 6) if np.isfinite(robot_roll) else ""
+        ),
+        "robot_pitch_rad": (
+            round(float(robot_pitch), 6) if np.isfinite(robot_pitch) else ""
         ),
         "robot_yaw_rad": (
             round(float(robot_yaw), 6) if np.isfinite(robot_yaw) else ""

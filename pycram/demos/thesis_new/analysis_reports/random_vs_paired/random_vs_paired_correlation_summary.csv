@@ -1,0 +1,13 @@
+grouping,metric,n_groups,pearson,spearman
+robot,success_rate,7,0.9678377761974543,0.8928571428571429
+robot,collision_failure_count,7,0.9839937022893064,1.0
+robot,retry_count,7,0.32350593887791834,0.40824829046386296
+robot,recovery_rate,7,0.26960184018665256,-0.14414999403128945
+robot,perturbation_rate,7,,
+robot,execution_time_s,7,0.9037678168921741,0.6785714285714287
+robot_environment,success_rate,21,0.8903210176744788,0.9282234981275013
+robot_environment,collision_failure_count,21,0.864448935779052,0.7688311688311688
+robot_environment,retry_count,21,0.21852733502401597,0.18469721283454688
+robot_environment,recovery_rate,21,0.3892220689946494,0.31469467439923116
+robot_environment,perturbation_rate,21,,
+robot_environment,execution_time_s,21,0.48385469297022154,0.47402597402597396

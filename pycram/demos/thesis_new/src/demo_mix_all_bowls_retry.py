@@ -80,7 +80,10 @@ ACTIVE_BOWL_COLOR = Color(R=0.52, G=0.82, B=0.98)
 FAILED_BOWL_COLOR = Color(R=0.95, G=0.20, B=0.20)
 SUCCESS_BOWL_COLOR = Color(R=0.62, G=0.92, B=0.62)
 RECORDS_DIR = os.path.join(os.path.dirname(__file__), "../records")
-RESULTS_CSV_PATH = os.path.join(RECORDS_DIR, "mix_all_bowls_results.csv")
+RESULTS_CSV_PATH = os.environ.get(
+    "THESIS_MIX_RESULTS_CSV_PATH",
+    os.path.join(RECORDS_DIR, "mix_all_bowls_results.csv"),
+)
 EXPERIMENT_CONDITION = "full_system"
 BASELINE_NAME = "task_knowledge+htn+constraint_planning"
 TASK_NAME = "bowl_mixing"
@@ -284,7 +287,7 @@ def _try_mix(context, bowl, pickup_pose, arm, tool, *, environment_name=None):
             )
 
 
-def _build_mixing_geometry_binding(bowl):
+def _build_mixing_geometry_binding(bowl, *, robot=None):
     mins, maxs = body_local_aabb(
         bowl,
         use_visual=True,
@@ -295,6 +298,29 @@ def _build_mixing_geometry_binding(bowl):
     pos = np.asarray(pose.to_position().to_np(), dtype=float).reshape(-1)[:3]
     quat = np.asarray(pose.to_quaternion().to_np(), dtype=float).reshape(-1)[:4]
     roll, pitch, yaw = euler_from_quaternion(quat)
+    robot_pos = np.full(3, np.nan, dtype=float)
+    robot_quat = np.full(4, np.nan, dtype=float)
+    robot_roll = float("nan")
+    robot_pitch = float("nan")
+    robot_yaw = float("nan")
+    if robot is not None:
+        try:
+            robot_base = getattr(robot, "base", None)
+            robot_pose_owner = (
+                getattr(robot_base, "root", None)
+                or getattr(robot, "root", None)
+                or robot_base
+            )
+            robot_pose = robot_pose_owner.global_pose
+            robot_pos = np.asarray(
+                robot_pose.to_position().to_np(), dtype=float
+            ).reshape(-1)[:3]
+            robot_quat = np.asarray(
+                robot_pose.to_quaternion().to_np(), dtype=float
+            ).reshape(-1)[:4]
+            robot_roll, robot_pitch, robot_yaw = euler_from_quaternion(robot_quat)
+        except Exception:
+            pass
 
     support = getattr(getattr(bowl, "parent_connection", None), "parent", None)
     support_name = _body_name(support) if support is not None else ""
@@ -366,6 +392,36 @@ def _build_mixing_geometry_binding(bowl):
         "object_roll_rad": round(float(roll), 6),
         "object_pitch_rad": round(float(pitch), 6),
         "object_yaw_rad": round(float(yaw), 6),
+        "robot_world_x": (
+            round(float(robot_pos[0]), 6) if np.isfinite(robot_pos[0]) else ""
+        ),
+        "robot_world_y": (
+            round(float(robot_pos[1]), 6) if np.isfinite(robot_pos[1]) else ""
+        ),
+        "robot_world_z": (
+            round(float(robot_pos[2]), 6) if np.isfinite(robot_pos[2]) else ""
+        ),
+        "robot_quat_x": (
+            round(float(robot_quat[0]), 6) if np.isfinite(robot_quat[0]) else ""
+        ),
+        "robot_quat_y": (
+            round(float(robot_quat[1]), 6) if np.isfinite(robot_quat[1]) else ""
+        ),
+        "robot_quat_z": (
+            round(float(robot_quat[2]), 6) if np.isfinite(robot_quat[2]) else ""
+        ),
+        "robot_quat_w": (
+            round(float(robot_quat[3]), 6) if np.isfinite(robot_quat[3]) else ""
+        ),
+        "robot_roll_rad": (
+            round(float(robot_roll), 6) if np.isfinite(robot_roll) else ""
+        ),
+        "robot_pitch_rad": (
+            round(float(robot_pitch), 6) if np.isfinite(robot_pitch) else ""
+        ),
+        "robot_yaw_rad": (
+            round(float(robot_yaw), 6) if np.isfinite(robot_yaw) else ""
+        ),
         "technique_name": MIXING_QUERY_TASK,
         "pointer_stride": int(POINTER_STRIDE),
     }
@@ -450,7 +506,6 @@ def main_mixing(
     bowl_results = []
     initialize_csv(RESULTS_CSV_PATH, _results_csv_fieldnames())
     debug_costmap_publishers = {}
-    time.sleep(50)
     with simulated_robot_without_collision:
         sequential(
             [
@@ -571,7 +626,9 @@ def main_mixing(
                 perturbation_applied=perturbation_applied,
                 perturbation_type=perturbation_type,
                 execution_time_s=time.perf_counter() - bowl_start_time,
-                geometry_binding=_build_mixing_geometry_binding(bowl),
+                geometry_binding=_build_mixing_geometry_binding(
+                    bowl, robot=context.robot
+                ),
             )
             append_csv_row(RESULTS_CSV_PATH, _results_csv_fieldnames(), result_row)
             print(
@@ -642,7 +699,9 @@ def main_mixing(
                         perturbation_applied=perturbation_applied,
                         perturbation_type=perturbation_type,
                         execution_time_s=time.perf_counter() - bowl_start_time,
-                        geometry_binding=_build_mixing_geometry_binding(bowl),
+                        geometry_binding=_build_mixing_geometry_binding(
+                            bowl, robot=context.robot
+                        ),
                     )
                     append_csv_row(
                         RESULTS_CSV_PATH, _results_csv_fieldnames(), result_row
@@ -729,7 +788,9 @@ def main_mixing(
             perturbation_applied=perturbation_applied,
             perturbation_type=perturbation_type,
             execution_time_s=time.perf_counter() - bowl_start_time,
-            geometry_binding=_build_mixing_geometry_binding(bowl),
+            geometry_binding=_build_mixing_geometry_binding(
+                bowl, robot=context.robot
+            ),
         )
         append_csv_row(RESULTS_CSV_PATH, _results_csv_fieldnames(), result_row)
         if DEBUG_PROFILE_MIXING:

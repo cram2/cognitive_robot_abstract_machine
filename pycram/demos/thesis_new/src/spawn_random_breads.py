@@ -23,7 +23,16 @@ RESOURCES_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../..", "..", "resources")
 )
 
-GENERIC_SUPPORT_EXCLUDE_KEYWORDS = ()
+GENERIC_SUPPORT_EXCLUDE_KEYWORDS = (
+    "fridge",
+    "cabinet",
+    "drawer",
+    "door",
+    "oven",
+    "dish_washer",
+    "dishwasher",
+    "handle",
+)
 PREFERRED_SURFACE_NAMES = (
     "island_countertop",
     "countertop",
@@ -40,7 +49,10 @@ ENVIRONMENT_ALLOWED_SURFACE_NAME_KEYWORDS = {
 }
 MIN_SUPPORT_SURFACE_AREA_M2 = 0.025
 MIN_SUPPORT_SURFACE_SPAN_M = 0.18
-MAX_SUPPORT_SURFACE_TOP_Z_M = 1.10
+MAX_SUPPORT_SURFACE_TOP_Z_M = 1.30
+MAX_SPAWN_OBJECT_WORLD_Z_M = 1.30
+SPAWN_OBSTACLE_VERTICAL_MARGIN_M = 0.03
+SPAWN_OBSTACLE_TOP_EPSILON_M = 0.01
 
 # Automatic count model: breads ~= usable_surface_area * BREADS_PER_SQM.
 # Keep this tunable when switching to a new environment.
@@ -58,6 +70,7 @@ DEBUG_SPAWN_FRAMES = True
 DEBUG_FORCE_SPAWN_ALL_TARGETS = False
 DEBUG_DISABLE_REACHABILITY = True
 DEBUG_SPAWN_ACTUAL_POSES = True
+MAX_PLACEMENT_ATTEMPTS_PER_OBJECT = 60
 
 CUT_OBJECT_CONFIGS = {
     "bread": {
@@ -142,6 +155,10 @@ def _surface_like_name(name):
 
 
 def _surface_geometry_is_usable(body):
+    basename = (_body_basename(body) or "").lower()
+    if any(skip in basename for skip in GENERIC_SUPPORT_EXCLUDE_KEYWORDS):
+        return False
+
     try:
         mins, maxs = body_local_aabb(body, use_visual=False, apply_shape_scale=True)
     except Exception:
@@ -226,6 +243,75 @@ def _is_robot_body(body, name, robot_body_ids, robot_body_names):
     return getattr(body, "id", None) in robot_body_ids or name in robot_body_names
 
 
+def _world_aabb_for_body(world, body):
+    try:
+        mins, maxs = body_local_aabb(body, use_visual=False, apply_shape_scale=True)
+    except Exception:
+        return None
+
+    corners = []
+    for x in (mins[0], maxs[0]):
+        for y in (mins[1], maxs[1]):
+            for z in (mins[2], maxs[2]):
+                local_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=float(x),
+                    y=float(y),
+                    z=float(z),
+                    roll=0.0,
+                    pitch=0.0,
+                    yaw=0.0,
+                    reference_frame=body,
+                )
+                try:
+                    corners.append(_pose_xyz(world.transform(local_pose, world.root)))
+                except Exception:
+                    return None
+    if not corners:
+        return None
+    corners = np.asarray(corners, dtype=float)
+    if not np.all(np.isfinite(corners)):
+        return None
+    return corners.min(axis=0), corners.max(axis=0)
+
+
+def _candidate_overlaps_existing_body(
+    *,
+    world,
+    candidate_world_pose,
+    radius,
+    support_body,
+    robot_body_ids,
+    robot_body_names,
+):
+    x, y, z = _pose_xyz(candidate_world_pose)
+    for body in getattr(world, "bodies", []):
+        if body is support_body:
+            continue
+        name = _body_name(body)
+        if not name:
+            continue
+        if _is_robot_body(body, name, robot_body_ids, robot_body_names):
+            continue
+        aabb = _world_aabb_for_body(world, body)
+        if aabb is None:
+            continue
+        mins, maxs = aabb
+        if float(z) < float(mins[2]) - SPAWN_OBSTACLE_VERTICAL_MARGIN_M:
+            continue
+        if float(z) >= float(maxs[2]) - SPAWN_OBSTACLE_TOP_EPSILON_M:
+            continue
+        if float(x) < float(mins[0]) - radius:
+            continue
+        if float(x) > float(maxs[0]) + radius:
+            continue
+        if float(y) < float(mins[1]) - radius:
+            continue
+        if float(y) > float(maxs[1]) + radius:
+            continue
+        return True, name
+    return False, ""
+
+
 def _collect_surface_bodies(world):
     surfaces = []
     seen = set()
@@ -236,6 +322,8 @@ def _collect_surface_bodies(world):
         name = _body_name(body)
         basename = (_body_basename(name) or "").lower()
         if not name or not basename or basename not in preferred_basenames:
+            continue
+        if any(skip in basename for skip in GENERIC_SUPPORT_EXCLUDE_KEYWORDS):
             continue
         if _is_robot_body(body, name, robot_body_ids, robot_body_names):
             continue
@@ -257,6 +345,9 @@ def _collect_surface_bodies(world):
             continue
 
         if _is_robot_body(body, name, robot_body_ids, robot_body_names):
+            continue
+        basename = (_body_basename(name) or "").lower()
+        if any(skip in basename for skip in GENERIC_SUPPORT_EXCLUDE_KEYWORDS):
             continue
         if not _surface_like_name(name):
             continue
@@ -498,6 +589,7 @@ def _sample_random_surface_layout(
     surface_plan = []
     created_idx = 0
     reachability_cache = {}
+    robot_body_ids, robot_body_names = _robot_body_identity_sets(world)
 
     with world.modify_world():
         _tint_surfaces_light_brown(world)
@@ -523,11 +615,12 @@ def _sample_random_surface_layout(
             reject_no_points = 0
             reject_clearance = 0
             reject_reachability = 0
+            reject_overlap = 0
             for _ in range(target_count):
                 scale = float(rng.choice(scale_choices))
                 radius = base_radius * scale * radius_safety_factor
                 placed = False
-                for _attempt in range(120):
+                for _attempt in range(MAX_PLACEMENT_ATTEMPTS_PER_OBJECT):
                     lo_x_eff = lo_x + radius
                     hi_x_eff = hi_x - radius
                     lo_y_eff = lo_y + radius
@@ -574,6 +667,27 @@ def _sample_random_surface_layout(
                         candidate_world_pose, environment_name=environment_name
                     ):
                         reject_clearance += 1
+                        continue
+                    candidate_position = candidate_world_pose.to_position()
+                    if float(candidate_position.z) > MAX_SPAWN_OBJECT_WORLD_Z_M:
+                        reject_clearance += 1
+                        continue
+                    overlaps_body, overlap_name = _candidate_overlaps_existing_body(
+                        world=world,
+                        candidate_world_pose=candidate_world_pose,
+                        radius=radius,
+                        support_body=surface_body,
+                        robot_body_ids=robot_body_ids,
+                        robot_body_names=robot_body_names,
+                    )
+                    if overlaps_body:
+                        reject_overlap += 1
+                        if DEBUG_SPAWN_FRAMES and reject_overlap <= 3:
+                            print(
+                                "[spawn-debug] rejected overlap "
+                                f"surface={surface_name} body={overlap_name} "
+                                f"xyz={_pose_xyz(candidate_world_pose)}"
+                            )
                         continue
                     if DEBUG_SPAWN_FRAMES and created_idx == 0:
                         print(
@@ -628,12 +742,13 @@ def _sample_random_surface_layout(
                     if placed:
                         break
                 if not placed:
-                    continue
+                    break
             surface_plan.append((surface_name, area_m2, target_count, len(occupied_xy)))
             print(
                 f"[spawn] surface={surface_name} placed={len(occupied_xy)}/{target_count} "
                 f"rejects(no_points={reject_no_points}, "
                 f"clearance={reject_clearance}, "
+                f"overlap={reject_overlap}, "
                 f"reachability={reject_reachability})"
             )
 

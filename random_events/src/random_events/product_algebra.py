@@ -418,7 +418,7 @@ class Event(AbstractCompositeSet):
     simple_set_example: SimpleEvent = field(init=False)
 
     @classmethod
-    def from_simple_sets(cls, *simple_sets: Iterable[SimpleEvent]):
+    def from_simple_sets(cls, *simple_sets: SimpleEvent):
         if isinstance(simple_sets, SimpleEvent):
             simple_sets = (simple_sets,)
         instance = cls.__new__(cls)

@@ -59,6 +59,7 @@ from pycram.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     SetGripperAction,
 )
+from pycram.tf_transformations import euler_from_quaternion
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Sponge
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
@@ -71,12 +72,15 @@ FAILED_TARGET_COLOR = Color(R=0.95, G=0.20, B=0.20)
 SUCCESS_TARGET_COLOR = Color(R=0.62, G=0.92, B=0.62)
 DEFAULT_TARGET_COLOR = Color(R=0.78, G=0.80, B=0.86)
 RECORDS_DIR = os.path.join(os.path.dirname(__file__), "../records")
-RESULTS_CSV_PATH = os.path.join(RECORDS_DIR, "wipe_all_spaces_results.csv")
+RESULTS_CSV_PATH = os.environ.get(
+    "THESIS_WIPE_RESULTS_CSV_PATH",
+    os.path.join(RECORDS_DIR, "wipe_all_spaces_results.csv"),
+)
 EXPERIMENT_CONDITION = "full_system"
 BASELINE_NAME = "task_knowledge+htn+constraint_planning"
 TASK_NAME = "space_wiping"
 POINTER_STRIDE = 3
-MAX_WIPE_TARGET_HEIGHT_M = 1.80
+MAX_WIPE_TARGET_HEIGHT_M = 1.30
 TARGET_MARKER_TOPIC = "/pycram/wipe_targets"
 VERTICAL_TARGET_AXIS_LENGTH_M = 0.18
 VERTICAL_TARGET_AXIS_WIDTH_M = 0.012
@@ -476,10 +480,34 @@ def _is_vertical_wipe_pose(target_pose):
     return abs(float(local_z_world[2])) < 0.5
 
 
-def _build_wipe_geometry_binding(target_data, target_pose):
+def _build_wipe_geometry_binding(target_data, target_pose, *, robot=None):
     target_pose = target_pose
     pos = np.asarray(target_pose.to_position().to_np(), dtype=float).reshape(-1)[:3]
     quat = np.asarray(target_pose.to_quaternion().to_np(), dtype=float).reshape(-1)[:4]
+    roll, pitch, yaw = euler_from_quaternion(quat)
+    robot_pos = np.full(3, np.nan, dtype=float)
+    robot_quat = np.full(4, np.nan, dtype=float)
+    robot_roll = float("nan")
+    robot_pitch = float("nan")
+    robot_yaw = float("nan")
+    if robot is not None:
+        try:
+            robot_base = getattr(robot, "base", None)
+            robot_pose_owner = (
+                getattr(robot_base, "root", None)
+                or getattr(robot, "root", None)
+                or robot_base
+            )
+            robot_pose = robot_pose_owner.global_pose
+            robot_pos = np.asarray(
+                robot_pose.to_position().to_np(), dtype=float
+            ).reshape(-1)[:3]
+            robot_quat = np.asarray(
+                robot_pose.to_quaternion().to_np(), dtype=float
+            ).reshape(-1)[:4]
+            robot_roll, robot_pitch, robot_yaw = euler_from_quaternion(robot_quat)
+        except Exception:
+            pass
     return {
         "target_world_x": round(float(pos[0]), 6),
         "target_world_y": round(float(pos[1]), 6),
@@ -492,6 +520,39 @@ def _build_wipe_geometry_binding(target_data, target_pose):
         "object_quat_y": round(float(quat[1]), 6),
         "object_quat_z": round(float(quat[2]), 6),
         "object_quat_w": round(float(quat[3]), 6),
+        "object_roll_rad": round(float(roll), 6),
+        "object_pitch_rad": round(float(pitch), 6),
+        "object_yaw_rad": round(float(yaw), 6),
+        "robot_world_x": (
+            round(float(robot_pos[0]), 6) if np.isfinite(robot_pos[0]) else ""
+        ),
+        "robot_world_y": (
+            round(float(robot_pos[1]), 6) if np.isfinite(robot_pos[1]) else ""
+        ),
+        "robot_world_z": (
+            round(float(robot_pos[2]), 6) if np.isfinite(robot_pos[2]) else ""
+        ),
+        "robot_quat_x": (
+            round(float(robot_quat[0]), 6) if np.isfinite(robot_quat[0]) else ""
+        ),
+        "robot_quat_y": (
+            round(float(robot_quat[1]), 6) if np.isfinite(robot_quat[1]) else ""
+        ),
+        "robot_quat_z": (
+            round(float(robot_quat[2]), 6) if np.isfinite(robot_quat[2]) else ""
+        ),
+        "robot_quat_w": (
+            round(float(robot_quat[3]), 6) if np.isfinite(robot_quat[3]) else ""
+        ),
+        "robot_roll_rad": (
+            round(float(robot_roll), 6) if np.isfinite(robot_roll) else ""
+        ),
+        "robot_pitch_rad": (
+            round(float(robot_pitch), 6) if np.isfinite(robot_pitch) else ""
+        ),
+        "robot_yaw_rad": (
+            round(float(robot_yaw), 6) if np.isfinite(robot_yaw) else ""
+        ),
         "technique_name": "wipe",
         "pointer_stride": int(POINTER_STRIDE),
     }
@@ -664,7 +725,9 @@ def main_wiping(seed=None, robot_name=None, environment_name=None):
                 perturbation_applied=False,
                 perturbation_type="",
                 execution_time_s=time.perf_counter() - target_start_time,
-                geometry_binding=_build_wipe_geometry_binding(target_data, target_pose),
+                geometry_binding=_build_wipe_geometry_binding(
+                    target_data, target_pose, robot=context.robot
+                ),
             )
             append_csv_row(RESULTS_CSV_PATH, _results_csv_fieldnames(), result_row)
             continue
@@ -746,7 +809,9 @@ def main_wiping(seed=None, robot_name=None, environment_name=None):
                 perturbation_applied=False,
                 perturbation_type="",
                 execution_time_s=time.perf_counter() - target_start_time,
-                geometry_binding=_build_wipe_geometry_binding(target_data, target_pose),
+                geometry_binding=_build_wipe_geometry_binding(
+                    target_data, target_pose, robot=context.robot
+                ),
             )
             append_csv_row(RESULTS_CSV_PATH, _results_csv_fieldnames(), result_row)
             continue
@@ -842,7 +907,7 @@ def main_wiping(seed=None, robot_name=None, environment_name=None):
                     perturbation_type=result_perturbation_type,
                     execution_time_s=time.perf_counter() - target_start_time,
                     geometry_binding=_build_wipe_geometry_binding(
-                        target_data, target_pose
+                        target_data, target_pose, robot=context.robot
                     ),
                 )
                 append_csv_row(RESULTS_CSV_PATH, _results_csv_fieldnames(), result_row)
@@ -920,7 +985,9 @@ def main_wiping(seed=None, robot_name=None, environment_name=None):
             perturbation_applied=False,
             perturbation_type="",
             execution_time_s=time.perf_counter() - target_start_time,
-            geometry_binding=_build_wipe_geometry_binding(target_data, target_pose),
+            geometry_binding=_build_wipe_geometry_binding(
+                target_data, target_pose, robot=context.robot
+            ),
         )
         append_csv_row(RESULTS_CSV_PATH, _results_csv_fieldnames(), result_row)
         if DEBUG_PROFILE_WIPING:
