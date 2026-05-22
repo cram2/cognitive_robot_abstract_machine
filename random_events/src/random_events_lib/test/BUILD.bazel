@@ -1,0 +1,36 @@
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
+cc_test(
+  name = "test_all",
+  size = "small",
+  srcs = glob(["*.cpp"]),
+  deps = ["@googletest//:gtest_main",
+          "//:random_events_lib"]
+)
+
+cc_test(
+  name = "test_interval",
+  size = "small",
+  srcs = ["test_interval.cpp"],
+  deps = ["@googletest//:gtest_main",
+          "//:random_events_lib"])
+
+cc_test(
+    name = "test_set",
+    size = "small",
+    srcs = ["test_set.cpp"],
+    deps = ["@googletest//:gtest_main",
+            "//:random_events_lib"])
+cc_test(
+    name = "test_variable",
+    size = "small",
+    srcs = ["test_variable.cpp"],
+    deps = ["@googletest//:gtest_main",
+            "//:random_events_lib"])
+
+cc_test(
+    name = "test_product_algebra",
+    size = "small",
+    srcs = ["test_product_algebra.cpp"],
+    deps = ["@googletest//:gtest_main",
+            "//:random_events_lib"])

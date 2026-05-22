@@ -1,4 +1,5 @@
 import os
+import unittest
 from unittest import TestCase
 
 import sqlalchemy.orm
@@ -7,21 +8,26 @@ from sqlalchemy.orm import MappedColumn as Column
 from typing_extensions import List, Sequence
 import pandas as pd
 
-from .datasets import Base, MappedAnimal, Species, get_dataset, Habitat, HabitatTable
+from .datasets import Base, MappedAnimal, Species, get_dataset, Habitat, HabitatTable, load_zoo_dataset
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import SingleClassRDR, MultiClassRDR, GeneralRDR
 from krrood.ripple_down_rules.utils import make_set
 from .test_helpers.helpers import get_fit_scrdr
 
+TEST_RESULTS_DIR: str = os.path.join(os.path.dirname(__file__), "test_results")
+CACHE_FILE: str = os.path.join(TEST_RESULTS_DIR, "zoo_dataset.pkl")
+zoo_cases, _ = load_zoo_dataset(cache_file=CACHE_FILE)
 
+
+@unittest.skipIf(len(zoo_cases) == 0, "Failed to load dataset")
 class TestAlchemyRDR(TestCase):
     session: sqlalchemy.orm.Session
-    test_results_dir: str = os.path.join(os.path.dirname(__file__), "test_results")
+    test_results_dir: str = TEST_RESULTS_DIR
     expert_answers_dir: str = os.path.join(
         os.path.dirname(__file__), "test_expert_answers"
     )
-    cache_file: str = os.path.join(test_results_dir, "zoo_dataset.pkl")
+    cache_file: str = CACHE_FILE
     all_cases: Sequence[MappedAnimal]
     targets: List[Species]
 

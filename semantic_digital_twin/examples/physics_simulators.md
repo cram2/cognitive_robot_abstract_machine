@@ -34,8 +34,12 @@ We begin by importing the necessary components:
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from physics_simulators.base_simulator import SimulatorConstraints
+from semantic_digital_twin.spatial_computations.raytracer import RayTracer
+
 import os # For path handling
 import time # For measuring simulation time
+import threading
+import math
 ```
 
 ## 1.2 Parsing a World Description
@@ -56,79 +60,87 @@ Only a physically stable and functional scene can be expected to behave correctl
 Below is a minimal example scene defined directly as an XML string.
 
 ```{code-cell} ipython3
-if __name__ == "__main__":
-    scene_xml_str = """
+scene_xml_str = """
 <mujoco>
-    <worldbody>
-        <body name="robot">
-            <geom type="box" pos="0 0 0.5" size="0.2 0.2 0.5" rgba="0.9 0.9 0.9 1"/>
-            <body name="left_shoulder" pos="0 0.3 0.9" quat="0.707 0.707 0 0">
-                <joint name="left_shoulder_joint" type="hinge" axis="0 0 1"/>
-                <geom type="cylinder" size="0.1 0.1 0.3" rgba="0.9 0.1 0.1 1"/>
-                <body name="left_arm" pos="0 -0.4 -0.1" quat="0.707 0.707 0 0">
-                    <joint name="left_arm_joint" type="hinge" axis="0 0 1"/>
-                    <geom type="box" size="0.1 0.1 0.3" rgba="0.1 0.9 0.1 1"/>
-                </body>
-            </body>
-            <body name="right_shoulder" pos="0 -0.3 0.9" quat="0.707 0.707 0 0">
-                <joint name="right_shoulder_joint" type="hinge" axis="0 0 1"/>
-                <geom type="cylinder" size="0.1 0.1 0.3" rgba="0.9 0.1 0.1 1"/>
-                <body name="right_arm" pos="0 -0.4 0.1" quat="0.707 0.707 0 0">
-                    <joint type="hinge" axis="0 0 1"/>
-                    <geom type="box" size="0.1 0.1 0.3" rgba="0.1 0.9 0.1 1"/>
-                </body>
+<worldbody>
+    <body name="robot">
+        <geom type="box" pos="0 0 0.5" size="0.2 0.2 0.5" rgba="0.9 0.9 0.9 1"/>
+        <body name="left_shoulder" pos="0 0.3 0.9" quat="0.707 0.707 0 0">
+            <joint name="left_shoulder_joint" type="hinge" axis="0 0 1"/>
+            <geom type="cylinder" size="0.1 0.1 0.3" rgba="0.9 0.1 0.1 1"/>
+            <body name="left_arm" pos="0 -0.4 -0.1" quat="0.707 0.707 0 0">
+                <joint name="left_arm_joint" type="hinge" axis="0 0 1"/>
+                <geom type="box" size="0.1 0.1 0.3" rgba="0.1 0.9 0.1 1"/>
             </body>
         </body>
-
-        <body name="table" pos="0.5 0 0.25">
-            <geom type="box" size="0.2 0.2 0.5" rgba="0.5 0.5 0.5 1"/>
+        <body name="right_shoulder" pos="0 -0.3 0.9" quat="0.707 0.707 0 0">
+            <joint name="right_shoulder_joint" type="hinge" axis="0 0 1"/>
+            <geom type="cylinder" size="0.1 0.1 0.3" rgba="0.9 0.1 0.1 1"/>
+            <body name="right_arm" pos="0 -0.4 0.1" quat="0.707 0.707 0 0">
+                <joint type="hinge" axis="0 0 1"/>
+                <geom type="box" size="0.1 0.1 0.3" rgba="0.1 0.9 0.1 1"/>
+            </body>
         </body>
+    </body>
 
-        <body name="object" pos="0.5 0 1.0">
-            <freejoint/>
-            <geom type="box" size="0.05 0.05 0.1" rgba="0.1 0.1 0.9 1"/>
-        </body>
-    </worldbody>
+    <body name="table" pos="0.5 0 0.25">
+        <geom type="box" size="0.2 0.2 0.5" rgba="0.5 0.5 0.5 1"/>
+    </body>
+
+    <body name="object" pos="0.5 0.0 1">
+        <freejoint/>
+        <geom type="box" size="0.05 0.05 0.05" rgba="0.1 0.1 0.9 1"/>
+    </body>
+
+    <body name="object2" pos="0. 0.0 1.5">
+        <freejoint/>
+        <geom type="box" size="0.05 0.05 0.05" rgba="0.1 0.9 0.9 1"/>
+    </body>
+    
+</worldbody>
 </mujoco>
 """
-    world = MJCFParser.from_xml_string(scene_xml_str).parse()
+world = MJCFParser.from_xml_string(scene_xml_str).parse()
+
+
+rt = RayTracer(world)
+rt.update_scene()
+rt.scene.show("jupyter")
 ```
 
 This scene contains:
 
 * A simple robot with two revolute arms
 * A static table
-* A dynamic object with a free joint
+* Two dynamic object with free joint
 
 ## 1.3 Running the Simulation
 
-```{code-cell} ipython3
-    headless = (
-        os.environ.get("CI", "false").lower() == "true"
-    )
+```python
+headless = (
+    os.environ.get("CI", "false").lower() == "true"
+)
 
-    multi_sim = MujocoSim(
-        world=world,
-        headless=headless,
-        step_size=0.001,
-    )
+multi_sim = MujocoSim(
+    world=world,
+    headless=headless,
+    step_size=0.001,
+)
+time_start = time.time()
 
-    constraints = SimulatorConstraints(max_number_of_steps=10000)
+constraints = SimulatorConstraints(max_number_of_steps=10000)
+multi_sim.start_simulation(constraints=constraints)
 
-    multi_sim.start_simulation(constraints=constraints)
+if multi_sim.is_running():
+    world.connections[3].position = math.pi / 3
 
-    time_start = time.time()
+# if multi_sim.is_running():
+#     multi_sim.stop_simulation()
 
-    while multi_sim.is_running():
-        time.sleep(0.1) # Sleep to avoid busy waiting
-        print(
-            f"Current number of steps: "
-            f"{multi_sim.simulator.current_number_of_steps}"
-        )
+print(f"Time elapsed: {time.time() - time_start:.2f}s")
 
-    print(f"Time elapsed: {time.time() - time_start:.2f}s")
-
-    multi_sim.stop_simulation()
+rt.update_scene()
+rt.scene.show("jupyter")
 ```
 
 ### Common Mistakes to Avoid
@@ -137,7 +149,7 @@ This scene contains:
 
 Never run a simulation without explicit termination conditions.
 Failing to do so can result in infinite loops and unresponsive processes.
-Always specify appropriate stopping criteria using `SimulatorConstraints`.
+Always specify appropriate stopping criteria using `SimulatorConstraints` or call `multi_sim.stop_simulation()` manually.
 
 **2. Avoid busy waiting**
 
@@ -167,179 +179,205 @@ Bodies, connections, and degrees of freedom may be added or removed at runtime.
 These changes are immediately reflected in the physics simulation.
 
 In the following example, we illustrate how new bodies and connections can be introduced while the simulation is already running.
-We start by importing the necessary components for constructing a world programmatically and defining two helper functions: one for spawning a robot body and another for creating shoulder bodies.
-Detailed implementation of these functions is provided in the [Creating Custom Bodies](creating-custom-bodies) tutorial.
+We start by importing the necessary components for constructing a world programmatically, along with the optional ROS adapters `TFPublisher` and `VizMarkerPublisher`, which stream transforms and visualization markers to RViz in real time.
+We then define three helper functions: `spawn_robot_body` creates a static robot base fixed to the world root, `spawn_arm` attaches a single-link arm via a revolute joint, and `spawn_free_box` spawns a free-floating box through a 6-DoF connection.
+Detailed implementation of this body-construction style is provided in the [Creating Custom Bodies](creating-custom-bodies) tutorial.
 
-```{code-cell} ipython3
-:tags: [hide-input]
 
+```python tags=["hide-input"]
+import os
+import threading
+import time
+import math
+import rclpy
+
+from physics_simulators.base_simulator import SimulatorConstraints
+from semantic_digital_twin.adapters.multi_sim import MujocoSim
+from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import FixedConnection, RevoluteConnection
+from semantic_digital_twin.world_description.connections import (
+    Connection6DoF,
+    FixedConnection,
+    RevoluteConnection,
+)
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
-from semantic_digital_twin.world_description.geometry import Box, Scale, Color, Cylinder
+from semantic_digital_twin.world_description.geometry import Box, Color, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
+
+def spawn_free_box(
+    spawn_world: World,
+    name: str = "box",
+    position: tuple = (0.0, 0.0, 1.5),
+    scale: Scale = Scale(0.1, 0.1, 0.1),
+    color: Color = Color(1.0, 1.0, 0.0, 1.0),
+) -> Body:
+    """
+    Spawn a free-floating box attached to the world root via a 6-DoF connection.
+    """
+    spawn_body = Body(name=PrefixedName(name))
+
+    box = Box(
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+            reference_frame=spawn_body,
+        ),
+        scale=scale,
+        color=color,
+    )
+    spawn_body.collision = ShapeCollection([box], reference_frame=spawn_body)
+
+    with spawn_world.modify_world():
+        connection = Connection6DoF.create_with_dofs(
+            parent=spawn_world.root,
+            child=spawn_body,
+            world=spawn_world,
+        )
+        spawn_world.add_connection(connection)
+
+        # Set the initial world pose of the box via the 6-DoF DoF state.
+        connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=position[0],
+            y=position[1],
+            z=position[2],
+            reference_frame=spawn_body,
+        )
+
+    return spawn_body
+
+
 def spawn_robot_body(spawn_world: World) -> Body:
+    """
+    Spawn the static robot base as a tall box rigidly fixed to the world root.
+    """
     spawn_body = Body(name=PrefixedName("robot"))
 
+    # Shape origin is expressed relative to the body frame.
     box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        x=0, y=0, z=0.5,
-        roll=0, pitch=0, yaw=0,
-        reference_frame=spawn_body
+        z=0.5,
+        reference_frame=spawn_body,
     )
-
     box = Box(
         origin=box_origin,
         scale=Scale(0.4, 0.4, 1.0),
         color=Color(0.9, 0.9, 0.9, 1.0),
     )
-
-    spawn_body.collision = ShapeCollection(
-        [box], reference_frame=spawn_body
-    )
+    spawn_body.collision = ShapeCollection([box], reference_frame=spawn_body)
 
     with spawn_world.modify_world():
         spawn_world.add_connection(
-            FixedConnection(
-                parent=spawn_world.root,
-                child=spawn_body
-            )
+            FixedConnection(parent=spawn_world.root, child=spawn_body)
         )
 
     return spawn_body
-   
-def spawn_shoulder_bodies(
-    spawn_world: World,
-    root_body: Body
-) -> tuple[Body, Body]:
 
-    # Left shoulder
-    spawn_left_shoulder_body = Body(
-        name=PrefixedName("left_shoulder")
+
+def spawn_arm(spawn_world: World, root_body: Body) -> RevoluteConnection:
+    """
+    Spawn a single-link arm attached to ``root_body`` via a revolute joint about Z.
+    """
+    spawn_arm_body = Body(name=PrefixedName("arm"))
+
+    # Offset the box shape so the link extends along +Y from the joint origin.
+    box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        y=0.25,
+        reference_frame=spawn_arm_body,
     )
-
-    cylinder = Cylinder(
-        width=0.2,
-        height=0.1,
+    box = Box(
+        origin=box_origin,
+        scale=Scale(0.1, 0.5, 0.1),
         color=Color(0.9, 0.1, 0.1, 1.0),
     )
-
-    spawn_left_shoulder_body.collision = ShapeCollection(
-        [cylinder],
-        reference_frame=spawn_left_shoulder_body
+    spawn_arm_body.collision = ShapeCollection(
+        [box], reference_frame=spawn_arm_body
     )
 
-    dof = DegreeOfFreedom(
-        name=PrefixedName("left_shoulder_joint")
-    )
+    dof = DegreeOfFreedom(name=PrefixedName("arm_joint"))
 
-    left_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=0, pos_y=0.3, pos_z=0.9,
-        quat_w=0.707, quat_x=0.707,
-        quat_y=0, quat_z=0
-    )
-
-    with spawn_world.modify_world():
-        spawn_world.add_degree_of_freedom(dof)
-        spawn_world.add_connection(
-            RevoluteConnection(
-                name=dof.name,
-                parent=root_body,
-                child=spawn_left_shoulder_body,
-                axis=Vector3.Z(reference_frame=spawn_left_shoulder_body),
-                dof_id=dof.id,
-                parent_T_connection_expression=left_origin,
-            )
-        )
-
-    # Right shoulder
-    spawn_right_shoulder_body = Body(
-        name=PrefixedName("right_shoulder")
-    )
-
-    spawn_right_shoulder_body.collision = ShapeCollection(
-        [cylinder],
-        reference_frame=spawn_right_shoulder_body
-    )
-
-    dof = DegreeOfFreedom(
-        name=PrefixedName("right_shoulder_joint")
-    )
-
-    right_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=0, pos_y=-0.3, pos_z=0.9,
-        quat_w=0.707, quat_x=0.707,
-        quat_y=0, quat_z=0
+    # Mount the joint on top of the robot base and rotate into a horizontal pose.
+    connection_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=0.0,
+        pos_y=0.3,
+        pos_z=0.9,
+        quat_w=0.707,
+        quat_x=0.707,
+        quat_y=0.0,
+        quat_z=0.0,
     )
 
     with spawn_world.modify_world():
         spawn_world.add_degree_of_freedom(dof)
-        spawn_world.add_connection(
-            RevoluteConnection(
-                name=dof.name,
-                parent=root_body,
-                child=spawn_right_shoulder_body,
-                axis=Vector3.Z(reference_frame=spawn_right_shoulder_body),
-                dof_id=dof.id,
-                parent_T_connection_expression=right_origin,
-            )
+        arm_connection = RevoluteConnection(
+            name=dof.name,
+            parent=root_body,
+            child=spawn_arm_body,
+            axis=Vector3.Z(reference_frame=spawn_arm_body),
+            dof_id=dof.id,
+            parent_T_connection_expression=connection_origin,
         )
+        spawn_world.add_connection(arm_connection)
 
-    return spawn_left_shoulder_body, spawn_right_shoulder_body
+    return arm_connection
+
 ```
 
-As before, we start by running the simulation using a predefined world description.
-However, after 100 simulation steps, we dynamically introduce additional bodies and connections. 
-The simulation proceeds without interruption, and the newly added elements are incorporated into the physics engine immediately, becoming fully active in the ongoing simulation.
+Unlike the previous section, we start from an empty `World` rather than from a predefined scene.
 
-```{code-cell} ipython3
-if __name__ == "__main__":
-    scene_xml_str = """
-<mujoco>
-</mujoco>
-"""
-    world = MJCFParser.from_xml_string(scene_xml_str).parse()
-    headless = (
-        os.environ.get("CI", "false").lower() == "true"
-    )
+```python
+world = World()
+```
 
-    multi_sim = MujocoSim(
-        world=world,
-        headless=headless,
-        step_size=0.001,
-    )
+Before launching the simulation we bring up a ROS node and attach `TFPublisher` and `VizMarkerPublisher`, so that transforms and visualization markers are streamed to RViz as the world changes.
 
-    constraints = SimulatorConstraints(max_number_of_steps=10000)
+```python
+rclpy.init()
+node = rclpy.create_node("semantic_digital_twin")
+spin_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
+spin_thread.start()
 
-    multi_sim.start_simulation(constraints=constraints)
+tf_publisher = TFPublisher(_world=world, node=node)
+viz_publisher = VizMarkerPublisher(_world=world, node=node)
+```
 
-    time_start = time.time()
+`MujocoSim` is then started on this empty world.
 
-    spawned = False
-    while multi_sim.is_running():
-        if multi_sim.simulator.current_number_of_steps >= 100 and not spawned:
-            spawned = True
-            time_spawn_start = time.time()
-            robot_body = spawn_robot_body(world)
-            spawn_shoulder_bodies(
-                spawn_world=world,
-                root_body=robot_body
-            )
-            print(
-                f"Time to spawn bodies: "
-                f"{time.time() - time_spawn_start:.2f}s"
-            )
-        time.sleep(0.1)
+```python
+headless = os.environ.get("CI", "false").lower() == "true"
 
-    print(f"Time elapsed: {time.time() - time_start:.2f}s")
+multi_sim = MujocoSim(
+    world=world,
+    headless=headless,
+    step_size=0.001,
+)
+multi_sim.start_simulation()
 
+```
+
+While the simulation is already running, we dynamically spawn the robot base, the revolute arm, and a free-floating box using the helper functions defined above.
+Each `modify_world()` block is propagated to the physics engine immediately, without pausing or restarting it.
+Finally, the arm joint position is commanded in a loop to exercise the state-synchronization path between the world description and the simulator.
+
+```python
+try:
+    # Build the scene: fixed robot base, revolute arm, and a free-falling box.
+    robot_body = spawn_robot_body(world)
+    arm_connection = spawn_arm(spawn_world=world, root_body=robot_body)
+    spawn_free_box(world)
+
+    # Slowly rotate the arm joint to exercise state synchronization.
+    for i in range(60):
+        arm_connection.position = 2 * math.pi / 60 * i
+        time.sleep(0.5)
+finally:
     multi_sim.stop_simulation()
+    rclpy.shutdown()
 ```
 
-As reflected in the output, the new bodies and connections are created in under **0.5 seconds**, while the simulation continues uninterrupted. The physical state remains continuous, and the world is modified dynamically at runtime without resetting or restarting the engine.
+As reflected in the output, new bodies, connections, and degrees of freedom are inserted into the running physics engine without any visible interruption.
+The simulated state remains continuous, and subsequent arm-joint commands are forwarded to the simulator on the fly, while RViz reflects the evolving scene through the TF and marker publishers.
 
 ### Common Mistakes to Avoid
 

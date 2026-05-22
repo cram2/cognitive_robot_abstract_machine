@@ -5,8 +5,7 @@ from typing_extensions import Type, Any, TYPE_CHECKING
 
 from sqlalchemy.orm import RelationshipProperty
 
-
-from krrood.utils import DataclassException
+from krrood.exceptions import DataclassException
 
 if TYPE_CHECKING:
     from krrood.ormatic.data_access_objects.alternative_mappings import FunctionMapping

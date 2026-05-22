@@ -30,13 +30,17 @@ class UniformDistributionTestCase(unittest.TestCase):
         self.assertEqual(self.distribution.probability(self.distribution.support), 1)
 
     def test_cdf(self):
-        cdf = self.distribution.cumulative_distribution_function(np.array([-1, 1, 2]).reshape(-1, 1))
+        cdf = self.distribution.cumulative_distribution_function(
+            np.array([-1, 1, 2]).reshape(-1, 1)
+        )
         self.assertEqual(cdf[0], 0)
         self.assertEqual(cdf[1], 0.5)
         self.assertEqual(cdf[2], 1)
 
     def test_probability(self):
-        event = SimpleEvent.from_data({self.x: closed(0, 1) | closed(1.5, 2)}).as_composite_set()
+        event = SimpleEvent.from_data(
+            {self.x: closed(0, 1) | closed(1.5, 2)}
+        ).as_composite_set()
         self.assertEqual(self.distribution.probability(event), 0.75)
 
     def test_mode(self):
@@ -75,7 +79,8 @@ class UniformDistributionTestCase(unittest.TestCase):
         ).as_composite_set()
         conditional, probability = self.distribution.truncated(event)
         conditional_by_hand = UniformDistribution(
-            variable=self.x, interval=SimpleInterval.from_data(1, 2, Bound.CLOSED, Bound.OPEN)
+            variable=self.x,
+            interval=SimpleInterval.from_data(1, 2, Bound.CLOSED, Bound.OPEN),
         )
         self.assertEqual(conditional, conditional_by_hand)
         self.assertEqual(probability, 0.5)
@@ -97,13 +102,35 @@ class UniformDistributionTestCase(unittest.TestCase):
         # fig.show()
 
     def test_variable_setting(self):
-        distribution = UniformDistribution(variable=Continuous("x"), interval=closed(0, 1).simple_sets[0])
+        distribution = UniformDistribution(
+            variable=Continuous("x"), interval=closed(0, 1).simple_sets[0]
+        )
         self.assertEqual(distribution.variable, Continuous("x"))
         distribution.variable = Continuous("y")
         self.assertEqual(distribution.variable, Continuous("y"))
 
     def test_translation(self):
-        distribution = UniformDistribution(variable=self.x, interval=SimpleInterval.from_data(0, 1))
+        distribution = UniformDistribution(
+            variable=self.x, interval=SimpleInterval.from_data(0, 1)
+        )
         distribution.apply_translation({self.x: 2.0})
-        expected_distribution = UniformDistribution(variable=self.x, interval=SimpleInterval.from_data(2, 3))
+        expected_distribution = UniformDistribution(
+            variable=self.x, interval=SimpleInterval.from_data(2, 3)
+        )
         self.assertEqual(distribution, expected_distribution)
+
+    def test_uniform_distribution_singleton(self):
+        x = Continuous("x")
+        dist = UniformDistribution(variable=x, interval=SimpleInterval.from_data(0, 2))
+
+        # singleton_allowed=False (default)
+        event = SimpleEvent.from_data({x: singleton(1)}).as_composite_set()
+        conditional, probability = dist.truncated(event)
+        self.assertIsNone(conditional)
+        self.assertEqual(probability, 0.0)
+
+        # singleton_allowed=True
+        conditional, probability = dist.truncated(event, singleton_allowed=True)
+        self.assertIsInstance(conditional, DiracDeltaDistribution)
+        self.assertEqual(conditional.location, 1.0)
+        self.assertAlmostEqual(probability, 0.5)  # exp(log(0.5)) = 0.5

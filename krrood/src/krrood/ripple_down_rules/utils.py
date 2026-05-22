@@ -12,7 +12,7 @@ import shutil
 import sys
 import threading
 import uuid
-from collections import UserDict, defaultdict
+from collections import UserDict
 from collections.abc import Iterator
 from copy import deepcopy, copy
 from dataclasses import is_dataclass, fields
@@ -30,6 +30,14 @@ import six
 from graphviz import Source
 from sqlalchemy.exc import NoInspectionAvailable
 from krrood.ripple_down_rules import logger
+from krrood.utils import (
+    is_builtin_type,
+    get_import_path_from_path,
+    get_method_name,
+    get_method_class_name_if_exists,
+    get_method_file_name,
+    get_imports_from_types,
+)
 
 try:
     import matplotlib
@@ -75,8 +83,6 @@ from typing_extensions import (
     Union,
     Self,
     ForwardRef,
-    Iterable,
-    Sequence,
 )
 
 if TYPE_CHECKING:
@@ -296,80 +302,6 @@ def get_imports_from_scope(scope: Dict[str, Any]) -> List[str]:
     :return: The imports as a string.
     """
     return get_imports_from_types(list(scope.values()))
-
-
-def extract_imports(
-    file_path: Optional[str] = None,
-    tree: Optional[ast.AST] = None,
-    package_name: Optional[str] = None,
-) -> Dict[str, Any]:
-    """
-    Extract imports from a Python file or an AST tree.
-
-    :param file_path: The path to the Python file to extract imports from.
-    :param tree: An AST tree to extract imports from. If provided, file_path is ignored.
-    :param package_name: The name of the package to use for relative imports.
-    """
-    if tree is None:
-        if file_path is None:
-            raise ValueError("Either file_path or tree must be provided")
-        with open(file_path, "r") as f:
-            tree = ast.parse(f.read(), filename=file_path)
-
-    scope = {}
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                module_name = alias.name
-                asname = alias.asname or alias.name
-                try:
-                    scope[asname] = importlib.import_module(
-                        module_name, package=package_name
-                    )
-                except ImportError as e:
-                    logger.warning(f"Could not import {module_name}: {e}")
-        elif isinstance(node, ast.ImportFrom):
-            module_name = node.module
-            for alias in node.names:
-                name = alias.name
-                asname = alias.asname or name
-                try:
-                    if node.level > 0:  # Handle relative imports
-                        package_name = get_import_path_from_path(
-                            Path(
-                                os.path.join(file_path, *[".."] * node.level)
-                            ).resolve()
-                        )
-                    if (
-                        package_name is not None and node.level > 0
-                    ):  # Handle relative imports
-                        module_rel_path = Path(
-                            os.path.join(file_path, *[".."] * node.level, module_name)
-                        ).resolve()
-                        idx = str(module_rel_path).rfind(package_name)
-                        if idx != -1:
-                            module_name = str(module_rel_path)[idx:].replace(
-                                os.path.sep, "."
-                            )
-                    try:
-                        module = importlib.import_module(
-                            module_name, package=package_name
-                        )
-                    except ModuleNotFoundError:
-                        module = importlib.import_module(
-                            f"{package_name}.{module_name}"
-                        )
-                    if name == "*":
-                        scope.update(module.__dict__)
-                    else:
-                        scope[asname] = getattr(module, name)
-                except (ImportError, AttributeError) as e:
-                    logger.warning(
-                        f"Could not import {module_name}: {e} while extracting imports from {file_path}"
-                    )
-
-    return scope
 
 
 def extract_function_or_class_file(
@@ -1040,14 +972,6 @@ def stringify_hint(tp):
     return str(tp)
 
 
-def is_builtin_type(tp):
-    return isinstance(tp, type) and tp.__module__ == "builtins"
-
-
-def is_typing_type(tp):
-    return tp.__module__ == "typing"
-
-
 origin_type_to_hint = {
     list: List,
     set: Set,
@@ -1171,62 +1095,11 @@ def get_types_to_import_from_type_hints(hints: List[Type]) -> Set[Type]:
     return to_import
 
 
-def get_import_path_from_path(path: str) -> Optional[str]:
-    """
-    Convert a file system path to a Python import path.
-
-    :param path: The file system path to convert.
-    :return: The Python import path.
-    """
-    package_name = os.path.abspath(path)
-    packages = package_name.split(os.path.sep)
-    # formated_package_name = package_name.replace('/', '.')
-    parent_package_idx = 0
-    # packages = formated_package_name.split('.')
-    for i in range(len(packages)):
-        if i == 0:
-            current_path = package_name
-        else:
-            current_path = "/" + "/".join(packages[:-i])
-        if os.path.exists(os.path.join(current_path, "__init__.py")):
-            parent_package_idx -= 1
-        else:
-            break
-    package_name = (
-        ".".join(packages[parent_package_idx:]) if parent_package_idx < 0 else None
-    )
-    return package_name
-
-
 def get_class_file_path(cls):
     """
     Get the file path of a class.
     """
     return os.path.abspath(inspect.getfile(cls))
-
-
-def get_function_import_data(func: Callable) -> Tuple[str, str]:
-    """
-    Get the import path of a function.
-
-    :param func: The function to get the import path for.
-    :return: The import path of the function.
-    """
-    func_name = get_method_name(func)
-    func_class_name = get_method_class_name_if_exists(func)
-    func_file_path = get_method_file_name(func)
-    func_file_name = func_file_path.split("/")[-1].split(".")[
-        0
-    ]  # Get the file name without extension
-    func_import_path = get_import_path_from_path(dirname(func_file_path))
-    func_import_path = (
-        f"{func_import_path}.{func_file_name}" if func_import_path else func_file_name
-    )
-    if func_class_name and func_class_name != func_name:
-        func_import_name = func_class_name
-    else:
-        func_import_name = func_name
-    return func_import_path, func_import_name
 
 
 def get_function_representation(func: Callable) -> str:
@@ -1241,165 +1114,6 @@ def get_function_representation(func: Callable) -> str:
     if func_class_name and func_class_name != func_name:
         return f"{func_class_name}.{func_name}"
     return func_name
-
-
-def get_relative_import(
-    target_file_path,
-    imported_module_path: Optional[str] = None,
-    module: Optional[str] = None,
-    package_name: Optional[str] = None,
-) -> str:
-    """
-    Get a relative import path from the target file to the imported module.
-
-    :param target_file_path: The file path of the target file.
-    :param imported_module_path: The file path of the module being imported.
-    :param module: The module name, if available.
-    :param package_name: The name of the root package where the module is located.
-    :return: A relative import path as a string.
-    """
-    # Convert to absolute paths
-    if module is not None:
-        imported_module_path = sys.modules[module].__file__
-    if imported_module_path is None:
-        raise ValueError("Either imported_module_path or module must be provided")
-    target_path = Path(target_file_path).resolve()
-    imported_file_name = Path(imported_module_path).name
-    target_file_name = Path(target_file_path).name
-    if package_name is not None:
-        target_path = Path(
-            get_path_starting_from_latest_encounter_of(
-                str(target_path), package_name, [target_file_name]
-            )
-        )
-    imported_path = Path(imported_module_path).resolve()
-    if package_name is not None:
-        imported_path = Path(
-            get_path_starting_from_latest_encounter_of(
-                str(imported_path), package_name, [imported_file_name]
-            )
-        )
-
-    # Compute relative path from target to imported module
-    rel_path = os.path.relpath(imported_path.parent, target_path.parent)
-
-    # Convert path to Python import format
-    rel_parts = [part.replace("..", ".") for part in Path(rel_path).parts]
-    rel_parts = rel_parts if rel_parts else [""]
-    dot_parts = [part for part in rel_parts if part == "."]
-    non_dot_parts = [part for part in rel_parts if part != "."] + [imported_path.stem]
-
-    # Join the parts
-    joined_parts = "." + "".join(dot_parts) + ".".join(non_dot_parts)
-
-    return joined_parts
-
-
-def get_path_starting_from_latest_encounter_of(
-    path: str, package_name: str, should_contain: List[str]
-) -> str:
-    """
-    Get the path starting from the package name.
-
-    :param path: The full path to the file.
-    :param package_name: The name of the package to start from.
-    :param should_contain: The names of the files or directorys to look for.
-    :return: The path starting from the package name that contains all the names in should_contain, otherwise raise an error.
-    :raise ValueError: If the path does not contain all the names in should_contain.
-    """
-    path_parts = path.split(os.path.sep)
-    if package_name not in path_parts:
-        raise ValueError(f"Could not find {package_name} in {path}")
-    idx = path_parts.index(package_name)
-    prev_idx = idx
-    while all(sc in path_parts[idx:] for sc in should_contain):
-        prev_idx = idx
-        try:
-            idx = path_parts.index(package_name, idx + 1)
-        except ValueError:
-            break
-    if all(sc in path_parts[idx:] for sc in should_contain):
-        path_parts = path_parts[prev_idx:]
-        return os.path.join(*path_parts)
-    else:
-        raise ValueError(f"Could not find {should_contain} in {path}")
-
-
-def get_imports_from_types(
-    type_objs: Iterable[Type],
-    target_file_path: Optional[str] = None,
-    package_name: Optional[str] = None,
-    exclueded_names: Optional[List[str]] = None,
-    excluded_modules: Optional[List[str]] = None,
-) -> List[str]:
-    """
-    Format import lines from type objects.
-
-    :param type_objs: A list of type objects to format.
-    :param target_file_path: The file path to which the imports should be relative.
-    :param package_name: The name of the package to use for relative imports.
-    :param exclueded_names: A list of names to exclude from the imports.
-    :param excluded_modules: A list of modules to exclude from the imports.
-    :return: A list of formatted import lines.
-    """
-    excluded_modules = [] if excluded_modules is None else excluded_modules
-    exclueded_names = [] if exclueded_names is None else exclueded_names
-    module_to_types = defaultdict(list)
-    for tp in type_objs:
-        try:
-            if isinstance(tp, type) or is_typing_type(tp):
-                module = tp.__module__
-                name = tp.__qualname__
-            elif callable(tp):
-                module, name = get_function_import_data(tp)
-            elif hasattr(type(tp), "__module__"):
-                module = type(tp).__module__
-                name = type(tp).__qualname__
-            else:
-                continue
-            if name == "NoneType":
-                module = "types"
-            if (
-                module is None
-                or module == "builtins"
-                or module.startswith("_")
-                or module in sys.builtin_module_names
-                or module in excluded_modules
-                or "<" in module
-                or name in exclueded_names
-            ):
-                continue
-            if module == "typing":
-                module = "typing_extensions"
-            module_to_types[module].append(name)
-        except AttributeError:
-            continue
-
-    lines = []
-    stem_imports = []
-    for module, names in module_to_types.items():
-        filtered_names = set()
-        for name in set(names):
-            if "." in name:
-                stem = ".".join(name.split(".")[1:])
-                name_to_import = name.split(".")[0]
-                filtered_names.add(name_to_import)
-                stem_imports.append(f"{stem} = {name_to_import}.{stem}")
-            else:
-                filtered_names.add(name)
-        joined = ", ".join(sorted(set(filtered_names)))
-        import_path = module
-        if (
-            (target_file_path is not None)
-            and (package_name is not None)
-            and (package_name in module)
-        ):
-            import_path = get_relative_import(
-                target_file_path, module=module, package_name=package_name
-            )
-        lines.append(f"from {import_path} import {joined}")
-    lines.extend(stem_imports)
-    return lines
 
 
 def get_method_args_as_dict(method: Callable, *args, **kwargs) -> Dict[str, Any]:
@@ -1424,35 +1138,6 @@ def get_method_args_as_dict(method: Callable, *args, **kwargs) -> Dict[str, Any]
     return dict(zip(func_arg_names, func_arg_values))
 
 
-def get_method_name(method: Callable) -> str:
-    """
-    Get the name of a method.
-
-    :param method: The method to get the name of.
-    :return: The name of the method.
-    """
-    return method.__name__ if hasattr(method, "__name__") else str(method)
-
-
-def get_method_class_name_if_exists(method: Callable) -> Optional[str]:
-    """
-    Get the class name of a method if it has one.
-
-    :param method: The method to get the class name of.
-    :return: The class name of the method.
-    """
-    if hasattr(method, "__self__"):
-        if hasattr(method.__self__, "__name__"):
-            return method.__self__.__name__
-        elif hasattr(method.__self__, "__class__"):
-            return method.__self__.__class__.__name__
-    return (
-        method.__qualname__.split(".")[0]
-        if hasattr(method, "__qualname__") and "." in method.__qualname__
-        else None
-    )
-
-
 def get_method_class_if_exists(method: Callable, *args) -> Optional[Type]:
     """
     Get the class of a method if it has one.
@@ -1469,16 +1154,6 @@ def get_method_class_if_exists(method: Callable, *args) -> Optional[Type]:
         elif method.__code__.co_varnames[0] == "cls":
             return args[0]
     return None
-
-
-def get_method_file_name(method: Callable) -> str:
-    """
-    Get the file name of a method.
-
-    :param method: The method to get the file name of.
-    :return: The file name of the method.
-    """
-    return method.__code__.co_filename
 
 
 def flatten_list(a: List):

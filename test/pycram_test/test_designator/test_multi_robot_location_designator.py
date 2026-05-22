@@ -17,6 +17,11 @@ from pycram.plans.factories import sequential
 from pycram.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+
+try:
+    from semantic_digital_twin.robots.garmi import Garmi
+except ImportError:
+    Garmi = None
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
@@ -30,7 +35,22 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 
 
-@pytest.fixture(scope="module", params=["hsrb", "stretch", "tiago", "pr2"])
+@pytest.fixture(
+    scope="module",
+    params=[
+        pytest.param(
+            "garmi",
+            marks=pytest.mark.skipif(
+                Garmi is None,
+                reason="GARMI semantic annotation not installed",
+            ),
+        ),
+        "hsrb",
+        "stretch",
+        "tiago",
+        "pr2",
+    ],
+)
 def setup_multi_robot_simple_apartment(
     request,
     hsr_world_setup,
@@ -77,6 +97,20 @@ def setup_multi_robot_simple_apartment(
             pr2_copy,
         )
         view = PR2.from_world(apartment_copy)
+        view.root.parent_connection.origin = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+        )
+        return apartment_copy, view
+
+    elif request.param == "garmi":
+        if Garmi is None:
+            pytest.skip("GARMI semantic annotation not installed")
+        garmi_world_setup = request.getfixturevalue("garmi_world_setup")
+        garmi_copy = deepcopy(garmi_world_setup)
+        apartment_copy.merge_world(
+            garmi_copy,
+        )
+        view = Garmi.from_world(apartment_copy)
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )

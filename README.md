@@ -33,15 +33,14 @@ workon cram-env
 deactivate
 ```
 
-#### Optional: Create symlink for ROS2 packages
-If you are using this repo with ROS2, you need to create a symlink for the ROS2 packages.
-Currently, only jazzy is supported.
+#### Optional: Setup your ROS Workspace
+To run the tests or use CRAM with a real robot you need to setup a ROS workspace with the dependencies. 
+The monorepo provides a shell script to setup the workspace for you. 
 ```bash
-cd <your_ros2_ws_path>/src
-ln -s <your_cram_repo_path>/cram_ros2_packages cram_ros2_packages
-colcon build
+export OVERLAY_WS=$HOME
+./scripts/setup_ros_workspace.sh
 ```
-
+This will create a ROS workspace in the folder specified in OVERLAY_WS
 
 ### Install using UV 
 

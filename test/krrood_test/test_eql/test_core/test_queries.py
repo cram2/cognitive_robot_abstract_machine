@@ -3,8 +3,19 @@ from dataclasses import dataclass
 from math import factorial
 from typing import Dict, List
 
-import krrood.entity_query_language.factories as eql
 import pytest
+
+import krrood.entity_query_language.factories as eql
+from krrood.entity_query_language.exceptions import (
+    MultipleSolutionFound,
+    UnsupportedNegation,
+    GreaterThanExpectedNumberOfSolutions,
+    LessThanExpectedNumberOfSolutions,
+    NonPositiveLimitValue,
+    LiteralConditionError,
+    UnsupportedExpressionTypeForDistinct,
+    TryingToModifyAnAlreadyBuiltQuery,
+)
 from krrood.entity_query_language.factories import (
     entity,
     set_of,
@@ -24,17 +35,6 @@ from krrood.entity_query_language.factories import (
     a,
     the,
 )
-
-from krrood.entity_query_language.exceptions import (
-    MultipleSolutionFound,
-    UnsupportedNegation,
-    GreaterThanExpectedNumberOfSolutions,
-    LessThanExpectedNumberOfSolutions,
-    NonPositiveLimitValue,
-    LiteralConditionError,
-    UnsupportedExpressionTypeForDistinct,
-    TryingToModifyAnAlreadyBuiltQuery,
-)
 from krrood.entity_query_language.predicate import (
     HasType,
     symbolic_function,
@@ -51,12 +51,8 @@ from krrood.entity_query_language.utils import (
     cartesian_product_while_passing_the_bindings_around,
 )
 from ...dataset.example_classes import (
-    KRROODPose,
-    KRROODPosition,
     KRROODVectorsWithProperty,
 )
-from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
-
 from ...dataset.semantic_world_like_classes import (
     Handle,
     Body,
@@ -146,7 +142,9 @@ def test_generate_with_using_attribute_and_callables(handles_and_containers_worl
 
     def generate_handles():
         B = variable(Body, domain=world.bodies)
-        yield from an(entity(B).where(B.name.startswith("Handle"))).evaluate()
+        query = an(entity(B).where(B.name.startswith("Handle")))
+        visualize_query_graph(query)
+        yield from query.evaluate()
 
     handles = list(generate_handles())
     assert len(handles) == 3, "Should generate 3 handles."
@@ -622,7 +620,7 @@ def test_generate_with_using_inherited_predicate(handles_and_containers_world):
             ),
         )
     )
-
+    visualize_query_graph(query)
     body_pairs = list(query.evaluate())
     body_pairs = [
         (body_pair[body1], body_pair[body2], body_pair[body3])
@@ -952,10 +950,19 @@ def test_flatten_iterable_attribute_and_use_not_equal(handles_and_containers_wor
     query = an(entity(drawers).where(drawer_1 != drawers))
 
     results = list(query.evaluate())
-
+    visualize_query_graph(query)
     # We should get one row for each drawer and the parent view preserved
     assert len(results) == 2
     assert {row.handle.name for row in results} == {"Handle2", "Handle3"}
+
+
+def visualize_query_graph(query, **kwargs):
+    try:
+        from krrood.entity_query_language.query_graph import QueryGraph
+
+        QueryGraph(query).visualize(**kwargs)
+    except ImportError as e:
+        print(f"Failed to visualize query graph: {e}")
 
 
 def test_exists_and_for_all(handles_and_containers_world):
@@ -1198,7 +1205,6 @@ def test_type_availability_in_mapped_variables(handles_and_containers_world):
 
 
 def test_indexing_on_dict_field():
-
     @dataclass
     class ItemWithDictionary:
         name: str
@@ -1224,6 +1230,7 @@ def test_indexing_on_dict_field():
 
     i = variable(ItemWithDictionary, world.items)
     q = an(entity(i).where(i.attrs["score"] == 2))
+    visualize_query_graph(q)
     res = list(q.evaluate())
     assert {x.name for x in res} == {"B", "C"}
 
@@ -1281,3 +1288,26 @@ def test_debugger_issue():
     var = variable(int, [1, 2, 3])
     with pytest.raises(TypeError):
         list(var)
+
+
+def test_presentation_example():
+    @dataclass
+    class Task:
+        name: str
+        completed: bool
+
+    @dataclass
+    class Robot:
+        name: str
+        battery: int
+        tasks: List[Task]
+
+    robots = [
+        Robot("Robot1", 100, [Task("Task1", True), Task("Task2", False)]),
+        Robot("Robot2", 50, [Task("Task3", False), Task("Task4", True)]),
+        Robot("Robot3", 75, [Task("Task5", False), Task("Task6", True)]),
+    ]
+    r = variable(Robot, robots)
+    q = an(entity(r).where(r.battery > 50, not_(r.tasks[0].completed)))
+    visualize_query_graph(q, figure_size=(20, 20), spacing_x=2, spacing_y=2)
+    assert q.tolist() == [robots[2]]
