@@ -135,9 +135,13 @@ def underspecified(
     the domain objects, it is used as a query for generative processes to infer solutions that satisfy the constraints
     in the query.
     """
+    from krrood.entity_query_language.scope import attach_definition_scope
+
     if target_type is not None:
-        return Match(factory=expression, type_=target_type)
-    return Match(factory=expression)
+        result = Match(factory=expression, type_=target_type)
+    else:
+        result = Match(factory=expression)
+    return attach_definition_scope(result)
 
 
 # %% Variable Declaration

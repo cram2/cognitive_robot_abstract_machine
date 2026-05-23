@@ -4,11 +4,12 @@ Explicit data structures for call stack frames captured during EQL object creati
 Replaces raw ``inspect.FrameInfo`` namedtuples with typed, memory-safe dataclasses
 that eagerly extract all needed data and drop the live frame reference immediately.
 """
+
 from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass
-from typing import Callable, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 
 @dataclass
@@ -26,23 +27,43 @@ class StackFrame:
     """The callable object for this frame, or ``None`` if not resolvable."""
     module_name: Optional[str]
     """Dotted module name (string, not ``ModuleType``) to avoid reference leaks."""
+    global_ns: Optional[Dict[str, Any]] = None
+    """Shallow snapshot of the frame's ``f_globals``, or ``None`` when scope was not captured."""
+    local_ns: Optional[Dict[str, Any]] = None
+    """Shallow snapshot of the frame's ``f_locals``, or ``None`` when scope was not captured."""
 
     @property
     def is_method(self) -> bool:
         """True when this frame is inside a class method or classmethod."""
         return self.class_object is not None
 
+    @property
+    def scope(self) -> Dict[str, Any]:
+        """Merged ``{**globals, **locals}`` snapshot (locals win). Empty if scope was not captured."""
+        merged: Dict[str, Any] = {}
+        if self.global_ns:
+            merged.update(self.global_ns)
+        if self.local_ns:
+            merged.update(self.local_ns)
+        return merged
+
     @classmethod
-    def from_frame_info(cls, fi: inspect.FrameInfo) -> StackFrame:
+    def from_frame_info(
+        cls, fi: inspect.FrameInfo, capture_scope: bool = False
+    ) -> StackFrame:
         """
         Eagerly extract all data from a live ``FrameInfo`` and drop the frame reference.
 
         Must be called while the frame is still on the call stack so that
         ``f_locals`` is populated.
+
+        :param fi: The live frame info to extract from.
+        :param capture_scope: When True, also snapshot shallow copies of the frame's
+            ``f_globals`` and ``f_locals`` so the frame's namespace survives the frame.
         """
         f = fi.frame
-        self_obj = f.f_locals.get('self', None)
-        cls_obj: Optional[type] = f.f_locals.get('cls', None)
+        self_obj = f.f_locals.get("self", None)
+        cls_obj: Optional[type] = f.f_locals.get("cls", None)
         if cls_obj is None and self_obj is not None:
             cls_obj = type(self_obj)
         fn_obj: Optional[Callable] = f.f_globals.get(fi.function, None)
@@ -58,6 +79,8 @@ class StackFrame:
             class_object=cls_obj,
             function_object=fn_obj,
             module_name=module.__name__ if module else None,
+            global_ns=dict(f.f_globals) if capture_scope else None,
+            local_ns=dict(f.f_locals) if capture_scope else None,
         )
 
 
