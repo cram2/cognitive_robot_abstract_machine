@@ -86,7 +86,7 @@ def is_iterable(obj: Any) -> bool:
 
     :param obj: The object to check.
     """
-    return hasattr(obj, "__iter__") and not isinstance(
+    return callable(getattr(obj, "__iter__", None)) and not isinstance(
         obj, (str, type, bytes, bytearray)
     )
 
@@ -109,26 +109,27 @@ def make_set(value: Any) -> Set:
 
 def cartesian_product_while_passing_the_bindings_around(
     expressions: Iterable[SymbolicExpression],
-    sources: Bindings,
-    parent: Optional[SymbolicExpression] = None,
+    sources: Optional[OperationResult],
 ) -> Iterator[OperationResult]:
     """
     Evaluate the symbolic expressions by generating combinations of values from their evaluation generators while
     passing the bindings from the previous evaluated generator to the next.
 
     :param expressions: The symbolic expressions to evaluate.
-    :param sources: The current bindings.
-    :param parent: The parent expression.
+    :param sources: The current OperationResult carrying bindings, or None.
     :return: An Iterable of Bindings for each combination of values.
     """
+    def _make_stage(inner_expression):
+        def stage(prev: Optional[OperationResult]):
+            for result in inner_expression._evaluate_(prev):
+                if prev is not None:
+                    result.update(prev)
+                yield result
+
+        return stage
+
     expression_evaluation_generators = [
-        (
-            lambda bindings, inner_expression=expression: (
-                result.update(bindings)
-                for result in inner_expression._evaluate_(bindings, parent=parent)
-            )
-        )
-        for expression in expressions
+        _make_stage(expression) for expression in expressions
     ]
 
     yield from chain_stages(expression_evaluation_generators, sources)
@@ -138,8 +139,8 @@ T = TypeVar("T")
 
 
 def chain_stages(
-    stages: List[Callable[[Bindings | OperationResult], Iterator[OperationResult]]],
-    initial: Bindings,
+    stages: List[Callable[[Optional[OperationResult]], Iterator[OperationResult]]],
+    initial: Optional[OperationResult],
 ) -> Iterator[OperationResult]:
     """
     Chains a sequence of stages into a single pipeline.
@@ -157,7 +158,7 @@ def chain_stages(
     """
 
     def evaluate_next_stage_or_yield(
-        i: int, b: OperationResult | Bindings
+        i: int, b: Optional[OperationResult]
     ) -> Iterator[OperationResult]:
         """
         Recursively evaluates the next stage or yields the current binding if all stages are done.

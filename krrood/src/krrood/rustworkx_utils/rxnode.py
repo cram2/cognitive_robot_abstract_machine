@@ -27,6 +27,7 @@ class RWXNode:
     # Visual emphasis options
     enclosed: bool = field(default=False)
     enclosed_name: ClassVar[str] = "enclosed"
+    faded: bool = field(default=False)
 
     def __post_init__(self):
         # store self as node data to keep a 1:1 mapping
