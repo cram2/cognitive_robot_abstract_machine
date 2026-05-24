@@ -1062,6 +1062,15 @@ class HasFillLevel(HasRootBody):
     """Differential equation governing how this container fills from an external source."""
 
     @synchronized_attribute_modification
+    def set_fill_connection(self, connection: Optional[LiquidConnection]) -> None:
+        """
+        Set the fill-level connection.
+
+        :param connection: The LiquidConnection to track as the fill-level DOF.
+        """
+        self.fill_connection = connection
+
+    @synchronized_attribute_modification
     def add_fill_equation(self, fill_equation: Optional[PouringEquation]) -> None:
         """
         Add a fill equation to the semantic annotation.
@@ -1098,6 +1107,11 @@ class HasFillLevel(HasRootBody):
         :param initial_fill: Starting fill level in [0, 1].
         :param outflow_rate_constant: Outflow rate constant for the articulated pouring equation.
         """
+        fill_equation = ArticulatedPouringEquation(
+            container_width=self.root.collision.width,
+            container_height=self.root.collision.height,
+            outflow_rate_constant=outflow_rate_constant,
+        )
         phantom = Body(name=PrefixedName(f"{self.root.name.name}_fill_level_phantom"))
         with world.modify_world():
             world.add_body(phantom)
@@ -1111,17 +1125,13 @@ class HasFillLevel(HasRootBody):
                     upper=DerivativeMap(position=1.0, velocity=1.0),
                 ),
             )
+            connection.outflow_equation = fill_equation
             world.add_connection(connection)
+            self.set_fill_connection(connection)
+            self.add_fill_equation(fill_equation)
 
-            self.fill_connection = connection
+        with world.modify_world():
             world.set_positions_1DOF_connection({connection: initial_fill})
-            self.add_fill_equation(
-                ArticulatedPouringEquation(
-                    container_width=self.root.collision.width,
-                    container_height=self.root.collision.height,
-                    outflow_rate_constant=outflow_rate_constant,
-                )
-            )
 
     @property
     def fill_level(self) -> float:

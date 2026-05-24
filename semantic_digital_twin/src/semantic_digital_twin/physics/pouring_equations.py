@@ -9,16 +9,19 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from typing import Any, Dict
 
 import krrood.symbolic_math.symbolic_math as sm
+from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.symbolic_math.symbolic_math import Scalar
+from typing_extensions import Self
 
 from semantic_digital_twin.physics.differential_equation import DifferentialEquation
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 
 
 @dataclass
-class PouringEquation(DifferentialEquation):
+class PouringEquation(SubclassJSONSerializer, DifferentialEquation):
     """
     Abstract ODE for pouring-domain fill-level dynamics.
 
@@ -70,6 +73,21 @@ class ArticulatedPouringEquation(PouringEquation):
 
     container_height: float
     container_width: float
+
+    def to_json(self) -> Dict[str, Any]:
+        result = super().to_json()
+        result["container_height"] = self.container_height
+        result["container_width"] = self.container_width
+        result["outflow_rate_constant"] = self.outflow_rate_constant
+        return result
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(
+            container_height=data["container_height"],
+            container_width=data["container_width"],
+            outflow_rate_constant=data["outflow_rate_constant"],
+        )
 
     def symbolic_tilt_floor(self, fill_sym: Scalar) -> Scalar:
         """

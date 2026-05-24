@@ -1204,6 +1204,41 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
         """
         return [self.raw_dof]
 
+    def to_json(self) -> Dict[str, Any]:
+        result = super().to_json()
+        result["outflow_equation"] = (
+            to_json(self.outflow_equation)
+            if self.outflow_equation is not None
+            else None
+        )
+        result["inflow_equation"] = (
+            to_json(self.inflow_equation) if self.inflow_equation is not None else None
+        )
+        return result
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> LiquidConnection:
+        instance = super()._from_json(data, **kwargs)
+        raw_outflow = data.get("outflow_equation")
+        if raw_outflow is not None:
+            instance.outflow_equation = from_json(raw_outflow)
+        raw_inflow = data.get("inflow_equation")
+        if raw_inflow is not None:
+            instance.inflow_equation = from_json(raw_inflow)
+        return instance
+
+    def copy_for_world(self, world: World) -> LiquidConnection:
+        """
+        Copy this connection into world, preserving the physics equations.
+
+        :param world: The target world.
+        :return: The copied connection registered in world.
+        """
+        copy = super().copy_for_world(world)
+        copy.outflow_equation = self.outflow_equation
+        copy.inflow_equation = self.inflow_equation
+        return copy
+
     def add_to_world(self, world: World):
         super().add_to_world(world)
         translation_axis = self.axis * self.dof.variables.position

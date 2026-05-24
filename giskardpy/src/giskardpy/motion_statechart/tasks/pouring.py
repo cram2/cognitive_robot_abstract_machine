@@ -76,6 +76,9 @@ class PouringTask(Task):
         :return: The generated task artifacts.
         """
         artifacts = NodeArtifacts()
+        self.fill_connection = context.world.get_connection(
+            self.fill_connection.parent, self.fill_connection.child
+        )
         fill_sym = self.fill_connection.dof.variables.position
 
         root_T_tip = context.world.compose_forward_kinematics_expression(
@@ -107,6 +110,7 @@ class PouringTask(Task):
         """
         fill = float(self.fill_connection.position)
         outflow = float(self.fill_vel_ode.evaluate()[0])
+        print(f"Fill level: {fill}, Outflow: {outflow}")
         if (
             fill <= self.goal_value + self.fill_level_tolerance
             and -self.outflow_tolerance < outflow < self.outflow_tolerance

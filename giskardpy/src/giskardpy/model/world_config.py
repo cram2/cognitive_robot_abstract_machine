@@ -64,9 +64,9 @@ class WorldWithFixedRobot(WorldConfig):
         world_with_robot = urdf_parser.parse()
         self.urdf_view.from_world(world_with_robot)
         self.robot_root = world_with_robot.root
-        map_C_robot = FixedConnection(parent=map, child=self.robot_root)
+        # map_C_robot = FixedConnection(parent=map, child=self.robot_root)
 
-        self.world.merge_world(world_with_robot, map_C_robot)
+        self.world.merge_world(world_with_robot)
 
 
 @dataclass
