@@ -103,7 +103,7 @@ class TestInteractiveExpert(unittest.TestCase):
 
     def test_abort_raises_no_conditions(self):
         def run_and_abort(namespace, header):
-            namespace["abort"]()  # expert gives up without answering
+            namespace["exit"]()  # expert gives up without answering
 
         expert = expert_with(run_and_abort)
         rdr = EQLSingleClassRDR(Animal, "species")
