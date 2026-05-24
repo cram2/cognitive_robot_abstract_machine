@@ -139,12 +139,38 @@ Reuse the IPython shell with the Phase-0 captured scope + EQL factories. Expert
 Verified there is **no** existing EQL→Python source emitter (repr/verbalization
 are display/NL only), so this is genuinely new.
 
-### Phase 7 — Tests
-Zoo load; single classify; single fit (conditions-only, replayed as live EQL
-expressions); full-dataset fit + accuracy; save→load→reclassify; underspecified
-path.
+### Phase 7 — Underspecified backend + tests
+The RDR is wired up as a **backend for underspecified (`...`) queries**, the same
+`Match`/ellipsis pattern the probabilistic backend consumes
+(`test/krrood_test/test_underspecified_knowledge/`).
+
+- `underspecified(type, domain=..., target_type=...)` now optionally carries a
+  domain (the `domain` field was hoisted from `MatchVariable` up to `Match`).
+- `rdr/underspecified.py::UnderspecifiedMatch` reads an underspecified `Match`:
+  finds the `...` inference targets, guards single-class to single-valued
+  attributes (rejects unbounded iterables → future `MultiClassRDR`), strips the
+  ellipsis conditions, and lazily streams the domain instances passing the filter.
+- `rdr/backend.py::RDRBackend` is the **lazy filter-then-infer pipeline** (decision
+  (1), not the unified single-DAG): one `EQLSingleClassRDR` per `(case type,
+  attribute)`; `infer()` yields `UnificationDict`s by default (read via
+  `query.variable` / `query.variable.<attr>`) or fills instances in place
+  (`fill_in_place=True`); auto fit-mode when no model exists.
+- Fit mode is ground-truth-aware: with a target the expert gives conditions only;
+  without one the expert gives both (`Expert.ask_for_rule`). `EQLSingleClassRDR`
+  supports `from_underspecified(template)` and `fit_case(target=None)`.
+- Generative inference (`inference(Drawer)(...)` — invent a new instance) is out of
+  scope for this phase.
+- Serializer fix: `and_`/`or_` rule conditions now serialize (conclusions attached
+  as connective children are excluded from the emitted boolean expression).
+
+Tests: `test_zoo_loader`, `test_observer`, `test_rule_tree_growth`,
+`test_single_class_rdr`, `test_interactive_expert`, `test_serialization`,
+`test_underspecified_rdr` (target discovery, ellipsis stripping, scalar guard, lazy
+infer, fill modes, fit modes, fit→save→load→infer).
 
 ## Status
-- Branch `rdr_refactor`, with `inference_explanation` merged in (clean merge,
-  committed).
-- Implementation starting at Phase 0.
+- Branch `rdr_refactor`, with `inference_explanation` merged in.
+- **Phases 0–7 complete and committed.** All `test/krrood_test/test_eql_rdr/` tests
+  pass; the pre-existing 8 `test_eql/test_meta_queries.py` failures are unrelated.
+- Future: unified single-DAG evaluation (perf), `MultiClassRDR` (iterable/multi
+  attributes), generative `inference(...)`, the `RDRDecorator` path.
