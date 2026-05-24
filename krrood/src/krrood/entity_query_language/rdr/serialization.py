@@ -123,16 +123,24 @@ def _emit_expr(node, var_names: Dict[uuid.UUID, str]) -> str:
             f"{_emit_expr(node.right, var_names)}"
         )
     if isinstance(node, AND):
-        return (
-            "and_(" + ", ".join(_emit_expr(c, var_names) for c in node._children_) + ")"
-        )
+        operands = _condition_operands(node)
+        return "and_(" + ", ".join(_emit_expr(c, var_names) for c in operands) + ")"
     if isinstance(node, OR):
-        return (
-            "or_(" + ", ".join(_emit_expr(c, var_names) for c in node._children_) + ")"
-        )
+        operands = _condition_operands(node)
+        return "or_(" + ", ".join(_emit_expr(c, var_names) for c in operands) + ")"
     if isinstance(node, Not):
         return f"not_({_emit_expr(node._children_[0], var_names)})"
     raise UnsupportedNodeForSerialization(node)
+
+
+def _condition_operands(node) -> List[Any]:
+    """
+    The logical operands of a connective, excluding any conclusions. When a rule's
+    condition is the connective itself (e.g. an ``and_`` root), its ``Add`` conclusions are
+    attached as children too; those are not part of the boolean expression.
+    """
+    conclusion_ids = {c._id_ for c in getattr(node, "_conclusions_", ())}
+    return [child for child in node._children_ if child._id_ not in conclusion_ids]
 
 
 # --------------------------------------------------------------------------- #
