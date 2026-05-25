@@ -19,6 +19,7 @@ from krrood.entity_query_language.factories import (
 )
 from krrood.entity_query_language.rdr.expert import Expert
 from krrood.entity_query_language.rdr.interactive import IPythonInterface
+from krrood.entity_query_language.rdr.utils import UNSET
 from krrood.entity_query_language.rdr.observer import trace_case
 from krrood.entity_query_language.rdr.rule_tree_view import (
     RuleStatus,
@@ -216,9 +217,7 @@ class TestInteractiveHeaderIntegration(unittest.TestCase):
             namespace["conditions"] = namespace["case_variable"].milk == True
 
         expert = Expert(interface=IPythonInterface(shell_runner=runner))
-        expert.ask_for_conditions(
-            first(Species.fish), Species.fish, Species.mammal, animal, trace
-        )
+        expert.ask_for_conditions(first(Species.fish), animal, Species.mammal, Species.fish, trace)
         header = captured["header"]
         self.assertIn("fish", header)
         self.assertIn("mammal", header)
@@ -235,7 +234,7 @@ class TestInteractiveHeaderIntegration(unittest.TestCase):
             namespace["conditions"] = namespace["case_variable"].milk == True
 
         expert = Expert(interface=IPythonInterface(shell_runner=runner))
-        expert.ask_for_conditions(first(Species.fish), None, Species.mammal, animal)
+        expert.ask_for_conditions(first(Species.fish), animal, Species.mammal)
         self.assertNotIn("rule tree", captured["header"])
 
 

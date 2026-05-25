@@ -11,6 +11,7 @@ import unittest
 from krrood.entity_query_language.factories import and_
 from krrood.entity_query_language.rdr.expert import Expert
 from krrood.entity_query_language.rdr.interface import FunctionInterface
+from krrood.entity_query_language.rdr.utils import UNSET
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 
 from .animal import Animal, Species
@@ -46,9 +47,25 @@ def maximally_specific_expert() -> Expert:
     return Expert(interface=FunctionInterface(answer_fn=answer))
 
 
+def labelling_expert(target_by_name):
+    """An expert that supplies *both* conclusion and conditions (ask-for-rule path)."""
+    def answer(context, requests):
+        result = {
+            "conditions": and_(
+                *[getattr(context.case_variable, f) == getattr(context.case_instance, f)
+                  for f in FEATURE_FIELDS]
+            )
+        }
+        if any(r.name == "conclusion" for r in requests):
+            result["conclusion"] = target_by_name[context.case_instance.name]
+        return result
+
+    return Expert(interface=FunctionInterface(answer_fn=answer))
+
+
 def scripted_expert(rules):
     """An expert returning conditions from a per-(target) callable, for controlled
-    scenarios. Returns ``(expert, calls)`` where ``calls`` records each elicitation as
+    scenarios. Returns ``(expert, calls)`` where ``calls`` records each expert interaction as
     ``(case_name, current_conclusion, target_conclusion)``.
     """
     calls = []
@@ -79,7 +96,7 @@ class TestEQLSingleClassRDR(unittest.TestCase):
         self.assertEqual(rdr.classify(first(Species.mammal)), Species.mammal)
         # The expert was asked exactly once (current conclusion was None).
         self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0][1], None)
+        self.assertEqual(calls[0][1], UNSET)
 
     def test_no_fire_routes_to_alternative(self):
         rdr = EQLSingleClassRDR(Animal, "species")
@@ -94,8 +111,8 @@ class TestEQLSingleClassRDR(unittest.TestCase):
         rdr.fit_case(first(Species.bird), Species.bird, expert)
         self.assertEqual(rdr.classify(first(Species.bird)), Species.bird)
         self.assertEqual(rdr.classify(first(Species.mammal)), Species.mammal)
-        # Second call saw current_conclusion None (nothing fired for the bird).
-        self.assertEqual(calls[-1][1], None)
+        # Second call saw no current_conclusion (nothing fired for the bird).
+        self.assertEqual(calls[-1][1], UNSET)
 
     def test_wrong_fire_routes_to_refinement(self):
         rdr = EQLSingleClassRDR(Animal, "species")
@@ -125,6 +142,16 @@ class TestEQLSingleClassRDR(unittest.TestCase):
         # Fitting an already-correct case must not ask the expert again.
         rdr.fit_case(first(Species.mammal), Species.mammal, expert)
         self.assertEqual(len(calls), calls_before)
+
+    def test_fit_case_without_target_uses_ask_for_rule(self):
+        # Regression: if UNSET is not passed as the "no-target" sentinel (e.g. None is
+        # used instead), fit_case takes the ask_for_conditions branch with target=None
+        # and stores a rule whose conclusion is None rather than the expert's label.
+        target_by_name = {a.name: t for a, t in zip(animals, targets)}
+        rdr = EQLSingleClassRDR(Animal, "species")
+        animal = first(Species.mammal)
+        rdr.fit_case(animal, expert=labelling_expert(target_by_name))
+        self.assertEqual(rdr.classify(animal), Species.mammal)
 
     def test_full_fit_memorises_training_set(self):
         rdr = EQLSingleClassRDR(Animal, "species")

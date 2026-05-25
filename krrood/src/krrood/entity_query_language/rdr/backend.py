@@ -31,6 +31,7 @@ from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.rdr.expert import Expert
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 from krrood.entity_query_language.rdr.underspecified import UnderspecifiedMatch
+from krrood.entity_query_language.rdr.utils import UNSET
 
 #: Ground truth: either a single conclusion shared by every case, or a per-case callable.
 GroundTruth = Union[Any, Callable[[Any], Any]]
@@ -120,7 +121,7 @@ class RDRBackend:
     @staticmethod
     def _target_for(case: Any, ground_truth: Optional[GroundTruth]) -> Optional[Any]:
         if ground_truth is None:
-            return None
+            return UNSET
         if callable(ground_truth):
             return ground_truth(case)
         return ground_truth

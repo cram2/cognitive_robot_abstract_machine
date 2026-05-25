@@ -23,6 +23,7 @@ from krrood.entity_query_language.core.base_expressions import (
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
 from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.enums import EvaluationContextKey
+from krrood.entity_query_language.rdr.utils import UNSET
 from krrood.entity_query_language.rules.conclusion import Add
 from krrood.entity_query_language.evaluation import (
     EvaluationContext,
@@ -104,13 +105,13 @@ class ConclusionObserver(EvaluationObserver):
         return None
 
     @property
-    def conclusion(self) -> Optional[Any]:
-        """The single inferred value, or ``None`` if no rule fired.
+    def conclusion(self) -> Any:
+        """The single inferred value, or ``UNSET`` if no rule fired.
 
         Single-class RDR conclusions are mutually exclusive, so all captured
         conclusions for one case carry the same value; we return the last one.
         """
-        return self.fired[-1].value if self.fired else None
+        return self.fired[-1].value if self.fired else UNSET
 
     @property
     def distinct_conclusions(self) -> List[Any]:
@@ -174,8 +175,8 @@ class ClassificationTrace:
     """Ids of every expression that was evaluated (fired ∪ evaluated-not-fired)."""
     firing_anchor: Optional[SymbolicExpression] = None
     """The condition node of the rule that produced the winning conclusion."""
-    conclusion: Optional[Any] = None
-    """The inferred conclusion (``None`` if no rule fired)."""
+    conclusion: Any = UNSET
+    """The inferred conclusion (``UNSET`` if no rule fired)."""
 
     @property
     def firing_anchor_id(self) -> Optional[UUID]:

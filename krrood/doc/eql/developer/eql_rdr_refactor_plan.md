@@ -170,7 +170,7 @@ infer, fill modes, fit modes, fit→save→load→infer).
 
 ### Phase 8 — Expert / ExpertInterface split + interactive ergonomics
 
-Phase 4 collapsed *what* to elicit and *how* to elicit it into a single
+Phase 4 collapsed *what* to interact/ask/retrieve and *how* to interact/ask/retrieve into a single
 `IPythonExpert(Expert)`. Phase 8 separates them and ports the ergonomics of the
 legacy `ripple_down_rules` IPython shell.
 
@@ -184,7 +184,7 @@ legacy `ripple_down_rules` IPython shell.
   `bool` means the expert wrote over the concrete case — re-prompt); conclusion
   must be non-`None`.
 - **`ExpertInterface`** (`rdr/interface.py`) — abstract `@dataclass`. It owns
-  *mechanism*: a template-method `elicit(context, requests) -> dict[str, Any]`
+  the *Interaction Mechanism*: a template-method `interact(context, requests) -> dict[str, Any]`
   running the build-namespace → render → run → validate → re-prompt loop. Concrete
   interfaces implement only `_run(namespace, header)`.
 - **`IPythonInterface`** (`rdr/interactive.py`) — the embedded-shell implementation.
@@ -213,7 +213,7 @@ returning an error message or `None`, `example`, `required`).
 
 #### Error-tolerant loop, colour, table
 
-- `elicit` re-renders a coloured error and reopens the shell on missing/invalid
+- `interact` re-renders a coloured error and reopens the shell on missing/invalid
   answers (e.g. `case_instance.x == True` yields a `bool`, caught by the
   `is SymbolicExpression` validator with a "build it over `case_variable`" hint).
   An **explicit exit** (`exit`/`quit`/Ctrl-D) aborts → raises

@@ -23,6 +23,7 @@ from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import add, entity, variable
 from krrood.entity_query_language.query.query import Query
 from krrood.entity_query_language.rdr.expert import Expert
+from krrood.entity_query_language.rdr.utils import UNSET
 from krrood.entity_query_language.rdr.observer import (
     ClassificationTrace,
     ConclusionObserver,
@@ -128,13 +129,13 @@ class EQLSingleClassRDR:
         )
 
     def fit_case(
-        self, case: Any, target: Optional[Any] = None, expert: Optional[Expert] = None
+        self, case: Any, target: Any = UNSET, expert: Optional[Expert] = None
     ) -> Any:
         """
         Ensure the RDR classifies ``case`` as ``target``, growing the rule tree when it does
         not.
 
-        When ``target`` is ``None`` (no ground truth) the expert supplies **both** the
+        When ``target`` is ``UNSET`` (no ground truth) the expert supplies **both** the
         conclusion and its conditions via :meth:`Expert.ask_for_rule`; otherwise only the
         conditions are requested (the conclusion is the known ``target``).
 
@@ -145,21 +146,17 @@ class EQLSingleClassRDR:
             raise ValueError("fit_case requires an expert.")
 
         trace = None if self.query is None else self._trace(case)
-        current = trace.conclusion if trace is not None else None
+        current = trace.conclusion if trace is not None else UNSET
 
-        if target is not None and current == target:
+        if target is not UNSET and current == target:
             return target
 
-        if target is None:
-            target, condition = expert.ask_for_rule(
-                case, current, self.case_variable, trace
-            )
+        if target is UNSET:
+            target, condition = expert.ask_for_rule(case, self.case_variable, current, trace)
             if current == target:
                 return target
         else:
-            condition = expert.ask_for_conditions(
-                case, current, target, self.case_variable, trace
-            )
+            condition = expert.ask_for_conditions(case, self.case_variable, target, current, trace)
 
         self._insert_rule(trace, current, condition, target)
         return target
@@ -178,7 +175,7 @@ class EQLSingleClassRDR:
             with self.query:
                 add(self.conclusion_variable, target)
             self.query.build()
-        elif current is None:
+        elif current is UNSET:
             # Nothing fired: attach an alternative at the conditions root.
             insert_alternative(
                 self.query._conditions_root_,

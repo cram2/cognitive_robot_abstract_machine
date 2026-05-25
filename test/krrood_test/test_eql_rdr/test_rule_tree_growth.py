@@ -18,6 +18,7 @@ from krrood.entity_query_language.rdr.rule_tree import (
     insert_alternative,
     insert_refinement,
 )
+from krrood.entity_query_language.rdr.utils import UNSET
 
 from .animal import Animal, Species
 from .zoo_loader import load_zoo_animals
@@ -39,8 +40,9 @@ class TestRuleTreeGrowth(unittest.TestCase):
         query.build()
 
         # Bird does not fire yet.
-        self.assertIsNone(
+        self.assertTrue(
             classify_case(query, animal, animal.species, first(Species.bird)).conclusion
+            is UNSET
         )
 
         insert_alternative(

@@ -116,7 +116,7 @@ class Palette:
 
 @dataclass
 class IPythonInterface(ExpertInterface):
-    """Elicits a rule's answers through an embedded IPython shell."""
+    """An interface based on an embedded IPython shell, that mediates the interaction with the expert"""
 
     shell_runner: Optional[ShellRunner] = None
     """Injectable launcher; defaults to a real embedded IPython shell. Tests pass a stub."""
@@ -178,7 +178,7 @@ class IPythonInterface(ExpertInterface):
 
     def _resolution_lines(self, context: CaseContext, p: Palette) -> List[str]:
         """The call to action: which condition to write, and why."""
-        if context.current_conclusion is None:
+        if not context.has_current_conclusion:
             lines = [p.label("No rule fired for this case.")]
             if context.has_target:
                 lines.append(
@@ -248,8 +248,7 @@ class IPythonInterface(ExpertInterface):
         lines.append(
             f"  Submit with {p.code('Ctrl-D')}; cancel with {p.code(f'{EXIT_NAME}()')}."
         )
-        if self._render_tree(context):
-            lines.append(f"  Show the rule tree with {p.code(f'%{SHOW_TREE_MAGIC}')}.")
+        lines.append(f"  Show the rule tree with {p.code(f'%{SHOW_TREE_MAGIC}')}.")
         lines.append(f"  Show this help again with {p.code(f'%{HELP_MAGIC}')}.")
         return "\n".join(lines)
 

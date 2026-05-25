@@ -15,6 +15,7 @@ from krrood.entity_query_language.factories import (
     variable,
 )
 from krrood.entity_query_language.rdr.observer import classify_case
+from krrood.entity_query_language.rdr.utils import UNSET
 
 from .animal import Animal, Species
 from .zoo_loader import load_zoo_animals
@@ -59,7 +60,7 @@ class TestConclusionObserver(unittest.TestCase):
         animal, species, query = self._build_flat_tree()
         # An insect has no milk, feathers, or fins → no rule fires.
         obs = classify_case(query, animal, species, _first_with_target(Species.insect))
-        self.assertIsNone(obs.conclusion)
+        self.assertTrue(obs.conclusion is UNSET)
         self.assertEqual(obs.fired, [])
 
     def test_refinement_overrides_parent_conclusion(self):

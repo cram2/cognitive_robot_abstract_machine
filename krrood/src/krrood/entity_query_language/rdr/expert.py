@@ -5,7 +5,7 @@ An :class:`Expert` decides which answers a new rule needs — only the *conditio
 target conclusion is known (ground-truth fit), or *both* a conclusion and its conditions
 when no target is given (the expert labels the case). It owns the validators (conditions
 must be a live EQL :class:`SymbolicExpression`; a conclusion must be non-``None``) and
-delegates the actual elicitation to its :class:`ExpertInterface`.
+delegates the actual expert interaction to its :class:`ExpertInterface`.
 
 Answers are live EQL expression objects built over the shared ``case_variable`` — never
 strings or lists.
@@ -25,8 +25,9 @@ from krrood.entity_query_language.rdr.interface import (
     AnswerRequest,
     CaseContext,
     ExpertAbort,
-    ExpertInterface,
+    ExpertInterface
 )
+from krrood.entity_query_language.rdr.utils import UNSET
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.rdr.observer import ClassificationTrace
@@ -71,26 +72,20 @@ def _validate_conclusion(value: Any) -> Optional[str]:
 class Expert:
     """Supplies a new rule's answers when the RDR mis/under-classifies a case.
 
-    Holds an :class:`ExpertInterface` that performs the actual elicitation; this class only
+    Holds an :class:`ExpertInterface` that performs the actual expert interaction; this class only
     builds the request specs and translates an :class:`ExpertAbort` into the policy-level
     :class:`NoConditionsProvided` / :class:`NoConclusionProvided`.
     """
 
     interface: ExpertInterface
 
-    def ask_for_conditions(
-        self,
-        case: Any,
-        current_conclusion: Optional[Any],
-        target_conclusion: Any,
-        case_variable: CanBehaveLikeAVariable,
-        trace: Optional["ClassificationTrace"] = None,
-    ) -> SymbolicExpression:
+    def ask_for_conditions(self, case: Any, case_variable: CanBehaveLikeAVariable, target_conclusion: Any,
+                           current_conclusion: Any = UNSET, trace: Optional[ClassificationTrace] = None) -> SymbolicExpression:
         """
         :param case: The case being fit (e.g. an ``Animal`` instance).
-        :param current_conclusion: What the RDR currently concludes (``None`` if no rule fired).
-        :param target_conclusion: The known correct conclusion.
         :param case_variable: The RDR's shared EQL variable; conditions must be built over it.
+        :param target_conclusion: The known correct conclusion.
+        :param current_conclusion: What the RDR currently concludes (``_UNSET`` if no rule fired).
         :param trace: The classification trace, for visualizing the rule tree to the expert.
         :return: A live EQL condition expression that holds for ``case`` and distinguishes it.
         """
@@ -107,26 +102,21 @@ class Expert:
             example=f"{ANSWER_NAME} = {CASE_VARIABLE_NAME}.some_attr == True",
         )
         try:
-            return self.interface.elicit(context, [request])[ANSWER_NAME]
+            return self.interface.interact(context, [request])[ANSWER_NAME]
         except ExpertAbort:
             raise NoConditionsProvided(
                 "The expert cancelled without supplying conditions."
             )
 
-    def ask_for_rule(
-        self,
-        case: Any,
-        current_conclusion: Optional[Any],
-        case_variable: CanBehaveLikeAVariable,
-        trace: Optional["ClassificationTrace"] = None,
-    ) -> Tuple[Any, SymbolicExpression]:
+    def ask_for_rule(self, case: Any, case_variable: CanBehaveLikeAVariable, current_conclusion: Any = UNSET,
+                     trace: Optional[ClassificationTrace] = None) -> Tuple[Any, SymbolicExpression]:
         """
         Ask the expert for **both** a conclusion and its conditions, for fitting when no
         ground-truth target is supplied (the expert labels the case).
 
         :param case: The case being fit.
-        :param current_conclusion: What the RDR currently concludes (``None`` if no rule fired).
         :param case_variable: The RDR's shared EQL variable; conditions are built over it.
+        :param current_conclusion: What the RDR currently concludes (``_UNSET`` if no rule fired).
         :param trace: The classification trace, for visualizing the rule tree to the expert.
         :return: ``(conclusion, conditions)`` — the value to conclude and a live EQL
             condition expression over ``case_variable`` that justifies it.
@@ -150,7 +140,7 @@ class Expert:
             ),
         ]
         try:
-            answers = self.interface.elicit(context, requests)
+            answers = self.interface.interact(context, requests)
         except ExpertAbort as abort:
             if CONCLUSION_NAME in abort.missing:
                 raise NoConclusionProvided(

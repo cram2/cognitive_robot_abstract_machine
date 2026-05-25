@@ -19,8 +19,8 @@ from krrood.entity_query_language.rdr.expert import (
 from krrood.entity_query_language.rdr.interactive import IPythonInterface
 from krrood.entity_query_language.rdr.interface import (
     CASE_INSTANCE_NAME,
-    CASE_VARIABLE_NAME,
-)
+    CASE_VARIABLE_NAME, )
+from krrood.entity_query_language.rdr.utils import UNSET
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 
 from .animal import Animal, Species
@@ -71,7 +71,7 @@ class TestInteractiveExpert(unittest.TestCase):
         expert = expert_with(maximally_specific_runner(captured))
         rdr = EQLSingleClassRDR(Animal, "species")
         case = first(Species.mammal)
-        expert.ask_for_conditions(case, None, Species.mammal, rdr.case_variable)
+        expert.ask_for_conditions(case, rdr.case_variable, Species.mammal)
 
         ns = captured["namespace"]
         for verb in ("entity", "variable", "and_", "refinement", "alternative", "add"):
@@ -84,18 +84,14 @@ class TestInteractiveExpert(unittest.TestCase):
         captured = {}
         expert = expert_with(maximally_specific_runner(captured))
         rdr = EQLSingleClassRDR(Animal, "species")
-        expert.ask_for_conditions(
-            first(Species.bird), Species.mammal, Species.bird, rdr.case_variable
-        )
+        expert.ask_for_conditions(first(Species.bird), rdr.case_variable, Species.bird, Species.mammal)
         header = captured["header"]
         self.assertIn("bird", header.lower())
 
     def test_returns_live_eql_expression(self):
         expert = expert_with(maximally_specific_runner())
         rdr = EQLSingleClassRDR(Animal, "species")
-        cond = expert.ask_for_conditions(
-            first(Species.mammal), None, Species.mammal, rdr.case_variable
-        )
+        cond = expert.ask_for_conditions(first(Species.mammal), rdr.case_variable, Species.mammal)
         self.assertIsInstance(cond, SymbolicExpression)
         self.assertNotIsInstance(cond, str)
 
@@ -106,9 +102,7 @@ class TestInteractiveExpert(unittest.TestCase):
         expert = expert_with(run_and_abort)
         rdr = EQLSingleClassRDR(Animal, "species")
         with self.assertRaises(NoConditionsProvided):
-            expert.ask_for_conditions(
-                first(Species.mammal), None, Species.mammal, rdr.case_variable
-            )
+            expert.ask_for_conditions(first(Species.mammal), rdr.case_variable, Species.mammal)
 
     def test_invalid_answer_is_reprompted_then_accepted(self):
         # First attempt builds the condition over the *concrete* case (a bool — invalid);
@@ -127,9 +121,7 @@ class TestInteractiveExpert(unittest.TestCase):
 
         expert = expert_with(run)
         rdr = EQLSingleClassRDR(Animal, "species")
-        cond = expert.ask_for_conditions(
-            first(Species.mammal), None, Species.mammal, rdr.case_variable
-        )
+        cond = expert.ask_for_conditions(first(Species.mammal), rdr.case_variable, Species.mammal)
         self.assertEqual(calls["n"], 2)
         self.assertIsInstance(cond, SymbolicExpression)
 
@@ -138,9 +130,7 @@ class TestInteractiveExpert(unittest.TestCase):
         rdr = EQLSingleClassRDR(Animal, "species")
         captured = {}
         expert = expert_with(maximally_specific_runner(captured))
-        expert.ask_for_conditions(
-            first(Species.mammal), None, Species.mammal, rdr.case_variable
-        )
+        expert.ask_for_conditions(first(Species.mammal), rdr.case_variable, Species.mammal)
         self.assertEqual(
             captured["namespace"].get("interactive_sentinel"), USER_SCOPE_SENTINEL
         )

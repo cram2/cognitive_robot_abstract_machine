@@ -1,5 +1,5 @@
 """
-The *mechanism* half of the expert split: how a rule's answers are elicited.
+The *mechanism* for how to get answers (rule conditions and conclusions) from an expert.
 
 An :class:`ExpertInterface` is the I/O strategy an :class:`~krrood.entity_query_language.rdr.expert.Expert`
 delegates to. The :class:`Expert` decides *what* to ask (a condition, or a conclusion +
@@ -13,7 +13,7 @@ Two value objects carry the request across the boundary:
 * :class:`AnswerRequest` — one named answer the expert must supply, with a validator and
   an example.
 
-The expert authors **live EQL expressions**, never strings: conditions are built over the
+The expert writes **EQL expressions**: conditions that are built over the
 ``case_variable`` (the shared rule-tree variable), while ``case_instance`` is the concrete
 object they can inspect and experiment on.
 """
@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from typing_extensions import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
+from krrood.entity_query_language.rdr.utils import UNSET
 from krrood.entity_query_language.scope import get_definition_scope
 
 if TYPE_CHECKING:
@@ -40,15 +41,12 @@ CASE_VARIABLE_NAME = "case_variable"
 #: Shell name of the zero-arg callable the expert calls to leave without answering.
 EXIT_NAME = "exit"
 
-#: Private namespace flag set by ``exit()``; checked by the elicitation loop.
+#: Private namespace flag set by ``exit()``; checked by the expert interaction loop.
 _ABORT_FLAG = "__expert_abort__"
-
-#: Sentinel for "no target conclusion was supplied" (the ask-for-rule path).
-_UNSET = object()
 
 
 class ExpertAbort(Exception):
-    """Raised by :meth:`ExpertInterface.elicit` when the expert cancels the session.
+    """Raised by :meth:`ExpertInterface.interact` when the expert cancels the session.
 
     Carries the names of the still-missing required answers so the calling
     :class:`Expert` can raise its own specific exception.
@@ -69,18 +67,23 @@ class CaseContext:
     """The concrete case object (e.g. an ``Animal`` instance) to inspect."""
     case_variable: CanBehaveLikeAVariable
     """The shared EQL variable the rule tree ranges over; conditions are built over it."""
-    current_conclusion: Optional[Any] = None
-    """What the RDR currently concludes for the case (``None`` if no rule fired)."""
-    target_conclusion: Any = _UNSET
+    current_conclusion: Any = UNSET
+    """What the RDR currently concludes for the case (``_UNSET`` if no rule fired)."""
+    target_conclusion: Any = UNSET
     """The known correct conclusion, or absent (sentinel) when the expert must label it."""
-    trace: Optional["ClassificationTrace"] = None
+    trace: Optional[ClassificationTrace] = None
     """The classification trace for this case, for visualizing the rule tree (``None`` when
     the RDR is empty / no classification was run)."""
 
     @property
     def has_target(self) -> bool:
         """:return: True when a ground-truth ``target_conclusion`` was supplied."""
-        return self.target_conclusion is not _UNSET
+        return self.target_conclusion is not UNSET
+
+    @property
+    def has_current_conclusion(self) -> bool:
+        """:return: True when the RDR has concluded a conclusion for the case."""
+        return self.current_conclusion is not UNSET
 
 
 @dataclass
@@ -99,9 +102,10 @@ class AnswerRequest:
 
 @dataclass
 class ExpertInterface(ABC):
-    """The I/O strategy an :class:`Expert` uses to elicit a rule's answers."""
+    """The I/O strategy an :class:`Expert` uses as the interaction interface through which answers and questions are
+    communicated."""
 
-    def elicit(
+    def interact(
         self, context: CaseContext, requests: List[AnswerRequest]
     ) -> Dict[str, Any]:
         """
@@ -216,12 +220,12 @@ class FunctionInterface(ExpertInterface):
         self._context: Optional[CaseContext] = None
         self._requests: List[AnswerRequest] = []
 
-    def elicit(
+    def interact(
         self, context: CaseContext, requests: List[AnswerRequest]
     ) -> Dict[str, Any]:
         self._context = context
         self._requests = requests
-        return super().elicit(context, requests)
+        return super().interact(context, requests)
 
     def _run(
         self,

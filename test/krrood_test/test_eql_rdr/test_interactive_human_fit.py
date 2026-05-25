@@ -45,9 +45,6 @@ from .zoo_loader import load_zoo_animals
 
 animals, targets = load_zoo_animals()
 
-RUN_INTERACTIVE = os.environ.get("EQL_RDR_INTERACTIVE") == "1"
-# RUN_INTERACTIVE = True
-
 #: Where the human-authored rule tree is saved, alongside these tests.
 FITTED_MODELS_DIR = os.path.join(os.path.dirname(__file__), "fitted_models")
 SAVED_MODEL_PATH = os.path.join(FITTED_MODELS_DIR, "zoo_species_rdr.py")
@@ -63,8 +60,8 @@ def _ipython_available() -> bool:
 
 
 @unittest.skipUnless(
-    RUN_INTERACTIVE,
-    "human-interactive: set EQL_RDR_INTERACTIVE=1 and run with `pytest -s`",
+    False,
+    "human-interactive: set to True and run with `pytest -s`",
 )
 @unittest.skipUnless(_ipython_available(), "IPython not installed")
 @unittest.skipIf(len(animals) == 0, "Failed to load zoo dataset")

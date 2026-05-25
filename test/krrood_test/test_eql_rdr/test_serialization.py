@@ -17,6 +17,7 @@ from krrood.entity_query_language.rdr.serialization import (
     save_rdr,
 )
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
+from krrood.entity_query_language.rdr.utils import UNSET
 
 from .animal import Animal, Species
 from .zoo_loader import load_zoo_animals
@@ -134,7 +135,7 @@ class TestSerialization(unittest.TestCase):
 
         # A reptile (backbone, no milk/feathers/fins) does not fire yet.
         reptile = first(Species.reptile)
-        self.assertIsNone(loaded.classify(reptile))
+        self.assertTrue(loaded.classify(reptile) is UNSET)
         expert = scripted_expert(
             {
                 Species.reptile: lambda v: (v.backbone == True),
