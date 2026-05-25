@@ -174,13 +174,7 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
         )
 
     def _setup_velocity_limits(self):
-        """
-        The UR10e default velocity limits are either 2.09 or 3.14 depending on the joint. Wrist joints are 3.14.
-        Clipping the limits below 3.14 causes weird movements in end effector orientation space,
-        as the wrist stops moving with the correct speed relative to the other arm joints.
-        """
-        vel_limits = defaultdict(lambda: 4.0)
-        self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
+        self.tighten_dof_velocity_limits_proportionally(maximum_velocity=0.2)
 
     def _setup_hardware_interfaces(self):
         controlled_joints = [

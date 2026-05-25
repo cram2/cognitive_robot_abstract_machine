@@ -27,6 +27,7 @@ from semantic_digital_twin.world_description.connections import (
     DifferentialDrive,
     PrismaticConnection,
     RevoluteConnection,
+    ActiveConnection1DOF,
 )
 from semantic_digital_twin.orm.ormatic_interface import *  # noqa
 
@@ -500,6 +501,86 @@ def test_pr2_tighten_dof_velocity_limits_of_1dof_connections(pr2_world_state_res
         pr2._world.get_connection_by_name("torso_lift_joint").dof.limits.upper.velocity
         == 0.013
     )
+
+
+def test_pr2_tighten_dof_velocity_limits_proportionally(pr2_world_state_reset):
+    """All limits scale by the same factor; the joint with the highest limit reaches maximum_velocity."""
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+
+    connections_with_limits = [
+        (connection, connection.raw_dof.limits.upper.velocity)
+        for connection in pr2._world.get_connections_by_type(ActiveConnection1DOF)
+        if connection.raw_dof.limits.upper.velocity is not None
+    ]
+    initial_maximum = max(velocity for _, velocity in connections_with_limits)
+    maximum_velocity = initial_maximum / 10
+
+    pr2.tighten_dof_velocity_limits_proportionally(maximum_velocity=maximum_velocity)
+
+    for connection, initial_limit in connections_with_limits:
+        expected = initial_limit * (maximum_velocity / initial_maximum)
+        assert connection.raw_dof.limits.upper.velocity == pytest.approx(expected)
+        # Symmetry: lower bound is the negative of the upper bound
+        assert connection.raw_dof.limits.lower.velocity == pytest.approx(-expected)
+
+
+def test_pr2_tighten_dof_velocity_limits_proportionally_preserves_ratios(
+    pr2_world_state_reset,
+):
+    """The ratio between any two joints with different limits is identical before and after scaling."""
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+
+    initial_limits = {
+        connection: connection.raw_dof.limits.upper.velocity
+        for connection in pr2._world.get_connections_by_type(ActiveConnection1DOF)
+        if connection.raw_dof.limits.upper.velocity is not None
+    }
+    initial_maximum = max(initial_limits.values())
+
+    distinct_pair = next(
+        (
+            (connection_a, connection_b)
+            for connection_a in initial_limits
+            for connection_b in initial_limits
+            if abs(initial_limits[connection_a] - initial_limits[connection_b]) > 1e-10
+        ),
+        None,
+    )
+
+    connection_a, connection_b = distinct_pair
+    before_ratio = initial_limits[connection_a] / initial_limits[connection_b]
+
+    pr2.tighten_dof_velocity_limits_proportionally(maximum_velocity=initial_maximum / 2)
+
+    after_ratio = (
+        connection_a.raw_dof.limits.upper.velocity
+        / connection_b.raw_dof.limits.upper.velocity
+    )
+    assert before_ratio == pytest.approx(after_ratio)
+
+
+def test_pr2_tighten_dof_velocity_limits_proportionally_no_op_when_within_bounds(
+    pr2_world_state_reset,
+):
+    """When maximum_velocity is at or above the current maximum, no limits are changed."""
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+
+    initial_limits = {
+        connection: connection.raw_dof.limits.upper.velocity
+        for connection in pr2._world.get_connections_by_type(ActiveConnection1DOF)
+        if connection.raw_dof.limits.upper.velocity is not None
+    }
+    initial_maximum = max(initial_limits.values())
+
+    # Calling with the exact current maximum must be a no-op
+    pr2.tighten_dof_velocity_limits_proportionally(maximum_velocity=initial_maximum)
+    for connection, initial_limit in initial_limits.items():
+        assert connection.raw_dof.limits.upper.velocity == pytest.approx(initial_limit)
+
+    # Calling with a larger value must also be a no-op
+    pr2.tighten_dof_velocity_limits_proportionally(maximum_velocity=100.0)
+    for connection, initial_limit in initial_limits.items():
+        assert connection.raw_dof.limits.upper.velocity == pytest.approx(initial_limit)
 
 
 def test_split_chain_of_connections(pr2_world_state_reset):

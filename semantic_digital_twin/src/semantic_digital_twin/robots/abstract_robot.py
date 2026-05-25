@@ -616,6 +616,43 @@ class AbstractRobot(Agent, ABC):
                 ),
             )
 
+    def tighten_dof_velocity_limits_proportionally(
+        self, maximum_velocity: float
+    ) -> None:
+        """
+        Tightens the velocity limits of all 1-DOF active connections proportionally,
+        preserving the relative magnitudes defined in the original robot description.
+
+        The joint with the highest current velocity limit is mapped to
+        ``maximum_velocity``; all others are scaled by the same factor.
+        Joints with no velocity limit are left unchanged.
+
+        If the current maximum is already at or below ``maximum_velocity``,
+        no changes are applied.
+
+        :param maximum_velocity: The target velocity for the joint with the
+            highest current velocity limit.
+        """
+        connections_with_velocity_limits = [
+            (connection, connection.raw_dof.limits.upper.velocity)
+            for connection in self._world.get_connections_by_type(ActiveConnection1DOF)
+            if connection.raw_dof.limits.upper.velocity is not None
+        ]
+        if not connections_with_velocity_limits:
+            return
+        original_maximum = max(
+            velocity for _, velocity in connections_with_velocity_limits
+        )
+        if original_maximum <= maximum_velocity:
+            return
+        scale_factor = maximum_velocity / original_maximum
+        for connection, current_velocity in connections_with_velocity_limits:
+            scaled_limit = current_velocity * scale_factor
+            connection.raw_dof._overwrite_dof_limits(
+                new_lower_limits=DerivativeMap(None, -scaled_limit, None, None),
+                new_upper_limits=DerivativeMap(None, scaled_limit, None, None),
+            )
+
     def add_manipulator(self, manipulator: Manipulator):
         """
         Adds a manipulator to the robot's collection of manipulators.
