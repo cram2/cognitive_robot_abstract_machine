@@ -84,6 +84,28 @@ def is_collapsible_aggregation_subquery(entity) -> bool:
     return is_aggregation_subquery(entity) and not is_constrained_query(entity)
 
 
+def aggregation_leaf_attribute(entity):
+    """
+    Return the leaf :class:`~krrood.entity_query_language.core.mapped_variable.Attribute`
+    of the aggregator's child chain (e.g. the ``amount`` node behind
+    ``max(t.amount_details.amount)``), or ``None`` when the aggregator's child is
+    not an attribute chain (e.g. ``max(x)`` over a bare variable).
+
+    :param entity: Candidate expression.
+    :returns: The leaf attribute node, or ``None``.
+    """
+    from krrood.entity_query_language.core.mapped_variable import Attribute
+    from krrood.entity_query_language.verbalization.chain_utils import walk_chain
+
+    aggregator = selected_aggregator(entity)
+    if aggregator is None:
+        return None
+    chain, _ = walk_chain(aggregator._child_)
+    if chain and isinstance(chain[-1], Attribute):
+        return chain[-1]
+    return None
+
+
 def aggregation_source_root(entity) -> Optional["Variable"]:
     """
     Return the root :class:`~krrood.entity_query_language.core.variable.Variable`

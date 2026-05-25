@@ -213,10 +213,11 @@ class Copulas(VocabEnum):
 
 
 class Prepositions(VocabEnum):
-    """Prepositions used in possessive path phrases (OF, OF THE)."""
+    """Prepositions used in possessive path phrases (OF, OF THE) and aggregate scopes (AMONG)."""
 
     OF     = PlainWord("of")
     OF_THE = PlainWord("of the")
+    AMONG  = PlainWord("among")
 
 
 class Conjunctions(VocabEnum):

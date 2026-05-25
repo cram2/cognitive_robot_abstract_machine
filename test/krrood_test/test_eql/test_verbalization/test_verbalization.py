@@ -476,6 +476,48 @@ def test_nested_constrained_aggregation_preserves_filter():
     assert "before" in text, f"Got: {text!r}"
 
 
+def test_nested_aggregation_collapses_to_compact_amount():
+    """An unconstrained max sub-query collapses to 'the maximum amount' (no chain, no variable)."""
+    t1 = variable(BankTransaction, domain=None)
+    t2 = variable(BankTransaction, domain=None)
+    query = eql.the(
+        entity(t1).where(t1.amount_details.amount == an(entity(eql.max(t2.amount_details.amount))))
+    )
+    text = verbalize_expression(query)
+    assert "is the maximum amount" in text, f"Got: {text!r}"
+
+
+def test_nested_aggregation_sum_uses_plural_leaf():
+    """SUM (a '… of' aggregation) collapses with a plural leaf: 'the sum of amounts'."""
+    t1 = variable(BankTransaction, domain=None)
+    t2 = variable(BankTransaction, domain=None)
+    query = eql.the(
+        entity(t1).where(t1.amount_details.amount == an(entity(eql.sum(t2.amount_details.amount))))
+    )
+    text = verbalize_expression(query)
+    assert "the sum of amounts" in text, f"Got: {text!r}"
+
+
+def test_nested_constrained_aggregation_no_second_find():
+    """A constrained aggregation sub-query keeps its filter via 'among … such that …', no second 'Find'."""
+    t1 = variable(BankTransaction, domain=None)
+    t2 = variable(BankTransaction, domain=None)
+    query = eql.the(
+        entity(t1).where(
+            t1.amount_details.amount
+            == an(
+                entity(eql.max(t2.amount_details.amount)).where(
+                    t2.booking_date < datetime.datetime(2024, 1, 1)
+                )
+            )
+        )
+    )
+    text = verbalize_expression(query)
+    assert text.count("Find") == 1, f"Expected exactly one 'Find' in: {text!r}"
+    assert "the maximum amount among" in text, f"Got: {text!r}"
+    assert "booking_date" in text and "before" in text, f"Got: {text!r}"
+
+
 # ── Integration: target test cases ────────────────────────────────────────────
 
 

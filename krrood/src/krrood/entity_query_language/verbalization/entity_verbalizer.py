@@ -22,12 +22,14 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     WordFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
+from krrood.entity_query_language.verbalization.utils import _str
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
     Conjunctions,
     Copulas,
     FallbackNouns,
     Keywords,
+    Prepositions,
     SortDirections,
 )
 
@@ -142,10 +144,7 @@ class EntityVerbalizer:
         :returns: A noun-phrase fragment for *expr*.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        from krrood.entity_query_language.verbalization.subquery import (
-            is_aggregation_subquery,
-            is_collapsible_aggregation_subquery,
-        )
+        from krrood.entity_query_language.verbalization.subquery import is_aggregation_subquery
 
         if expr._id_ in ctx.seen:
             return _phrase(Articles.THE.as_fragment(), _role(ctx.seen[expr._id_], SemanticRole.VARIABLE))
@@ -153,15 +152,104 @@ class EntityVerbalizer:
         expr.build()
 
         if is_aggregation_subquery(expr):
-            if is_collapsible_aggregation_subquery(expr):
-                ctx.query_depth += 1
-                try:
-                    return self._d.build(expr.selected_variable, ctx)
-                finally:
-                    ctx.query_depth -= 1
-            return self.verbalize_query(expr, ctx)
+            return self._verbalize_aggregation_value_(expr, ctx)
 
         return self.as_noun(expr, ctx)
+
+    def _verbalize_aggregation_value_(self, expr: "Entity", ctx: "VerbalizationContext") -> VerbFragment:
+        """
+        Render an aggregation sub-query as a compact aggregate noun phrase.
+
+        * **Unconstrained** → *"the <aggregation> <leaf>"* (e.g. *"the maximum amount"*).
+          The aggregation source variable and intermediate path are dropped — in
+          the role of a value, that provenance is noise.
+        * **Constrained** → *"the <aggregation> <leaf> among <plural source> such
+          that <filter>"* — the filter is load-bearing, so it is preserved (still
+          no imperative *"Find"*).
+        * **No attribute leaf** (aggregating a bare variable) → falls back to the
+          aggregator's own verbose rendering.
+
+        The singular/plural form of the leaf follows the aggregation word's
+        :class:`~krrood.entity_query_language.verbalization.vocabulary.words.ChildForm`
+        (``maximum`` → *"amount"*; ``sum of`` → *"amounts"*).
+
+        :param expr: An aggregation sub-query Entity.
+        :param ctx: Shared verbalization state.
+        :returns: Aggregate noun-phrase fragment.
+        :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
+        """
+        from krrood.entity_query_language.verbalization.rules.aggregators import _AGGREGATION_KIND
+        from krrood.entity_query_language.verbalization.subquery import (
+            aggregation_leaf_attribute,
+            is_constrained_query,
+            selected_aggregator,
+        )
+        from krrood.entity_query_language.verbalization.vocabulary.words import ChildForm
+
+        aggregator = selected_aggregator(expr)
+        leaf = aggregation_leaf_attribute(expr)
+        if leaf is None:
+            ctx.query_depth += 1
+            try:
+                return self._d.build(aggregator, ctx)
+            finally:
+                ctx.query_depth -= 1
+
+        agg_kind = _AGGREGATION_KIND[type(aggregator)]
+        plural_leaf = agg_kind.value.child_form == ChildForm.PLURAL
+        leaf_frag = RoleFragment.for_attribute(leaf._owner_class_, leaf._attribute_name_, plural=plural_leaf)
+        aggregate = _phrase(Articles.THE.as_fragment(), agg_kind.as_fragment(), leaf_frag)
+
+        if aggregator._id_ not in ctx.seen:
+            ctx.seen[aggregator._id_] = _str(_phrase(agg_kind.as_fragment(), leaf_frag))
+
+        if not is_constrained_query(expr):
+            return aggregate
+        return self._aggregation_scope_(expr, aggregate, ctx)
+
+    def _aggregation_scope_(
+        self, expr: "Entity", aggregate: VerbFragment, ctx: "VerbalizationContext"
+    ) -> VerbFragment:
+        """
+        Append *"among <plural source> such that <filter>"* to a constrained aggregate.
+
+        :param expr: A constrained aggregation sub-query Entity.
+        :param aggregate: The already-built *"the <aggregation> <leaf>"* fragment.
+        :param ctx: Shared verbalization state.
+        :returns: Aggregate phrase extended with its scope and filter.
+        :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
+        """
+        from krrood.entity_query_language.verbalization.subquery import aggregation_source_root
+
+        source = aggregation_source_root(expr)
+        source_frag = (
+            verbalize_plural(source, ctx, self._d.build)
+            if source is not None
+            else FallbackNouns.ENTITY.plural_fragment()
+        )
+        parts = [aggregate, Prepositions.AMONG.as_fragment(), source_frag]
+
+        where_expr = expr._where_expression_
+        if where_expr is not None:
+            ctx.query_depth += 1
+            try:
+                condition = self._d.build(where_expr.condition, ctx)
+            finally:
+                ctx.query_depth -= 1
+            parts += [Keywords.SUCH_THAT.as_fragment(), condition]
+
+        having_expr = expr._having_expression_
+        if having_expr is not None:
+            ctx.compact_predicates = True
+            ctx.query_depth += 1
+            try:
+                having_frag = self._d.build(having_expr.condition, ctx)
+            finally:
+                ctx.query_depth -= 1
+                ctx.compact_predicates = False
+            parts += [Keywords.HAVING.as_fragment(), having_frag]
+
+        return _phrase(*parts)
 
     def as_noun(self, expr: "Entity", ctx: "VerbalizationContext") -> VerbFragment:
         """
