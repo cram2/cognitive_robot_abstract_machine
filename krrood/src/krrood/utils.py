@@ -11,7 +11,7 @@ import types
 from collections import defaultdict
 from copy import deepcopy
 from dataclasses import Field
-from dataclasses import fields, MISSING
+from dataclasses import dataclass, field, fields, MISSING
 from functools import lru_cache, wraps
 from importlib.util import resolve_name
 from inspect import isclass
@@ -683,15 +683,16 @@ def get_scope_from_imports(
     return scope
 
 
-def _import_module_safely(
+def get_and_import_module(
     module_name: str, package_name: Optional[str]
-) -> Optional[types.ModuleType]:
+) -> types.ModuleType:
     """
-    Attempt to import a module with an optional package context and return the module or None on failure.
+    Attempt to import a module with an optional package context and return the module or raise.
 
     :param module_name: The name of the module to import.
     :param package_name: The package name to use for relative imports, or None for absolute imports.
-    :return: The imported module or None if import fails.
+    :return: The imported module.
+    :raises ModuleNotFoundError: If the module cannot be found.
     """
     module = get_module_object(module_name, package_name)
     if module is not None:
@@ -699,21 +700,16 @@ def _import_module_safely(
 
     try:
         return importlib.import_module(module_name, package=package_name)
-    except ModuleNotFoundError:
+    except ModuleNotFoundError as e:
         if not package_name:
-            return None
-        try:
-            if module_name.startswith(".") and package_name:
-                full_name = resolve_name(module_name, package_name)
-            else:
-                full_name = f"{package_name}.{module_name}"
-            if full_name in sys.modules:
-                return sys.modules[full_name]
-            return importlib.import_module(full_name)
-        except Exception:
-            return None
-    except ImportError:
-        return None
+            raise e
+        if module_name.startswith(".") and package_name:
+            full_name = resolve_name(module_name, package_name)
+        else:
+            full_name = f"{package_name}.{module_name}"
+        if full_name in sys.modules:
+            return sys.modules[full_name]
+        return importlib.import_module(full_name)
 
 
 def get_module_object(
@@ -792,11 +788,8 @@ def _handle_import_node(
     for alias in node.names:
         module_name = alias.name
         asname = alias.asname or alias.name
-        module = _import_module_safely(module_name, package_name)
-        if module is not None:
-            scope[asname] = module
-        else:
-            logger.warning(f"Could not import {module_name}")
+        module = get_and_import_module(module_name, package_name)
+        scope[asname] = module
 
 
 def _handle_import_from_node(
@@ -829,19 +822,13 @@ def _handle_import_from_node(
 
     module = None
     if resolved_module_name is not None:
-        module = _import_module_safely(resolved_module_name, package_name)
+        module = get_and_import_module(resolved_module_name, package_name)
 
     if module is None and resolved_package_name and resolved_module_name:
         # Fallback already attempted in _import_module_safely; keep for parity
-        module = _import_module_safely(
+        module = get_and_import_module(
             f"{resolved_package_name}.{resolved_module_name}", None
         )
-
-    if module is None:
-        logger.warning(
-            f"Could not import {resolved_module_name} while extracting imports from {file_path}"
-        )
-        return package_name
 
     for alias in node.names:
         name = alias.name

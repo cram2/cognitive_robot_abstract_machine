@@ -54,6 +54,11 @@ from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
 )
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+
+try:
+    from semantic_digital_twin.robots.garmi import Garmi
+except ImportError:
+    Garmi = None
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
@@ -68,7 +73,22 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 
 
-@pytest.fixture(scope="module", params=["hsrb", "stretch", "tiago", "pr2"])
+@pytest.fixture(
+    scope="session",
+    params=[
+        pytest.param(
+            "garmi",
+            marks=pytest.mark.skipif(
+                Garmi is None,
+                reason="GARMI semantic annotation not installed",
+            ),
+        ),
+        "hsrb",
+        "stretch",
+        "tiago",
+        "pr2",
+    ],
+)
 def setup_multi_robot_apartment(
     request,
     hsr_world_setup,
@@ -120,6 +140,20 @@ def setup_multi_robot_apartment(
         )
         return apartment_copy, view
 
+    elif request.param == "garmi":
+        if Garmi is None:
+            pytest.skip("GARMI semantic annotation not installed")
+        garmi_world_setup = request.getfixturevalue("garmi_world_setup")
+        garmi_copy = deepcopy(garmi_world_setup)
+        apartment_copy.merge_world(
+            garmi_copy,
+        )
+        view = Garmi.from_world(apartment_copy)
+        view.root.parent_connection.origin = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+        )
+        return apartment_copy, view
+
 
 @pytest.fixture
 def immutable_multiple_robot_apartment(
@@ -154,9 +188,11 @@ def test_move_torso_multi(immutable_multiple_robot_apartment):
 
 def test_navigate_multi(immutable_multiple_robot_apartment):
     world, view, context = immutable_multiple_robot_apartment
+    target_position = [2, -2, 0]
+
     plan = execute_single(
         NavigateAction(
-            Pose(Point3.from_iterable([1, 2, 0]), reference_frame=world.root)
+            Pose(Point3.from_iterable(target_position), reference_frame=world.root)
         ),
         context=context,
     )
@@ -168,7 +204,7 @@ def test_navigate_multi(immutable_multiple_robot_apartment):
     robot_base_position = robot_base_pose.to_position().to_np()
     robot_base_orientation = robot_base_pose.to_quaternion().to_np()
 
-    assert robot_base_position[:3] == pytest.approx([1, 2, 0], abs=0.01)
+    assert robot_base_position[:3] == pytest.approx(target_position, abs=0.01)
     assert robot_base_orientation == pytest.approx([0, 0, 0, 1], abs=0.01)
 
 

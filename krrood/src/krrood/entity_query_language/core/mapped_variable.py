@@ -263,7 +263,7 @@ class Index(MappedVariable):
 
     @property
     def _name_(self):
-        return f"{self._child_._var_._name_}[{self._key_}]"
+        return f"{self._child_._var_._name_}[{repr(self._key_)}]"
 
     def _set_child_instance_value_(self, instance: Any, value: Any):
         instance[self._key_] = value

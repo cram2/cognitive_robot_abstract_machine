@@ -4,7 +4,9 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 
 import numpy as np
-import rclpy
+
+from pycram import logger
+
 from typing_extensions import List, Optional, Iterator
 
 from giskardpy.executor import Executor
@@ -43,12 +45,18 @@ from pycram.pose_validator import (
 )
 from pycram.utils import link_pose_for_joint_config
 from pycram.view_manager import ViewManager
-from semantic_digital_twin.adapters.ros.visualization.pose_publisher import (
-    PosePublisher,
-)
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
+try:
+    from semantic_digital_twin.adapters.ros.visualization.pose_publisher import (
+        PosePublisher,
+    )
+    from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+        VizMarkerPublisher,
+    )
+except ModuleNotFoundError as e:
+    logger.warning(f"Could not import modules from ros adapter: {e}")
+    PosePublisher = None
+    VizMarkerPublisher = None
+
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
 )

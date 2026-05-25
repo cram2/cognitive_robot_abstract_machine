@@ -4,8 +4,11 @@ import importlib
 import os
 import weakref
 from copy import deepcopy
+from dataclasses import dataclass
 from functools import lru_cache, wraps
-from typing import List, Callable
+from typing import List
+
+from krrood.class_diagrams.mocking import MockedModule, MockedClass
 
 try:
     from ament_index_python import PackageNotFoundError
@@ -13,7 +16,7 @@ except ModuleNotFoundError:
     PackageNotFoundError = None
 from xml.etree import ElementTree as ET
 
-from typing_extensions import Any, Tuple, TypeVar
+from typing_extensions import Any, Tuple, ClassVar, Type
 
 
 class IDGenerator:
@@ -80,7 +83,7 @@ class suppress_stdout_stderr(object):
 
 
 def hacky_urdf_parser_fix(
-    urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
+        urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
 ) -> str:
     # Parse input string
     root = ET.fromstring(urdf)
@@ -193,3 +196,36 @@ def camel_case_split(word: str) -> List[str]:
             start = i
     result.append(word[start:])
     return result
+
+
+@dataclass
+class MockedNodeClass(MockedClass):
+    """
+    Mocked class for Node in rclpy
+    """
+    ...
+
+
+@dataclass
+class MockedNodeModule(MockedModule):
+    """
+    Mocked module for rclpy.node.
+    """
+    Node: Type[MockedNodeClass] = MockedNodeClass
+    """
+    A mocked Node class.
+    """
+
+
+@dataclass
+class MockedRCLPY(MockedModule):
+    """
+    Mocked module for rclpy.
+    """
+    node: ClassVar[MockedNodeModule] = MockedNodeModule()
+
+
+mocked_rclpy = MockedRCLPY()
+"""
+A mocked rclpy module.
+"""

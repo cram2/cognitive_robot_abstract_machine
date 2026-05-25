@@ -7,6 +7,7 @@ from enum import Enum
 from functools import lru_cache
 from typing import get_args, get_origin
 from uuid import UUID
+import builtins
 
 import typing_extensions
 from typing_extensions import Callable, get_args, get_origin
@@ -249,9 +250,15 @@ def get_type_hints_of_object(
                 object_, include_extras=True, localns=local_namespace
             )
             break
-        except NameError as e:
-            object_from_name = resolve_name_in_hierarchy(e.name, object_)
-            local_namespace[e.name] = object_from_name
+        except NameError as name_error:
+            object_from_name = resolve_name_in_hierarchy(name_error.name, object_)
+            local_namespace[name_error.name] = object_from_name
+        except TypeError as type_error:
+            logger.warning(
+                f"Could not get type hints for {object_} due to TypeError: {type_error}. This may be caused by a type"
+                f" hint that cannot be resolved."
+            )
+            raise
     return type_hints
 
 
@@ -277,6 +284,8 @@ def get_object_by_name_from_another_object_in_same_module(
     scope = get_scope_from_imports(file_path=source_path)
     if name in scope:
         return scope[name]
+    elif name in builtins.__dict__:
+        return builtins.__dict__[name]
     else:
         raise CouldNotResolveType(
             name,
