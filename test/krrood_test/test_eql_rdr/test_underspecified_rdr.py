@@ -39,6 +39,12 @@ FEATURE_FIELDS = [
     f.name for f in dataclasses.fields(Animal) if f.name not in ("name", "species")
 ]
 
+# Small slice of milk-bearing animals reused by constant-ground-truth tests.
+_SMALL_MILK_ANIMALS = [a for a in animals if a.milk][:5]
+
+# Shared cache for the expensive full-zoo fit (filled once by setUpModule).
+_ZOO_MODEL_CACHE: Optional[EQLSingleClassRDR] = None
+
 
 def first(sp: Species) -> Animal:
     return next(a for a, t in zip(animals, targets) if t is sp)
@@ -76,6 +82,19 @@ def labelling_expert() -> Expert:
         return result
 
     return Expert(interface=FunctionInterface(answer_fn=answer))
+
+
+def setUpModule():
+    """Fit the full-zoo species model once for the whole module."""
+    global _ZOO_MODEL_CACHE
+    if not animals:
+        return
+    backend = RDRBackend(expert=maximally_specific_expert())
+    backend.fit(
+        underspecified(Animal, domain=animals)(species=...),
+        ground_truth=lambda a: target_by_name[a.name],
+    )
+    _ZOO_MODEL_CACHE = backend.models.get((Animal, "species"))
 
 
 @unittest.skipIf(len(animals) == 0, "Failed to load zoo dataset")
@@ -126,12 +145,13 @@ class TestFromUnderspecified(unittest.TestCase):
 
 @unittest.skipIf(len(animals) == 0, "Failed to load zoo dataset")
 class TestRDRBackendInfer(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._fitted_model = _ZOO_MODEL_CACHE
+
     def _fitted_backend(self):
-        backend = RDRBackend(expert=maximally_specific_expert())
-        backend.fit(
-            underspecified(Animal, domain=animals)(species=...),
-            ground_truth=lambda a: target_by_name[a.name],
-        )
+        backend = RDRBackend()
+        backend.models[(Animal, "species")] = self._fitted_model
         return backend
 
     def test_infer_is_lazy(self):
@@ -176,14 +196,22 @@ class TestRDRBackendInfer(unittest.TestCase):
 
 @unittest.skipIf(len(animals) == 0, "Failed to load zoo dataset")
 class TestRDRBackendFitModes(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if not _SMALL_MILK_ANIMALS:
+            return
+        backend = RDRBackend(expert=maximally_specific_expert())
+        backend.fit(
+            underspecified(Animal, domain=_SMALL_MILK_ANIMALS)(milk=True, species=...),
+            ground_truth=Species.mammal,
+        )
+        cls._mammal_backend = backend
+
     def test_constant_ground_truth(self):
         # Every milk-bearing animal is a mammal: a single ground-truth value for the subset.
-        backend = RDRBackend(expert=maximally_specific_expert())
-        query = underspecified(Animal, domain=animals)(milk=True, species=...)
-        backend.fit(query, ground_truth=Species.mammal)
-        out = underspecified(Animal, domain=animals)(milk=True, species=...)
+        out = underspecified(Animal, domain=_SMALL_MILK_ANIMALS)(milk=True, species=...)
         self.assertTrue(
-            all(r[out.variable.species] == Species.mammal for r in backend.infer(out))
+            all(r[out.variable.species] == Species.mammal for r in self._mammal_backend.infer(out))
         )
 
     def test_auto_fit_mode_without_ground_truth_uses_ask_for_rule(self):
@@ -202,25 +230,25 @@ class TestRDRBackendFitModes(unittest.TestCase):
 
 @unittest.skipIf(len(animals) == 0, "Failed to load zoo dataset")
 class TestUnderspecifiedEndToEnd(unittest.TestCase):
-    def test_fit_save_load_infer(self):
-        backend = RDRBackend(expert=maximally_specific_expert())
-        backend.fit(
-            underspecified(Animal, domain=animals)(species=...),
-            ground_truth=lambda a: target_by_name[a.name],
-        )
-        [model] = backend.models.values()
+    @classmethod
+    def setUpClass(cls):
+        cls._fitted_model = _ZOO_MODEL_CACHE
 
+    def test_fit_save_load_infer(self):
+        model = self._fitted_model
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "zoo_rdr.py")
             save_rdr(model, path)
             loaded = load_rdr(path)
 
+        original_backend = RDRBackend()
+        original_backend.models[(Animal, "species")] = model
         reloaded_backend = RDRBackend()
         reloaded_backend.models[(Animal, "species")] = loaded
 
         q1 = underspecified(Animal, domain=animals)(species=...)
         q2 = underspecified(Animal, domain=animals)(species=...)
-        before = [r[q1.variable.species] for r in backend.infer(q1)]
+        before = [r[q1.variable.species] for r in original_backend.infer(q1)]
         after = [r[q2.variable.species] for r in reloaded_backend.infer(q2)]
         self.assertEqual(before, after)
 
