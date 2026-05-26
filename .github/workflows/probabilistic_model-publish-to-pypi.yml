@@ -1,0 +1,106 @@
+name: Publish probabilistic_model to PyPI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'probabilistic_model/**'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: probabilistic_model
+
+jobs:
+  check-version:
+    name: Check if version is new
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.check.outputs.should_publish }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Check version against PyPI
+        id: check
+        run: |
+          LOCAL_VERSION=$(python -c "
+          import ast
+          with open('src/probabilistic_model/__init__.py') as f:
+              for line in f:
+                  if line.startswith('__version__'):
+                      print(ast.literal_eval(line.split('=', 1)[1].strip()))
+                      break
+          ")
+          echo "Local version: $LOCAL_VERSION"
+
+          PYPI_VERSION=$(pip index versions probabilistic_model 2>/dev/null \
+            | grep -oP '(?<=Available versions: )[^,]+' \
+            | tr -d ' ' || echo "0.0.0")
+          echo "PyPI version: $PYPI_VERSION"
+
+          python -c "
+          import sys
+          def parse(v):
+              return tuple(int(x) for x in v.split('.'))
+          sys.exit(0 if parse('$LOCAL_VERSION') > parse('$PYPI_VERSION') else 1)
+          " && echo "should_publish=true" >> $GITHUB_OUTPUT \
+            || echo "should_publish=false" >> $GITHUB_OUTPUT
+          echo "version=$LOCAL_VERSION" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    needs: check-version
+    if: needs.check-version.outputs.should_publish == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Build
+        run: |
+          pip install build
+          python -m build
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: probabilistic_model/dist/
+
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: build
+    defaults:
+      run:
+        working-directory: .
+    environment:
+      name: pypi
+      url: https://pypi.org/p/probabilistic-model
+    permissions:
+      id-token: write  # required for trusted publishing
+    steps:
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          verbose: 'true'

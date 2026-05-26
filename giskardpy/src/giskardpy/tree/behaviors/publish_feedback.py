@@ -32,7 +32,8 @@ class PublishFeedback(GiskardBehavior):
     @record_time
     def update(self):
         data = {}
-        if self.has_new_goal():
+        has_new_goal = self.has_new_goal()
+        if has_new_goal:
             self.last_goal_id = self.move_action_server.goal_id
             data["motion_statechart"] = (
                 GiskardBlackboard().motion_statechart.create_structure_copy().to_json()
@@ -46,7 +47,7 @@ class PublishFeedback(GiskardBehavior):
             GiskardBlackboard().motion_statechart.observation_state.to_json()
         )
 
-        if self.has_state_changed() or self.has_new_goal():
+        if self.has_state_changed() or has_new_goal:
             msg = JsonAction.Feedback()
             msg.feedback = json.dumps(data)
             self.move_action_server.send_feedback(msg)

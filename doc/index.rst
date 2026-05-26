@@ -83,14 +83,8 @@ Activate / deactivate
 ..code:: bash
 
   workon cram-env
+
   deactivate
-
-Pull the submodules:
-
-.. code:: bash
-
-  cd cognitive_robot_abstract_machine
-  git submodule update --init --recursive
 
 Install using UV
 ~~~~~~~~~~~~~~~~

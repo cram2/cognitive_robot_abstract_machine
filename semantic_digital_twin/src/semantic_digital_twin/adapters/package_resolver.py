@@ -123,18 +123,27 @@ class FileUriResolver(PathResolver):
     Resolves file:// URIs and plain filesystem paths.
     """
 
+    base_directory: str = None
+    """
+    The base directory to resolve relative paths from.
+    """
+
     def supports(self, uri: str) -> bool:
         return uri.startswith("file://") or uri.startswith("/") or "://" not in uri
 
     def resolve(self, uri: str) -> str:
-        path = uri
         if uri.startswith("file://"):
-            path = (
-                uri.replace("file://", "./", 1)
-                if not uri.startswith("file:///")
-                else uri[len("file://") :]
-            )
-        return path
+            if uri.startswith("file:///"):
+                path = uri[len("file://"):]  # absolute
+            else:
+                path = uri.replace("file://", "", 1)  # relative
+        else:
+            path = uri
+
+        if not os.path.isabs(path):
+            path = os.path.join(self.base_directory, path)
+
+        return os.path.abspath(path)
 
 
 @dataclass

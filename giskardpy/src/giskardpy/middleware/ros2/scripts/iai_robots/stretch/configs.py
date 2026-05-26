@@ -20,10 +20,10 @@ from semantic_digital_twin.world_description.connections import (
 
 class StretchStandaloneInterface(StandAloneRobotInterfaceConfig):
 
-    def __init__(self, drive_joint_name: str = "brumbrum"):
+    def __init__(self):
         super().__init__(
             [
-                drive_joint_name,
+                # self.world.get_connections_by_type(DifferentialDrive)[0].name,
                 "joint_gripper_finger_left",
                 "joint_gripper_finger_right",
                 "joint_right_wheel",

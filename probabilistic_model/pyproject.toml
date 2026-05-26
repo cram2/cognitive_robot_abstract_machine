@@ -25,8 +25,8 @@ keywords=["probabilistic models", "probabilistic machine learning", "probability
 dynamic = ["version", "dependencies"]
 
 [project.urls]
-"Source" = 'https://github.com/probabilistic_model/probabilistic_model'
-"Bug Tracker" = 'https://github.com/tomsch420/probabilistic_model/issues'
+"Source" = 'https://github.com/cram2/cognitive_robot_abstract_machine'
+"Bug Tracker" = 'https://github.com/cram2/cognitive_robot_abstract_machine/issues'
 
 [tool.setuptools.packages.find]
 where = ["src"]  # list of folders that contain the packages (["."] by default)

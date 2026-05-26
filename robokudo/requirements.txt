@@ -1,0 +1,13 @@
+pytest>=7.1.1
+open3d>=0.15.2
+numpy>=1.22.3
+pydot>=1.4.2
+scipy>=1.8.0
+pymongo
+numba<=0.61.2
+pyyaml
+transforms3d
+opencv-python>=4.11.0.86
+matplotlib
+setuptools
+pooch

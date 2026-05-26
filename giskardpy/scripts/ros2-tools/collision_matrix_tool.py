@@ -111,13 +111,13 @@ class SelfCollisionMatrixInterface:
     def load_urdf(self, urdf_path: str):
         robot_world = URDFParser.from_file(urdf_path).parse()
         self.self_collision_matrix_rule = SelfCollisionMatrixRule()
-        self.robot = MinimalRobot.from_world(robot_world)
         with self.world.modify_world():
             self.world.clear()
             self.world.add_body(map := Body(name=PrefixedName("map")))
             self.world.merge_world(
                 robot_world, FixedConnection(parent=map, child=robot_world.root)
             )
+        self.robot = MinimalRobot.from_world(self.world)
 
     def dye_all_bodies_white_transparent(self):
         with self.world.modify_world():
@@ -184,9 +184,23 @@ class SelfCollisionMatrixInterface:
             )
 
     def safe_srdf(self, file_path: str):
+        self._sync_reasons_to_collision_pairs()
         self.self_collision_matrix_rule.save_self_collision_matrix(
             self.robot.name.name, file_path
         )
+
+    def _sync_reasons_to_collision_pairs(self):
+        """
+        Synchronizes the _reasons dictionary back into allowed_collision_pairs.
+        This ensures UI changes are persisted when saving the SRDF.
+        """
+        self.self_collision_matrix_rule.allowed_collision_pairs.clear()
+        for (body_a, body_b), reason in self._reasons.items():
+            if reason is not None:
+                collision_check = CollisionCheck.create_and_validate(body_a, body_b)
+                self.self_collision_matrix_rule.allowed_collision_pairs.add(
+                    collision_check
+                )
 
     def add_body(self, body: Body):
         self.self_collision_matrix_rule.allowed_collision_bodies.discard(body)

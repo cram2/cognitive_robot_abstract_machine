@@ -12,6 +12,9 @@ from random_events.interval import SimpleInterval, Interval
 from typing_extensions import Type
 import datetime
 
+from random_events.product_algebra import Event
+from random_events.variable import Variable, Continuous
+
 
 def simple_interval_as_array(interval: SimpleInterval) -> np.ndarray:
     """
@@ -90,3 +93,33 @@ def neighbouring_points(point: float) -> np.array:
     :return: The point and its two neighbours
     """
     return np.array([np.nextafter(point, -np.inf), point, np.nextafter(point, np.inf)])
+
+
+def event_compatible_for_truncation_with_singletons(event: Event):
+    """
+    Check if the event is compatible for truncation with singletons.
+    It is compatible if for each variable, either all intervals are singletons or all intervals are not singletons.
+    :param event: The event to check.
+    :return: True if the event is compatible, False otherwise.
+    """
+    intervals_per_dimensions = defaultdict(list)
+
+    for variable in event.variables:
+        variable: Variable
+        if not isinstance(variable, Continuous):
+            continue
+
+        for simple_event in event.simple_sets:
+            # collect all simple intervals for this variable across the composite event
+            intervals_per_dimensions[variable].extend(
+                simple_event[variable].simple_sets
+            )
+
+    for variable, intervals in intervals_per_dimensions.items():
+        if all(interval.is_singleton() for interval in intervals):
+            continue
+        elif all(not interval.is_singleton() for interval in intervals):
+            continue
+        else:
+            return False
+    return True

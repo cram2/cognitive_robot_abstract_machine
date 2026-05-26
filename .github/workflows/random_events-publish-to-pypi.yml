@@ -1,0 +1,157 @@
+name: Publish random_events to PyPI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'random_events/**'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: random_events
+
+jobs:
+  check-version:
+    name: Check if version is new
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.check.outputs.should_publish }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Check version against PyPI
+        id: check
+        run: |
+          LOCAL_VERSION=$(python -c "
+          import ast
+          with open('src/random_events/__init__.py') as f:
+              for line in f:
+                  if line.startswith('__version__'):
+                      print(ast.literal_eval(line.split('=', 1)[1].strip()))
+                      break
+          ")
+          echo "Local version: $LOCAL_VERSION"
+
+          PYPI_VERSION=$(pip index versions random_events 2>/dev/null \
+            | grep -oP '(?<=Available versions: )[^,]+' \
+            | tr -d ' ' || echo "0.0.0")
+          echo "PyPI version: $PYPI_VERSION"
+
+          python -c "
+          import sys
+          def parse(v):
+              return tuple(int(x) for x in v.split('.'))
+          sys.exit(0 if parse('$LOCAL_VERSION') > parse('$PYPI_VERSION') else 1)
+          " && echo "should_publish=true" >> $GITHUB_OUTPUT \
+            || echo "should_publish=false" >> $GITHUB_OUTPUT
+          echo "version=$LOCAL_VERSION" >> $GITHUB_OUTPUT
+
+  build-wheels:
+    name: Build wheel for Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    needs: check-version
+    if: needs.check-version.outputs.should_publish == 'true'
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install cibuildwheel
+        run: pip install cibuildwheel
+
+      - name: Build wheels
+        env:
+          CIBW_BUILD: >-
+            cp${{ matrix.python-version == '3.10' && '310' ||
+                  matrix.python-version == '3.11' && '311' ||
+                  matrix.python-version == '3.12' && '312' ||
+                  matrix.python-version == '3.9'  && '39'  || '38' }}-manylinux_x86_64
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+          CIBW_BEFORE_BUILD: pip install -r requirements.txt
+          CIBW_REPAIR_WHEEL_COMMAND: auditwheel repair -w {dest_dir} {wheel}
+        run: python -m cibuildwheel --output-dir wheelhouse
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.python-version }}
+          path: random_events/wheelhouse/*.whl
+
+  build-sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    needs: check-version
+    if: needs.check-version.outputs.should_publish == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Build SDist
+        run: |
+          pip install build
+          python -m build --sdist
+
+      - name: Upload SDist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: random_events/dist/*.tar.gz
+
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [build-wheels, build-sdist]
+    defaults:
+      run:
+        working-directory: .
+    environment:
+      name: pypi
+      url: https://pypi.org/p/random-events
+    permissions:
+      id-token: write  # required for trusted publishing
+    steps:
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: dist/
+          merge-multiple: true
+
+      - name: Download SDist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          verbose: 'true'

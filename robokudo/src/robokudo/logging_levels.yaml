@@ -1,0 +1,35 @@
+# Logging configuration for ROS2
+
+# Mapping of log level numbers:
+# DEBUG	10
+# INFO	20
+# WARNING	30
+# ERROR	40
+# CRITICAL	50
+
+# robokudo
+robokudo: 20
+robokudo.main: 20
+robokudo.query: 20
+robokudo_example_package: 20
+
+# ROS2 (rclpy and related libraries)
+rclpy: 10
+rclpy.node: 20
+ros2cli: 20
+rosidl_generator_py: 20
+rcutils: 20
+
+# ROS Graph
+rosgraph: 20
+
+# Third-party libraries
+pkg_resources: 20
+setuptools: 20
+concurrent: 20
+PIL: 20
+tqdm: 20
+open3d: 20
+gnupg: 20
+sklearn: 20
+xmlrpc: 20

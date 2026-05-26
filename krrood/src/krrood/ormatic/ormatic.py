@@ -114,6 +114,7 @@ class ORMatic:
         Fill the type mappings of this with needed defaults
         """
         self.type_mappings[Type] = TypeType
+        self.type_mappings[type] = TypeType
         self.type_mappings[Enum] = PolymorphicEnumType
         self.type_mappings[SubclassJSONSerializer] = JSON
         self.type_mappings[uuid.UUID] = sqlalchemy.UUID

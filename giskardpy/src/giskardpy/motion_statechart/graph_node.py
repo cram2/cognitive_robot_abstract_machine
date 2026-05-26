@@ -25,6 +25,7 @@ from krrood.adapters.json_serializer import (
     to_json,
 )
 from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar, trinary_logic_not
+from krrood.exceptions import DataclassException
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import (
     Point3,
@@ -1050,7 +1051,7 @@ class EndMotion(MotionStatechartNode):
 
 @dataclass(eq=False, repr=False)
 class CancelMotion(MotionStatechartNode):
-    exception: Exception = field(kw_only=True)
+    exception: DataclassException = field(kw_only=True)
     observation_expression: Scalar = field(
         default_factory=Scalar.const_true, init=False
     )
