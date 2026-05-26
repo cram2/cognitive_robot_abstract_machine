@@ -75,9 +75,9 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
                             tip_link=tip,
                             goal_pose=self.target,
                         ),
-                        LocalMinimumReached(),
+                        LocalMinimumReached(joint_convergence_threshold=0.025),
                     ],
-                    minimum_success=2,
+                    minimum_success=1,
                 ),
             ]
         )
@@ -114,7 +114,7 @@ class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
     def _motion_chart(self) -> NavigateActionServerTask:
         world_T_target = self.world.transform(self.target, self.world.root)
         world_T_target.z = 0
-        return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.05)
+        return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.1)
         return NavigateActionServerTask(
             target_pose=self.target,
             base_link=self.robot.root,

@@ -1,5 +1,6 @@
 from typing import List
 
+import numpy as np
 from py_trees.common import Status
 from std_msgs.msg import Float64MultiArray
 
@@ -9,7 +10,10 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.blackboard_utils import (
     catch_and_raise_to_blackboard,
 )
-from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
+from semantic_digital_twin.world_description.connections import (
+    ActiveConnection1DOF,
+    PrismaticConnection,
+)
 
 
 class JointGroupVelController(GiskardBehavior):
@@ -34,8 +38,20 @@ class JointGroupVelController(GiskardBehavior):
     @record_time
     def update(self):
         msg = Float64MultiArray()
+
+        minimum_valid_velocity = 0.03
+        low_velocity = 0.0
         for i, connection in enumerate(self.connections):
-            msg.data.append(connection.velocity)
+            velocity = connection.velocity
+            abs_velocity = abs(velocity)
+            vel_sign = np.sign(velocity)
+            if (
+                not isinstance(connection, PrismaticConnection)
+                and not "finger" in connection.name.name
+                and low_velocity < abs_velocity < minimum_valid_velocity
+            ):
+                velocity = minimum_valid_velocity * vel_sign
+            msg.data.append(velocity)
         self.cmd_pub.publish(msg)
         return Status.RUNNING
 

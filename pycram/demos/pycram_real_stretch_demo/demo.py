@@ -34,6 +34,8 @@ from pycram.robot_plans.actions.core.robot_body import (
     StretchRetractArm,
     StretchTorsoShelfPickPlaceHeight,
     StretchTorsoTablePickPlaceHeight,
+    MoveTorsoAction,
+    SetGripperAction,
 )
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.package_resolver import CompositePathResolver
@@ -46,7 +48,7 @@ from semantic_digital_twin.adapters.ros.world_synchronizer import (
     StateSynchronizer,
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -72,7 +74,7 @@ executor.add_node(node)
 thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
 thread.start()
 
-exec_type = ExecutionType.SIMULATED
+exec_type = ExecutionType.REAL
 
 exec_env = ExecutionEnvironment(exec_type)
 
@@ -355,7 +357,7 @@ grasp_desc = GraspDescription(
 
 # input("Ready ...")
 cereal_body = world.get_body_by_name("cheeze_it.obj")
-shelf_body = shelf_layer2.root
+shelf_body = world.get_body_by_name("shelf_layer2")
 bedside_table_body = world.get_body_by_name("bedside_table.dae")
 
 plan = sequential(
@@ -373,7 +375,7 @@ plan = sequential(
         PlaceAction(
             object_designator=world.get_body_by_name("cheeze_it.obj"),
             target_location=Pose.from_xyz_rpy(
-                x=0.1, z=0.505, yaw=np.pi, reference_frame=bedside_table_body
+                x=0.1, z=0.49, yaw=np.pi, reference_frame=bedside_table_body
             ),
             arm=Arms.LEFT,
         ),
@@ -381,6 +383,7 @@ plan = sequential(
     ],
     context,
 ).plan
+
 
 with exec_env:
     plan.perform()
