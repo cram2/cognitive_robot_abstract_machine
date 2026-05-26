@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
+from typing import Union
 
 from typing_extensions import List, TypeVar, Generic
 
@@ -93,3 +94,22 @@ class ExampleClass: ...
 
 @dataclass(eq=False)
 class CombinedClass(ExampleClass, GenericListClass[str]): ...
+
+
+@dataclass(eq=False)
+class OneGenericSubClassSafe(Generic[T], AbstractSubClassSafeGeneric, ABC):
+    one_generic_first_argument: T
+
+
+@dataclass(eq=False)
+class CombinedThreeGenericSubClassSafe(
+    Generic[U, V], OneGenericSubClassSafe[Union[U, V]]
+):
+    combined_three_generic_first_argument: U
+    combined_three_generic_second_argument: V
+
+
+@dataclass(eq=False)
+class SpecificCombinedThreeGenericSubClassSafe(
+    CombinedThreeGenericSubClassSafe[ExampleClass, CombinedClass]
+): ...

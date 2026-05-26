@@ -1,5 +1,6 @@
 import sys
 from dataclasses import fields
+from typing import Union
 
 from typing_extensions import (
     get_type_hints,
@@ -21,6 +22,8 @@ from ..dataset.classes_with_generic import (
     SubClassGenericThatRecreatesAFieldWithNonBuiltInType,
     TwoGenericContainerBoundToBuiltIns,
     CombinedClass,
+    SpecificCombinedThreeGenericSubClassSafe,
+    ExampleClass,
 )
 
 
@@ -126,3 +129,14 @@ def test_combined_class_with_generic_subclass_safe_generic_inheritance_second_do
 
     field_ = next(f for f in fields(cls) if f.name == field_name)
     assert field_.type == list[str]
+
+
+def test_SpecificCombinedThreeGenericSubClassSafe():
+    cls = SpecificCombinedThreeGenericSubClassSafe
+    resolved_hints = get_type_hints(cls, include_extras=True)
+    assert resolved_hints["combined_three_generic_first_argument"] == ExampleClass
+    assert resolved_hints["combined_three_generic_second_argument"] == CombinedClass
+    assert (
+        resolved_hints["one_generic_first_argument"]
+        == Union[ExampleClass, CombinedClass]
+    )
