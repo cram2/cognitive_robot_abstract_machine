@@ -1,5 +1,6 @@
 import sys
 from dataclasses import fields
+from typing import Union
 
 from typing_extensions import (
     get_type_hints,
@@ -20,6 +21,9 @@ from ..dataset.classes_with_generic import (
     SubClassGenericThatRecreatesAFieldWithAnotherVar,
     SubClassGenericThatRecreatesAFieldWithNonBuiltInType,
     TwoGenericContainerBoundToBuiltIns,
+    CombinedClass,
+    SpecificCombinedThreeGenericSubClassSafe,
+    ExampleClass,
 )
 
 
@@ -114,4 +118,25 @@ def _assert_generic_type_is_resolved(cls):
     assert (
         get_origin(nested_generic_type) is list
         and get_args(nested_generic_type)[0] is generic_type
+    )
+
+
+def test_combined_class_with_generic_subclass_safe_generic_inheritance_second_doesnt_die_from_missing_type_and_is_still_updated():
+    cls = CombinedClass
+    resolved_hints = get_type_hints(cls, include_extras=True)
+    field_name = "generic_list"
+    assert resolved_hints[field_name] == list[str]
+
+    field_ = next(f for f in fields(cls) if f.name == field_name)
+    assert field_.type == list[str]
+
+
+def test_SpecificCombinedThreeGenericSubClassSafe():
+    cls = SpecificCombinedThreeGenericSubClassSafe
+    resolved_hints = get_type_hints(cls, include_extras=True)
+    assert resolved_hints["combined_three_generic_first_argument"] == ExampleClass
+    assert resolved_hints["combined_three_generic_second_argument"] == CombinedClass
+    assert (
+        resolved_hints["one_generic_first_argument"]
+        == Union[ExampleClass, CombinedClass]
     )
