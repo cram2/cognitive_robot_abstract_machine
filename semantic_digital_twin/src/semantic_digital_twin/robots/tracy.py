@@ -174,7 +174,7 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
         )
 
     def _setup_velocity_limits(self):
-        self.tighten_dof_velocity_limits_proportionally(maximum_velocity=0.2)
+        self.tighten_dof_velocity_limits_proportionally(maximum_velocity=1.0)
 
     def _setup_hardware_interfaces(self):
         controlled_joints = [
