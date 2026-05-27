@@ -846,14 +846,14 @@ def create_reference_frame_with_only_yaw_from_body(body: Body) -> Body:
         name=PrefixedName(prefix=str(body.name), name="base_with_yaw")
     )
 
-    body_T_world = world.transform(body.global_pose, world.root)
+    world_T_body = world.transform(body.global_pose, world.root)
     reference_frame_T_world = HomogeneousTransformationMatrix.from_xyz_rpy(
-        x=body_T_world.x,
-        y=body_T_world.y,
-        z=body_T_world.z,
+        x=world_T_body.x,
+        y=world_T_body.y,
+        z=world_T_body.z,
         roll=0.0,
         pitch=0.0,
-        yaw=body_T_world.yaw,
+        yaw=world_T_body.yaw,
         reference_frame=world.root,
     )
 

@@ -23,7 +23,7 @@ import rclpy
 import tqdm
 from rclpy.executors import SingleThreadedExecutor
 
-from experiments.sage_10k.demos import Sage10kAbstractDemo
+from experiments.sage_10k.demos import Sage10kAbstractDemoHSRB
 from krrood.utils import recursive_subclasses
 from pycram.motion_executor import simulated_robot
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
@@ -32,7 +32,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 from semantic_digital_twin.orm.ormatic_interface import *  # type: ignore
 
 
-def run_demo(demo: Sage10kAbstractDemo):
+def run_demo(demo: Sage10kAbstractDemoHSRB):
     """
     Runs a single Sage10k demo.
 
@@ -64,7 +64,7 @@ def run_demo(demo: Sage10kAbstractDemo):
 
 
 if __name__ == "__main__":
-    pbar = tqdm.tqdm(recursive_subclasses(Sage10kAbstractDemo))
+    pbar = tqdm.tqdm(recursive_subclasses(Sage10kAbstractDemoHSRB))
     for demo in pbar:
         pbar.set_postfix({"Current Scene": demo.scene_url.name})
         run_demo(demo())

@@ -222,7 +222,7 @@ def variable_from_name_and_type(name: str, type_: Type) -> Variable:
 
 def most_appropriate_variable_type(
     union: Iterable[Type],
-) -> Optional[Union[*compatible_types]]:
+) -> Optional[Type[Union[*compatible_types]]]:
     """
     Get the most appropriate type for a random events variable from a union of types.
     The most appropriate type is the one, where the mathematical interpretation as set has the highest cardinality.

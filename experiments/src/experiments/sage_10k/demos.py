@@ -43,7 +43,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
-class Sage10kAbstractDemo:
+class Sage10kAbstractDemoHSRB:
     """
     Base class for all Sage10k demos with the HSRB robot.
     Extend this class to create a new demo.
@@ -125,7 +125,7 @@ class Sage10kAbstractDemo:
 
 
 @dataclass
-class Sage10kGymDemo(Sage10kAbstractDemo):
+class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
     """
     Collect a bottle from the bench and put it in the bin.
     """
@@ -217,7 +217,7 @@ class Sage10kGymDemo(Sage10kAbstractDemo):
 
 
 @dataclass
-class Sage10kTVStudioDemo(Sage10kAbstractDemo):
+class Sage10kTVStudioDemo(Sage10kAbstractDemoHSRB):
     """
     Get the book from the table and present it to the audience.
     """
@@ -291,7 +291,7 @@ class Sage10kTVStudioDemo(Sage10kAbstractDemo):
 
 
 @dataclass
-class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemo):
+class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
     """
     Put something to read next to the clean couch.
     """
@@ -379,7 +379,7 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemo):
 
 
 @dataclass
-class Sage10kTropicalWarehouse(Sage10kAbstractDemo):
+class Sage10kTropicalWarehouse(Sage10kAbstractDemoHSRB):
     """
     Fetch me a cup from the warehouse.
     """
@@ -458,7 +458,7 @@ class Sage10kTropicalWarehouse(Sage10kAbstractDemo):
 
 
 @dataclass
-class Sage10kVaporwave(Sage10kAbstractDemo):
+class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
     """
     Fetch me a cup from the warehouse.
     """
@@ -537,7 +537,7 @@ class Sage10kVaporwave(Sage10kAbstractDemo):
 
 
 @dataclass
-class Sage10kEclecticResidence(Sage10kAbstractDemo):
+class Sage10kEclecticResidence(Sage10kAbstractDemoHSRB):
     """
     Fetch me a cup from the warehouse.
     """
@@ -622,7 +622,7 @@ class Sage10kEclecticResidence(Sage10kAbstractDemo):
 
 
 @dataclass
-class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemo):
+class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
     scene_url = Sage10kActionableScenes.SOUTHWESTERN_STORE
 
     @property
@@ -746,7 +746,7 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemo):
 
 
 @dataclass
-class Sage10kBrutalistStoreDemo(Sage10kAbstractDemo):
+class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
     scene_url = Sage10kActionableScenes.BRUTALIST_STORE
 
     @property
@@ -852,7 +852,7 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemo):
 
 
 @dataclass
-class Sage10kAmericanBuffetDemo(Sage10kAbstractDemo):
+class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
     scene_url = Sage10kActionableScenes.AMERICAN_BUFFET_RESTAURANT
 
     @property

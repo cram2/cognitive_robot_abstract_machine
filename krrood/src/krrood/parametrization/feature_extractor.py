@@ -9,7 +9,7 @@ from typing import List, Type
 import pandas as pd
 import sqlalchemy
 from sqlalchemy.orm import MANYTOONE, ONETOMANY
-from typing_extensions import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, Any
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
@@ -98,7 +98,7 @@ class FeatureExtractor:
 
         return result
 
-    def apply_mapping(self, instance: DataAccessObject) -> List:
+    def apply_mapping(self, instance: DataAccessObject) -> List[Any]:
         """
         Extracts the mapped values for each feature from the given instance.
         :param instance: The instance to extract features from.

@@ -390,6 +390,9 @@ class NygaInduction:
     """
 
     variable: Continuous
+    """
+    The variable of the distribution.
+    """
 
     min_likelihood_improvement: float = 0.01
     """
@@ -411,6 +414,9 @@ class NygaInduction:
     probabilistic_circuit: ProbabilisticCircuit = field(
         init=False, default_factory=ProbabilisticCircuit, compare=False
     )
+    """
+    The probabilistic circuit to mount the distribution into.
+    """
 
     def fit(
         self, data: np.ndarray, weights: Optional[np.ndarray] = None

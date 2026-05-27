@@ -332,7 +332,7 @@ class UnderspecifiedNode(PlanNode):
                 self.underspecified_action
             )
 
-        for grounded_action in tqdm.tqdm(self._action_iterator):
+        for grounded_action in self._action_iterator:
             new_child = ActionNode(designator=grounded_action)
             self.add_child(new_child)
             try:
