@@ -10,8 +10,18 @@ from giskardpy.qp.qp_controller_config import QPControllerConfig
 from rclpy import Parameter
 from rclpy.exceptions import ParameterUninitializedException
 
+from giskardpy.utils import objgraph_debug
+
 
 def main():
+    import os
+
+    print(
+        f"GISKARD_OBJGRAPH="
+        f"{os.environ.get("GISKARD_OBJGRAPH")!r} -> enabled={objgraph_debug.ENABLED}",
+        flush=True,
+    )
+
     rospy.init_node("giskard")
     try:
         rospy.node.declare_parameters(
@@ -35,6 +45,10 @@ def main():
             target_frequency=80, prediction_horizon=50
         ),
     )
+    objgraph_debug.report_growth(label="giskard startup baseline")
+    objgraph_debug.report_growth(label="giskard startup baseline")
+    objgraph_debug.start_periodic()
+
     giskard.live()
 
 

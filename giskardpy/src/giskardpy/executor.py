@@ -11,6 +11,7 @@ from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.qp.exceptions import EmptyProblemException
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from giskardpy.utils import objgraph_debug
 from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
     WorldStateTrajectoryPlotter,
@@ -113,6 +114,9 @@ class Executor:
     def __post_init__(self):
         self.pacer.target_frequency = self.context.qp_controller_config.target_frequency
         self._create_control_cycles_variable()
+        self.float_variable_data_base_len = len(
+            self.context.float_variable_data.variables
+        )
 
     def _create_control_cycles_variable(self):
         self.context.control_cycle_variable = FloatVariable("control_cycles")
@@ -138,6 +142,17 @@ class Executor:
         if self.trajectory_plotter is not None:
             self.trajectory_plotter.reset(self.context.world.state, self.time)
         self.context.collision_manager.update_collision_matrix()
+        if objgraph_debug.ENABLED:
+            cm = self.context.collision_manager
+            n_checks = len(cm.collision_matrix.collision_checks)
+            n_consumers = len(cm.collision_consumers)
+            n_bodies = len(self.context.world.bodies_with_collision)
+            print(
+                f"[objgraph] LIVE collision_matrix after compile: "
+                f"{n_checks} checks | {n_consumers} consumers " f"(per-tick checking {'ON' if n_consumers else 'OFF'}) | "
+                f"{n_bodies} bodies_with_collision",
+                flush=True,
+            )
         # do one tick to immediately active nodes whose start condition is constant true.
         self.motion_statechart.tick(self.context)
 
@@ -209,6 +224,19 @@ class Executor:
             life_cycle_variables=self.motion_statechart.life_cycle_state.life_cycle_symbols(),
             float_variables=self.context.float_variable_data.variables,
         )
+
+        if objgraph_debug.ENABLED:
+            cc = constraint_collection
+            print(
+                f"[objgraph] QP after compile: {len(ordered_dofs)} active DOFs x " 
+                f"horizon {controller_config.prediction_horizon} | constraints " f"total={len(cc._constraints)} "
+                f"(ineq={len(cc.inequality_constraints)}, "
+                f"eq={len(cc.equality_constraints)}, "
+                f"deriv_ineq={len(cc.derivative_inequality_constraints)}, "
+                f"deriv_eq={len(cc.derivative_equality_constraints)})",
+                flush=True,
+            )
+
         if self.qp_controller.has_not_free_variables():
             raise EmptyProblemException()
 

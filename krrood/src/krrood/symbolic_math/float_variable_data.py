@@ -69,6 +69,12 @@ class FloatVariableData:
 
             variable.resolve = resolve_variable
 
+    def truncate(self, n: int) -> None:
+        if not 0 <= n <= len(self.variables):
+            raise ValueError(f"Trying to truncate out of range")
+        self.variables = self.variables[:n]
+        self.data = self.data[:n].copy()
+
     def set_value(
         self, expression: SymbolicMathType, value: float | list[float] | np.ndarray
     ):

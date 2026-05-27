@@ -441,7 +441,7 @@ class MotionStatechart(SubclassJSONSerializer):
         if isinstance(node, Goal):
             for child_node in node.nodes:
                 self._build_and_apply_artifacts(child_node, context=context)
-            node.build(context=context)
+            # node.build(context=context)
         artifacts = node.build(context=context)
         node._constraint_collection = artifacts.constraints
         node._constraint_collection.link_to_motion_statechart_node(node)
@@ -579,6 +579,8 @@ class MotionStatechart(SubclassJSONSerializer):
     def cleanup_nodes(self, context: MotionStatechartContext):
         for node in self.nodes:
             node.cleanup(context)
+
+        self.history.history.clear()
 
     def draw(self, file_name: str):
         """

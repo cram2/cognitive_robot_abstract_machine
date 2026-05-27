@@ -5,6 +5,7 @@ from py_trees.common import Status
 from giskardpy.middleware.ros2 import rospy
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.blackboard_utils import GiskardBlackboard
+from giskardpy.utils import objgraph_debug
 
 
 class ProcessWorldUpdate(GiskardBehavior):
@@ -21,8 +22,24 @@ class ProcessWorldUpdate(GiskardBehavior):
         else:
             if not self.worker_thread.is_alive():
                 self.worker_thread = None
+                version = GiskardBlackboard().executor.context.world._model_manager.version
                 rospy.node.get_logger().info(
-                    f"Finished world update, model version: {GiskardBlackboard().executor.context.world._model_manager.version}."
+                    f"Finished world update, model version: {version}."
+                )
+                objgraph_debug.report_growth(label=f"After world update version {version}")
+                objgraph_debug.count_types(
+                    [
+                        "Compiled",
+                        "Collision",
+                        "Matrix",
+                        "Connection",
+                        "Body",
+                        "DegreeOfFreedom",
+                        "Monitor",
+                        "Task",
+                        "CollisionObject",
+                    ],
+                    label=f"v={version}",
                 )
                 return Status.SUCCESS
         return Status.RUNNING
