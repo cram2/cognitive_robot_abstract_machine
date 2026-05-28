@@ -40,6 +40,16 @@ from krrood.entity_query_language.factories import (
     or_,
 )
 from krrood.entity_query_language.predicate import HasType, Predicate, Triple
+from krrood.entity_query_language.verbalization.pipeline import VerbalizationPipeline
+from krrood.entity_query_language.verbalization.rendering.formatter import (
+    ANSIFormatter,
+    HTMLFormatter,
+    PlainFormatter,
+)
+from krrood.entity_query_language.verbalization.rendering.renderer import (
+    HierarchicalRenderer,
+    ParagraphRenderer,
+)
 from krrood.entity_query_language.verbalization.verbalizer import (
     EQLVerbalizer,
     VerbalizationContext,
@@ -1628,3 +1638,126 @@ def test_pr_example():
     assert verbalize_expression(
         query) == ("Find a BankTransaction whose amount is greater than 1000, and booking_date is between May 1, 2026,"
                    " and May 30, 2026")
+
+
+# ── verbalize_expression renderer argument tests ──────────────────────────────
+
+
+def test_verbalize_expression_no_renderer_backward_compatible():
+    """Calling verbalize_expression with no renderer arg matches current plain output."""
+    r = variable(_Robot, [])
+    q = an(entity(r).where(r.battery > 50))
+    assert verbalize_expression(q) == verbalize_expression(
+        q, renderer=ParagraphRenderer(PlainFormatter())
+    )
+
+
+def test_verbalize_expression_explicit_plain_paragraph():
+    """Explicit plain formatter + paragraph renderer produces same output as default."""
+    r = variable(_Robot, [])
+    q = an(entity(r).where(r.battery > 50))
+    result = verbalize_expression(q, renderer=ParagraphRenderer(PlainFormatter()))
+    assert "Find" in result
+    assert "Robot" in result
+    assert "\033" not in result
+    assert "<span" not in result
+
+
+def test_verbalize_expression_ansi_paragraph():
+    """ANSI formatter + paragraph renderer produces escape codes, no added newlines."""
+    r = variable(_Robot, [])
+    q = an(entity(r).where(r.battery > 50))
+    result = verbalize_expression(q, renderer=ParagraphRenderer(ANSIFormatter()))
+    assert "\033[" in result
+    assert "Robot" in result
+
+
+def test_verbalize_expression_ansi_hierarchical():
+    """ANSI formatter + hierarchical renderer produces escape codes and newlines."""
+    r = variable(_Robot, [])
+    q = an(entity(r).where(or_(r.battery > 50, r.battery < 10)))
+    result = verbalize_expression(q, renderer=HierarchicalRenderer(ANSIFormatter()))
+    assert "\033[" in result
+    assert "\n" in result
+
+
+def test_verbalize_expression_html_paragraph():
+    """HTML formatter + paragraph renderer produces spans and the dark wrapper div."""
+    r = variable(_Robot, [])
+    q = an(entity(r).where(r.battery > 50))
+    result = verbalize_expression(q, renderer=ParagraphRenderer(HTMLFormatter()))
+    assert "<span" in result
+    # HTML pipeline wraps output in a dark <div> for Jupyter rendering.
+    assert "<div" in result
+
+
+def test_verbalize_expression_html_hierarchical():
+    """HTML formatter + hierarchical renderer produces spans and br tags."""
+    r = variable(_Robot, [])
+    q = an(entity(r).where(or_(r.battery > 50, r.battery < 10)))
+    result = verbalize_expression(q, renderer=HierarchicalRenderer(HTMLFormatter()))
+    assert "<span" in result
+    assert "<br>" in result
+
+
+@pytest.mark.parametrize(
+    "renderer_factory",
+    [
+        lambda: ParagraphRenderer(PlainFormatter()),
+        lambda: ParagraphRenderer(ANSIFormatter()),
+        lambda: ParagraphRenderer(HTMLFormatter()),
+        lambda: HierarchicalRenderer(PlainFormatter()),
+        lambda: HierarchicalRenderer(ANSIFormatter()),
+        lambda: HierarchicalRenderer(HTMLFormatter()),
+    ],
+)
+def test_verbalize_expression_all_combos_produce_non_empty(renderer_factory):
+    """Every formatter × renderer combination produces a non-empty string."""
+    r = variable(_Robot, [])
+    q = an(entity(r).where(r.battery > 50))
+    result = verbalize_expression(q, renderer=renderer_factory())
+    assert isinstance(result, str)
+    assert len(result) > 0
+    assert "Robot" in result
+
+
+def test_verbalize_expression_equivalence_to_pipeline():
+    """verbalize_expression with a renderer produces the same output as VerbalizationPipeline."""
+    r = variable(_Robot, [])
+    q = an(entity(r).where(r.battery > 50))
+
+    for renderer in [
+        ParagraphRenderer(PlainFormatter()),
+        ParagraphRenderer(ANSIFormatter()),
+        ParagraphRenderer(HTMLFormatter()),
+        HierarchicalRenderer(PlainFormatter()),
+        HierarchicalRenderer(ANSIFormatter()),
+        HierarchicalRenderer(HTMLFormatter()),
+    ]:
+        via_func = verbalize_expression(q, renderer=renderer)
+        via_pipeline = VerbalizationPipeline(renderer).verbalize(q)
+        assert via_func == via_pipeline, (
+            f"Mismatch for {type(renderer).__name__} / "
+            f"{type(renderer._formatter).__name__}"
+        )
+
+
+def test_verbalize_expression_html_hierarchical_handles_constrained_aggregation(
+    departments_and_employees_fixture,
+):
+    """A constrained aggregation query works end-to-end with HTML hierarchical output."""
+    _, _ = departments_and_employees_fixture
+    employee = variable(Employee, domain=None)
+    avg_salary = eql.average(employee.salary)
+    query = a(
+        set_of(employee.department, avg_salary)
+        .grouped_by(employee.department)
+        .having(avg_salary > 30000)
+    )
+    result = verbalize_expression(
+        query, renderer=HierarchicalRenderer(HTMLFormatter())
+    )
+    assert "<span" in result
+    assert "<br>" in result
+    assert "Employee" in result
+    assert "average" in result
