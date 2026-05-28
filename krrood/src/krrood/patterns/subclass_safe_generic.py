@@ -4,6 +4,8 @@ from abc import ABC
 from copy import copy
 from dataclasses import dataclass, fields, Field, field
 from functools import lru_cache
+from inspect import isclass
+from typing import Union, Tuple, Hashable
 
 from typing_extensions import (
     Generic,
@@ -14,14 +16,18 @@ from typing_extensions import (
     Dict,
     Any,
     List,
+    get_origin,
+    get_args,
 )
 
 from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
 )
+from krrood.entity_query_language.utils import ensure_hashable
 from krrood.utils import (
-    get_generic_type_param,
+    get_generic_type_params,
     T,
+    resolve_union_type,
 )
 
 if TYPE_CHECKING:
@@ -44,6 +50,11 @@ class AbstractSubClassSafeGeneric(ABC):
         Automatically updates the field types that use the generic type parameters with the new
         specified types, before the class is initialized.
         """
+        # if cls.__name__ != "HSRBGripper":
+        #     return
+        # if cls.__name__ != "SubClassGenericThatUpdatesGenericTypeToBuiltInType":
+        #     return
+
         substitutions = cls._get_generic_type_substitutions()
         if not substitutions:
             return
@@ -67,90 +78,175 @@ class AbstractSubClassSafeGeneric(ABC):
         :param name: The name of the field.
         :param kwargs: Keyword arguments to update the field with.
         """
-        field_ = next((f for f in fields(cls) if f.name == name), None)
+        existing_field = None
+        for base in cls.__mro__:
+            if hasattr(base, "__dataclass_fields__"):
+                if name in base.__dataclass_fields__:
+                    existing_field = base.__dataclass_fields__[name]
+                    break
         if hasattr(cls, name):
             # First check if there's a new created field that is yet to be processed
             attribute_value = getattr(cls, name)
             if isinstance(attribute_value, Field):
+                new_attribute_value = copy(attribute_value)
                 for key, value in kwargs.items():
-                    setattr(attribute_value, key, value)
+                    setattr(new_attribute_value, key, value)
             else:
                 non_type_kwargs = copy(kwargs)
                 non_type_kwargs.pop("type", None)
                 if non_type_kwargs:
                     setattr(cls, name, field(**non_type_kwargs))
         else:
-            # If not, check if there's an existing field that needs to be updated
-            field_ = copy(next((f for f in fields(cls) if f.name == name), None))
-            if field_ is not None:
+            if existing_field is not None:
+                new_field = copy(existing_field)
                 for key, value in kwargs.items():
-                    setattr(field_, key, value)
-                setattr(cls, field_.name, field_)
+                    setattr(new_field, key, value)
+                setattr(cls, name, new_field)
             else:
                 field_kwargs = copy(kwargs)
                 field_kwargs.pop("type", None)
-                setattr(cls, name, field(**field_kwargs))
+                if field_kwargs:
+                    setattr(cls, name, field(**field_kwargs))
         if "type" in kwargs:
             cls.__annotations__[name] = kwargs["type"]
         elif type_ is not None:
             cls.__annotations__[name] = type_
-        elif field_ is not None:
-            cls.__annotations__[name] = field_.type
+        elif existing_field is not None:
+            cls.__annotations__[name] = existing_field.type
         else:
             cls.__annotations__[name] = Any
 
     @classmethod
-    def _get_generic_base(cls) -> Optional[Type]:
+    def _get_unique_generic_bases(cls) -> List[Type[AbstractSubClassSafeGeneric]]:
         """
-        :return: The class that declares the generic parameters for this hierarchy, i.e. the
-            direct subclass of :class:`AbstractSubClassSafeGeneric` in the MRO.
+        :return: The unique generic bases of this class, excluding itself, AbstractSubClassSafeGeneric and object,
+        and excluding any base that is a superclass of another base or not a subclass of AbstractSubClassSafeGeneric.
         """
+        unique_bases = []
         for base in cls.__mro__:
             if base in (cls, AbstractSubClassSafeGeneric, object):
                 continue
             if not issubclass(base, AbstractSubClassSafeGeneric):
                 continue
-            if AbstractSubClassSafeGeneric in base.__bases__:
-                return base
-        return None
+            if any(issubclass(other_base, base) for other_base in unique_bases):
+                continue
+            unique_bases.append(base)
+        return unique_bases
 
     @classmethod
-    def _get_generic_type_substitutions(cls) -> Dict[Any, Any]:
+    def _get_generic_type_substitutions(cls) -> Dict[Type, Type]:
         """
         :return: A mapping from each old generic type (as declared on the parent class) to the
             new generic type used by this class, for every position whose binding changed.
         """
-        current_types = cls.get_generic_types()
-        if not current_types:
+        unique_generic_bases = cls._get_unique_generic_bases()
+        if not unique_generic_bases:
             return {}
-        generic_base = cls._get_generic_base()
-        if generic_base is None:
-            return {}
-        for base in cls.__bases__:
-            if not isinstance(base, type) or not issubclass(base, generic_base):
+        generic_base_to_type_map = {}
+        for generic_base in unique_generic_bases:
+            generic_base_types = generic_base.get_generic_types(True, False)
+            if not generic_base_types:
+                generic_base_types = generic_base.get_generic_types(False, True)
+
+            if not generic_base_types:
                 continue
-            base_types = base.get_generic_types()
-            if not base_types or len(base_types) != len(current_types):
-                continue
-            substitutions: Dict[Any, Any] = {}
-            for old_type, new_type in zip(base_types, current_types):
+
+            generic_base_to_generic_type_map = (
+                cls._get_origin_base_to_generic_types_map()
+            )
+            generic_base_to_type_map.update(
+                cls.get_superclass_generic_type_substitution()
+            )
+            # if not len(root_generic_base_types) == len(
+            #     generic_base_to_generic_type_map[ensure_hashable(generic_base)]
+            # ):
+            #     raise ValueError(f"Lengths differ")
+            for old_type, new_type in zip(
+                generic_base_types,
+                generic_base_to_generic_type_map[ensure_hashable(generic_base)],
+            ):
                 if old_type is new_type or new_type is None:
                     continue
-                substitutions[old_type] = new_type
-            if substitutions:
-                return substitutions
-        return {}
+                generic_base_to_type_map[old_type] = new_type
+
+        # first resolve all generic types, then afterwards resolve union types
+        for base_type, resolved_type in generic_base_to_type_map.items():
+            if get_origin(resolved_type) is not Union:
+                continue
+            generic_base_to_type_map[base_type] = resolve_union_type(
+                resolved_type, generic_base_to_type_map
+            )
+
+        return generic_base_to_type_map
 
     @classmethod
-    @lru_cache
-    def get_generic_types(cls) -> Optional[List[Type]]:
+    def _get_origin_base_to_generic_types_map(cls) -> Dict[Hashable, Tuple[Type, ...]]:
+        """
+        :return: A mapping from each generic base of this class to the generic types it uses, for every generic base
+        that is a subclass of AbstractSubClassSafeGeneric or is declared with generic type parameters via Generic[...].
+        """
+        origin_base_to_generic_type: Dict[Hashable, Tuple[Type, ...]] = {}
+        for base in getattr(cls, "__orig_bases__", []):
+            base_origin = get_origin(base)
+            if base_origin is None:
+                continue
+            if base_origin is not Generic and not issubclass(
+                base_origin, AbstractSubClassSafeGeneric
+            ):
+                continue
+            origin_base_to_generic_type[ensure_hashable(base_origin)] = get_args(base)
+        return origin_base_to_generic_type
+
+    @classmethod
+    def get_generic_types(
+        cls,
+        from_root_generic_base: bool = True,
+        from_specialized_generic_base: bool = True,
+    ) -> List[Type]:
         """
         :return: The concrete generic type parameters bound for this class, in declaration order.
         """
-        generic_base = cls._get_generic_base()
-        if generic_base is None:
-            return None
-        return get_generic_type_param(cls, generic_base)
+        return get_generic_type_params(
+            cls,
+            AbstractSubClassSafeGeneric,
+            from_root_generic_base,
+            from_specialized_generic_base,
+        )
+
+    @classmethod
+    def get_superclass_generic_type_substitution(cls) -> Dict[Type, Type]:
+
+        substitutions = {}
+
+        for base in getattr(cls, "__orig_bases__", []):
+            if base is AbstractSubClassSafeGeneric:
+                continue
+            if isclass(base) and not issubclass(base, AbstractSubClassSafeGeneric):
+                continue
+            base_origin = get_origin(base)
+            if not base_origin or not issubclass(
+                base_origin, AbstractSubClassSafeGeneric
+            ):
+                continue
+
+            specialized_base_types = base_origin.get_generic_types(False, True)
+            root_base_types = base_origin.get_generic_types(True, False)
+            resolved_types = get_args(base)
+
+            for old_type, new_type in zip(
+                base_origin._get_unique_generic_bases(), specialized_base_types
+            ):
+                if old_type is new_type or new_type is None:
+                    continue
+
+                substitutions[
+                    ensure_hashable(old_type.get_generic_types(True, False)[0])
+                ] = new_type
+            for old_type, new_type in zip(root_base_types, resolved_types):
+                if old_type is new_type or new_type is None:
+                    continue
+                substitutions[ensure_hashable(old_type)] = new_type
+        return substitutions
 
 
 @dataclass
@@ -175,7 +271,7 @@ class SubClassSafeGeneric(Generic[T], AbstractSubClassSafeGeneric, ABC):
         """
         :return: The type of the role taker.
         """
-        generic_types = get_generic_type_param(cls, SubClassSafeGeneric)
+        generic_types = get_generic_type_params(cls, SubClassSafeGeneric)
         if generic_types:
             return generic_types[0]
         return None

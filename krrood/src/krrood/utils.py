@@ -18,7 +18,7 @@ from inspect import isclass
 from os import PathLike
 from os.path import dirname
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Generic
 from typing import Union, Any
 
 from typing_extensions import TypeVar, Type, List, Optional, Callable
@@ -614,29 +614,50 @@ def run_subprocess_on_file(command: List[str]):
         raise SubprocessExecutionError(command, e.returncode, e.stdout, e.stderr) from e
 
 
-def get_generic_type_param(cls, generic_base: Type[T]) -> Optional[List[Type[T]]]:
+def get_generic_type_params(
+    cls,
+    generic_base: Type,
+    from_root_generic_base: bool = True,
+    from_specialized_generic_base: bool = True,
+) -> List[Type[T]]:
     """
     Given a subclass and its generic base, return the concrete type parameter(s).
 
     Example:
-        get_generic_type_param(Employee, Role) -> (<class '__main__.Person'>,)
+        get_generic_type_params(Employee, Role) -> (<class '__main__.Person'>,)
 
     :param cls: The subclass to check.
     :param generic_base: The generic base class to check against.
-    :return: A list of concrete type parameters, or None if not found.
+    :return: A list of concrete type parameters
     """
+    params = []
     for base in getattr(cls, "__orig_bases__", []):
         base_origin = get_origin(base)
-        if base_origin is None:
+        if not base_origin:
             if isclass(base) and issubclass(base, generic_base):
-                res = get_generic_type_param(base, generic_base)
-                if res:
-                    return res
+                params.extend(get_generic_type_params(base, generic_base))
             continue
-        if issubclass(base_origin, generic_base):
-            args = get_args(base)
-            return list(args) if args else None
-    return None
+        if from_root_generic_base and base_origin is Generic:
+            params.extend(list(get_args(base)))
+        elif from_specialized_generic_base and issubclass(base_origin, generic_base):
+            params.extend(list(get_args(base)))
+
+    return params
+
+
+def resolve_union_type(union_type, substitution):
+    resolved_types = []
+    for arg in get_args(union_type):
+        if get_origin(arg) is Union:
+            resolved_types.append(resolve_union_type(arg, substitution))
+        elif arg in substitution:
+            resolved_types.append(substitution[arg])
+        else:
+            resolved_types.append(arg)
+
+    # PyCharm flags this as `Invalid type argument`, but this works at runtime
+    new_union = Union[*resolved_types]
+    return new_union
 
 
 def get_scope_from_imports(

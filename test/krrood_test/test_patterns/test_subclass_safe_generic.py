@@ -10,7 +10,7 @@ from typing_extensions import (
 
 from krrood.entity_query_language.factories import variable_from
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from krrood.utils import get_generic_type_param
+from krrood.utils import get_generic_type_params
 from ..dataset.classes_with_generic import (
     FirstGeneric,
     SubClassGenericThatUpdatesGenericTypeToBuiltInType,
@@ -22,7 +22,7 @@ from ..dataset.classes_with_generic import (
     SubClassGenericThatRecreatesAFieldWithNonBuiltInType,
     TwoGenericContainerBoundToBuiltIns,
     CombinedClass,
-    SpecificCombinedThreeGenericSubClassSafe,
+    ComplexCombinedThreeGenericSubClassSafe,
     ExampleClass,
 )
 
@@ -73,7 +73,7 @@ def assert_field_kwargs_are_preserved_when_resolving_generic_type(cls, kw_only=F
     assert get_origin(evaluated_type) is list
     assert (
         get_args(evaluated_type)[0]
-        is get_generic_type_param(cls, SubClassSafeGeneric)[0]
+        is get_generic_type_params(cls, SubClassSafeGeneric)[0]
     )
 
 
@@ -107,7 +107,7 @@ def test_resolve_two_generic_types_subclass_with_built_in_types():
 
 def _assert_generic_type_is_resolved(cls):
     resolved_hints = get_type_hints(cls, include_extras=True)
-    generic_type = get_generic_type_param(cls, SubClassSafeGeneric)[0]
+    generic_type = get_generic_type_params(cls, SubClassSafeGeneric)[0]
     assert (
         resolved_hints[variable_from(cls).attribute_using_generic._attribute_name_]
         is generic_type
@@ -131,8 +131,8 @@ def test_combined_class_with_generic_subclass_safe_generic_inheritance_second_do
     assert field_.type == list[str]
 
 
-def test_SpecificCombinedThreeGenericSubClassSafe():
-    cls = SpecificCombinedThreeGenericSubClassSafe
+def test_ComplexCombinedThreeGenericSubClassSafe():
+    cls = ComplexCombinedThreeGenericSubClassSafe
     resolved_hints = get_type_hints(cls, include_extras=True)
     assert resolved_hints["combined_three_generic_first_argument"] == ExampleClass
     assert resolved_hints["combined_three_generic_second_argument"] == CombinedClass
