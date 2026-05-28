@@ -3,12 +3,44 @@ from typing import Optional
 
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
+    RobotInterfaceConfig,
 )
 from giskardpy.model.world_config import WorldWithFixedRobot
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.daisy import DAiSy
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+
+
+class DAiSyVelocityInterface(RobotInterfaceConfig):
+
+    def setup(self):
+        self.sync_joint_state_topic("/joint_states")
+        # self.sync_joint_state_topic("/right_gripper/device_states")
+        # self.sync_joint_state_topic("/left_gripper/device_states")
+        joints_left = [
+            "left_shoulder_pan_joint",
+            "left_shoulder_lift_joint",
+            "left_elbow_joint",
+            "left_wrist_1_joint",
+            "left_wrist_2_joint",
+            "left_wrist_3_joint",
+        ]
+        self.add_joint_velocity_group_controller(
+            cmd_topic="/left_forward_velocity_controller/commands",
+            connections=joints_left,
+        )
+        joints_right = [
+            "right_shoulder_pan_joint",
+            "right_shoulder_lift_joint",
+            "right_elbow_joint",
+            "right_wrist_1_joint",
+            "right_wrist_2_joint",
+            "right_wrist_3_joint",
+        ]
+        self.add_joint_velocity_group_controller(
+            cmd_topic="/right_forward_velocity_controller/commands",
+            connections=joints_right,
+        )
 
 
 class WorldWithDaisyConfig(WorldWithFixedRobot):
@@ -45,5 +77,9 @@ class DaisyStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
                 "right_wrist_1_joint",
                 "right_wrist_2_joint",
                 "right_wrist_3_joint",
+                "left_gripper_finger_joint",
+                "left_gripper_right_finger_joint",
+                "right_gripper_finger_joint",
+                "right_gripper_right_finger_joint",
             ]
         )

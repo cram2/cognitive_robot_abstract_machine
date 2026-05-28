@@ -7,6 +7,7 @@ import numpy as np
 import objgraph
 import pytest
 
+from giskardpy.middleware.ros2.utils.utils import load_xacro
 from semantic_digital_twin.robots.daisy import DAiSy
 
 try:
@@ -434,14 +435,7 @@ def tracy_world():
 def daisy_world():
     if not daisy_installed():
         pytest.skip("DAiSy not installed")
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "urdf",
-    )
-    daisy = os.path.join(urdf_dir, "daisy.urdf")
+    daisy = "package://iai_daisy_description/robots/daisy.urdf.xacro"
     daisy_parser = URDFParser.from_file(file_path=daisy)
     world_with_daisy = daisy_parser.parse()
     DAiSy.from_world(world_with_daisy)

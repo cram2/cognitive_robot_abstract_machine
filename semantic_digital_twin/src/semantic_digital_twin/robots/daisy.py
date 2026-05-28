@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import os
 from collections import defaultdict
 from dataclasses import dataclass
+from importlib.resources import files
+from pathlib import Path
 from typing import Self
 
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -126,6 +129,16 @@ class DAiSy(AbstractRobot, SpecifiesLeftRightArm):
         self.add_arm(right_arm)
 
     def _setup_collision_rules(self):
+        srdf_path = os.path.join(
+            Path(files("semantic_digital_twin")).parent.parent,
+            "resources",
+            "collision_configs",
+            "daisy.srdf",
+        )
+        self._world.collision_manager.ignore_collision_rules.append(
+            SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
+        )
+
         self._world.collision_manager.add_default_rule(
             AvoidExternalCollisions(
                 buffer_zone_distance=0.05, violated_distance=0.0, robot=self
@@ -157,6 +170,10 @@ class DAiSy(AbstractRobot, SpecifiesLeftRightArm):
             "right_wrist_1_joint",
             "right_wrist_2_joint",
             "right_wrist_3_joint",
+            "left_gripper_finger_joint",
+            "left_gripper_right_finger_joint",
+            "right_gripper_finger_joint",
+            "right_gripper_right_finger_joint",
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(

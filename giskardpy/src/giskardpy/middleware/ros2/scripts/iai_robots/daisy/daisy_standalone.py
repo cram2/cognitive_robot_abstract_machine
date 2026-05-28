@@ -14,7 +14,7 @@ from giskardpy.qp.qp_controller_config import QPControllerConfig
 def main():
     rospy.init_node("giskard")
     default_robot_desc = load_xacro(
-        "package://iai_daisy_description/robots/daisy_ur5_two_gripper_table.urdf.xacro"
+        "package://iai_daisy_description/robots/daisy.urdf.xacro"
     )
     rospy.node.declare_parameters(
         namespace="", parameters=[("robot_description", Parameter.Type.STRING)]
