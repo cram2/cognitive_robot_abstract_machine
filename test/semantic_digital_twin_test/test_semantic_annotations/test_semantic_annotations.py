@@ -214,8 +214,8 @@ def test_explain_inferred_semantic_annotations(apartment_world_setup):
     assert explanation is not None
     assert isinstance(explanation.query_root, SymbolicExpression)
     assert explanation.get_satisfied_conditions_as_string() == (
-        '(FixedConnection.parent == PrismaticConnection.child)'
-        '\nAND (FixedConnection.child == Handle.root)')
+        '(Handle.root == FixedConnection.child)'
+        '\nAND (FixedConnection.parent == PrismaticConnection.child)')
     visualize = False
     if visualize:
         explanation.condition_graph().visualize(filename="drawer_explanation.pdf")
