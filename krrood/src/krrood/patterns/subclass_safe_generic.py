@@ -50,8 +50,6 @@ class AbstractSubClassSafeGeneric(ABC):
         Automatically updates the field types that use the generic type parameters with the new
         specified types, before the class is initialized.
         """
-        # if cls.__name__ != "HSRBGripper":
-        #     return
         # if cls.__name__ != "SubClassGenericThatUpdatesGenericTypeToBuiltInType":
         #     return
 
@@ -147,27 +145,20 @@ class AbstractSubClassSafeGeneric(ABC):
             generic_base_types = generic_base.get_generic_types(True, False)
             if not generic_base_types:
                 generic_base_types = generic_base.get_generic_types(False, True)
-
-            if not generic_base_types:
-                continue
-
-            generic_base_to_generic_type_map = (
-                cls._get_origin_base_to_generic_types_map()
-            )
-            generic_base_to_type_map.update(
-                cls.get_superclass_generic_type_substitution()
-            )
-            # if not len(root_generic_base_types) == len(
-            #     generic_base_to_generic_type_map[ensure_hashable(generic_base)]
-            # ):
-            #     raise ValueError(f"Lengths differ")
-            for old_type, new_type in zip(
-                generic_base_types,
-                generic_base_to_generic_type_map[ensure_hashable(generic_base)],
-            ):
-                if old_type is new_type or new_type is None:
-                    continue
-                generic_base_to_type_map[old_type] = new_type
+                generic_base_to_generic_type_map = (
+                    cls._get_origin_base_to_generic_types_map()
+                )
+                for old_type, new_type in zip(
+                    generic_base_types,
+                    generic_base_to_generic_type_map[ensure_hashable(generic_base)],
+                ):
+                    if old_type is new_type or new_type is None:
+                        continue
+                    generic_base_to_type_map[old_type] = new_type
+            else:
+                generic_base_to_type_map.update(
+                    cls.get_superclass_generic_type_substitution()
+                )
 
         # first resolve all generic types, then afterwards resolve union types
         for base_type, resolved_type in generic_base_to_type_map.items():

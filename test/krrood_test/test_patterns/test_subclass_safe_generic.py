@@ -24,6 +24,7 @@ from ..dataset.classes_with_generic import (
     CombinedClass,
     ComplexCombinedThreeGenericSubClassSafe,
     ExampleClass,
+    ComplexCombinedThreeGenericSubClassSafeWithThirdTypes,
 )
 
 
@@ -140,3 +141,11 @@ def test_ComplexCombinedThreeGenericSubClassSafe():
         resolved_hints["one_generic_first_argument"]
         == Union[ExampleClass, CombinedClass]
     )
+
+
+def test_ComplexCombinedThreeGenericSubClassSafeWithThirdTypes():
+    cls = ComplexCombinedThreeGenericSubClassSafeWithThirdTypes
+    resolved_hints = get_type_hints(cls, include_extras=True)
+    assert resolved_hints["combined_three_generic_first_argument"] == ExampleClass
+    assert resolved_hints["combined_three_generic_second_argument"] == CombinedClass
+    assert resolved_hints["one_generic_first_argument"] == int

@@ -114,3 +114,17 @@ class CombinedThreeGenericSubClassSafe(
 class ComplexCombinedThreeGenericSubClassSafe(
     CombinedThreeGenericSubClassSafe[ExampleClass, CombinedClass]
 ): ...
+
+
+@dataclass(eq=False)
+class CombinedThreeGenericSubClassSafeWithThirdType(
+    Generic[U, V], OneGenericSubClassSafe[int]
+):
+    combined_three_generic_first_argument: U
+    combined_three_generic_second_argument: V
+
+
+@dataclass(eq=False)
+class ComplexCombinedThreeGenericSubClassSafeWithThirdTypes(
+    CombinedThreeGenericSubClassSafeWithThirdType[ExampleClass, CombinedClass]
+): ...
