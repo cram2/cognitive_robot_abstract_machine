@@ -23,6 +23,7 @@ from dataclasses import dataclass
 
 from typing_extensions import Any, Dict, Optional, Tuple, get_args, get_origin
 
+from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.class_diagrams.utils import get_type_hints_of_object
 
 #: The runtime type of ``None``, used to detect ``Optional`` / ``... | None`` annotations.
@@ -109,7 +110,7 @@ def _annotation_of(owner_type: type, attribute_name: str) -> Any:
     """:return: The declared annotation for the attribute, or ``None`` if unresolvable."""
     try:
         return get_type_hints_of_object(owner_type).get(attribute_name)
-    except Exception:
+    except (CouldNotResolveType, TypeError):
         return None
 
 
