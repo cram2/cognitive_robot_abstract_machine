@@ -132,6 +132,7 @@ class Handle(HasRootBody):
             }
         )
 
+
 @dataclass(eq=False)
 class Dishwasher(HasCaseAsRootBody, HasDoors, HasDrawers):
     """
@@ -397,8 +398,10 @@ class Cabinet(Furniture, HasCaseAsRootBody):
 @dataclass(eq=False)
 class Fridge(Cabinet, HasDoors, HasDrawers): ...
 
+
 @dataclass(eq=False)
 class Oven(HasRootBody): ...
+
 
 @dataclass(eq=False)
 class Dresser(Cabinet, HasDrawers, HasDoors): ...
@@ -828,6 +831,7 @@ class Salt(Food):
     A pack or container of salt (e.g., salt shaker or salt can).
     """
 
+
 @dataclass(eq=False)
 class CoffeeTable(Table):
     """
@@ -881,6 +885,13 @@ class Armchair(Chair):
 class TrashCan(HasRootBody, Furniture):
     """
     Abstract class for Trash Can.
+    """
+
+
+@dataclass(eq=False)
+class ShelvingUnit(Furniture):
+    """
+    A shelving unit.
     """
 
 
