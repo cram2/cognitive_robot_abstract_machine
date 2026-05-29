@@ -387,7 +387,7 @@ class StateSynchronizer(StateChangeCallback, SynchronizerOnCallback):
         """
         Publish the current world state to the ROS topic.
         """
-        if not publish_changes or self._is_paused:
+        if not publish_changes:
             return
 
         changes = self.compute_state_changes()
@@ -428,6 +428,36 @@ class StateSynchronizer(StateChangeCallback, SynchronizerOnCallback):
         idx = np.nonzero(changed_mask)[0]
         return {ids[i]: float(curr[i]) for i in idx}
 
+    def update_previous_world_state(self):
+        """
+        Skip advancing the snapshot while paused (e.g. during a model-change context).
+        """
+        if self._is_paused:
+            return
+        super().update_previous_world_state()
+
+    def resume(self) -> None:
+        """
+        Resume, then apply any state messages that arrived while paused.
+        """
+        super().resume()  # sets _is_paused = False
+
+        if not self.missed_messages:
+            return
+
+        messages_to_apply = self.missed_messages
+        self.missed_messages = []
+
+        for msg in messages_to_apply:
+            try:
+                indices = [self._world.state._index[_id] for _id in msg.ids]
+            except KeyError:
+                continue
+            if indices:
+                self._world.state._data[0, indices] = np.asarray(
+                    msg.states, dtype=float
+                )
+
 
 @dataclass
 class ModelSynchronizer(
@@ -454,6 +484,9 @@ class ModelSynchronizer(
             msg.modifications.apply(self._world)
         for callback in running_callbacks:
             callback.resume()
+        for callback in running_callbacks:
+            if isinstance(callback, SynchronizerOnCallback):
+                callback.apply_missed_messages()
 
     def world_callback(self, publish_changes: bool = True, synchronous: bool = False):
 
