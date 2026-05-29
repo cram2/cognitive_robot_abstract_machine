@@ -889,13 +889,6 @@ class TrashCan(HasRootBody, Furniture):
 
 
 @dataclass(eq=False)
-class ShelvingUnit(Furniture):
-    """
-    A shelving unit.
-    """
-
-
-@dataclass(eq=False)
 class ShelfLayer(HasSupportingSurface):
     """
     A horizontal surface used for storing objects, typically found inside cabinets or on walls.
