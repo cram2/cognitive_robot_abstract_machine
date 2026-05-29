@@ -21,7 +21,7 @@ object they can inspect and experiment on.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from typing_extensions import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
@@ -30,6 +30,8 @@ from krrood.entity_query_language.rdr.utils import UNSET
 from krrood.entity_query_language.scope import get_definition_scope
 
 if TYPE_CHECKING:
+    from krrood.entity_query_language.rdr.aid import ConclusionAid
+    from krrood.entity_query_language.rdr.conclusion_domain import ConclusionDomain
     from krrood.entity_query_language.rdr.observer import ClassificationTrace
 
 #: Shell name bound to the concrete case (inspect/experiment: ``case_instance.milk``).
@@ -74,6 +76,12 @@ class CaseContext:
     trace: Optional[ClassificationTrace] = None
     """The classification trace for this case, for visualizing the rule tree (``None`` when
     the RDR is empty / no classification was run)."""
+    conclusion_domain: Optional["ConclusionDomain"] = None
+    """The resolved allowable-value domain of the conclusion attribute, when the expert must
+    label the case (``None`` on the conditions-only path, where the conclusion is known)."""
+    aids: List["ConclusionAid"] = field(default_factory=list)
+    """Optional task-specific aids consulted while labelling the case (presentation and/or
+    conclusion suggestion). Empty by default."""
 
     @property
     def has_target(self) -> bool:
@@ -98,6 +106,10 @@ class AnswerRequest:
     """A copy-pasteable example shown in the header (e.g. ``conditions = ...``)."""
     required: bool = True
     """Whether the session may not complete until a valid value is supplied."""
+    default: Any = None
+    """The value the answer name is seeded with in the namespace before the expert edits it
+    (e.g. ``UNSET`` to distinguish "left unset" from a deliberate ``None``, or a pre-seeded
+    suggestion)."""
 
 
 @dataclass
@@ -142,7 +154,7 @@ class ExpertInterface(ABC):
         namespace[_ABORT_FLAG] = False
         namespace[EXIT_NAME] = _make_exit(namespace)
         for request in requests:
-            namespace[request.name] = None
+            namespace[request.name] = request.default
         return namespace
 
     @staticmethod

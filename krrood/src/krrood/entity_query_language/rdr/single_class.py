@@ -14,6 +14,7 @@ Single-class means conclusions are mutually exclusive: each case resolves to one
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import cached_property
 
 from typing_extensions import Any, List, Optional, Type
 
@@ -22,6 +23,10 @@ from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVari
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import add, entity, variable
 from krrood.entity_query_language.query.query import Query
+from krrood.entity_query_language.rdr.conclusion_domain import (
+    ConclusionDomain,
+    resolve_conclusion_domain,
+)
 from krrood.entity_query_language.rdr.expert import Expert
 from krrood.entity_query_language.rdr.utils import UNSET
 from krrood.entity_query_language.rdr.observer import (
@@ -152,11 +157,16 @@ class EQLSingleClassRDR:
             return target
 
         if target is UNSET:
-            target, condition = expert.ask_for_rule(case, self.case_variable, current, trace)
-            if current == target:
+            target, condition = expert.ask_for_rule(
+                case, self.case_variable, self.conclusion_domain, current, trace
+            )
+            if condition is None:
+                # The expert kept the current conclusion; nothing to insert.
                 return target
         else:
-            condition = expert.ask_for_conditions(case, self.case_variable, target, current, trace)
+            condition = expert.ask_for_conditions(
+                case, self.case_variable, target, current, trace
+            )
 
         self._insert_rule(trace, current, condition, target)
         return target
@@ -200,9 +210,11 @@ class EQLSingleClassRDR:
     ) -> "EQLSingleClassRDR":
         """
         Fit the RDR over ``cases``. When ``targets`` is given it is paired with ``cases``
-        (ground-truth fitting); when ``None`` the expert labels each case.
+        (ground-truth fitting); when ``None`` the expert labels each case (the no-target
+        ``ask_for_rule`` path), so each case is paired with the ``UNSET`` sentinel rather than
+        a literal ``None`` target.
         """
-        paired_targets = targets if targets is not None else [None] * len(cases)
+        paired_targets = targets if targets is not None else [UNSET] * len(cases)
         for case, target in zip(cases, paired_targets):
             self.fit_case(case, target, expert)
         return self
@@ -211,3 +223,8 @@ class EQLSingleClassRDR:
     def conditions_root(self) -> Optional[SymbolicExpression]:
         """The root of the rule tree's condition DAG, or ``None`` if empty."""
         return self.query._conditions_root_ if self.query is not None else None
+
+    @cached_property
+    def conclusion_domain(self) -> ConclusionDomain:
+        """The allowable-value domain of the predicted attribute, resolved from its type."""
+        return resolve_conclusion_domain(self.case_type, self.conclusion_attribute_name)
