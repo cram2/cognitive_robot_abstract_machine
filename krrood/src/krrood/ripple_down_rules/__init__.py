@@ -1,25 +1,41 @@
 __version__ = "0.7.2"
 
 import logging
-import sys
 
 logger = logging.Logger("rdr")
 logger.setLevel(logging.INFO)
 
-try:
-    from PyQt6.QtWidgets import QApplication
-    app = QApplication(sys.argv)
-except ImportError:
-    app = None
+
+def _get_qapp():
+    """Return the global QApplication instance, creating it lazily on first call.
+
+    Previously the QApplication was created at import time, which is a side
+    effect that breaks headless environments and test isolation.
+    """
+    global _get_qapp
+    try:
+        from PyQt6.QtWidgets import QApplication
+        import sys
+
+        app = QApplication(sys.argv)
+    except ImportError:
+        app = None
+
+    def _get_qapp():
+        return app
+
+    return app
 
 
-# Trigger patch
+# Re-exports used by generated RDR Python files (``from krrood.ripple_down_rules import *``).
+from .predicates import Predicate, IsA, Has, DependsOn  # noqa: E402, F401
+from .datastructures.tracked_object import TrackedObjectMixin  # noqa: E402, F401
+from .datastructures.dataclasses import CaseQuery  # noqa: E402, F401
+from .rdr_decorators import RDRDecorator  # noqa: E402, F401
+from .rdr import MultiClassRDR, SingleClassRDR, GeneralRDR  # noqa: E402, F401
+
+# Optional meta-package integration.
 try:
-    from .predicates import *
-    from .datastructures.tracked_object import TrackedObjectMixin
-    from .datastructures.dataclasses import CaseQuery
-    from .rdr_decorators import RDRDecorator
-    from .rdr import MultiClassRDR, SingleClassRDR, GeneralRDR
-    import ripple_down_rules_meta._apply_overrides
+    import ripple_down_rules_meta._apply_overrides  # noqa: F401
 except ImportError:
     pass

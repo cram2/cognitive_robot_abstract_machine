@@ -52,7 +52,6 @@ from krrood.entity_query_language.rdr.interface import FunctionInterface
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 from krrood.entity_query_language.rdr.utils import UNSET
 
-
 # ---------------------------------------------------------------------------
 # Helpers — NOT collected by pytest (no ``Test`` prefix, no ``test_`` prefix)
 # ---------------------------------------------------------------------------
@@ -158,7 +157,9 @@ class TestBasicWrapping:
         assert issubclass(distance_wrapper.case_type, FunctionCase)
         assert distance_wrapper.case_type is not FunctionCase
 
-    def test_wrapper_case_type_function_classvar_is_original(self, distance_wrapper, tmp_path):
+    def test_wrapper_case_type_function_classvar_is_original(
+        self, distance_wrapper, tmp_path
+    ):
         """``wrapper.case_type.function`` must reference the original decorated callable.
 
         This verifies that ``__post_init__`` correctly assigns
@@ -239,7 +240,9 @@ class TestFitMode:
         result = fit_mode_wrapper(3.0, 4.0)
         assert result == pytest.approx(5.0)
 
-    def test_fit_mode_call_invokes_rdr_fit_case(self, fit_mode_wrapper, scripted_expert):
+    def test_fit_mode_call_invokes_rdr_fit_case(
+        self, fit_mode_wrapper, scripted_expert
+    ):
         """In fit mode, calling the wrapper must invoke ``rdr.fit_case`` on every call.
 
         We spy on ``fit_mode_wrapper.rdr.fit_case`` to count invocations; a
@@ -268,7 +271,7 @@ class TestMissingAnnotationsErrors:
         The error must be raised when the decorator is applied, not when the
         wrapper is later called.
         """
-        from krrood.class_diagrams.code_generation_utilities import (
+        from krrood.code_generation import (
             FunctionMissingAnnotationsError,
         )
         from krrood.entity_query_language.rdr.decorator import rdr
@@ -287,7 +290,7 @@ class TestMissingAnnotationsErrors:
         The error must be raised when the decorator is applied, not deferred
         until the wrapper is called.
         """
-        from krrood.class_diagrams.code_generation_utilities import (
+        from krrood.code_generation import (
             FunctionMissingAnnotationsError,
         )
         from krrood.entity_query_language.rdr.decorator import rdr

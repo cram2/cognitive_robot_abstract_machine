@@ -217,9 +217,9 @@ class TemplateFileCreator:
                     )
                 else:
                     func_args[k] = (
-                        type(v).__name__
+                        stringify_hint(type(v))
                         if not isinstance(v, type)
-                        else f"Type[{v.__name__}]"
+                        else f"Type[{stringify_hint(v)}]"
                     )
             func_args = ", ".join(
                 [

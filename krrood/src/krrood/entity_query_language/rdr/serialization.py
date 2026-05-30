@@ -53,13 +53,10 @@ _FACTORY_IMPORT = (
 )
 
 
-def _class_name_to_var_name(class_name: str) -> str:
-    """Return a lower-camel-cased variable name for a CamelCase class name.
-
-    E.g. ``"Distance"`` → ``"distance"``, ``"MyDistance"`` → ``"myDistance"``.
-    Handles empty strings safely.
-    """
-    return class_name[0].lower() + class_name[1:] if class_name else class_name
+# Moved to krrood.code_generation.utils — keep alias for backward compatibility.
+from krrood.code_generation.utils import (
+    to_variable_name as _class_name_to_var_name,
+)  # noqa: F401
 
 
 def _load_module_from_path(path: str) -> types.ModuleType:
@@ -240,6 +237,10 @@ def rdr_to_python(rdr, case_type_is_local: bool = False) -> str:
         definition at the top of the same file.
     :return: Python module source that rebuilds the same rule-tree DAG on import.
     """
+    import os
+
+    from krrood.code_generation import CodeGenerator, get_imports_from_types
+
     if rdr.query is None:
         raise ValueError("Cannot serialize an empty RDR (no rules have been added).")
 
@@ -255,38 +256,26 @@ def rdr_to_python(rdr, case_type_is_local: bool = False) -> str:
         rdr.query._conditions_root_, var_names, conclusion_var_source, referenced_types
     )
 
-    # Group imported names by module so e.g. Animal and Species share one import line.
-    # When case_type_is_local=True the case type itself is defined in the same file
-    # (by the class-header section), so its import is omitted.
-    imports_by_module: Dict[str, set] = {}
-    for t in referenced_types:
-        if case_type_is_local and t is case_type:
-            continue
-        imports_by_module.setdefault(t.__module__, set()).add(t.__name__)
-    type_imports = "\n".join(
-        f"from {module} import {', '.join(sorted(names))}"
-        for module, names in sorted(imports_by_module.items())
-    )
+    # Generate type import lines via the centralized import generator.
+    if case_type_is_local:
+        types_to_import = [t for t in referenced_types if t is not case_type]
+    else:
+        types_to_import = list(referenced_types)
+    type_imports = "\n".join(get_imports_from_types(types_to_import))
 
-    lines = [
-        '"""Auto-generated EQL-RDR rule tree. Do not edit by hand."""',
-        _FACTORY_IMPORT,
-        type_imports,
-        "",
-        f"{var_name} = variable({case_type.__name__}, domain=[])",
-        f"query = entity({var_name}).where({base_condition})",
-        "with query:",
-        _indent(body, "    "),
-        "query.build()",
-        "",
-        "# Stable handles for loading.",
-        "RDR_CASE_TYPE = " + case_type.__name__,
-        f"RDR_CONCLUSION_ATTRIBUTE = {rdr.conclusion_attribute_name!r}",
-        f"RDR_CASE_VARIABLE = {var_name}",
-        "RDR_QUERY = query",
-        "",
-    ]
-    return "\n".join(lines)
+    # Render file-level structure via Jinja2 template.
+    template_dir = os.path.join(os.path.dirname(__file__), "templates")
+    generator = CodeGenerator(template_dir=template_dir)
+    return generator.render(
+        "rdr_module.py.jinja",
+        factory_import=_FACTORY_IMPORT,
+        type_imports=type_imports,
+        var_name=var_name,
+        case_type_name=case_type.__name__,
+        base_condition=base_condition,
+        body=_indent(body, "    "),
+        conclusion_attribute_name=rdr.conclusion_attribute_name,
+    )
 
 
 def save_rdr(rdr, path: str) -> str:
@@ -311,9 +300,7 @@ def save_rdr_with_case(rdr, path: str) -> str:
     :param path: Destination ``.py`` file path.
     :returns: The source written to disk.
     """
-    from krrood.class_diagrams.code_generation_utilities import (
-        function_to_dataclass_source,
-    )
+    from krrood.code_generation import function_to_dataclass_source
     from krrood.entity_query_language.rdr.function_case import FunctionCase
 
     if isinstance(rdr.case_type, type) and issubclass(rdr.case_type, FunctionCase):

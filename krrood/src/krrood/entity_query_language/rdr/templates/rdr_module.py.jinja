@@ -1,0 +1,15 @@
+"""Auto-generated EQL-RDR rule tree. Do not edit by hand."""
+{{ factory_import }}
+{{ type_imports }}
+
+{{ var_name }} = variable({{ case_type_name }}, domain=[])
+query = entity({{ var_name }}).where({{ base_condition }})
+with query:
+{{ body }}
+query.build()
+
+# Stable handles for loading.
+RDR_CASE_TYPE = {{ case_type_name }}
+RDR_CONCLUSION_ATTRIBUTE = {{ conclusion_attribute_name|tojson }}
+RDR_CASE_VARIABLE = {{ var_name }}
+RDR_QUERY = query

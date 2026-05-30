@@ -3,6 +3,7 @@
 by an :class:`EQLSingleClassRDR` whose case type is generated from the
 function's own signature.
 """
+
 from __future__ import annotations
 
 import functools
@@ -13,16 +14,16 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import Any, Callable, Optional, Type
 
-from krrood.class_diagrams.code_generation_utilities import (
+from krrood.code_generation import (
     FunctionMissingAnnotationsError,
     function_to_dataclass_source,
     to_camel_case,
+    to_variable_name,
 )
 from krrood.entity_query_language.rdr.file_store import RDRFileStore
 from krrood.entity_query_language.rdr.function_case import FunctionCase
 from krrood.entity_query_language.rdr.serialization import (
     _FACTORY_IMPORT,
-    _class_name_to_var_name,
     load_rdr,
 )
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
@@ -34,21 +35,18 @@ if TYPE_CHECKING:
 
 def _empty_rdr_preamble(class_name: str) -> str:
     """Return the rule-tree section for a brand-new (empty) RDR file."""
-    var_name = _class_name_to_var_name(class_name)
-    lines = [
-        '"""Auto-generated EQL-RDR rule tree. Do not edit by hand."""',
-        _FACTORY_IMPORT,
-        "",
-        f"{var_name} = variable({class_name}, domain=[])",
-        "",
-        "# Stable handles for loading.",
-        f"RDR_CASE_TYPE = {class_name}",
-        "RDR_CONCLUSION_ATTRIBUTE = '_output'",
-        f"RDR_CASE_VARIABLE = {var_name}",
-        "RDR_QUERY = None",
-        "",
-    ]
-    return "\n".join(lines)
+    import os
+
+    from krrood.code_generation import CodeGenerator
+
+    template_dir = os.path.join(os.path.dirname(__file__), "templates")
+    generator = CodeGenerator(template_dir=template_dir)
+    return generator.render(
+        "rdr_empty.py.jinja",
+        factory_import=_FACTORY_IMPORT,
+        var_name=to_variable_name(class_name),
+        class_name=class_name,
+    )
 
 
 @dataclass
@@ -100,7 +98,9 @@ class RDRWrapper:
         self, case: Any, target: Any = UNSET, expert: "Optional[Expert]" = None
     ) -> Any:
         """Delegate to the internal RDR, using :attr:`expert` when none is supplied."""
-        return self.rdr.fit_case(case, target, expert if expert is not None else self.expert)
+        return self.rdr.fit_case(
+            case, target, expert if expert is not None else self.expert
+        )
 
     def fit(
         self,
@@ -109,7 +109,9 @@ class RDRWrapper:
         expert: "Optional[Expert]" = None,
     ) -> EQLSingleClassRDR:
         """Delegate to the internal RDR's batch :meth:`~EQLSingleClassRDR.fit`."""
-        return self.rdr.fit(cases, targets, expert if expert is not None else self.expert)
+        return self.rdr.fit(
+            cases, targets, expert if expert is not None else self.expert
+        )
 
     def _load_or_generate(self) -> "tuple[Type[FunctionCase], EQLSingleClassRDR]":
         if self.store.exists():
@@ -131,11 +133,7 @@ class RDRWrapper:
         sig = inspect.signature(self.func)
         bound = sig.bind(*args, **kwargs)
         bound.apply_defaults()
-        params = {
-            k: v
-            for k, v in bound.arguments.items()
-            if k not in ("self", "cls")
-        }
+        params = {k: v for k, v in bound.arguments.items() if k not in ("self", "cls")}
         return self.case_type(**params, _output=output)
 
 

@@ -469,18 +469,18 @@ def build_user_input_from_conclusion(conclusion: Any) -> str:
         user_input = function_body
     elif isinstance(conclusion, set):
         user_input = (
-            "{" + f"{', '.join([conclusion_to_str(t) for t in conclusion])}" + "}"
+            "{" + f"{', '.join([value_to_source(t) for t in conclusion])}" + "}"
         )
     elif isinstance(conclusion, list):
         user_input = (
-            "[" + f"{', '.join([conclusion_to_str(t) for t in conclusion])}" + "]"
+            "[" + f"{', '.join([value_to_source(t) for t in conclusion])}" + "]"
         )
     elif isinstance(conclusion, tuple):
         user_input = (
-            "(" + f"{', '.join([conclusion_to_str(t) for t in conclusion])}" + ")"
+            "(" + f"{', '.join([value_to_source(t) for t in conclusion])}" + ")"
         )
     else:
-        user_input = conclusion_to_str(conclusion)
+        user_input = value_to_source(conclusion)
 
     return user_input
 
@@ -2301,3 +2301,18 @@ def get_method_object_from_pytest_request(request) -> Callable:
     else:
         func = getattr(func, test_name)
     return func
+
+
+# ---------------------------------------------------------------------------
+# Deprecated — moved to krrood.code_generation.utils
+# ---------------------------------------------------------------------------
+
+from krrood.code_generation.utils import (  # noqa: E402, F401
+    value_to_source,
+    extract_function_or_class_file,
+    extract_function_or_class_from_source,
+    get_types_to_import_from_func_type_hints,
+    get_types_to_import_from_type_hints,
+    str_to_snake_case,
+    stringify_hint,
+)

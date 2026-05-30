@@ -1271,8 +1271,10 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
             imports.append(f"from .{self.generated_python_defs_file_name} import *")
             f.write("\n".join(imports) + "\n\n\n")
             f.write(f"attribute_name = '{self.attribute_name}'\n")
+            from krrood.code_generation.utils import stringify_type_hint
+
             f.write(
-                f"conclusion_type = ({', '.join([ct.__name__ for ct in self.conclusion_type])},)\n"
+                f"conclusion_type = ({', '.join([stringify_type_hint(ct) for ct in self.conclusion_type])},)\n"
             )
             f.write(f"mutually_exclusive = {self.mutually_exclusive}\n")
             self.write_rdr_metadata_to_pyton_file(f)
@@ -1557,10 +1559,16 @@ class SingleClassRDR(RDRWithCodeWriter):
 
     @property
     def conclusion_type_hint(self) -> str:
+        from krrood.code_generation.utils import stringify_type_hint
+
         all_types = set(list(self.conclusion_type) + [type(self.default_conclusion)])
         if NoneType in all_types:
-            return f"Optional[{', '.join([t.__name__ for t in all_types if t is not NoneType])}]"
-        return f"Union[{', '.join([t.__name__ for t in all_types])}]"
+            type_names = [
+                stringify_type_hint(t) for t in all_types if t is not NoneType
+            ]
+            return f"Optional[{', '.join(type_names)}]"
+        type_names = [stringify_type_hint(t) for t in all_types]
+        return f"Union[{', '.join(type_names)}]"
 
     def _get_types_to_import(self) -> Tuple[Set[Type], Set[Type], Set[Type]]:
         main_types, def_types, case_types = super()._get_types_to_import()
@@ -1773,8 +1781,12 @@ class MultiClassRDR(RDRWithCodeWriter):
 
     @property
     def conclusion_type_hint(self) -> str:
+        from krrood.code_generation.utils import stringify_type_hint
+
         conclusion_types = [
-            ct.__name__ for ct in self.conclusion_type if ct not in [list, set]
+            stringify_type_hint(ct)
+            for ct in self.conclusion_type
+            if ct not in [list, set]
         ]
         if len(conclusion_types) == 1:
             return f"Set[{conclusion_types[0]}]"

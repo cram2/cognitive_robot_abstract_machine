@@ -36,7 +36,6 @@ from krrood.entity_query_language.rdr.interface import FunctionInterface
 from krrood.entity_query_language.rdr.serialization import load_rdr
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 
-
 # ---------------------------------------------------------------------------
 # Helpers — not collected by pytest (no "Test" prefix, not test_ functions)
 # ---------------------------------------------------------------------------
@@ -84,7 +83,7 @@ def generated_case_type(distance_func):
     the bottom of the generated source can resolve it without importing from the
     test module (which is not on sys.path as a named module during exec).
     """
-    from krrood.class_diagrams.code_generation_utilities import (
+    from krrood.code_generation import (
         function_to_dataclass_source,
     )
 
@@ -142,9 +141,7 @@ class TestPathResolutionRelative:
         from krrood.entity_query_language.rdr.file_store import RDRFileStore
 
         store = RDRFileStore(func=distance_func, filename="model.py")
-        expected_parent = (
-            Path(inspect.getfile(distance_func)).parent / "_rdr_models"
-        )
+        expected_parent = Path(inspect.getfile(distance_func)).parent / "_rdr_models"
         assert Path(store.path).parent == expected_parent
 
     def test_relative_filename_preserves_basename(self, distance_func):

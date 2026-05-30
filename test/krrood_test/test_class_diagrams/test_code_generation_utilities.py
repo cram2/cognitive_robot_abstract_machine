@@ -60,13 +60,12 @@ import pytest
 # implementation does not yet exist — rather than producing confusing per-test
 # AttributeErrors at call time.
 # ---------------------------------------------------------------------------
-from krrood.class_diagrams.code_generation_utilities import (
+from krrood.code_generation import (
     FunctionMissingAnnotationsError,
     function_to_dataclass_source,
     generate_callable_import,
     to_camel_case,
 )
-
 
 # ===========================================================================
 # Shared helpers / fixtures
@@ -222,9 +221,7 @@ class TestGenerateCallableImportModuleLevel:
 class TestGenerateCallableImportMethod:
     """Guarantees for ``generate_callable_import`` when passed an unbound method."""
 
-    def test_import_line_imports_class_not_function(
-        self, method_host_class
-    ) -> None:
+    def test_import_line_imports_class_not_function(self, method_host_class) -> None:
         """The import line must import ``MyClass``, not ``distance`` directly.
 
         When a function's ``__qualname__`` contains a dot (``MyClass.distance``),
@@ -247,17 +244,13 @@ class TestGenerateCallableImportMethod:
         _, access_expr = generate_callable_import(method)
         assert "." in access_expr
 
-    def test_access_expression_starts_with_class_name(
-        self, method_host_class
-    ) -> None:
+    def test_access_expression_starts_with_class_name(self, method_host_class) -> None:
         """The access expression starts with the class name."""
         method = method_host_class.distance
         _, access_expr = generate_callable_import(method)
         assert access_expr.startswith("MyClass")
 
-    def test_access_expression_ends_with_method_name(
-        self, method_host_class
-    ) -> None:
+    def test_access_expression_ends_with_method_name(self, method_host_class) -> None:
         """The access expression ends with the method name."""
         method = method_host_class.distance
         _, access_expr = generate_callable_import(method)
@@ -351,9 +344,7 @@ class TestValidateAnnotationsSelfExcluded:
         # We check that "self" is not introduced as a typed field annotation.
         lines = source.splitlines()
         field_lines = [
-            ln.strip()
-            for ln in lines
-            if ":" in ln and not ln.strip().startswith("#")
+            ln.strip() for ln in lines if ":" in ln and not ln.strip().startswith("#")
         ]
         # No field line should start with "self"
         self_fields = [fl for fl in field_lines if fl.startswith("self")]
@@ -384,9 +375,7 @@ class TestValidateAnnotationsClsExcluded:
         source = function_to_dataclass_source(MyClass.create.__func__)
         lines = source.splitlines()
         field_lines = [
-            ln.strip()
-            for ln in lines
-            if ":" in ln and not ln.strip().startswith("#")
+            ln.strip() for ln in lines if ":" in ln and not ln.strip().startswith("#")
         ]
         cls_fields = [fl for fl in field_lines if fl.startswith("cls")]
         assert cls_fields == []
@@ -475,9 +464,7 @@ class TestFunctionToDataclassSourceClassVar:
         assert "function" in distance_source
         assert "ClassVar" in distance_source
 
-    def test_function_classvar_assigned_to_distance(
-        self, distance_source: str
-    ) -> None:
+    def test_function_classvar_assigned_to_distance(self, distance_source: str) -> None:
         """The ``function`` ClassVar is assigned the wrapped function name."""
         assert "= distance" in distance_source or "=distance" in distance_source
 
