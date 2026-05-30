@@ -20,7 +20,7 @@ class WorldWithGarmiConfig(WorldWithOmniDriveRobot):
     odom_body_name: PrefixedName = field(
         default_factory=lambda: PrefixedName("odom_combined")
     )
-    urdf_view: AbstractRobot = field(kw_only=True, default=Garmi, init=False)
+    urdf_view: Garmi = field(kw_only=True, default=Garmi)
 
 
 class GarmiStandaloneInterface(StandAloneRobotInterfaceConfig):
