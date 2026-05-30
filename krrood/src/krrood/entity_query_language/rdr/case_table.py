@@ -5,7 +5,8 @@ The case's ``(attribute, value)`` pairs are laid out across as many columns as t
 terminal is wide enough for: the number of pairs per row is derived from the available
 width and :data:`DEFAULT_MIN_COLUMN_WIDTH` (the smallest a pair column may be), and the
 value columns are then stretched so the table spans the full width rather than hugging
-its content. Values that overflow their budget are clipped with an ellipsis.
+its content. Values that overflow their budget are wrapped across multiple lines so the
+full content is visible rather than truncated.
 
 Kept deliberately small and dependency-light (just ``tabulate``);
 """
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import dataclasses
 import shutil
+import textwrap
 
 from dataclasses import dataclass
 
@@ -136,11 +138,11 @@ class CaseTableRenderer:
         cells = [
             (
                 self._style_key(_clip(name, key_width).ljust(key_width)),
-                _clip(value, value_width).ljust(value_width),
+                textwrap.fill(value, width=value_width) if value else "",
             )
             for name, value in items
         ]
-        empty_pair = ["".ljust(key_width), "".ljust(value_width)]
+        empty_pair = ["".ljust(key_width), ""]
         rows: List[List[str]] = []
         for start in range(0, len(cells), pairs_per_row):
             chunk = cells[start : start + pairs_per_row]

@@ -40,6 +40,12 @@ from krrood.entity_query_language.rdr.interface import (
     CaseContext,
     ExpertInterface,
 )
+from krrood.entity_query_language.rdr.expert import ANSWER_NAME, CONCLUSION_NAME
+from krrood.entity_query_language.rdr.magics import (
+    CONDITIONS_MAGIC,
+    CONCLUSION_MAGIC,
+    _make_assign_exit_magic,
+)
 from krrood.entity_query_language.rdr.prompt_sections import (  # noqa: F401
     AID_MAGIC,
     HELP_MAGIC,
@@ -54,6 +60,10 @@ from krrood.entity_query_language.rdr.rule_tree_view import render_rule_tree
 ShellRunner = Callable[[Dict[str, Any], str], None]
 
 # AID_MAGIC, HELP_MAGIC, SHOW_TREE_MAGIC are defined in prompt_sections and re-exported above.
+
+#: ANSI escape sequence: erase display and return cursor to top-left.
+#: Emitted before each new embedded shell so each case starts on a clean screen.
+CLEAR_SCREEN = "\033[2J\033[H"
 
 #: Private namespace key holding the zero-arg rule-tree renderer for the ``%show_tree`` magic.
 _TREE_RENDER_KEY = "__rule_tree_render__"
@@ -199,6 +209,14 @@ class IPythonInterface(ExpertInterface):
             f"  Build your answer over {p.code(CASE_VARIABLE_NAME)} and assign it:",
         ]
         lines.extend(f"      {p.code(request.example)}" for request in requests)
+        lines.append(f"  Or use the shorthand magic (assigns and submits in one step):")
+        for request in requests:
+            magic = (
+                CONCLUSION_MAGIC
+                if request.name == CONCLUSION_NAME
+                else CONDITIONS_MAGIC
+            )
+            lines.append(f"      {p.code(f'%{magic} <value-or-expression>')}")
         lines.append(
             f"  Submit with {p.code('Ctrl-D')}; cancel with {p.code(f'{EXIT_NAME}()')}."
         )
@@ -260,6 +278,9 @@ class IPythonInterface(ExpertInterface):
                     return
                 super().ask_exit()
 
+        if self.use_color:
+            print(CLEAR_SCREEN, end="", flush=True)
+
         shell = _ValidatingEmbeddedShell(banner1=header, user_ns=namespace)
         shell.auto_match = True
         shell.confirm_exit = False
@@ -270,6 +291,26 @@ class IPythonInterface(ExpertInterface):
         )
         self._register_namespace_magic(shell, namespace, HELP_MAGIC, _HELP_TEXT_KEY)
         self._register_namespace_magic(shell, namespace, AID_MAGIC, _AID_TEXT_KEY)
+
+        # Register action magics for the answers that are in flight this session.
+        # The answer names are pre-seeded into namespace by _build_namespace, so
+        # their presence is a reliable signal for which magics to register.
+        if CONCLUSION_NAME in namespace:
+            shell.register_magic_function(
+                _make_assign_exit_magic(
+                    CONCLUSION_NAME, shell, namespace, validate, self.palette
+                ),
+                magic_kind="line",
+                magic_name=CONCLUSION_MAGIC,
+            )
+        if ANSWER_NAME in namespace:
+            shell.register_magic_function(
+                _make_assign_exit_magic(
+                    ANSWER_NAME, shell, namespace, validate, self.palette
+                ),
+                magic_kind="line",
+                magic_name=CONDITIONS_MAGIC,
+            )
 
         def _cancel() -> None:
             shell._force_exit = True
