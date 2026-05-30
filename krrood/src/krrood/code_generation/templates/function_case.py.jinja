@@ -1,0 +1,23 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from typing_extensions import ClassVar, Callable
+from {{ base_module }} import {{ base_class_name }}
+{{ type_imports_str }}try:
+    {{ import_line }}
+except ImportError:
+    pass
+
+
+@dataclass
+class {{ class_name }}({{ base_class_name }}):
+    """FunctionCase for the `{{ func_name }}` function."""
+{% for field in fields %}
+    {{ field.name }}: {{ field.type_str }}
+{% endfor %}
+    _output: {{ return_type_str }}
+
+
+try:
+    {{ class_name }}.function = {{ access_expr }}
+except NameError:
+    pass
