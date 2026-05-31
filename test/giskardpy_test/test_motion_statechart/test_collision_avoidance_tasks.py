@@ -878,10 +878,9 @@ def test_collision_for_robot_with_static_base(tracy_world):
 
 
 def test_repeated_collision_pr2_apartment_does_not_increase_execution_time(
-    pr2_apartment_world, rclpy_node
+    pr2_apartment_world,
 ):
     world = deepcopy(pr2_apartment_world)
-    VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
 
     tool_frame = world.get_body_by_name("r_gripper_tool_frame")
     robot = PR2.from_world(world)
