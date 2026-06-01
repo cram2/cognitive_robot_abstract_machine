@@ -2,7 +2,7 @@
 Pouring-domain physics classes: differential equations, fill-level mixin, and inflow equation.
 
 Provides the SDT-native building blocks for pouring simulation that carry no
-giskardpy dependency. The giskardpy-dependent physics model (PouringMSCModel) live in pycram.body_motion_problem.pouring.physics.
+giskardpy dependency. The giskardpy-dependent physics model (PouringMSCModel) lives in giskardpy.body_motion_problem.pouring_physics.
 """
 
 from __future__ import annotations

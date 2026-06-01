@@ -58,11 +58,13 @@ def conclusion_331345798360792447350644865254855982739(case) -> List[Drawer]:
         handle = variable(Handle, case.semantic_annotations)
         prismatic_connection = variable(PrismaticConnection, case.connections)
         fixed_connection = match_variable(FixedConnection, case.connections)(
-            parent=prismatic_connection.child, child=handle.root
+            parent=prismatic_connection.child
         )
-        return inference(Drawer)(
-            root=fixed_connection.parent, handle=fixed_connection.child
-        ).tolist()
+        return (
+            entity(inference(Drawer)(root=fixed_connection.parent, handle=handle))
+            .where(fixed_connection.child == handle.root)
+            .tolist()
+        )
 
     return get_drawers(case)
 
@@ -109,11 +111,13 @@ def conclusion_59112619694893607910753808758642808601(case) -> List[Door]:
         handle = variable(Handle, case.semantic_annotations)
         revolute_connection = variable(RevoluteConnection, case.connections)
         fixed_connection = match_variable(FixedConnection, case.connections)(
-            parent=revolute_connection.child, child=handle.root
+            parent=revolute_connection.child
         )
-        return inference(Door)(
-            root=fixed_connection.parent, handle=fixed_connection.child
-        ).tolist()
+        return (
+            entity(inference(Door)(root=fixed_connection.parent, handle=handle))
+            .where(fixed_connection.child == handle.root)
+            .tolist()
+        )
 
     return get_doors(case)
 

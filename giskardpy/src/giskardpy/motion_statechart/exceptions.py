@@ -139,3 +139,10 @@ class DuplicateContextExtensionError(MotionStatechartError):
     def __post_init__(self):
         self.message = f"Extension of type {self.extension_type.__name__} already exists. You cannot add it twice."
         super().__post_init__()
+
+
+@dataclass
+class LocalMinimumReachedError(MotionStatechartError):
+    def __post_init__(self):
+        self.message = "Motion cancelled: local minimum reached."
+        super().__post_init__()

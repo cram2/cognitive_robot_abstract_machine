@@ -7,28 +7,26 @@ from dataclasses import dataclass
 
 import pytest
 
-# from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
 from giskardpy.motion_statechart.goals.open_close import Open
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from krrood.entity_query_language.factories import an, set_of, variable
 from krrood.ormatic.utils import classproperty
 
-from pycram.body_motion_problem.types import Effect, Motion, TaskRequest
-from pycram.body_motion_problem.predicates import SatisfiesRequest, Causes
-from pycram.body_motion_problem.container_manipulation.predicates import (
-    ContainerCanPerform,
-)
-from pycram.body_motion_problem.container_manipulation.effects import (
+from giskardpy.body_motion_problem.container_physics import RunMSCModel
+from giskardpy.body_motion_problem.pouring_physics import PouringMSCModel
+from pycram.body_motion_problem.predicates import MotionStatechartCanPerform
+from semantic_digital_twin.reasoning.bmp_predicates import Causes, SatisfiesRequest
+from semantic_digital_twin.semantic_annotations.effects import (
     ClosedEffect,
     OpenedEffect,
+    PouringEffect,
 )
-from pycram.body_motion_problem.container_manipulation.physics import RunMSCModel
-from pycram.body_motion_problem.pouring.effects import PouringEffect
-from pycram.body_motion_problem.pouring.physics import (
-    PouringMSCModel,
-)
-from pycram.body_motion_problem.pouring.predicates import PouringCanPerform
+from semantic_digital_twin.world_description.effects import Effect, TaskRequest
+from semantic_digital_twin.world_description.motion import Motion
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.pr2 import PR2
@@ -171,7 +169,7 @@ def _get_msc_model_for_open_goal(handle_body, actuator, goal_value) -> RunMSCMod
     )
     msc.add_node(goal)
     msc.add_node(EndMotion.when_true(goal))
-    return RunMSCModel(msc=msc, actuator=actuator, timeout=500)
+    return RunMSCModel(motion_statechart=msc, actuator=actuator, timeout=500)
 
 
 def _extend_world(
@@ -224,7 +222,7 @@ def _extend_world(
                 trajectory=[],
                 actuator=act,
                 motion_model=_get_msc_model_for_open_goal(
-                    annotation.handle, act, upper
+                    annotation.handle.root, act, upper
                 ),
             )
         )
@@ -243,7 +241,7 @@ def _extend_world(
                     trajectory=[],
                     actuator=act,
                     motion_model=_get_msc_model_for_open_goal(
-                        annotation.handle, act, lower
+                        annotation.handle.root, act, lower
                     ),
                 )
             )
@@ -297,9 +295,10 @@ class TestContainerManipulationPredicates:
         # effects[0] = OpenedEffect, motions[1] = close motion — direction mismatch
         assert not Causes(effect=effects[0], motion=motions[1], environment=world)()
 
-    def test_can_execute(self, mutable_model_world):
-        """ContainerCanPerform returns False for an empty trajectory and a bool for a non-empty one."""
+    def test_can_execute(self, mutable_model_world, rclpy_node):
+        """MotionStatechartCanPerform returns False for an empty trajectory and a bool for a non-empty one."""
         world = mutable_model_world
+        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         world.get_body_by_name("base_footprint").parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.2, 2, 0)
         )
@@ -308,12 +307,12 @@ class TestContainerManipulationPredicates:
         robot = PR2.from_world(world)
         motion = motions[0]
 
-        assert not ContainerCanPerform(motion=motion, robot=robot)()
+        assert not MotionStatechartCanPerform(motion=motion, robot=robot)()
 
         act = drawers[0].root.parent_connection
         upper = act.active_dofs[0].limits.upper.position
         motion.trajectory = [i * upper / 8 for i in range(9)]
-        result = ContainerCanPerform(motion=motion, robot=robot)()
+        result = MotionStatechartCanPerform(motion=motion, robot=robot)()
         assert isinstance(result, bool)
 
 
@@ -389,7 +388,7 @@ class TestPouringPredicates:
         assert not Causes(effect=effect, environment=world, motion=motion)()
 
     def test_pouring_can_perform(self, pr2_world_with_cup):
-        """PouringCanPerform confirms the PR2 can execute the tilt trajectory from Causes."""
+        """MotionStatechartCanPerform confirms the PR2 can execute the tilt trajectory from Causes."""
         world, cup, robot = pr2_world_with_cup
 
         goal_fill = 0.6
@@ -412,7 +411,7 @@ class TestPouringPredicates:
 
         causes = Causes(effect=effect, environment=world, motion=motion)
         assert causes()
-        assert PouringCanPerform(motion=motion, robot=robot)()
+        assert MotionStatechartCanPerform(motion=motion, robot=robot)()
 
 
 # ---------------------------------------------------------------------------
@@ -599,7 +598,7 @@ class TestPouringQueries:
             set_of(task_sym, effect_sym, motion_sym).where(
                 SatisfiesRequest(task=task_sym, effect=effect_sym),
                 Causes(effect=effect_sym, environment=world, motion=motion_sym),
-                PouringCanPerform(motion=motion_sym, robot=robot),
+                MotionStatechartCanPerform(motion=motion_sym, robot=robot),
             )
         )
 
@@ -619,7 +618,7 @@ class TestPouringQueries:
         motion = Motion(
             trajectory=trajectory,
             actuator=cup.root.parent_connection,
-            dt=0.1,
+            time_step=0.1,
         )
 
         candidate_effects = [
@@ -659,16 +658,15 @@ class TestPouringQueries:
 
 
 # ---------------------------------------------------------------------------
-# 5. Long-running robot integration tests (not executed in CI)
+# 5. Long-running robot integration tests
 # ---------------------------------------------------------------------------
-# @pytest.mark.skip(reason="Long-running tests are skipped in CI for now")
 class TestRobotIntegration:
     def test_query_motion_satisfying_task_request_stretch(
         self, stretch_apartment_world, rclpy_node
     ):
         """Motion querying for open task using Stretch robot in the kitchen world (drawers only)."""
         world = stretch_apartment_world
-        # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         effects, motions, open_task, _, drawers = _extend_world(
             world, only_drawers=True
         )
@@ -682,7 +680,7 @@ class TestRobotIntegration:
             set_of(task_sym, motion_sym, effect_sym).where(
                 SatisfiesRequest(task=task_sym, effect=effect_sym),
                 Causes(effect=effect_sym, motion=motion_sym, environment=world),
-                ContainerCanPerform(motion=motion_sym, robot=robot),
+                MotionStatechartCanPerform(motion=motion_sym, robot=robot),
             )
         )
 
@@ -695,7 +693,7 @@ class TestRobotIntegration:
     ):
         """Motion querying for open task using Tiago robot in the kitchen world."""
         world = tiago_apartment_world
-        # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         effects, motions, open_task, _, _ = _extend_world(
             world, only_doors=False, only_drawers=True
         )
@@ -714,7 +712,7 @@ class TestRobotIntegration:
             set_of(task_sym, motion_sym, effect_sym).where(
                 SatisfiesRequest(task=task_sym, effect=effect_sym),
                 Causes(effect=effect_sym, motion=motion_sym, environment=world),
-                ContainerCanPerform(motion=motion_sym, robot=robot),
+                MotionStatechartCanPerform(motion=motion_sym, robot=robot),
             )
         )
 
@@ -727,7 +725,7 @@ class TestRobotIntegration:
     ):
         """Given a fixed motion on the first drawer, query recovers task and effect using PR2."""
         world = mutable_model_world
-        # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         effects, _, open_task, close_task, drawers = _extend_world(world)
 
         motion = Motion(
@@ -752,7 +750,7 @@ class TestRobotIntegration:
             set_of(motion_sym, effect_sym, task_sym).where(
                 SatisfiesRequest(task=task_sym, effect=effect_sym),
                 Causes(effect=effect_sym, motion=motion_sym, environment=world),
-                ContainerCanPerform(motion=motion_sym, robot=robot),
+                MotionStatechartCanPerform(motion=motion_sym, robot=robot),
             )
         )
         results = list(query.evaluate())
