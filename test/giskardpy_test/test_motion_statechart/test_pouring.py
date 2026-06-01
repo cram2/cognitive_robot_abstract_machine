@@ -29,6 +29,7 @@ from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
+    Point3,
 )
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
@@ -50,7 +51,6 @@ from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
 from dataclasses import dataclass
 from krrood.ormatic.utils import classproperty
-from spatial_types import Point3
 
 _JEROEN_CUP_STL = str(
     Path(files("semantic_digital_twin")).parent.parent

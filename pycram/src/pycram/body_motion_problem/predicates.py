@@ -1,12 +1,3 @@
-"""
-BMP predicate implementation for embodiment feasibility.
-
-The embodiment feasibility predicate (CanPerform) checks whether a robot can
-physically execute a motion trajectory given its kinematic and dynamic limits.
-The semantic correctness (SatisfiesRequest) and causal sufficiency (Causes)
-predicates live in semantic_digital_twin.reasoning.bmp_predicates.
-"""
-
 from __future__ import annotations
 
 import gc
@@ -55,6 +46,7 @@ from pycram.locations.costmaps import (
 @dataclass
 class MotionStatechartCanPerform(CanPerform):
     """
+    Actual implementation of the abstract interface defined in CanPerform.
     Whole-body feasibility check using QP-based motion planning with
     costmap-driven base placement.
 

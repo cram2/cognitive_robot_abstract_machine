@@ -1,10 +1,3 @@
-"""
-Pouring-domain physics classes: differential equations, fill-level mixin, and inflow equation.
-
-Provides the SDT-native building blocks for pouring simulation that carry no
-giskardpy dependency. The giskardpy-dependent physics model (PouringMSCModel) lives in giskardpy.body_motion_problem.pouring_physics.
-"""
-
 from __future__ import annotations
 
 from abc import abstractmethod
@@ -25,10 +18,10 @@ class PouringEquation(SubclassJSONSerializer, DifferentialEquation):
     """
     Abstract ODE for pouring-domain fill-level dynamics.
 
-    Owns the outflow rate constant ``k``.
+    Owns the outflow rate constant.
     Concrete subclasses implement :meth:`symbolic_velocity`.
 
-    :param k: Outflow rate constant.
+    :param outflow_rate_constant: Outflow rate constant.
     """
 
     outflow_rate_constant: float = field(default=1.0, kw_only=True)
@@ -45,11 +38,11 @@ class PouringEquation(SubclassJSONSerializer, DifferentialEquation):
         :return: Symbolic desired fill velocity.
         """
 
-    def symbolic_tilt_floor(self, fill_sym: Scalar) -> Scalar:
+    def symbolic_tilt_floor(self, fill_expression: Scalar) -> Scalar:
         """
         Symbolic minimum tilt angle at which flow begins for the given fill level.
 
-        :param fill_sym: Symbolic fill-level position DOF variable.
+        :param fill_expression: Symbolic fill-level position DOF variable.
         :return: Symbolic tilt floor angle in radians.
         """
         return sm.Scalar(0.0)
@@ -89,16 +82,16 @@ class ArticulatedPouringEquation(PouringEquation):
             outflow_rate_constant=data["outflow_rate_constant"],
         )
 
-    def symbolic_tilt_floor(self, fill_sym: Scalar) -> Scalar:
+    def symbolic_tilt_floor(self, fill_expression: Scalar) -> Scalar:
         """
         Returns the geometric tilt offset φ(fill) — the minimum tilt for flow.
 
-        :param fill_sym: Symbolic fill-level position DOF variable.
+        :param fill_expression: Symbolic fill-level position DOF variable.
         :return: Symbolic φ(fill) in radians.
         """
         A = self.container_height
         r = self.container_width / 2
-        return sm.atan2(A - fill_sym * A, r)
+        return sm.atan2(A - fill_expression * A, r)
 
     def symbolic_velocity(
         self, tilt_expression: Scalar, fill_expression: Scalar

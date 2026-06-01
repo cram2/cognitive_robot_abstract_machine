@@ -5,8 +5,6 @@ from copy import deepcopy
 import numpy as np
 import pytest
 
-from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
-from semantic_digital_twin.datastructures.definitions import StaticJointState
 from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
@@ -42,9 +40,6 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointState
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Door, Drawer
-from giskardpy.motion_statechart.goals.open_close import Open
-from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -56,7 +51,6 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AvoidAllCollisions,
     AllowAllCollisions,
-    AllowCollisionBetweenGroups,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot

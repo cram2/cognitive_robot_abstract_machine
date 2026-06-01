@@ -1,7 +1,3 @@
-"""
-Abstract physics model interface for the Body Motion Problem framework.
-"""
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -9,6 +5,7 @@ from typing import Optional
 
 from semantic_digital_twin.world_description.effects import Effect
 from semantic_digital_twin.world_description.world_entity import Body, Connection
+from semantic_digital_twin.world import World
 
 
 class PhysicsModel(ABC):
@@ -22,7 +19,7 @@ class PhysicsModel(ABC):
     """
 
     @abstractmethod
-    def run(self, effect: Effect, world: object) -> tuple[Optional[list[float]], bool]:
+    def run(self, effect: Effect, world: World) -> tuple[Optional[list[float]], bool]:
         """
         Simulate the motion and return the recorded actuator trajectory and whether
         the effect was achieved.

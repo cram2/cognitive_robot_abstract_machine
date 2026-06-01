@@ -21,10 +21,6 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AllowSelfCollisions,
 )
 from semantic_digital_twin.reasoning.predicates import is_place_occupied
-from semantic_digital_twin.spatial_computations.ik_solver import (
-    MaxIterationsException,
-    UnreachableException,
-)
 from semantic_digital_twin.robots.abstract_robot import (
     AbstractRobot,
     ParallelGripper,
@@ -112,12 +108,9 @@ def blocking(
     :param tip: The threshold between the end effector and the position.
     :return: A list of bodies the robot is in collision with when reaching for the specified object or None if the pose or object is not reachable.
     """
-    try:
-        result = root._world.compute_inverse_kinematics(
-            root=root, tip=tip, target=pose, max_iterations=1000
-        )
-    except (MaxIterationsException, UnreachableException):
-        return []
+    result = root._world.compute_inverse_kinematics(
+        root=root, tip=tip, target=pose, max_iterations=1000
+    )
     with root._world.modify_world():
         for dof, state in result.items():
             root._world.state[dof.id].position = state
