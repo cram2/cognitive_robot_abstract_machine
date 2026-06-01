@@ -1,6 +1,16 @@
 import sys
+import pytest
 from dataclasses import fields, dataclass
-from typing import Union, TypeVar, Generic, List
+from typing import (
+    Union,
+    TypeVar,
+    Generic,
+    List,
+    Optional,
+    Callable,
+    Annotated,
+    Dict,
+)
 
 from typing_extensions import (
     get_type_hints,
@@ -292,3 +302,55 @@ def test_transitive_map_failure():
 
     res = resolve_type(List[T], subs)
     assert res.resolved_type == List[int]
+
+
+@pytest.mark.parametrize(
+    "type_hint, expected_resolved",
+    [
+        (Union[T, U], Union[int, str]),
+        ("float | T", float | int),
+        (Optional[U], Optional[str]),
+        (Callable[[T], U], Callable[[int], str]),
+        (Annotated[V, "metadata"], Annotated[float, "metadata"]),
+        (List[Union[T, Dict[str, U]]], List[Union[int, Dict[str, str]]]),
+    ],
+)
+def test_complex_type_resolution(type_hint, expected_resolved):
+    """
+    Test that complex types are correctly resolved when bound in a subclass.
+    """
+
+    @dataclass
+    class Base(Generic[T, U, V], AbstractSubClassSafeGeneric):
+        attribute: type_hint
+
+    @dataclass
+    class Final(Base[int, str, float]):
+        pass
+
+    fields_by_name = {field.name: field for field in fields(Final)}
+    assert fields_by_name["attribute"].type == expected_resolved
+
+
+def test_circular_reference_resolution():
+    """
+    Test that circular references in type substitutions are handled without infinite recursion.
+    """
+    T_local = TypeVar("T_local")
+    U_local = TypeVar("U_local")
+
+    # Direct cycle: T -> U, U -> T
+    substitutions = {T_local: U_local, U_local: T_local}
+    resolved = AbstractSubClassSafeGeneric._resolve_substitutions_transitively(
+        substitutions
+    )
+    assert resolved[T_local] in {T_local, U_local}
+    assert resolved[U_local] in {T_local, U_local}
+
+    # Indirect cycle: T -> List[U], U -> T
+    substitutions = {T_local: List[U_local], U_local: T_local}
+    resolved = AbstractSubClassSafeGeneric._resolve_substitutions_transitively(
+        substitutions
+    )
+    assert resolved[T_local] is not None
+    assert resolved[U_local] is not None

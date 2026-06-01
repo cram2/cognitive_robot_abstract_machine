@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from abc import ABC
 from copy import copy
-from dataclasses import dataclass, fields, Field, field
+from dataclasses import dataclass, fields, Field
 from functools import lru_cache
 from inspect import isclass
-from typing import Tuple, ClassVar
+from typing import Tuple
 
 from typing_extensions import (
     Generic,
@@ -15,15 +15,13 @@ from typing_extensions import (
     Optional,
     Dict,
     Any,
-    List,
     get_origin,
     get_args,
-    assert_never,
+    TypeAlias,
 )
 
 from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
-    resolve_type,
 )
 from krrood.exceptions import MismatchingNumberOfGenericParametersAndResolvedTypes
 from krrood.utils import (
@@ -35,6 +33,9 @@ from krrood.utils import (
 
 if TYPE_CHECKING:
     pass
+
+
+ResolvableType: TypeAlias = type | TypeVar | list["ResolvableType"] | Any
 
 
 @dataclass
@@ -109,7 +110,7 @@ class AbstractSubClassSafeGeneric(ABC):
         cls.__annotations__[name] = resolved_type
 
     @classmethod
-    def _get_generic_type_substitutions(cls) -> Dict[Type, Type]:
+    def _get_generic_type_substitutions(cls) -> Dict[Any, ResolvableType]:
         """
         Get the generic type substitutions for this class.
 
@@ -171,26 +172,49 @@ class AbstractSubClassSafeGeneric(ABC):
 
     @classmethod
     def _resolve_substitutions_transitively(
-        cls, substitutions: Dict[Type, Type]
-    ) -> Dict[Type, Type]:
+        cls, substitutions: Dict[Any, ResolvableType]
+    ) -> Dict[Any, ResolvableType]:
         """
-        Recursively resolve TypeVars in the substitution map to their most concrete form.
+        Recursively resolve TypeVars in the substitution map to their most concrete form
+        using cycle detection to handle complex generic hierarchies safely.
 
         :param substitutions: The substitution map to resolve.
         :return: A new substitution map with fully resolved types.
         """
         resolved_substitutions = {}
+
+        def _resolve_recursive(
+            current_type: ResolvableType, visited: set[Any]
+        ) -> ResolvableType:
+            if isinstance(current_type, TypeVar):
+                type_key = ensure_hashable(current_type)
+                if type_key in visited:
+                    return current_type
+
+                if type_key in substitutions:
+                    return _resolve_recursive(
+                        substitutions[type_key], visited | {type_key}
+                    )
+                return current_type
+
+            if isinstance(current_type, list):
+                return [_resolve_recursive(item, visited) for item in current_type]
+
+            origin = get_origin(current_type)
+            if origin is None:
+                return current_type
+
+            args = get_args(current_type)
+            resolved_args = tuple(_resolve_recursive(arg, visited) for arg in args)
+
+            if resolved_args == args:
+                return current_type
+
+            return origin[resolved_args]
+
         for old_type, new_type in substitutions.items():
-            current_type = new_type
-            # Limit iterations to avoid infinite loops in case of circular references
-            for _ in range(100):
-                resolution = resolve_type(current_type, substitutions)
-                if not resolution.resolved:
-                    break
-                if resolution.resolved_type is current_type:
-                    break
-                current_type = resolution.resolved_type
-            resolved_substitutions[old_type] = current_type
+            resolved_substitutions[old_type] = _resolve_recursive(new_type, set())
+
         return resolved_substitutions
 
     @classmethod
@@ -236,7 +260,7 @@ class SubClassSafeGeneric(Generic[T], AbstractSubClassSafeGeneric, ABC):
     @lru_cache
     def get_generic_type(cls) -> Optional[Type[T]]:
         """
-        :return: The type of the role taker.
+        :return: The type that is currently bound to the generic type parameter T for this class, or None if T is not bound.
         """
         generic_types = get_generic_type_params(cls, SubClassSafeGeneric)
         if not generic_types:
