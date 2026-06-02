@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
@@ -31,10 +31,23 @@ def make_rule_for_allowing_collision_between_two_groups(
     bodies1: List[Body],
     bodies2: List[Body],
     robot: AbstractRobot,
+    buffer_zone_distance: Optional[float] = None,
 ) -> UpdateTemporaryCollisionRules:
-    """Create a temporary collision rule that allows collisions between two groups of bodies."""
+    """Create a temporary collision rule that allows collisions between two groups of bodies.
+
+    If ``buffer_zone_distance`` is given it overrides the robot's default external-collision
+    standoff for the duration of the motion; otherwise the robot's default is kept.
+    """
+    external_collisions = (
+        AvoidExternalCollisions(robot=robot)
+        if buffer_zone_distance is None
+        else AvoidExternalCollisions(
+            robot=robot, buffer_zone_distance=buffer_zone_distance
+        )
+    )
     return UpdateTemporaryCollisionRules(
         temporary_rules=[
+            external_collisions,
             AllowCollisionBetweenGroups(
                 body_group_a=[
                     b for b in bodies1 if b is not None and b.has_collision()
@@ -43,7 +56,19 @@ def make_rule_for_allowing_collision_between_two_groups(
                     b for b in bodies2 if b is not None and b.has_collision()
                 ],
             ),
-            AvoidExternalCollisions(robot=robot),
+        ]
+    )
+
+
+def make_external_collision_buffer_rule(
+    robot: AbstractRobot, buffer_zone_distance: float
+) -> UpdateTemporaryCollisionRules:
+    """Temporarily override the robot's external-collision buffer (soft standoff) distance."""
+    return UpdateTemporaryCollisionRules(
+        temporary_rules=[
+            AvoidExternalCollisions(
+                robot=robot, buffer_zone_distance=buffer_zone_distance
+            )
         ]
     )
 
@@ -65,6 +90,10 @@ class CollisionAwareArmMotion(BaseMotion):
     use_collision_avoidance: bool = True
     """Whether to enable collision avoidance during the motion."""
 
+    collision_buffer_distance: Optional[float] = None
+    """Override for the external-collision buffer (soft standoff) distance in meters.
+    None keeps the robot's default."""
+
     def perform(self):
         pass
 
@@ -76,8 +105,13 @@ class CollisionAwareArmMotion(BaseMotion):
                 return tasks[0]
             return Parallel(tasks, minimum_success=minimum_success)
         hand = ViewManager.get_end_effector_view(self.arm, self.robot)
+        arm = ViewManager.get_arm_view(self.arm, self.robot)
+        manipulating_bodies = list({*arm.bodies, *hand.bodies})
         allow_rule = make_rule_for_allowing_collision_between_two_groups(
-            list(hand.bodies), self.allowed_collision_bodies, robot=hand._robot
+            manipulating_bodies,
+            self.allowed_collision_bodies,
+            robot=hand._robot,
+            buffer_zone_distance=self.collision_buffer_distance,
         )
         motion = Parallel(
             [
@@ -134,6 +168,15 @@ class PoseGraspMotion(CollisionAwareArmMotion):
             ],
             minimum_success=1,
         )
+        if self.collision_buffer_distance is not None:
+            pre_grasp_step = Parallel(
+                [
+                    make_external_collision_buffer_rule(
+                        hand._robot, self.collision_buffer_distance
+                    ),
+                    pre_grasp_step,
+                ]
+            )
         grasp_step = self._with_collision_avoidance([move_to_grasp])
 
         return Sequence([pre_grasp_step, grasp_step])
@@ -156,14 +199,16 @@ class RetractMotion(CollisionAwareArmMotion):
     """Maximum velocity during retract."""
 
     def _compute_goal(self) -> CartesianPosition:
-        tool_frame = ViewManager.get_end_effector_view(self.arm, self.robot).tool_frame
+        manipulator = ViewManager.get_end_effector_view(self.arm, self.robot)
+        tool_frame = manipulator.tool_frame
         if self.direction == RetractDirection.WORLD_Z:
             goal_point = tool_frame.global_pose.to_position() + Vector3(
                 0, 0, self.distance, reference_frame=self.world.root
             )
         else:
             gripper_approach_axis = (
-                tool_frame.global_pose.to_rotation_matrix().z_vector()
+                tool_frame.global_pose.to_rotation_matrix()
+                @ manipulator.front_facing_axis
             )
             goal_point = (
                 tool_frame.global_pose.to_position()
