@@ -5,11 +5,11 @@ from typing import Generator
 import numpy
 import pytest
 
+from krrood.entity_query_language.factories import evaluate_condition
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import Arms
 from pycram.motion_executor import simulated_robot
 from pycram.plans.factories import sequential
-from pycram.plans.failures import PlanFailure
 from pycram.robot_plans.actions.core.pose_grasp import (
     PoseGraspAction,
     PoseGraspAndLiftAction,
@@ -110,48 +110,22 @@ def test_pose_grasp_precondition_fails_without_grasp_pose(pose_grasp_world):
     box_body = world.get_body_by_name("grasp_box")
 
     obj = GraspableBox(root=box_body, _world=world, grasp_pose="")
-    action = PoseGraspAction(target=obj, arm=Arms.LEFT)
+    action = PoseGraspAction(target_object=obj, arm=Arms.LEFT)
 
-    with pytest.raises(PlanFailure):
-        action.validate_precondition()
+    condition = action.pre_condition(
+        action.bound_variables, context, action.designator_parameter
+    )
+    assert not evaluate_condition(condition)
 
-
-def test_pose_grasp_and_lift_precondition_fails_without_grasp_pose(pose_grasp_world):
-    world, view, context = pose_grasp_world
-    box_body = world.get_body_by_name("grasp_box")
-
-    obj = GraspableBox(root=box_body, _world=world, grasp_pose="")
     action = PoseGraspAndLiftAction(target=obj, arm=Arms.LEFT)
 
-    with pytest.raises(PlanFailure):
-        action.validate_precondition()
-
-
-def test_pose_grasp_action(pose_grasp_world, rclpy_node):
-    VizMarkerPublisher(_world=pose_grasp_world[0], node=rclpy_node).with_tf_publisher()
-    world, view, context = pose_grasp_world
-    box_body = world.get_body_by_name("grasp_box")
-
-    obj = GraspableBox(root=box_body, _world=world)
-    with world.modify_world():
-        world.add_semantic_annotation(obj)
-
-    with simulated_robot:
-        sequential(
-            [ParkArmsAction(Arms.BOTH), PoseGraspAction(target=obj, arm=Arms.LEFT)],
-            context,
-        ).perform()
-
-    left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
-    tool_frame_position = (
-        left_arm.manipulator.tool_frame.global_pose.to_position().to_np()
+    condition = action.pre_condition(
+        action.bound_variables, context, action.designator_parameter
     )
-    box_world_position = box_body.global_pose.to_position().to_np()
-    assert tool_frame_position[:3] == pytest.approx(box_world_position[:3], abs=0.02)
+    assert not evaluate_condition(condition)
 
 
-def test_pose_grasp_and_lift_action(pose_grasp_world, rclpy_node):
-    VizMarkerPublisher(_world=pose_grasp_world[0], node=rclpy_node).with_tf_publisher()
+def test_pose_grasp_action(pose_grasp_world):
     world, view, context = pose_grasp_world
     box_body = world.get_body_by_name("grasp_box")
 
@@ -163,7 +137,38 @@ def test_pose_grasp_and_lift_action(pose_grasp_world, rclpy_node):
         sequential(
             [
                 ParkArmsAction(Arms.BOTH),
-                PoseGraspAndLiftAction(target=obj, arm=Arms.LEFT),
+                PoseGraspAction(
+                    target_object=obj,
+                    arm=Arms.LEFT,
+                ),
+            ],
+            context,
+        ).perform()
+
+    left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
+    tool_frame_position = (
+        left_arm.manipulator.tool_frame.global_pose.to_position().to_np()
+    )
+    box_world_position = box_body.global_pose.to_position().to_np()
+    assert tool_frame_position[:3] == pytest.approx(box_world_position[:3], abs=0.02)
+
+
+def test_pose_grasp_and_lift_action(pose_grasp_world):
+    world, view, context = pose_grasp_world
+    box_body = world.get_body_by_name("grasp_box")
+
+    obj = GraspableBox(root=box_body, _world=world)
+    with world.modify_world():
+        world.add_semantic_annotation(obj)
+
+    with simulated_robot:
+        sequential(
+            [
+                ParkArmsAction(Arms.BOTH),
+                PoseGraspAndLiftAction(
+                    target=obj,
+                    arm=Arms.LEFT,
+                ),
             ],
             context,
         ).perform()
@@ -173,12 +178,9 @@ def test_pose_grasp_and_lift_action(pose_grasp_world, rclpy_node):
 
 
 def test_pose_grasp_action_skips_blocked_pose(
-    pose_grasp_world_with_obstacle, rclpy_node
+    pose_grasp_world_with_obstacle,
 ):
     """The obstacle blocks the first grasp pose (yaw=0); the action must fall back to a free pose."""
-    VizMarkerPublisher(
-        _world=pose_grasp_world_with_obstacle[0], node=rclpy_node
-    ).with_tf_publisher()
     world, view, context = pose_grasp_world_with_obstacle
     box_body = world.get_body_by_name("grasp_box")
 
@@ -186,7 +188,7 @@ def test_pose_grasp_action_skips_blocked_pose(
     with world.modify_world():
         world.add_semantic_annotation(obj)
 
-    action = PoseGraspAction(target=obj, arm=Arms.LEFT)
+    action = PoseGraspAction(target_object=obj, arm=Arms.LEFT, check_blocking=True)
 
     with simulated_robot:
         sequential(
