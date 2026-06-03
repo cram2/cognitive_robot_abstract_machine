@@ -38,7 +38,7 @@ def test_pick_up_motion(immutable_model_world):
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,
-        view.left_arm.manipulator,
+        view.left_arm.end_effector,
     )
     pick_up = PickUpAction(
         test_world.get_body_by_name("milk.stl"), Arms.LEFT, grasp_description

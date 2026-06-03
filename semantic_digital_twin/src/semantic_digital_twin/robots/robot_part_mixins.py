@@ -18,13 +18,6 @@ from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
 )
 
-if TYPE_CHECKING:
-    from semantic_digital_twin.robots.robot_parts import (
-        MechanicalGripper,
-        ParallelGripper,
-        HumanoidHand,
-    )
-
 logger = logging.getLogger("semantic_digital_twin")
 
 GenericFinger = TypeVar("GenericFinger")

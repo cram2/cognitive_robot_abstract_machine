@@ -45,6 +45,7 @@ from semantic_digital_twin.robots.robot_parts import (
     EndEffector,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
+from semantic_digital_twin.world_description.connections import ActiveConnection
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -108,7 +109,7 @@ class HSRBRightFinger(Finger):
 class HSRBGripper(EndEffector, HasTwoFingers[HSRBLeftFinger, HSRBRightFinger]):
 
     def setup_hardware_interfaces(self):
-        self._setup_hardware_interfaces_for_active_connections()
+        return
 
     def setup_joint_states(self) -> List[JointState]:
         world = self._world
@@ -356,7 +357,7 @@ class HSRBNeck(
 class HSRBTorso(Torso, HasOneArm[HSRBArm], HasNeck[HSRBNeck]):
 
     def setup_hardware_interfaces(self):
-        self._setup_hardware_interfaces_for_active_connections()
+        return
 
     def setup_joint_states(self) -> List[JointState]:
         torso_joint = self.active_connections

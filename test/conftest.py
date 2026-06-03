@@ -454,8 +454,7 @@ def stretch_world():
         "resources",
         "robots",
     )
-    stretch = os.path.join(urdf_dir, "stretch_description.urdf")
-    return world_with_urdf_factory(stretch, Stretch, DifferentialDrive)
+    return world_with_urdf_factory(Stretch, DifferentialDrive)
 
 
 @pytest.fixture(scope="session")

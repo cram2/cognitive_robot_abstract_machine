@@ -42,7 +42,7 @@ class MoveTorsoAction(ActionDescription):
     """
 
     def execute(self) -> None:
-        joint_state = self.robot.torso.get_joint_state_by_type(self.torso_state)
+        joint_state = self.robot.get_torso().get_joint_state_by_type(self.torso_state)
         self.add_subplan(
             execute_single(
                 MoveJointsMotion(
@@ -85,7 +85,6 @@ class SetGripperAction(ActionDescription):
                 [MoveGripperMotion(gripper=arm, motion=self.motion) for arm in arms]
             )
         ).perform()
-
 
 
 @dataclass

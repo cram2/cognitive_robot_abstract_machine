@@ -45,6 +45,8 @@ from pycram.pose_validator import (
 )
 from pycram.utils import link_pose_for_joint_config
 from pycram.view_manager import ViewManager
+from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
+
 try:
     from semantic_digital_twin.adapters.ros.visualization.pose_publisher import (
         PosePublisher,
@@ -282,7 +284,7 @@ class CostmapLocation(Location):
                 else GraspDescription.calculate_grasp_descriptions(
                     ViewManager.get_arm_view(
                         self.reachable_arm, test_robot
-                    ).manipulator,
+                    ).end_effector,
                     self.target,
                 )
             )
@@ -303,10 +305,14 @@ class CostmapLocation(Location):
                 ee = ViewManager.get_arm_view(self.reachable_arm, test_robot)
                 is_reachable = pose_sequence_reachability_validator(
                     target_sequence,
-                    ee.manipulator.tool_frame,
+                    ee.end_effector.tool_frame,
                     test_robot,
                     test_world,
-                    use_fullbody_ik=test_robot.full_body_controlled,
+                    use_fullbody_ik=(
+                        test_robot.mobile_base.full_body_controlled
+                        if isinstance(test_robot, HasMobileBase)
+                        else False
+                    ),
                 )
                 if is_reachable:
                     pose = GraspPose.from_pose(
@@ -503,7 +509,7 @@ class AccessingLocation(Location):
                 grasp = GraspDescription(
                     ApproachDirection.FRONT,
                     VerticalAlignment.NoAlignment,
-                    arm_chain.manipulator,
+                    arm_chain.end_effector,
                 ).grasp_orientation()
                 grasp.reference_frame = test_world.root
                 current_target_sequence = [deepcopy(pose) for pose in target_sequence]
@@ -514,7 +520,7 @@ class AccessingLocation(Location):
 
                 is_reachable = pose_sequence_reachability_validator(
                     current_target_sequence,
-                    arm_chain.manipulator.tool_frame,
+                    arm_chain.end_effector.tool_frame,
                     test_robot,
                     test_world,
                     use_fullbody_ik=test_robot.full_body_controlled,
@@ -647,7 +653,7 @@ class GiskardLocation(Location):
         test_world.name = "Test World"
 
         test_robot = test_world.get_semantic_annotation_by_id(self.robot.id)
-        test_ee = test_world._get_world_entity_by_hash(hash(ee.manipulator.tool_frame))
+        test_ee = test_world._get_world_entity_by_hash(hash(ee.end_effector.tool_frame))
         with test_world.modify_world():
             test_robot._setup_collision_rules()
 
@@ -658,9 +664,9 @@ class GiskardLocation(Location):
                 if self.grasp_description
                 else GraspDescription.calculate_grasp_descriptions(
                     (
-                        test_robot.left_arm.manipulator
+                        test_robot.left_arm.end_effector
                         if self.arm == Arms.LEFT
-                        else test_robot.right_arm.manipulator
+                        else test_robot.right_arm.end_effector
                     ),
                     self.target_pose,
                 )

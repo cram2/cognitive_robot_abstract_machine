@@ -196,7 +196,7 @@ def test_move_torso_multi(immutable_multiple_robot_apartment):
     with simulated_robot:
         plan.perform()
 
-    joint_state = view.torso.get_joint_state_by_type(TorsoState.HIGH)
+    joint_state = view.get_torso().get_joint_state_by_type(TorsoState.HIGH)
 
     for connection, target in joint_state.items():
         assert connection.position == pytest.approx(target, abs=0.01)
@@ -233,8 +233,8 @@ def test_move_gripper_multi(immutable_multiple_robot_apartment):
         plan.perform()
 
     arm = view.all_arms[0]
-    open_state = arm.manipulator.get_joint_state_by_type(GripperState.OPEN)
-    close_state = arm.manipulator.get_joint_state_by_type(GripperState.CLOSE)
+    open_state = arm.end_effector.get_joint_state_by_type(GripperState.OPEN)
+    close_state = arm.end_effector.get_joint_state_by_type(GripperState.CLOSE)
 
     for connection, target in open_state.items():
         assert connection.position == pytest.approx(target, abs=0.02)
@@ -280,7 +280,7 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,
-        left_arm.manipulator,
+        left_arm.end_effector,
     )
     milk_body = world.get_body_by_name("milk.stl")
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -309,7 +309,7 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
     with simulated_robot:
         plan.perform()
 
-    manipulator_pose = left_arm.manipulator.tool_frame.global_transform
+    manipulator_pose = left_arm.end_effector.tool_frame.global_transform
     manipulator_position = manipulator_pose.to_position().to_np()
     manipulator_orientation = manipulator_pose.to_quaternion().to_np()
 
@@ -344,7 +344,7 @@ def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
     # robot.full_body_controlled = True
     left_arm = ViewManager.get_arm_view(Arms.LEFT, robot)
     front_axis = tuple(
-        int(v) for v in left_arm.manipulator.front_facing_axis.to_np()[:3]
+        int(v) for v in left_arm.end_effector.front_facing_axis.to_np()[:3]
     )
     grasp_axis = AxisIdentifier.from_tuple(front_axis)
 
@@ -374,7 +374,7 @@ def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
     with simulated_robot:
         plan.perform()
 
-    tip_pose = left_arm.manipulator.tool_frame.global_transform
+    tip_pose = left_arm.end_effector.tool_frame.global_transform
     dist = np.linalg.norm(tip_pose.to_position() - np.array(target_pose.to_position()))
     assert dist < 0.01
 
@@ -386,7 +386,7 @@ def test_grasping(immutable_multiple_robot_apartment):
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,
-        left_arm.manipulator,
+        left_arm.end_effector,
     )
     grasping_action = GraspingAction(
         world.get_body_by_name("milk.stl"), Arms.LEFT, grasp_description
@@ -424,7 +424,7 @@ def test_pick_up_multi(mutable_multiple_robot_apartment):
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,
-        left_arm.manipulator,
+        left_arm.end_effector,
     )
 
     milk_body = world.get_body_by_name("milk.stl")
@@ -451,7 +451,7 @@ def test_pick_up_multi(mutable_multiple_robot_apartment):
 
     assert (
         world.get_connection(
-            left_arm.manipulator.tool_frame,
+            left_arm.end_effector.tool_frame,
             world.get_body_by_name("milk.stl"),
         )
         is not None
@@ -468,7 +468,7 @@ def test_place_multi(mutable_multiple_robot_apartment):
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,
-        left_arm.manipulator,
+        left_arm.end_effector,
     )
 
     milk_body = world.get_body_by_name("milk.stl")
@@ -500,7 +500,7 @@ def test_place_multi(mutable_multiple_robot_apartment):
 
     with pytest.raises(NoEdgeBetweenNodes):
         world.get_connection(
-            left_arm.manipulator.tool_frame,
+            left_arm.end_effector.tool_frame,
             world.get_body_by_name("milk.stl"),
         )
 

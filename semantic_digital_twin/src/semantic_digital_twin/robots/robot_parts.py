@@ -44,6 +44,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasSensors,
     GenericSensor,
     GenericEndEffector,
+    HasLeftRightArm,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
@@ -660,6 +661,22 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
     @property
     def all_sensors(self) -> list[Sensor]:
         return [p for p in self._robot_parts if isinstance(p, Sensor)]
+
+    def get_torso(self):
+        [torso] = [p for p in self._robot_parts if isinstance(p, Torso)]
+        return torso
+
+    def get_left_arm_if_specified(self) -> Optional[Arm]:
+        for part in self._robot_parts:
+            if isinstance(part, HasLeftRightArm):
+                return part.left_arm
+        return None
+
+    def get_right_arm_if_specified(self) -> Optional[Arm]:
+        for part in self._robot_parts:
+            if isinstance(part, HasLeftRightArm):
+                return part.right_arm
+        return None
 
     def get_default_camera(self) -> Camera:
         """
