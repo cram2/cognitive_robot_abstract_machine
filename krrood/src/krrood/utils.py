@@ -18,7 +18,7 @@ from inspect import isclass
 from os import PathLike
 from os.path import dirname
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Generic, Hashable
 from typing import Union, Any
 
 from typing_extensions import TypeVar, Type, List, Optional, Callable
@@ -31,6 +31,16 @@ from typing_extensions import (
 )
 
 from krrood import logger
+from krrood.exceptions import (
+    NoSourceDataToParseImportsFrom,
+    NoModuleSourceProvided,
+    NoDefaultValueFound,
+    PackageNameNotFoundError,
+    PathMissingRequiredPartsError,
+    SubprocessExecutionError,
+    SourceDataNotProvided,
+    ModuleNotFoundForConvertingImportsToAbsolute,
+)
 
 T = TypeVar("T")
 
@@ -43,76 +53,6 @@ def recursive_subclasses(cls: Type[T]) -> List[Type[T]]:
     return cls.__subclasses__() + [
         g for s in cls.__subclasses__() for g in recursive_subclasses(s)
     ]
-
-
-@dataclass
-class DataclassException(Exception):
-    """
-    A base exception class for dataclass-based exceptions.
-    The way this is used is by inheriting from it and setting the `message` field in the __post_init__ method,
-    then calling the super().__post_init__() method.
-    """
-
-    message: str = field(kw_only=True, default=None)
-
-    def __post_init__(self):
-        super().__init__(self.message)
-
-
-@dataclass
-class InputError(DataclassException):
-    """
-    Raised when there is an error with user input.
-    """
-
-
-@dataclass
-class NoSourceDataToParseImportsFrom(InputError):
-    """
-    Raised when there is no source data given to parse imports from.
-    """
-
-
-@dataclass
-class NoModuleSourceProvided(InputError):
-    """
-    Raised when there is no source module data given to parse imports from.
-    """
-
-
-@dataclass
-class NoDefaultValueFound(DataclassException):
-    """
-    Raised when no default value for a given field in a dataclass is found.
-    """
-
-
-@dataclass
-class PackageNameNotFoundError(DataclassException):
-    """
-    Raised when a package name is not found in a given path.
-    """
-
-
-@dataclass
-class PathMissingRequiredComponentsError(DataclassException):
-    """
-    Raised when a path does not contain all required components.
-    """
-
-
-@dataclass
-class SubprocessExecutionError(DataclassException):
-    """
-    Raised when a subprocess execution fails.
-    """
-
-
-@dataclass
-class SourceDataNotProvided(InputError):
-    """
-    Raised when no source data is provided.
-    """
 
 
 def get_full_class_name(cls):
@@ -137,9 +77,9 @@ def inheritance_path_length(child_class: Type, parent_class: Type) -> Optional[i
     :return: The minimum path length between `child_class` and `parent_class` or None if no path exists.
     """
     if not (
-            isclass(child_class)
-            and isclass(parent_class)
-            and issubclass(child_class, parent_class)
+        isclass(child_class)
+        and isclass(parent_class)
+        and issubclass(child_class, parent_class)
     ):
         return None
 
@@ -147,7 +87,7 @@ def inheritance_path_length(child_class: Type, parent_class: Type) -> Optional[i
 
 
 def _inheritance_path_length(
-        child_class: Type, parent_class: Type, current_length: int = 0
+    child_class: Type, parent_class: Type, current_length: int = 0
 ) -> int:
     """
     Helper function for :func:`inheritance_path_length`.
@@ -189,7 +129,7 @@ def get_default_value(dataclass_type, field_name):
         elif f.default_factory is not MISSING:  # handles mutable defaults
             return f.default_factory()
         else:
-            raise NoDefaultValueFound(message=f"No default value for field '{field_name}'")
+            raise NoDefaultValueFound(dataclass_type, field_name)
     return None
 
 
@@ -214,12 +154,12 @@ def get_default_values_for_dataclass(dataclass_type):
 
 
 def extract_imports_from(
-        module: Optional[types.ModuleType] = None,
-        file_path: Optional[str] = None,
-        source: Optional[str] = None,
-        ast_tree: Optional[ast.AST] = None,
-        exclude_libraries: Optional[List[str]] = None,
-        convert_relative_to_absolute: bool = False,
+    module: Optional[types.ModuleType] = None,
+    file_path: Optional[str] = None,
+    source: Optional[str] = None,
+    ast_tree: Optional[ast.AST] = None,
+    exclude_libraries: Optional[List[str]] = None,
+    convert_relative_to_absolute: bool = False,
 ) -> List[str]:
     """
     Extract imports from a module or source code or a file path or an ast and returns them as a list of strings.
@@ -233,19 +173,25 @@ def extract_imports_from(
     """
     exclude_libraries = exclude_libraries or []
     if module is None and source is None and file_path is None and ast_tree is None:
-        raise NoSourceDataToParseImportsFrom(message="Either module, source, file_path or ast_tree must be provided")
+        raise NoSourceDataToParseImportsFrom(
+            module=module, file_path=file_path, ast_tree=ast_tree
+        )
     if module:
         source = inspect.getsource(module)
+        current_module_name = module.__name__
     elif file_path:
         with open(file_path, "r") as f:
             source = f.read()
+        current_module_name = os.path.splitext(os.path.basename(file_path))[0]
+    elif convert_relative_to_absolute:
+        raise ModuleNotFoundForConvertingImportsToAbsolute(
+            path=file_path, source_code=source
+        )
 
     tree = ast_tree or ast.parse(source)
 
     import_modules = set()
     from_imports = defaultdict(set)
-
-    current_module = module.__name__
 
     for node in ast.walk(tree):
 
@@ -271,7 +217,7 @@ def extract_imports_from(
             full_module = f"{prefix}{module_name}"
 
             if convert_relative_to_absolute and node.level > 0:
-                full_module = resolve_name(full_module, current_module)
+                full_module = resolve_name(full_module, current_module_name)
 
             if node.module and node.module in exclude_libraries:
                 continue
@@ -295,7 +241,7 @@ def extract_imports_from(
 
 
 def generate_relative_import(
-        from_module: str, target_module: str, symbol: str | None = None
+    from_module: str, target_module: str, symbol: str | None = None
 ) -> str:
     """
     Generate a relative import statement using Python's own resolver.
@@ -315,7 +261,7 @@ def generate_relative_import(
     # find common prefix
     i = 0
     while (
-            i < min(len(from_parts), len(target_parts)) and from_parts[i] == target_parts[i]
+        i < min(len(from_parts), len(target_parts)) and from_parts[i] == target_parts[i]
     ):
         i += 1
 
@@ -346,9 +292,9 @@ def own_dataclass_fields(cls) -> List[Field]:
 
 
 def get_type_names_per_module_from_types(
-        type_objects: Iterable[Type],
-        excluded_names: Optional[List[str]] = None,
-        excluded_modules: Optional[List[str]] = None,
+    type_objects: Iterable[Type],
+    excluded_names: Optional[List[str]] = None,
+    excluded_modules: Optional[List[str]] = None,
 ) -> Dict[str, List[str]]:
     """
     Get a dictionary of type names grouped by module.
@@ -376,14 +322,14 @@ def get_type_names_per_module_from_types(
             if name == "NoneType":
                 module = "types"
             if (
-                    module is None
-                    or module == "builtins"
-                    or module.startswith("_")
-                    or module in sys.builtin_module_names
-                    or module in excluded_modules
-                    or "<" in module
-                    or name in excluded_names
-                    or "site-packages" in module.split(".")
+                module is None
+                or module == "builtins"
+                or module.startswith("_")
+                or module in sys.builtin_module_names
+                or module in excluded_modules
+                or "<" in module
+                or name in excluded_names
+                or "site-packages" in module.split(".")
             ):
                 continue
             if module == "typing":
@@ -407,8 +353,11 @@ def is_builtin_type(type_object: Any):
     :param type_object: A type object to check.
     :return: True if the type is a built-in type, False otherwise.
     """
-    return isinstance(type_object, type) and type_object.__module__ == "builtins" and hasattr(builtins,
-                                                                                              type_object.__name__)
+    return (
+        isinstance(type_object, type)
+        and type_object.__module__ == "builtins"
+        and hasattr(builtins, type_object.__name__)
+    )
 
 
 def get_import_path_from_path(path: str) -> Optional[str]:
@@ -500,25 +449,27 @@ def get_method_file_name(method: Callable) -> str:
 
 
 def get_relative_import(
-        target_file_path: str | PathLike[str],
-        imported_module_path: Optional[str] = None,
-        module: Optional[str] = None,
-        package_name: Optional[str] = None,
+    target_file_path: str | PathLike[str],
+    imported_module_path: Optional[str] = None,
+    module_name: Optional[str] = None,
+    package_name: Optional[str] = None,
 ) -> str:
     """
     Get a relative import path from the target file to the imported module.
 
     :param target_file_path: The file path of the target file.
     :param imported_module_path: The file path of the module being imported.
-    :param module: The module name, if available.
+    :param module_name: The module name, if available.
     :param package_name: The name of the root package where the module is located.
     :return: A relative import path as a string.
     """
     # Convert to absolute paths
-    if module is not None:
-        imported_module_path = sys.modules[module].__file__
+    if module_name is not None:
+        imported_module_path = sys.modules[module_name].__file__
     if imported_module_path is None:
-        raise NoModuleSourceProvided(message="Either imported_module_path or module must be provided")
+        raise NoModuleSourceProvided(
+            imported_module_path=imported_module_path, module_name=module_name
+        )
     target_path = Path(target_file_path).resolve()
     imported_file_name = Path(imported_module_path).name
     target_file_name = Path(target_file_path).name
@@ -552,7 +503,7 @@ def get_relative_import(
 
 
 def get_path_starting_from_latest_encounter_of(
-        path: str, package_name: str, should_contain: List[str]
+    path: str, package_name: str, should_contain: List[str]
 ) -> str:
     """
     Get the path starting from the package name.
@@ -566,7 +517,7 @@ def get_path_starting_from_latest_encounter_of(
     """
     path_parts = path.split(os.path.sep)
     if package_name not in path_parts:
-        raise PackageNameNotFoundError(message=f"Could not find {package_name} in {path}")
+        raise PackageNameNotFoundError(package_name, path)
     idx = path_parts.index(package_name)
     prev_idx = idx
     while all(sc in path_parts[idx:] for sc in should_contain):
@@ -579,15 +530,15 @@ def get_path_starting_from_latest_encounter_of(
         path_parts = path_parts[prev_idx:]
         return os.path.join(*path_parts)
     else:
-        raise PathMissingRequiredComponentsError(message=f"Could not find {should_contain} in {path}")
+        raise PathMissingRequiredPartsError(should_contain, path)
 
 
 def get_imports_from_types(
-        type_objects: Iterable[Type],
-        target_file_path: Optional[str] = None,
-        package_name: Optional[str] = None,
-        excluded_names: Optional[List[str]] = None,
-        excluded_modules: Optional[List[str]] = None,
+    type_objects: Iterable[Type],
+    target_file_path: Optional[str] = None,
+    package_name: Optional[str] = None,
+    excluded_names: Optional[List[str]] = None,
+    excluded_modules: Optional[List[str]] = None,
 ) -> List[str]:
     """
     Format import lines from type objects.
@@ -618,12 +569,12 @@ def get_imports_from_types(
         joined = ", ".join(sorted(set(filtered_names)))
         import_path = module
         if (
-                (target_file_path is not None)
-                and (package_name is not None)
-                and (package_name in module)
+            (target_file_path is not None)
+            and (package_name is not None)
+            and (package_name in module)
         ):
             import_path = get_relative_import(
-                target_file_path, module=module, package_name=package_name
+                target_file_path, module_name=module, package_name=package_name
             )
         lines.append(f"from {import_path} import {joined}")
     lines.extend(stem_imports)
@@ -660,43 +611,97 @@ def run_subprocess_on_file(command: List[str]):
     try:
         result = subprocess.run(command, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
-        raise SubprocessExecutionError(
-            message=f"command: {command} failed with code {e.returncode}\n"
-                    f"STDOUT:\n{e.stdout}\n"
-                    f"STDERR:\n{e.stderr}"
-        ) from e
+        raise SubprocessExecutionError(command, e.returncode, e.stdout, e.stderr) from e
 
 
-def get_generic_type_param(cls, generic_base: Type[T]) -> Optional[List[Type[T]]]:
+def get_generic_type_params(
+    cls,
+    generic_base: Type,
+    include_root_generic_base: bool = True,
+    include_specialized_generic_base: bool = True,
+) -> List[Type[T]]:
     """
     Given a subclass and its generic base, return the concrete type parameter(s).
 
     Example:
-        get_generic_type_param(Employee, Role) -> (<class '__main__.Person'>,)
+        get_generic_type_params(Employee, Role) -> (<class '__main__.Person'>,)
 
     :param cls: The subclass to check.
     :param generic_base: The generic base class to check against.
-    :return: A list of concrete type parameters, or None if not found.
+    :param include_root_generic_base: Whether to include type parameters the class gets from its own typing.Generic directly.
+    :param include_specialized_generic_base: Whether to include type parameters from superclasses that are generic, which are not typing.Generic.
+    :return: A list of concrete type parameters
     """
-    for base in getattr(cls, "__orig_bases__", []):
-        base_origin = get_origin(base)
-        if base_origin is None:
-            if isclass(base) and issubclass(base, generic_base):
-                res = get_generic_type_param(base, generic_base)
-                if res:
-                    return res
-            continue
-        if issubclass(base_origin, generic_base):
-            args = get_args(base)
-            return list(args) if args else None
+    params = []
+    if include_root_generic_base:
+        # Use __parameters__ to get the class's own unbound TypeVars.
+        params.extend(list(getattr(cls, "__parameters__", [])))
+
+    if include_specialized_generic_base:
+        for base in getattr(cls, "__orig_bases__", []):
+            base_origin = get_origin(base)
+            if (
+                not base_origin
+                or base_origin is Generic
+                or not issubclass(base_origin, generic_base)
+            ):
+                continue
+            for arg in get_args(base):
+                if not isinstance(arg, TypeVar):
+                    params.append(arg)
+                elif not include_root_generic_base:
+                    # If we specifically excluded root generic params, we might still want
+                    # TypeVars that are being passed to this specialized base
+                    # Example: For `class Child(Generic[T, U], Parent[T])`:
+                    # - `include_root_generic_base=True` returns `[T, U]` (captures all definitions, avoids duplicates).
+                    # - `include_root_generic_base=False` returns `[T]` (captures only what is specifically passed to `Parent`).
+                    params.append(arg)
+
+    return params
+
+
+def get_existing_field_by_name(cls, name: str) -> Optional[Field]:
+    """
+    Find the existing field in the MRO if it exists.
+
+    :param name: The name of the field.
+    :return: The existing field if found, otherwise None.
+    """
+    for base in cls.__mro__:
+        fields = getattr(base, "__dataclass_fields__", None)
+        if fields and name in fields:
+            return fields[name]
     return None
 
 
+def is_hashable(obj) -> bool:
+    """
+    Checks if an object is hashable by attempting to compute its hash.
+
+    :param obj: The object to check.
+    :return: True if the object is hashable, False otherwise.
+    """
+    try:
+        hash(obj)
+        return True
+    except TypeError:
+        return False
+
+
+def ensure_hashable(obj) -> Hashable:
+    """
+    :return: The object itself if it is hashable, otherwise its id.
+    """
+    if not is_hashable(obj):
+        return id(obj)
+    return obj
+
+
 def get_scope_from_imports(
-        file_path: Optional[str] = None,
-        tree: Optional[ast.AST] = None,
-        package_name: Optional[str] = None,
-        source: Optional[str] = None,
+    file_path: Optional[str] = None,
+    tree: Optional[ast.AST] = None,
+    package_name: Optional[str] = None,
+    source: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Create a scope dictionary from imports in a Python file or an AST tree.
@@ -708,13 +713,17 @@ def get_scope_from_imports(
     :return: A dictionary representing the scope with imported modules and their attributes.
     """
     if tree is None and file_path is None and source is None:
-        raise SourceDataNotProvided(message="Either file_path, tree, or source must be provided")
+        raise SourceDataNotProvided(file_path, tree, source)
 
     # Ensure we have source and a parsed AST
     if file_path and source is None:
         with open(file_path, "r") as f:
             source = f.read()
-    parsed_tree = tree or (ast.parse(source) if file_path is None else ast.parse(source, filename=file_path))
+    parsed_tree = tree or (
+        ast.parse(source)
+        if file_path is None
+        else ast.parse(source, filename=file_path)
+    )
 
     scope: Dict[str, Any] = {}
 
@@ -732,13 +741,16 @@ def get_scope_from_imports(
     return scope
 
 
-def _import_module_safely(module_name: str, package_name: Optional[str]) -> Optional[types.ModuleType]:
+def get_and_import_module(
+    module_name: str, package_name: Optional[str]
+) -> types.ModuleType:
     """
-    Attempt to import a module with an optional package context and return the module or None on failure.
+    Attempt to import a module with an optional package context and return the module or raise.
 
     :param module_name: The name of the module to import.
     :param package_name: The package name to use for relative imports, or None for absolute imports.
-    :return: The imported module or None if import fails.
+    :return: The imported module.
+    :raises ModuleNotFoundError: If the module cannot be found.
     """
     module = get_module_object(module_name, package_name)
     if module is not None:
@@ -746,24 +758,21 @@ def _import_module_safely(module_name: str, package_name: Optional[str]) -> Opti
 
     try:
         return importlib.import_module(module_name, package=package_name)
-    except ModuleNotFoundError:
+    except ModuleNotFoundError as e:
         if not package_name:
-            return None
-        try:
-            if module_name.startswith('.') and package_name:
-                full_name = resolve_name(module_name, package_name)
-            else:
-                full_name = f"{package_name}.{module_name}"
-            if full_name in sys.modules:
-                return sys.modules[full_name]
-            return importlib.import_module(full_name)
-        except Exception:
-            return None
-    except ImportError:
-        return None
+            raise e
+        if module_name.startswith(".") and package_name:
+            full_name = resolve_name(module_name, package_name)
+        else:
+            full_name = f"{package_name}.{module_name}"
+        if full_name in sys.modules:
+            return sys.modules[full_name]
+        return importlib.import_module(full_name)
 
 
-def get_module_object(module_name: str, package_name: Optional[str] = None) -> Optional[types.ModuleType]:
+def get_module_object(
+    module_name: str, package_name: Optional[str] = None
+) -> Optional[types.ModuleType]:
     """
     :param module_name: The name of the module to import.
     :param package_name: The name of the package containing the module.
@@ -771,7 +780,7 @@ def get_module_object(module_name: str, package_name: Optional[str] = None) -> O
     """
     try:
         full_name = module_name
-        if module_name.startswith('.') and package_name:
+        if module_name.startswith(".") and package_name:
             full_name = resolve_name(module_name, package_name)
 
         if full_name in sys.modules:
@@ -781,7 +790,10 @@ def get_module_object(module_name: str, package_name: Optional[str] = None) -> O
 
 
 def _resolve_relative_import(
-        file_path: Optional[str], node: ast.ImportFrom, module_name: Optional[str], package_name: Optional[str]
+    file_path: Optional[str],
+    node: ast.ImportFrom,
+    module_name: Optional[str],
+    package_name: Optional[str],
 ) -> tuple[Optional[str], Optional[str]]:
     """
     Resolve relative import context and possibly adjust module and package names based on file location.
@@ -811,7 +823,9 @@ def _resolve_relative_import(
                 ).resolve()
                 idx = str(module_rel_path).rfind(resolved_package)
                 if idx != -1:
-                    resolved_module = str(module_rel_path)[idx:].replace(os.path.sep, ".")
+                    resolved_module = str(module_rel_path)[idx:].replace(
+                        os.path.sep, "."
+                    )
             except Exception:
                 # Fall back to original module name
                 pass
@@ -819,7 +833,9 @@ def _resolve_relative_import(
     return resolved_module, resolved_package
 
 
-def _handle_import_node(node: ast.Import, scope: Dict[str, Any], package_name: Optional[str]) -> None:
+def _handle_import_node(
+    node: ast.Import, scope: Dict[str, Any], package_name: Optional[str]
+) -> None:
     """
     Process a standard import node and update the provided scope mapping.
 
@@ -830,15 +846,15 @@ def _handle_import_node(node: ast.Import, scope: Dict[str, Any], package_name: O
     for alias in node.names:
         module_name = alias.name
         asname = alias.asname or alias.name
-        module = _import_module_safely(module_name, package_name)
-        if module is not None:
-            scope[asname] = module
-        else:
-            logger.warning(f"Could not import {module_name}")
+        module = get_and_import_module(module_name, package_name)
+        scope[asname] = module
 
 
 def _handle_import_from_node(
-        node: ast.ImportFrom, scope: Dict[str, Any], file_path: Optional[str], package_name: Optional[str]
+    node: ast.ImportFrom,
+    scope: Dict[str, Any],
+    file_path: Optional[str],
+    package_name: Optional[str],
 ) -> Optional[str]:
     """
     Process a from-import node and update the provided scope mapping.
@@ -853,7 +869,10 @@ def _handle_import_from_node(
 
     # Resolve relative imports (may update package_name and module_name)
     resolved_module_name, resolved_package_name = _resolve_relative_import(
-        file_path=file_path, node=node, module_name=module_name, package_name=package_name
+        file_path=file_path,
+        node=node,
+        module_name=module_name,
+        package_name=package_name,
     )
 
     # Mimic original behavior: allow package_name to be overwritten for subsequent iterations
@@ -861,17 +880,13 @@ def _handle_import_from_node(
 
     module = None
     if resolved_module_name is not None:
-        module = _import_module_safely(resolved_module_name, package_name)
+        module = get_and_import_module(resolved_module_name, package_name)
 
     if module is None and resolved_package_name and resolved_module_name:
         # Fallback already attempted in _import_module_safely; keep for parity
-        module = _import_module_safely(f"{resolved_package_name}.{resolved_module_name}", None)
-
-    if module is None:
-        logger.warning(
-            f"Could not import {resolved_module_name} while extracting imports from {file_path}"
+        module = get_and_import_module(
+            f"{resolved_package_name}.{resolved_module_name}", None
         )
-        return package_name
 
     for alias in node.names:
         name = alias.name
@@ -889,16 +904,16 @@ def _handle_import_from_node(
     return package_name
 
 
-T = TypeVar("T", bound=Callable[..., Any])
+TCallable = TypeVar("TCallable", bound=Callable[..., Any])
 
 
-def memoize(function: T) -> T:
+def memoize(function: TCallable) -> TCallable:
     """
     Caches the return value of a function call at the instance level.
     """
 
     @wraps(function)
-    def wrapper(self, *args: Any, **kwargs: Any) -> T:
+    def wrapper(self, *args: Any, **kwargs: Any) -> Any:
         if not hasattr(self, "__memo__"):
             self.__memo__ = {}
         memo = self.__memo__
@@ -914,7 +929,7 @@ def memoize(function: T) -> T:
     return wrapper  # type: ignore
 
 
-def copy_memoize(function: T) -> T:
+def copy_memoize(function: TCallable) -> TCallable:
     """
     Caches the return value of a function call at the instance level but returns a deepcopy of the value.
     """

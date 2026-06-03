@@ -1,7 +1,8 @@
 from dataclasses import dataclass
+
 from typing_extensions import Type, Optional
 
-from krrood.utils import DataclassException
+from krrood.exceptions import DataclassException
 
 
 @dataclass
@@ -71,4 +72,15 @@ class CouldNotResolveType(DataclassException):
         self.message = (
             f"Could not resolve type {self.type_name}.\n{self.extra_information}"
         )
+        super().__post_init__()
+
+
+@dataclass
+class MockedClassInstantiationError(DataclassException):
+    """
+    Raised when an attempt is made to instantiate a MockedClass.
+    """
+
+    def __post_init__(self):
+        self.message = "MockedClass cannot be instantiated directly"
         super().__post_init__()

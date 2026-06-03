@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar
-from krrood.utils import DataclassException
+from krrood.exceptions import DataclassException
 from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
 from typing_extensions import TYPE_CHECKING, Type
 

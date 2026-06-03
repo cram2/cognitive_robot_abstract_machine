@@ -13,7 +13,7 @@ from types import NoneType, ModuleType
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseFactoryMetaData
 
 from krrood.ripple_down_rules import logger
-from krrood.ripple_down_rules.failures import RDRLoadError
+from krrood.ripple_down_rules.exceptions import RDRLoadError
 
 try:
     from matplotlib import pyplot as plt
@@ -326,9 +326,7 @@ class RippleDownRules(SubclassJSONSerializer, ABC):
                 f"Make sure the file exists and is valid."
             )
             if rdr is None:
-                raise RDRLoadError(
-                    f"Could not load the rdr model {model_name} from {model_dir}, error is {e}"
-                )
+                raise RDRLoadError(model_name, model_dir)
             rdr.save(
                 save_dir=load_dir, model_name=model_name, package_name=package_name
             )

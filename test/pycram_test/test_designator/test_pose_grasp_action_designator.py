@@ -178,7 +178,7 @@ def test_pose_grasp_and_lift_action(pose_grasp_world):
 
 
 def test_pose_grasp_action_skips_blocked_pose(
-    pose_grasp_world_with_obstacle,
+    pose_grasp_world_with_obstacle, rclpy_node
 ):
     """The obstacle blocks the first grasp pose (yaw=0); the action must fall back to a free pose."""
     world, view, context = pose_grasp_world_with_obstacle
@@ -187,6 +187,8 @@ def test_pose_grasp_action_skips_blocked_pose(
     obj = GraspableBox(root=box_body, _world=world)
     with world.modify_world():
         world.add_semantic_annotation(obj)
+
+    VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
 
     action = PoseGraspAction(target_object=obj, arm=Arms.LEFT, check_blocking=True)
 

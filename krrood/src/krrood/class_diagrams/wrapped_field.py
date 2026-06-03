@@ -26,11 +26,11 @@ from typing_extensions import (
 
 from krrood.class_diagrams.exceptions import MissingContainedTypeOfContainer
 from krrood.class_diagrams.utils import behaves_like_a_built_in_class, get_type_hints_of_object
-from krrood.utils import module_and_class_name, is_builtin_type, memoize
+from krrood.utils import module_and_class_name, is_builtin_type
 
 if TYPE_CHECKING:
     from krrood.class_diagrams.class_diagram import WrappedClass
-    from krrood.ontomatic.property_descriptor import PropertyDescriptor
+    from krrood.ontomatic.property_descriptor.property_descriptor import PropertyDescriptor
 
 
 @dataclass
@@ -117,8 +117,9 @@ class WrappedField:
         if origin is not None and not isinstance(clazz, type):
             clazz = origin
 
-        return get_type_hints_of_object(clazz, namespace=tuple(local_namespace.items()))[
-            self.field.name]
+        return get_type_hints_of_object(
+            clazz, namespace=tuple(local_namespace.items())
+        )[self.field.name]
 
     def _build_initial_namespace(self) -> dict:
         """
@@ -142,7 +143,9 @@ class WrappedField:
 
     @cached_property
     def is_builtin_type(self) -> bool:
-        return is_builtin_type(self.type_endpoint) or (self.type_endpoint in [datetime, NoneType])
+        return is_builtin_type(self.type_endpoint) or (
+                self.type_endpoint in [datetime, NoneType]
+        )
 
     @cached_property
     def is_container(self) -> bool:
@@ -220,10 +223,10 @@ class WrappedField:
     @cached_property
     def is_role_taker(self) -> bool:
         return (
-                self.is_one_to_one_relationship
-                and not self.is_optional
-                and self.field.default == MISSING
-                and self.field.default_factory == MISSING
+            self.is_one_to_one_relationship
+            and not self.is_optional
+            and self.field.default == MISSING
+            and self.field.default_factory == MISSING
         )
 
     @cached_property
@@ -251,7 +254,7 @@ class WrappedField:
         """
         # If it's a class and it inherits from Generic but has no arguments
         if inspect.isclass(self.type_endpoint) and issubclass(
-                self.type_endpoint, Generic
+            self.type_endpoint, Generic
         ):
             return True
 

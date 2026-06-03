@@ -235,26 +235,3 @@ def convert_args_and_kwargs_into_hashable_key(
             v = tuple(v)
         key.append((k, v))
     return tuple(sorted(key))
-
-
-def ensure_hashable(obj) -> Hashable:
-    """
-    :return: The object itself if it is hashable, otherwise its id.
-    """
-    if not is_hashable(obj):
-        return id(obj)
-    return obj
-
-
-def is_hashable(obj) -> bool:
-    """
-    Checks if an object is hashable by attempting to compute its hash.
-
-    :param obj: The object to check.
-    :return: True if the object is hashable, False otherwise.
-    """
-    try:
-        hash(obj)
-        return True
-    except TypeError:
-        return False

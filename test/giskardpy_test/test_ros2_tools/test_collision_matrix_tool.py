@@ -178,3 +178,17 @@ def test_script_launch_and_kill():
     finally:
         if process.poll() is None:
             process.kill()
+
+
+def test_load_urdf_and_compute_srdf_pr2(interface):
+    pr2_xacro_path = (
+        "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+    )
+    interface.load_urdf(pr2_xacro_path)
+    assert len(interface.world.bodies) > 0
+
+    progess_mock = MagicMock()
+    interface.compute_self_collision_matrix(
+        progress_bar=progess_mock, number_of_tries_never=100
+    )
+    assert len(interface._reasons) > 0

@@ -25,7 +25,7 @@ from krrood.adapters.json_serializer import (
     to_json,
 )
 from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar, trinary_logic_not
-from krrood.utils import DataclassException
+from krrood.exceptions import DataclassException
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import (
     Point3,

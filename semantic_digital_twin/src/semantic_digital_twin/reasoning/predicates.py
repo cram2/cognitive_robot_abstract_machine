@@ -203,6 +203,44 @@ def reachable(pose: HomogeneousTransformationMatrix, root: Body, tip: Body) -> b
 
 
 @symbolic_function
+def compute_euclidean_planar_distance(body1: Body, body2: Body, ignore_dimension: Vector3):
+    """
+    Computes the Euclidean distance between two bodies in 2D space, ignoring a specific dimension
+    specified by the user. The ignored dimension is set to zero before the distance calculation. This
+    function can be used to handle scenarios where computations are restricted to certain spatial
+    planes.
+
+    :param body1: The first body to compute the distance from. It uses the global pose of the body
+                      to extract the position.
+    :param body2: The second body to compute the distance to. It also utilizes the global pose of
+                      the body to extract the position.
+    :param ignore_dimension: Specifies which dimension (x, y, or z) should be ignored in the
+                                     computation. The ignored dimension is set to zero for both
+                                     positions prior to calculating the distance.
+
+    :return: The Euclidean distance between the two bodies in the 2D plane after ignoring the
+               specified dimension.
+    """
+    body1_position = body1.global_pose.to_position()
+    body2_position = body2.global_pose.to_position()
+
+    if np.allclose(ignore_dimension, Vector3.X()):
+        body1_position.x = 0.0
+        body2_position.x = 0.0
+    elif np.allclose(ignore_dimension, Vector3.Y()):
+        body1_position.y = 0.0
+        body2_position.y = 0.0
+    elif np.allclose(ignore_dimension, Vector3.Z()):
+        body1_position.z = 0.0
+        body2_position.z = 0.0
+
+
+    return body1_position.euclidean_distance(
+        body2_position
+    )
+
+
+@symbolic_function
 def is_supported_by(
     supported_body: Body, supporting_body: Body, max_intersection_height: float = 0.1
 ) -> bool:
@@ -242,6 +280,31 @@ def is_supported_by(
     z_intersection: Interval = intersection[SpatialVariables.z.value]
     size = sum([si.upper - si.lower for si in z_intersection.simple_sets])
     return size < max_intersection_height
+
+@symbolic_function
+def is_supporting(supporting_body: Body, max_intersection_height: float = 0.1) -> bool:
+    """
+    Determine if any body in the world is supported by a given supporting body.
+
+    This function iterates over all bodies in the provided world and checks
+    if any of them are supported by the specified supporting body. The
+    support determination is performed using the helper function `is_supported_by`.
+    Bodies for which the computation fails are skipped.
+
+    :param supporting_body: The body that is being checked to determine if it is supporting other bodies in the world.
+    :param max_intersection_height: The maximum allowable intersection
+    height for a body to be considered supported. Defaults to 0.1.
+
+    :return: True if any body in the world is supported by the supporting_body,
+    False otherwise.
+    """
+    for candidate in supporting_body._world.bodies_with_collision:
+        if candidate is supporting_body:
+            continue
+        if is_supported_by(candidate, supporting_body, max_intersection_height):
+            return True
+
+    return False
 
 
 @symbolic_function

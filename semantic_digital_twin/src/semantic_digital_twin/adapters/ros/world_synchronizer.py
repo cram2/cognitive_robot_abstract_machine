@@ -32,7 +32,6 @@ from semantic_digital_twin.callbacks.callback import (
     ModelChangeCallback,
 )
 from semantic_digital_twin.exceptions import MissingPublishChangesKWARG
-from semantic_digital_twin.orm.ormatic_interface import *
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     WorldEntityWithID,
@@ -506,6 +505,8 @@ class ModelReloadSynchronizer(Synchronizer):
 
         :param msg: The message containing the primary key of the model to be fetched.
         """
+        from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
         query = select(WorldMappingDAO).where(
             WorldMappingDAO.database_id == msg.primary_key
         )

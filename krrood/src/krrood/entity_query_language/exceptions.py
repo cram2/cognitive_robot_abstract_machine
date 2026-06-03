@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 from typing_extensions import TYPE_CHECKING, Type, Any, List, Tuple, Optional
 
-from krrood.utils import DataclassException
+from krrood.exceptions import DataclassException
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.query.query import (

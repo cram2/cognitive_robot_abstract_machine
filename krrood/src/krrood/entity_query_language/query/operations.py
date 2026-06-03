@@ -46,7 +46,8 @@ from krrood.entity_query_language.exceptions import (
 from krrood.entity_query_language.operators.set_operations import (
     MultiArityExpressionThatPerformsACartesianProduct,
 )
-from krrood.entity_query_language.utils import ensure_hashable, is_iterable
+from krrood.entity_query_language.utils import is_iterable
+from krrood.utils import ensure_hashable
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
 from krrood.utils import memoize
 

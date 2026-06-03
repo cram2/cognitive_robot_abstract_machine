@@ -3,6 +3,13 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
+import time
+
+from semantic_digital_twin.datastructures.definitions import StaticJointState
+from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
+)
 from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
@@ -868,3 +875,65 @@ def test_collision_for_robot_with_static_base(tracy_world):
                 f"Gripper penetrated the obstacle (distance={contact.distance:.4f}m)."
                 "ExternalCollisionAvoidance is not avoiding the obstacle."
             )
+
+
+def test_repeated_collision_pr2_apartment_does_not_increase_execution_time(
+    pr2_apartment_world,
+):
+    world = deepcopy(pr2_apartment_world)
+
+    tool_frame = world.get_body_by_name("r_gripper_tool_frame")
+    robot = PR2.from_world(world)
+
+    left_arm_park = robot.left_arm.get_joint_state_by_type(StaticJointState.PARK)
+    right_arm_park = robot.right_arm.get_joint_state_by_type(StaticJointState.PARK)
+    world.set_positions_1DOF_connection(dict(left_arm_park.items()))
+    world.set_positions_1DOF_connection(dict(right_arm_park.items()))
+
+    body = world.get_body_by_name("handle_cab11_t")
+
+    execution_times = []
+    for i in range(10):
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                UpdateTemporaryCollisionRules(
+                    temporary_rules=[
+                        AvoidExternalCollisions(robot=robot),
+                        AllowCollisionBetweenGroups(
+                            body_group_a=[
+                                b
+                                for b in robot.right_arm.manipulator.bodies
+                                if b.has_collision()
+                            ],
+                            body_group_b=[
+                                b
+                                for b in world.bodies
+                                if "apartment" in str(b.name) and b.has_collision()
+                            ],
+                        ),
+                    ]
+                ),
+                CartesianPose(
+                    root_link=world.root,
+                    tip_link=tool_frame,
+                    goal_pose=body.global_pose,
+                ),
+                ExternalCollisionAvoidance(robot=robot),
+                SelfCollisionAvoidance(robot=robot),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(msc.nodes[1]))
+
+        kin_sim = Executor(
+            MotionStatechartContext(world=world),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        with world.reset_state_context():
+            start_time = time.time()
+            kin_sim.tick_until_end(500)
+            end_time = time.time()
+            execution_times.append(end_time - start_time)
+
+    mean_execution_time = np.mean(execution_times)
+    np.testing.assert_allclose(execution_times, mean_execution_time, rtol=0.5)

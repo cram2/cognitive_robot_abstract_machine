@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Set
 
-from krrood.utils import DataclassException
+from krrood.exceptions import DataclassException
 from random_events.variable import Variable
 
 
