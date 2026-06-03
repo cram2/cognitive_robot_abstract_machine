@@ -1940,6 +1940,18 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def y(self) -> sm.Scalar:
         return self[1, 3]
 
+    @property
+    def roll(self) -> sm.Scalar:
+        return self.to_rotation_matrix().to_rpy()[0]
+
+    @property
+    def pitch(self) -> sm.Scalar:
+        return self.to_rotation_matrix().to_rpy()[1]
+
+    @property
+    def yaw(self) -> sm.Scalar:
+        return self.to_rotation_matrix().to_rpy()[2]
+
     @y.setter
     def y(self, value: sm.ScalarData):
         self[1, 3] = value
@@ -1951,6 +1963,14 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     @z.setter
     def z(self, value: sm.ScalarData):
         self[2, 3] = value
+
+    @property
+    def position(self) -> Point3:
+        return self.to_position()
+
+    @property
+    def orientation(self) -> Quaternion:
+        return self.to_quaternion()
 
     def to_position(self) -> Point3:
         result = Point3.from_iterable(
@@ -1978,6 +1998,160 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
                     self.reference_frame,
                 )
             )
+        return super().__hash__()
+
+
+@dataclass(eq=False, init=False, repr=False)
+class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
+    """
+    Represents a 2D pose consisting of an x coordinate, a y coordinate, and a yaw angle.
+
+    Internally stored as a 3×1 symbolic vector ``[x, y, yaw]``.
+    Behaves similarly to :class:`Pose`, but lives in the 2D plane (z=0, roll=0, pitch=0).
+    Whenever 3D calculations are required, use :meth:`to_pose` to obtain the equivalent
+    3D :class:`Pose`.
+    """
+
+    def __init__(
+        self,
+        x: sm.ScalarData = 0,
+        y: sm.ScalarData = 0,
+        yaw: sm.ScalarData = 0,
+        reference_frame: Optional[KinematicStructureEntity] = None,
+    ):
+        self.casadi_sx = sm.to_sx([x, y, yaw])
+        self.reference_frame = reference_frame
+        super().__post_init__()
+
+    def _verify_type(self):
+        if self.shape != (3, 1):
+            raise WrongDimensionsError(
+                expected_dimensions=(3, 1), actual_dimensions=self.shape
+            )
+
+    # ------------------------------------------------------------------
+    # Properties
+    # ------------------------------------------------------------------
+
+    @property
+    def x(self) -> sm.Scalar:
+        return self[0]
+
+    @x.setter
+    def x(self, value: sm.ScalarData):
+        self[0] = value
+
+    @property
+    def y(self) -> sm.Scalar:
+        return self[1]
+
+    @y.setter
+    def y(self, value: sm.ScalarData):
+        self[1] = value
+
+    @property
+    def yaw(self) -> sm.Scalar:
+        return self[2]
+
+    @yaw.setter
+    def yaw(self, value: sm.ScalarData):
+        self[2] = value
+
+    @property
+    def z(self) -> float:
+        return 0
+
+    @property
+    def roll(self) -> float:
+        return 0
+
+    @property
+    def pitch(self) -> float:
+        return 0
+
+    # ------------------------------------------------------------------
+    # Conversion to 3D
+    # ------------------------------------------------------------------
+
+    def to_pose(self) -> Pose:
+        """Convert to a 3D :class:`Pose` with z=0, roll=0, pitch=0."""
+        return Pose.from_xyz_rpy(
+            x=self.x,
+            y=self.y,
+            z=0,
+            roll=0,
+            pitch=0,
+            yaw=self.yaw,
+            reference_frame=self.reference_frame,
+        )
+
+    # ------------------------------------------------------------------
+    # Pose-like interface (delegates to to_pose())
+    # ------------------------------------------------------------------
+
+    @property
+    def position(self) -> Point3:
+        return self.to_pose().to_position()
+
+    @property
+    def orientation(self) -> Quaternion:
+        return self.to_pose().to_quaternion()
+
+    def to_position(self) -> Point3:
+        return self.to_pose().to_position()
+
+    def to_quaternion(self) -> Quaternion:
+        return self.to_pose().to_quaternion()
+
+    def to_rotation_matrix(self) -> RotationMatrix:
+        return self.to_pose().to_rotation_matrix()
+
+    def to_homogeneous_matrix(self) -> HomogeneousTransformationMatrix:
+        return self.to_pose().to_homogeneous_matrix()
+
+    # ------------------------------------------------------------------
+    # Factory methods
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def from_pose(
+        cls,
+        pose: Pose,
+        reference_frame: Optional[KinematicStructureEntity] = None,
+    ) -> Pose2D:
+        """Extract a Pose2D from a 3D Pose by dropping z, roll, pitch."""
+        _, _, yaw = pose.to_rotation_matrix().to_rpy()
+        frame = reference_frame if reference_frame is not None else pose.reference_frame
+        return cls(x=pose.x, y=pose.y, yaw=yaw, reference_frame=frame)
+
+    # ------------------------------------------------------------------
+    # JSON serialization
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        reference_frame = cls._parse_optional_frame_from_json(
+            data, key="reference_frame_id", **kwargs
+        )
+        return cls(
+            x=data["data"][0],
+            y=data["data"][1],
+            yaw=data["data"][2],
+            reference_frame=reference_frame,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        if not self.is_constant():
+            raise SpatialTypeNotJsonSerializable(self)
+        result = super().to_json()
+        if self.reference_frame is not None:
+            result["reference_frame_id"] = to_json(self.reference_frame.id)
+        result["data"] = self.to_np().tolist()
+        return result
+
+    def __hash__(self):
+        if self.is_constant():
+            return hash((*self.to_np().tolist(), self.reference_frame))
         return super().__hash__()
 
 

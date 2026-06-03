@@ -6,4 +6,6 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     SpatialType,
     Quaternion,
     GenericSpatialType,
+    Pose,
+    Pose2D,
 )

@@ -264,6 +264,13 @@ class InstantiatedVariable(
     def _name_(self):
         return self._type_.__name__
 
+    def apply_mapping_on_external_root(self, *args, **kwargs: Dict[str, Any]) -> Any:
+        """
+        Same as `MappedVariable.apply_mapping_on_external_root`
+
+        """
+        return self._type_(*args, **kwargs)
+
 
 @dataclass(eq=False, repr=False)
 class ExternallySetVariable(CanHaveDomainSource[T]):

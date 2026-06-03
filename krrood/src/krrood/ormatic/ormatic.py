@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import pathlib
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
@@ -12,7 +13,7 @@ from sqlalchemy import JSON
 from typing_extensions import List, Type, Dict
 from typing_extensions import Optional, TextIO
 
-from krrood.ormatic.custom_types import TypeType, PolymorphicEnumType
+from krrood.ormatic.custom_types import TypeType, PolymorphicEnumType, PathType
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.sqlalchemy_generator import SQLAlchemyGenerator
 from krrood.ormatic.type_dict import TypeDict
@@ -118,6 +119,7 @@ class ORMatic:
         self.type_mappings[Enum] = PolymorphicEnumType
         self.type_mappings[SubclassJSONSerializer] = JSON
         self.type_mappings[uuid.UUID] = sqlalchemy.UUID
+        self.type_mappings[pathlib.Path] = PathType
 
         for key in self.type_mappings.keys():
             self.imported_modules.add(key.__module__)
@@ -213,6 +215,14 @@ class ORMatic:
     def make_all_tables(self):
         for table in self.wrapped_tables.values():
             table.parse_fields()
+
+    @classmethod
+    def get_type_mappings(cls) -> TypeDict:
+        """
+        :return: The default type mappings that are used by ORMatic.
+        """
+        ormatic = cls(ClassDiagram([]))
+        return ormatic.type_mappings
 
     def foreign_key_name(self, wrapped_field: WrappedField) -> str:
         """

@@ -11,6 +11,7 @@ from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.entity_query_language.predicate import symbolic_function
+from pycram.datastructures.grasp import GraspDescription
 from pycram.plans.plan import Plan
 from pycram.plans.plan_node import PlanNode
 from pycram.robot_plans import MoveToolCenterPointMotion
@@ -93,6 +94,7 @@ def reachability_validator(
     robot_view: AbstractRobot,
     world: World,
     use_fullbody_ik: bool = False,
+    grasp_description: GraspDescription = None,
 ) -> bool:
     """
     Evaluates if a pose can be reached with the tip_link in the given world. This uses giskard motion state charts
@@ -103,7 +105,10 @@ def reachability_validator(
     :param robot_view: The semantic annotation of the robot which should be evaluated for reachability
     :param world: The world in which the visibility should be validated.
     :param use_fullbody_ik: If true the base will be used in trying to reach the poses
+    :param grasp_description: The description of the grasp.
     """
+    if grasp_description:
+        _, target_pose, _ = grasp_description._pose_sequence(target_pose)
     return pose_sequence_reachability_validator(
         [target_pose], tip_link, robot_view, world, use_fullbody_ik
     )

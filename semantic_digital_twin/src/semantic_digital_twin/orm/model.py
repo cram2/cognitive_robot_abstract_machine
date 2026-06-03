@@ -22,6 +22,7 @@ from semantic_digital_twin.spatial_types import (
 from semantic_digital_twin.spatial_types.spatial_types import (
     Quaternion,
     Pose,
+    Pose2D,
     SpatialType,
 )
 from semantic_digital_twin.world import World
@@ -134,7 +135,7 @@ class Point3Mapping(AlternativeMapping[Point3]):
 
     @classmethod
     def from_domain_object(cls, obj: Point3):
-        x, y, z, _ = obj.to_np().tolist()
+        x, y, z, _ = float(obj.x), float(obj.y), float(obj.z), obj.reference_frame
         result = cls(x=x, y=y, z=z, reference_frame=obj.reference_frame)
         return result
 
@@ -155,7 +156,7 @@ class QuaternionMapping(AlternativeMapping[Quaternion]):
 
     @classmethod
     def from_domain_object(cls, obj: Quaternion):
-        x, y, z, w = obj.to_np().tolist()
+        x, y, z, w = float(obj.x), float(obj.y), float(obj.z), float(obj.w)
         result = cls(x=x, y=y, z=z, w=w, reference_frame=obj.reference_frame)
         return result
 
@@ -234,8 +235,8 @@ class PoseMapping(AlternativeMapping[Pose]):
 
     @classmethod
     def from_domain_object(cls, obj: Pose):
-        position = obj.to_position()
-        orientation = obj.to_quaternion()
+        position = obj.position
+        orientation = obj.orientation
         result = cls(position=position, orientation=orientation)
         result.reference_frame = obj.reference_frame
         return result
@@ -250,8 +251,8 @@ class PoseMapping(AlternativeMapping[Pose]):
     @classmethod
     def from_point_mapping_quaternion_mapping(
         cls,
-        point_mapping: Point3Mapping,
-        quaternion_mapping: QuaternionMapping,
+        position: Point3Mapping,
+        orientation: QuaternionMapping,
         reference_frame: KinematicStructureEntity,
     ) -> Pose:
         """
@@ -260,20 +261,44 @@ class PoseMapping(AlternativeMapping[Pose]):
         This method constructs a Pose object by utilizing the provided Point3Mapping for the position and the
         QuaternionMapping for the orientation. The resulting Pose is associated with the specified reference frame.
 
-        :param point_mapping: A Point3Mapping object that provides the position data for the Pose.
-        :param quaternion_mapping: A QuaternionMapping object that provides the orientation data for the Pose.
+        :param position: A Point3Mapping object that provides the position data for the Pose.
+        :param orientation: A QuaternionMapping object that provides the orientation data for the Pose.
         :param reference_frame: The reference frame to which the Pose will be associated.
         :return: A Pose instance created from the given Point3Mapping and QuaternionMapping.
         """
         return Pose(
-            position=point_mapping.to_domain_object(),
-            orientation=quaternion_mapping.to_domain_object(),
+            position=position.to_domain_object(),
+            orientation=orientation.to_domain_object(),
             reference_frame=reference_frame,
         )
 
     @classmethod
     def required_pre_build_classes(cls) -> List[Type]:
         return [Point3, Quaternion]
+
+
+@dataclass(eq=False)
+class Pose2DMapping(AlternativeMapping[Pose2D]):
+    x: float
+    y: float
+    yaw: float
+    reference_frame: Optional[KinematicStructureEntity] = field(
+        default=None, kw_only=True
+    )
+
+    @classmethod
+    def from_domain_object(cls, obj: Pose2D):
+        result = cls(x=float(obj.x), y=float(obj.y), yaw=float(obj.yaw))
+        result.reference_frame = obj.reference_frame
+        return result
+
+    def to_domain_object(self) -> Pose2D:
+        return Pose2D(
+            x=self.x,
+            y=self.y,
+            yaw=self.yaw,
+            reference_frame=self.reference_frame,
+        )
 
 
 class TrimeshType(TypeDecorator):

@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-import datetime
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Tuple, List
+from typing import Tuple, List, Optional, Any
 
 from typing_extensions import Optional, Dict, Any
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from semantic_digital_twin.datastructures.definitions import (
-    TorsoState,
-    GripperState,
-    StaticJointState,
-)
-from ....datastructures.dataclasses import Context
+from krrood.entity_query_language.core.variable import Variable
+from pycram.datastructures.dataclasses import Context
+from pycram.robot_plans import MoveManipulatorMotion
+from semantic_digital_twin.reasoning.predicates import allclose
+from semantic_digital_twin.robots.abstract_robot import Manipulator
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from pycram.datastructures.enums import AxisIdentifier, Arms
 
 from pycram.datastructures.trajectory import PoseTrajectory
@@ -85,7 +84,6 @@ class SetGripperAction(ActionDescription):
                 [MoveGripperMotion(gripper=arm, motion=self.motion) for arm in arms]
             )
         ).perform()
-
 
 
 @dataclass
@@ -238,3 +236,48 @@ class FollowToolCenterPointPathAction(ActionDescription):
         max_wait_time: timedelta = timedelta(seconds=2),
     ):
         pass
+
+
+@dataclass
+class MoveManipulatorAction(ActionDescription):
+    """
+    Move the manipulator to a specific pose.
+    """
+
+    target_pose: Pose
+    """
+    The pose where the manipulator should be moved to.
+    """
+
+    manipulator: Manipulator
+    """
+    The manipulator that should be moved.
+    """
+
+    allow_gripper_collision: bool
+    """
+    If the gripper can collide with something.
+    """
+
+    def execute(self):
+        self.add_subplan(
+            execute_single(
+                MoveManipulatorMotion(
+                    self.target_pose,
+                    self.manipulator,
+                    self.allow_gripper_collision,
+                )
+            )
+        ).perform()
+
+    @staticmethod
+    def post_condition(
+        variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression:
+        manipulator = variables["manipulator"]
+        target_pose = variables["target_pose"]
+        return allclose(
+            manipulator.tool_frame.global_pose.to_np(),
+            target_pose.to_np(),
+            atol=0.1,
+        )

@@ -45,7 +45,7 @@ jobs:
             ${{ runner.os }}-cache-
 
       - name: Build ORM
-        if: ${{inputs.lib == 'pycram' || inputs.lib == 'semantic_digital_twin'}}
+        if: ${{inputs.lib == 'pycram' || inputs.lib == 'semantic_digital_twin' || inputs.lib == 'experiments'}}
         run: |
           cd cognitive_robot_abstract_machine/${{ inputs.lib }}/scripts/
           source /opt/ros/cram-env/bin/activate

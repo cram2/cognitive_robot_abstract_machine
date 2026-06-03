@@ -22,6 +22,7 @@ from typing_extensions import (
     List,
 )
 
+from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.entity_query_language.core.base_expressions import (
     UnaryExpression,
     Bindings,
@@ -206,6 +207,30 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         """
         raise NotImplementedError
 
+    def apply_mapping_on_external_root(self, instance: Any) -> Any:
+        """
+        Apply the mapping on the given instance by following the access path and applying the mapping at each step.
+
+        :param instance: The instance to apply the mapping on.
+        :return: An iterable of the mapped values.
+        """
+        current = instance
+        for domain_mapping in self._access_path_:
+            current = next(domain_mapping._apply_mapping_(current))
+        return current
+
+    def get_clean_name_from_mapped_variable(self) -> str:
+        """
+        Get a clean name from a mapped variable by joining its attribute names.
+
+        :return: The clean name.
+        """
+        names = []
+        for step in self._access_path_:
+            if isinstance(step, Attribute):
+                names.append(step._attribute_name_)
+        return ".".join(names)
+
 
 @dataclass(eq=False, repr=False)
 class Attribute(MappedVariable):
@@ -293,6 +318,11 @@ class Call(MappedVariable):
     @property
     def _name_(self):
         return f"{self._child_._var_._name_}()"
+
+    def _update_type_(self) -> None:
+        if self._child_._type_ is None:
+            return
+        self._type_ = get_type_hints_of_object(self._child_._type_)["return"]
 
 
 @dataclass(eq=False, repr=False)

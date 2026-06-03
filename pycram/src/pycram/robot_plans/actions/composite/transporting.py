@@ -301,12 +301,13 @@ class MoveAndPickUpAction(ActionDescription):
     """
 
     def execute(self):
-        obj_pose = Pose.from_spatial_type(self.object_designator.global_transform)
         self.add_subplan(
             sequential(
                 [
                     NavigateAction(self.standing_position, self.keep_joint_states),
-                    FaceAtAction(obj_pose, self.keep_joint_states),
+                    FaceAtAction(
+                        self.object_designator.global_pose, self.keep_joint_states
+                    ),
                     PickUpAction(
                         self.object_designator, self.arm, self.grasp_description
                     ),

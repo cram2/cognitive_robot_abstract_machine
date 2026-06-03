@@ -7,7 +7,7 @@ import numpy as np
 from typing_extensions import Any, Dict
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.factories import and_
+from krrood.entity_query_language.factories import and_, ConditionType
 from pycram.config.action_conf import ActionConfig
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
@@ -74,21 +74,27 @@ class OpenAction(ActionDescription):
     @staticmethod
     def pre_condition(
         variables, context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression:
+    ) -> ConditionType:
         """
         The gripper with which to open the container has to be free and the handle has to be reachable.
         """
-        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
         test_world = deepcopy(context.world)
+        test_robot = context.robot.from_world(test_world)
+        manipulator = ViewManager.get_end_effector_view(variables["arm"], test_robot)
 
         return and_(
             GripperIsFree(manipulator),
             reachability_validator(
                 kwargs["object_designator"].global_pose,
                 manipulator.tool_frame,
-                context.robot.from_world(test_world),
+                test_robot,
                 test_world,
                 context.robot.full_body_controlled,
+                GraspDescription(
+                    ApproachDirection.FRONT,
+                    VerticalAlignment.NoAlignment,
+                    ViewManager.get_end_effector_view(kwargs["arm"], test_robot),
+                ),
             ),
         )
 
