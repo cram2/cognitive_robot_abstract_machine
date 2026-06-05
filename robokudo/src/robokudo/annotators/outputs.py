@@ -140,6 +140,10 @@ class ClearAnnotatorOutputs(Behaviour):
         )
 
         pipeline = find_parent_of_type(self, robokudo.pipeline.Pipeline)
+        if pipeline is None:
+            self.feedback_message = "No parent pipeline found!"
+            return Status.FAILURE
+
         annotator_outputs = annotator_output_pipeline_map_buffer.map[pipeline.name]
         assert isinstance(annotator_outputs, AnnotatorOutputs)
         annotator_outputs.clear_outputs()
