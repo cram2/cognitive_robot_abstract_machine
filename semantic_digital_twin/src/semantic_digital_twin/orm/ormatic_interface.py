@@ -50,6 +50,7 @@ import semantic_digital_twin.reasoning.predicates
 import semantic_digital_twin.reasoning.reasoner
 import semantic_digital_twin.reasoning.world_reasoner
 import semantic_digital_twin.robots.armar7
+import semantic_digital_twin.robots.garmi
 import semantic_digital_twin.robots.hsrb
 import semantic_digital_twin.robots.icub3
 import semantic_digital_twin.robots.justin
@@ -849,6 +850,23 @@ class Armar7NeckDAO_sensors_association(Base, AssociationDataAccessObject):
 
     target: Mapped[AzureKinectRGBDAO] = relationship(
         "AzureKinectRGBDAO", foreign_keys=[target_azurekinectrgbdao_id]
+    )
+
+
+class GarmiNeckDAO_sensors_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "_24159828222561644200652040421426352899498118227735590280021402"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_garmineckdao_id: Mapped[int] = mapped_column(
+        ForeignKey("GarmiNeckDAO.database_id")
+    )
+    target_garmicameradao_id: Mapped[int] = mapped_column(
+        ForeignKey("GarmiCameraDAO.database_id")
+    )
+
+    target: Mapped[GarmiCameraDAO] = relationship(
+        "GarmiCameraDAO", foreign_keys=[target_garmicameradao_id]
     )
 
 
@@ -7313,6 +7331,44 @@ class Armar7RightGripperDAO(
     }
 
 
+class GarmiLeftGripperDAO(
+    EndEffectorDAO,
+    DataAccessObject[semantic_digital_twin.robots.garmi.GarmiLeftGripper],
+):
+
+    __tablename__ = "GarmiLeftGripperDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(EndEffectorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiLeftGripperDAO",
+        "inherit_condition": database_id == EndEffectorDAO.database_id,
+    }
+
+
+class GarmiRightGripperDAO(
+    EndEffectorDAO,
+    DataAccessObject[semantic_digital_twin.robots.garmi.GarmiRightGripper],
+):
+
+    __tablename__ = "GarmiRightGripperDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(EndEffectorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiRightGripperDAO",
+        "inherit_condition": database_id == EndEffectorDAO.database_id,
+    }
+
+
 class HSRBGripperDAO(
     EndEffectorDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBGripper]
 ):
@@ -7705,6 +7761,38 @@ class Armar7RightArmDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "Armar7RightArmDAO",
+        "inherit_condition": database_id == ArmDAO.database_id,
+    }
+
+
+class GarmiLeftArmDAO(
+    ArmDAO, DataAccessObject[semantic_digital_twin.robots.garmi.GarmiLeftArm]
+):
+
+    __tablename__ = "GarmiLeftArmDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ArmDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiLeftArmDAO",
+        "inherit_condition": database_id == ArmDAO.database_id,
+    }
+
+
+class GarmiRightArmDAO(
+    ArmDAO, DataAccessObject[semantic_digital_twin.robots.garmi.GarmiRightArm]
+):
+
+    __tablename__ = "GarmiRightArmDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ArmDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiRightArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
     }
 
@@ -8178,6 +8266,74 @@ class Armar7RightThumbDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "Armar7RightThumbDAO",
+        "inherit_condition": database_id == FingerDAO.database_id,
+    }
+
+
+class GarmiLeftGripperLeftFingerDAO(
+    FingerDAO,
+    DataAccessObject[semantic_digital_twin.robots.garmi.GarmiLeftGripperLeftFinger],
+):
+
+    __tablename__ = "GarmiLeftGripperLeftFingerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(FingerDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiLeftGripperLeftFingerDAO",
+        "inherit_condition": database_id == FingerDAO.database_id,
+    }
+
+
+class GarmiLeftGripperRightFingerDAO(
+    FingerDAO,
+    DataAccessObject[semantic_digital_twin.robots.garmi.GarmiLeftGripperRightFinger],
+):
+
+    __tablename__ = "GarmiLeftGripperRightFingerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(FingerDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiLeftGripperRightFingerDAO",
+        "inherit_condition": database_id == FingerDAO.database_id,
+    }
+
+
+class GarmiRightGripperLeftFingerDAO(
+    FingerDAO,
+    DataAccessObject[semantic_digital_twin.robots.garmi.GarmiRightGripperLeftFinger],
+):
+
+    __tablename__ = "GarmiRightGripperLeftFingerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(FingerDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiRightGripperLeftFingerDAO",
+        "inherit_condition": database_id == FingerDAO.database_id,
+    }
+
+
+class GarmiRightGripperRightFingerDAO(
+    FingerDAO,
+    DataAccessObject[semantic_digital_twin.robots.garmi.GarmiRightGripperRightFinger],
+):
+
+    __tablename__ = "GarmiRightGripperRightFingerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(FingerDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiRightGripperRightFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
     }
 
@@ -8992,6 +9148,29 @@ class Armar7NeckDAO(
     }
 
 
+class GarmiNeckDAO(
+    NeckDAO, DataAccessObject[semantic_digital_twin.robots.garmi.GarmiNeck]
+):
+
+    __tablename__ = "GarmiNeckDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(NeckDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    sensors: Mapped[builtins.list[GarmiNeckDAO_sensors_association]] = relationship(
+        "GarmiNeckDAO_sensors_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[GarmiNeckDAO_sensors_association.source_garmineckdao_id]",
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiNeckDAO",
+        "inherit_condition": database_id == NeckDAO.database_id,
+    }
+
+
 class HSRBNeckDAO(
     NeckDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBNeck]
 ):
@@ -9210,6 +9389,22 @@ class Armar7TorsoDAO(
     }
 
 
+class GarmiTorsoDAO(
+    TorsoDAO, DataAccessObject[semantic_digital_twin.robots.garmi.GarmiTorso]
+):
+
+    __tablename__ = "GarmiTorsoDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(TorsoDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiTorsoDAO",
+        "inherit_condition": database_id == TorsoDAO.database_id,
+    }
+
+
 class HSRBTorsoDAO(
     TorsoDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBTorso]
 ):
@@ -9414,6 +9609,24 @@ class Armar7MobileBaseDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "Armar7MobileBaseDAO",
+        "inherit_condition": database_id == MobileBaseDAO.database_id,
+    }
+
+
+class GarmiMobileBaseDAO(
+    MobileBaseDAO, DataAccessObject[semantic_digital_twin.robots.garmi.GarmiMobileBase]
+):
+
+    __tablename__ = "GarmiMobileBaseDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MobileBaseDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiMobileBaseDAO",
         "inherit_condition": database_id == MobileBaseDAO.database_id,
     }
 
@@ -9676,6 +9889,22 @@ class D435DAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "D435DAO",
+        "inherit_condition": database_id == CameraDAO.database_id,
+    }
+
+
+class GarmiCameraDAO(
+    CameraDAO, DataAccessObject[semantic_digital_twin.robots.garmi.GarmiCamera]
+):
+
+    __tablename__ = "GarmiCameraDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(CameraDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiCameraDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
     }
 
@@ -9974,6 +10203,24 @@ class Armar7DAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "Armar7DAO",
+        "inherit_condition": database_id == AbstractRobotDAO.database_id,
+    }
+
+
+class GarmiDAO(
+    AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.garmi.Garmi]
+):
+
+    __tablename__ = "GarmiDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(AbstractRobotDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiDAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
     }
 

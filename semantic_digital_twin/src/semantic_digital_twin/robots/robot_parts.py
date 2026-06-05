@@ -155,17 +155,13 @@ class HasRobotParts(ABC):
                 # Recursive call to trigger initialization for child part's fields
                 part.setup_robot_part_semantic_annotations()
 
-    def _initialize_list_field(self, field_name: str, item_type: Any):
+    def _initialize_list_field(self, field_name: str, types_to_initialize: list[Any]):
         """
         Helper to initialize all parts matching item_type and append them to a list field.
 
-        Handles Union types by initializing one instance of each type in the Union.
+        :param field_name: Name of the list field to initialize
+        :param types_to_initialize: List of types to initialize in the field
         """
-        if get_origin(item_type) in (Union, getattr(types, "UnionType", Union)):
-            types_to_initialize = get_args(item_type)
-        else:
-            types_to_initialize = item_type
-
         current_list = getattr(self, field_name)
         if not isinstance(current_list, list):
             current_list = []
