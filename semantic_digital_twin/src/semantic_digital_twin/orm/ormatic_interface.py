@@ -7303,6 +7303,21 @@ class MujocoCameraDAO(
     }
 
 
+class SoftTrunkSectionDAO(
+    Base, DataAccessObject[semantic_digital_twin.robots.soft_trunk.SoftTrunkSection]
+):
+
+    __tablename__ = "SoftTrunkSectionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    length: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    radius: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    resolution: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+
 class SpatialTypeDAO(
     Base,
     DataAccessObject[semantic_digital_twin.spatial_types.spatial_types.SpatialType],
