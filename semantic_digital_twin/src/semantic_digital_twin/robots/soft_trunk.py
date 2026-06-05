@@ -5,7 +5,11 @@ from typing import Self, TYPE_CHECKING, List, Tuple
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot, Arm, Manipulator
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.soft_connections import (
     PiecewiseConstantCurvatureConnection,
     CosseratRodConnection,
@@ -129,12 +133,21 @@ class SoftTrunk(AbstractRobot):
             prev_body = root_body
             kappas, phis = [], []
 
+            default_limits = DegreeOfFreedomLimits(
+                lower=DerivativeMap(position=-10.0, velocity=-10.0),
+                upper=DerivativeMap(position=10.0, velocity=10.0),
+            )
+
             for s in range(num_sections):
                 # Create unique DOFs for this section
                 kappa = DegreeOfFreedom(
-                    name=PrefixedName(name=f"kappa_{s}", prefix=prefix)
+                    name=PrefixedName(name=f"kappa_{s}", prefix=prefix),
+                    limits=default_limits,
                 )
-                phi = DegreeOfFreedom(name=PrefixedName(name=f"phi_{s}", prefix=prefix))
+                phi = DegreeOfFreedom(
+                    name=PrefixedName(name=f"phi_{s}", prefix=prefix),
+                    limits=default_limits,
+                )
                 world.add_degree_of_freedom(kappa)
                 world.add_degree_of_freedom(phi)
                 kappas.append(kappa)
@@ -279,19 +292,32 @@ class SoftTrunk(AbstractRobot):
             prev_body = root_body
             all_bx, all_by, all_tor, all_ext = [], [], [], []
 
+            strain_limits = DegreeOfFreedomLimits(
+                lower=DerivativeMap(position=-10.0, velocity=-10.0),
+                upper=DerivativeMap(position=10.0, velocity=10.0),
+            )
+            extension_limits = DegreeOfFreedomLimits(
+                lower=DerivativeMap(position=0.1, velocity=-10.0),
+                upper=DerivativeMap(position=3.0, velocity=10.0),
+            )
+
             for s in range(num_sections):
                 # Create unique DOFs (Strains)
                 bx = DegreeOfFreedom(
-                    name=PrefixedName(name=f"bending_x_{s}", prefix=prefix)
+                    name=PrefixedName(name=f"bending_x_{s}", prefix=prefix),
+                    limits=strain_limits,
                 )
                 by = DegreeOfFreedom(
-                    name=PrefixedName(name=f"bending_y_{s}", prefix=prefix)
+                    name=PrefixedName(name=f"bending_y_{s}", prefix=prefix),
+                    limits=strain_limits,
                 )
                 tor = DegreeOfFreedom(
-                    name=PrefixedName(name=f"torsion_{s}", prefix=prefix)
+                    name=PrefixedName(name=f"torsion_{s}", prefix=prefix),
+                    limits=strain_limits,
                 )
                 ext = DegreeOfFreedom(
-                    name=PrefixedName(name=f"extension_{s}", prefix=prefix)
+                    name=PrefixedName(name=f"extension_{s}", prefix=prefix),
+                    limits=extension_limits,
                 )
 
                 for dof in [bx, by, tor, ext]:
