@@ -89,6 +89,73 @@ class SoftTrunk(AbstractRobot):
 
         return soft_trunk
 
+    def _get_sorted_dofs_by_type(self, substring: str) -> List[DegreeOfFreedom]:
+        """
+        Finds DOFs by traversing the robot's own kinematic chains.
+        """
+        found_dofs = set()
+        for chain in self.manipulator_chains:
+            connections = self._world.compute_chain_of_connections(
+                chain.root, chain.tip
+            )
+            for conn in connections:
+                for dof in conn.active_dofs:
+                    if substring in str(dof.name):
+                        found_dofs.add(dof)
+
+        return sorted(list(found_dofs), key=lambda x: str(x.name))
+
+    @property
+    def kappa_dofs(self) -> List[DegreeOfFreedom]:
+        """Returns all curvature DOFs for a PCC robot."""
+        return self._get_sorted_dofs_by_type("kappa")
+
+    @property
+    def phi_dofs(self) -> List[DegreeOfFreedom]:
+        """Returns all bending plane DOFs for a PCC robot."""
+        return self._get_sorted_dofs_by_type("phi")
+
+    @property
+    def bending_x_dofs(self) -> List[DegreeOfFreedom]:
+        """Returns all bending-x (ux) DOFs for a Cosserat robot."""
+        return self._get_sorted_dofs_by_type("bending_x")
+
+    @property
+    def bending_y_dofs(self) -> List[DegreeOfFreedom]:
+        """Returns all bending-y (uy) DOFs for a Cosserat robot."""
+        return self._get_sorted_dofs_by_type("bending_y")
+
+    @property
+    def torsion_dofs(self) -> List[DegreeOfFreedom]:
+        """Returns all axial torsion (uz) DOFs for a Cosserat robot."""
+        return self._get_sorted_dofs_by_type("torsion")
+
+    @property
+    def extension_dofs(self) -> List[DegreeOfFreedom]:
+        """Returns all linear extension (vz) DOFs for a Cosserat robot."""
+        return self._get_sorted_dofs_by_type("extension")
+
+    @property
+    def pcc_sections(self) -> List[Tuple[DegreeOfFreedom, DegreeOfFreedom]]:
+        """Returns a list of (kappa_dof, phi_dof) tuples, one per section."""
+        return list(zip(self.kappa_dofs, self.phi_dofs))
+
+    @property
+    def cosserat_sections(
+        self,
+    ) -> List[
+        Tuple[DegreeOfFreedom, DegreeOfFreedom, DegreeOfFreedom, DegreeOfFreedom]
+    ]:
+        """Returns a list of (bx, by, torsion, extension) tuples, one per section."""
+        return list(
+            zip(
+                self.bending_x_dofs,
+                self.bending_y_dofs,
+                self.torsion_dofs,
+                self.extension_dofs,
+            )
+        )
+
     def _setup_semantic_annotations(self):
         pass
 
@@ -109,7 +176,7 @@ class SoftTrunk(AbstractRobot):
         cls,
         world: World,
         sections: List[SoftTrunkSection],
-    ) -> Tuple[SoftTrunk, List[DegreeOfFreedom], List[DegreeOfFreedom]]:
+    ) -> SoftTrunk:
         """
         Builds a Piecewise Constant Curvature (PCC) robot from a list of sections.
 
@@ -117,7 +184,7 @@ class SoftTrunk(AbstractRobot):
 
         :param sections: A list of section configurations defining the robot's morphology.
 
-        :return: A tuple containing (Robot, List of Kappa DOFs, List of Phi DOFs).
+        :return: A SoftTrunk robot view.
         """
 
         prefix = "pcc"
@@ -199,20 +266,14 @@ class SoftTrunk(AbstractRobot):
             robot.add_kinematic_chain(arm_chain)
             world.add_semantic_annotation(robot)
 
-        return robot, kappas, phis
+        return robot
 
     @classmethod
     def build_cosserat(
         cls,
         world: World,
         sections: List[SoftTrunkSection],
-    ) -> Tuple[
-        SoftTrunk,
-        List[DegreeOfFreedom],
-        List[DegreeOfFreedom],
-        List[DegreeOfFreedom],
-        List[DegreeOfFreedom],
-    ]:
+    ) -> SoftTrunk:
         """
         Builds a Cosserat Rod robot.
 
@@ -220,7 +281,7 @@ class SoftTrunk(AbstractRobot):
 
         :param sections: A list of section configurations defining the morphology.
 
-        :return: A tuple containing (Robot, Bending_X DOFs, Bending_Y DOFs, Torsion DOFs, Extension DOFs).
+        :return: A SoftTrunk robot view
         """
 
         prefix = "cosserat"
@@ -316,4 +377,4 @@ class SoftTrunk(AbstractRobot):
             robot.add_kinematic_chain(arm_chain)
             world.add_semantic_annotation(robot)
 
-        return robot, all_bx, all_by, all_tor, all_ext
+        return robot
