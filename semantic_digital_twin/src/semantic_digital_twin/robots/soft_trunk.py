@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Self, TYPE_CHECKING, List, Tuple
 
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot, Arm, Manipulator
@@ -26,6 +26,17 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 
+@dataclass
+class SoftTrunkSection:
+    """
+    Encapsulates the physical and visual properties of a single soft section.
+    """
+
+    length: float
+    radius: float
+    resolution: int
+
+
 @dataclass(eq=False)
 class SoftTrunk(AbstractRobot):
     """
@@ -50,7 +61,34 @@ class SoftTrunk(AbstractRobot):
             _world=world,
         )
 
-    # Internal setup methods
+    @classmethod
+    def from_world(
+        cls, world: World, name: str = "robot", prefix: str = "soft_trunk"
+    ) -> Self:
+        """
+        Wraps an existing soft robot structure in the world into a SoftTrunk view.
+
+        :param world: The world instance containing the soft robot entities.
+
+        :param name: The semantic name to assign to the robot.
+
+        :param prefix: The prefix used by the robot's bodies in the world.
+
+        :return: A SoftTrunk robot view.
+        """
+
+        with world.modify_world():
+            root_body = world.get_body_by_name(PrefixedName("base", prefix))
+
+            soft_trunk = cls(
+                name=PrefixedName(name, prefix),
+                root=root_body,
+                _world=world,
+            )
+            world.add_semantic_annotation(soft_trunk)
+
+        return soft_trunk
+
     def _setup_semantic_annotations(self):
         pass
 
@@ -70,60 +108,23 @@ class SoftTrunk(AbstractRobot):
     def build_piecewise_constant_curvature(
         cls,
         world: World,
-        num_sections: int = 3,
-        segments_per_section: int = 6,
-        total_length: float = 0.9,
-        radius: float = 0.02,
+        sections: List[SoftTrunkSection],
     ) -> Tuple[SoftTrunk, List[DegreeOfFreedom], List[DegreeOfFreedom]]:
         """
-        Builds a uniform soft robot using the Piecewise Constant Curvature (PCC) model.
+        Builds a Piecewise Constant Curvature (PCC) robot from a list of sections.
 
         :param world: The world from which to create the robot view.
-        :param num_sections: The number of independently controlled bending sections.
-        :param segments_per_section: The number of visual segments per section (defines the smoothness).
-        :param total_length: The total physical length of the robot in meters.
-        :param radius: The uniform radius of the robot's cross-section.
 
-        :return: A tuple containing:
-                - The initialized SoftTrunk robot instance.
-                - A list of kappa Degrees of Freedom (curvature) for each section.
-                - A list of phi Degrees of Freedom (bending plane) for each section.
+        :param sections: A list of section configurations defining the robot's morphology.
+
+        :return: A tuple containing (Robot, List of Kappa DOFs, List of Phi DOFs).
         """
-        section_lengths = [total_length / num_sections] * num_sections
-        section_radii = [radius] * num_sections
-        section_resolutions = [segments_per_section] * num_sections
 
-        return cls.build_custom_piecewise_constant_curvature(
-            world, section_lengths, section_radii, section_resolutions
-        )
-
-    @classmethod
-    def build_custom_piecewise_constant_curvature(
-        cls,
-        world: World,
-        section_lengths: List[float],
-        section_radii: List[float],
-        section_resolutions: List[int],
-    ) -> Tuple[SoftTrunk, List[DegreeOfFreedom], List[DegreeOfFreedom]]:
-        """
-        Builds a heterogeneous PCC robot with unique dimensions for every section.
-
-        :param world: The world from which to create the robot view.
-        :param section_lengths: A list containing the length of each section in meters.
-        :param section_radii: A list containing the radius of each section.
-        :param section_resolutions: A list containing the number of visual segments for each section.
-
-        :return: A tuple containing:
-                - The initialized SoftTrunk robot instance.
-                - A list of kappa Degrees of Freedom (curvature) for each section.
-                - A list of phi Degrees of Freedom (bending plane) for each section.
-        """
-        num_sections = len(section_lengths)
         prefix = "pcc"
-
         with world.modify_world():
             root_body = Body(name=PrefixedName(name="base", prefix=prefix))
             world.add_body(root_body)
+
             robot = cls(
                 name=PrefixedName(name="robot", prefix=prefix),
                 root=root_body,
@@ -132,52 +133,42 @@ class SoftTrunk(AbstractRobot):
 
             prev_body = root_body
             kappas, phis = [], []
-
-            default_limits = DegreeOfFreedomLimits(
+            limits = DegreeOfFreedomLimits(
                 lower=DerivativeMap(position=-10.0, velocity=-10.0),
                 upper=DerivativeMap(position=10.0, velocity=10.0),
             )
 
-            for s in range(num_sections):
-                # Create unique DOFs for this section
+            for s, section in enumerate(sections):
                 kappa = DegreeOfFreedom(
-                    name=PrefixedName(name=f"kappa_{s}", prefix=prefix),
-                    limits=default_limits,
+                    name=PrefixedName(f"kappa_{s}", prefix),
+                    limits=limits,
                 )
                 phi = DegreeOfFreedom(
-                    name=PrefixedName(name=f"phi_{s}", prefix=prefix),
-                    limits=default_limits,
+                    name=PrefixedName(f"phi_{s}", prefix),
+                    limits=limits,
                 )
                 world.add_degree_of_freedom(kappa)
                 world.add_degree_of_freedom(phi)
                 kappas.append(kappa)
                 phis.append(phi)
 
-                # Section Dimensions
-                current_section_length = section_lengths[s]
-                current_radius = section_radii[s]
-                resolution = section_resolutions[s]
-                segment_length = current_section_length / resolution
-
-                # Build the segments for this section
-                for i in range(resolution):
-                    color_val = (s + 1) / num_sections
+                segment_length = section.length / section.resolution
+                for i in range(section.resolution):
+                    color_val = (s + 1) / len(sections)
                     visual = Cylinder(
                         origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                             z=-segment_length / 2
                         ),
-                        width=current_radius * 2,
+                        width=section.radius * 2,
                         height=segment_length,
                         color=Color(0.0, color_val, 1.0 - color_val, 1.0),
                     )
-
                     curr_body = Body(
-                        name=PrefixedName(name=f"sec{s}_seg{i}", prefix=prefix),
+                        name=PrefixedName(f"sec{s}_seg{i}", prefix),
                         visual=ShapeCollection([visual]),
                     )
                     world.add_body(curr_body)
 
-                    # Connect using UUIDs
                     connection = PiecewiseConstantCurvatureConnection(
                         parent=prev_body,
                         child=curr_body,
@@ -189,7 +180,7 @@ class SoftTrunk(AbstractRobot):
                     prev_body = curr_body
 
             tip_manipulator = Manipulator(
-                name=PrefixedName(name="effector", prefix=prefix),
+                name=PrefixedName("effector", prefix),
                 root=prev_body,
                 tool_frame=prev_body.name,
                 front_facing_axis=Vector3(z=1.0),
@@ -199,7 +190,7 @@ class SoftTrunk(AbstractRobot):
             world.add_semantic_annotation(tip_manipulator)
 
             arm_chain = Arm(
-                name=PrefixedName(name="arm", prefix=prefix),
+                name=PrefixedName("arm", prefix),
                 root=root_body,
                 tip=prev_body,
                 _world=world,
@@ -207,16 +198,14 @@ class SoftTrunk(AbstractRobot):
             )
             robot.add_kinematic_chain(arm_chain)
             world.add_semantic_annotation(robot)
+
         return robot, kappas, phis
 
     @classmethod
     def build_cosserat(
         cls,
         world: World,
-        num_sections: int = 3,
-        segments_per_section: int = 10,
-        total_length: float = 0.9,
-        radius: float = 0.02,
+        sections: List[SoftTrunkSection],
     ) -> Tuple[
         SoftTrunk,
         List[DegreeOfFreedom],
@@ -225,61 +214,16 @@ class SoftTrunk(AbstractRobot):
         List[DegreeOfFreedom],
     ]:
         """
-        Builds a uniform soft robot based on Cosserat Rod Theory.
+        Builds a Cosserat Rod robot.
 
         :param world: The world from which to create the robot view.
-        :param num_sections: Number of control sections.
-        :param segments_per_section: Integration steps per section (defines accuracy and smoothness).
-        :param total_length: Total length in meters.
-        :param radius: Uniform radius of the rod.
 
-        :return: A tuple containing:
-                - The SoftTrunk instance.
-                - List of Degrees of Freedom for bending around the X-axis (bending_x).
-                - List of Degrees of Freedom for bending around the Y-axis (bending_y).
-                - List of Degrees of Freedom for twisting (torsion).
-                - List of Degrees of Freedom for stretching (extension).
+        :param sections: A list of section configurations defining the morphology.
+
+        :return: A tuple containing (Robot, Bending_X DOFs, Bending_Y DOFs, Torsion DOFs, Extension DOFs).
         """
-        section_lengths = [total_length / num_sections] * num_sections
-        section_radii = [radius] * num_sections
-        section_resolutions = [segments_per_section] * num_sections
 
-        return cls.build_custom_cosserat(
-            world, section_lengths, section_radii, section_resolutions
-        )
-
-    @classmethod
-    def build_custom_cosserat(
-        cls,
-        world: World,
-        section_lengths: List[float],
-        section_radii: List[float],
-        section_resolutions: List[int],
-    ) -> Tuple[
-        SoftTrunk,
-        List[DegreeOfFreedom],
-        List[DegreeOfFreedom],
-        List[DegreeOfFreedom],
-        List[DegreeOfFreedom],
-    ]:
-        """
-        Builds a heterogeneous Cosserat Rod robot supporting complex torsion and extension.
-
-        :param world: The world from which to create the robot view.
-        :param section_lengths: List of lengths for each section.
-        :param section_radii: List of radii for each section.
-        :param section_resolutions: List of integration resolutions for each section.
-
-        :return: A tuple containing:
-                - The SoftTrunk instance.
-                - List of Degrees of Freedom for bending around the X-axis (bending_x).
-                - List of Degrees of Freedom for bending around the Y-axis (bending_y).
-                - List of Degrees of Freedom for twisting (torsion).
-                - List of Degrees of Freedom for stretching (extension).
-        """
-        num_sections = len(section_lengths)
         prefix = "cosserat"
-
         with world.modify_world():
             root_body = Body(name=PrefixedName(name="base", prefix=prefix))
             world.add_body(root_body)
@@ -291,7 +235,6 @@ class SoftTrunk(AbstractRobot):
 
             prev_body = root_body
             all_bx, all_by, all_tor, all_ext = [], [], [], []
-
             strain_limits = DegreeOfFreedomLimits(
                 lower=DerivativeMap(position=-10.0, velocity=-10.0),
                 upper=DerivativeMap(position=10.0, velocity=10.0),
@@ -301,61 +244,45 @@ class SoftTrunk(AbstractRobot):
                 upper=DerivativeMap(position=3.0, velocity=10.0),
             )
 
-            for s in range(num_sections):
-                # Create unique DOFs (Strains)
+            for s, section in enumerate(sections):
                 bx = DegreeOfFreedom(
-                    name=PrefixedName(name=f"bending_x_{s}", prefix=prefix),
-                    limits=strain_limits,
+                    name=PrefixedName(f"bending_x_{s}", prefix), limits=strain_limits
                 )
                 by = DegreeOfFreedom(
-                    name=PrefixedName(name=f"bending_y_{s}", prefix=prefix),
-                    limits=strain_limits,
+                    name=PrefixedName(f"bending_y_{s}", prefix), limits=strain_limits
                 )
                 tor = DegreeOfFreedom(
-                    name=PrefixedName(name=f"torsion_{s}", prefix=prefix),
-                    limits=strain_limits,
+                    name=PrefixedName(f"torsion_{s}", prefix), limits=strain_limits
                 )
                 ext = DegreeOfFreedom(
-                    name=PrefixedName(name=f"extension_{s}", prefix=prefix),
-                    limits=extension_limits,
+                    name=PrefixedName(f"extension_{s}", prefix), limits=extension_limits
                 )
-
                 for dof in [bx, by, tor, ext]:
                     world.add_degree_of_freedom(dof)
-
-                # Initialize extension to rest length
                 world.state[ext.id].position = 1.0
-
                 all_bx.append(bx)
                 all_by.append(by)
                 all_tor.append(tor)
                 all_ext.append(ext)
 
-                # Section Dimensions
-                current_section_length = section_lengths[s]
-                current_radius = section_radii[s]
-                resolution = section_resolutions[s]
-                segment_length = current_section_length / resolution
-
-                # Build Segments for this section
-                for i in range(resolution):
-                    color_val = (s + 1) / num_sections
+                segment_length = section.length / section.resolution
+                for i in range(section.resolution):
+                    color_val = (s + 1) / len(sections)
                     visual = Cylinder(
                         origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                             z=-segment_length / 2
                         ),
-                        width=current_radius * 2,
+                        width=section.radius * 2,
                         height=segment_length,
                         color=Color(color_val, 0.2, 1.0 - color_val, 1.0),
                     )
 
                     curr_body = Body(
-                        name=PrefixedName(name=f"sec{s}_seg{i}", prefix=prefix),
+                        name=PrefixedName(f"sec{s}_seg{i}", prefix),
                         visual=ShapeCollection([visual]),
                     )
                     world.add_body(curr_body)
 
-                    # Connect using UUIDs
                     connection = CosseratRodConnection(
                         parent=prev_body,
                         child=curr_body,
@@ -368,9 +295,9 @@ class SoftTrunk(AbstractRobot):
                     world.add_connection(connection)
                     prev_body = curr_body
 
-            # Semantic Registration
+            # Semantic registration
             tip_manipulator = Manipulator(
-                name=PrefixedName(name="effector", prefix=prefix),
+                name=PrefixedName("effector", prefix),
                 root=prev_body,
                 tool_frame=prev_body.name,
                 front_facing_axis=Vector3(z=1.0),
@@ -380,7 +307,7 @@ class SoftTrunk(AbstractRobot):
             world.add_semantic_annotation(tip_manipulator)
 
             arm_chain = Arm(
-                name=PrefixedName(name="arm", prefix=prefix),
+                name=PrefixedName("arm", prefix),
                 root=root_body,
                 tip=prev_body,
                 _world=world,
