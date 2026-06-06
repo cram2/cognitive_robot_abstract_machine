@@ -7,17 +7,25 @@ every ``SymbolicExpression`` carries.
 
 All tests are expected to fail with ``ImportError`` until
 ``krrood/src/krrood/entity_query_language/rdr/corner_case.py`` is created.
+
+**Option A migration (Phase 2):** ``to_ordered_sources`` no longer accepts a raw ``emit``
+callable.  The serializer is now stored on the ``CornerCaseStore`` itself (``self.serializer``)
+and tests that previously passed a bare function now pass a ``CaseSerializer`` subclass.
+``TrivialSerializer`` and ``SpySerializer`` below are the adapter helpers.
 """
 
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Set, Tuple, Type
+from typing import Any, Set, Tuple, Type
 
 import pytest
 
-from krrood.entity_query_language.rdr.corner_case import CornerCaseStore  # noqa: E402
+from krrood.entity_query_language.rdr.corner_case import (  # noqa: E402
+    CaseSerializer,
+    CornerCaseStore,
+)
 from krrood.entity_query_language.factories import entity, variable
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 
@@ -50,9 +58,47 @@ def _make_condition_node(case_type=Animal):
     return av.milk == True  # noqa: E712  — produces a SymbolicExpression
 
 
-def _trivial_emit(case: object) -> Tuple[str, Set[Type]]:
-    """Minimal ``emit`` callable: returns the str representation and an empty type set."""
-    return (str(case), set())
+@dataclass
+class TrivialSerializer(CaseSerializer):
+    """Pattern: TrivialSerializer — minimal CaseSerializer that returns str(case).
+
+    Replaces the old ``_trivial_emit`` raw callable after the Option A migration.
+    ``to_source`` returns the string representation with an empty referenced-type set;
+    ``from_data`` is a no-op stub (not exercised in Phase 1 tests).
+    """
+
+    def to_source(self, case: Any) -> Tuple[str, Set[Type]]:
+        """Return ``(str(case), set())`` — trivial serialization for test isolation."""
+        return (str(case), set())
+
+    def from_data(self, data: Any, case_type: Type) -> Any:
+        """Stub: not exercised in Phase 1 tests."""
+        return data
+
+
+@dataclass
+class SpySerializer(CaseSerializer):
+    """Pattern: SpySerializer — records every case passed to ``to_source``.
+
+    Replaces the old ``spy_emit`` raw callable after the Option A migration.
+    The ``received`` list accumulates each case instance in call order so tests
+    can assert on what was serialized.
+    """
+
+    received: list = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.received is None:
+            self.received = []
+
+    def to_source(self, case: Any) -> Tuple[str, Set[Type]]:
+        """Record ``case`` and return a trivial serialization."""
+        self.received.append(case)
+        return (str(case), set())
+
+    def from_data(self, data: Any, case_type: Type) -> Any:
+        """Stub: not exercised in Phase 1 tests."""
+        return data
 
 
 # ---------------------------------------------------------------------------
@@ -108,8 +154,9 @@ def test_to_ordered_sources_only_includes_recorded_nodes():
     """
     When only nodes 0 and 2 (by position in the ordered list) have recorded corner
     cases, ``to_ordered_sources`` returns a dict with keys ``{0, 2}`` — key 1 is absent.
+    Uses ``TrivialSerializer`` (Option A: serializer stored on the store, not passed inline).
     """
-    store = CornerCaseStore()
+    store = CornerCaseStore(serializer=TrivialSerializer())
     n0 = _make_condition_node()
     n1 = _make_condition_node()
     n2 = _make_condition_node()
@@ -119,7 +166,7 @@ def test_to_ordered_sources_only_includes_recorded_nodes():
     store.record(n0, case_a)
     store.record(n2, case_c)
 
-    result = store.to_ordered_sources([n0, n1, n2], _trivial_emit)
+    result = store.to_ordered_sources([n0, n1, n2])
 
     assert set(result.keys()) == {0, 2}
     assert 1 not in result
@@ -131,22 +178,20 @@ def test_to_ordered_sources_only_includes_recorded_nodes():
 
 
 def test_to_ordered_sources_calls_emit_with_the_case():
-    """The ``emit`` callable receives the exact case instance that was recorded."""
-    store = CornerCaseStore()
+    """The serializer's ``to_source`` receives the exact case instance that was recorded.
+
+    Uses ``SpySerializer`` (Option A: serializer stored on the store, not passed inline).
+    """
+    spy = SpySerializer()
+    store = CornerCaseStore(serializer=spy)
     node = _make_condition_node()
     sentinel_case = MinimalCase(name="sentinel", milk=True)
     store.record(node, sentinel_case)
 
-    received: list = []
+    store.to_ordered_sources([node])
 
-    def spy_emit(case: object) -> Tuple[str, Set[Type]]:
-        received.append(case)
-        return (str(case), set())
-
-    store.to_ordered_sources([node], spy_emit)
-
-    assert len(received) == 1
-    assert received[0] is sentinel_case
+    assert len(spy.received) == 1
+    assert spy.received[0] is sentinel_case
 
 
 # ---------------------------------------------------------------------------
