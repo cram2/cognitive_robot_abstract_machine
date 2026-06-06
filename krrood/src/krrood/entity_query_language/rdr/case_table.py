@@ -192,6 +192,10 @@ def render_cases_side_by_side(
     :param use_color: Whether to emit ANSI colour in the tables.
     :return: A string containing both tables separated by a blank line.
     """
-    new_table = render_case_table(new_case, min_column_width=min_column_width, use_color=use_color)
-    corner_table = render_case_table(corner_case, min_column_width=min_column_width, use_color=use_color)
+    new_table = render_case_table(
+        new_case, min_column_width=min_column_width, use_color=use_color
+    )
+    corner_table = render_case_table(
+        corner_case, min_column_width=min_column_width, use_color=use_color
+    )
     return f"{new_label}\n{new_table}\n\n{corner_label}\n{corner_table}"

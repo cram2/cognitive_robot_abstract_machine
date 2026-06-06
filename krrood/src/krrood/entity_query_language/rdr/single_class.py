@@ -152,7 +152,9 @@ class EQLSingleClassRDR:
             self._trace(case), head=head, tail=tail, use_color=use_color
         )
 
-    def fit_case(self, case: Any, target: Any = UNSET, expert: Optional[Expert] = None) -> Any:
+    def fit_case(
+        self, case: Any, target: Any = UNSET, expert: Optional[Expert] = None
+    ) -> Any:
         """
         Ensure the RDR classifies ``case`` as ``target``, growing the rule tree when it does
         not.
@@ -183,7 +185,12 @@ class EQLSingleClassRDR:
 
         if target is UNSET:
             target, condition = expert.ask_for_rule(
-                case, self.case_variable, self.conclusion_domain, current, trace, corner_case
+                case,
+                self.case_variable,
+                self.conclusion_domain,
+                current,
+                trace,
+                corner_case,
             )
             if condition is None:
                 # The expert kept the current conclusion; nothing to insert.
@@ -327,6 +334,4 @@ class EQLSingleClassRDR:
         :param conclusion_value: The conclusion value to query (e.g. ``Species.molusc``).
         :return: The backward-inference knowledge for *conclusion_value*.
         """
-        return self._backward_index.query(
-            self.conditions_root, conclusion_value
-        )
+        return self._backward_index.query(self.conditions_root, conclusion_value)

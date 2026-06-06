@@ -26,7 +26,6 @@ from uuid import UUID
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 
-
 # ---------------------------------------------------------------------------
 # Exception
 # ---------------------------------------------------------------------------
