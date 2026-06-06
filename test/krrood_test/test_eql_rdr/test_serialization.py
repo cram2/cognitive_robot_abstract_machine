@@ -9,7 +9,13 @@ import os
 import tempfile
 import unittest
 
-from krrood.entity_query_language.factories import add, entity, not_, refinement, variable
+from krrood.entity_query_language.factories import (
+    add,
+    entity,
+    not_,
+    refinement,
+    variable,
+)
 from krrood.entity_query_language.rdr.expert import Expert
 from krrood.entity_query_language.rdr.interface import FunctionInterface
 from krrood.entity_query_language.rdr.serialization import (
@@ -189,12 +195,12 @@ class TestSerialization(unittest.TestCase):
 
 
 def _build_chained_refinement_tree() -> EQLSingleClassRDR:
-    """backbone → fish; except if not_(milk) → molusc; except if venomous → reptile.
+    """Build an RDR with two levels of chained refinements: backbone → fish,
+    except if not_(milk) → molusc, except if venomous → reptile.
 
-    Two levels of chained refinements built directly from EQL context managers.  The outer
-    refinement uses ``not_()`` as its condition — the pattern that exposed the missing rule
-    for the scorpion (``Not._evaluate__`` previously dropped the result chain, causing
-    ``satisfied_condition_ids`` to omit the parent rule's condition ID).
+    The outer refinement uses ``not_()`` as its condition, covering the
+    path where a negated refinement condition must still propagate the
+    parent rule's satisfaction through the result chain.
     """
     animal_var = variable(Animal, domain=[])
     query = entity(animal_var).where(animal_var.backbone == True)

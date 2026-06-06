@@ -232,6 +232,13 @@ class EQLSingleClassRDR:
 
         When ``targets`` is ``None`` the no-target path has no ground truth to converge
         against, so the method is a single pass (unchanged from previous behaviour).
+
+        :param cases: The case instances to fit.
+        :param targets: Optional ground-truth conclusions paired with ``cases``.
+            ``None`` triggers the expert-labeling (``ask_for_rule``) path.
+        :param expert: The expert that supplies rule conditions.
+        :param max_passes: Maximum number of convergent passes.  Defaults to 10.
+        :return: This RDR, for chaining.
         """
         paired_targets = targets if targets is not None else [UNSET] * len(cases)
         # Indices of cases to fit on the current pass.  Starts as all of them;

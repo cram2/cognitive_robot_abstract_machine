@@ -49,11 +49,15 @@ def maximally_specific_expert() -> Expert:
 
 def labelling_expert(target_by_name):
     """An expert that supplies *both* conclusion and conditions (ask-for-rule path)."""
+
     def answer(context, requests):
         result = {
             "conditions": and_(
-                *[getattr(context.case_variable, f) == getattr(context.case_instance, f)
-                  for f in FEATURE_FIELDS]
+                *[
+                    getattr(context.case_variable, f)
+                    == getattr(context.case_instance, f)
+                    for f in FEATURE_FIELDS
+                ]
             )
         }
         if any(r.name == "conclusion" for r in requests):
@@ -188,35 +192,35 @@ def _molusc_backbone_false_expert():
     call_details: list = []
 
     def answer(context, requests):
-        v = context.case_variable
-        c = context.case_instance
-        cur = context.current_conclusion
+        case_variable = context.case_variable
+        case_instance = context.case_instance
+        current_conclusion = context.current_conclusion
         target = context.target_conclusion
-        call_details.append((c.name, cur, target))
+        call_details.append((case_instance.name, current_conclusion, target))
 
         has_conclusion = any(r.name == "conclusion" for r in requests)
 
         if target is UNSET and has_conclusion:
             # No-target path: return both conclusion and conditions.
             result = {"conclusion": Species.molusc}
-            if cur == Species.reptile:
-                result["conditions"] = v.backbone == False
-            elif cur is UNSET:
-                result["conditions"] = v.milk == False
+            if current_conclusion == Species.reptile:
+                result["conditions"] = case_variable.backbone == False
+            elif current_conclusion is UNSET:
+                result["conditions"] = case_variable.milk == False
             else:
-                result["conditions"] = v.milk == False
+                result["conditions"] = case_variable.milk == False
             return result
 
         if target == Species.mammal:
-            return {"conditions": v.milk == True}
+            return {"conditions": case_variable.milk == True}
         if target == Species.reptile:
-            return {"conditions": v.venomous == True}
+            return {"conditions": case_variable.venomous == True}
         if target == Species.molusc:
-            if cur == Species.reptile:
-                return {"conditions": v.backbone == False}
-            return {"conditions": v.milk == False}
+            if current_conclusion == Species.reptile:
+                return {"conditions": case_variable.backbone == False}
+            return {"conditions": case_variable.milk == False}
 
-        return {"conditions": v.milk == True}
+        return {"conditions": case_variable.milk == True}
 
     return Expert(interface=FunctionInterface(answer_fn=answer)), call_details
 
@@ -237,26 +241,66 @@ class TestFitConvergent(unittest.TestCase):
         """
         mammal = Animal(
             name="scenario_mammal",
-            hair=True, feathers=False, eggs=False, milk=True,
-            airborne=False, aquatic=False, predator=False, toothed=True,
-            backbone=True, breathes=True, venomous=False, fins=False,
-            legs=4, tail=True, domestic=False, catsize=True,
+            hair=True,
+            feathers=False,
+            eggs=False,
+            milk=True,
+            airborne=False,
+            aquatic=False,
+            predator=False,
+            toothed=True,
+            backbone=True,
+            breathes=True,
+            venomous=False,
+            fins=False,
+            legs=4,
+            tail=True,
+            domestic=False,
+            catsize=True,
         )
         molusc = Animal(
             name="scenario_molusc",
-            hair=False, feathers=False, eggs=False, milk=False,
-            airborne=False, aquatic=False, predator=False, toothed=False,
-            backbone=False, breathes=True, venomous=True, fins=False,
-            legs=0, tail=False, domestic=False, catsize=False,
+            hair=False,
+            feathers=False,
+            eggs=False,
+            milk=False,
+            airborne=False,
+            aquatic=False,
+            predator=False,
+            toothed=False,
+            backbone=False,
+            breathes=True,
+            venomous=True,
+            fins=False,
+            legs=0,
+            tail=False,
+            domestic=False,
+            catsize=False,
         )
         reptile = Animal(
             name="scenario_reptile",
-            hair=False, feathers=False, eggs=False, milk=False,
-            airborne=False, aquatic=False, predator=True, toothed=True,
-            backbone=True, breathes=True, venomous=True, fins=False,
-            legs=4, tail=True, domestic=False, catsize=False,
+            hair=False,
+            feathers=False,
+            eggs=False,
+            milk=False,
+            airborne=False,
+            aquatic=False,
+            predator=True,
+            toothed=True,
+            backbone=True,
+            breathes=True,
+            venomous=True,
+            fins=False,
+            legs=4,
+            tail=True,
+            domestic=False,
+            catsize=False,
         )
-        return [mammal, molusc, reptile], [Species.mammal, Species.molusc, Species.reptile]
+        return [mammal, molusc, reptile], [
+            Species.mammal,
+            Species.molusc,
+            Species.reptile,
+        ]
 
     def test_fit_already_convergent_in_one_pass(self):
         """A model that already converges in a single pass should not add extra expert calls."""
@@ -275,7 +319,8 @@ class TestFitConvergent(unittest.TestCase):
 
         for c, t in zip(cases, case_targets):
             self.assertEqual(
-                rdr.classify(c), t,
+                rdr.classify(c),
+                t,
                 f"{c.name}: expected {t}, got {rdr.classify(c)}",
             )
 
@@ -284,12 +329,11 @@ class TestFitConvergent(unittest.TestCase):
         # (now misclassified as reptile by the venomous rule — expert supplied
         # not_backbone).  The re-visit is what makes fitting convergent.
         molusc_calls = [
-            (cur, tgt)
-            for name, cur, tgt in calls
-            if name == "scenario_molusc"
+            (cur, tgt) for name, cur, tgt in calls if name == "scenario_molusc"
         ]
         self.assertEqual(
-            len(molusc_calls), 2,
+            len(molusc_calls),
+            2,
             f"Expected 2 calls for molusc (first pass + re-fit), got {len(molusc_calls)}",
         )
         # The re-fit (second call) saw current == reptile (broken by venomous rule).
@@ -312,10 +356,22 @@ class TestFitConvergent(unittest.TestCase):
         # An expert that answers randomly — the RDR can never converge.
         case = Animal(
             name="endless",
-            hair=False, feathers=False, eggs=True, milk=False,
-            airborne=False, aquatic=False, predator=False, toothed=False,
-            backbone=False, breathes=True, venomous=False, fins=False,
-            legs=0, tail=False, domestic=False, catsize=False,
+            hair=False,
+            feathers=False,
+            eggs=True,
+            milk=False,
+            airborne=False,
+            aquatic=False,
+            predator=False,
+            toothed=False,
+            backbone=False,
+            breathes=True,
+            venomous=False,
+            fins=False,
+            legs=0,
+            tail=False,
+            domestic=False,
+            catsize=False,
         )
 
         def oscillating_answer(context, requests):

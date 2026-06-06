@@ -7,6 +7,7 @@ interactive header integration.
 """
 
 import unittest
+from pathlib import Path
 
 from colorama import Fore
 
@@ -16,12 +17,14 @@ from krrood.entity_query_language.factories import (
     entity,
     not_,
     refinement,
-    variable, and_,
+    variable,
+    and_,
 )
 from krrood.entity_query_language.rdr.expert import Expert
 from krrood.entity_query_language.rdr.interactive import IPythonInterface
-from krrood.entity_query_language.rdr.utils import UNSET
 from krrood.entity_query_language.rdr.observer import trace_case
+from krrood.entity_query_language.rdr.serialization import load_rdr
+from krrood.entity_query_language.rdr.utils import UNSET
 from krrood.entity_query_language.rdr.rule_tree_view import (
     RuleStatus,
     RuleTreeRenderer,
@@ -144,11 +147,10 @@ class TestStatusResolution(unittest.TestCase):
         self.assertEqual(status["species = mammal"], RuleStatus.NOT_EVALUATED)
 
     def test_refinement_with_not_condition_parent_is_green(self):
-        """Regression: ``not_(x)`` as a refinement condition must not suppress the parent rule's green status.
+        """``not_(x)`` as a refinement condition must propagate the parent rule's green status.
 
-        ``Not._evaluate__`` previously dropped the result chain, so the parent rule's condition
-        ID was absent from ``satisfied_condition_ids`` and appeared red even though the parent
-        fired (a prerequisite for any refinement being evaluated at all).
+        ``Not._evaluate__`` passes its child result as the ``previous_operation_result``
+        so the satisfaction-tracking chain reaches ancestor conditions.
         """
         # backbone → fish (base rule); except if not_(milk) → molusc (refinement).
         # For a fish (backbone=True, milk=False): backbone fires (green), not_(milk)=True so
@@ -163,7 +165,9 @@ class TestStatusResolution(unittest.TestCase):
 
         fish_case = first(Species.fish)  # backbone=True, milk=False
         rules = walk_rules(query._conditions_root_)
-        trace = trace_case(query, animal_var, animal_var.species, fish_case, query._conditions_root_)
+        trace = trace_case(
+            query, animal_var, animal_var.species, fish_case, query._conditions_root_
+        )
         status = {
             format_conclusion(r.conclusions[0]): resolve_status(
                 r, trace.satisfied_condition_ids, trace.evaluated_expression_ids
@@ -182,28 +186,29 @@ class TestStatusResolution(unittest.TestCase):
         shallower depth would be a visual lie (Refinement can only evaluate its right
         branch when its left branch already fired).
         """
-        from krrood.entity_query_language.rdr.serialization import load_rdr
-        import os
-
-        model_path = os.path.join(
-            os.path.dirname(__file__), "fitted_models", "zoo_species_rdr.py"
-        )
-        if not os.path.exists(model_path):
+        model_path = Path(__file__).parent / "fitted_models" / "zoo_species_rdr.py"
+        if not model_path.exists():
             self.skipTest("human-fitted zoo model not yet committed")
 
-        rdr = load_rdr(model_path)
+        rdr = load_rdr(str(model_path))
         for animal_case, _ in zip(animals, targets):
             trace = rdr._trace(animal_case)
             rules = walk_rules(trace.rule_tree_root)
             statuses = [
-                resolve_status(r, trace.satisfied_condition_ids, trace.evaluated_expression_ids)
+                resolve_status(
+                    r, trace.satisfied_condition_ids, trace.evaluated_expression_ids
+                )
                 for r in rules
             ]
             for i, rule in enumerate(rules):
                 if rule.depth == 0 or statuses[i] != RuleStatus.FIRED:
                     continue
                 parent_idx = next(
-                    (j for j in range(i - 1, -1, -1) if rules[j].depth == rule.depth - 1),
+                    (
+                        j
+                        for j in range(i - 1, -1, -1)
+                        if rules[j].depth == rule.depth - 1
+                    ),
                     None,
                 )
                 if parent_idx is not None:
@@ -231,7 +236,12 @@ class TestRenderer(unittest.TestCase):
             "backbone",
         ][:n]
         return [
-            RuleView(condition=(getattr(animal, f) == True), conclusions=[], depth=0, kind="if")
+            RuleView(
+                condition=(getattr(animal, f) == True),
+                conclusions=[],
+                depth=0,
+                kind="if",
+            )
             for f in fields
         ]
 
@@ -268,7 +278,11 @@ class TestRenderer(unittest.TestCase):
     def test_render_rule_tree_colours_fired_rule(self):
         animal, query = _refined_tree()
         trace = trace_case(
-            query, animal, animal.species, first(Species.mammal), query._conditions_root_
+            query,
+            animal,
+            animal.species,
+            first(Species.mammal),
+            query._conditions_root_,
         )
         out = render_rule_tree(trace, use_color=True)
         self.assertIn("milk == true", out)
@@ -290,7 +304,9 @@ class TestInteractiveHeaderIntegration(unittest.TestCase):
             namespace["conditions"] = namespace["case_variable"].milk == True
 
         expert = Expert(interface=IPythonInterface(shell_runner=runner))
-        expert.ask_for_conditions(first(Species.fish), animal, Species.mammal, Species.fish, trace)
+        expert.ask_for_conditions(
+            first(Species.fish), animal, Species.mammal, Species.fish, trace
+        )
         header = captured["header"]
         self.assertIn("fish", header)
         self.assertIn("mammal", header)
