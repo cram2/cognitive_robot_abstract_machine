@@ -1,20 +1,4 @@
-"""
-Phase 3 tests: ``save_path`` on ``EQLSingleClassRDR`` and ``save_rdr_with_case``.
-
-These tests gate two implementation steps:
-
-Step A — ``save_path`` field on ``EQLSingleClassRDR`` (``rdr/single_class.py``):
-  * ``save_path=None`` (default): ``fit_case`` must NOT write any file.
-  * ``save_path=<tmp>`` present: after ``fit_case`` a file exists at that path.
-  * A second ``fit_case`` call triggers a second write (spy counter == 2).
-
-Step B — ``save_rdr_with_case(rdr, path)`` in ``rdr/serialization.py``:
-  * File produced by ``save_rdr_with_case`` round-trips via ``load_rdr``.
-  * ``FunctionCase``-based RDR: file contains the dataclass class-header section.
-  * Non-``FunctionCase`` RDR: function falls back to plain ``save_rdr`` (no header).
-  * ``rdr_to_python(case_type_is_local=True)``: case type not re-imported in the
-    rule-tree section.
-"""
+"""Tests for ``save_path`` on ``EQLSingleClassRDR`` and ``save_rdr_with_case``."""
 
 from __future__ import annotations
 
@@ -35,6 +19,7 @@ from krrood.entity_query_language.rdr.serialization import (
     rdr_to_python,
     save_rdr,
     save_rdr_with_case,
+    walk_rules_in_emission_order,
 )
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 from krrood.entity_query_language.rdr.utils import UNSET
@@ -129,9 +114,7 @@ class TestSavePathFieldDefault(unittest.TestCase):
                 "krrood.entity_query_language.rdr.single_class.save_rdr_with_case"
             ) as mock_save:
                 rdr = EQLSingleClassRDR(Animal, "species")
-                expert = _scripted_expert(
-                    {Species.mammal: lambda v: v.milk == True}
-                )
+                expert = _scripted_expert({Species.mammal: lambda v: v.milk == True})
                 rdr.fit_case(first(Species.mammal), Species.mammal, expert)
                 mock_save.assert_not_called()
 
@@ -145,9 +128,7 @@ class TestSavePathFieldPresent(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "model.py")
             rdr = EQLSingleClassRDR(Animal, "species", save_path=path)
-            expert = _scripted_expert(
-                {Species.mammal: lambda v: v.milk == True}
-            )
+            expert = _scripted_expert({Species.mammal: lambda v: v.milk == True})
             rdr.fit_case(first(Species.mammal), Species.mammal, expert)
             self.assertTrue(os.path.exists(path))
 
@@ -156,9 +137,7 @@ class TestSavePathFieldPresent(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "model.py")
             rdr = EQLSingleClassRDR(Animal, "species", save_path=path)
-            expert = _scripted_expert(
-                {Species.mammal: lambda v: v.milk == True}
-            )
+            expert = _scripted_expert({Species.mammal: lambda v: v.milk == True})
             rdr.fit_case(first(Species.mammal), Species.mammal, expert)
             with open(path) as f:
                 content = f.read()
@@ -190,9 +169,7 @@ class TestSavePathFieldPresent(unittest.TestCase):
                 "krrood.entity_query_language.rdr.single_class.save_rdr_with_case"
             ) as mock_save:
                 rdr = EQLSingleClassRDR(Animal, "species", save_path=path)
-                expert = _scripted_expert(
-                    {Species.mammal: lambda v: v.milk == True}
-                )
+                expert = _scripted_expert({Species.mammal: lambda v: v.milk == True})
                 rdr.fit_case(first(Species.mammal), Species.mammal, expert)
                 count_after_first = mock_save.call_count
                 # Fit the same case again — it is already correct, no new rule inserted.
@@ -354,7 +331,9 @@ class TestRdrToPythonCaseTypeIsLocal(unittest.TestCase):
         rdr = _build_one_rule_rdr()
         src = rdr_to_python(rdr, case_type_is_local=True)
         import_lines = [
-            line for line in src.splitlines() if line.strip().startswith(("import ", "from "))
+            line
+            for line in src.splitlines()
+            if line.strip().startswith(("import ", "from "))
         ]
         case_type_name = rdr.case_type.__name__  # "Animal"
         for line in import_lines:
@@ -370,7 +349,9 @@ class TestRdrToPythonCaseTypeIsLocal(unittest.TestCase):
         src = rdr_to_python(rdr, case_type_is_local=True)
         # Species.mammal is referenced, so 'Species' must appear in an import line.
         import_lines = [
-            line for line in src.splitlines() if line.strip().startswith(("import ", "from "))
+            line
+            for line in src.splitlines()
+            if line.strip().startswith(("import ", "from "))
         ]
         self.assertTrue(
             any("Species" in line for line in import_lines),
@@ -382,7 +363,9 @@ class TestRdrToPythonCaseTypeIsLocal(unittest.TestCase):
         rdr = _build_one_rule_rdr()
         src = rdr_to_python(rdr, case_type_is_local=False)
         import_lines = [
-            line for line in src.splitlines() if line.strip().startswith(("import ", "from "))
+            line
+            for line in src.splitlines()
+            if line.strip().startswith(("import ", "from "))
         ]
         case_type_name = rdr.case_type.__name__
         self.assertTrue(
@@ -396,21 +379,6 @@ class TestRdrToPythonCaseTypeIsLocal(unittest.TestCase):
         src_default = rdr_to_python(rdr)
         src_explicit = rdr_to_python(rdr, case_type_is_local=False)
         self.assertEqual(src_default, src_explicit)
-
-
-if __name__ == "__main__":
-    unittest.main()
-
-
-# ---------------------------------------------------------------------------
-# Phase 3 — save_rdr_with_case preserves the CornerCaseStore
-# ---------------------------------------------------------------------------
-
-
-import os as _os
-import tempfile as _tempfile
-
-from krrood.entity_query_language.rdr.serialization import walk_rules_in_emission_order
 
 
 @unittest.skipIf(len(animals) == 0, "Failed to load zoo dataset")
@@ -435,8 +403,8 @@ class TestSaveRdrWithCasePreservesCornerCases(unittest.TestCase):
         # Sanity: two fit_case calls must have recorded two corner cases.
         self.assertEqual(original_count, 2)
 
-        with _tempfile.TemporaryDirectory() as d:
-            path = _os.path.join(d, "model.py")
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "model.py")
             save_rdr_with_case(rdr, path)
             loaded = load_rdr(path)
 
@@ -451,8 +419,8 @@ class TestSaveRdrWithCasePreservesCornerCases(unittest.TestCase):
         rdr = _build_two_rule_rdr()
         ordered_before = walk_rules_in_emission_order(rdr.conditions_root)
 
-        with _tempfile.TemporaryDirectory() as d:
-            path = _os.path.join(d, "model.py")
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "model.py")
             save_rdr_with_case(rdr, path)
             loaded = load_rdr(path)
 

@@ -1,24 +1,10 @@
-"""
-Phase 1 — Unit tests for ``CornerCaseStore``.
-
-Each test verifies exactly one contract of the store in isolation.  No EQLSingleClassRDR
-is constructed here; the only dependency on the wider EQL system is the ``_id_`` UUID that
-every ``SymbolicExpression`` carries.
-
-All tests are expected to fail with ``ImportError`` until
-``krrood/src/krrood/entity_query_language/rdr/corner_case.py`` is created.
-
-**Option A migration (Phase 2):** ``to_ordered_sources`` no longer accepts a raw ``emit``
-callable.  The serializer is now stored on the ``CornerCaseStore`` itself (``self.serializer``)
-and tests that previously passed a bare function now pass a ``CaseSerializer`` subclass.
-``TrivialSerializer`` and ``SpySerializer`` below are the adapter helpers.
-"""
+"""Unit tests for ``CornerCaseStore``."""
 
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
-from typing import Any, Set, Tuple, Type
+from dataclasses import dataclass, field
+from typing_extensions import Any, Set, Tuple, Type
 
 import pytest
 
@@ -30,7 +16,6 @@ from krrood.entity_query_language.factories import entity, variable
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 
 from .animal import Animal, Species
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -85,11 +70,7 @@ class SpySerializer(CaseSerializer):
     can assert on what was serialized.
     """
 
-    received: list = None  # type: ignore[assignment]
-
-    def __post_init__(self) -> None:
-        if self.received is None:
-            self.received = []
+    received: list = field(default_factory=list)
 
     def to_source(self, case: Any) -> Tuple[str, Set[Type]]:
         """Record ``case`` and return a trivial serialization."""

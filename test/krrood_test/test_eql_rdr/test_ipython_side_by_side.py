@@ -1,15 +1,4 @@
-"""
-Phase 4 — Unit tests for ``IPythonInterface._case_table`` dispatching.
-
-Verifies exactly two dispatch contracts:
-1. When ``context.corner_case is None`` the output is identical to what
-   ``render_case_table`` would produce for the new case alone (single-case path).
-2. When ``context.corner_case`` is set the output contains both the new-case label
-   and the corner-case label (side-by-side path).
-
-These tests require Phase 4 to add ``corner_case`` to ``CaseContext``; they will
-fail with ``TypeError`` (unexpected keyword argument) until that field exists.
-"""
+"""Unit tests for ``IPythonInterface._case_table`` dispatching."""
 
 from __future__ import annotations
 

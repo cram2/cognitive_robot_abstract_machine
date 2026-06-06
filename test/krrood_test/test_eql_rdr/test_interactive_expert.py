@@ -30,6 +30,7 @@ from krrood.entity_query_language.rdr.magics import (
 )
 from krrood.entity_query_language.rdr.utils import UNSET
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
+from krrood.entity_query_language.rdr.interface import CaseContext, FunctionInterface
 
 from .animal import Animal, Species
 from .zoo_loader import load_zoo_animals
@@ -280,19 +281,6 @@ class TestKnowsMagic(unittest.TestCase):
         self.assertIn("usage", output.lower())
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# ---------------------------------------------------------------------------
-# Phase 4 — CaseContext.corner_case field and fit_case provenance wiring
-# ---------------------------------------------------------------------------
-
-import dataclasses as _dataclasses
-
-from krrood.entity_query_language.rdr.interface import FunctionInterface
-
-
 def _make_animal(
     name: str,
     *,
@@ -302,11 +290,7 @@ def _make_animal(
     backbone: bool = True,
     venomous: bool = False,
 ) -> Animal:
-    """Pattern: DistinctAnimalCase — minimal animal with one discriminating feature.
-
-    Mirrors the helper in ``test_corner_case_population.py`` so this class is
-    self-contained.
-    """
+    """Return a minimal animal with one discriminating feature set."""
     return Animal(
         name=name,
         hair=milk,
@@ -329,13 +313,7 @@ def _make_animal(
 
 
 def _scripted_function_expert(rules: dict) -> Expert:
-    """A ``FunctionInterface``-backed expert that records every ``CaseContext`` it sees.
-
-    ``rules`` maps a target ``Species`` to a callable ``(case_variable) -> condition``.
-    The function also appends the full ``CaseContext`` to ``recorded_contexts`` (a list
-    attached to the returned expert as ``expert.recorded_contexts``) so tests can
-    inspect ``corner_case`` after fitting.
-    """
+    """A ``FunctionInterface``-backed expert that records every ``CaseContext`` it sees."""
     recorded: list = []
 
     def answer(context, requests):
@@ -348,18 +326,12 @@ def _scripted_function_expert(rules: dict) -> Expert:
 
 
 class TestCaseContextCornerCase(unittest.TestCase):
-    """Phase 4 — ``CaseContext.corner_case`` field and ``fit_case`` provenance wiring."""
+    """Tests for ``CaseContext.corner_case`` field and ``fit_case`` provenance wiring."""
 
     def test_case_context_has_corner_case_field(self):
-        """``CaseContext`` exposes a ``corner_case`` attribute that defaults to ``None``.
-
-        This tests that Phase 4 added the field to the dataclass; it fails with
-        ``AttributeError`` or ``TypeError`` until the field exists.
-        """
+        """``CaseContext`` exposes a ``corner_case`` attribute that defaults to ``None``."""
         rdr = EQLSingleClassRDR(Animal, "species")
         case = _make_animal("mammal", milk=True)
-        from krrood.entity_query_language.rdr.interface import CaseContext
-
         ctx = CaseContext(case_instance=case, case_variable=rdr.case_variable)
         self.assertIsNone(ctx.corner_case)
 
@@ -457,3 +429,7 @@ class TestCaseContextCornerCase(unittest.TestCase):
         self.assertEqual(len(expert.recorded_contexts), 2)
         ctx_alternative = expert.recorded_contexts[1]
         self.assertIsNone(ctx_alternative.corner_case)
+
+
+if __name__ == "__main__":
+    unittest.main()

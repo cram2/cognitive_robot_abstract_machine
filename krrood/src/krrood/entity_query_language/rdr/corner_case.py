@@ -8,22 +8,20 @@ index (see :func:`~krrood.entity_query_language.rdr.serialization.walk_rules_in_
 
 Serialization of corner-case instances is delegated to a pluggable
 :class:`CaseSerializer`. The default implementation, :class:`AsdictCaseSerializer`,
-handles flat and nested dataclasses (scalars, enums, nested dataclasses). A future
-:class:`OrmCaseSerializer` will handle complex object graphs via Ormatic; adding it
-requires only implementing the two-method ABC — no changes to :class:`CornerCaseStore`
-or the serialization template.
+handles flat and nested dataclasses (scalars, enums, nested dataclasses).
 """
 
 from __future__ import annotations
 
 import dataclasses
 import enum
-import typing
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing_extensions import Any, Dict, List, Optional, Set, Tuple, Type
 from uuid import UUID
 
+from krrood.class_diagrams.utils import get_type_hints_of_object
+from krrood.code_generation.utils import value_to_source
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 
 # ---------------------------------------------------------------------------
@@ -32,19 +30,17 @@ from krrood.entity_query_language.core.base_expressions import SymbolicExpressio
 
 
 class CaseNotSerializableError(Exception):
-    """Raised when :class:`AsdictCaseSerializer` cannot emit constructor source for a value.
-
-    :ivar value: The field value that could not be serialized.
-    """
+    """Raised when :class:`AsdictCaseSerializer` cannot emit constructor source for a value."""
 
     def __init__(self, value: Any) -> None:
         super().__init__(
             f"Cannot serialize value of type {type(value).__name__!r} to Python "
-            "constructor source. Only None, bool, int, float, str, enum members, "
-            "and nested dataclasses are supported by AsdictCaseSerializer. "
-            "For complex object graphs, use OrmCaseSerializer."
+            "constructor source. Only None, bool, int, float, str, enum.Enum members, "
+            "and nested dataclasses are supported. For other types, implement a custom "
+            "CaseSerializer."
         )
         self.value = value
+        """The field value that could not be serialized."""
 
 
 # ---------------------------------------------------------------------------
@@ -58,7 +54,7 @@ class CaseSerializer(ABC):
 
     Implementations convert a case instance to Python constructor source (for the
     saved ``.py`` file) and reconstruct it on load. The default implementation is
-    :class:`AsdictCaseSerializer`; future implementations may delegate to Ormatic.
+    :class:`AsdictCaseSerializer`.
     """
 
     @abstractmethod
@@ -72,10 +68,15 @@ class CaseSerializer(ABC):
 
     @abstractmethod
     def from_data(self, data: Any, case_type: Type) -> Any:
-        """Reconstruct a case instance from ``data`` (as produced by :meth:`to_source`).
+        """Reconstruct a case instance from ``data``.
 
-        :param data: The raw data (e.g. a dict from ``dataclasses.asdict``) stored
-            in the saved file.
+        This method is part of the extension contract for :class:`CaseSerializer`
+        implementations. The default save/load path (``rdr_to_python`` / ``load_rdr``)
+        does not call this method — it uses ``eval`` of the constructor source emitted
+        by :meth:`to_source`. Subclasses may use this method in their own round-trip
+        strategy (for example, reconstructing from a DAO dict).
+
+        :param data: The data representation of the case as stored by the subclass.
         :param case_type: The expected type of the reconstructed instance.
         :return: A case instance equal to the original.
         """
@@ -103,7 +104,8 @@ class AsdictCaseSerializer(CaseSerializer):
 
     **Documented constraint:** case types must be ``dataclasses.asdict``-safe — no
     circular object references, and all fields must be settable via the constructor.
-    For complex production types that violate this, provide an ``OrmCaseSerializer``.
+    For complex production types that violate this, implement a custom
+    :class:`CaseSerializer`.
     """
 
     def to_source(self, case: Any) -> Tuple[str, Set[Type]]:
@@ -134,8 +136,6 @@ class AsdictCaseSerializer(CaseSerializer):
             ref_types: Set[Type] = set()
             if isinstance(value, enum.Enum):
                 ref_types.add(type(value))
-            from krrood.code_generation.utils import value_to_source
-
             return value_to_source(value), ref_types
         raise CaseNotSerializableError(value)
 
@@ -148,10 +148,7 @@ class AsdictCaseSerializer(CaseSerializer):
         """
         if not dataclasses.is_dataclass(case_type):
             return data
-        try:
-            hints = typing.get_type_hints(case_type)
-        except Exception:
-            hints = {}
+        hints = get_type_hints_of_object(case_type)
         kwargs = {}
         for f in dataclasses.fields(case_type):
             val = data[f.name]
@@ -170,11 +167,7 @@ class AsdictCaseSerializer(CaseSerializer):
 
 @dataclass
 class CornerCaseStore:
-    """Maps each rule's condition-node id to the case instance that triggered it.
-
-    :ivar cases: Live in-memory mapping from condition-node ``_id_`` to corner case.
-    :ivar serializer: Strategy for converting case instances to Python source and back.
-    """
+    """Maps each rule's condition-node id to the case instance that triggered it."""
 
     cases: Dict[UUID, Any] = field(default_factory=dict)
     """Live in-memory mapping from condition-node ``_id_`` to corner case instance."""

@@ -1,26 +1,11 @@
-"""
-Phase 2 — Unit tests for ``CaseSerializer`` ABC and ``AsdictCaseSerializer``.
-
-Each test verifies exactly one contract.  Tests are gated on the Phase 2
-symbols being present in ``corner_case.py``; they will fail with ``ImportError``
-until the implementation lands.
-
-Design choices pinned here:
-- ``to_source`` must raise ``CaseNotSerializableError`` for field values that are
-  neither a scalar/enum (handled by ``value_to_source``) nor a nested dataclass.
-  It must NOT silently fall through to ``repr()``.
-- ``from_data`` reconstructs nested dataclasses by reading ``typing.get_type_hints``
-  on the outer case type and recursing when a field type is itself a dataclass.
-- ``CornerCaseStore.to_ordered_sources`` uses ``self.serializer`` (no ``emit``
-  parameter — Option A migration, see ``test_corner_case_store.py``).
-"""
+"""Unit tests for ``CaseSerializer`` ABC and ``AsdictCaseSerializer``."""
 
 from __future__ import annotations
 
 import dataclasses
 import enum
-from dataclasses import asdict, dataclass
-from typing import Any, Set, Tuple, Type
+from dataclasses import asdict, dataclass, field
+from typing_extensions import Any, Set, Tuple, Type
 
 import pytest
 
@@ -33,7 +18,6 @@ from krrood.entity_query_language.rdr.corner_case import (
 from krrood.entity_query_language.factories import variable
 
 from .animal import Animal, Species
-
 
 # ---------------------------------------------------------------------------
 # Inline dataclass fixtures (pattern-named, never collected by pytest)
@@ -291,11 +275,7 @@ class SentinelSerializer(CaseSerializer):
     """
 
     SENTINEL: str = "SENTINEL_SOURCE"
-    called_with: list = None  # type: ignore[assignment]
-
-    def __post_init__(self) -> None:
-        if self.called_with is None:
-            self.called_with = []
+    called_with: list = field(default_factory=list)
 
     def to_source(self, case: Any) -> Tuple[str, Set[Type]]:
         """Record the case and return a sentinel string so callers can detect this was used."""

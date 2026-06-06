@@ -434,10 +434,10 @@ class TestRdrDecoratorCornerCaseRoundTrip:
         def _make_scripted_expert(conclusion: float, condition_fn):
             """Return a scripted Expert that answers conclusion then conditions."""
 
-            call_count = {"n": 0}
+            call_count = {"count": 0}
 
             def answer_fn(ctx, reqs):
-                call_count["n"] += 1
+                call_count["count"] += 1
                 if len(reqs) == 1 and reqs[0].name == "conclusion":
                     return {"conclusion": conclusion}
                 return {"conditions": condition_fn(ctx)}
@@ -460,9 +460,9 @@ class TestRdrDecoratorCornerCaseRoundTrip:
         # Step 3: verify the in-memory store recorded exactly 2 corner cases.
         # ------------------------------------------------------------------ #
         original_count = len(distance.rdr.corner_cases.cases)
-        assert original_count == 2, (
-            f"Expected 2 corner cases after 2 rule insertions, got {original_count}"
-        )
+        assert (
+            original_count == 2
+        ), f"Expected 2 corner cases after 2 rule insertions, got {original_count}"
 
         # ------------------------------------------------------------------ #
         # Step 4: reload from the same file via a fresh RDRWrapper.

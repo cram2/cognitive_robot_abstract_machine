@@ -1,16 +1,4 @@
-"""
-Phase 4 — Unit tests for ``render_cases_side_by_side``.
-
-Each test verifies exactly one observable guarantee of the side-by-side renderer:
-label presence, default label text, and that both case-specific values appear in the
-output.  None of these tests depend on how the columns are physically arranged (they
-do NOT assert the exact column layout), so they will remain valid whether the
-implementation stacks or tiles the tables.
-
-All tests are expected to FAIL (``ImportError`` / ``AttributeError``) until Phase 4
-introduces ``render_cases_side_by_side`` in
-``krrood.entity_query_language.rdr.case_table``.
-"""
+"""Unit tests for ``render_cases_side_by_side``."""
 
 from __future__ import annotations
 

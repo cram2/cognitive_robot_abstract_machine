@@ -1,13 +1,4 @@
-"""
-Phase 1 — Integration tests: ``EQLSingleClassRDR`` populates ``corner_cases`` during fitting.
-
-Each test verifies exactly one observable effect of the ``case`` parameter being threaded
-through ``fit_case`` -> ``_insert_rule`` -> ``CornerCaseStore.record``.  A programmatic
-``FunctionInterface`` is used so no IPython shell is needed.
-
-All tests are expected to fail with ``AttributeError`` on ``rdr.corner_cases`` (or
-``ImportError`` from ``corner_case.py``) until Phase 1 is implemented.
-"""
+"""Integration tests: ``EQLSingleClassRDR`` populates ``corner_cases`` during fitting."""
 
 from __future__ import annotations
 

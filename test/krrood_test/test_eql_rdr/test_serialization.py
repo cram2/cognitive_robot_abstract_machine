@@ -1,9 +1,4 @@
-"""
-Phase 6 tests: persist the EQL rule-tree DAG as a Python module and load it back.
-
-The serialized artifact is Python source (no JSON, no rule-as-string). Round-tripping
-must preserve classifications exactly.
-"""
+"""Tests for EQL rule-tree DAG serialization: persist as Python module and load it back."""
 
 import os
 import tempfile
@@ -18,10 +13,12 @@ from krrood.entity_query_language.factories import (
 )
 from krrood.entity_query_language.rdr.expert import Expert
 from krrood.entity_query_language.rdr.interface import FunctionInterface
+from krrood.entity_query_language.rdr.corner_case import CornerCaseStore
 from krrood.entity_query_language.rdr.serialization import (
     load_rdr,
     rdr_to_python,
     save_rdr,
+    walk_rules_in_emission_order,
 )
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 from krrood.entity_query_language.rdr.utils import UNSET
@@ -256,19 +253,11 @@ if __name__ == "__main__":
 
 
 # ---------------------------------------------------------------------------
-# Phase 3 — CornerCase serialization round-trip
+# CornerCase serialization round-trip
 # ---------------------------------------------------------------------------
 
 
-import os as _os
-import tempfile as _tempfile
-
 import pytest
-
-from krrood.entity_query_language.rdr.corner_case import CornerCaseStore
-from krrood.entity_query_language.rdr.serialization import (
-    walk_rules_in_emission_order,
-)
 
 
 def _build_one_rule_rdr_for_cc() -> EQLSingleClassRDR:
@@ -297,11 +286,7 @@ def _build_three_rule_rdr_for_cc() -> EQLSingleClassRDR:
 
 @pytest.mark.skipif(len(animals) == 0, reason="Failed to load zoo dataset")
 class TestCornerCaseSerialization:
-    """Phase 3 serialization round-trip tests for CornerCaseStore.
-
-    Every test in this class must FAIL until ``rdr_to_python`` emits a
-    ``RDR_CORNER_CASES`` block and ``load_rdr`` rebuilds the store from it.
-    """
+    """Serialization round-trip tests for ``CornerCaseStore``."""
 
     def test_rdr_corner_cases_key_present_in_emitted_source(self):
         """``rdr_to_python`` must emit a ``RDR_CORNER_CASES`` assignment in the source.
@@ -332,8 +317,8 @@ class TestCornerCaseSerialization:
         """
         rdr = _build_one_rule_rdr_for_cc()
         original_count = len(rdr.corner_cases.cases)
-        with _tempfile.TemporaryDirectory() as d:
-            path = _os.path.join(d, "model.py")
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "model.py")
             save_rdr(rdr, path)
             loaded = load_rdr(path)
         assert len(loaded.corner_cases.cases) == original_count
@@ -351,8 +336,8 @@ class TestCornerCaseSerialization:
         original_case = rdr.corner_cases.get(ordered_before[0]._id_)
         assert original_case is not None, "fit_case must have recorded a corner case"
 
-        with _tempfile.TemporaryDirectory() as d:
-            path = _os.path.join(d, "model.py")
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "model.py")
             save_rdr(rdr, path)
             loaded = load_rdr(path)
 
@@ -369,31 +354,26 @@ class TestCornerCaseSerialization:
         not only the first or the last.
         """
         rdr = _build_three_rule_rdr_for_cc()
-        with _tempfile.TemporaryDirectory() as d:
-            path = _os.path.join(d, "model.py")
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "model.py")
             save_rdr(rdr, path)
             loaded = load_rdr(path)
 
         ordered = walk_rules_in_emission_order(loaded.conditions_root)
         assert len(ordered) == 3, "Three rules must have been loaded"
         for node in ordered:
-            assert loaded.corner_cases.get(node._id_) is not None, (
-                f"Node {node._id_} has no corner case in the loaded store"
-            )
+            assert (
+                loaded.corner_cases.get(node._id_) is not None
+            ), f"Node {node._id_} has no corner case in the loaded store"
 
     def test_load_old_file_without_corner_cases_gives_empty_store(self):
-        """Loading a pre-Phase-3 file that has no ``RDR_CORNER_CASES`` gives an empty store.
+        """Loading a file that has no ``RDR_CORNER_CASES`` gives an empty store.
 
-        Backward-compatibility contract: old files must still load without error; the
-        store is empty because there is nothing to rebuild from.
-
-        Uses the checked-in ``zoo_species_rdr.py`` which was written before Phase 3 and
-        therefore has no ``RDR_CORNER_CASES`` assignment.
+        Backward-compatibility contract: old files load without error; the store is
+        empty when no corner-case block is present.
         """
-        import os as _os2
-
-        legacy_path = _os2.path.join(
-            _os2.path.dirname(__file__),
+        legacy_path = os.path.join(
+            os.path.dirname(__file__),
             "fitted_models",
             "zoo_species_rdr.py",
         )

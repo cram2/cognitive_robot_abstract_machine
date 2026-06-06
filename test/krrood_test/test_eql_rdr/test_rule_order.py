@@ -1,15 +1,4 @@
-"""
-Phase 0 tests: ``walk_rules_in_emission_order`` — the canonical traversal order.
-
-These tests verify that ``walk_rules_in_emission_order`` yields condition nodes in the
-exact order ``serialization._emit_rule_body`` visits them.  This shared ordering is what
-lets the serializer (save) and the corner-case-store rebuilder (load) stay in lockstep.
-
-All tests import ``walk_rules_in_emission_order`` from
-``krrood.entity_query_language.rdr.serialization`` and will fail with ``ImportError``
-until Phase 0 is implemented — that is the intended gate behaviour for test-first
-development.
-"""
+"""Tests for ``walk_rules_in_emission_order`` — the canonical traversal order."""
 
 from __future__ import annotations
 
@@ -17,6 +6,7 @@ import re
 
 import pytest
 
+from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.factories import add, entity, variable
 from krrood.entity_query_language.rdr.rule_tree import (
     insert_alternative,
@@ -28,6 +18,7 @@ from krrood.entity_query_language.rdr.serialization import (
     walk_rules_in_emission_order,
 )
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
+from krrood.entity_query_language.rules.conclusion import Add
 
 from .animal import Animal, Species
 
@@ -337,10 +328,6 @@ def test_emission_order_i_th_node_matches_i_th_add_in_source():
     assert len(emitted_values) == len(emission_nodes)
 
     for i, (node, emitted_value_str) in enumerate(zip(emission_nodes, emitted_values)):
-        # Resolve the node's conclusion value (the Species enum member).
-        from krrood.entity_query_language.rules.conclusion import Add
-        from krrood.entity_query_language.core.variable import Literal
-
         add_conclusions = [c for c in node._conclusions_ if isinstance(c, Add)]
         assert add_conclusions, f"Node at index {i} has no Add conclusion"
         conclusion_add = add_conclusions[0]

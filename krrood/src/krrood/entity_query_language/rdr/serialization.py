@@ -141,7 +141,7 @@ def _decompose(node) -> Tuple[Any, List[Tuple[type, Any]]]:
     return node, branches
 
 
-def walk_rules_in_emission_order(conditions_root) -> List:
+def walk_rules_in_emission_order(conditions_root: Any) -> List[Any]:
     """
     Return condition (leaf) nodes in the same pre-order that ``_emit_rule_body`` visits.
 
@@ -292,12 +292,15 @@ def rdr_to_python(rdr, case_type_is_local: bool = False) -> str:
 
     # Build the corner-cases block: {positional_index: constructor_source, ...}.
     ordered_nodes = walk_rules_in_emission_order(rdr.query._conditions_root_)
-    cc_sources = rdr.corner_cases.to_ordered_sources(ordered_nodes)
-    for _, ref_types in cc_sources.values():
-        referenced_types.update(ref_types)
-    if cc_sources:
+    corner_case_sources = rdr.corner_cases.to_ordered_sources(ordered_nodes)
+    for _, referenced_types_for_case in corner_case_sources.values():
+        referenced_types.update(referenced_types_for_case)
+    if corner_case_sources:
         entries = ", ".join(
-            f"{idx}: {src}" for idx, (src, _) in sorted(cc_sources.items())
+            f"{positional_index}: {constructor_source}"
+            for positional_index, (constructor_source, _) in sorted(
+                corner_case_sources.items()
+            )
         )
         corner_cases_dict_src = "{" + entries + "}"
     else:
