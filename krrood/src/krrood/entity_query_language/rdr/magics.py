@@ -3,17 +3,27 @@
 :func:`_make_assign_exit_magic` creates action magics (``%conclusion``,
 ``%conditions``) that evaluate an expression, assign it to the named answer
 variable, validate, and exit the embedded shell on success — all in one step.
+:func:`_make_knowledge_magic` creates a read-only magic (``%knows``) that
+displays backward-inference results.
 """
 
 from __future__ import annotations
 
 from typing_extensions import Any, Callable, Dict
 
+from krrood.entity_query_language.rdr.rule_tree_view import format_condition
+
 #: Magic name for setting the conclusion answer variable.
 CONCLUSION_MAGIC = "conclusion"
 
 #: Magic name for setting the conditions answer variable.
 CONDITIONS_MAGIC = "conditions"
+
+#: Magic name for backward-inference query.
+BACKWARD_MAGIC = "knows"
+
+#: Namespace key holding the RDR for the ``%knows`` magic.
+_KNOWLEDGE_KEY = "__backward_knowledge__"
 
 
 def _make_assign_exit_magic(
@@ -60,5 +70,70 @@ def _make_assign_exit_magic(
             return
         shell._force_exit = True
         shell.ask_exit()
+
+    return magic
+
+
+def _make_knowledge_magic(
+    namespace: Dict[str, Any],
+    palette: Any,
+) -> Callable[[str], None]:
+    """Build a line magic (``%knows <value>``) that queries backward inference.
+
+    Reads the RDR reference from the namespace at :data:`_KNOWLEDGE_KEY`,
+    evaluates the line argument in the namespace, calls
+    ``rdr.what_do_we_know_about(value)``, and prints the result as a
+    human-readable list of sufficient condition sets.
+
+    :param namespace: The shell's namespace (mutated in place).
+    :param palette: A :class:`~krrood.entity_query_language.rdr.interactive.Palette` for
+        colouring output.
+    :return: A line-magic function ``(line: str) -> None``.
+    """
+
+    def magic(line: str) -> None:
+        rdr = namespace.get(_KNOWLEDGE_KEY)
+        if rdr is None:
+            print(palette.error("[error] No rule tree available in this session."))
+            return
+
+        if not line.strip():
+            print(palette.hint("Usage: %knows <conclusion_value>"))
+            return
+
+        try:
+            value = eval(line.strip(), namespace)
+        except Exception as exc:
+            print(palette.error(f"[error] Cannot evaluate argument: {exc}"))
+            return
+
+        knowledge = rdr.what_do_we_know_about(value)
+        p = palette
+
+        if not knowledge.is_satisfiable():
+            print(
+                p.label("→ ")
+                + p.neutral("No rule path concludes ")
+                + p.code(repr(value))
+                + p.label(".")
+            )
+            return
+
+        label = repr(value)
+        sets = knowledge.sufficient_condition_sets
+        print(
+            p.label("→ ")
+            + str(len(sets))
+            + p.label(" sufficient condition set(s) for ")
+            + p.good(label)
+            + p.label(":")
+        )
+        for i, scs in enumerate(sets, 1):
+            print()
+            print(f"  {p.keyword(f'{i}.')}")
+            for gc in scs.conditions:
+                expr_str = format_condition(gc.expression)
+                display = f"not {expr_str}" if gc.negated else expr_str
+                print(f"    {p.code(display)}")
 
     return magic

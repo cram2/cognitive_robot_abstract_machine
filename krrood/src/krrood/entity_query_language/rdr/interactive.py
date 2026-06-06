@@ -42,9 +42,12 @@ from krrood.entity_query_language.rdr.interface import (
 )
 from krrood.entity_query_language.rdr.expert import ANSWER_NAME, CONCLUSION_NAME
 from krrood.entity_query_language.rdr.magics import (
+    BACKWARD_MAGIC,
     CONDITIONS_MAGIC,
     CONCLUSION_MAGIC,
+    _KNOWLEDGE_KEY,
     _make_assign_exit_magic,
+    _make_knowledge_magic,
 )
 from krrood.entity_query_language.rdr.prompt_sections import (  # noqa: F401
     AID_MAGIC,
@@ -147,6 +150,11 @@ class IPythonInterface(ExpertInterface):
     use_color: bool = True
     """Whether the header, framing and magics emit ANSI colour."""
 
+    rdr: Optional[Any] = None
+    """The :class:`~krrood.entity_query_language.rdr.single_class.EQLSingleClassRDR` being fit,
+    exposed for the ``%knows`` backward-inference magic. ``None`` when the interface is used
+    without an RDR (no magic is registered)."""
+
     _aid_cache: Optional[str] = field(init=False, default=None)
     """Memoized aid ``present()`` output for the current ``interact()`` call (set once per
     question in :meth:`_build_namespace`, reused by the header and the ``%aid`` magic)."""
@@ -230,6 +238,10 @@ class IPythonInterface(ExpertInterface):
         lines.append(f"  Show the rule tree with {p.code(f'%{SHOW_TREE_MAGIC}')}.")
         if context.aids:
             lines.append(f"  Show the task aid with {p.code(f'%{AID_MAGIC}')}.")
+        if self.rdr is not None:
+            lines.append(
+                f"  Query backward inference with {p.code(f'%{BACKWARD_MAGIC} <value>')}."
+            )
         lines.append(f"  Show this help again with {p.code(f'%{HELP_MAGIC}')}.")
         return "\n".join(lines)
 
@@ -244,6 +256,8 @@ class IPythonInterface(ExpertInterface):
         self._aid_cache = self._aid_text(context)
         if context.aids:
             namespace[_AID_TEXT_KEY] = lambda: self._aid_cache
+        if self.rdr is not None:
+            namespace[_KNOWLEDGE_KEY] = self.rdr
         if context.conclusion_domain is not None:
             for name, value in context.conclusion_domain.namespace_bindings().items():
                 namespace.setdefault(name, value)
@@ -317,6 +331,14 @@ class IPythonInterface(ExpertInterface):
                 ),
                 magic_kind="line",
                 magic_name=CONDITIONS_MAGIC,
+            )
+
+        # Register the backward-inference read-only magic when the RDR is available.
+        if _KNOWLEDGE_KEY in namespace:
+            shell.register_magic_function(
+                _make_knowledge_magic(namespace, self.palette),
+                magic_kind="line",
+                magic_name=BACKWARD_MAGIC,
             )
 
         def _cancel() -> None:

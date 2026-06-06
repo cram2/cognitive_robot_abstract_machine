@@ -11,6 +11,7 @@ import dataclasses
 import unittest
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.rdr.backward_inference import ConclusionKnowledge
 from krrood.entity_query_language.rdr.expert import (
     ANSWER_NAME,
     Expert,
@@ -20,6 +21,10 @@ from krrood.entity_query_language.rdr.interactive import IPythonInterface
 from krrood.entity_query_language.rdr.interface import (
     CASE_INSTANCE_NAME,
     CASE_VARIABLE_NAME, )
+from krrood.entity_query_language.rdr.magics import (
+    _KNOWLEDGE_KEY,
+    _make_knowledge_magic,
+)
 from krrood.entity_query_language.rdr.utils import UNSET
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 
@@ -143,6 +148,125 @@ class TestInteractiveExpert(unittest.TestCase):
             rdr.fit_case(case, target, expert)
         for case, target in subset:
             self.assertEqual(rdr.classify(case), target, case.name)
+
+
+@unittest.skipIf(len(animals) == 0, "Failed to load zoo dataset")
+class TestKnowsMagic(unittest.TestCase):
+    """Tests for the ``%knows`` backward-inference magic."""
+
+    def test_knowledge_key_in_namespace_when_rdr_set(self):
+        """The RDR reference appears in the namespace under _KNOWLEDGE_KEY."""
+        captured = {}
+
+        def runner(ns, header):
+            captured["key"] = ns.get(_KNOWLEDGE_KEY)
+            cv = ns[CASE_VARIABLE_NAME]
+            case = ns[CASE_INSTANCE_NAME]
+            ns[ANSWER_NAME] = cv.milk == True
+
+        rdr = EQLSingleClassRDR(Animal, "species")
+        interface = IPythonInterface(shell_runner=runner, rdr=rdr)
+        expert = Expert(interface=interface)
+        expert.ask_for_conditions(first(Species.mammal), rdr.case_variable, Species.mammal)
+        self.assertIs(captured["key"], rdr)
+
+    def test_knowledge_key_absent_when_no_rdr(self):
+        """Without ``rdr`` set, _KNOWLEDGE_KEY is not in the namespace."""
+        captured = {}
+
+        def runner(ns, header):
+            captured["key"] = ns.get(_KNOWLEDGE_KEY)
+            cv = ns[CASE_VARIABLE_NAME]
+            case = ns[CASE_INSTANCE_NAME]
+            ns[ANSWER_NAME] = cv.milk == True
+
+        rdr = EQLSingleClassRDR(Animal, "species")
+        interface = IPythonInterface(shell_runner=runner)
+        expert = Expert(interface=interface)
+        expert.ask_for_conditions(first(Species.mammal), rdr.case_variable, Species.mammal)
+        self.assertIsNone(captured["key"])
+
+    def test_knows_queries_rdr_directly(self):
+        """what_do_we_know_about returns correct results after fitting through interactive."""
+        rdr = EQLSingleClassRDR(Animal, "species")
+
+        def runner(ns, header):
+            cv = ns[CASE_VARIABLE_NAME]
+            case = ns[CASE_INSTANCE_NAME]
+            ns[ANSWER_NAME] = cv.milk == True
+
+        interface = IPythonInterface(shell_runner=runner, rdr=rdr)
+        expert = Expert(interface=interface)
+        rdr.fit_case(first(Species.mammal), Species.mammal, expert)
+
+        knowledge = rdr.what_do_we_know_about(Species.mammal)
+        self.assertIsInstance(knowledge, ConclusionKnowledge)
+        self.assertTrue(knowledge.is_satisfiable())
+        self.assertEqual(len(knowledge.sufficient_condition_sets), 1)
+
+    def test_knows_empty_rdr(self):
+        """Empty RDR returns no paths for any value."""
+        rdr = EQLSingleClassRDR(Animal, "species")
+        knowledge = rdr.what_do_we_know_about(Species.molusc)
+        self.assertIsInstance(knowledge, ConclusionKnowledge)
+        self.assertFalse(knowledge.is_satisfiable())
+
+    def test_knows_magic_function_evals_in_namespace(self):
+        """The magic closure evals its argument and queries the RDR."""
+        rdr = EQLSingleClassRDR(Animal, "species")
+
+        def runner(ns, header):
+            cv = ns[CASE_VARIABLE_NAME]
+            case = ns[CASE_INSTANCE_NAME]
+            ns[ANSWER_NAME] = cv.milk == True
+
+        interface = IPythonInterface(shell_runner=runner, rdr=rdr)
+        expert = Expert(interface=interface)
+        rdr.fit_case(first(Species.mammal), Species.mammal, expert)
+
+        # Build a namespace as the shell would see it
+        ns = {_KNOWLEDGE_KEY: rdr, "Species": Species, "True": True, "False": False}
+        magic = _make_knowledge_magic(ns, IPythonInterface().palette)
+
+        import io
+        import contextlib
+        f = io.StringIO()
+        with contextlib.redirect_stdout(f):
+            magic("Species.mammal")
+
+        output = f.getvalue()
+        self.assertIn("mammal", output.lower())
+        self.assertIn("milk", output.lower())
+
+    def test_knows_magic_bad_argument(self):
+        """Invalid magic argument prints an error."""
+        rdr = EQLSingleClassRDR(Animal, "species")
+        ns = {_KNOWLEDGE_KEY: rdr}
+        magic = _make_knowledge_magic(ns, IPythonInterface().palette)
+
+        import io
+        import contextlib
+        f = io.StringIO()
+        with contextlib.redirect_stdout(f):
+            magic("Species.NonExistentValue")
+
+        output = f.getvalue()
+        self.assertIn("error", output.lower())
+
+    def test_knows_magic_empty_line(self):
+        """Empty magic line prints usage hint."""
+        rdr = EQLSingleClassRDR(Animal, "species")
+        ns = {_KNOWLEDGE_KEY: rdr}
+        magic = _make_knowledge_magic(ns, IPythonInterface().palette)
+
+        import io
+        import contextlib
+        f = io.StringIO()
+        with contextlib.redirect_stdout(f):
+            magic("")
+
+        output = f.getvalue()
+        self.assertIn("usage", output.lower())
 
 
 if __name__ == "__main__":
