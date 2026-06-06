@@ -20,30 +20,22 @@ with query:
         add(animal.species, Species.fish)
         with refinement(animal.fins == False):
             add(animal.species, Species.molusc)
-            with refinement(animal.backbone == True):
+            with refinement(animal.feathers == True):
                 add(animal.species, Species.bird)
-                with refinement(animal.feathers == False):
-                    add(animal.species, Species.amphibian)
-                    with refinement(animal.tail == True):
-                        add(animal.species, Species.reptile)
-                        with refinement(animal.aquatic == True):
-                            add(animal.species, Species.amphibian)
-                            with refinement(animal.venomous == True):
-                                add(animal.species, Species.reptile)
+            with refinement(animal.legs > 0):
+                add(animal.species, Species.amphibian)
+                with refinement(animal.backbone == False):
+                    add(animal.species, Species.molusc)
+            with refinement(animal.tail == True):
+                add(animal.species, Species.reptile)
     with alternative(animal.feathers == True):
         add(animal.species, Species.bird)
     with alternative(animal.backbone == False):
         add(animal.species, Species.molusc)
-        with refinement(animal.aquatic == False):
+        with refinement(animal.eggs == True):
             add(animal.species, Species.insect)
-            with refinement(animal.eggs == False):
+            with refinement(animal.legs == 0):
                 add(animal.species, Species.molusc)
-            with refinement(animal.backbone == False):
-                add(animal.species, Species.molusc)
-                with refinement(animal.eggs == True):
-                    add(animal.species, Species.insect)
-                    with refinement(animal.legs == 0):
-                        add(animal.species, Species.molusc)
     with alternative(animal.tail == True):
         add(animal.species, Species.reptile)
 query.build()

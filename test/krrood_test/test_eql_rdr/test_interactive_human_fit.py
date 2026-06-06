@@ -70,7 +70,7 @@ class TestFitZooAsHumanExpert(unittest.TestCase):
         # Ground-truth fitting: you (the expert) supply only the conditions; the species is
         # the known target. The RDR prompts you only when it would misclassify a case.
         rdr = EQLSingleClassRDR(Animal, "species")
-        rdr.fit(animals, targets, Expert(interface=IPythonInterface()))
+        rdr.fit(animals, targets, Expert(interface=IPythonInterface(rdr=rdr)))
 
         os.makedirs(FITTED_MODELS_DIR, exist_ok=True)
         save_rdr(rdr, SAVED_MODEL_PATH)
