@@ -189,6 +189,28 @@ def _attribute_path(attr: Attribute) -> str:
     return f"{format_condition(child)}.{attr._attribute_name_}"
 
 
+def _format_conclusion_selector(expr: ConclusionSelector) -> str:
+    """Render a :class:`ConclusionSelector` in a compact, readable form.
+
+    ConclusionSelectors (Alternative, Refinement, Next) are control-flow nodes, not
+    conditions. When they appear as guard expressions in backward-inference output
+    the default dataclass ``repr`` is unreadable — it dumps all internal fields
+    including ``_conclusions_``, parent references, and evaluation flags.
+
+    This helper renders them via their child expressions instead.
+    """
+    match expr:
+        case Alternative():
+            return f"({format_condition(expr.left)} else {format_condition(expr.right)})"
+        case Refinement():
+            return f"({format_condition(expr.left)} except if {format_condition(expr.right)})"
+        case Next():
+            children = ", ".join(format_condition(c) for c in expr._operation_children_)
+            return f"next ({children})"
+        case _:
+            return expr.__class__.__name__
+
+
 def format_condition(expr: Any) -> str:
     """
     Render a condition expression as a compact, prefix-stripped string.
@@ -198,7 +220,7 @@ def format_condition(expr: Any) -> str:
     """
     match expr:
         case ConclusionSelector():
-            return repr(expr)
+            return _format_conclusion_selector(expr)
         case Comparator():
             return f"{format_condition(expr.left)} {expr._name_} {format_condition(expr.right)}"
         case AND():

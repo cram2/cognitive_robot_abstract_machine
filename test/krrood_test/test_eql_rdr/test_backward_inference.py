@@ -29,7 +29,9 @@ from krrood.entity_query_language.rdr.rule_tree import (
     insert_alternative,
     insert_refinement,
 )
+from krrood.entity_query_language.rdr.rule_tree_view import format_condition
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
+from krrood.entity_query_language.rules.conclusion_selector import ConclusionSelector
 
 from .animal import Animal, Species
 
@@ -156,9 +158,11 @@ class TestConclusionKnowledge:
         assert knowledge.is_satisfiable()
         assert len(knowledge.sufficient_condition_sets) == 1
         cond_set = knowledge.sufficient_condition_sets[0]
-        # Two conditions: NOT(Alternative(milk, feathers)) guard + fins == True (leaf)
-        assert len(cond_set.conditions) == 2
+        # Three conditions: NOT(milk) + NOT(feathers) guards (flattened from
+        # NOT(Alternative(milk, feathers))) + fins == True (leaf)
+        assert len(cond_set.conditions) == 3
         assert cond_set.conditions[0].negated is True
+        assert cond_set.conditions[1].negated is True
 
     def test_flat_tree_molusc_not_satisfiable(self):
         _, _, root = _flat_tree()
@@ -217,9 +221,11 @@ class TestConclusionKnowledge:
         assert knowledge.is_satisfiable()
         assert len(knowledge.sufficient_condition_sets) == 1
         conds = knowledge.sufficient_condition_sets[0].conditions
-        # NOT(Alternative(milk, feathers)) guard + backbone (leaf)
-        assert len(conds) == 2
+        # NOT(milk) + NOT(feathers) (flattened from NOT(Alternative(milk, feathers)))
+        # + backbone (leaf)
+        assert len(conds) == 3
         assert conds[0].negated is True
+        assert conds[1].negated is True
 
     def test_empty_tree(self):
         rdr = EQLSingleClassRDR(Animal, "species")
@@ -464,6 +470,60 @@ class TestCacheInvalidation:
         rdr.fit_case(_COW, Species.mammal, expert)
 
         assert rdr.what_do_we_know_about(Species.mammal).is_satisfiable()
+
+
+
+# ---------------------------------------------------------------------------
+# format_condition handles ConclusionSelector guards
+# ---------------------------------------------------------------------------
+
+
+class TestGuardFlattening:
+    """ConclusionSelector guard expressions are flattened to leaf conditions.
+
+    The _collect_rule_paths traversal decomposes Alternative/Refinement nodes
+    into their constituent conditions so guards are precise and human-readable:
+    NOT(Alternative(A,B)) → NOT(A), NOT(B); Refinement(A,B) → A.
+    """
+
+    def test_flat_tree_fish_guards_are_comparators_not_selectors(self):
+        """After flattening, fish guards are Comparators, not ConclusionSelectors."""
+        _, _, root = _flat_tree()
+        knowledge = what_do_we_know_about(root, Species.fish)
+        conds = knowledge.sufficient_condition_sets[0].conditions
+        # Before flattening: first guard was Alternative(milk, feathers)
+        # After flattening: NOT(milk), NOT(feathers) — both Comparators
+        for gc in conds:
+            assert not isinstance(gc.expression, ConclusionSelector), (
+                f"Guard should be flattened: {gc.expression}"
+            )
+
+    def test_no_guard_is_ever_a_conclusion_selector(self):
+        """No guard expression in any test tree is a ConclusionSelector."""
+        for _, _, root in [_flat_tree(), _refinement_tree(), _mixed_tree()]:
+            for value in (Species.mammal, Species.bird, Species.fish):
+                knowledge = what_do_we_know_about(root, value)
+                for scs in knowledge.sufficient_condition_sets:
+                    for gc in scs.conditions:
+                        assert not isinstance(gc.expression, ConclusionSelector), (
+                            f"Guard for {value} in {_tree_name(root)}"
+                            f" is unflattened: {gc.expression}"
+                        )
+
+    def test_flattened_guards_are_readable(self):
+        """format_condition on flattened guards never shows dataclass fields."""
+        _, _, root = _flat_tree()
+        knowledge = what_do_we_know_about(root, Species.fish)
+        for scs in knowledge.sufficient_condition_sets:
+            for gc in scs.conditions:
+                rendered = format_condition(gc.expression)
+                assert "_conclusions_=" not in rendered
+                assert "right_yielded" not in rendered
+
+
+def _tree_name(root):
+    """Helper to identify which test tree we're in."""
+    return getattr(root, "_name_", str(type(root).__name__))
 
 
 # ---------------------------------------------------------------------------

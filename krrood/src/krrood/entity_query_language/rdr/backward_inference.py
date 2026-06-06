@@ -21,6 +21,7 @@ from typing_extensions import TYPE_CHECKING, Any, Dict, Iterator, List, Optional
 from krrood.entity_query_language.core.base_expressions import OperationResult
 from krrood.entity_query_language.rules.conclusion_selector import (
     Alternative,
+    ConclusionSelector,
     Next,
     Refinement,
 )
@@ -121,6 +122,30 @@ class _RulePath:
     """Conclusion nodes at the leaf of this rule path."""
 
 
+def _flatten_guard(
+    expr: "SymbolicExpression",
+    negated: bool,
+) -> List[GuardCondition]:
+    """Decompose a ConclusionSelector guard into leaf GuardConditions.
+
+    RDR control-flow operators (Alternative, Refinement) encode branch choice
+    semantics. When they appear as guard expressions they should be decomposed
+    into their constituent leaf conditions for readability — the guard's
+    semantic meaning is just the sibling's immediate condition truth, not the
+    entire subtree.
+
+    Semantics:
+    * ``NOT(Alternative(A, B))`` → ``NOT(A), NOT(B)``  (De Morgan on OR)
+    * ``Refinement(A, B)`` → ``A``  (truth equals left's truth for bool check)
+    * ``NOT(Refinement(A, B))`` → ``NOT(A)``
+    """
+    if isinstance(expr, Alternative) and negated:
+        return _flatten_guard(expr.left, True) + _flatten_guard(expr.right, True)
+    if isinstance(expr, Refinement):
+        return _flatten_guard(expr.left, negated)
+    return [GuardCondition(expr, negated)]
+
+
 def _collect_rule_paths(
     node: "SymbolicExpression",
     guard: List[GuardCondition],
@@ -133,21 +158,26 @@ def _collect_rule_paths(
     * ``Refinement(left, right)``: left fires when ``NOT(right)`` (refinement doesn't
       override); right fires when ``left`` (parent fired — positive guard).
     * ``Next``: each child is a separate disjunct (same depth, no cross-guards).
+
+    Guards that are ConclusionSelector nodes are flattened via
+    :func:`_flatten_guard` — a single ``NOT(Alternative(A, B))`` becomes the
+    two guards ``NOT(A), NOT(B)``, and ``Refinement(A, B)`` reduces to ``A``.
+    This keeps the guard list semantically precise and human-readable.
     """
     if isinstance(node, Refinement):
         yield from _collect_rule_paths(
             node.left,
-            guard + [GuardCondition(node.right, negated=True)],
+            guard + _flatten_guard(node.right, negated=True),
         )
         yield from _collect_rule_paths(
             node.right,
-            guard + [GuardCondition(node.left, negated=False)],
+            guard + _flatten_guard(node.left, negated=False),
         )
     elif isinstance(node, Alternative):
         yield from _collect_rule_paths(node.left, guard)
         yield from _collect_rule_paths(
             node.right,
-            guard + [GuardCondition(node.left, negated=True)],
+            guard + _flatten_guard(node.left, negated=True),
         )
     elif isinstance(node, Next):
         for child in node._operation_children_:
