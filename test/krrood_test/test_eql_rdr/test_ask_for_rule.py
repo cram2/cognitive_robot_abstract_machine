@@ -259,11 +259,7 @@ class TestKeepCurrentConclusion(unittest.TestCase):
         def seed_answer(context, requests):
             return {ANSWER_NAME: context.case_variable.milk == True}
 
-        rdr.fit_case(
-            mammal,
-            Species.mammal,
-            Expert(interface=FunctionInterface(answer_fn=seed_answer)),
-        )
+        rdr.fit_case(mammal, Species.mammal, Expert(interface=FunctionInterface(answer_fn=seed_answer)))
 
         call_log = []
 

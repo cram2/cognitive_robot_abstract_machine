@@ -23,7 +23,7 @@ from typing_extensions import (
     Optional,
     Tuple,
     Type,
-    Union,
+    Union, Self,
 )
 
 from krrood.entity_query_language.core.base_expressions import UnificationDict
@@ -56,7 +56,7 @@ class RDRBackend:
 
     def fit(
         self, query: Any, ground_truth: Optional[GroundTruth] = None
-    ) -> "RDRBackend":
+    ) -> Self:
         """
         Train the model for ``query``'s ``...`` attribute over the filtered domain.
 
@@ -68,7 +68,7 @@ class RDRBackend:
         statement = UnderspecifiedMatch(query)
         rdr = self._get_or_create(statement)
         for case in statement.filtered_cases():
-            rdr.fit_case(case, self._target_for(case, ground_truth), expert=self.expert)
+            rdr.fit_case(case, target=self._target_for(case, ground_truth), expert=self.expert)
         return self
 
     def infer(

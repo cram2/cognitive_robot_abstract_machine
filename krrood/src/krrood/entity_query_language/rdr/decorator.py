@@ -101,9 +101,7 @@ class RDRWrapper:
         self, case: Any, target: Any = UNSET, expert: "Optional[Expert]" = None
     ) -> Any:
         """Delegate to the internal RDR, using :attr:`expert` when none is supplied."""
-        return self.rdr.fit_case(
-            case, target, expert if expert is not None else self.expert
-        )
+        return self.rdr.fit_case(case, target, expert if expert is not None else self.expert)
 
     def fit(
         self,

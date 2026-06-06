@@ -127,7 +127,10 @@ class Expert:
     """
 
     interface: ExpertInterface
-    aids: List["ConclusionAid"] = field(default_factory=list)
+    """
+    The interface to use to interact with the expert.
+    """
+    aids: List[ConclusionAid] = field(default_factory=list)
     """Optional task-specific aids consulted while labelling a case: each may present an
     information / visual aid and / or suggest a conclusion (see :class:`ConclusionAid`)."""
 

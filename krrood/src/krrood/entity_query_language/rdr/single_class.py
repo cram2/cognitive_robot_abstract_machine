@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from typing_extensions import Any, List, Optional, Type
+from typing_extensions import Any, List, Optional, Type, Self
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
@@ -136,9 +136,7 @@ class EQLSingleClassRDR:
             self._trace(case), head=head, tail=tail, use_color=use_color
         )
 
-    def fit_case(
-        self, case: Any, target: Any = UNSET, expert: Optional[Expert] = None
-    ) -> Any:
+    def fit_case(self, case: Any, target: Any = UNSET, expert: Optional[Expert] = None) -> Any:
         """
         Ensure the RDR classifies ``case`` as ``target``, growing the rule tree when it does
         not.
@@ -147,17 +145,21 @@ class EQLSingleClassRDR:
         conclusion and its conditions via :meth:`Expert.ask_for_rule`; otherwise only the
         conditions are requested (the conclusion is the known ``target``).
 
+        :param case: The case to classify.
+        :param target: The known correct conclusion, or ``UNSET`` when no ground truth is available.
+        :param expert: The expert that supplies rule conditions (and conclusion, when ``target`` is ``UNSET``).
         :return: The conclusion now associated with ``case`` (``target`` when given, else the
             expert's conclusion).
         """
-        if expert is None:
-            raise ValueError("fit_case requires an expert.")
 
         trace = None if self.query is None else self._trace(case)
         current = trace.conclusion if trace is not None else UNSET
 
         if target is not UNSET and current == target:
             return target
+
+        if expert is None:
+            raise ValueError("Expert must be supplied to fit_case")
 
         if target is UNSET:
             target, condition = expert.ask_for_rule(
@@ -214,7 +216,7 @@ class EQLSingleClassRDR:
         targets: Optional[List[Any]] = None,
         expert: Optional[Expert] = None,
         max_passes: int = 10,
-    ) -> "EQLSingleClassRDR":
+    ) -> Self:
         """
         Fit the RDR over ``cases``. When ``targets`` is given it is paired with ``cases``
         (ground-truth fitting); when ``None`` the expert labels each case (the no-target
