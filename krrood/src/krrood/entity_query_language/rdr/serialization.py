@@ -290,6 +290,19 @@ def rdr_to_python(rdr, case_type_is_local: bool = False) -> str:
         rdr.query._conditions_root_, var_names, conclusion_var_source, referenced_types
     )
 
+    # Build the corner-cases block: {positional_index: constructor_source, ...}.
+    ordered_nodes = walk_rules_in_emission_order(rdr.query._conditions_root_)
+    cc_sources = rdr.corner_cases.to_ordered_sources(ordered_nodes)
+    for _, ref_types in cc_sources.values():
+        referenced_types.update(ref_types)
+    if cc_sources:
+        entries = ", ".join(
+            f"{idx}: {src}" for idx, (src, _) in sorted(cc_sources.items())
+        )
+        corner_cases_dict_src = "{" + entries + "}"
+    else:
+        corner_cases_dict_src = "{}"
+
     # Generate type import lines via the centralized import generator.
     if case_type_is_local:
         types_to_import = [t for t in referenced_types if t is not case_type]
@@ -309,6 +322,7 @@ def rdr_to_python(rdr, case_type_is_local: bool = False) -> str:
         base_condition=base_condition,
         body=_indent(body, "    "),
         conclusion_attribute_name=rdr.conclusion_attribute_name,
+        corner_cases_dict_src=corner_cases_dict_src,
     )
 
 
@@ -356,6 +370,7 @@ def load_rdr(path: str):
     """
     Load an :class:`EQLSingleClassRDR` from a module previously written by :func:`save_rdr`.
     """
+    from krrood.entity_query_language.rdr.corner_case import CornerCaseStore
     from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 
     module = _load_module_from_path(path)
@@ -366,4 +381,9 @@ def load_rdr(path: str):
         module.RDR_CASE_VARIABLE, module.RDR_CONCLUSION_ATTRIBUTE
     )
     rdr.query = module.RDR_QUERY
+
+    cases_by_index = getattr(module, "RDR_CORNER_CASES", {})
+    ordered_nodes = walk_rules_in_emission_order(rdr.conditions_root)
+    rdr.corner_cases = CornerCaseStore.from_ordered_cases(ordered_nodes, cases_by_index)
+
     return rdr
