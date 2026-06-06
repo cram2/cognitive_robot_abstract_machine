@@ -400,3 +400,73 @@ class TestRdrToPythonCaseTypeIsLocal(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — save_rdr_with_case preserves the CornerCaseStore
+# ---------------------------------------------------------------------------
+
+
+import os as _os
+import tempfile as _tempfile
+
+from krrood.entity_query_language.rdr.serialization import walk_rules_in_emission_order
+
+
+@unittest.skipIf(len(animals) == 0, "Failed to load zoo dataset")
+class TestSaveRdrWithCasePreservesCornerCases(unittest.TestCase):
+    """``save_rdr_with_case`` must persist and restore corner cases just like ``save_rdr``.
+
+    The round-trip path goes through ``save_rdr_with_case`` (which prepends a
+    ``FunctionCase`` class header for function-case RDRs and falls back to ``save_rdr``
+    for plain RDRs).  In both cases the ``RDR_CORNER_CASES`` block must survive.
+    """
+
+    def test_save_rdr_with_case_preserves_corner_cases(self):
+        """After ``save_rdr_with_case`` + ``load_rdr``, the loaded store has the
+        same number of corner-case entries as the original.
+
+        This tests both the plain-RDR fallback path (Animal case type is not a
+        FunctionCase subclass) and validates that ``load_rdr`` restores the store
+        from the ``RDR_CORNER_CASES`` block embedded by ``rdr_to_python``.
+        """
+        rdr = _build_two_rule_rdr()
+        original_count = len(rdr.corner_cases.cases)
+        # Sanity: two fit_case calls must have recorded two corner cases.
+        self.assertEqual(original_count, 2)
+
+        with _tempfile.TemporaryDirectory() as d:
+            path = _os.path.join(d, "model.py")
+            save_rdr_with_case(rdr, path)
+            loaded = load_rdr(path)
+
+        self.assertEqual(len(loaded.corner_cases.cases), original_count)
+
+    def test_save_rdr_with_case_corner_case_values_equal_originals(self):
+        """Each restored corner case must equal (``==``) the case used during fitting.
+
+        Verifies that ``AsdictCaseSerializer`` faithfully reconstructs the ``Animal``
+        dataclass through the constructor-source round-trip path.
+        """
+        rdr = _build_two_rule_rdr()
+        ordered_before = walk_rules_in_emission_order(rdr.conditions_root)
+
+        with _tempfile.TemporaryDirectory() as d:
+            path = _os.path.join(d, "model.py")
+            save_rdr_with_case(rdr, path)
+            loaded = load_rdr(path)
+
+        ordered_after = walk_rules_in_emission_order(loaded.conditions_root)
+        self.assertEqual(len(ordered_before), len(ordered_after))
+        for node_before, node_after in zip(ordered_before, ordered_after):
+            original_case = rdr.corner_cases.get(node_before._id_)
+            restored_case = loaded.corner_cases.get(node_after._id_)
+            self.assertIsNotNone(
+                original_case,
+                "Each fitted rule must have a recorded corner case",
+            )
+            self.assertIsNotNone(
+                restored_case,
+                "Each loaded rule must have a restored corner case",
+            )
+            self.assertEqual(restored_case, original_case)
