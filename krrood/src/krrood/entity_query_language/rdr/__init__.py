@@ -59,8 +59,17 @@ from krrood.entity_query_language.rdr.serialization import save_rdr_with_case
 from krrood.entity_query_language.rdr.backward_inference import (
     BackwardInferenceIndex,
     ConclusionKnowledge,
+    GuardCondition,
     SufficientConditionSet,
     what_do_we_know_about,
+)
+from krrood.entity_query_language.rdr.condition_resolver import (
+    ChainConditionResolver,
+    ConditionResolver,
+    CornerCaseKnowledgeResolver,
+    ResolvedCondition,
+    ResolutionSource,
+    TargetKnowledgeResolver,
 )
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 from krrood.entity_query_language.rdr.underspecified import (
@@ -117,6 +126,14 @@ __all__ = [
     # backward inference
     "BackwardInferenceIndex",
     "ConclusionKnowledge",
+    "GuardCondition",
     "SufficientConditionSet",
     "what_do_we_know_about",
+    # auto-condition resolution
+    "ConditionResolver",
+    "ChainConditionResolver",
+    "TargetKnowledgeResolver",
+    "CornerCaseKnowledgeResolver",
+    "ResolvedCondition",
+    "ResolutionSource",
 ]

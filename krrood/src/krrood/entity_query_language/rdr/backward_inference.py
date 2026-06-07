@@ -16,7 +16,16 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from typing_extensions import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Set, Tuple
+from typing_extensions import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 
 from krrood.entity_query_language.core.base_expressions import OperationResult
 from krrood.entity_query_language.rules.conclusion_selector import (
@@ -69,8 +78,7 @@ class GuardCondition:
         shared_variable._update_domain_([case])
         results = list(self.expression.evaluate())
         truth = any(
-            r.is_true if isinstance(r, OperationResult) else bool(r)
-            for r in results
+            r.is_true if isinstance(r, OperationResult) else bool(r) for r in results
         )
         return not truth if self.negated else truth
 
@@ -219,10 +227,7 @@ def _build_full_index(
             if value not in seen:
                 buckets[value].append(SufficientConditionSet(path.conditions))
                 seen.add(value)
-    return {
-        v: ConclusionKnowledge(v, tuple(sets))
-        for v, sets in buckets.items()
-    }
+    return {v: ConclusionKnowledge(v, tuple(sets)) for v, sets in buckets.items()}
 
 
 @dataclass
@@ -234,9 +239,7 @@ class BackwardInferenceIndex:
     Subsequent queries for any value are O(1) dict lookups.
     """
 
-    _cache: Optional[Dict[Any, ConclusionKnowledge]] = field(
-        default=None, init=False
-    )
+    _cache: Optional[Dict[Any, ConclusionKnowledge]] = field(default=None, init=False)
 
     def invalidate(self) -> None:
         """:return: None. Marks the cache stale so the next query rebuilds."""

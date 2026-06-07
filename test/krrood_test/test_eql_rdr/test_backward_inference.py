@@ -36,7 +36,6 @@ from krrood.entity_query_language.rules.conclusion_selector import ConclusionSel
 
 from .animal import Animal, Species
 
-
 # ---------------------------------------------------------------------------
 # Fixture helpers
 # ---------------------------------------------------------------------------
@@ -84,34 +83,82 @@ def _mixed_tree() -> Tuple[Any, Any, Any]:
 
 _COW = Animal(
     name="cow",
-    hair=True, feathers=False, eggs=False, milk=True,
-    airborne=False, aquatic=False, predator=False, toothed=True,
-    backbone=True, breathes=True, venomous=False, fins=False,
-    legs=4, tail=True, domestic=True, catsize=True,
+    hair=True,
+    feathers=False,
+    eggs=False,
+    milk=True,
+    airborne=False,
+    aquatic=False,
+    predator=False,
+    toothed=True,
+    backbone=True,
+    breathes=True,
+    venomous=False,
+    fins=False,
+    legs=4,
+    tail=True,
+    domestic=True,
+    catsize=True,
     species=None,
 )
 _EAGLE = Animal(
     name="eagle",
-    hair=False, feathers=True, eggs=True, milk=False,
-    airborne=True, aquatic=False, predator=True, toothed=True,
-    backbone=True, breathes=True, venomous=False, fins=False,
-    legs=2, tail=True, domestic=False, catsize=False,
+    hair=False,
+    feathers=True,
+    eggs=True,
+    milk=False,
+    airborne=True,
+    aquatic=False,
+    predator=True,
+    toothed=True,
+    backbone=True,
+    breathes=True,
+    venomous=False,
+    fins=False,
+    legs=2,
+    tail=True,
+    domestic=False,
+    catsize=False,
     species=None,
 )
 _TUNA = Animal(
     name="tuna",
-    hair=False, feathers=False, eggs=True, milk=False,
-    airborne=False, aquatic=True, predator=True, toothed=True,
-    backbone=True, breathes=False, venomous=False, fins=True,
-    legs=0, tail=True, domestic=False, catsize=False,
+    hair=False,
+    feathers=False,
+    eggs=True,
+    milk=False,
+    airborne=False,
+    aquatic=True,
+    predator=True,
+    toothed=True,
+    backbone=True,
+    breathes=False,
+    venomous=False,
+    fins=True,
+    legs=0,
+    tail=True,
+    domestic=False,
+    catsize=False,
     species=None,
 )
 _FROG = Animal(
     name="frog",
-    hair=False, feathers=False, eggs=True, milk=False,
-    airborne=False, aquatic=True, predator=False, toothed=False,
-    backbone=False, breathes=True, venomous=False, fins=False,
-    legs=4, tail=False, domestic=False, catsize=False,
+    hair=False,
+    feathers=False,
+    eggs=True,
+    milk=False,
+    airborne=False,
+    aquatic=True,
+    predator=False,
+    toothed=False,
+    backbone=False,
+    breathes=True,
+    venomous=False,
+    fins=False,
+    legs=4,
+    tail=False,
+    domestic=False,
+    catsize=False,
     species=None,
 )
 
@@ -214,7 +261,7 @@ class TestConclusionKnowledge:
         # backbone (positive guard) + NOT(milk) (alt guard) + feathers (leaf)
         assert len(conds) == 3
         assert conds[0].negated is False  # backbone
-        assert conds[1].negated is True   # NOT(milk)
+        assert conds[1].negated is True  # NOT(milk)
 
     def test_mixed_tree_fish(self):
         _, _, root = _mixed_tree()
@@ -253,105 +300,165 @@ class TestEvaluateAgainst:
     def test_flat_mammal_true_for_cow(self):
         animal, _, root = _flat_tree()
         knowledge = what_do_we_know_about(root, Species.mammal)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _COW) is True
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _COW)
+            is True
+        )
 
     def test_flat_mammal_false_for_eagle(self):
         animal, _, root = _flat_tree()
         knowledge = what_do_we_know_about(root, Species.mammal)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _EAGLE) is False
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _EAGLE)
+            is False
+        )
 
     def test_flat_mammal_false_for_frog(self):
         animal, _, root = _flat_tree()
         knowledge = what_do_we_know_about(root, Species.mammal)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _FROG) is False
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _FROG)
+            is False
+        )
 
     def test_flat_bird_true_for_eagle(self):
         animal, _, root = _flat_tree()
         knowledge = what_do_we_know_about(root, Species.bird)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _EAGLE) is True
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _EAGLE)
+            is True
+        )
 
     def test_flat_bird_false_for_cow(self):
         animal, _, root = _flat_tree()
         knowledge = what_do_we_know_about(root, Species.bird)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _COW) is False
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _COW)
+            is False
+        )
 
     def test_flat_bird_false_for_tuna(self):
         animal, _, root = _flat_tree()
         knowledge = what_do_we_know_about(root, Species.bird)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _TUNA) is False
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _TUNA)
+            is False
+        )
 
     def test_flat_fish_true_for_tuna(self):
         animal, _, root = _flat_tree()
         knowledge = what_do_we_know_about(root, Species.fish)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _TUNA) is True
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _TUNA)
+            is True
+        )
 
     def test_flat_fish_false_for_frog(self):
         animal, _, root = _flat_tree()
         knowledge = what_do_we_know_about(root, Species.fish)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _FROG) is False
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _FROG)
+            is False
+        )
 
     def test_flat_fish_false_for_eagle(self):
         animal, _, root = _flat_tree()
         knowledge = what_do_we_know_about(root, Species.fish)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _EAGLE) is False
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _EAGLE)
+            is False
+        )
 
     def test_refinement_mammal_true_for_cow(self):
         animal, _, root = _refinement_tree()
         knowledge = what_do_we_know_about(root, Species.mammal)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _COW) is True
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _COW)
+            is True
+        )
 
     def test_refinement_mammal_false_for_tuna(self):
         animal, _, root = _refinement_tree()
         knowledge = what_do_we_know_about(root, Species.mammal)
         # Tuna has backbone but not milk, so mammal shouldn't match
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _TUNA) is False
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _TUNA)
+            is False
+        )
 
     def test_refinement_fish_true_for_tuna(self):
         animal, _, root = _refinement_tree()
         knowledge = what_do_we_know_about(root, Species.fish)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _TUNA) is True
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _TUNA)
+            is True
+        )
 
     def test_refinement_fish_false_for_cow(self):
         animal, _, root = _refinement_tree()
         knowledge = what_do_we_know_about(root, Species.fish)
         # Cow has backbone AND milk, so the refinement overrides — NOT(milk) guard fails
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _COW) is False
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _COW)
+            is False
+        )
 
     def test_refinement_fish_false_for_frog(self):
         animal, _, root = _refinement_tree()
         knowledge = what_do_we_know_about(root, Species.fish)
         # Frog has no backbone, so the backbone condition fails
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _FROG) is False
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _FROG)
+            is False
+        )
 
     def test_mixed_mammal_true_for_cow(self):
         animal, _, root = _mixed_tree()
         knowledge = what_do_we_know_about(root, Species.mammal)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _COW) is True
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _COW)
+            is True
+        )
 
     def test_mixed_mammal_false_for_eagle(self):
         animal, _, root = _mixed_tree()
         knowledge = what_do_we_know_about(root, Species.mammal)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _EAGLE) is False
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _EAGLE)
+            is False
+        )
 
     def test_mixed_bird_true_for_eagle(self):
         animal, _, root = _mixed_tree()
         knowledge = what_do_we_know_about(root, Species.bird)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _EAGLE) is True
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _EAGLE)
+            is True
+        )
 
     def test_mixed_bird_false_for_cow(self):
         animal, _, root = _mixed_tree()
         knowledge = what_do_we_know_about(root, Species.bird)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _COW) is False
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _COW)
+            is False
+        )
 
     def test_mixed_fish_true_for_tuna(self):
         animal, _, root = _mixed_tree()
         knowledge = what_do_we_know_about(root, Species.fish)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _TUNA) is True
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _TUNA)
+            is True
+        )
 
     def test_mixed_fish_false_for_cow(self):
         animal, _, root = _mixed_tree()
         knowledge = what_do_we_know_about(root, Species.fish)
-        assert knowledge.sufficient_condition_sets[0].evaluate_against(animal, _COW) is False
+        assert (
+            knowledge.sufficient_condition_sets[0].evaluate_against(animal, _COW)
+            is False
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -473,7 +580,6 @@ class TestCacheInvalidation:
         assert rdr.what_do_we_know_about(Species.mammal).is_satisfiable()
 
 
-
 # ---------------------------------------------------------------------------
 # format_condition handles ConclusionSelector guards
 # ---------------------------------------------------------------------------
@@ -495,9 +601,9 @@ class TestGuardFlattening:
         # Before flattening: first guard was Alternative(milk, feathers)
         # After flattening: NOT(milk), NOT(feathers) — both Comparators
         for gc in conds:
-            assert not isinstance(gc.expression, ConclusionSelector), (
-                f"Guard should be flattened: {gc.expression}"
-            )
+            assert not isinstance(
+                gc.expression, ConclusionSelector
+            ), f"Guard should be flattened: {gc.expression}"
 
     def test_no_guard_is_ever_a_conclusion_selector(self):
         """No guard expression in any test tree is a ConclusionSelector."""

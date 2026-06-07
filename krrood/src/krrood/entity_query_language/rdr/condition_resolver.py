@@ -120,7 +120,9 @@ class TargetKnowledgeResolver(ConditionResolver):
                 if guard.holds_for(case_variable, case) and not guard.holds_for(
                     case_variable, corner_case
                 ):
-                    return ResolvedCondition(_materialize(guard), ResolutionSource.TARGET_KNOWLEDGE)
+                    return ResolvedCondition(
+                        _materialize(guard), ResolutionSource.TARGET_KNOWLEDGE
+                    )
         return None
 
 
@@ -177,8 +179,13 @@ class ChainConditionResolver(ConditionResolver):
     ) -> Optional[ResolvedCondition]:
         for resolver in self.resolvers:
             result = resolver.resolve(
-                case, case_variable, target, current, corner_case,
-                target_knowledge, current_knowledge,
+                case,
+                case_variable,
+                target,
+                current,
+                corner_case,
+                target_knowledge,
+                current_knowledge,
             )
             if result is not None:
                 return result
