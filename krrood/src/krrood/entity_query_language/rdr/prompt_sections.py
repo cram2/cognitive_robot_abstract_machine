@@ -69,6 +69,11 @@ class RenderContext:
         """:return: True when the interaction is asking for conditions."""
         return any(r.name == ANSWER_NAME for r in self.requests)
 
+    @property
+    def has_suggested_condition(self) -> bool:
+        """:return: True when a suggested condition hint is available from the resolver."""
+        return self.case.suggested_condition is not None
+
 
 @dataclass(frozen=True)
 class PromptSection:
@@ -197,6 +202,13 @@ def _help_hint(ctx: RenderContext) -> List[str]:
     return [ctx.palette.hint(f"Type {magics} for help with this case.")]
 
 
+def _auto_resolution_hint(ctx: RenderContext) -> List[str]:
+    return [
+        ctx.palette.hint("Suggested condition (auto-resolved): ")
+        + ctx.palette.code(format_condition(ctx.case.suggested_condition))
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Registry — the single extension point for new prompt situations.
 # New prompt situations = append a PromptSection; never modify existing ones.
@@ -263,5 +275,10 @@ PROMPT_SECTIONS: List[PromptSection] = [
         name="help_hint",
         applicable=lambda ctx: True,
         lines=_help_hint,
+    ),
+    PromptSection(
+        name="auto_resolution_hint",
+        applicable=lambda ctx: ctx.has_suggested_condition,
+        lines=_auto_resolution_hint,
     ),
 ]

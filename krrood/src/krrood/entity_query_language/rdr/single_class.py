@@ -37,7 +37,10 @@ from krrood.entity_query_language.rdr.backward_inference import (
     BackwardInferenceIndex,
     ConclusionKnowledge,
 )
-from krrood.entity_query_language.rdr.condition_resolver import ConditionResolver
+from krrood.entity_query_language.rdr.condition_resolver import (
+    ConditionResolver,
+    ResolutionMode,
+)
 from krrood.entity_query_language.rdr.corner_case import CornerCaseStore
 
 _FITTING_DESCRIPTION = "Fitting RDR"
@@ -105,6 +108,16 @@ class EQLSingleClassRDR:
     before asking the expert. Only applies to the refinement branch (wrong rule fired).
     Use :class:`~krrood.entity_query_language.rdr.condition_resolver.ChainConditionResolver`
     ``.backward_inference_default()`` for the standard two-phase resolution strategy.
+    """
+    resolution_mode: ResolutionMode = field(default=ResolutionMode.SILENT)
+    """Controls whether an auto-resolved condition is silently inserted or shown as a hint.
+
+    :attr:`~krrood.entity_query_language.rdr.condition_resolver.ResolutionMode.SILENT`
+    (default) inserts the condition directly without asking the expert.
+    :attr:`~krrood.entity_query_language.rdr.condition_resolver.ResolutionMode.HINT`
+    passes the resolved condition to the expert as a pre-seeded suggestion; the expert
+    may accept it unchanged or overwrite it.  Has no effect when :attr:`condition_resolver`
+    is ``None``.
     """
 
     def __post_init__(self) -> None:
@@ -219,12 +232,8 @@ class EQLSingleClassRDR:
                 return target
         else:
             resolved = self._try_auto_resolve(case, target, current, corner_case)
-            condition = (
-                resolved
-                if resolved is not None
-                else expert.ask_for_conditions(
-                    case, self.case_variable, target, current, trace, corner_case
-                )
+            condition = self._apply_resolution(
+                resolved, case, target, current, trace, corner_case, expert
             )
 
         self._insert_rule(trace, current, condition, target, case)
@@ -265,6 +274,47 @@ class EQLSingleClassRDR:
             current_knowledge,
         )
         return result.expression if result is not None else None
+
+    def _apply_resolution(
+        self,
+        resolved: Optional[SymbolicExpression],
+        case: Any,
+        target: Any,
+        current: Any,
+        trace: Optional[ClassificationTrace],
+        corner_case: Optional[Any],
+        expert: Expert,
+    ) -> SymbolicExpression:
+        """Apply the auto-resolver outcome according to :attr:`resolution_mode`.
+
+        In :attr:`~krrood.entity_query_language.rdr.condition_resolver.ResolutionMode.SILENT`
+        mode (default), a resolved condition is inserted directly without prompting.  In
+        :attr:`~krrood.entity_query_language.rdr.condition_resolver.ResolutionMode.HINT`
+        mode, the resolved expression is passed as a suggestion so the expert can accept
+        or overwrite it.  When ``resolved`` is ``None`` the expert is always consulted
+        regardless of mode.
+
+        :param resolved: Auto-resolved expression, or ``None`` if the resolver found nothing.
+        :param case: The case being fit.
+        :param target: The correct conclusion.
+        :param current: The wrong conclusion currently returned.
+        :param trace: Classification trace.
+        :param corner_case: Corner case of the firing rule.
+        :param expert: The expert that supplies conditions.
+        :return: The EQL condition expression to insert.
+        """
+        if resolved is not None and self.resolution_mode is ResolutionMode.SILENT:
+            return resolved
+        suggestion = resolved if self.resolution_mode is ResolutionMode.HINT else None
+        return expert.ask_for_conditions(
+            case,
+            self.case_variable,
+            target,
+            current,
+            trace,
+            corner_case,
+            suggestion=suggestion,
+        )
 
     def _insert_rule(
         self,

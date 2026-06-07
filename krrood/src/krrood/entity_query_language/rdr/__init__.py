@@ -68,6 +68,7 @@ from krrood.entity_query_language.rdr.condition_resolver import (
     ConditionResolver,
     CornerCaseKnowledgeResolver,
     ResolvedCondition,
+    ResolutionMode,
     ResolutionSource,
     TargetKnowledgeResolver,
 )
