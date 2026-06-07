@@ -10,8 +10,12 @@ import unittest
 from unittest.mock import patch
 
 from krrood.entity_query_language.factories import and_
+from krrood.entity_query_language.rdr.condition_resolver import ChainConditionResolver
 from krrood.entity_query_language.rdr.expert import Expert
-from krrood.entity_query_language.rdr.interface import ExpertInterface, FunctionInterface
+from krrood.entity_query_language.rdr.interface import (
+    ExpertInterface,
+    FunctionInterface,
+)
 from krrood.entity_query_language.rdr.progress import SpyProgressReporter
 from krrood.entity_query_language.rdr.utils import UNSET
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
@@ -149,6 +153,7 @@ def _labelling_answer(target_by_name):
     conclusion only when the ``conclusion`` answer is requested (the
     ``ask_for_rule`` -> ``_ask_for_conclusion`` interact call).
     """
+
     def answer(context, requests):
         result = {
             "conditions": and_(
@@ -162,6 +167,7 @@ def _labelling_answer(target_by_name):
         if any(r.name == "conclusion" for r in requests):
             result["conclusion"] = target_by_name[context.case_instance.name]
         return result
+
     return answer
 
 
@@ -483,9 +489,7 @@ class TestProgressBarIntegration(unittest.TestCase):
         subset, subset_targets = animals[:5], targets[:5]
 
         spy = SpyProgressReporter()
-        interface = SpyFunctionInterface(
-            answer_fn=_maximally_specific_answer, spy=spy
-        )
+        interface = SpyFunctionInterface(answer_fn=_maximally_specific_answer, spy=spy)
         expert = Expert(interface=interface)
         rdr.fit(subset, subset_targets, expert)
 
@@ -626,9 +630,7 @@ class TestProgressBarIntegration(unittest.TestCase):
 
         # Control: fit without spy.
         rdr_control = EQLSingleClassRDR(Animal, "species")
-        expert_control = Expert(
-            interface=FunctionInterface(answer_fn=_scorpion_answer)
-        )
+        expert_control = Expert(interface=FunctionInterface(answer_fn=_scorpion_answer))
         rdr_control.fit(cases, case_targets, expert_control)
 
         # With spy.
@@ -651,6 +653,397 @@ class TestProgressBarIntegration(unittest.TestCase):
 
         # Sanity: the spy was active.
         self.assertGreater(len(spy.events), 0)
+
+
+# ---------------------------------------------------------------------------
+# Helpers for TestAutoConditionResolution
+# ---------------------------------------------------------------------------
+
+
+def _make_auto_resolution_animal(name: str, **kwargs) -> "Animal":
+    """Build an :class:`Animal` with sensible defaults for auto-resolution scenarios.
+
+    Only the fields supplied via ``kwargs`` deviate from the defaults.  The defaults
+    produce a generic non-descript animal that no rule fires for, so callers only need
+    to specify the discriminating features.
+    """
+    defaults = dict(
+        hair=False,
+        feathers=False,
+        eggs=False,
+        milk=False,
+        airborne=False,
+        aquatic=False,
+        predator=False,
+        toothed=False,
+        backbone=True,
+        breathes=True,
+        venomous=False,
+        fins=False,
+        legs=4,
+        tail=False,
+        domestic=False,
+        catsize=False,
+    )
+    defaults.update(kwargs)
+    return Animal(name=name, **defaults)
+
+
+class CountingFunctionInterface(FunctionInterface):
+    """A :class:`FunctionInterface` that counts calls to its underlying answer function.
+
+    The counter attribute ``ask_for_conditions_count`` increments every time the
+    interface is invoked via :meth:`interact`.  This lets a test assert, without any
+    mocking framework, that ``Expert.ask_for_conditions`` was (or was not) called for
+    a specific fitting step.
+    """
+
+    def __init__(self, answer_fn):
+        super().__init__(answer_fn=answer_fn)
+        self.ask_for_conditions_count: int = 0
+
+    def interact(self, context, requests):
+        """Forward to the parent and record the call."""
+        self.ask_for_conditions_count += 1
+        return super().interact(context, requests)
+
+
+@unittest.skipIf(len(animals) == 0, "Failed to load zoo dataset")
+class TestAutoConditionResolution(unittest.TestCase):
+    """Phase 5 integration tests: auto-condition inference in :meth:`EQLSingleClassRDR.fit_case`.
+
+    These tests verify the behaviour of the ``condition_resolver`` field on
+    :class:`EQLSingleClassRDR`.  When a resolver is set, :meth:`fit_case` attempts to
+    derive a differentiating condition automatically from the rule tree's backward-
+    inference index before calling the expert.  The resolver is only active on the
+    *refinement* branch (a wrong rule fired); the alternative branch and the UNSET
+    (no-target) branch are always delegated to the expert.
+    """
+
+    # ------------------------------------------------------------------
+    # Shared scenario builder
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _three_species_rdr(answer_fn, *, with_resolver: bool):
+        """Return ``(rdr, interface)`` with mammal / reptile / bird already fitted.
+
+        The fit order is:
+          1. mammal  (``milk==True -> mammal``)
+          2. reptile (``venomous==True -> reptile``)
+          3. bird1   (``feathers==True -> bird``)
+
+        After these three insertions the tree already holds backward-inference
+        knowledge for ``Species.bird`` (``feathers==True``).  A second bird that
+        is also venomous (``bird2``) will be wrongly classified as reptile —
+        setting up the auto-resolution refinement path.
+
+        :param answer_fn: The FunctionInterface answer function to embed.
+        :param with_resolver: When ``True``, the RDR is constructed with
+            ``ChainConditionResolver.backward_inference_default()``.
+        :return: ``(rdr, counting_interface)``.
+        """
+        interface = CountingFunctionInterface(answer_fn=answer_fn)
+        expert = Expert(interface=interface)
+        resolver = (
+            ChainConditionResolver.backward_inference_default()
+            if with_resolver
+            else None
+        )
+        rdr = EQLSingleClassRDR(Animal, "species", condition_resolver=resolver)
+
+        mammal = _make_auto_resolution_animal("auto_m1", milk=True, hair=True)
+        reptile = _make_auto_resolution_animal(
+            "auto_r1", venomous=True, eggs=True, toothed=True
+        )
+        bird1 = _make_auto_resolution_animal(
+            "auto_b1", feathers=True, eggs=True, airborne=True, legs=2
+        )
+        rdr.fit_case(mammal, Species.mammal, expert)
+        rdr.fit_case(reptile, Species.reptile, expert)
+        rdr.fit_case(bird1, Species.bird, expert)
+        return rdr, interface
+
+    @staticmethod
+    def _standard_answer_fn(context, requests):
+        """Condition answer function for the three-species scenario.
+
+        Maps target conclusions to maximally simple discriminating conditions:
+        * mammal  → ``milk==True``
+        * bird    → ``feathers==True``
+        * reptile → ``venomous==True``
+        * fish    → ``fins==True``
+        """
+        v = context.case_variable
+        target = context.target_conclusion
+        if target == Species.mammal:
+            return {"conditions": v.milk == True}
+        if target == Species.bird:
+            return {"conditions": v.feathers == True}
+        if target == Species.reptile:
+            return {"conditions": v.venomous == True}
+        if target == Species.fish:
+            return {"conditions": v.fins == True}
+        raise ValueError(f"Unexpected target in standard_answer_fn: {target!r}")
+
+    @staticmethod
+    def _unset_path_answer_fn(context, requests):
+        """Answer function for the no-target (``UNSET``) path.
+
+        Returns a conclusion (``Species.bird``) when asked, plus a ``feathers==True``
+        condition — enough for the UNSET branch test to succeed without the test
+        caring about the specific conclusion chosen.
+        """
+        v = context.case_variable
+        result = {"conditions": v.feathers == True}
+        if any(r.name == "conclusion" for r in requests):
+            result["conclusion"] = Species.bird
+        return result
+
+    # ------------------------------------------------------------------
+    # Test 1 — Expert NOT called when auto-resolution succeeds
+    # ------------------------------------------------------------------
+
+    def test_expert_not_called_when_auto_resolution_succeeds(self):
+        """Auto-resolution silences the expert when backward inference finds a discriminator.
+
+        Scenario: mammal (milk=True), reptile (venomous=True), bird1 (feathers=True) are
+        fitted in that order.  The tree now knows ``feathers==True`` for ``Species.bird``.
+        ``bird2`` has both ``feathers=True`` and ``venomous=True``; it is initially
+        misclassified as reptile (reptile's rule fires first).
+
+        On ``fit_case(bird2, Species.bird, expert)``, :meth:`_try_auto_resolve` must find
+        ``feathers==True`` from the backward-inference knowledge of ``Species.bird`` — this
+        guard is True for ``bird2`` and False for the reptile corner case (feathers=False).
+        The expert MUST NOT be called (zero additional interact() invocations).
+        After fitting, ``classify(bird2)`` must return ``Species.bird``.
+        """
+        rdr, interface = self._three_species_rdr(
+            self._standard_answer_fn, with_resolver=True
+        )
+        bird2 = _make_auto_resolution_animal(
+            "auto_b2", feathers=True, venomous=True, eggs=True, legs=2
+        )
+
+        # Confirm bird2 is wrongly classified before fitting (refinement path will trigger).
+        self.assertEqual(
+            rdr.classify(bird2),
+            Species.reptile,
+            "Precondition: bird2 must be misclassified as reptile before fitting.",
+        )
+
+        count_before = interface.ask_for_conditions_count
+        rdr.fit_case(bird2, Species.bird, Expert(interface=interface))
+        count_after = interface.ask_for_conditions_count
+
+        self.assertEqual(
+            count_after,
+            count_before,
+            "Expert must NOT be called when auto-resolution succeeds: "
+            f"interact() was invoked {count_after - count_before} extra time(s).",
+        )
+        self.assertEqual(
+            rdr.classify(bird2),
+            Species.bird,
+            "bird2 must be correctly classified as Species.bird after auto-resolved fitting.",
+        )
+
+    # ------------------------------------------------------------------
+    # Test 2 — Expert IS called when auto-resolution fails (fallback)
+    # ------------------------------------------------------------------
+
+    def test_expert_called_when_auto_resolution_fails(self):
+        """Expert is invoked as fallback when backward inference finds no discriminator.
+
+        A case whose target species (``Species.fish``) has no existing rules in the
+        tree provides no backward-inference knowledge.  When the resolver is given a
+        case that is wrongly classified as reptile (venomous=True, fins=True),
+        ``TargetKnowledgeResolver`` and ``CornerCaseKnowledgeResolver`` both return
+        ``None`` because no fish knowledge exists.  The expert MUST be called exactly
+        once as the fallback.
+        """
+        rdr, interface = self._three_species_rdr(
+            self._standard_answer_fn, with_resolver=True
+        )
+        # fish2: venomous=True triggers the reptile rule -> wrong (should be fish)
+        # No backward-inference knowledge for Species.fish exists yet.
+        fish2 = _make_auto_resolution_animal(
+            "auto_f2", fins=True, venomous=True, aquatic=True, toothed=True
+        )
+
+        self.assertEqual(
+            rdr.classify(fish2),
+            Species.reptile,
+            "Precondition: fish2 must be misclassified as reptile before fitting.",
+        )
+
+        count_before = interface.ask_for_conditions_count
+        rdr.fit_case(fish2, Species.fish, Expert(interface=interface))
+        calls_made = interface.ask_for_conditions_count - count_before
+
+        self.assertEqual(
+            calls_made,
+            1,
+            "Expert MUST be called exactly once when auto-resolution fails "
+            f"(got {calls_made} call(s)).",
+        )
+        self.assertEqual(
+            rdr.classify(fish2),
+            Species.fish,
+            "fish2 must be correctly classified as Species.fish after expert-supplied fitting.",
+        )
+
+    # ------------------------------------------------------------------
+    # Test 3 — No resolver (default) — expert always called
+    # ------------------------------------------------------------------
+
+    def test_expert_always_called_when_no_resolver_set(self):
+        """Without a ``condition_resolver``, the expert is always called on the refinement path.
+
+        Even when the rule tree already holds backward-inference knowledge for
+        ``Species.bird`` (``feathers==True``), a resolver-free RDR must not attempt
+        auto-resolution.  The expert MUST be called exactly once for ``bird2`` — the
+        ``_try_auto_resolve`` guard ``condition_resolver is None`` returns ``None``
+        immediately and the fallback expert path is taken unconditionally.
+        """
+        rdr, interface = self._three_species_rdr(
+            self._standard_answer_fn, with_resolver=False
+        )
+        bird2 = _make_auto_resolution_animal(
+            "auto_b2_no_res", feathers=True, venomous=True, eggs=True, legs=2
+        )
+
+        self.assertEqual(
+            rdr.classify(bird2),
+            Species.reptile,
+            "Precondition: bird2 must be misclassified as reptile before fitting.",
+        )
+
+        count_before = interface.ask_for_conditions_count
+        rdr.fit_case(bird2, Species.bird, Expert(interface=interface))
+        calls_made = interface.ask_for_conditions_count - count_before
+
+        self.assertEqual(
+            calls_made,
+            1,
+            "Expert MUST be called once when condition_resolver is None "
+            f"(got {calls_made} call(s)).",
+        )
+        self.assertEqual(
+            rdr.classify(bird2),
+            Species.bird,
+            "bird2 must be correctly classified after expert-supplied fitting.",
+        )
+
+    # ------------------------------------------------------------------
+    # Test 4 — End-to-end: full convergence with auto-resolution
+    # ------------------------------------------------------------------
+
+    def test_end_to_end_convergence_expert_silent_for_auto_resolved_duplicates(self):
+        """All duplicate cases converge correctly and the expert is never called for them.
+
+        After fitting the three originals (mammal, reptile, bird1) with the expert,
+        the RDR has backward-inference knowledge for each species.  Two duplicate cases
+        that would be wrongly classified (``bird2`` as reptile) are then fitted.
+        The resolver finds a discriminator from the existing knowledge without consulting
+        the expert.  All five animals must be classified correctly after fitting, and
+        zero additional expert calls must have occurred for the duplicate pass.
+        """
+        rdr, interface = self._three_species_rdr(
+            self._standard_answer_fn, with_resolver=True
+        )
+
+        mammal1 = _make_auto_resolution_animal("auto_m1_ref", milk=True, hair=True)
+        reptile1 = _make_auto_resolution_animal(
+            "auto_r1_ref", venomous=True, eggs=True, toothed=True
+        )
+        bird1 = _make_auto_resolution_animal(
+            "auto_b1_ref", feathers=True, eggs=True, airborne=True, legs=2
+        )
+        bird2 = _make_auto_resolution_animal(
+            "auto_b2_e2e", feathers=True, venomous=True, eggs=True, legs=2
+        )
+
+        # bird2 is wrongly classified before fitting.
+        self.assertEqual(rdr.classify(bird2), Species.reptile)
+
+        count_before = interface.ask_for_conditions_count
+        expert = Expert(interface=interface)
+        rdr.fit_case(
+            mammal1, Species.mammal, expert
+        )  # already correct — no expert call
+        rdr.fit_case(bird2, Species.bird, expert)  # auto-resolved — no expert call
+        calls_for_duplicates = interface.ask_for_conditions_count - count_before
+
+        self.assertEqual(
+            calls_for_duplicates,
+            0,
+            "Expert must not be called for already-correct or auto-resolved duplicate cases "
+            f"(got {calls_for_duplicates} call(s)).",
+        )
+
+        # All cases (originals from _three_species_rdr plus new duplicates) must be correct.
+        # Animal is an unhashable dataclass, so use a list of (case, target) pairs.
+        expected_classifications = [
+            (mammal1, Species.mammal),
+            (reptile1, Species.reptile),
+            (bird1, Species.bird),
+            (bird2, Species.bird),
+        ]
+        for case, target in expected_classifications:
+            self.assertEqual(
+                rdr.classify(case),
+                target,
+                f"{case.name}: expected {target}, got {rdr.classify(case)}.",
+            )
+
+    # ------------------------------------------------------------------
+    # Test 5 — UNSET path (no target) still routes to expert
+    # ------------------------------------------------------------------
+
+    def test_unset_path_always_routes_to_expert_regardless_of_resolver(self):
+        """The UNSET (no-target) path always consults the expert, never auto-resolves.
+
+        When ``fit_case`` is called without a ``target`` (i.e., ``target=UNSET``),
+        the method invokes ``expert.ask_for_rule``, not ``ask_for_conditions``.
+        The ``_try_auto_resolve`` guard ``current is UNSET`` returns ``None``
+        immediately and the expert MUST be called even when backward-inference
+        knowledge exists and the resolver is active.
+
+        This is verified by counting interact() calls: the UNSET path calls
+        ``ask_for_rule`` which itself calls ``ask_for_conditions`` internally,
+        so at least one interact() must occur.
+        """
+        rdr, interface = self._three_species_rdr(
+            self._unset_path_answer_fn, with_resolver=True
+        )
+
+        # An animal that would be auto-resolved if given a target; here no target is given.
+        unknown = _make_auto_resolution_animal(
+            "auto_unknown", feathers=True, venomous=True, legs=2
+        )
+
+        count_before = interface.ask_for_conditions_count
+        rdr.fit_case(unknown, expert=Expert(interface=interface))
+        calls_made = interface.ask_for_conditions_count - count_before
+
+        self.assertGreater(
+            calls_made,
+            0,
+            "Expert MUST be called on the UNSET path even when a resolver is active "
+            f"(got {calls_made} call(s)).",
+        )
+        # The classification must be valid (whatever the expert concluded).
+        result = rdr.classify(unknown)
+        self.assertIsNotNone(
+            result,
+            "After UNSET-path fitting, classify(unknown) must return a non-None species.",
+        )
+        self.assertIsInstance(
+            result,
+            Species,
+            f"classify(unknown) must return a Species member, got {type(result).__name__}.",
+        )
 
 
 if __name__ == "__main__":
