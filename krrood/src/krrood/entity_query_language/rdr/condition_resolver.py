@@ -79,13 +79,13 @@ class ConditionResolver(ABC):
     def resolve(
         self,
         case: Any,
-        case_variable: "CanBehaveLikeAVariable",
+        case_variable: CanBehaveLikeAVariable,
         target: Any,
         current: Any,
         corner_case: Any,
-        target_knowledge: "ConclusionKnowledge",
-        current_knowledge: "ConclusionKnowledge",
-        firing_anchor: Optional["SymbolicExpression"] = None,
+        target_knowledge: ConclusionKnowledge,
+        current_knowledge: ConclusionKnowledge,
+        firing_anchor: Optional[SymbolicExpression] = None,
     ) -> Optional[ResolvedCondition]:
         """Attempt to auto-derive a differentiating condition.
 
@@ -125,23 +125,14 @@ class TargetKnowledgeResolver(ConditionResolver):
     def resolve(
         self,
         case: Any,
-        case_variable: "CanBehaveLikeAVariable",
+        case_variable: CanBehaveLikeAVariable,
         target: Any,
         current: Any,
         corner_case: Any,
-        target_knowledge: "ConclusionKnowledge",
-        current_knowledge: "ConclusionKnowledge",
-        firing_anchor: Optional["SymbolicExpression"] = None,
+        target_knowledge: ConclusionKnowledge,
+        current_knowledge: ConclusionKnowledge,
+        firing_anchor: Optional[SymbolicExpression] = None,
     ) -> Optional[ResolvedCondition]:
-        """Search ``target_knowledge`` for a guard that discriminates ``case`` from ``corner_case``.
-
-        Returns the first guard that holds for ``case`` and does not hold for ``corner_case``,
-        materialized as a :class:`ResolvedCondition` tagged
-        :attr:`ResolutionSource.TARGET_KNOWLEDGE`.
-
-        :param firing_anchor: Unused by this resolver; accepted for interface compatibility.
-        :return: A :class:`ResolvedCondition`, or ``None`` if no discriminating guard is found.
-        """
         for sufficient_condition_set in target_knowledge.sufficient_condition_sets:
             for guard in sufficient_condition_set.conditions:
                 if guard.holds_for(case_variable, case) and not guard.holds_for(
@@ -172,9 +163,9 @@ class CornerCaseKnowledgeResolver(ConditionResolver):
 
     def _active_path(
         self,
-        firing_anchor: Optional["SymbolicExpression"],
-        current_knowledge: "ConclusionKnowledge",
-    ) -> Optional["SufficientConditionSet"]:
+        firing_anchor: Optional[SymbolicExpression],
+        current_knowledge: ConclusionKnowledge,
+    ) -> Optional[SufficientConditionSet]:
         """Return the :class:`SufficientConditionSet` that contains ``firing_anchor``
         as a positive (non-negated) guard expression.
 
@@ -202,13 +193,13 @@ class CornerCaseKnowledgeResolver(ConditionResolver):
     def resolve(
         self,
         case: Any,
-        case_variable: "CanBehaveLikeAVariable",
+        case_variable: CanBehaveLikeAVariable,
         target: Any,
         current: Any,
         corner_case: Any,
-        target_knowledge: "ConclusionKnowledge",
-        current_knowledge: "ConclusionKnowledge",
-        firing_anchor: Optional["SymbolicExpression"] = None,
+        target_knowledge: ConclusionKnowledge,
+        current_knowledge: ConclusionKnowledge,
+        firing_anchor: Optional[SymbolicExpression] = None,
     ) -> Optional[ResolvedCondition]:
         """Search non-active paths in ``current_knowledge`` for a positive discriminating guard.
 
@@ -244,13 +235,13 @@ class ChainConditionResolver(ConditionResolver):
     def resolve(
         self,
         case: Any,
-        case_variable: "CanBehaveLikeAVariable",
+        case_variable: CanBehaveLikeAVariable,
         target: Any,
         current: Any,
         corner_case: Any,
-        target_knowledge: "ConclusionKnowledge",
-        current_knowledge: "ConclusionKnowledge",
-        firing_anchor: Optional["SymbolicExpression"] = None,
+        target_knowledge: ConclusionKnowledge,
+        current_knowledge: ConclusionKnowledge,
+        firing_anchor: Optional[SymbolicExpression] = None,
     ) -> Optional[ResolvedCondition]:
         """Try each resolver in :attr:`resolvers` in order, returning the first non-``None`` result.
 
@@ -273,7 +264,7 @@ class ChainConditionResolver(ConditionResolver):
         return None
 
     @classmethod
-    def backward_inference_default(cls) -> "ChainConditionResolver":
+    def backward_inference_default(cls) -> ChainConditionResolver:
         """Return the standard two-resolver chain.
 
         :class:`TargetKnowledgeResolver` runs first, searching the target conclusion's

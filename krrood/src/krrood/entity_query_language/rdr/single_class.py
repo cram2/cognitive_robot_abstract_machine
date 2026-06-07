@@ -64,6 +64,9 @@ from krrood.entity_query_language.scope import (
 )
 
 _FITTING_DESCRIPTION = "Fitting RDR"
+"""
+The description of the fitting RDR situation, used in error messages and documentation.
+"""
 
 
 class RDRConvergenceWarning(UserWarning):
@@ -128,7 +131,7 @@ class EQLSingleClassRDR:
         attach_definition_scope(self.case_variable, capture_caller_scope())
 
     @classmethod
-    def from_underspecified(cls, template: Any) -> "EQLSingleClassRDR":
+    def from_underspecified(cls, template: Any) -> EQLSingleClassRDR:
         """
         Build an RDR from an underspecified ``Match`` template: the lone ``...`` attribute
         defines what the RDR predicts.
@@ -149,11 +152,26 @@ class EQLSingleClassRDR:
         return self._observe(case).conclusion
 
     def _observe(self, case: Any) -> ConclusionObserver:
+        """
+        Observe a case and return a conclusion observer for it. An observer is a tool for
+        tracking the progress of classification and can be used to debug or explain the
+        classification process.
+
+        :param case: The case to observe.
+        :return: A conclusion observer for the case.
+        """
         return classify_case(
             self.query, self.case_variable, self.conclusion_variable, case
         )
 
     def _trace(self, case: Any) -> ClassificationTrace:
+        """
+        Trace the classification process for a given case, returning a detailed trace of
+        the classification steps.
+
+        :param case: The case to trace.
+        :return: A classification trace object.
+        """
         return trace_case(
             self.query,
             self.case_variable,
@@ -398,7 +416,7 @@ class EQLSingleClassRDR:
         paired_targets = targets if targets is not None else [UNSET] * len(cases)
         pending = list(range(len(cases)))
 
-        progress: Optional["ProgressReporter"] = None
+        progress: Optional[ProgressReporter] = None
         if expert is not None:
             progress = expert.interface.make_progress_reporter()
         if progress is not None:
@@ -426,7 +444,7 @@ class EQLSingleClassRDR:
         paired_targets: List[Any],
         pending: List[int],
         expert: Optional[Expert],
-        progress: Optional["ProgressReporter"],
+        progress: Optional[ProgressReporter],
         max_passes: int,
     ) -> None:
         """Run the convergent fitting loop until all cases are correct or a cycle is detected.
