@@ -42,20 +42,6 @@ from krrood.entity_query_language.rdr.condition_resolver import (
     ResolutionMode,
 )
 from krrood.entity_query_language.rdr.corner_case import CornerCaseStore
-
-_FITTING_DESCRIPTION = "Fitting RDR"
-
-
-class RDRConvergenceWarning(UserWarning):
-    """Emitted when the RDR fitting loop detects oscillation and terminates early.
-
-    The pending set of misclassified cases repeated a previously seen signature,
-    meaning the tree is oscillating rather than converging. Inspect the warning
-    message for the clashing case reprs; if :attr:`EQLSingleClassRDR.save_path`
-    is set the partially fitted model is saved there for inspection.
-    """
-
-
 from krrood.entity_query_language.rdr.observer import (
     ClassificationTrace,
     ConclusionObserver,
@@ -76,6 +62,18 @@ from krrood.entity_query_language.scope import (
     attach_definition_scope,
     capture_caller_scope,
 )
+
+_FITTING_DESCRIPTION = "Fitting RDR"
+
+
+class RDRConvergenceWarning(UserWarning):
+    """Emitted when the RDR fitting loop detects oscillation and terminates early.
+
+    The pending set of misclassified cases repeated a previously seen signature,
+    meaning the tree is oscillating rather than converging. Inspect the warning
+    message for the clashing case reprs; if :attr:`EQLSingleClassRDR.save_path`
+    is set the partially fitted model is saved there for inspection.
+    """
 
 
 @dataclass
@@ -107,7 +105,7 @@ class EQLSingleClassRDR:
     When set, :meth:`fit_case` attempts to derive a differentiating condition automatically
     before asking the expert. Only applies to the refinement branch (wrong rule fired).
     Use :class:`~krrood.entity_query_language.rdr.condition_resolver.ChainConditionResolver`
-    ``.backward_inference_default()`` for the standard two-phase resolution strategy.
+    ``.backward_inference_default()`` for the standard target-knowledge resolution strategy.
     """
     resolution_mode: ResolutionMode = field(default=ResolutionMode.SILENT)
     """Controls whether an auto-resolved condition is silently inserted or shown as a hint.
@@ -378,7 +376,7 @@ class EQLSingleClassRDR:
         negligible compared to expert interaction.
 
         When ``targets`` is ``None`` the no-target path has no ground truth to converge
-        against, so the method is a single pass (unchanged from previous behaviour).
+        against, so each case is fitted exactly once with no cycle detection.
 
         :param cases: The case instances to fit.
         :param targets: Optional ground-truth conclusions paired with ``cases``.
@@ -450,7 +448,8 @@ class EQLSingleClassRDR:
             pending = [
                 i
                 for i in range(len(cases))
-                if self.classify(cases[i]) != paired_targets[i]
+                if paired_targets[i] is not UNSET
+                and self.classify(cases[i]) != paired_targets[i]
             ]
 
             if not pending:

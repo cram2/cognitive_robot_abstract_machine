@@ -139,5 +139,7 @@ __all__ = [
     "TargetKnowledgeResolver",
     "CornerCaseKnowledgeResolver",
     "ResolvedCondition",
+    "ResolutionMode",
     "ResolutionSource",
+    "RDRConvergenceWarning",
 ]

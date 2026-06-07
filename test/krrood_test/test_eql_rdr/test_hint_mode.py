@@ -17,13 +17,17 @@ from typing_extensions import Any, Dict, List, Optional
 
 import pytest
 
-from .animal import Animal, Species
+from .animal import Animal, Species, make_animal as _make_animal
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.rdr.condition_resolver import (
     ChainConditionResolver,
     ResolutionMode,
 )
-from krrood.entity_query_language.rdr.expert import Expert
+from krrood.entity_query_language.rdr.expert import (
+    ANSWER_NAME,
+    Expert,
+    _validate_conditions,
+)
 from krrood.entity_query_language.rdr.interface import (
     AnswerRequest,
     CaseContext,
@@ -36,35 +40,6 @@ from krrood.entity_query_language.rdr.prompt_sections import (
 )
 from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 from krrood.entity_query_language.rdr.utils import UNSET
-
-# ---------------------------------------------------------------------------
-# Shared Animal helpers
-# ---------------------------------------------------------------------------
-
-
-def _make_animal(name: str, **kwargs) -> Animal:
-    """Build an Animal with all-False/zero defaults except for specified kwargs."""
-    defaults = dict(
-        hair=False,
-        feathers=False,
-        eggs=False,
-        milk=False,
-        airborne=False,
-        aquatic=False,
-        predator=False,
-        toothed=False,
-        backbone=True,
-        breathes=True,
-        venomous=False,
-        fins=False,
-        legs=4,
-        tail=False,
-        domestic=False,
-        catsize=False,
-    )
-    defaults.update(kwargs)
-    return Animal(name=name, **defaults)
-
 
 # ---------------------------------------------------------------------------
 # Three-rule RDR scenario
@@ -475,6 +450,35 @@ class TestPromptSectionHint:
         """Return an empty RDR for building a CaseContext (provides case_variable)."""
         return EQLSingleClassRDR(Animal, "species")
 
+    def _three_rule_suggestion(self):
+        """Build a three-rule RDR and return ``(rdr, bird2, reptile, suggestion)``.
+
+        ``suggestion`` is the auto-resolved expression for ``bird2`` (the condition
+        the backward-inference resolver would insert silently in SILENT mode).
+        """
+        mammal = _make_animal("mammal", milk=True, hair=True)
+        reptile = _make_animal("reptile", venomous=True, eggs=True, toothed=True)
+        bird1 = _make_animal("bird1", feathers=True, eggs=True, airborne=True, legs=2)
+        bird2 = _make_animal("bird2", feathers=True, venomous=True, eggs=True, legs=2)
+
+        rdr = EQLSingleClassRDR(
+            Animal,
+            "species",
+            condition_resolver=ChainConditionResolver.backward_inference_default(),
+        )
+        setup_expert = Expert(
+            interface=FunctionInterface(answer_fn=_three_rule_answer_fn)
+        )
+        rdr.fit_case(mammal, Species.mammal, setup_expert)
+        rdr.fit_case(reptile, Species.reptile, setup_expert)
+        rdr.fit_case(bird1, Species.bird, setup_expert)
+
+        suggestion = rdr._try_auto_resolve(
+            bird2, Species.bird, Species.reptile, reptile
+        )
+        assert suggestion is not None, "Pre-condition: resolver must find a suggestion"
+        return rdr, bird2, reptile, suggestion
+
     def _render_ctx(
         self,
         suggested_condition: Optional[SymbolicExpression],
@@ -493,11 +497,6 @@ class TestPromptSectionHint:
             target_conclusion=Species.bird,
             suggested_condition=suggested_condition,
         )
-        from krrood.entity_query_language.rdr.expert import (
-            ANSWER_NAME,
-            _validate_conditions,
-        )
-
         req = AnswerRequest(
             name=ANSWER_NAME,
             validate=_validate_conditions,
@@ -518,29 +517,7 @@ class TestPromptSectionHint:
 
         Guarantee: the section fires whenever a hint is available for the expert.
         """
-        mammal = _make_animal("mammal", milk=True, hair=True)
-        reptile = _make_animal("reptile", venomous=True, eggs=True, toothed=True)
-        bird1 = _make_animal("bird1", feathers=True, eggs=True, airborne=True, legs=2)
-        bird2 = _make_animal("bird2", feathers=True, venomous=True, eggs=True, legs=2)
-
-        rdr = EQLSingleClassRDR(
-            Animal,
-            "species",
-            condition_resolver=ChainConditionResolver.backward_inference_default(),
-        )
-        setup_expert = Expert(
-            interface=FunctionInterface(answer_fn=_three_rule_answer_fn)
-        )
-        rdr.fit_case(mammal, Species.mammal, setup_expert)
-        rdr.fit_case(reptile, Species.reptile, setup_expert)
-        rdr.fit_case(bird1, Species.bird, setup_expert)
-
-        # Obtain the resolved condition by running _try_auto_resolve directly.
-        suggestion = rdr._try_auto_resolve(
-            bird2, Species.bird, Species.reptile, reptile
-        )
-        assert suggestion is not None, "Pre-condition: resolver must find a suggestion"
-
+        rdr, bird2, _reptile, suggestion = self._three_rule_suggestion()
         render_ctx = self._render_ctx(
             suggested_condition=suggestion, rdr=rdr, case=bird2
         )
@@ -563,30 +540,7 @@ class TestPromptSectionHint:
         Guarantee: when applicable, the section emits at least one line with a
         non-empty string so the expert shell displays the hint.
         """
-        mammal = _make_animal("mammal", milk=True, hair=True)
-        reptile = _make_animal("reptile", venomous=True, eggs=True, toothed=True)
-        bird1 = _make_animal("bird1", feathers=True, eggs=True, airborne=True, legs=2)
-        bird2 = _make_animal(
-            "bird2_lines", feathers=True, venomous=True, eggs=True, legs=2
-        )
-
-        rdr = EQLSingleClassRDR(
-            Animal,
-            "species",
-            condition_resolver=ChainConditionResolver.backward_inference_default(),
-        )
-        setup_expert = Expert(
-            interface=FunctionInterface(answer_fn=_three_rule_answer_fn)
-        )
-        rdr.fit_case(mammal, Species.mammal, setup_expert)
-        rdr.fit_case(reptile, Species.reptile, setup_expert)
-        rdr.fit_case(bird1, Species.bird, setup_expert)
-
-        suggestion = rdr._try_auto_resolve(
-            bird2, Species.bird, Species.reptile, reptile
-        )
-        assert suggestion is not None, "Pre-condition: resolver must find a suggestion"
-
+        rdr, bird2, _reptile, suggestion = self._three_rule_suggestion()
         render_ctx = self._render_ctx(
             suggested_condition=suggestion, rdr=rdr, case=bird2
         )

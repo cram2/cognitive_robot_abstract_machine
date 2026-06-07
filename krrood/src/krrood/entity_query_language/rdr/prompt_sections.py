@@ -267,6 +267,11 @@ PROMPT_SECTIONS: List[PromptSection] = [
         lines=_allowed_values,
     ),
     PromptSection(
+        name="auto_resolution_hint",
+        applicable=lambda ctx: ctx.has_suggested_condition,
+        lines=_auto_resolution_hint,
+    ),
+    PromptSection(
         name="contextual_example",
         applicable=lambda ctx: True,
         lines=_contextual_example,
@@ -275,10 +280,5 @@ PROMPT_SECTIONS: List[PromptSection] = [
         name="help_hint",
         applicable=lambda ctx: True,
         lines=_help_hint,
-    ),
-    PromptSection(
-        name="auto_resolution_hint",
-        applicable=lambda ctx: ctx.has_suggested_condition,
-        lines=_auto_resolution_hint,
     ),
 ]

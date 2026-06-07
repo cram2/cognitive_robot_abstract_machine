@@ -55,3 +55,33 @@ class Animal:
     domestic: bool
     catsize: bool
     species: Optional[Species] = None
+
+
+_ANIMAL_DEFAULTS = dict(
+    hair=False,
+    feathers=False,
+    eggs=False,
+    milk=False,
+    airborne=False,
+    aquatic=False,
+    predator=False,
+    toothed=False,
+    backbone=True,
+    breathes=True,
+    venomous=False,
+    fins=False,
+    legs=0,
+    tail=False,
+    domestic=False,
+    catsize=False,
+)
+
+
+def make_animal(name: str, **kwargs) -> Animal:
+    """Build an :class:`Animal` with all-False/zero defaults, overriding with ``kwargs``.
+
+    :param name: The animal's name.
+    :param kwargs: Attribute overrides; keys must match :class:`Animal` field names.
+    :return: A fully specified :class:`Animal` instance.
+    """
+    return Animal(name=name, **{**_ANIMAL_DEFAULTS, **kwargs})

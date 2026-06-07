@@ -375,7 +375,7 @@ class TestCornerCaseSerialization:
         legacy_path = os.path.join(
             os.path.dirname(__file__),
             "fitted_models",
-            "zoo_species_rdr.py",
+            "zoo_species_rdr_no_corner_cases.py",
         )
         loaded = load_rdr(legacy_path)
         assert isinstance(loaded.corner_cases, CornerCaseStore)

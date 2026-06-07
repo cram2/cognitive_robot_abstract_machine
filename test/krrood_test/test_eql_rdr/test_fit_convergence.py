@@ -1,8 +1,8 @@
 """
 Tests for oscillation detection and progress teardown in :meth:`EQLSingleClassRDR.fit`.
 
-Each test verifies exactly one guarantee of the convergence-loop cycle-detection path
-introduced in :class:`~krrood.entity_query_language.rdr.single_class.EQLSingleClassRDR`:
+Each test verifies exactly one guarantee of the convergence-loop cycle-detection behavior
+of :meth:`~krrood.entity_query_language.rdr.single_class.EQLSingleClassRDR.fit`:
 
 1. A non-discriminating expert triggers :class:`RDRConvergenceWarning` and terminates.
 2. A discriminating expert completes without any warning.
