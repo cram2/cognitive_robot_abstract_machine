@@ -142,6 +142,7 @@ class Expert:
         current_conclusion: Any = UNSET,
         trace: Optional[ClassificationTrace] = None,
         corner_case: Optional[Any] = None,
+        suggestion: Optional[SymbolicExpression] = None,
     ) -> SymbolicExpression:
         """
         :param case: The case being fit (e.g. an ``Animal`` instance).
@@ -150,6 +151,9 @@ class Expert:
         :param current_conclusion: What the RDR currently concludes (``_UNSET`` if no rule fired).
         :param trace: The classification trace, for visualizing the rule tree to the expert.
         :param corner_case: The corner case of the firing rule, for side-by-side display.
+        :param suggestion: Optional auto-resolved condition to pre-seed; displayed as a hint
+            and used as the namespace default so the expert can accept it by pressing CTRL+D
+            or overwrite it with any other expression.
         :return: A live EQL condition expression that holds for ``case`` and distinguishes it.
         """
         context = CaseContext(
@@ -159,11 +163,13 @@ class Expert:
             target_conclusion=target_conclusion,
             trace=trace,
             corner_case=corner_case,
+            suggested_condition=suggestion,
         )
         request = AnswerRequest(
             name=ANSWER_NAME,
             validate=_validate_conditions,
             example=f"{ANSWER_NAME} = {CASE_VARIABLE_NAME}.some_attr == True",
+            default=suggestion,
         )
         try:
             return self.interface.interact(context, [request])[ANSWER_NAME]

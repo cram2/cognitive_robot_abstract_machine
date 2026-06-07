@@ -30,6 +30,7 @@ from krrood.entity_query_language.rdr.utils import UNSET
 from krrood.entity_query_language.scope import get_definition_scope
 
 if TYPE_CHECKING:
+    from krrood.entity_query_language.core.base_expressions import SymbolicExpression
     from krrood.entity_query_language.rdr.aid import ConclusionAid
     from krrood.entity_query_language.rdr.conclusion_domain import ConclusionDomain
     from krrood.entity_query_language.rdr.observer import ClassificationTrace
@@ -86,6 +87,9 @@ class CaseContext:
     corner_case: Optional[Any] = None
     """The corner case of the firing rule, when a rule fired during the classification trace.
     ``None`` when no rule fired (first rule or alternative path)."""
+    suggested_condition: Optional["SymbolicExpression"] = None
+    """Auto-resolved condition suggested to the expert in HINT mode; ``None`` when no hint
+    is available (SILENT mode or resolver found nothing)."""
 
     @property
     def has_target(self) -> bool:

@@ -36,6 +36,19 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
 
 
+class ResolutionMode(Enum):
+    """Controls how an auto-resolved condition is applied in :meth:`~krrood.entity_query_language.rdr.single_class.EQLSingleClassRDR.fit_case`.
+
+    :attr:`SILENT` preserves the original behaviour (no expert prompt); :attr:`HINT`
+    shows the suggestion to the expert who may accept or overwrite it.
+    """
+
+    SILENT = "silent"
+    """Auto-resolved condition is inserted directly without consulting the expert."""
+    HINT = "hint"
+    """Auto-resolved condition is shown to the expert as a pre-seeded suggestion."""
+
+
 class ResolutionSource(Enum):
     """Identifies which resolution strategy produced a :class:`ResolvedCondition`."""
 
@@ -238,6 +251,7 @@ __all__ = [
     "ConditionResolver",
     "CornerCaseKnowledgeResolver",
     "ResolvedCondition",
+    "ResolutionMode",
     "ResolutionSource",
     "TargetKnowledgeResolver",
 ]
