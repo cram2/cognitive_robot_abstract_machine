@@ -1,5 +1,6 @@
 """
-Phase 5 tests: EQLSingleClassRDR orchestration (classify + fit_case).
+Tests for :class:`~krrood.entity_query_language.rdr.single_class.EQLSingleClassRDR`
+orchestration (classify + fit_case).
 
 Experts here are programmatic and return live EQL condition expressions built over
 the RDR's shared case variable — the same contract the interactive shell will honour.
@@ -689,18 +690,18 @@ def _make_auto_resolution_animal(name: str, **kwargs) -> "Animal":
     return Animal(name=name, **defaults)
 
 
+@dataclasses.dataclass
 class CountingFunctionInterface(FunctionInterface):
     """A :class:`FunctionInterface` that counts calls to its underlying answer function.
 
-    The counter attribute ``ask_for_conditions_count`` increments every time the
+    The counter attribute :attr:`ask_for_conditions_count` increments every time the
     interface is invoked via :meth:`interact`.  This lets a test assert, without any
     mocking framework, that ``Expert.ask_for_conditions`` was (or was not) called for
     a specific fitting step.
     """
 
-    def __init__(self, answer_fn):
-        super().__init__(answer_fn=answer_fn)
-        self.ask_for_conditions_count: int = 0
+    ask_for_conditions_count: int = dataclasses.field(default=0, init=False)
+    """Number of times :meth:`interact` has been called."""
 
     def interact(self, context, requests):
         """Forward to the parent and record the call."""
@@ -710,7 +711,7 @@ class CountingFunctionInterface(FunctionInterface):
 
 @unittest.skipIf(len(animals) == 0, "Failed to load zoo dataset")
 class TestAutoConditionResolution(unittest.TestCase):
-    """Phase 5 integration tests: auto-condition inference in :meth:`EQLSingleClassRDR.fit_case`.
+    """Integration tests for auto-condition inference in :meth:`EQLSingleClassRDR.fit_case`.
 
     These tests verify the behaviour of the ``condition_resolver`` field on
     :class:`EQLSingleClassRDR`.  When a resolver is set, :meth:`fit_case` attempts to
@@ -774,16 +775,16 @@ class TestAutoConditionResolution(unittest.TestCase):
         * reptile → ``venomous==True``
         * fish    → ``fins==True``
         """
-        v = context.case_variable
+        case_variable = context.case_variable
         target = context.target_conclusion
         if target == Species.mammal:
-            return {"conditions": v.milk == True}
+            return {"conditions": case_variable.milk == True}
         if target == Species.bird:
-            return {"conditions": v.feathers == True}
+            return {"conditions": case_variable.feathers == True}
         if target == Species.reptile:
-            return {"conditions": v.venomous == True}
+            return {"conditions": case_variable.venomous == True}
         if target == Species.fish:
-            return {"conditions": v.fins == True}
+            return {"conditions": case_variable.fins == True}
         raise ValueError(f"Unexpected target in standard_answer_fn: {target!r}")
 
     @staticmethod
@@ -794,8 +795,8 @@ class TestAutoConditionResolution(unittest.TestCase):
         condition — enough for the UNSET branch test to succeed without the test
         caring about the specific conclusion chosen.
         """
-        v = context.case_variable
-        result = {"conditions": v.feathers == True}
+        case_variable = context.case_variable
+        result = {"conditions": case_variable.feathers == True}
         if any(r.name == "conclusion" for r in requests):
             result["conclusion"] = Species.bird
         return result

@@ -1,7 +1,7 @@
 """
-Surgical tests for Phase 2 of the auto-condition inference feature:
-``condition_resolver.py`` — ResolutionSource, ResolvedCondition,
-ConditionResolver ABC, ChainConditionResolver, and the two concrete stubs.
+Tests for the auto-condition resolution system (``condition_resolver.py``):
+``ResolutionSource``, ``ResolvedCondition``, ``ConditionResolver`` ABC,
+``ChainConditionResolver``, and the two concrete strategy resolvers.
 
 Each test class pins exactly one contract; each test method verifies one
 observable guarantee.
@@ -10,10 +10,12 @@ observable guarantee.
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, Optional
 
 import pytest
+from typing_extensions import Any, Optional
 
+from .animal import Animal, Species
+from krrood.entity_query_language.rdr.backward_inference import ConclusionKnowledge
 from krrood.entity_query_language.rdr.condition_resolver import (
     ChainConditionResolver,
     ConditionResolver,
@@ -22,6 +24,9 @@ from krrood.entity_query_language.rdr.condition_resolver import (
     ResolutionSource,
     TargetKnowledgeResolver,
 )
+from krrood.entity_query_language.rdr.expert import Expert
+from krrood.entity_query_language.rdr.interface import FunctionInterface
+from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 
 # ---------------------------------------------------------------------------
 # Minimal stub helpers — named after the pattern they exercise, not "Mock"
@@ -322,15 +327,17 @@ class TestChainConditionResolver:
                 self.call_count += 1
                 return None
 
-        r1 = _CountingNone()
-        r2 = _CountingNone()
-        r3 = _CountingNone()
-        chain = ChainConditionResolver([r1, r2, r3])
+        counting_resolver_1 = _CountingNone()
+        counting_resolver_2 = _CountingNone()
+        counting_resolver_3 = _CountingNone()
+        chain = ChainConditionResolver(
+            [counting_resolver_1, counting_resolver_2, counting_resolver_3]
+        )
         chain.resolve(*_DUMMY_ARGS)
 
-        assert r1.call_count == 1
-        assert r2.call_count == 1
-        assert r3.call_count == 1
+        assert counting_resolver_1.call_count == 1
+        assert counting_resolver_2.call_count == 1
+        assert counting_resolver_3.call_count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -377,16 +384,6 @@ class TestConditionResolverABC:
 # ---------------------------------------------------------------------------
 # Animal helpers shared by TestTargetKnowledgeResolver
 # ---------------------------------------------------------------------------
-
-from .animal import Animal, Species  # noqa: E402  (placed after stubs for clarity)
-from krrood.entity_query_language.rdr.single_class import (
-    EQLSingleClassRDR,
-)  # noqa: E402
-from krrood.entity_query_language.rdr.expert import Expert  # noqa: E402
-from krrood.entity_query_language.rdr.interface import FunctionInterface  # noqa: E402
-from krrood.entity_query_language.rdr.backward_inference import (
-    ConclusionKnowledge,
-)  # noqa: E402
 
 
 def _make_mammal(**overrides) -> Animal:

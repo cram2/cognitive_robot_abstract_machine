@@ -8,7 +8,7 @@ returns the sets of conditions that would cause a given conclusion value to fire
 
 from __future__ import annotations
 
-from typing import Any, List, Tuple
+from typing_extensions import Any, List, Tuple
 
 import pytest
 
@@ -660,12 +660,12 @@ class TestIsSatisfiable:
 
 
 # ---------------------------------------------------------------------------
-# Phase 1: GuardCondition.holds_for
+# GuardCondition.holds_for
 # ---------------------------------------------------------------------------
 
 
 class TestGuardConditionHoldsFor:
-    """Unit tests for GuardCondition.holds_for — the new Phase 1 method.
+    """Unit tests for :meth:`GuardCondition.holds_for`.
 
     Each test exercises exactly one path through the holds_for logic:
     whether the guard is positive or negated, and whether the underlying
@@ -712,16 +712,14 @@ class TestGuardConditionHoldsFor:
 
 
 # ---------------------------------------------------------------------------
-# Phase 1: SufficientConditionSet.evaluate_against delegates to holds_for
+# SufficientConditionSet.evaluate_against delegates to GuardCondition.holds_for
 # ---------------------------------------------------------------------------
 
 
 class TestSufficientConditionSetDelegates:
-    """Regression tests verifying evaluate_against delegates to GuardCondition.holds_for.
-
-    The refactored implementation replaces the original evaluation loop with
-    ``all(guard.holds_for(...))``. These tests confirm the delegation preserves
-    the original semantics: all guards must hold, and the first failure short-circuits.
+    """Verifies that :meth:`SufficientConditionSet.evaluate_against` delegates per-guard
+    evaluation to :meth:`GuardCondition.holds_for` and that the all-guards-must-hold
+    semantics are preserved: every guard must pass, and the first failure short-circuits.
     """
 
     def test_evaluate_against_returns_true_when_all_guards_pass(self):

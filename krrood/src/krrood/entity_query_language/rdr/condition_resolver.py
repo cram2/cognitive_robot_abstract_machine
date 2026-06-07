@@ -8,11 +8,11 @@ is only consulted when no automatic resolution is possible.
 
 The two built-in strategies, composed as a :class:`ChainConditionResolver`:
 
-* :class:`TargetKnowledgeResolver` — Phase 1: find a condition already known for the
-  target conclusion that is True for the new case and False for the corner case.
-* :class:`CornerCaseKnowledgeResolver` — Phase 2: find a condition known for the wrong
-  (current) conclusion that is True for the corner case, then negate it; if the negation
-  is True for the new case, use it.
+* :class:`TargetKnowledgeResolver` — primary strategy: find a condition already known for
+  the target conclusion that is True for the new case and False for the corner case.
+* :class:`CornerCaseKnowledgeResolver` — secondary strategy: find a condition known for
+  the wrong (current) conclusion that is True for the corner case, then negate it; if the
+  negation is True for the new case, use it.
 
 Both strategies are gated on ``corner_case is not None`` (refinement branch only) and
 are fully silent — no expert prompt is produced when a condition is auto-resolved.
@@ -26,13 +26,15 @@ from enum import Enum
 
 from typing_extensions import TYPE_CHECKING, Any, List, Optional
 
+from krrood.entity_query_language.factories import not_
+from krrood.entity_query_language.rdr.backward_inference import (
+    ConclusionKnowledge,
+    GuardCondition,
+)
+
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import SymbolicExpression
     from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
-    from krrood.entity_query_language.rdr.backward_inference import (
-        ConclusionKnowledge,
-        GuardCondition,
-    )
 
 
 class ResolutionSource(Enum):
@@ -44,14 +46,12 @@ class ResolutionSource(Enum):
 
 @dataclass(frozen=True)
 class ResolvedCondition:
-    """An automatically derived condition expression and its provenance.
-
-    :param expression: The EQL condition expression to insert as the new rule's condition.
-    :param source: Which resolution strategy produced this condition.
-    """
+    """An automatically derived condition expression and its provenance."""
 
     expression: "SymbolicExpression"
+    """The EQL condition expression to insert as the new rule's condition."""
     source: ResolutionSource
+    """The resolution strategy that produced this condition."""
 
 
 class ConditionResolver(ABC):
@@ -87,18 +87,19 @@ class ConditionResolver(ABC):
 
 
 def _materialize(guard: "GuardCondition") -> "SymbolicExpression":
-    """Return the EQL expression for *guard*, applying negation when needed.
+    """Apply negation to produce the EQL expression used as a new rule's condition.
 
     A ``negated=True`` guard fires when its expression is False, so materializing it
     for use as a new rule's condition requires wrapping it with ``not_``.
-    """
-    from krrood.entity_query_language.factories import not_
 
+    :return: ``not_(guard.expression)`` when ``guard.negated`` is ``True``, otherwise
+        ``guard.expression``.
+    """
     return not_(guard.expression) if guard.negated else guard.expression
 
 
 class TargetKnowledgeResolver(ConditionResolver):
-    """Phase-1 resolver: use backward inference on the target conclusion.
+    """Primary strategy resolver: use backward inference on the target conclusion.
 
     Searches the sufficient condition sets known for ``target`` and returns the first
     guard that is True for the new case and False for the corner case — guaranteeing
@@ -115,8 +116,16 @@ class TargetKnowledgeResolver(ConditionResolver):
         target_knowledge: "ConclusionKnowledge",
         current_knowledge: "ConclusionKnowledge",
     ) -> Optional[ResolvedCondition]:
-        for scs in target_knowledge.sufficient_condition_sets:
-            for guard in scs.conditions:
+        """Search ``target_knowledge`` for a guard that discriminates ``case`` from ``corner_case``.
+
+        Returns the first guard that holds for ``case`` and does not hold for ``corner_case``,
+        materialized as a :class:`ResolvedCondition` tagged
+        :attr:`ResolutionSource.TARGET_KNOWLEDGE`.
+
+        :return: A :class:`ResolvedCondition`, or ``None`` if no discriminating guard is found.
+        """
+        for sufficient_condition_set in target_knowledge.sufficient_condition_sets:
+            for guard in sufficient_condition_set.conditions:
                 if guard.holds_for(case_variable, case) and not guard.holds_for(
                     case_variable, corner_case
                 ):
@@ -127,7 +136,7 @@ class TargetKnowledgeResolver(ConditionResolver):
 
 
 class CornerCaseKnowledgeResolver(ConditionResolver):
-    """Phase-2 resolver: use backward inference on the wrong (current) conclusion.
+    """Secondary strategy resolver: use backward inference on the wrong (current) conclusion.
 
     Searches the sufficient condition sets known for ``current`` and finds a guard that
     is True for the corner case. The negation of that guard is then checked: if it is
@@ -144,10 +153,15 @@ class CornerCaseKnowledgeResolver(ConditionResolver):
         target_knowledge: "ConclusionKnowledge",
         current_knowledge: "ConclusionKnowledge",
     ) -> Optional[ResolvedCondition]:
-        from krrood.entity_query_language.rdr.backward_inference import GuardCondition
+        """Search ``current_knowledge`` for a guard whose negation discriminates ``case`` from ``corner_case``.
 
-        for scs in current_knowledge.sufficient_condition_sets:
-            for guard in scs.conditions:
+        Finds a guard that holds for ``corner_case`` and whose negation holds for ``case``,
+        then returns the negated condition tagged :attr:`ResolutionSource.CORNER_CASE_KNOWLEDGE`.
+
+        :return: A :class:`ResolvedCondition`, or ``None`` if no negated guard discriminates.
+        """
+        for sufficient_condition_set in current_knowledge.sufficient_condition_sets:
+            for guard in sufficient_condition_set.conditions:
                 if guard.holds_for(case_variable, corner_case):
                     negated = GuardCondition(guard.expression, not guard.negated)
                     if negated.holds_for(case_variable, case):
@@ -160,12 +174,10 @@ class CornerCaseKnowledgeResolver(ConditionResolver):
 
 @dataclass
 class ChainConditionResolver(ConditionResolver):
-    """A Chain-of-Responsibility that tries each resolver in order, returning the first match.
-
-    :param resolvers: Ordered list of :class:`ConditionResolver` strategies to try.
-    """
+    """A Chain-of-Responsibility that tries each resolver in order, returning the first match."""
 
     resolvers: List[ConditionResolver] = field(default_factory=list)
+    """Ordered list of :class:`ConditionResolver` strategies to try, in priority order."""
 
     def resolve(
         self,
@@ -177,6 +189,11 @@ class ChainConditionResolver(ConditionResolver):
         target_knowledge: "ConclusionKnowledge",
         current_knowledge: "ConclusionKnowledge",
     ) -> Optional[ResolvedCondition]:
+        """Try each resolver in :attr:`resolvers` in order, returning the first non-``None`` result.
+
+        :return: The first :class:`ResolvedCondition` produced by a resolver, or ``None``
+            if every resolver returns ``None``.
+        """
         for resolver in self.resolvers:
             result = resolver.resolve(
                 case,

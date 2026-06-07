@@ -205,10 +205,13 @@ class EQLSingleClassRDR:
                 # The expert kept the current conclusion; nothing to insert.
                 return target
         else:
-            condition = self._try_auto_resolve(
-                case, target, current, corner_case
-            ) or expert.ask_for_conditions(
-                case, self.case_variable, target, current, trace, corner_case
+            resolved = self._try_auto_resolve(case, target, current, corner_case)
+            condition = (
+                resolved
+                if resolved is not None
+                else expert.ask_for_conditions(
+                    case, self.case_variable, target, current, trace, corner_case
+                )
             )
 
         self._insert_rule(trace, current, condition, target, case)
@@ -224,17 +227,16 @@ class EQLSingleClassRDR:
     ) -> Optional[SymbolicExpression]:
         """Attempt to derive a differentiating condition without asking the expert.
 
-        Returns a condition expression when the :attr:`condition_resolver` finds one,
-        ``None`` otherwise (which causes the caller to fall back to the expert).
         Only active for the refinement branch: returns ``None`` immediately when
-        ``condition_resolver`` is unset, ``corner_case`` is ``None``, or ``current``
-        is ``UNSET``.
+        :attr:`condition_resolver` is unset, ``corner_case`` is ``None``, or ``current``
+        is ``UNSET``. When active, queries the backward-inference index for both
+        ``target`` and ``current`` knowledge and delegates to :attr:`condition_resolver`.
 
         :param case: The new case being fit.
         :param target: The correct conclusion.
         :param current: The wrong conclusion currently returned by the firing rule.
         :param corner_case: The case that triggered the currently-firing rule's creation.
-        :return: An auto-derived EQL condition, or ``None``.
+        :return: An auto-derived EQL condition expression, or ``None`` to fall back to the expert.
         """
         if self.condition_resolver is None or corner_case is None or current is UNSET:
             return None
