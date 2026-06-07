@@ -263,16 +263,16 @@ class TestChainConditionResolver:
 
         assert isinstance(result, ChainConditionResolver)
 
-    def test_backward_inference_default_has_one_resolver(self):
-        """backward_inference_default() installs exactly one resolver.
+    def test_backward_inference_default_has_two_resolvers(self):
+        """backward_inference_default() installs exactly two resolvers.
 
-        Guarantee: the default chain contains only a single strategy —
-        CornerCaseKnowledgeResolver is intentionally excluded from the default because
-        it inspects the current (wrong) branch and can cause oscillation.
+        Guarantee: the default chain contains TargetKnowledgeResolver followed by
+        CornerCaseKnowledgeResolver — the ordering is part of the public contract and
+        the count pins the surface so any future addition requires an explicit test update.
         """
         chain = ChainConditionResolver.backward_inference_default()
 
-        assert len(chain.resolvers) == 1
+        assert len(chain.resolvers) == 2
 
     def test_backward_inference_default_first_resolver_is_target_knowledge(self):
         """backward_inference_default() places TargetKnowledgeResolver first.
@@ -284,17 +284,27 @@ class TestChainConditionResolver:
 
         assert isinstance(chain.resolvers[0], TargetKnowledgeResolver)
 
-    def test_backward_inference_default_only_resolver_is_target_knowledge(self):
-        """backward_inference_default() installs exactly one TargetKnowledgeResolver.
+    def test_backward_inference_default_resolvers_are_target_then_corner_case(self):
+        """backward_inference_default() contains TargetKnowledgeResolver then CornerCaseKnowledgeResolver.
 
-        Guarantee: the default chain contains only the target-knowledge strategy —
-        CornerCaseKnowledgeResolver is intentionally excluded because it inspects the
-        current (wrong) branch and can cause oscillation.
+        Guarantee: index 0 is TargetKnowledgeResolver, index 1 is CornerCaseKnowledgeResolver —
+        both types and their order are pinned so downstream callers that depend on strategy
+        sequencing cannot be silently broken by reordering.
         """
         chain = ChainConditionResolver.backward_inference_default()
 
-        assert len(chain.resolvers) == 1
         assert isinstance(chain.resolvers[0], TargetKnowledgeResolver)
+        assert isinstance(chain.resolvers[1], CornerCaseKnowledgeResolver)
+
+    def test_backward_inference_default_second_resolver_is_corner_case_knowledge(self):
+        """backward_inference_default() places CornerCaseKnowledgeResolver at index 1.
+
+        Guarantee: the second strategy in the default chain is exactly
+        CornerCaseKnowledgeResolver — not a generic fallback resolver.
+        """
+        chain = ChainConditionResolver.backward_inference_default()
+
+        assert isinstance(chain.resolvers[1], CornerCaseKnowledgeResolver)
 
     def test_chain_returns_first_resolver_result_not_second(self):
         """The result value comes from the first non-None resolver, not a later one.
@@ -732,204 +742,369 @@ class TestTargetKnowledgeResolver:
 
 
 # ---------------------------------------------------------------------------
-# TestCornerCaseKnowledgeResolver — Phase 4 negation-path tests
+# TestCornerCaseKnowledgeResolver — Phase 2 positive-condition semantics tests
 #
-# Strategy: use a single-rule EQL tree (milk==True → mammal) to derive a real
-# ConclusionKnowledge whose GuardCondition.holds_for() evaluates live EQL
-# expressions.  Tests 1 and 2 use this tree for current_knowledge; tests 3 and
-# 4 construct ConclusionKnowledge directly to isolate specific logic branches.
+# The new algorithm searches non-active paths to the wrong conclusion for a
+# POSITIVE guard (no negation) that holds for the new case and does not hold
+# for the corner case.  The active path is the SCS whose guard expression is
+# identical (by identity) to firing_anchor.
+#
+# Strategy: synthesize ConclusionKnowledge directly with two SufficientConditionSets
+# built from live EQL variable expressions so GuardCondition.holds_for() evaluates
+# correctly.  SCS-0 is designated the "active" path by providing its guard expression
+# as firing_anchor; SCS-1 is the non-active path searched for a discriminating guard.
 # ---------------------------------------------------------------------------
 
 
-def _milk_mammal_knowledge():
-    """Build a single-rule tree ``milk==True → mammal`` and return its knowledge.
+def _two_path_wrong_knowledge():
+    """Build live ConclusionKnowledge with two independent SCSs for Species.fish.
 
-    Returns ``(case_variable, current_knowledge)`` where ``current_knowledge``
-    for Species.mammal has exactly one SufficientConditionSet with one guard:
-    ``milk == True`` (negated=False).
+    SCS-0 (active path):  fins == True   (negated=False)
+    SCS-1 (non-active):   aquatic == True (negated=False)
 
-    Named pattern: MilkMammalKnowledge — a minimal current_knowledge fixture
-    that gives the resolver exactly one positive guard to negate.
+    Returns ``(case_variable, fins_expr, aquatic_expr, current_knowledge)`` so
+    callers can supply ``fins_expr`` as ``firing_anchor`` to mark SCS-0 as active
+    and leave SCS-1 as the search target.
+
+    Named pattern: TwoPathWrongKnowledge — a minimal two-SCS ConclusionKnowledge
+    fixture that provides the resolver exactly one non-active path to search.
     """
-    from krrood.entity_query_language.factories import add, entity, variable
+    from krrood.entity_query_language.factories import variable
     from krrood.entity_query_language.rdr.backward_inference import (
-        what_do_we_know_about,
+        GuardCondition,
+        SufficientConditionSet,
     )
 
-    animal = variable(Animal, domain=[])
-    query = entity(animal).where(animal.milk == True)
-    with query:
-        add(animal.species, Species.mammal)
-    query.build()
-    current_knowledge = what_do_we_know_about(query._conditions_root_, Species.mammal)
-    return animal, current_knowledge
+    case_variable = variable(Animal, domain=[])
+    fins_expr = case_variable.fins == True  # noqa: E712
+    aquatic_expr = case_variable.aquatic == True  # noqa: E712
+
+    scs_active = SufficientConditionSet(
+        conditions=(GuardCondition(fins_expr, negated=False),)
+    )
+    scs_non_active = SufficientConditionSet(
+        conditions=(GuardCondition(aquatic_expr, negated=False),)
+    )
+    current_knowledge = ConclusionKnowledge(
+        conclusion_value=Species.fish,
+        sufficient_condition_sets=(scs_active, scs_non_active),
+    )
+    return case_variable, fins_expr, aquatic_expr, current_knowledge
+
+
+def _eval_expr(expr, case_variable, case):
+    """Evaluate a live EQL expression against *case*, returning a bool.
+
+    Binds *case_variable* to [*case*] then collects all OperationResult/bool values
+    from expr.evaluate(), returning True only when at least one is true.
+    """
+    from krrood.entity_query_language.core.base_expressions import OperationResult
+
+    case_variable._update_domain_([case])
+    results = list(expr.evaluate())
+    return any(
+        r.is_true if isinstance(r, OperationResult) else bool(r) for r in results
+    )
 
 
 class TestCornerCaseKnowledgeResolver:
-    """CornerCaseKnowledgeResolver finds a discriminating condition by negating
-    a guard that holds for the corner case and checking it against the new case."""
+    """CornerCaseKnowledgeResolver finds a positive discriminating condition from
+    a non-active path to the wrong conclusion, without applying negation."""
 
-    def test_resolves_when_negated_guard_holds_for_new_case(self):
-        """Resolver returns CORNER_CASE_KNOWLEDGE when the negated corner-case guard holds.
+    def test_non_active_path_guard_returned_when_it_discriminates(self):
+        """Non-active-path guard is returned when it holds for case but not corner_case.
 
-        Guarantee: given current_knowledge with guard ``milk==True`` (which holds for
-        the corner case — a mammal with milk=True), the resolver constructs
-        ``GuardCondition(milk_expr, negated=True)`` and checks it against the new
-        case (an animal with milk=False).  NOT(milk) holds for the non-mammal, so a
-        ResolvedCondition tagged CORNER_CASE_KNOWLEDGE is returned.
+        Guarantee: given two SCSs for the wrong conclusion, where the active path's
+        guard expression equals firing_anchor, the resolver finds a guard in the
+        non-active path that is True for the new case and False for the corner case
+        and returns a ResolvedCondition tagged CORNER_CASE_KNOWLEDGE.
+
+        Scenario:
+          Active path:     fins == True   (firing_anchor)
+          Non-active path: aquatic == True
+          case:        aquatic=True, fins=False  → non-active guard holds
+          corner_case: aquatic=False, fins=True  → non-active guard does not hold
         """
-        case_variable, current_knowledge = _milk_mammal_knowledge()
+        case_variable, fins_expr, _aquatic_expr, current_knowledge = (
+            _two_path_wrong_knowledge()
+        )
 
-        # corner_case: mammal — the condition milk==True holds for it.
-        corner_case = _make_mammal(name="mammal_corner")
-        # new_case: non-mammal animal with milk=False — NOT(milk==True) holds.
-        new_case = _make_bird(name="non_mammal_new", feathers=False, milk=False)
+        # new case: aquatic=True → non-active guard holds; fins=False → not active path
+        case = _make_mammal(name="aquatic_case", fins=False, aquatic=True)
+        # corner case: aquatic=False → non-active guard fails; fins=True → active path
+        corner_case = _make_mammal(name="fins_corner", fins=True, aquatic=False)
 
-        empty_target = ConclusionKnowledge(Species.fish, ())
-
+        empty_target = ConclusionKnowledge(Species.bird, ())
         resolver = CornerCaseKnowledgeResolver()
+
         result = resolver.resolve(
-            case=new_case,
+            case=case,
             case_variable=case_variable,
-            target=Species.fish,
-            current=Species.mammal,
+            target=Species.bird,
+            current=Species.fish,
             corner_case=corner_case,
             target_knowledge=empty_target,
             current_knowledge=current_knowledge,
+            firing_anchor=fins_expr,
         )
 
         assert result is not None
         assert isinstance(result, ResolvedCondition)
         assert result.source is ResolutionSource.CORNER_CASE_KNOWLEDGE
 
-    def test_returns_none_when_negated_guard_does_not_hold_for_new_case(self):
-        """Resolver returns None when NOT(corner-case guard) fails for the new case.
+    def test_active_path_guard_never_returned(self):
+        """A guard that exists only in the active path is never returned.
 
-        Guarantee: if the new case also satisfies the same condition as the corner
-        case (both have milk=True), then NOT(milk) does not hold for the new case
-        and no negated condition can discriminate — the resolver correctly yields None.
+        Guarantee: even when the active-path guard (fins == True) would discriminate
+        case from corner_case, it is excluded because it belongs to the active SCS.
+        The resolver returns None when no non-active guard can discriminate.
+
+        Scenario:
+          Active path:     fins == True   (firing_anchor)
+          Non-active path: aquatic == True
+          case:        fins=True, aquatic=False → active guard holds, non-active does not
+          corner_case: fins=False, aquatic=False → neither holds for corner_case
+          Expected: None (non-active guard fails for case; active guard excluded)
         """
-        case_variable, current_knowledge = _milk_mammal_knowledge()
+        case_variable, fins_expr, _aquatic_expr, current_knowledge = (
+            _two_path_wrong_knowledge()
+        )
 
-        # Both corner case and new case have milk=True → NOT(milk) is False for both.
-        corner_case = _make_mammal(name="mammal_corner")
-        new_case = _make_mammal(name="mammal_new")
+        # case: fins=True → active guard holds; aquatic=False → non-active guard fails
+        case = _make_mammal(name="fins_case", fins=True, aquatic=False)
+        # corner_case: fins=False → active guard fails; aquatic=False → non-active fails
+        corner_case = _make_mammal(name="no_aquatic_corner", fins=False, aquatic=False)
 
-        empty_target = ConclusionKnowledge(Species.mammal, ())
-
+        empty_target = ConclusionKnowledge(Species.bird, ())
         resolver = CornerCaseKnowledgeResolver()
+
         result = resolver.resolve(
-            case=new_case,
+            case=case,
             case_variable=case_variable,
-            target=Species.mammal,
-            current=Species.mammal,
+            target=Species.bird,
+            current=Species.fish,
             corner_case=corner_case,
             target_knowledge=empty_target,
             current_knowledge=current_knowledge,
+            firing_anchor=fins_expr,
         )
 
         assert result is None
 
-    def test_returns_none_when_current_knowledge_is_empty(self):
+    def test_active_path_identified_by_firing_anchor(self):
+        """_active_path() returns the SCS whose guard expression is firing_anchor.
+
+        Guarantee: identity comparison on guard.expression selects precisely the SCS
+        that contains the firing anchor and excludes the sibling SCS.
+
+        The active SCS contains fins_expr as its guard.expression; the non-active SCS
+        contains aquatic_expr.  _active_path(fins_expr, ...) must return the fins SCS
+        and not the aquatic SCS.
+        """
+        from krrood.entity_query_language.rdr.backward_inference import (
+            GuardCondition,
+            SufficientConditionSet,
+        )
+        from krrood.entity_query_language.factories import variable
+
+        case_variable = variable(Animal, domain=[])
+        fins_expr = case_variable.fins == True  # noqa: E712
+        aquatic_expr = case_variable.aquatic == True  # noqa: E712
+
+        scs_fins = SufficientConditionSet(
+            conditions=(GuardCondition(fins_expr, negated=False),)
+        )
+        scs_aquatic = SufficientConditionSet(
+            conditions=(GuardCondition(aquatic_expr, negated=False),)
+        )
+        current_knowledge = ConclusionKnowledge(
+            conclusion_value=Species.fish,
+            sufficient_condition_sets=(scs_fins, scs_aquatic),
+        )
+
+        resolver = CornerCaseKnowledgeResolver()
+        active = resolver._active_path(fins_expr, current_knowledge)
+
+        assert active is scs_fins
+        assert active is not scs_aquatic
+
+    def test_returns_none_when_all_non_active_guards_fail(self):
+        """Resolver returns None when every non-active-path guard fails to discriminate.
+
+        Guarantee: if the non-active guard holds for both case and corner_case, it
+        does not discriminate and the resolver correctly yields None.
+
+        Scenario:
+          Active path:     fins == True   (firing_anchor)
+          Non-active path: aquatic == True
+          case:        aquatic=True, fins=False → non-active guard holds
+          corner_case: aquatic=True, fins=True  → non-active guard ALSO holds
+          → guard is True for both; no discrimination possible → None
+        """
+        case_variable, fins_expr, _aquatic_expr, current_knowledge = (
+            _two_path_wrong_knowledge()
+        )
+
+        case = _make_mammal(name="aquatic_case", fins=False, aquatic=True)
+        corner_case = _make_mammal(name="aquatic_corner", fins=True, aquatic=True)
+
+        empty_target = ConclusionKnowledge(Species.bird, ())
+        resolver = CornerCaseKnowledgeResolver()
+
+        result = resolver.resolve(
+            case=case,
+            case_variable=case_variable,
+            target=Species.bird,
+            current=Species.fish,
+            corner_case=corner_case,
+            target_knowledge=empty_target,
+            current_knowledge=current_knowledge,
+            firing_anchor=fins_expr,
+        )
+
+        assert result is None
+
+    def test_returns_none_when_no_sufficient_condition_sets(self):
         """Resolver returns None immediately when current_knowledge has no condition sets.
 
-        Guarantee: an empty ConclusionKnowledge (no rule paths for the current
-        conclusion) causes the outer loop to be a no-op and the method returns None
-        without error.
+        Guarantee: an empty ConclusionKnowledge causes the outer loop to be a no-op
+        and the resolver returns None without error — no AttributeError or crash.
         """
-        case_variable, _ = (
-            _milk_mammal_knowledge()
-        )  # variable needed for call signature
+        from krrood.entity_query_language.factories import variable
 
-        corner_case = _make_mammal(name="corner")
-        new_case = _make_bird(name="new")
+        case_variable = variable(Animal, domain=[])
+        fins_expr = case_variable.fins == True  # noqa: E712
 
-        empty_current = ConclusionKnowledge(Species.mammal, ())
-        empty_target = ConclusionKnowledge(Species.fish, ())
+        empty_current = ConclusionKnowledge(Species.fish, ())
+        empty_target = ConclusionKnowledge(Species.bird, ())
+
+        case = _make_mammal(name="some_case", fins=False, aquatic=True)
+        corner_case = _make_mammal(name="some_corner", fins=True, aquatic=False)
 
         resolver = CornerCaseKnowledgeResolver()
         result = resolver.resolve(
-            case=new_case,
+            case=case,
             case_variable=case_variable,
-            target=Species.fish,
-            current=Species.mammal,
+            target=Species.bird,
+            current=Species.fish,
             corner_case=corner_case,
             target_knowledge=empty_target,
             current_knowledge=empty_current,
+            firing_anchor=fins_expr,
         )
 
         assert result is None
 
-    def test_negated_guard_in_current_knowledge_is_double_negated_correctly(self):
-        """A negated=True guard from current_knowledge is double-negated to negated=False.
+    def test_returns_none_when_only_active_path_exists(self):
+        """Resolver returns None when the only SCS is the active path.
 
-        Guarantee: when the corner case's guard already has ``negated=True``
-        (fires when its expression is False), applying ``not guard.negated``
-        produces a new GuardCondition with ``negated=False``.  ``_materialize``
-        with ``negated=False`` returns the raw expression directly (no ``not_``
-        wrapping), so the materialised expression evaluates to True for the new case.
-
-        Scenario: the guard is ``GuardCondition(fins==True, negated=True)``.
-        - corner_case has fins=False → negated guard holds (NOT fins is True).
-        - new_case has fins=True → double-negated condition (fins itself) is True.
-        We synthesise the guard directly so the test isolates _materialize logic
-        independent of any specific tree topology.
+        Guarantee: with a single SCS that is excluded as the active path,
+        the non-active loop body never executes and the result is None.
         """
         from krrood.entity_query_language.factories import variable
         from krrood.entity_query_language.rdr.backward_inference import (
             GuardCondition,
             SufficientConditionSet,
         )
-        from krrood.entity_query_language.core.base_expressions import OperationResult
 
-        # Live variable so GuardCondition.holds_for() can evaluate EQL expressions.
         case_variable = variable(Animal, domain=[])
         fins_expr = case_variable.fins == True  # noqa: E712
 
-        # A guard that fires when fins==False (negated=True).
-        negated_guard = GuardCondition(fins_expr, negated=True)
-
-        # corner_case: fins=False → the negated guard holds.
-        corner_case = _make_mammal(name="no_fins_corner", fins=False)
-        assert (
-            negated_guard.holds_for(case_variable, corner_case) is True
-        ), "Test pre-condition: negated guard must hold for the corner case"
-
-        # new_case: fins=True → double-negation (fins itself) holds.
-        new_case = _make_bird(name="fins_new", fins=True, feathers=False)
-
-        # Synthesise current_knowledge with only this negated guard.
+        scs_only = SufficientConditionSet(
+            conditions=(GuardCondition(fins_expr, negated=False),)
+        )
         current_knowledge = ConclusionKnowledge(
             conclusion_value=Species.fish,
-            sufficient_condition_sets=(
-                SufficientConditionSet(conditions=(negated_guard,)),
-            ),
+            sufficient_condition_sets=(scs_only,),
         )
-        empty_target = ConclusionKnowledge(Species.reptile, ())
+        empty_target = ConclusionKnowledge(Species.bird, ())
+
+        # case has fins=True so the guard would discriminate if it were searched
+        case = _make_mammal(name="fins_case", fins=True, aquatic=False)
+        corner_case = _make_mammal(name="no_fins_corner", fins=False, aquatic=False)
 
         resolver = CornerCaseKnowledgeResolver()
         result = resolver.resolve(
-            case=new_case,
+            case=case,
             case_variable=case_variable,
-            target=Species.reptile,
+            target=Species.bird,
             current=Species.fish,
             corner_case=corner_case,
             target_knowledge=empty_target,
             current_knowledge=current_knowledge,
+            firing_anchor=fins_expr,  # marks the only SCS as active
         )
 
-        # The double-negation path must produce a result.
+        assert result is None
+
+    def test_returns_result_when_firing_anchor_none(self):
+        """When firing_anchor is None, all paths are searched (no active-path exclusion).
+
+        Guarantee: firing_anchor=None degrades gracefully — _active_path() returns None,
+        so no SCS is excluded and any discriminating guard in any path can be returned.
+
+        Scenario: with two SCSs (fins, aquatic) and firing_anchor=None, the fins guard
+        can discriminate case from corner_case and is returned even though it would have
+        been excluded as the active path if firing_anchor had been supplied.
+        """
+        case_variable, _fins_expr, _aquatic_expr, current_knowledge = (
+            _two_path_wrong_knowledge()
+        )
+
+        # case: fins=True → fins guard holds
+        # corner_case: fins=False → fins guard fails → discriminates
+        case = _make_mammal(name="fins_case", fins=True, aquatic=False)
+        corner_case = _make_mammal(name="no_fins_corner", fins=False, aquatic=False)
+
+        empty_target = ConclusionKnowledge(Species.bird, ())
+        resolver = CornerCaseKnowledgeResolver()
+
+        result = resolver.resolve(
+            case=case,
+            case_variable=case_variable,
+            target=Species.bird,
+            current=Species.fish,
+            corner_case=corner_case,
+            target_knowledge=empty_target,
+            current_knowledge=current_knowledge,
+            firing_anchor=None,  # no active path excluded
+        )
+
         assert result is not None
         assert result.source is ResolutionSource.CORNER_CASE_KNOWLEDGE
 
-        # _materialize with negated=False returns the raw expression (fins==True).
-        # Evaluating it against new_case (fins=True) must yield True.
-        case_variable._update_domain_([new_case])
-        eval_results = list(result.expression.evaluate())
-        truth = any(
-            r.is_true if isinstance(r, OperationResult) else bool(r)
-            for r in eval_results
+    def test_no_negation_applied_to_returned_expression(self):
+        """The returned expression is the raw guard expression — not wrapped in not_().
+
+        Guarantee: _materialize(guard) for a non-negated guard returns guard.expression
+        directly.  The resolved expression evaluates True for case (positive condition),
+        confirming no negation wrapper was applied.
+
+        Scenario: non-active guard is aquatic==True; case has aquatic=True;
+        the resolved expression must evaluate True for case (confirming it is positive).
+        """
+        case_variable, fins_expr, _aquatic_expr, current_knowledge = (
+            _two_path_wrong_knowledge()
         )
-        assert (
-            truth is True
-        ), "Materialised double-negated expression must evaluate True for the new case"
+
+        case = _make_mammal(name="aquatic_case", fins=False, aquatic=True)
+        corner_case = _make_mammal(name="fins_corner", fins=True, aquatic=False)
+
+        empty_target = ConclusionKnowledge(Species.bird, ())
+        resolver = CornerCaseKnowledgeResolver()
+
+        result = resolver.resolve(
+            case=case,
+            case_variable=case_variable,
+            target=Species.bird,
+            current=Species.fish,
+            corner_case=corner_case,
+            target_knowledge=empty_target,
+            current_knowledge=current_knowledge,
+            firing_anchor=fins_expr,
+        )
+
+        assert result is not None
+        # The expression must evaluate True for case (aquatic=True) — positive, not negated.
+        truth_for_case = _eval_expr(result.expression, case_variable, case)
+        assert truth_for_case is True
