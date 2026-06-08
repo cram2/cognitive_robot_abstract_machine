@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
-from typing_extensions import Optional
+from typing_extensions import Callable, List, Optional, TypeVar
 
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
@@ -24,6 +24,8 @@ from krrood.entity_query_language.verbalization.utils import _ensure_plural
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.mapped_variable import Attribute
+
+_T = TypeVar("_T")
 
 
 @dataclass
@@ -89,7 +91,9 @@ class RoleFragment(VerbFragment):
         )
 
     @classmethod
-    def for_attribute(cls, owner, attribute_name: str, plural: bool = False) -> RoleFragment:
+    def for_attribute(
+        cls, owner, attribute_name: str, plural: bool = False
+    ) -> RoleFragment:
         """
         Build a fragment for an attribute access, linked to its owner class.
 
@@ -150,6 +154,67 @@ class BlockFragment(VerbFragment):
     """Ordered list of sub-item fragments."""
 
 
+# ── Fragment catamorphism ──────────────────────────────────────────────────────
+
+
+def fold_fragment(
+    fragment: VerbFragment,
+    *,
+    word: Callable[[str], _T],
+    role: Callable[[str, SemanticRole, Optional[SourceRef]], _T],
+    phrase: Callable[[List[_T], str], _T],
+    block: Callable[[BlockFragment], _T],
+) -> _T:
+    """
+    Fold a :class:`VerbFragment` tree into a value of type ``_T`` by supplying one
+    handler per node kind — the single, shared structural recursion over the IR.
+
+    This is the *catamorphism* (the unique homomorphism from the fragment tree into
+    a target algebra): the recursion scheme lives here once; each caller provides an
+    *algebra* (the four handlers) describing how to combine results. Every consumer
+    of the IR — plain-text flattening and each
+    :class:`~krrood.entity_query_language.verbalization.rendering.renderer.FragmentRenderer`
+    — is expressed as one such fold, so the Word/Role/Phrase traversal is written
+    exactly once instead of being copied per consumer.
+
+    ``word``, ``role`` and ``phrase`` receive already-folded children; ``block``
+    receives the raw :class:`BlockFragment` because block layout is genuinely
+    consumer-specific (flat prose vs. indented bullets) and must control its own
+    recursion (e.g. with depth).
+
+    Concept references:
+
+    * Catamorphism / F-algebra — Meijer, Fokkinga & Paterson (1991), "Functional
+      Programming with Bananas, Lenses, Envelopes and Barbed Wire", FPCA; Bird & de
+      Moor (1997), "Algebra of Programming".
+    * Phrase specification traversed by realisation processors — Gatt & Reiter
+      (2009), "SimpleNLG: A realisation engine for practical applications", ENLG.
+
+    :param fragment: Root of the fragment tree.
+    :param word: Handler for :class:`WordFragment` text.
+    :param role: Handler for :class:`RoleFragment` ``(text, role, source_ref)``.
+    :param phrase: Handler for :class:`PhraseFragment` ``(folded_parts, separator)``.
+    :param block: Handler for a raw :class:`BlockFragment` (controls its own recursion).
+    :return: The folded value.
+    :rtype: _T
+    """
+    match fragment:
+        case WordFragment(text=text):
+            return word(text)
+        case RoleFragment(text=text, role=semantic_role, source_ref=ref):
+            return role(text, semantic_role, ref)
+        case PhraseFragment(parts=parts, separator=separator):
+            folded = [
+                fold_fragment(p, word=word, role=role, phrase=phrase, block=block)
+                for p in parts
+            ]
+            return phrase(folded, separator)
+        case BlockFragment():
+            return block(fragment)
+        case _:
+            return word("")
+
+
 # ── Fragment flattening ────────────────────────────────────────────────────────
 
 
@@ -158,26 +223,28 @@ def flatten_fragment_to_plain_text(fragment: VerbFragment) -> str:
     Flatten a :class:`VerbFragment` tree to a plain string (no colour markup).
 
     Used for internal comparisons, logging, and plain-text verbalization output.
+    Expressed as a :func:`fold_fragment` over the plain-text algebra.
 
     :param fragment: Root of the fragment tree to flatten.
     :type fragment: VerbFragment
     :return: Plain-text representation with spaces between tokens.
     :rtype: str
     """
-    match fragment:
-        case WordFragment(text=t):
-            return t
-        case RoleFragment(text=t):
-            return t
-        case PhraseFragment(parts=parts, separator=separator):
-            return separator.join(flatten_fragment_to_plain_text(p) for p in parts)
-        case BlockFragment(header=header, items=items):
-            parts_text = ", ".join(flatten_fragment_to_plain_text(i) for i in items)
-            if header is None:
-                return parts_text
-            return f"{flatten_fragment_to_plain_text(header)} {parts_text}" if parts_text else flatten_fragment_to_plain_text(header)
-        case _:
-            return ""
+
+    def _block(b: BlockFragment) -> str:
+        items = ", ".join(flatten_fragment_to_plain_text(i) for i in b.items)
+        if b.header is None:
+            return items
+        header = flatten_fragment_to_plain_text(b.header)
+        return f"{header} {items}" if items else header
+
+    return fold_fragment(
+        fragment,
+        word=lambda text: text,
+        role=lambda text, _role, _ref: text,
+        phrase=lambda parts, separator: separator.join(parts),
+        block=_block,
+    )
 
 
 # ── Fragment joining utilities ─────────────────────────────────────────────────

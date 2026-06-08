@@ -20,10 +20,8 @@ from typing_extensions import Optional
 
 from krrood.entity_query_language.verbalization.fragments.base import (
     BlockFragment,
-    PhraseFragment,
-    RoleFragment,
+    fold_fragment,
     VerbFragment,
-    WordFragment,
 )
 from krrood.entity_query_language.verbalization.rendering.formatter import (
     BulletStyle,
@@ -35,7 +33,9 @@ from krrood.entity_query_language.verbalization.rendering.formatter import (
 )
 
 if TYPE_CHECKING:
-    from krrood.entity_query_language.verbalization.rendering.source_link_resolver import SourceLinkResolver
+    from krrood.entity_query_language.verbalization.rendering.source_link_resolver import (
+        SourceLinkResolver,
+    )
 
 
 @dataclass
@@ -115,23 +115,23 @@ class ParagraphRenderer(FragmentRenderer):
         :return: Plain or coloured prose string (no newlines or bullets).
         :rtype: str
         """
-        match fragment:
-            case WordFragment(text=text):
-                return text
-            case RoleFragment(text=text, role=role, source_ref=ref):
-                return self._render_role(text, role, ref)
-            case PhraseFragment(parts=parts, separator=separator):
-                rendered = [self.render(p) for p in parts]
-                return separator.join(rendered)
-            case BlockFragment(header=header, items=items):
-                rendered_items = [self.render(i) for i in items]
-                prose = ", ".join(rendered_items)
-                if header is None:
-                    return prose
-                header_str = self.render(header)
-                return f"{header_str}{self._formatter.space}{prose}" if prose else header_str
-            case _:
-                return ""
+
+        def _block(block: BlockFragment) -> str:
+            prose = ", ".join(self.render(i) for i in block.items)
+            if block.header is None:
+                return prose
+            header_str = self.render(block.header)
+            return (
+                f"{header_str}{self._formatter.space}{prose}" if prose else header_str
+            )
+
+        return fold_fragment(
+            fragment,
+            word=lambda text: text,
+            role=lambda text, role, ref: self._render_role(text, role, ref),
+            phrase=lambda parts, separator: separator.join(parts),
+            block=_block,
+        )
 
 
 @dataclass
@@ -186,7 +186,7 @@ class HierarchicalRenderer(FragmentRenderer):
     @property
     def formatted_indent(self) -> str:
         """The indentation string, with spaces replaced by the formatter's space character."""
-        return self.indent_size.value.replace(' ', self._formatter.space)
+        return self.indent_size.value.replace(" ", self._formatter.space)
 
     def _render_item(self, fragment: VerbFragment, depth: int) -> str:
         """Render one item, prepending the bullet at its indentation level."""
@@ -194,19 +194,24 @@ class HierarchicalRenderer(FragmentRenderer):
             case BlockFragment():
                 return self.render(fragment, depth)
             case _:
-                prefix = self.formatted_indent * depth + self.bullet.value + self._formatter.space
+                prefix = (
+                    self.formatted_indent * depth
+                    + self.bullet.value
+                    + self._formatter.space
+                )
                 return prefix + self._inline(fragment)
 
     def _inline(self, fragment: VerbFragment) -> str:
-        """Render a non-block fragment as a flat inline string."""
-        match fragment:
-            case WordFragment(text=text):
-                return text
-            case RoleFragment(text=text, role=role, source_ref=ref):
-                return self._render_role(text, role, ref)
-            case PhraseFragment(parts=parts, separator=separator):
-                return separator.join(self._inline(p) for p in parts)
-            case BlockFragment():
-                return self.render(fragment, 0)
-            case _:
-                return ""
+        """Render a non-block fragment as a flat inline string.
+
+        Expressed as a :func:`~krrood.entity_query_language.verbalization.fragments.base.fold_fragment`;
+        a nested block falls back to the depth-aware :meth:`render` so its indented
+        layout is preserved.
+        """
+        return fold_fragment(
+            fragment,
+            word=lambda text: text,
+            role=lambda text, role, ref: self._render_role(text, role, ref),
+            phrase=lambda parts, separator: separator.join(parts),
+            block=lambda block: self.render(block, 0),
+        )
