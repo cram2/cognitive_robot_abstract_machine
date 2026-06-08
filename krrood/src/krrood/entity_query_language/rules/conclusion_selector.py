@@ -56,7 +56,13 @@ def _fresh_expression(expr: SymbolicExpression) -> SymbolicExpression:
 
     clone = copy(expr)
     clone._id_ = uuid.uuid4()
-    clone._parent_ = None
+    # Give the clone its own lists instead of sharing the original's (shallow copy
+    # makes _children_ and _parents_ the SAME list object).  Assigning directly
+    # avoids the _parent_ setter, which would mutate the shared _parents_ list
+    # and wrench the original's parent out of it.
+    clone._children_ = []
+    clone._parents_ = []
+    clone._parent__ = None
     # :meth:`_update_children_` returns ``v._expression_`` for each child, so the
     # clone must point to itself — otherwise the ORIGINAL node gets wired in.
     clone._expression_ = clone

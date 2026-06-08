@@ -13,16 +13,16 @@ from krrood.entity_query_language.factories import (
 from test.krrood_test.test_eql_rdr.animal import Animal, Species
 
 animal = variable(Animal, domain=[])
-query = entity(animal).where(animal.milk == True)
+query = entity(animal).where(animal.milk)
 with query:
     add(animal.species, Species.mammal)
     with alternative(animal.aquatic):
         add(animal.species, Species.fish)
-        with refinement(not_(animal.backbone)):
+        with refinement(animal.backbone == False):
             add(animal.species, Species.molusc)
         with refinement(animal.feathers):
             add(animal.species, Species.bird)
-        with refinement(not_(animal.fins)):
+        with refinement(animal.fins == False):
             add(animal.species, Species.amphibian)
             with refinement(animal.tail):
                 add(animal.species, Species.reptile)
@@ -30,11 +30,11 @@ with query:
                     add(animal.species, Species.amphibian)
     with alternative(animal.feathers):
         add(animal.species, Species.bird)
-    with alternative(not_(animal.backbone)):
+    with alternative(animal.backbone == False):
         add(animal.species, Species.molusc)
         with refinement(animal.legs > 0):
             add(animal.species, Species.insect)
-            with refinement(not_(animal.eggs)):
+            with refinement(animal.eggs == False):
                 add(animal.species, Species.molusc)
     with alternative(animal.tail):
         add(animal.species, Species.reptile)
