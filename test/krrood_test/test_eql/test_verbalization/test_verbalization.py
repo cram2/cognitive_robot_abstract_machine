@@ -1670,7 +1670,7 @@ def test_is_calculation_value_predicate():
 
 
 def test_fold_range_pairs_is_position_independent():
-    from krrood.entity_query_language.verbalization.range_fold import (
+    from krrood.entity_query_language.verbalization.microplanning.coordination import (
         fold_range_pairs,
         has_pair,
         RangeFold,
@@ -1694,7 +1694,7 @@ def test_fold_range_pairs_is_position_independent():
 
 
 def test_fold_range_pairs_ignores_unrelated_bounds():
-    from krrood.entity_query_language.verbalization.range_fold import has_pair
+    from krrood.entity_query_language.verbalization.microplanning.coordination import has_pair
 
     bank_transaction = variable(BankTransaction, domain=None)
     lower_bound = datetime.datetime(2026, 5, 15)

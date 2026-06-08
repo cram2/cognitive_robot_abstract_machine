@@ -38,7 +38,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 from krrood.entity_query_language.verbalization.fragments.factory import phrase, word
 from krrood.entity_query_language.verbalization.operator_phrase import comparator_phrase
 from krrood.entity_query_language.verbalization.rules.chains import verbalize_chain
-from krrood.entity_query_language.verbalization.range_fold import (
+from krrood.entity_query_language.verbalization.microplanning.coordination import (
     build_between,
     fold_range_pairs,
     has_pair,
@@ -105,7 +105,10 @@ class AndRule(LogicalRule):
         :return: Oxford-comma joined fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        parts = [verbalizer.build(conjunct, context) for conjunct in flatten_operands(expression, AND)]
+        parts = [
+            verbalizer.build(conjunct, context)
+            for conjunct in flatten_operands(expression, AND)
+        ]
         if len(parts) == 1:
             return parts[0]
         return oxford_and(parts, Conjunctions.AND.as_fragment())
@@ -117,7 +120,7 @@ class RangeConjunctionRule(AndRule):
     same attribute by folding it into a *"… is between lo and hi"* phrase.
 
     Precondition (declarative): an ``AND`` whose flattened conjuncts contain at least
-    one foldable pair (:func:`~krrood.entity_query_language.verbalization.range_fold.has_pair`).
+    one foldable pair (:func:`~krrood.entity_query_language.verbalization.microplanning.coordination.has_pair`).
     Takes priority over :class:`AndRule`; non-range conjunctions fall through.
     The left side of the range is verbalized normally, so it still picks up a
     pronoun (*"its booking_date is between …"*) when the chain root is the subject.
@@ -126,7 +129,9 @@ class RangeConjunctionRule(AndRule):
     @classmethod
     def applies(cls, expression, context: VerbalizationContext) -> bool:
         """Return ``True`` for an ``AND`` containing a foldable lo/hi range pair."""
-        return isinstance(expression, AND) and has_pair(flatten_operands(expression, AND))
+        return isinstance(expression, AND) and has_pair(
+            flatten_operands(expression, AND)
+        )
 
     @classmethod
     def transform(
@@ -184,7 +189,10 @@ class OrRule(LogicalRule):
         :return: Disjunction phrase fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        parts = [verbalizer.build(conjunct, context) for conjunct in flatten_operands(expression, OR)]
+        parts = [
+            verbalizer.build(conjunct, context)
+            for conjunct in flatten_operands(expression, OR)
+        ]
         if len(parts) == 1:
             return parts[0]
         head_with_comma = PhraseFragment(
@@ -244,7 +252,9 @@ class NotComparatorRule(NotRule):
     @classmethod
     def applies(cls, expression, context: VerbalizationContext) -> bool:
         """Return ``True`` when the Not child is a Comparator."""
-        return isinstance(expression, Not) and isinstance(expression._child_, Comparator)
+        return isinstance(expression, Not) and isinstance(
+            expression._child_, Comparator
+        )
 
     @classmethod
     def transform(

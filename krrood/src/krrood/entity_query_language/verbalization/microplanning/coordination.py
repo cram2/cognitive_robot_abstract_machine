@@ -1,14 +1,29 @@
 """
-Range folding — collapsing a lower-bound and an upper-bound comparison on the
-same attribute into a single ``between`` phrase.
+Coordination — the microplanning task of combining several clauses/constituents
+into more concise English by joining them with coordinating conjunctions.
 
-``t.booking_date >= lo`` and ``t.booking_date <= hi`` (in either order, joined by
-``AND``) fold into ``RangeFold(t.booking_date, lo, hi)``, which both the generic
-conjunction rule and the subject-restriction rule render as
-*"… is between lo and hi"*.
+In the Reiter & Dale microplanning model this is the **aggregation** task; its
+principal linguistic realisation is *coordination* (joining constituents with
+*and* / *or*, plus conjunction reduction such as folding ``x >= lo`` and
+``x <= hi`` into ``x is between lo and hi``).  The module is named
+**coordination** rather than *aggregation* to avoid collision with EQL's own
+:class:`~krrood.entity_query_language.operators.aggregators.Aggregator`
+operators (Count / Sum / …), which are a different concept entirely.
 
-:func:`fold_range_pairs` and :func:`has_pair` detect complementary bound pairs;
-:func:`build_between` renders the folded phrase.
+This module owns the EQL-level coordination decisions — detecting complementary
+bound comparisons on the same attribute chain and folding them into a single
+:class:`RangeFold` — rendered as a *between* phrase by :func:`build_between`.
+Fragment-level conjunction joining (Oxford-comma assembly) lives with the phrase
+IR as
+:func:`~krrood.entity_query_language.verbalization.fragments.base.oxford_and`.
+
+References:
+
+* Reiter, E. & Dale, R. (2000), "Building Natural Language Generation Systems",
+  CUP — *aggregation* as a microplanning task.
+* Dalianis, H. (1999), "Aggregation in Natural Language Generation",
+  *Computational Intelligence* 15(4) — aggregation realised via coordination /
+  conjunction reduction.
 """
 
 from __future__ import annotations
@@ -53,6 +68,7 @@ class RangeFold:
 
 class _Bound(Enum):
     """Internal marker for the direction of a bound comparison in range folding."""
+
     LOWER = auto()
     UPPER = auto()
 
@@ -128,7 +144,11 @@ def fold_range_pairs(conjuncts: List) -> List[Union[SymbolicExpression, RangeFol
             else (conjuncts[partner], conjunct)
         )
         result.append(
-            RangeFold(chain_expression=lower.left, lower_expression=lower.right, upper_expression=upper.right)
+            RangeFold(
+                chain_expression=lower.left,
+                lower_expression=lower.right,
+                upper_expression=upper.right,
+            )
         )
     return result
 
@@ -159,5 +179,7 @@ def build_between(
     :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
     """
     op = (RangePhrases.BETWEEN if compact else RangePhrases.IS_BETWEEN).as_fragment()
-    bounds = oxford_and([lower_fragment, upper_fragment], Conjunctions.AND.as_fragment())
+    bounds = oxford_and(
+        [lower_fragment, upper_fragment], Conjunctions.AND.as_fragment()
+    )
     return PhraseFragment(parts=[left_fragment, op, bounds])

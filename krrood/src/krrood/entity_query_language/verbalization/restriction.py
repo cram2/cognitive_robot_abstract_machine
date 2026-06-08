@@ -30,15 +30,20 @@ from krrood.entity_query_language.operators.core_logical_operators import (
     AND,
     flatten_operands,
 )
-from krrood.entity_query_language.verbalization.chain_utils import chain_root, walk_chain
+from krrood.entity_query_language.verbalization.chain_utils import (
+    chain_root,
+    walk_chain,
+)
 from krrood.entity_query_language.verbalization.fragments.base import (
     oxford_and,
     PhraseFragment,
     RoleFragment,
     VerbFragment,
 )
-from krrood.entity_query_language.verbalization.operator_phrase import comparator_operator
-from krrood.entity_query_language.verbalization.range_fold import (
+from krrood.entity_query_language.verbalization.operator_phrase import (
+    comparator_operator,
+)
+from krrood.entity_query_language.verbalization.microplanning.coordination import (
     build_between,
     fold_range_pairs,
     RangeFold,
@@ -100,7 +105,11 @@ class RestrictionRule(ABC):
     @classmethod
     @abstractmethod
     def render(
-        cls, item, subject_variable, context: VerbalizationContext, verbalizer: EQLVerbalizer
+        cls,
+        item,
+        subject_variable,
+        context: VerbalizationContext,
+        verbalizer: EQLVerbalizer,
     ) -> VerbFragment:
         """Render *item* as a bare predicate fragment (e.g. *"booking_date is between X and Y"*)."""
 
@@ -117,7 +126,11 @@ class RangeRestrictionRule(RestrictionRule):
 
     @classmethod
     def render(
-        cls, item, subject_variable, context: VerbalizationContext, verbalizer: EQLVerbalizer
+        cls,
+        item,
+        subject_variable,
+        context: VerbalizationContext,
+        verbalizer: EQLVerbalizer,
     ) -> VerbFragment:
         attr = _single_hop_attr(item.chain_expression, subject_variable)
         left = RoleFragment.for_attribute(attr._owner_class_, attr._attribute_name_)
@@ -147,7 +160,11 @@ class AttributePredicateRestrictionRule(RestrictionRule):
 
     @classmethod
     def render(
-        cls, item, subject_variable, context: VerbalizationContext, verbalizer: EQLVerbalizer
+        cls,
+        item,
+        subject_variable,
+        context: VerbalizationContext,
+        verbalizer: EQLVerbalizer,
     ) -> VerbFragment:
         attr = _single_hop_attr(item.left, subject_variable)
         attribute_fragment = RoleFragment.for_attribute(
@@ -155,7 +172,11 @@ class AttributePredicateRestrictionRule(RestrictionRule):
         )
         operator_fragment = comparator_operator(item, context, compact=False)
         return PhraseFragment(
-            parts=[attribute_fragment, operator_fragment, verbalizer.build(item.right, context)]
+            parts=[
+                attribute_fragment,
+                operator_fragment,
+                verbalizer.build(item.right, context),
+            ]
         )
 
 
@@ -180,7 +201,9 @@ class RestrictionSubjectRule(ABC):
 
     @classmethod
     @abstractmethod
-    def applies(cls, expression, selected_variable, context: VerbalizationContext) -> bool:
+    def applies(
+        cls, expression, selected_variable, context: VerbalizationContext
+    ) -> bool:
         """Return ``True`` when this rule can name the restriction subject of *expression*."""
 
     @classmethod
@@ -193,7 +216,9 @@ class SelectedVariableSubjectRule(RestrictionSubjectRule):
     """The selection itself is a plain :class:`~krrood.entity_query_language.core.variable.Variable` → it is its own subject."""
 
     @classmethod
-    def applies(cls, expression, selected_variable, context: VerbalizationContext) -> bool:
+    def applies(
+        cls, expression, selected_variable, context: VerbalizationContext
+    ) -> bool:
         return isinstance(selected_variable, Variable)
 
     @classmethod
@@ -215,7 +240,9 @@ class AggregationSourceSubjectRule(RestrictionSubjectRule):
     """
 
     @classmethod
-    def applies(cls, expression, selected_variable, context: VerbalizationContext) -> bool:
+    def applies(
+        cls, expression, selected_variable, context: VerbalizationContext
+    ) -> bool:
         return (
             isinstance(selected_variable, Aggregator)
             and aggregation_source_root(expression) is not None
@@ -251,17 +278,22 @@ def restriction_subject(expression, selected_variable, context: VerbalizationCon
 
 # ── Builder ─────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class RestrictionClauseBuilder:
     """
     Partition a subject's ``WHERE`` condition into a *"whose <grouped>"* modifier and a
     residual condition fragment.
     """
+
     _verbalizer: EQLVerbalizer
     """The parent verbalizer for recursive sub-expression rendering."""
 
     def build(
-        self, subject_variable: Optional[Variable], condition: SymbolicExpression, context: VerbalizationContext
+        self,
+        subject_variable: Optional[Variable],
+        condition: SymbolicExpression,
+        context: VerbalizationContext,
     ) -> tuple[Optional[VerbFragment], Optional[VerbFragment]]:
         """
         :param subject_variable: The subject the conditions restrict (its single-hop attribute
@@ -283,7 +315,9 @@ class RestrictionClauseBuilder:
             if rule is None:
                 residual.append(item)
             else:
-                grouped.append(rule.render(item, subject_variable, context, self._verbalizer))
+                grouped.append(
+                    rule.render(item, subject_variable, context, self._verbalizer)
+                )
 
         whose_fragment = None
         if grouped:
@@ -293,11 +327,15 @@ class RestrictionClauseBuilder:
                     oxford_and(grouped, Conjunctions.AND.as_fragment()),
                 ],
             )
-        residual_fragment = self._render_residual(residual, context) if residual else None
+        residual_fragment = (
+            self._render_residual(residual, context) if residual else None
+        )
         return whose_fragment, residual_fragment
 
     @staticmethod
-    def _match(item, subject_variable, context: VerbalizationContext) -> Optional[Type[RestrictionRule]]:
+    def _match(
+        item, subject_variable, context: VerbalizationContext
+    ) -> Optional[Type[RestrictionRule]]:
         for rule in RESTRICTION_RULES:
             if rule.applies(item, subject_variable, context):
                 return rule
