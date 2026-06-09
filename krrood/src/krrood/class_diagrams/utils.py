@@ -12,7 +12,7 @@ import builtins
 import typing_extensions
 from typing_extensions import Callable, get_args, get_origin
 from typing_extensions import List, Type, Any, Dict, Tuple, Generic
-from typing_extensions import TypeVar
+from typing_extensions import TypeVar, TypeVarTuple
 
 from krrood import logger
 from krrood.class_diagrams.exceptions import CouldNotResolveType
@@ -189,7 +189,7 @@ def resolve_type(
     :return: A TypeHintResolutionResult object containing the resolved type and a boolean indicating whether any
     substitutions were made.
     """
-    if isinstance(type_to_resolve, TypeVar):
+    if isinstance(type_to_resolve, (TypeVar, TypeVarTuple)):
         type_to_resolve_key = ensure_hashable(type_to_resolve)
         if type_to_resolve_key not in substitution:
             return TypeHintResolutionResult(type_to_resolve, False, type_to_resolve)
@@ -198,22 +198,30 @@ def resolve_type(
         )
 
     # If the type itself can be indexed (like List[T] or Optional[T])
-    params = getattr(type_to_resolve, "__parameters__", None)
-    if hasattr(type_to_resolve, "__getitem__") and params:
-        new_params = []
-        resolved: bool = False  # whether any substitutions were made
-        for param in params:
-            if param in substitution:
-                new_params.append(substitution[param])
-                resolved = True
-            else:
-                new_params.append(param)
-        subscript_param = new_params[0] if len(new_params) == 1 else tuple(new_params)
-        return TypeHintResolutionResult(
-            type_to_resolve[subscript_param], resolved, type_to_resolve
-        )
+    parameters = getattr(type_to_resolve, "__parameters__", None)
+    if not (hasattr(type_to_resolve, "__getitem__") and parameters):
+        return TypeHintResolutionResult(type_to_resolve, False, type_to_resolve)
 
-    return TypeHintResolutionResult(type_to_resolve, False, type_to_resolve)
+    new_parameters = []
+    resolved: bool = False
+    for parameter in parameters:
+        if parameter not in substitution:
+            new_parameters.append(parameter)
+            continue
+
+        value = substitution[parameter]
+        if isinstance(parameter, TypeVarTuple) and isinstance(value, tuple):
+            new_parameters.extend(value)
+        else:
+            new_parameters.append(value)
+        resolved = True
+
+    subscript_parameter = (
+        new_parameters[0] if len(new_parameters) == 1 else tuple(new_parameters)
+    )
+    return TypeHintResolutionResult(
+        type_to_resolve[subscript_parameter], resolved, type_to_resolve
+    )
 
 
 @lru_cache

@@ -77,7 +77,7 @@ garmi = world.get_semantic_annotations_by_type(Garmi)[0]
 milk_place_pose = Pose(Point3(x=2.2, y=7.6, z=0.865), reference_frame=world.root)
 
 # robot = variable(AbstractRobot, [garmi])
-# number_of_arms = an(entity(count(robot.manipulators))).tolist()
+# number_of_arms = an(entity(count(robot.end_effectors))).tolist()
 
 # print(number_of_arms)
 with simulated_robot:

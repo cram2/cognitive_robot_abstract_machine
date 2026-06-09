@@ -138,9 +138,6 @@ class CollisionManager(ModelChangeCallback):
     Objects that are notified about changes in the collision matrix.
     """
 
-    def __hash__(self):
-        return hash(id(self))
-
     def __post_init__(self):
         super().__post_init__()
         self._notify()

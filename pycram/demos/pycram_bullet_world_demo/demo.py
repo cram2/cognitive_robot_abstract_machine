@@ -81,7 +81,7 @@ with world.modify_world():
             Spoon(root=world.get_body_by_name("spoon.stl")),
         ]
     )
-    world.add_semantic_annotation(
+    world.add_semantic_annotation_recursively(
         Drawer(
             root=world.get_body_by_name("cabinet10_drawer_top"),
             handle=Handle(root=world.get_body_by_name("handle_cab10_t")),
@@ -109,7 +109,9 @@ plan = sequential(
             Pose.from_xyz_rpy(5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
             GraspDescription(
-                ApproachDirection.FRONT, VerticalAlignment.TOP, pr2.left_arm.manipulator
+                ApproachDirection.FRONT,
+                VerticalAlignment.TOP,
+                pr2.left_arm.end_effector,
             ),
         ),
     ],

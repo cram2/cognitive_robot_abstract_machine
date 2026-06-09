@@ -23,7 +23,7 @@ def test_get_bound_variables(immutable_model_world):
         GraspDescription(
             ApproachDirection.FRONT,
             VerticalAlignment.NoAlignment,
-            view.left_arm.manipulator,
+            view.left_arm.end_effector,
         ),
     )
 
@@ -52,7 +52,7 @@ def test_pick_up_pre_conditions(mutable_model_world):
         GraspDescription(
             ApproachDirection.FRONT,
             VerticalAlignment.NoAlignment,
-            view.left_arm.manipulator,
+            view.left_arm.end_effector,
         ),
     )
 
@@ -99,7 +99,7 @@ def test_pick_up_post_condition(mutable_model_world):
         GraspDescription(
             ApproachDirection.FRONT,
             VerticalAlignment.NoAlignment,
-            view.left_arm.manipulator,
+            view.left_arm.end_effector,
         ),
     )
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -116,7 +116,7 @@ def test_pick_up_post_condition(mutable_model_world):
     assert world.get_body_by_name(
         "milk.stl"
     ) in world.get_kinematic_structure_entities_of_branch(
-        view.left_arm.manipulator.tool_frame
+        view.left_arm.end_effector.tool_frame
     )
 
     assert pick_action.evaluate_post_condition()
@@ -131,7 +131,7 @@ def test_context_evaluate_condition(mutable_model_world):
         GraspDescription(
             ApproachDirection.FRONT,
             VerticalAlignment.NoAlignment,
-            view.left_arm.manipulator,
+            view.left_arm.end_effector,
         ),
     )
     # Make action impossible

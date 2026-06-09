@@ -58,7 +58,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AllowAllCollisions,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.spatial_types import (
@@ -212,6 +212,8 @@ def test_external_collision_avoidance_battle():
                 child=strong_robot_world.root,
             ),
         )
+        strong = world.get_kinematic_structure_entity_by_id(strong.id)
+        strong_robot_sa = world.get_semantic_annotation_by_id(strong_robot_sa.id)
         world.merge_world(
             weak_robot_world,
             omni2 := OmniDrive.create_with_dofs(
@@ -220,6 +222,9 @@ def test_external_collision_avoidance_battle():
                 child=weak_robot_world.root,
             ),
         )
+        weak = world.get_kinematic_structure_entity_by_id(weak.id)
+        weak_robot_sa = world.get_semantic_annotation_by_id(weak_robot_sa.id)
+
         omni1.has_hardware_interface = True
         omni2.has_hardware_interface = True
 
@@ -892,7 +897,7 @@ def test_repeated_collision_pr2_apartment_does_not_increase_execution_time(
     world = deepcopy(pr2_apartment_world)
 
     tool_frame = world.get_body_by_name("r_gripper_tool_frame")
-    robot = PR2.from_world(world)
+    robot = world.get_semantic_annotations_by_type(PR2)[0]
 
     left_arm_park = robot.left_arm.get_joint_state_by_type(StaticJointState.PARK)
     right_arm_park = robot.right_arm.get_joint_state_by_type(StaticJointState.PARK)
@@ -912,7 +917,7 @@ def test_repeated_collision_pr2_apartment_does_not_increase_execution_time(
                         AllowCollisionBetweenGroups(
                             body_group_a=[
                                 b
-                                for b in robot.right_arm.manipulator.bodies
+                                for b in robot.right_arm.end_effector.bodies
                                 if b.has_collision()
                             ],
                             body_group_b=[
@@ -944,5 +949,14 @@ def test_repeated_collision_pr2_apartment_does_not_increase_execution_time(
             end_time = time.time()
             execution_times.append(end_time - start_time)
 
-    mean_execution_time = np.mean(execution_times)
-    np.testing.assert_allclose(execution_times, mean_execution_time, rtol=0.5)
+    # Split execution times into two halves
+    half = len(execution_times) // 2
+    first_half_median = np.median(execution_times[:half])
+    second_half_median = np.median(execution_times[half:])
+
+    # Assert that the second half is not significantly slower than the first half.
+    # We allow a small margin (e.g., 20%) for natural noise.
+    assert second_half_median <= first_half_median * 1.2, (
+        f"Execution time is increasing: first half median {first_half_median:.4f}s, "
+        f"second half median {second_half_median:.4f}s"
+    )

@@ -21,7 +21,15 @@ from pathlib import Path
 from typing import Tuple, Generic, Hashable
 from typing import Union, Any
 
-from typing_extensions import TypeVar, Type, List, Optional, Callable
+from typing_extensions import (
+    TypeVar,
+    Type,
+    List,
+    Optional,
+    Callable,
+    TypeVarTuple,
+    Unpack,
+)
 from typing_extensions import (
     _SpecialForm,
     Iterable,
@@ -632,10 +640,10 @@ def get_generic_type_params(
     :param include_specialized_generic_base: Whether to include type parameters from superclasses that are generic, which are not typing.Generic.
     :return: A list of concrete type parameters
     """
-    params = []
+    parameters = []
     if include_root_generic_base:
         # Use __parameters__ to get the class's own unbound TypeVars.
-        params.extend(list(getattr(cls, "__parameters__", [])))
+        parameters.extend(list(getattr(cls, "__parameters__", [])))
 
     if include_specialized_generic_base:
         for base in getattr(cls, "__orig_bases__", []):
@@ -646,18 +654,18 @@ def get_generic_type_params(
                 or not issubclass(base_origin, generic_base)
             ):
                 continue
-            for arg in get_args(base):
-                if not isinstance(arg, TypeVar):
-                    params.append(arg)
+            for argument in get_args(base):
+                if not isinstance(argument, (TypeVar, TypeVarTuple)):
+                    parameters.append(argument)
                 elif not include_root_generic_base:
-                    # If we specifically excluded root generic params, we might still want
+                    # If we specifically excluded root generic parameters, we might still want
                     # TypeVars that are being passed to this specialized base
                     # Example: For `class Child(Generic[T, U], Parent[T])`:
                     # - `include_root_generic_base=True` returns `[T, U]` (captures all definitions, avoids duplicates).
                     # - `include_root_generic_base=False` returns `[T]` (captures only what is specifically passed to `Parent`).
-                    params.append(arg)
+                    parameters.append(argument)
 
-    return params
+    return parameters
 
 
 def get_existing_field_by_name(cls, name: str) -> Optional[Field]:

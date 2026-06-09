@@ -33,6 +33,7 @@ from semantic_digital_twin.exceptions import (
     MissingWorldModificationContextError,
     MismatchingPublishChangesAttribute,
 )
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Door,
@@ -311,14 +312,7 @@ def test_model_synchronization_merge_full_world_stress_test(rclpy_node):
             _world=w2,
         )
 
-        pr2_world = URDFParser.from_file(
-            os.path.join(
-                Path(files("semantic_digital_twin")).parent.parent,
-                "resources",
-                "urdf",
-                "pr2_kinematic_tree.urdf",
-            )
-        ).parse()
+        pr2_world = URDFParser.from_file(PR2.get_ros_file_path()).parse()
 
         def wait_for_sync(timeout=5.0, interval=0.05):
             start = time.time()
@@ -990,8 +984,10 @@ def test_attribute_update_modification_apply_direct():
     # Test single value update
     mod = AttributeUpdateModification(
         entity_id=anno.id,
-        updated_kwargs=[
-            JSONAttributeDiff(attribute_name="value", added_values=["direct_value"])
+        updated_kwargs_json_list=[
+            JSONAttributeDiff(
+                attribute_name="value", added_values=[to_json("direct_value")]
+            )
         ],
     )
     mod.apply(w)
@@ -1000,8 +996,8 @@ def test_attribute_update_modification_apply_direct():
     # Test entity reference update
     mod = AttributeUpdateModification(
         entity_id=anno.id,
-        updated_kwargs=[
-            JSONAttributeDiff(attribute_name="entity", added_values=[b1.id])
+        updated_kwargs_json_list=[
+            JSONAttributeDiff(attribute_name="entity", added_values=[to_json(b1.id)])
         ],
     )
     mod.apply(w)
@@ -1010,8 +1006,8 @@ def test_attribute_update_modification_apply_direct():
     # Test list update (add)
     mod = AttributeUpdateModification(
         entity_id=anno.id,
-        updated_kwargs=[
-            JSONAttributeDiff(attribute_name="entities", added_values=[b1.id])
+        updated_kwargs_json_list=[
+            JSONAttributeDiff(attribute_name="entities", added_values=[to_json(b1.id)])
         ],
     )
     mod.apply(w)
@@ -1020,8 +1016,10 @@ def test_attribute_update_modification_apply_direct():
     # Test list update (remove)
     mod = AttributeUpdateModification(
         entity_id=anno.id,
-        updated_kwargs=[
-            JSONAttributeDiff(attribute_name="entities", removed_values=[b1.id])
+        updated_kwargs_json_list=[
+            JSONAttributeDiff(
+                attribute_name="entities", removed_values=[to_json(b1.id)]
+            )
         ],
     )
     mod.apply(w)

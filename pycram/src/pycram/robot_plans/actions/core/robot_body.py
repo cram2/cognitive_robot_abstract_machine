@@ -11,7 +11,7 @@ from krrood.entity_query_language.core.variable import Variable
 from pycram.datastructures.dataclasses import Context
 from pycram.robot_plans import MoveManipulatorMotion
 from semantic_digital_twin.reasoning.predicates import allclose
-from semantic_digital_twin.robots.abstract_robot import Manipulator
+from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from pycram.datastructures.enums import AxisIdentifier, Arms
 
@@ -41,7 +41,7 @@ class MoveTorsoAction(ActionDescription):
     """
 
     def execute(self) -> None:
-        joint_state = self.robot.torso.get_joint_state_by_type(self.torso_state)
+        joint_state = self.robot.get_torso().get_joint_state_by_type(self.torso_state)
         self.add_subplan(
             execute_single(
                 MoveJointsMotion(
@@ -241,17 +241,17 @@ class FollowToolCenterPointPathAction(ActionDescription):
 @dataclass
 class MoveManipulatorAction(ActionDescription):
     """
-    Move the manipulator to a specific pose.
+    Move the end_effector to a specific pose.
     """
 
     target_pose: Pose
     """
-    The pose where the manipulator should be moved to.
+    The pose where the end_effector should be moved to.
     """
 
-    manipulator: Manipulator
+    end_effector: EndEffector
     """
-    The manipulator that should be moved.
+    The end_effector that should be moved.
     """
 
     allow_gripper_collision: bool
@@ -264,7 +264,7 @@ class MoveManipulatorAction(ActionDescription):
             execute_single(
                 MoveManipulatorMotion(
                     self.target_pose,
-                    self.manipulator,
+                    self.end_effector,
                     self.allow_gripper_collision,
                 )
             )
@@ -274,10 +274,10 @@ class MoveManipulatorAction(ActionDescription):
     def post_condition(
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> SymbolicExpression:
-        manipulator = variables["manipulator"]
+        end_effector = variables["end_effector"]
         target_pose = variables["target_pose"]
         return allclose(
-            manipulator.tool_frame.global_pose.to_np(),
+            end_effector.tool_frame.global_pose.to_np(),
             target_pose.to_np(),
             atol=0.1,
         )

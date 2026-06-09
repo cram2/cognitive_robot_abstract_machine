@@ -27,6 +27,8 @@ from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Region,
     SemanticAnnotation,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
 )
 
@@ -93,12 +95,12 @@ class DetectAction(ActionDescription):
 @dataclass
 class MoveToReach(ActionDescription):
     """
-    Let the robot move to a position facing the target and reach with a manipulator.
+    Let the robot move to a position facing the target and reach with a end_effector.
     """
 
     target_pose_offset_robot: Pose2D
     """
-    The pose where the robot should stand with regard to the manipulator target pose. 2D since z-axis is not relevant.
+    The pose where the robot should stand with regard to the end_effector target pose. 2D since z-axis is not relevant.
     """
 
     hip_rotation: float
@@ -106,9 +108,9 @@ class MoveToReach(ActionDescription):
     Additional yaw applied to the orientation facing the target directly.
     """
 
-    target_pose_manipulator: Pose
+    target_pose_end_effector: Pose
     """
-    Pose that should be reached by the manipulator.
+    Pose that should be reached by the end_effector.
     """
 
     grasp_description: GraspDescription
@@ -119,12 +121,12 @@ class MoveToReach(ActionDescription):
     def execute(self):
         grasp_orientation = self.grasp_description.grasp_orientation()
         target_pose = Pose(
-            self.target_pose_manipulator.to_position(),
+            self.target_pose_end_effector.to_position(),
             (
-                self.target_pose_manipulator.to_rotation_matrix()
+                self.target_pose_end_effector.to_rotation_matrix()
                 @ grasp_orientation.to_rotation_matrix()
             ).to_quaternion(),
-            self.target_pose_manipulator.reference_frame,
+            self.target_pose_end_effector.reference_frame,
         )
         self.add_subplan(
             sequential(
@@ -132,7 +134,7 @@ class MoveToReach(ActionDescription):
                     NavigateAction(self.standing_pose),
                     MoveManipulatorAction(
                         target_pose,
-                        self.grasp_description.manipulator,
+                        self.grasp_description.end_effector,
                         allow_gripper_collision=False,
                     ),
                 ]
@@ -146,7 +148,7 @@ class MoveToReach(ActionDescription):
 
         :return: The calculated standing pose.
         """
-        reference_T_target = self.target_pose_manipulator.to_homogeneous_matrix()
+        reference_T_target = self.target_pose_end_effector.to_homogeneous_matrix()
         target_V_robot = -Vector3(
             x=self.target_pose_offset_robot.x, y=self.target_pose_offset_robot.y
         )
@@ -160,10 +162,10 @@ class MoveToReach(ActionDescription):
             point=Point3(
                 x=self.target_pose_offset_robot.x,
                 y=self.target_pose_offset_robot.y,
-                z=-self.target_pose_manipulator.z,
+                z=-self.target_pose_end_effector.z,
             ),
             rotation_matrix=target_R_robot_pointing_to_target,
-            reference_frame=self.target_pose_manipulator.reference_frame,
+            reference_frame=self.target_pose_end_effector.reference_frame,
         )
         reference_T_robot = reference_T_target @ target_T_robot
         return reference_T_robot.to_pose()

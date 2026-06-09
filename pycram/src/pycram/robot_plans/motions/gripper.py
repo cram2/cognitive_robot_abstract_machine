@@ -9,7 +9,8 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.robots.abstract_robot import Manipulator
+from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
+from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 from pycram.robot_plans.motions.base import BaseMotion
@@ -153,7 +154,12 @@ class MoveToolCenterPointMotion(BaseMotion):
     @property
     def _motion_chart(self):
         tip = ViewManager().get_end_effector_view(self.arm, self.robot).tool_frame
-        root = self.world.root if self.robot.full_body_controlled else self.robot.root
+        root = (
+            self.world.root
+            if isinstance(self.robot, HasMobileBase)
+            and self.robot.mobile_base.full_body_controlled
+            else self.robot.root
+        )
         task = None
         if self.movement_type == MovementType.TRANSLATION:
             task = CartesianPosition(
@@ -205,7 +211,12 @@ class MoveTCPWaypointsMotion(BaseMotion):
     @property
     def _motion_chart(self):
         tip = ViewManager().get_end_effector_view(self.arm, self.robot).tool_frame
-        root = self.world.root if self.robot.full_body_controlled else self.robot.root
+        root = (
+            self.world.root
+            if isinstance(self.robot, HasMobileBase)
+            and self.robot.mobile_base.full_body_controlled
+            else self.robot.root
+        )
         nodes = [
             CartesianPose(
                 root_link=root,
@@ -229,9 +240,9 @@ class MoveManipulatorMotion(BaseMotion):
     Target pose to which the TCP should be moved
     """
 
-    manipulator: Manipulator
+    end_effector: EndEffector
     """
-    The Manipulator to move to the target pose
+    The end effector to move to the target pose
     """
 
     allow_gripper_collision: bool = False
@@ -241,15 +252,22 @@ class MoveManipulatorMotion(BaseMotion):
 
     @property
     def _motion_chart(self):
-        root = self.world.root if self.robot.full_body_controlled else self.robot.root
+        robot = self.robot
+        full_body_controlled = (
+            robot.mobile_base.full_body_controlled
+            if isinstance(robot, HasMobileBase)
+            else False
+        )
+
+        root = self.world.root if full_body_controlled else robot.root
         goal_pose = (
             self.target
-            if self.robot.full_body_controlled
+            if full_body_controlled
             else self.world.transform(self.target, root)
         )
         task = CartesianPose(
             root_link=root,
-            tip_link=self.manipulator.tool_frame,
+            tip_link=self.end_effector.tool_frame,
             goal_pose=goal_pose,
             threshold=0.005,
             name=self.__class__.__name__,

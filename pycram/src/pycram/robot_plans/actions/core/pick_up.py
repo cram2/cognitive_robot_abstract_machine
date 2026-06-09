@@ -28,6 +28,7 @@ from pycram.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.reasoning.predicates import allclose
 from semantic_digital_twin.reasoning.robot_predicates import is_body_in_gripper
+from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -90,7 +91,7 @@ class ReachAction(ActionDescription):
         """
         The sequence in which the robot would reach the target pose needs to be achiveable
         """
-        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        end_effector = ViewManager.get_end_effector_view(variables["arm"], context.robot)
         test_world = deepcopy(context.world)
         grasp_pose_sequence = kwargs["grasp_description"]._pose_sequence(
             kwargs["target_pose"],
@@ -100,10 +101,14 @@ class ReachAction(ActionDescription):
         return and_(
             pose_sequence_reachability_validator(
                 grasp_pose_sequence,
-                manipulator.tool_frame,
-                context.robot.from_world(test_world),
+                end_effector.tool_frame,
+                test_world.get_semantic_annotations_by_type(type(context.robot))[0],
                 test_world,
-                context.robot.full_body_controlled,
+                (
+                    context.robot.mobile_base.full_body_controlled
+                    if isinstance(context.robot, HasMobileBase)
+                    else False
+                ),
             ),
         )
 
@@ -114,9 +119,9 @@ class ReachAction(ActionDescription):
         """
         The end effector needs to be close to the target pose
         """
-        manipulator = ViewManager.get_end_effector_view(kwargs["arm"], context.robot)
+        end_effector = ViewManager.get_end_effector_view(kwargs["arm"], context.robot)
         return or_(
-            is_body_in_gripper(variable_from(kwargs["object_designator"]), manipulator)
+            is_body_in_gripper(variable_from(kwargs["object_designator"]), end_effector)
             > 0.9,
             allclose(
                 variable_from(kwargs["object_designator"].global_pose.to_position()),
@@ -193,19 +198,23 @@ class PickUpAction(ActionDescription):
         """
         The gripper with which to grasp the object needs to be free and the object needs to be reachable
         """
-        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        end_effector = ViewManager.get_end_effector_view(variables["arm"], context.robot)
         test_world = deepcopy(context.world)
         grasp_pose_sequence = kwargs["grasp_description"].grasp_pose_sequence(
             kwargs["object_designator"]
         )
         return and_(
-            GripperIsFree(manipulator),
+            GripperIsFree(end_effector),
             pose_sequence_reachability_validator(
                 grasp_pose_sequence,
-                manipulator.tool_frame,
-                context.robot.from_world(test_world),
+                end_effector.tool_frame,
+                test_world.get_semantic_annotations_by_type(type(context.robot))[0],
                 test_world,
-                context.robot.full_body_controlled,
+                (
+                    context.robot.mobile_base.full_body_controlled
+                    if isinstance(context.robot, HasMobileBase)
+                    else False
+                ),
             ),
         )
 
@@ -216,10 +225,10 @@ class PickUpAction(ActionDescription):
         """
         The object needs to be in the griper frame
         """
-        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        end_effector = ViewManager.get_end_effector_view(variables["arm"], context.robot)
         return or_(
-            not_(GripperIsFree(manipulator)),
-            is_body_in_gripper(kwargs["object_designator"], manipulator) > 0.9,
+            not_(GripperIsFree(end_effector)),
+            is_body_in_gripper(kwargs["object_designator"], end_effector) > 0.9,
         )
 
 

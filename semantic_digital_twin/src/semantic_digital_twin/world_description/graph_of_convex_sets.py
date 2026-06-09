@@ -9,9 +9,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 import rustworkx as rx
-
 from rtree import index
 from sortedcontainers import SortedSet
+
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    SemanticEnvironmentAnnotation,
+    Agent,
+)
+
+logger = logging.getLogger("semantic_digital_twin")
 from typing_extensions import List, Optional, Dict, Sequence
 from typing_extensions import Self
 
@@ -31,10 +37,8 @@ from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
-    SemanticEnvironmentAnnotation,
     Body,
     Region,
-    Agent,
 )
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (

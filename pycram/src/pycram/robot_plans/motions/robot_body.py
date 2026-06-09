@@ -6,7 +6,7 @@ from typing_extensions import List
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from pycram.robot_plans.motions.base import BaseMotion
-from semantic_digital_twin.robots.abstract_robot import Camera
+from semantic_digital_twin.robots.robot_parts import Camera
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
@@ -80,7 +80,7 @@ class LookingMotion(BaseMotion):
     def _motion_chart(self):
         self.camera.forward_facing_axis.reference_frame = self.camera.root
         return Pointing(
-            root_link=self.robot.torso.root,
+            root_link=self.robot.get_torso().root,
             tip_link=self.camera.root,
             goal_point=self.target.to_position(),
             pointing_axis=self.camera.forward_facing_axis,

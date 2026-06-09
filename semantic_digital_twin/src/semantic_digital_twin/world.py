@@ -7,7 +7,7 @@ import threading
 import uuid
 from copy import deepcopy, copy
 from dataclasses import dataclass, field
-from functools import wraps, lru_cache, cached_property
+from functools import wraps, cached_property
 from uuid import UUID
 
 import numpy as np
@@ -26,10 +26,14 @@ from typing_extensions import (
     Any,
     Iterable,
     TYPE_CHECKING,
+    get_args,
 )
 from typing_extensions import List
 from typing_extensions import Type, Set
 
+from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
+from krrood.utils import memoize, clear_memoization_cache
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.collision_checking.collision_manager import CollisionManager
 from semantic_digital_twin.collision_checking.pybullet_collision_detector import (
@@ -46,9 +50,10 @@ from semantic_digital_twin.exceptions import (
     MissingReferenceFrameError,
     MismatchingPublishChangesAttribute,
     AtomicWorldModificationNotAtomic,
+    SemanticAnnotationCircularDependencyError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
-from semantic_digital_twin.robots.abstract_robot import SemanticRobotAnnotation
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_computations.forward_kinematics import (
     ForwardKinematicsManager,
 )
@@ -70,7 +75,6 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.connections import HasUpdateState
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
-    DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.visitors import (
     CollisionBodyCollector,
@@ -105,7 +109,6 @@ from semantic_digital_twin.world_description.world_modification import (
     RemoveActuatorModification,
 )
 from semantic_digital_twin.world_description.world_state import WorldState
-from krrood.utils import memoize, clear_memoization_cache
 
 from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
@@ -113,7 +116,7 @@ from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDec
 if TYPE_CHECKING:
     from semantic_digital_twin.spatial_types import GenericSpatialType
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("semantic_digital_twin")
 
 id_generator = IDGenerator()
 
@@ -454,6 +457,7 @@ class World(HasSimulatorProperties):
                 _world=self, mesh_decomposer=self.mesh_decomposer
             ),
         )
+        self.collision_manager.add_to_world(self)
 
     def __hash__(self):
         return hash((id(self), self._model_manager.version))
@@ -526,6 +530,22 @@ class World(HasSimulatorProperties):
         return self.get_kinematic_structure_entity_by_type(Region)
 
     @property
+    def robot_bodies_with_collision(self) -> List[Body]:
+        return [
+            body
+            for robot in self.get_semantic_annotations_by_type(AbstractRobot)
+            for body in robot.bodies_with_collision
+        ]
+
+    @property
+    def robot_body_to_robot_mapping(self) -> dict[Body, AbstractRobot]:
+        return {
+            body: robot
+            for robot in self.get_semantic_annotations_by_type(AbstractRobot)
+            for body in robot.bodies
+        }
+
+    @property
     def bodies(self) -> List[Body]:
         """
         :return: A list of all bodies in the world.
@@ -583,6 +603,56 @@ class World(HasSimulatorProperties):
         return [
             connection for connection in self.connections if connection.is_controlled
         ]
+
+    @property
+    def semantic_annotations_topologically_sorted(self) -> List[SemanticAnnotation]:
+        """
+        Return a list of all semantic annotations in the world, sorted topologically based on their dependencies.
+        """
+        return self._topologically_sort_semantic_annotations(self.semantic_annotations)
+
+    def _topologically_sort_semantic_annotations(
+        self,
+        annotations: List[SemanticAnnotation],
+    ) -> List[SemanticAnnotation]:
+        """
+        Sort semantic annotations in topological order based on their dependencies.
+        Annotations with no dependencies come first, followed by annotations that depend on them.
+
+        :param annotations: List of semantic annotations to sort.
+        :return: Sorted list of semantic annotations in dependency order.
+        """
+        annotation_set = set(annotations)
+        dependency_map = {}
+
+        for annotation in annotations:
+            deps = annotation._referenced_semantic_annotations()
+            # Only consider dependencies that are in our list
+            dependency_map[annotation] = deps & annotation_set
+
+        # Perform topological sort using Kahn's algorithm https://www.geeksforgeeks.org/dsa/topological-sorting-indegree-based-solution/
+        sorted_annotations = []
+        no_dependency_queue = [
+            ann for ann in annotations if len(dependency_map[ann]) == 0
+        ]
+
+        while no_dependency_queue:
+            current = no_dependency_queue.pop(0)
+            sorted_annotations.append(current)
+
+            # Find annotations that depend on the current one
+            for annotation in annotations:
+                if current not in dependency_map[annotation]:
+                    continue
+
+                dependency_map[annotation].remove(current)
+                if len(dependency_map[annotation]) == 0:
+                    no_dependency_queue.append(annotation)
+
+        if len(sorted_annotations) != len(annotations):
+            raise SemanticAnnotationCircularDependencyError(sorted_annotations)
+
+        return sorted_annotations
 
     # %% Adding WorldEntities to the World
     def add_connection(self, connection: Connection) -> None:
@@ -691,8 +761,39 @@ class World(HasSimulatorProperties):
         :raises AddingAnExistingSemanticAnnotationError: If the semantic annotation already exists
         """
         self._raise_error_if_belongs_to_other_world(semantic_annotation)
-        if not self.is_semantic_annotation_in_world(semantic_annotation):
-            self._add_semantic_annotation(semantic_annotation)
+        if self.is_semantic_annotation_in_world(semantic_annotation):
+            return
+        self._add_semantic_annotation(semantic_annotation)
+
+    def add_semantic_annotation_recursively(
+        self, semantic_annotation: SemanticAnnotation
+    ) -> None:
+        """
+        Recursively adds a semantic annotation to the current list of semantic annotations if it doesn't already exist.
+        Recursively traverses the semantic annotation's fields and adds any nested semantic annotations as well.
+        Fields are added to the world first to ensure a valid modification history.
+
+        :param semantic_annotation: The semantic annotation instance to be added. Its name must be unique within
+            the current context.
+
+        :raises AddingAnExistingSemanticAnnotationError: If the semantic annotation already exists
+        """
+        self._raise_error_if_belongs_to_other_world(semantic_annotation)
+        if self.is_semantic_annotation_in_world(semantic_annotation):
+            return
+        introspector = DataclassOnlyIntrospector()
+
+        for field_ in introspector.discover(semantic_annotation.__class__):
+            value = getattr(semantic_annotation, field_.public_name)
+
+            if isinstance(value, list_like_classes):
+                for value_ in value:
+                    if not isinstance(value_, SemanticAnnotation):
+                        continue
+                    self.add_semantic_annotation_recursively(value_)
+            elif isinstance(value, SemanticAnnotation):
+                self.add_semantic_annotation_recursively(value)
+        self._add_semantic_annotation(semantic_annotation)
 
     def add_semantic_annotations(
         self,
@@ -882,7 +983,6 @@ class World(HasSimulatorProperties):
             dof.has_hardware_interface = value
 
     # %% Getter
-    @memoize
     def get_connection(
         self, parent: KinematicStructureEntity, child: KinematicStructureEntity
     ) -> Connection:
@@ -965,6 +1065,17 @@ class World(HasSimulatorProperties):
         )
 
     @memoize
+    def get_kinematic_structure_entity_in_branch_by_name(
+        self, branch_root: KinematicStructureEntity, name: Union[str, PrefixedName]
+    ) -> KinematicStructureEntity:
+        kinematic_structure_entities = self.get_kinematic_structure_entities_of_branch(
+            branch_root
+        )
+        return self._get_world_entity_by_name_from_iterable(
+            name, kinematic_structure_entities
+        )
+
+    @memoize
     def get_body_by_name(self, name: Union[str, PrefixedName]) -> Body:
         return self._get_world_entity_by_name_from_iterable(name, self.bodies)
 
@@ -977,6 +1088,17 @@ class World(HasSimulatorProperties):
             if body.global_pose.position.euclidean_distance(world_P_body)
             <= maximum_distance
         ]
+
+    @memoize
+    def get_body_in_branch_by_name(
+        self, branch_root: KinematicStructureEntity, name: Union[str, PrefixedName]
+    ) -> Body:
+        bodies = [
+            kse
+            for kse in self.get_kinematic_structure_entities_of_branch(branch_root)
+            if isinstance(kse, Body)
+        ]
+        return self._get_world_entity_by_name_from_iterable(name, bodies)
 
     @memoize
     def get_degree_of_freedom_by_name(
@@ -993,7 +1115,7 @@ class World(HasSimulatorProperties):
     def _get_world_entity_by_name_from_iterable(
         self,
         name: Union[str, PrefixedName],
-        world_entity_iterable: Iterable[GenericWorldEntity],
+        world_entity_iterable: list[GenericWorldEntity],
     ) -> GenericWorldEntity:
         """
         If more than one world entity matches the specified name, or if no world entity is found,
@@ -1781,11 +1903,13 @@ class World(HasSimulatorProperties):
         """
         Clears all stored data and resets the state of the instance.
         """
-        kse = self.kinematic_structure_entities
         self._clear_world_entities()
         self.state.clear()
         self._world_entity_hash_table.clear()
         self._model_manager.model_modification_blocks.clear()
+        self._model_manager.model_change_callbacks.clear()
+        self.state.state_change_callbacks.clear()
+        self.__post_init__()
 
     def _clear_world_entities(self):
         """
@@ -1793,6 +1917,11 @@ class World(HasSimulatorProperties):
         ..warning::
             Super destructive, world will be unusable after this call.
         """
+        # semantic_annotations need to be reversed because they are in order in which they are added, and they need to
+        # be removed in reverse order
+        for semantic_annotation in reversed(self.semantic_annotations):
+            self.remove_semantic_annotation(semantic_annotation)
+
         for kinematic_structure_entity in self.kinematic_structure_entities:
             self.remove_kinematic_structure_entity(kinematic_structure_entity)
 
@@ -1801,9 +1930,6 @@ class World(HasSimulatorProperties):
 
         for degree_of_freedom in copy(self.degrees_of_freedom):
             self.remove_degree_of_freedom(degree_of_freedom)
-
-        for semantic_annotation in self.semantic_annotations:
-            self.remove_semantic_annotation(semantic_annotation)
 
     def is_empty(self):
         """
@@ -1858,33 +1984,13 @@ class World(HasSimulatorProperties):
         memo[me_id] = new_world
 
         with new_world.modify_world():
-            for body in self.bodies:
-                new_body = Body(
-                    name=body.name,
-                    id=body.id,
-                    visual=body.visual.copy_for_world(new_world),
-                    collision=body.collision.copy_for_world(new_world),
+            for modification_block in self._model_manager.model_modification_blocks:
+                modification_block.update_references_for_world_and_apply(
+                    world=new_world
                 )
-                new_world.add_kinematic_structure_entity(new_body)
-            for region in self.regions:
-                new_region = Region(
-                    name=region.name,
-                    area=region.area,
-                    id=region.id,
-                )
-                new_world.add_kinematic_structure_entity(new_region)
-            for dof in self.degrees_of_freedom:
-                new_dof = DegreeOfFreedom(
-                    name=dof.name,
-                    limits=deepcopy(dof.limits),
-                    id=dof.id,
-                )
-                new_world.add_degree_of_freedom(new_dof)
-                new_world.state[dof.id] = self.state[dof.id].data
-                new_dof.has_hardware_interface = dof.has_hardware_interface
-            for connection in self.connections:
-                new_connection = connection.copy_for_world(new_world)
-                new_world.add_connection(new_connection)
+
+            new_world.state.merge_state(self.state)
+
         return new_world
 
     def visualize_world_structure(self) -> Image:

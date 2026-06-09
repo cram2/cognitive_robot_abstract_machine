@@ -38,8 +38,8 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import (
-    Manipulator,
+from semantic_digital_twin.robots.robot_parts import (
+    EndEffector,
     AbstractRobot,
 )
 from semantic_digital_twin.robots.pr2 import PR2
@@ -187,7 +187,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         )
 
         move_to_reach = underspecified(MoveToReach)(
-            target_pose_manipulator=target_pose,
+            target_pose_end_effector=target_pose,
             target_pose_offset_robot=underspecified(Pose2D)(
                 x=..., y=..., yaw=..., reference_frame=None
             ),
@@ -195,7 +195,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
             grasp_description=underspecified(GraspDescription)(
                 approach_direction=...,
                 vertical_alignment=...,
-                manipulator=variable(Manipulator, world.semantic_annotations),
+                end_effector=variable(EndEffector, world.semantic_annotations),
                 rotate_gripper=...,
                 manipulation_offset=...,
             ),

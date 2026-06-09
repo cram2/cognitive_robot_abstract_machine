@@ -10,12 +10,15 @@ from typing import (
     Callable,
     Annotated,
     Dict,
+    Tuple,
 )
 
 from typing_extensions import (
     get_type_hints,
     get_args,
     get_origin,
+    TypeVarTuple,
+    Unpack,
 )
 
 from krrood.entity_query_language.factories import variable_from
@@ -235,8 +238,8 @@ def test_transitive_resolution_complex():
     class Final(Intermediate[int]):
         pass
 
-    field_dict = {f.name: f for f in fields(Final)}
-    assert field_dict["attr"].type == List[int]
+    fields_by_name = {field.name: field for field in fields(Final)}
+    assert fields_by_name["attr"].type == List[int]
 
 
 W = TypeVar("W")
@@ -265,18 +268,18 @@ def test_multiple_generic_bases_map_failure():
     class Final(Combined[str, bool]):
         pass
 
-    subs = Final._get_generic_type_substitutions()
+    substitutions = Final._get_generic_type_substitutions()
 
     # T2 should be mapped to int (via Combined)
-    assert subs.get(ensure_hashable(T2)) == int
+    assert substitutions.get(ensure_hashable(T2)) == int
     # V should be mapped to W and then to bool, so resolved V should be bool
-    # We use subs.get because it might be missing or wrongly mapped
+    # We use substitutions.get because it might be missing or wrongly mapped
 
     # In a perfect world, we should be able to resolve V to bool through the chain V -> W -> bool
     from krrood.class_diagrams.utils import resolve_type
 
-    res = resolve_type(V, subs)
-    assert res.resolved_type == bool
+    result = resolve_type(V, substitutions)
+    assert result.resolved_type == bool
 
 
 def test_transitive_map_failure():
@@ -297,11 +300,11 @@ def test_transitive_map_failure():
     class Final(Intermediate[int]):
         pass
 
-    subs = Final._get_generic_type_substitutions()
+    substitutions = Final._get_generic_type_substitutions()
     from krrood.class_diagrams.utils import resolve_type
 
-    res = resolve_type(List[T], subs)
-    assert res.resolved_type == List[int]
+    result = resolve_type(List[T], substitutions)
+    assert result.resolved_type == List[int]
 
 
 @pytest.mark.parametrize(
@@ -354,3 +357,160 @@ def test_circular_reference_resolution():
     )
     assert resolved[T_local] is not None
     assert resolved[U_local] is not None
+
+
+Ts = TypeVarTuple("Ts")
+
+
+def test_typevartuple_basic_substitution():
+    """
+    Test that TypeVarTuple is correctly substituted when bound in a subclass.
+    """
+
+    @dataclass
+    class Base(Generic[Unpack[Ts]], AbstractSubClassSafeGeneric):
+        attribute: Tuple[Unpack[Ts]]
+
+    @dataclass
+    class Final(Base[int, str]):
+        pass
+
+    fields_by_name = {field.name: field for field in fields(Final)}
+    assert fields_by_name["attribute"].type == Tuple[int, str]
+
+
+def test_typevartuple_mixed_with_typevar():
+    """
+    Test that TypeVarTuple mixed with normal TypeVar is correctly substituted.
+    """
+
+    @dataclass
+    class Base(Generic[T, Unpack[Ts]], AbstractSubClassSafeGeneric):
+        attribute: Tuple[T, Unpack[Ts]]
+
+    @dataclass
+    class Final(Base[float, int, str]):
+        pass
+
+    fields_by_name = {field.name: field for field in fields(Final)}
+    assert fields_by_name["attribute"].type == Tuple[float, int, str]
+
+
+def test_typevartuple_multiple_subclasses():
+    """
+    Test that TypeVarTuple resolution works through multiple levels of inheritance.
+    """
+
+    @dataclass
+    class Base(Generic[Unpack[Ts]], AbstractSubClassSafeGeneric):
+        attribute: Tuple[Unpack[Ts]]
+
+    @dataclass
+    class Intermediate(Generic[T, Unpack[Ts]], Base[Unpack[Ts]]):
+        other: T
+
+    @dataclass
+    class Final(Intermediate[bool, int, str]):
+        pass
+
+    fields_by_name = {field.name: field for field in fields(Final)}
+    assert fields_by_name["attribute"].type == Tuple[int, str]
+    assert fields_by_name["other"].type == bool
+
+
+def test_typevartuple_unpack_in_different_positions():
+    """
+    Test Unpack[Ts] in different positions within a Tuple or other generic.
+    """
+
+    @dataclass
+    class Base(Generic[Unpack[Ts]], AbstractSubClassSafeGeneric):
+        attribute: Tuple[int, Unpack[Ts], float]
+
+    @dataclass
+    class Final(Base[str, bool]):
+        pass
+
+    fields_by_name = {field.name: field for field in fields(Final)}
+    # Expected: Tuple[int, str, bool, float]
+    assert fields_by_name["attribute"].type == Tuple[int, str, bool, float]
+
+
+def test_typevartuple_at_start():
+    """
+    Test TypeVarTuple at the start of Generic declaration.
+    """
+
+    @dataclass
+    class Base(Generic[Unpack[Ts], T], AbstractSubClassSafeGeneric):
+        first: Tuple[Unpack[Ts]]
+        last: T
+
+    @dataclass
+    class Final(Base[int, str, float]):
+        pass
+
+    fields_by_name = {field.name: field for field in fields(Final)}
+    assert fields_by_name["first"].type == Tuple[int, str]
+    assert fields_by_name["last"].type == float
+
+
+def test_typevartuple_in_middle():
+    """
+    Test TypeVarTuple in the middle of Generic declaration.
+    """
+
+    @dataclass
+    class Base(Generic[T, Unpack[Ts], U], AbstractSubClassSafeGeneric):
+        first: T
+        middle: Tuple[Unpack[Ts]]
+        last: U
+
+    @dataclass
+    class Final(Base[int, str, float, bool]):
+        pass
+
+    fields_by_name = {field.name: field for field in fields(Final)}
+    assert fields_by_name["first"].type == int
+    assert fields_by_name["middle"].type == Tuple[str, float]
+    assert fields_by_name["last"].type == bool
+
+
+def test_typevartuple_empty_middle():
+    """
+    Test TypeVarTuple in the middle with empty arguments for it.
+    """
+
+    @dataclass
+    class Base(Generic[T, Unpack[Ts], U], AbstractSubClassSafeGeneric):
+        first: T
+        middle: Tuple[Unpack[Ts]]
+        last: U
+
+    @dataclass
+    class Final(Base[int, bool]):
+        pass
+
+    fields_by_name = {field.name: field for field in fields(Final)}
+    assert fields_by_name["first"].type == int
+    assert fields_by_name["middle"].type == Tuple[()]
+    assert fields_by_name["last"].type == bool
+
+
+def test_typevartuple_multiple_usage_in_fields():
+    """
+    Test that TypeVarTuple can be used in multiple fields.
+    """
+
+    @dataclass
+    class Base(Generic[Unpack[Ts]], AbstractSubClassSafeGeneric):
+        first: Tuple[Unpack[Ts]]
+        second: List[Tuple[Unpack[Ts]]]
+
+    @dataclass
+    class Final(Base[int, str]):
+        pass
+
+    fields_by_name = {field.name: field for field in fields(Final)}
+    assert fields_by_name["first"].type == Tuple[int, str]
+    assert fields_by_name["second"].type == List[Tuple[int, str]]

@@ -2,14 +2,22 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Iterable, Optional, Self, Tuple, List
+from typing import Iterable, Optional, Self, Tuple, TYPE_CHECKING
 
-from random_events.interval import closed
-from random_events.product_algebra import SimpleEvent
 from typing_extensions import List, Type
 
 from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math import symbolic_math
+from random_events.interval import closed
+from random_events.product_algebra import SimpleEvent
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.exceptions import (
+    InvalidPlaneDimensions,
+    InvalidHingeActiveAxis,
+    MissingSemanticAnnotationError,
+)
+from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasSupportingSurface,
     HasRootRegion,
@@ -24,21 +32,11 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
     HasStorageSpace,
 )
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.datastructures.variables import SpatialVariables
-from semantic_digital_twin.exceptions import (
-    InvalidPlaneDimensions,
-    InvalidHingeActiveAxis,
-    MissingSemanticAnnotationError,
-)
-from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
@@ -58,6 +56,9 @@ from semantic_digital_twin.world_description.world_entity import (
     Region,
     Connection,
 )
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.world import World
 
 
 @dataclass(eq=False)
@@ -749,16 +750,12 @@ class Milk(Food, IsPerceivable):
     A container of milk.
     """
 
-    ...
-
 
 @dataclass(eq=False)
 class SaltContainer(HasRootBody, IsPerceivable):
     """
     A container of salt.
     """
-
-    ...
 
 
 @dataclass(eq=False)
@@ -1057,6 +1054,38 @@ class Baseball(HasRootBody):
 class LiquidCap(HasRootBody):
     """
     A liquid cap.
+    """
+
+
+@dataclass(eq=False)
+class Agent(HasRootBody):
+    """
+    Represents an entity in the world that can act, move, or be controlled.
+
+    Agents are dynamic bodies with semantic meaning — they may have intent,
+    behavior, or be controlled by external or internal logic. Examples include
+    robots, humans, or other autonomous actors.
+
+    """
+
+
+@dataclass(eq=False)
+class Human(Agent):
+    """
+    Represents a human agent in the environment.
+
+    A Person is an Agent that is not robotically actuated and does not provide
+    kinematic chains, end_effectors, or robot-specific components.
+
+    This class exists primarily for semantic distinction, so that algorithms
+    can treat human agents differently from robots if needed.
+    """
+
+
+@dataclass(eq=False)
+class SemanticEnvironmentAnnotation(HasRootBody):
+    """
+    Represents a semantic annotation of the environment.
     """
 
 

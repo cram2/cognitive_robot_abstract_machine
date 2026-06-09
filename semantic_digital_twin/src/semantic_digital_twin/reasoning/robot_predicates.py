@@ -21,10 +21,10 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AllowSelfCollisions,
 )
 from semantic_digital_twin.reasoning.predicates import is_place_occupied
-from semantic_digital_twin.robots.abstract_robot import (
+from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
+from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
-    ParallelGripper,
-    Manipulator,
+    EndEffector,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import BoundingBox
@@ -81,7 +81,7 @@ def robot_holds_body(robot: AbstractRobot, body: Body) -> bool:
     :param body: The body to check if it is picked
     :return: True if the robot is holding the object, False otherwise
     """
-    g = variable(ParallelGripper, robot._world.semantic_annotations)
+    g = variable(EndEffector, robot._world.semantic_annotations)
     grippers = an(
         entity(g).where(
             g._robot == robot,
@@ -125,7 +125,7 @@ def blocking(
 
 
 @symbolic_function
-def bodies_in_gripper(gripper: ParallelGripper, sample_size: int = 100) -> List[Body]:
+def bodies_in_gripper(gripper: HasTwoFingers, sample_size: int = 100) -> List[Body]:
     """
     Gets all bodies which are between the finger of the gripper.
     This method uses samples of rays which are cast between the finger
@@ -155,7 +155,7 @@ def bodies_in_gripper(gripper: ParallelGripper, sample_size: int = 100) -> List[
 
 @symbolic_function
 def is_body_in_gripper(
-    body: Body, gripper: Manipulator, sample_size: int = 100
+    body: Body, gripper: EndEffector, sample_size: int = 100
 ) -> float:
     """
     Check if the body in the gripper.
@@ -174,7 +174,7 @@ def is_body_in_gripper(
 
 
 @symbolic_function
-def is_gripper_holding_something(gripper: Manipulator) -> bool:
+def is_gripper_holding_something(gripper: EndEffector) -> bool:
     """
     Check if the gripper is holding something.
 
@@ -191,7 +191,9 @@ def is_gripper_holding_something(gripper: Manipulator) -> bool:
 def is_pose_free_for_robot(
     robot: AbstractRobot, pose: HomogeneousTransformationMatrix
 ) -> bool:
-    robot_bb = robot.base.bounding_box.transform_to_origin(robot.root.global_pose)
+    robot_bb = robot.mobile_base.bounding_box.transform_to_origin(
+        robot.root.global_pose
+    )
     target_bb = BoundingBox(
         robot_bb.min_x,
         robot_bb.min_y,

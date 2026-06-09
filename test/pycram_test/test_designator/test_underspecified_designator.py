@@ -16,7 +16,7 @@ from pycram.motion_executor import simulated_robot
 from pycram.plans.factories import sequential, execute_single
 from pycram.robot_plans.actions.core.navigation import NavigateAction
 from pycram.robot_plans.actions.core.pick_up import PickUpAction
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
@@ -78,7 +78,7 @@ def test_underspecified_language(mutable_model_world):
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,
-        robot.left_arm.manipulator,
+        robot.left_arm.end_effector,
     )
     plan_generator = underspecified(sequential, target_type=SequentialNode)(
         children=[

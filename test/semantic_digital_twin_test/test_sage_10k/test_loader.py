@@ -14,10 +14,35 @@ from semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer import (
     BoxDecomposer,
 )
 from semantic_digital_twin.pipeline.pipeline import Pipeline
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Book,
+    BookFront,
+)
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
 )
 from semantic_digital_twin.world import World
+
+from semantic_digital_twin.adapters.mesh import STLParser
+
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose,
+)
+
+from pycram.motion_executor import simulated_robot
+
+from pycram.plans.factories import execute_single, sequential
+
+from pycram.robot_plans.actions.core.navigation import NavigateAction
+
+from pycram.datastructures.dataclasses import Context
+
+from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+
+from pycram.robot_plans.actions.core.pick_up import PickUpAction
+
+from semantic_digital_twin.datastructures.definitions import TorsoState
 
 
 def verify_scene(world: World, scene: Sage10kScene):

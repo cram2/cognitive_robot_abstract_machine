@@ -195,7 +195,7 @@ with simulated_robot:
             grasp_description=GraspDescription(
                 ApproachDirection.FRONT,
                 VerticalAlignment.NoAlignment,
-                context.robot.right_arm.manipulator,
+                context.robot.right_arm.end_effector,
             ),
         ),
         PlaceAction(

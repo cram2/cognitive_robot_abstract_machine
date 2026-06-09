@@ -6,7 +6,7 @@ from typing_extensions import TYPE_CHECKING
 
 from krrood.exceptions import DataclassException
 from pycram.datastructures.enums import Arms
-from semantic_digital_twin.robots.abstract_robot import Manipulator
+from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -111,13 +111,22 @@ class BodyUnfetchable(PlanFailure):
 
 
 @dataclass
-class ManipulatorDidNotReachTarget(PlanFailure):
+class EndEffectorDidNotReachTarget(PlanFailure):
+    """
+    Raised when an end effector did not reach its target during a motion
+    """
 
-    manipulator: Manipulator
+    end_effector: EndEffector
+    """
+    The end effector that did not reach its target.
+    """
 
     target: Pose
+    """
+    The target pose that the end effector did not reach.
+    """
 
     def __post_init__(self):
         self.message = (
-            f"Manipulator {self.manipulator} did not reach target {self.target}"
+            f"EndEffector {self.end_effector} did not reach target {self.target}"
         )
