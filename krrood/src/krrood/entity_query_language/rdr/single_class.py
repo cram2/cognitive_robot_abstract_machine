@@ -418,6 +418,9 @@ class EQLSingleClassRDR:
         paired_targets = targets if targets is not None else [UNSET] * len(cases)
         pending = list(range(len(cases)))
 
+        if expert is not None and self.save_path is not None and expert.interface.on_save is None:
+            expert.interface.on_save = lambda: save_rdr_with_case(self, self.save_path)
+
         progress: Optional[ProgressReporter] = None
         if expert is not None:
             progress = expert.interface.make_progress_reporter()

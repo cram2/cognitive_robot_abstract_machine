@@ -127,6 +127,26 @@ class ExpertInterface(ABC):
     """The I/O strategy an :class:`Expert` uses as the interaction interface through which answers and questions are
     communicated."""
 
+    on_save: Optional[Callable[[], None]] = field(default=None, kw_only=True)
+    """Zero-arg callable that persists the model state. ``None`` when no save path is
+    configured (see :attr:`~EQLSingleClassRDR.save_path`). Injected automatically by
+    :meth:`EQLSingleClassRDR.fit` when a save path is present, or supplied directly by
+    callers that need a custom persistence strategy.
+
+    Declared as a keyword-only field so that subclasses may still define positional
+    (non-default) constructor parameters (e.g. ``FunctionInterface.answer_fn``) without
+    violating Python's dataclass field-ordering constraint.
+    """
+
+    def save(self) -> None:
+        """Persist the current model state.
+
+        Calls :attr:`on_save` if configured; silently no-ops otherwise so callers never
+        need to guard against an unconfigured interface.
+        """
+        if self.on_save is not None:
+            self.on_save()
+
     def interact(
         self, context: CaseContext, requests: List[AnswerRequest]
     ) -> Dict[str, Any]:

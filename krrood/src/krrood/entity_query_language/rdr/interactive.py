@@ -46,9 +46,11 @@ from krrood.entity_query_language.rdr.magics import (
     BACKWARD_MAGIC,
     CONDITIONS_MAGIC,
     CONCLUSION_MAGIC,
+    SAVE_MAGIC,
     _KNOWLEDGE_KEY,
     _make_assign_exit_magic,
     _make_knowledge_magic,
+    _make_save_magic,
 )
 from krrood.entity_query_language.rdr.prompt_sections import (  # noqa: F401
     AID_MAGIC,
@@ -280,6 +282,8 @@ class IPythonInterface(ExpertInterface):
             lines.append(
                 f"  Query backward inference with {p.code(f'%{BACKWARD_MAGIC} <value>')}."
             )
+        if self.on_save is not None:
+            lines.append(f"  Save the model now with {p.code(f'%{SAVE_MAGIC}')}.")
         lines.append(f"  Show this help again with {p.code(f'%{HELP_MAGIC}')}.")
         return "\n".join(lines)
 
@@ -378,6 +382,14 @@ class IPythonInterface(ExpertInterface):
                 magic_kind="line",
                 magic_name=BACKWARD_MAGIC,
             )
+
+        # Register the on-demand save magic unconditionally; the magic itself handles
+        # the case where on_save is None (prints a hint instead of saving).
+        shell.register_magic_function(
+            _make_save_magic(self, self.palette),
+            magic_kind="line",
+            magic_name=SAVE_MAGIC,
+        )
 
         def _cancel() -> None:
             shell._force_exit = True

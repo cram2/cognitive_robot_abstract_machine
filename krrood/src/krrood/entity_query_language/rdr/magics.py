@@ -9,9 +9,12 @@ displays backward-inference results.
 
 from __future__ import annotations
 
-from typing_extensions import Any, Callable, Dict
+from typing_extensions import TYPE_CHECKING, Any, Callable, Dict
 
 from krrood.entity_query_language.rdr.rule_tree_view import format_condition
+
+if TYPE_CHECKING:
+    from krrood.entity_query_language.rdr.interface import ExpertInterface
 
 #: Magic name for setting the conclusion answer variable.
 CONCLUSION_MAGIC = "conclusion"
@@ -21,6 +24,9 @@ CONDITIONS_MAGIC = "conditions"
 
 #: Magic name for backward-inference query.
 BACKWARD_MAGIC = "knows"
+
+#: Magic name for on-demand model save.
+SAVE_MAGIC = "save"
 
 #: Namespace key holding the RDR for the ``%knows`` magic.
 _KNOWLEDGE_KEY = "__backward_knowledge__"
@@ -135,5 +141,35 @@ def _make_knowledge_magic(
                 expr_str = format_condition(gc.expression)
                 display = f"not {expr_str}" if gc.negated else expr_str
                 print(f"    {p.code(display)}")
+
+    return magic
+
+
+def _make_save_magic(
+    interface: "ExpertInterface",
+    palette: Any,
+) -> Callable[[str], None]:
+    """Build a ``%save`` line magic that calls :meth:`ExpertInterface.save`.
+
+    Accepts the *interface* rather than the raw callback so that late injection of
+    :attr:`~ExpertInterface.on_save` (done by :meth:`EQLSingleClassRDR.fit` after
+    the shell is already built) is visible at call time.
+
+    When :attr:`~ExpertInterface.on_save` is ``None`` a hint is printed and no save
+    occurs; no exception is raised so the shell stays open.
+
+    :param interface: The :class:`~krrood.entity_query_language.rdr.interface.ExpertInterface`
+        whose :meth:`~krrood.entity_query_language.rdr.interface.ExpertInterface.save` to invoke.
+    :param palette: A :class:`~krrood.entity_query_language.rdr.interactive.Palette` for
+        colouring feedback messages.
+    :return: A line-magic function ``(line: str) -> None``.
+    """
+
+    def magic(line: str) -> None:
+        if interface.on_save is None:
+            print(palette.hint("[hint] No save path configured for this session."))
+            return
+        interface.save()
+        print(palette.good("[saved] Model saved."))
 
     return magic
