@@ -1,3 +1,4 @@
+import gc
 import os
 import threading
 import time
@@ -135,6 +136,7 @@ def cleanup_after_test():
 @pytest.fixture(autouse=True, scope="module")
 def count_worlds():
     yield
+    gc.collect()
     world_in_mem = objgraph.count("World")
     if world_in_mem > 30:
         raise MemoryError(

@@ -1,9 +1,12 @@
+import gc
 import os
 from copy import deepcopy
 from dataclasses import dataclass
+from time import sleep
 from uuid import UUID
 
 import numpy as np
+import objgraph
 import pytest
 from numpy.testing import assert_raises
 
@@ -801,6 +804,15 @@ def test_copy_two_times(pr2_world_state_reset):
     for connection in pr2_world_state_reset.connections:
         pr2_copy_connection = pr2_copy_2.get_connection_by_name(connection.name)
         assert connection.name == pr2_copy_connection.name
+
+
+def test_copy_many_times_doesnt_leak(pr2_world_state_reset):
+    world_copy = deepcopy(pr2_world_state_reset)
+    initial_count = objgraph.count("World")
+    for _ in range(40):
+        world_copy = deepcopy(world_copy)
+    gc.collect()
+    assert initial_count == objgraph.count("World")
 
 
 def test_copy_id(pr2_world_state_reset):
