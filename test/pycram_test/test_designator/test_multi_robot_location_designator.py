@@ -63,16 +63,16 @@ from semantic_digital_twin.world import World
 )
 def setup_multi_robot_simple_apartment(
     request,
-    hsr_world_setup,
-    stretch_world,
-    tiago_world,
-    pr2_world_setup,
-    simple_apartment_setup,
+    _hsr_world_setup,
+    _stretch_world_setup,
+    _tiago_world_setup,
+    _pr2_world_setup,
+    _simple_apartment_setup,
 ):
-    apartment_copy = deepcopy(simple_apartment_setup)
+    apartment_copy = deepcopy(_simple_apartment_setup)
 
     if request.param == "hsrb":
-        hsr_copy = deepcopy(hsr_world_setup)
+        hsr_copy = deepcopy(_hsr_world_setup)
         apartment_copy.merge_world(hsr_copy)
         view = apartment_copy.get_semantic_annotations_by_type(HSRB)
         view = view[0] if view else HSRB.from_world(apartment_copy)
@@ -81,7 +81,7 @@ def setup_multi_robot_simple_apartment(
         )
         return apartment_copy, view
     elif request.param == "stretch":
-        stretch_copy = deepcopy(stretch_world)
+        stretch_copy = deepcopy(_stretch_world_setup)
         apartment_copy.merge_world(
             stretch_copy,
         )
@@ -93,7 +93,7 @@ def setup_multi_robot_simple_apartment(
         return apartment_copy, view
 
     elif request.param == "tiago":
-        tiago_copy = deepcopy(tiago_world)
+        tiago_copy = deepcopy(_tiago_world_setup)
         apartment_copy.merge_world(
             tiago_copy,
         )
@@ -105,7 +105,7 @@ def setup_multi_robot_simple_apartment(
         return apartment_copy, view
 
     elif request.param == "pr2":
-        pr2_copy = deepcopy(pr2_world_setup)
+        pr2_copy = deepcopy(_pr2_world_setup)
         apartment_copy.merge_world(
             pr2_copy,
         )
@@ -305,8 +305,8 @@ def test_visibility_reachability_merge(
     assert len(pose.to_quaternion().to_list()) == 4
 
 
-def test_accessing_location_pose(apartment_world_pr2_copy_with_context):
-    world, robot, context = apartment_world_pr2_copy_with_context
+def test_accessing_location_pose(immutable_model_world):
+    world, robot, context = immutable_model_world
     plan = sequential(
         [
             ParkArmsAction(Arms.BOTH),
@@ -318,12 +318,13 @@ def test_accessing_location_pose(apartment_world_pr2_copy_with_context):
         plan.perform()
 
     with world.modify_world():
-        world.add_semantic_annotation(
+        world.add_semantic_annotation_recursively(
             drawer := Drawer(
                 root=world.get_body_by_name("cabinet10_drawer_middle"),
                 handle=Handle(root=world.get_body_by_name("handle_cab10_m")),
             )
         )
+
     location_desig = accessing_location(drawer, context=context, arm=Arms.RIGHT)
     with simulated_robot:
         pose = next(iter(location_desig))

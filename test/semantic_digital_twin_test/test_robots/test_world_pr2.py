@@ -469,9 +469,9 @@ def test_tracy_semantic_annotation(tracy_world):
     assert len(tracy.get_sensors()) == 1
 
 
-def test_hsrb_semantic_annotation(hsr_world_setup):
-    hsrb = hsr_world_setup.get_semantic_annotations_by_type(HSRB)[0]
-    hsr_world_setup._notify_model_change()
+def test_hsrb_semantic_annotation(_hsr_world_setup):
+    hsrb = _hsr_world_setup.get_semantic_annotations_by_type(HSRB)[0]
+    _hsr_world_setup._notify_model_change()
 
     assert len(hsrb.get_end_effectors()) == 1
     assert len(hsrb.get_arms()) == 1

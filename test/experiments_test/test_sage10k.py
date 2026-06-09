@@ -94,9 +94,9 @@ def wall_door_handle_world():
     return world, wall, door, handle
 
 
-def test_door_opening(wall_door_handle_world, hsr_world_setup, rclpy_node):
+def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
     world, wall, door, handle = wall_door_handle_world
-    hsr_copy = deepcopy(hsr_world_setup)
+    hsr_copy = deepcopy(_hsr_world_setup)
     world.merge_world(hsr_copy)
     odom_combined = world.get_body_by_name("odom_combined")
     odom_combined.parent_connection.origin = (

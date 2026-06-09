@@ -96,16 +96,16 @@ from semantic_digital_twin.world import World
 )
 def setup_multi_robot_apartment(
     request,
-    hsr_world_setup,
-    stretch_world,
-    tiago_world,
-    pr2_world_setup,
-    apartment_world_setup,
+    _hsr_world_setup,
+    _stretch_world_setup,
+    _tiago_world_setup,
+    _pr2_world_setup,
+    _apartment_world_setup,
 ):
-    apartment_copy = deepcopy(apartment_world_setup)
+    apartment_copy = deepcopy(_apartment_world_setup)
 
     if request.param == "hsrb":
-        hsr_copy = deepcopy(hsr_world_setup)
+        hsr_copy = deepcopy(_hsr_world_setup)
         apartment_copy.merge_world(hsr_copy)
         view = apartment_copy.get_semantic_annotations_by_type(HSRB)
         if not view:
@@ -117,7 +117,7 @@ def setup_multi_robot_apartment(
         )
         return apartment_copy, view
     elif request.param == "stretch":
-        stretch_copy = deepcopy(stretch_world)
+        stretch_copy = deepcopy(_stretch_world_setup)
         apartment_copy.merge_world(
             stretch_copy,
         )
@@ -132,7 +132,7 @@ def setup_multi_robot_apartment(
         return apartment_copy, view
 
     elif request.param == "tiago":
-        tiago_copy = deepcopy(tiago_world)
+        tiago_copy = deepcopy(_tiago_world_setup)
         apartment_copy.merge_world(
             tiago_copy,
         )
@@ -147,7 +147,7 @@ def setup_multi_robot_apartment(
         return apartment_copy, view
 
     elif request.param == "pr2":
-        pr2_copy = deepcopy(pr2_world_setup)
+        pr2_copy = deepcopy(_pr2_world_setup)
         apartment_copy.merge_world(
             pr2_copy,
         )
