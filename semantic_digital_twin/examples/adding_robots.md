@@ -28,6 +28,8 @@ The high-level workflow is:
 4. Implement the classes leaf-first, robot class last.
 5. Instantiate and validate.
 
+In the future, we will look to provide a GUI to help you with this process.
+
 ---
 
 ## Step 1: Load your URDF and inspect the kinematic structure
