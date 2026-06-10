@@ -3,7 +3,7 @@ from copy import deepcopy
 import numpy as np
 import pytest
 
-import experiments.ormatic_interface  # type: ignore
+import experiments.orm.ormatic_interface  # type: ignore
 from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
 from krrood.entity_query_language.factories import underspecified
 from krrood.entity_query_language.backends import ProbabilisticBackend
