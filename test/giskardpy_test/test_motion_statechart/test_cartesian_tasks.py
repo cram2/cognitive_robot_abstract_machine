@@ -42,7 +42,7 @@ from krrood.symbolic_math.symbolic_math import (
     trinary_logic_not,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import Manipulator
+from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -393,41 +393,41 @@ class TestCartesianTasks:
             atol=cart_goal.threshold,
         )
 
-    def test_front_facing_orientation(self, hsr_world_setup: World):
+    def test_front_facing_orientation(self, _hsr_world_setup: World):
         """Test combined position and orientation control in parallel."""
-        with hsr_world_setup.modify_world():
+        with _hsr_world_setup.modify_world():
             box = Body(
                 name=PrefixedName("muh"),
                 collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
             )
             connection = FixedConnection(
-                parent=hsr_world_setup.root,
+                parent=_hsr_world_setup.root,
                 child=box,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=2, z=0.5
                 ),
             )
-            hsr_world_setup.add_connection(connection)
+            _hsr_world_setup.add_connection(connection)
 
-        hsr = hsr_world_setup.get_semantic_annotations_by_type(HSRB)[0]
-        hand = hsr_world_setup.get_semantic_annotations_by_type(Manipulator)[0]
+        hsr = _hsr_world_setup.get_semantic_annotations_by_type(HSRB)[0]
+        hand = _hsr_world_setup.get_semantic_annotations_by_type(EndEffector)[0]
         msc = MotionStatechart()
         orientation_goal = hand.front_facing_orientation.to_rotation_matrix()
-        orientation_goal.reference_frame = hsr_world_setup.get_body_by_name(
+        orientation_goal.reference_frame = _hsr_world_setup.get_body_by_name(
             "base_footprint"
         )
         msc.add_node(
             goal := Parallel(
                 [
                     CartesianOrientation(
-                        root_link=hsr_world_setup.root,
+                        root_link=_hsr_world_setup.root,
                         tip_link=hand.tool_frame,
                         goal_orientation=orientation_goal,
                     ),
                     CartesianPosition(
-                        root_link=hsr_world_setup.root,
+                        root_link=_hsr_world_setup.root,
                         tip_link=hand.tool_frame,
-                        goal_point=hsr_world_setup.bodies[
+                        goal_point=_hsr_world_setup.bodies[
                             -1
                         ].global_transform.to_position(),
                     ),
@@ -436,7 +436,7 @@ class TestCartesianTasks:
         )
         msc.add_node(EndMotion.when_true(goal))
 
-        kin_sim = Executor(MotionStatechartContext(world=hsr_world_setup))
+        kin_sim = Executor(MotionStatechartContext(world=_hsr_world_setup))
         kin_sim.compile(motion_statechart=msc)
         kin_sim.tick_until_end()
 

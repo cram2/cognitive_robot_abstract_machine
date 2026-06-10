@@ -4,7 +4,7 @@ from functools import cached_property
 import numpy as np
 import logging
 
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
@@ -118,7 +118,7 @@ class ProbabilisticCostmap:
                 robot_view=robot,
             )
         elif costmap_type == VisibilityCostmap:
-            camera = robot.sensors[0]
+            camera = robot.get_default_camera()
             self.costmap = VisibilityCostmap(
                 min_height=camera.minimal_height,
                 max_height=camera.maximal_height,

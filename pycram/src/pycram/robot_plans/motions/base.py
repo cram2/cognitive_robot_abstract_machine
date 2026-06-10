@@ -10,8 +10,8 @@ from typing_extensions import TypeVar, Type
 
 from giskardpy.motion_statechart.graph_node import Task
 from pycram.plans.designator import Designator
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from ...alternative_motion_mapping import AlternativeMotion
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from pycram.alternative_motion_mapping import AlternativeMotion
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,6 @@ class BaseMotion(Designator):
     Motions create exactly one goal.
     """
 
-    @abstractmethod
     def perform(self):
         """
         Passes this designator to the process module for execution. Will be overwritten by each motion.

@@ -21,6 +21,10 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.robots.robot_parts import (
+        AbstractRobot,
+        AbstractRobotPart,
+    )
     from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.geometry import Scale
     from semantic_digital_twin.world_description.world_entity import (
@@ -31,7 +35,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.spatial_types.spatial_types import (
         SpatialType,
     )
-    from semantic_digital_twin.spatial_types import Vector3
+    from semantic_digital_twin.spatial_types import Vector3, Point3
     from semantic_digital_twin.world_description.degree_of_freedom import (
         DegreeOfFreedomLimits,
     )
@@ -236,6 +240,21 @@ class MismatchingWorld(UsageError):
 
 
 @dataclass
+class SemanticAnnotationCircularDependencyError(UsageError):
+    """
+    Raised when a circular dependency between semantic annotations is detected.
+    """
+
+    semantic_annotations: List[SemanticAnnotation]
+    """
+    The list of semantic annotations that in which a circular dependency is detected.
+    """
+
+    def __post_init__(self):
+        self.message = f"The following semantic annotations have circular dependencies: {self.semantic_annotations}"
+
+
+@dataclass
 class MissingSemanticAnnotationError(UsageError):
     """
     Raised when a semantic annotation is required but missing.
@@ -276,6 +295,14 @@ class InvalidPlaneDimensions(UsageError):
 
     def __post_init__(self):
         self.message = f"The Dimensions {self.scale} are invalid for the class {self.clazz.__name__}"
+
+
+@dataclass
+class UselessConceptError(UsageError):
+    """
+    Used to indicate that the operation the user is trying to perform is not useful in the current context, even
+    though it might be technically possible.
+    """
 
 
 @dataclass
@@ -348,11 +375,71 @@ class MissingPublishChangesKWARG(UsageError):
 
 
 @dataclass
+class StateUpdateContainsUnknownDegreesOfFreedomError(UsageError):
+    """
+    Raised when a WorldStateUpdate is received that contains one or more DOF identifiers
+    absent from the world state index.  This indicates a severe model/state desynchronization
+    that must be investigated rather than silently ignored.
+    """
+
+    unknown_identifiers: List[UUID]
+    """
+    List of unknown DOF UUIDs that were attempted to update the state of
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"Received a WorldStateUpdate containing {len(self.unknown_identifiers)} "
+            f"DOF identifier(s) absent from the world state index: "
+            f"{self.unknown_identifiers}. "
+            "This means the world model and state are severely out of sync."
+        )
+
+
+@dataclass
+class ApplyMissedMessagesWhileWorldIsBeingModifiedError(UsageError):
+    """
+    Raised when apply_missed_messages is called while a modify_world context is active on the synchronizer's world.
+    Applying missed messages requires entering a modify_world context internally, which would conflict
+    with any currently active modify_world context due to mismatching publish_changes policies.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            "apply_missed_messages must not be called while a modify_world context is active on the synchronizer's world. "
+            "Call apply_missed_messages after the modify_world context has exited."
+        )
+
+
+@dataclass
 class DuplicateWorldEntityError(UsageError):
     world_entities: List[WorldEntity]
 
     def __post_init__(self):
         self.message = f"WorldEntities {self.world_entities} are duplicates, while world entity elements should be unique."
+
+
+@dataclass
+class DuplicateRobotAssignmentsError(UsageError):
+    """
+    Raised when a robot part is assigned to multiple robots, which should not happen.
+    """
+
+    robot_part: AbstractRobotPart
+    """
+    The robot part that is assigned to multiple robots.
+    """
+
+    robots: list[AbstractRobot]
+    """
+    The robots that are already assigned to the robot part.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"Robot part {self.robot_part} is assigned to multiple robots: {self.robots}."
+            f" Each robot part should be assigned to at most one robot."
+        )
 
 
 @dataclass
@@ -417,6 +504,31 @@ class WorldEntityNotFoundError(UsageError):
 
 
 @dataclass
+class MissingDefaultCameraError(UsageError):
+    """
+    Raised when trying to access the default camera of a robot that does not have a default camera.
+    """
+
+    robot: Type[AbstractRobot]
+    """
+    The robot that does not have a default camera.
+    """
+
+    def __post_init__(self):
+        self.message = f"Robot {self.robot.name} does not have a default camera."
+
+
+@dataclass
+class MissingWorldError(UsageError):
+    """
+    Raised when trying to access a world that is None, but a world is required for the operation.
+    """
+
+    def __post_init__(self):
+        self.message = f"The world you are trying to access is None."
+
+
+@dataclass
 class WorldEntityWithIDNotFoundError(UsageError):
     id: UUID
 
@@ -431,6 +543,21 @@ class AlreadyBelongsToAWorldError(UsageError):
 
     def __post_init__(self):
         self.message = f"Cannot add a {self.type_trying_to_add} that already belongs to another world {self.world.name}."
+
+
+@dataclass
+class DoesNotBelongToAWorldError(UsageError):
+    """
+    Raised when trying to use a world entity that does not belong to any world in a context where it must belong to a world.
+    """
+
+    world_entity: WorldEntity
+    """
+    The world entity that does not belong to a world.
+    """
+
+    def __post_init__(self):
+        self.message = f"WorldEntity {self.world_entity} does not belong to a world."
 
 
 class NotJsonSerializable(JSONSerializationError): ...
@@ -545,3 +672,18 @@ class AtomicWorldModificationNotAtomic(DataclassException):
             f"{self.modification.__name__} tried to perform an atomic world modification anyways."
         )
         super().__post_init__()
+
+
+@dataclass
+class PointOccupiedError(DataclassException):
+    """
+    Error that is raised when a pose is occupied or not in the search space of a Connectivity Graphs.
+    """
+
+    point: Point3
+    """
+    The point that is occupied.
+    """
+
+    def __post_init__(self):
+        self.message = f"The point {self.point} is occupied."

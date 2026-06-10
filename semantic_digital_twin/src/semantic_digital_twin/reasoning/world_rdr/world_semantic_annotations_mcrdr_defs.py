@@ -1,5 +1,3 @@
-from typing_extensions import List
-
 from krrood.entity_query_language.factories import (
     contains,
     entity,
@@ -21,6 +19,7 @@ from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
+from typing_extensions import List
 
 
 def conditions_90574698325129464513441443063592862114(case) -> bool:
@@ -57,12 +56,11 @@ def conclusion_331345798360792447350644865254855982739(case) -> List[Drawer]:
         """Get possible value(s) for World.semantic_annotations of types list/set of Drawer"""
         handle = variable(Handle, case.semantic_annotations)
         prismatic_connection = variable(PrismaticConnection, case.connections)
-        fixed_connection = match_variable(FixedConnection, case.connections)(
-            parent=prismatic_connection.child, child=handle.root
-        )
-        return inference(Drawer)(
-            root=fixed_connection.parent, handle=fixed_connection.child
-        ).tolist()
+        fixed_connection = variable(FixedConnection, case.connections)
+        return entity(inference(Drawer)(
+            root=fixed_connection.parent, handle=handle
+        )).where(handle.root == fixed_connection.child,
+                 fixed_connection.parent == prismatic_connection.child).tolist()
 
     return get_drawers(case)
 
@@ -108,12 +106,11 @@ def conclusion_59112619694893607910753808758642808601(case) -> List[Door]:
         """Get possible value(s) for World.semantic_annotations  of type Door."""
         handle = variable(Handle, case.semantic_annotations)
         revolute_connection = variable(RevoluteConnection, case.connections)
-        fixed_connection = match_variable(FixedConnection, case.connections)(
-            parent=revolute_connection.child, child=handle.root
-        )
-        return inference(Door)(
-            root=fixed_connection.parent, handle=fixed_connection.child
-        ).tolist()
+        fixed_connection = variable(FixedConnection, case.connections)
+        return entity(inference(Door)(
+            root=fixed_connection.parent, handle=handle
+        )).where(fixed_connection.parent == revolute_connection.child,
+                 fixed_connection.child == handle.root).tolist()
 
     return get_doors(case)
 

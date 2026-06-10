@@ -55,7 +55,7 @@ class PlaceAction(ActionDescription):
     @property
     def action_plan(self) -> PlanNode:
         arm = ViewManager.get_arm_view(self.arm, self.robot)
-        manipulator = arm.manipulator
+        end_effector = arm.end_effector
 
         previous_pick = self.plan_node.get_previous_node_by_designator_type(
             PickUpAction
@@ -64,7 +64,7 @@ class PlaceAction(ActionDescription):
             previous_pick.designator.grasp_description
             if previous_pick
             else GraspDescription(
-                ApproachDirection.FRONT, VerticalAlignment.NoAlignment, manipulator
+                ApproachDirection.FRONT, VerticalAlignment.NoAlignment, end_effector
             )
         )
 
@@ -166,10 +166,10 @@ class PlaceAction(ActionDescription):
         """
         The object needs to be in the gripper frame
         """
-        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        end_effector = ViewManager.get_end_effector_view(variables["arm"], context.robot)
         return or_(
-            not_(GripperIsFree(manipulator)),
-            is_body_in_gripper(kwargs["object_designator"], manipulator) > 0.9,
+            not_(GripperIsFree(end_effector)),
+            is_body_in_gripper(kwargs["object_designator"], end_effector) > 0.9,
         )
 
     @staticmethod
@@ -179,10 +179,10 @@ class PlaceAction(ActionDescription):
         """
         the gripper must be free again and the object needs to be at the target location
         """
-        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        end_effector = ViewManager.get_end_effector_view(variables["arm"], context.robot)
         return and_(
-            GripperIsFree(manipulator),
-            is_body_in_gripper(kwargs["object_designator"], manipulator) < 0.1,
+            GripperIsFree(end_effector),
+            is_body_in_gripper(kwargs["object_designator"], end_effector) < 0.1,
             allclose(
                 kwargs["object_designator"].global_pose,
                 kwargs["target_location"].to_spatial_type(),

@@ -14,7 +14,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -67,6 +67,12 @@ def test_clear(rclpy_node, pr2_world_copy):
     world_copy = deepcopy(pr2_world_copy)
     with pr2_world_copy.modify_world():
         pr2_world_copy.clear()
+    tf_wrapper = TFWrapper(node=rclpy_node)
+    tf_publisher = TFPublisher(
+        node=rclpy_node,
+        _world=pr2_world_copy,
+    )
+
     with pr2_world_copy.modify_world():
         pr2_world_copy.merge_world(world_copy)
 

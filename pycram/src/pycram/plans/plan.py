@@ -29,7 +29,7 @@ from pycram.plans.plan_node import (
     DesignatorNode,
 )
 from pycram.visualization import plot_rustworkx_interactive, create_ordered_graph
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 
 if TYPE_CHECKING:

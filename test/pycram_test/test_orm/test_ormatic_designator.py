@@ -1,6 +1,3 @@
-import time
-
-import numpy as np
 import pytest
 from sqlalchemy import select
 
@@ -8,7 +5,8 @@ from sqlalchemy import select
 import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
 import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
 from krrood.ormatic.data_access_objects.helper import to_dao
-from pycram.datastructures.enums import Arms
+from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+from pycram.datastructures.grasp import GraspDescription
 from pycram.motion_executor import simulated_robot
 from pycram.orm.ormatic_interface import *  # type: ignore
 from pycram.plans.factories import sequential, execute_single
@@ -16,9 +14,6 @@ from pycram.plans.plan import Plan
 from pycram.robot_plans.actions.composite.transporting import TransportAction
 from pycram.robot_plans.actions.core.navigation import NavigateAction
 from pycram.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
@@ -99,6 +94,11 @@ def complex_plan(mutable_model_world):
                 2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
             ),
             arm=Arms.LEFT,
+            grasp_description=GraspDescription(
+                ApproachDirection.LEFT,
+                VerticalAlignment.NoAlignment,
+                robot_view.left_arm.end_effector,
+            ),
         ),
         context=context,
     ).plan

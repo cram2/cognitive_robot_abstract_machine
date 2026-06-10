@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Dict
 from typing_extensions import Optional, List, Any, get_type_hints
 
 from pycram.exceptions import ContextIsUnavailable
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 
 if TYPE_CHECKING:

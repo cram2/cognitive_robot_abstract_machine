@@ -4,3 +4,4 @@ numpy
 sphinx-autoapi
 sphinxcontrib-plantuml
 pylint
+sphinxcontrib-mermaid

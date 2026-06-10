@@ -128,7 +128,7 @@ class AxisIdentifier(Enum):
         return next((axis for axis in cls if axis.value == axis_tuple), None)
 
 
-class Grasp:
+class Grasp(Enum):
     """
     Base class for grasp enums.
     """
@@ -142,7 +142,7 @@ class Grasp:
         return next((grasp for grasp in cls if grasp.value == (axis, direction)), None)
 
 
-class ApproachDirection(Grasp, Enum):
+class ApproachDirection(Grasp):
     """
     Enum for the approach direction of a gripper.
     The AxisIdentifier is used to identify the axis of the gripper, and the int is used to identify the direction along
@@ -162,7 +162,7 @@ class ApproachDirection(Grasp, Enum):
         return self.value[0]
 
 
-class VerticalAlignment(Grasp, Enum):
+class VerticalAlignment(Grasp):
     """
     Enum for the vertical alignment of a gripper.
     The AxisIdentifier is used to identify the axis of the gripper, and the int is used to identify the direction along

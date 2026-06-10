@@ -1,22 +1,17 @@
 import logging
-import os
-from dataclasses import is_dataclass
+from pathlib import Path
 
 import numpy as np
 
-import giskardpy
+import giskardpy  # type: ignore
 import pycram.locations.costmaps
-import pycram.orm.ormatic_interface
 import semantic_digital_twin.orm.ormatic_interface
 from krrood.adapters.json_serializer import SubclassJSONSerializer
-from krrood.class_diagrams import ClassDiagram
-from krrood.ormatic.data_access_objects.dao import AlternativeMapping
-from krrood.ormatic.helper import get_classes_of_ormatic_interface
+
 from krrood.ormatic.ormatic import ORMatic
-from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import classes_of_package, classes_of_module
-from krrood.utils import recursive_subclasses
 from pycram.orm.model import NumpyType
+import pycram.orm.model
 import giskardpy.qp.solvers
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -26,53 +21,27 @@ import giskardpy.qp.solvers
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-# import classes from the existing interface
-classes, alternative_mappings, type_mappings = get_classes_of_ormatic_interface(
-    semantic_digital_twin.orm.ormatic_interface
-)
-classes = set(classes)
+ignored_classes = set(classes_of_package(giskardpy.qp.solvers))
+ignored_classes |= set(classes_of_module(pycram.locations.costmaps))
+ignored_classes |= {SubclassJSONSerializer}
 
-classes |= set(classes_of_package(pycram))
-classes |= set(classes_of_package(giskardpy))
-classes -= set(classes_of_package(giskardpy.qp.solvers))
-classes -= set(classes_of_module(pycram.locations.costmaps))
-classes -= set(classes_of_module(pycram.orm.ormatic_interface))
-classes -= {SubclassJSONSerializer}
+dependencies = [semantic_digital_twin.orm.ormatic_interface]
 
-
-alternative_mappings += [am for am in recursive_subclasses(AlternativeMapping)]
-alternative_mappings = list(set(alternative_mappings))
-# keep only dataclasses that are NOT AlternativeMapping subclasses
-classes = {
-    c for c in classes if is_dataclass(c) and not issubclass(c, AlternativeMapping)
-}
-classes |= {am.original_class() for am in recursive_subclasses(AlternativeMapping)}
-
-alternative_mappings = [
-    am
-    for am in recursive_subclasses(AlternativeMapping)
-    if am.original_class() in classes
-]
-
-# create the new ormatic interface
-class_diagram = ClassDiagram(
-    list(sorted(classes, key=lambda c: c.__name__, reverse=True))
-)
-
-type_mappings.update({np.ndarray: NumpyType})
+type_mappings = {np.ndarray: NumpyType}
 
 
 # Create an ORMatic object with the classes to be mapped
-ormatic = ORMatic(
-    class_diagram,
-    type_mappings=TypeDict(type_mappings),
-    alternative_mappings=alternative_mappings,
+ormatic = ORMatic.from_package(
+    [pycram, giskardpy], dependencies, ignored_classes, type_mappings
 )
 logging.getLogger("krrood").setLevel(logging.DEBUG)
+
 
 # Generate the ORM classes
 ormatic.make_all_tables()
 
-path = os.path.abspath(os.path.join(os.getcwd(), "../src/pycram/orm/"))
-with open(os.path.join(path, "ormatic_interface.py"), "w") as f:
+ormatic_interface_path = (
+    Path(__file__).parent.parent / "src" / "pycram" / "orm" / "ormatic_interface.py"
+)
+with open(ormatic_interface_path, "w") as f:
     ormatic.to_sqlalchemy_file(f)

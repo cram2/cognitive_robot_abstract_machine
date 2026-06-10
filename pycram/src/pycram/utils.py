@@ -29,10 +29,18 @@ from pycram.tf_transformations import (
     quaternion_about_axis,
     quaternion_multiply,
 )
+from pycram.tf_transformations import (
+    quaternion_about_axis,
+    quaternion_multiply,
+)
+from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
+from semantic_digital_twin.collision_checking.collision_rules import AllowSelfCollisions
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
     Point3,
 )
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:

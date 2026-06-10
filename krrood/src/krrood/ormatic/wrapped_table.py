@@ -9,6 +9,7 @@ from inspect import isclass
 import sqlalchemy
 from typing_extensions import List, Dict, TYPE_CHECKING, Optional, Set, Type, get_origin
 
+from krrood.adapters.json_serializer import JSONData
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.utils import InheritanceStrategy
 from krrood.class_diagrams.class_diagram import (
@@ -528,16 +529,16 @@ class WrappedTable:
         """
 
         # check underspecified generic fields
-        if (
-            wrapped_field.is_underspecified_generic
-            and isclass(wrapped_field.type_endpoint)
-            and not any(
-                [
+        if isclass(wrapped_field.type_endpoint) and (
+            (
+                wrapped_field.is_underspecified_generic
+                and not any(
                     am
                     for am in self.ormatic.alternative_mappings
                     if issubclass(wrapped_field.type_endpoint, am.original_class())
-                ]
+                )
             )
+            or issubclass(wrapped_field.type_endpoint, dict)
         ):
             logger.info(f"Skipping underspecified generic field.")
 
@@ -580,6 +581,7 @@ class WrappedTable:
             wrapped_field.is_collection_of_builtins
             or wrapped_field.type_endpoint in self.ormatic.type_mappings
             and wrapped_field.is_container
+            or wrapped_field.type_endpoint is JSONData
         ):
             logger.info(f"Parsing as JSON.")
             self.create_json_column(wrapped_field)
@@ -752,7 +754,12 @@ class WrappedTable:
         self.ormatic.imported_modules.add("typing_extensions")
         self.ormatic.imported_modules.add(wrapped_field.type_endpoint.__module__)
         column_name = wrapped_field.field.name
-        container = Set if issubclass(wrapped_field.container_type, set) else List
+        container = (
+            Set
+            if isclass(wrapped_field.container_type)
+            and issubclass(wrapped_field.container_type, set)
+            else List
+        )
         column_type = f"Mapped[{module_and_class_name(container)}[{module_and_class_name(wrapped_field.type_endpoint)}]]"
         column_constructor = f"mapped_column(JSON, nullable={wrapped_field.is_optional}, use_existing_column=True)"
         self.custom_columns.append(

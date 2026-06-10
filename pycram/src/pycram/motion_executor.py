@@ -245,7 +245,7 @@ class MSCExecutable:
 
     def perform_simulation(self):
         counter = 0
-        while counter < 2000:
+        while counter < len(self.motions) * 1500:
             if self.plan_node.is_interrupted:
                 return
             elif self.plan_node.is_paused:
