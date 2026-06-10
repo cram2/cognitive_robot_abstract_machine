@@ -23,8 +23,7 @@ dependencies = [
   "physics_simulators",
   "experiments",
   "ipykernel>=7.2.0",
-  "lark-parser>=0.12.0",
-  "scikit-image",
+  "lark-parser>=0.12.0"
 ]
 
 [tool.uv.workspace]
