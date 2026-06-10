@@ -16,7 +16,6 @@ msg/*Goal.msg
 msg/*Result.msg
 msg/_*.py
 *muh*
-*.txt
 *.png
 *.lprof
 tmp_data/
