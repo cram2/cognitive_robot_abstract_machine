@@ -160,7 +160,7 @@ class VariableRule(PhraseRule):
         """
         type_name = node._type_.__name__
         label = ctx.refer.disambiguation_map.get(node._id_, type_name)
-        ctx.refer.register_label(node, label)
+        ctx.refer.mark_introduced(node)
         numbered = label != type_name
         return NounPhrase(
             head=RoleFragment.for_variable(label, node),

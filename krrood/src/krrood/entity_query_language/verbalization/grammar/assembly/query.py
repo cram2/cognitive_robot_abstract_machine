@@ -4,10 +4,11 @@ into the *"Find … such that … grouped by … having … ordered by …"* blo
 noun-phrase / aggregation-value forms).
 
 This is the realisation half of the planner/assembler split: it owns recursion
-(``self.ctx.child``), the render-scope mutations (query-depth, subject, compact
-predicates) and the coreference bookkeeping (``self.ctx.context.seen``) — concerns that
-are order-dependent and cannot be pre-computed (Reiter & Dale 2000).  All *what to say*
-decisions already live in the plan; the assembler only combines.
+(``self.ctx.child``) and the render-scope mutations (query-depth, compact predicates).
+Coreference is no longer resolved here — the assembler emits referring ``NounPhrase`` s and
+``SubjectScope`` markers, and the document-order ``CoreferenceProcessor`` pass decides
+first/subsequent/pronoun afterwards (Reiter & Dale 2000).  All *what to say* decisions already
+live in the plan; the assembler only combines.
 
 Reference: Gatt & Reiter (2009), SimpleNLG — surface realisation.
 """

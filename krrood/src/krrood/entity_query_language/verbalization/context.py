@@ -76,8 +76,8 @@ class VerbalizationContext:
     # ── Referring-expression delegation ──────────────────────────────────────
 
     @property
-    def seen(self) -> dict:
-        """Referents introduced so far (for cross-build seeding); see
+    def seen(self) -> set:
+        """Referent ids introduced so far (for cross-build seeding); see
         :attr:`ReferringExpressions.seen`."""
         return self.referring.seen
 
@@ -86,9 +86,9 @@ class VerbalizationContext:
         """Pre-computed disambiguation labels; see :attr:`ReferringExpressions.disambiguation_map`."""
         return self.referring.disambiguation_map
 
-    def register_label(self, expression, text: str) -> None:
-        """Delegate to :meth:`ReferringExpressions.register_label`."""
-        self.referring.register_label(expression, text)
+    def mark_introduced(self, expression) -> None:
+        """Delegate to :meth:`ReferringExpressions.mark_introduced`."""
+        self.referring.mark_introduced(expression)
 
     def noun_for_parts(self, var) -> tuple[Definiteness, str]:
         """Delegate to :meth:`ReferringExpressions.noun_for_parts`."""

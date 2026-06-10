@@ -24,16 +24,11 @@ import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
-from typing_extensions import Dict, List
+from typing_extensions import Dict, List, Set
 
 from krrood.entity_query_language.core.variable import Variable, Literal
 from krrood.entity_query_language.query.query import Entity, Query
-from krrood.entity_query_language.verbalization.fragments.base import (
-    RoleFragment,
-    VerbFragment,
-)
 from krrood.entity_query_language.verbalization.fragments.features import Definiteness
-from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.subquery import (
     aggregation_source_root,
     selected_aggregator,
@@ -121,11 +116,11 @@ class ReferringExpressions:
     is seeded as already-mentioned (the within-build first/subsequent decision is the pass's).
     """
 
-    seen: "Dict[uuid.UUID, VerbFragment]" = field(default_factory=dict)
-    """Referents introduced so far (keyed by expression ``_id_``).  Only the *keys* are used now
-    — to seed the coreference pass across builds sharing this context (see
-    :meth:`EQLVerbalizer.build`); the within-build decision is the pass's.  (The stored values are
-    vestigial and this could shrink to a ``Set``.)"""
+    seen: "Set[uuid.UUID]" = field(default_factory=set)
+    """Referent ``_id_`` s introduced so far — used only to seed the coreference pass across
+    builds sharing this context (see :meth:`EQLVerbalizer.build`), so verbalizing the same
+    expression twice on one context reads *"a Robot"* then *"the Robot"*.  The within-build
+    first/subsequent decision is the pass's."""
 
     disambiguation_map: Dict[uuid.UUID, str] = field(default_factory=dict)
     """Maps variable ``_id_`` → display label, pre-computed before verbalization
@@ -137,9 +132,9 @@ class ReferringExpressions:
         """Create an instance with the disambiguation map pre-built for *expression*."""
         return cls(disambiguation_map=_build_disambiguation_map(expression))
 
-    def register_label(self, expression, text: str) -> None:
+    def mark_introduced(self, expression) -> None:
         """Record *expression* as introduced (so a later build sharing this context seeds it)."""
-        self.seen[expression._id_] = RoleFragment(text=text, role=SemanticRole.VARIABLE)
+        self.seen.add(expression._id_)
 
     def noun_for_parts(self, var) -> tuple[Definiteness, str]:
         """
@@ -164,6 +159,5 @@ class ReferringExpressions:
         )
         label = self.disambiguation_map.get(var._id_, type_name)
         is_numbered = label != type_name
-        if var._id_ not in self.seen:
-            self.seen[var._id_] = RoleFragment(text=label, role=SemanticRole.VARIABLE)
+        self.seen.add(var._id_)  # recorded for cross-build seeding (see :attr:`seen`)
         return (Definiteness.BARE if is_numbered else Definiteness.INDEFINITE), label

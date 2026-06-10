@@ -115,12 +115,12 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
 
     def _register_antecedent(self, antecedent: AntecedentInfo) -> None:
         root = antecedent.root
-        self.ctx.refer.register_label(root, antecedent.type_name)
+        self.ctx.refer.mark_introduced(root)
         if isinstance(root, Entity):
             root.build()
             sel = root.selected_variable
             if sel is not None and hasattr(sel, "_id_"):
-                self.ctx.refer.register_label(sel, antecedent.type_name)
+                self.ctx.refer.mark_introduced(sel)
 
     def _condition_frags(
         self, conditions: List[PlannedCondition], antecedent: AntecedentInfo
@@ -184,7 +184,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
             if getattr(current, "_type_", None)
             else FallbackNouns.ENTITY.text
         )
-        self.ctx.refer.register_label(current, root_type)
+        self.ctx.refer.mark_introduced(current)
         parts = build_path_parts(chain)
         field = list(reversed(parts))[0][0] if parts else root_type
         return GroupKeyPhrases.COMMON_OF.build_phrase(field, root_type)

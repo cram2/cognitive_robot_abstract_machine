@@ -21,14 +21,14 @@ class _Ref:
         self._id_ = identifier
 
 
-def test_register_label_marks_the_referent_introduced():
+def test_mark_introduced_records_the_referent():
     refer = ReferringExpressions()
     robot = _Ref(1)
     assert robot._id_ not in refer.seen
-    refer.register_label(robot, "Robot")
+    refer.mark_introduced(robot)
     # Recorded so a later build sharing this context seeds it as already-mentioned.
     assert robot._id_ in refer.seen
 
 
 def test_seen_starts_empty():
-    assert ReferringExpressions().seen == {}
+    assert ReferringExpressions().seen == set()

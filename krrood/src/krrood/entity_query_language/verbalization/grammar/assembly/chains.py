@@ -102,7 +102,8 @@ class ChainAssembler(Assembler[MappedVariable, None]):
     def _plural_attribute(self, expression: MappedVariable) -> Optional[VerbFragment]:
         """*"attrs of Roots"* when *expression* is a single ``Attribute`` on a ``Variable``,
         else ``None`` (caller falls through to the singular rendering).  Tags both leaves
-        plural for the morphology pass; registers the root for coreference."""
+        plural for the morphology pass; marks the root introduced for cross-build seeding.
+        """
         chain, root = walk_chain(expression)
         if not (
             isinstance(root, Variable)
@@ -112,7 +113,7 @@ class ChainAssembler(Assembler[MappedVariable, None]):
             return None
         type_name = root._type_.__name__
         label = self.ctx.refer.disambiguation_map.get(root._id_, type_name)
-        self.ctx.refer.register_label(root, label)
+        self.ctx.refer.mark_introduced(root)
         numbered = label != type_name
         attribute = chain[0]
         root_np = NounPhrase(

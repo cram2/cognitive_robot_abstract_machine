@@ -68,7 +68,7 @@ class EQLVerbalizer:
         # Referents already introduced by prior builds on this (shared) context, so the same
         # expression verbalized twice reads "a Robot" then "the Robot".  Snapshot BEFORE the
         # fold, which records this build's own mentions in the same set.
-        already_seen = set(context.seen.keys())
+        already_seen = set(context.seen)
         fragment = fold(expression, context, ALL_PHRASE_RULES)
         return realize_tree(fragment, already_seen=already_seen)
 
