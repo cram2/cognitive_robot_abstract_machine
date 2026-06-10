@@ -29,16 +29,11 @@ jobs:
       - name: Install dependencies
         run: |
           cd cognitive_robot_abstract_machine
-          repo_root="$(git rev-parse --show-toplevel)"
-          cd "$repo_root"
           source /opt/ros/cram-env/bin/activate
           sudo apt-get update
           sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libegl1
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          export PATH="$HOME/.local/bin:$PATH"
-          uv sync --frozen --active --all-packages
+          poetry install
           python -c "import sys; print(sys.executable)"
-          python -c "import skimage; print(skimage.__file__)"
 
       - name: Restore cache
         uses: actions/cache/restore@v4
@@ -54,8 +49,7 @@ jobs:
         if: ${{inputs.repo_lowercase == 'coraplex' || inputs.repo_lowercase == 'semantic_digital_twin'}}
         run: |
           cd cognitive_robot_abstract_machine
-          repo_root="$(git rev-parse --show-toplevel)"
-          cd "$repo_root/${{ inputs.lib }}/scripts/"
+          cd ${{ inputs.lib }}/scripts/
           source /opt/ros/overlay_ws/install/setup.bash
           source /opt/ros/cram-env/bin/activate
           python generate_orm.py
@@ -63,8 +57,6 @@ jobs:
       - name: Run Script
         run: |
           cd cognitive_robot_abstract_machine
-          repo_root="$(git rev-parse --show-toplevel)"
-          cd "$repo_root"
           source /opt/ros/overlay_ws/install/setup.bash
           source /opt/ros/cram-env/bin/activate
           ./${{inputs.script}}

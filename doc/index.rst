@@ -101,7 +101,25 @@ then install packages:
 
 .. code:: bash
 
-  uv sync --active --all-packages
+  uv sync --active
+
+Alternative: Poetry
+~~~~~~~~~~~~~~~~~~~
+
+Alternatively you can use poetry to install all packages in the
+repository.
+
+Install poetry if you haven't already:
+
+.. code:: bash
+
+  pip install poetry
+
+Install the CRAM package along with its dependencies:
+
+.. code:: bash
+
+  poetry install
 
 .. _ref-to-contributing:
 

@@ -29,16 +29,11 @@ jobs:
       - name: Install dependencies
         run: |
           cd cognitive_robot_abstract_machine
-          repo_root="$(git rev-parse --show-toplevel)"
-          cd "$repo_root"
           source /opt/ros/cram-env/bin/activate
           sudo apt-get update
           sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libegl1
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          export PATH="$HOME/.local/bin:$PATH"
-          uv sync --frozen --active --all-packages
+          poetry install
           python -c "import sys; print(sys.executable)"
-          python -c "import skimage; print(skimage.__file__)"
 
       - name: Restore cache
         uses: actions/cache/restore@v4
@@ -54,8 +49,7 @@ jobs:
         if: ${{inputs.lib == 'coraplex' || inputs.lib == 'semantic_digital_twin' || inputs.lib == 'experiments'}}
         run: |
           cd cognitive_robot_abstract_machine
-          repo_root="$(git rev-parse --show-toplevel)"
-          cd "$repo_root/${{ inputs.lib }}/scripts/"
+          cd ${{ inputs.lib }}/scripts/
           source /opt/ros/cram-env/bin/activate
           source /opt/ros/overlay_ws/install/setup.bash
           python generate_orm.py
@@ -64,8 +58,7 @@ jobs:
         if: ${{inputs.lib == 'random_events'}}
         run: |
           cd cognitive_robot_abstract_machine
-          repo_root="$(git rev-parse --show-toplevel)"
-          cd "$repo_root/${{ inputs.lib }}/src/random_events_lib"
+          cd ${{ inputs.lib }}/src/random_events_lib
           sudo apt-get install -y g++ unzip zip
           BAZEL_VERSION=7.0.0
           curl -L -o bazel.sh \
@@ -80,15 +73,13 @@ jobs:
       - name: Run tests
         run: |
           cd cognitive_robot_abstract_machine
-          repo_root="$(git rev-parse --show-toplevel)"
-          cd "$repo_root"
           source /opt/ros/cram-env/bin/activate
           source /opt/ros/overlay_ws/install/setup.bash
           echo "PYTHONPATH: $PYTHONPATH"
           if [[ "${{ inputs.lib }}" == "probabilistic_model" ]]; then
             export QT_QPA_PLATFORM=offscreen
           fi
-          python -m pytest -sv -n auto test/${{ inputs.lib }}_test
+          python -m pytest -sv -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
 
       - name: Save cache
         uses: actions/cache/save@v4
