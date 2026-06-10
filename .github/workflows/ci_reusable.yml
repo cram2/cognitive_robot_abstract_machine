@@ -49,8 +49,7 @@ jobs:
       - name: Build ORM
         if: ${{inputs.lib == 'coraplex' || inputs.lib == 'semantic_digital_twin' || inputs.lib == 'experiments'}}
         run: |
-          cd cognitive_robot_abstract_machine
-          cd ${{ inputs.lib }}/scripts/
+          cd cognitive_robot_abstract_machine/${{ inputs.lib }}/scripts/
           source /opt/ros/cram-env/bin/activate
           source /opt/ros/overlay_ws/install/setup.bash
           python generate_orm.py
@@ -58,8 +57,7 @@ jobs:
       - name: Run CPP tests
         if: ${{inputs.lib == 'random_events'}}
         run: |
-          cd cognitive_robot_abstract_machine
-          cd ${{ inputs.lib }}/src/random_events_lib
+          cd cognitive_robot_abstract_machine/${{ inputs.lib }}/src/random_events_lib
           sudo apt-get install -y g++ unzip zip
           BAZEL_VERSION=7.0.0
           curl -L -o bazel.sh \
