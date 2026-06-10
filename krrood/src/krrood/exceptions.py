@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import types
 from dataclasses import dataclass, field
+from typing import Type, Tuple
 
 from typing_extensions import Optional
 
@@ -26,6 +27,37 @@ class InputError(DataclassException):
     """
     Raised when there is an error with user input.
     """
+
+
+@dataclass
+class MismatchingNumberOfGenericParametersAndResolvedTypes(DataclassException):
+    """
+    Raised when the number of generic parameters does not match the number of resolved types.
+    """
+
+    affected_class: Type
+    """
+    The class that has the generic parameters.
+    """
+
+    parameters: list[Type]
+    """
+    The generic parameters of the class.
+    """
+
+    resolved_types: Tuple[Type, ...]
+    """
+    The resolved types for the generic parameters.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"The number of generic type parameters in {self.affected_class.__name__} "
+            f"({len(self.parameters)}) does not match the number of "
+            f"provided arguments ({len(self.resolved_types)})."
+            f"Parameters: {self.parameters}, resolved_types: {self.resolved_types}"
+        )
+        super().__post_init__()
 
 
 @dataclass

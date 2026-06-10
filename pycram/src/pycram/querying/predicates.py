@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing_extensions import List, Callable
 
 from krrood.entity_query_language.predicate import Predicate
-from semantic_digital_twin.robots.abstract_robot import Manipulator
+from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
     Body,
@@ -16,7 +16,7 @@ class GripperOccupancy:
     Base class for predicates that check the gripper occupancy.
     """
 
-    manipulator: Manipulator
+    end_effector: EndEffector
     """
     Semantic annotation for the gripper that should be evaluated.
     """
@@ -30,19 +30,19 @@ class GripperOccupancy:
         :return: True if the condition is satisfied, False otherwise.
         """
         bodies_under_tcp = (
-            self.manipulator._world.get_kinematic_structure_entities_of_branch(
-                self.manipulator.tool_frame
+            self.end_effector._world.get_kinematic_structure_entities_of_branch(
+                self.end_effector.tool_frame
             )
         )
-        if self.manipulator.tool_frame in bodies_under_tcp:
-            bodies_under_tcp.remove(self.manipulator.tool_frame)
+        if self.end_effector.tool_frame in bodies_under_tcp:
+            bodies_under_tcp.remove(self.end_effector.tool_frame)
         return condition(bodies_under_tcp)
 
 
 @dataclass
 class GripperIsFree(GripperOccupancy, Predicate):
     """
-    Checks if the gripper is holding something. Checks this by looking at the kinematic structure of the manipulator.
+    Checks if the gripper is holding something. Checks this by looking at the kinematic structure of the end_effector.
     """
 
     def __call__(self) -> bool:

@@ -235,7 +235,7 @@ def test_exception_parallel(immutable_model_world):
     def raise_except():
         raise PlanFailure()
 
-    act = NavigateAction(Pose(reference_frame=world.root))
+    act = NavigateAction(Pose.from_xyz_rpy(x=-2, reference_frame=world.root))
     act2 = code(raise_except)
 
     plan = parallel([act, act2], context).plan
@@ -252,7 +252,7 @@ def test_exception_try_all(immutable_model_world):
     def raise_except():
         raise PlanFailure()
 
-    act = NavigateAction(Pose(reference_frame=world.root))
+    act = NavigateAction(Pose.from_xyz_rpy(x=-2, reference_frame=world.root))
     act2 = code(raise_except)
 
     plan = try_all([act, act2], context).plan

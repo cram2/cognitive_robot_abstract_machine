@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from abc import abstractmethod, ABC
 from collections import deque
 from dataclasses import dataclass, field
@@ -8,6 +9,7 @@ from datetime import datetime
 from typing import Optional, Any, List, Type, TYPE_CHECKING, Iterable, Iterator
 
 import rustworkx as rx
+import tqdm
 from typing_extensions import Union
 
 from giskardpy.motion_statechart.graph_node import Task

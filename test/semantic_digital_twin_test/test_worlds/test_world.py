@@ -1,11 +1,16 @@
+import gc
+import os
 from copy import deepcopy
 from dataclasses import dataclass
+from time import sleep
 from uuid import UUID
 
 import numpy as np
+import objgraph
 import pytest
 from numpy.testing import assert_raises
 
+from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     DuplicateWorldEntityError,
@@ -15,7 +20,12 @@ from semantic_digital_twin.exceptions import (
     WrongWorldModelVersion,
     NonMonotonicTimeError,
 )
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle, Milk
+from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Handle,
+    Milk,
+    Drawer,
+)
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
 
@@ -637,13 +647,35 @@ def test_copy_world(world_setup):
         == 0.0
     )
     assert float(bf.global_transform.to_np()[0, 3]) == 1.5
-    assert all(
-        hash(d) in world_copy._world_entity_hash_table.keys()
-        for d in world.degrees_of_freedom
+
+    assert set(world_copy._world_entity_hash_table.keys()) == set(
+        world._world_entity_hash_table.keys()
     )
-    assert all(
-        hash(k) in world_copy._world_entity_hash_table.keys()
-        for k in world.kinematic_structure_entities
+
+
+def test_copy_big_world():
+    pr2_world = URDFParser.from_file(
+        file_path="package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+    ).parse()
+    PR2.from_world(pr2_world)
+    apartment_world = URDFParser.from_file(
+        os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "..",
+            "pycram",
+            "resources",
+            "worlds",
+            "apartment.urdf",
+        )
+    ).parse()
+
+    apartment_world.merge_world(pr2_world)
+    apartment_world_copy = deepcopy(apartment_world)
+
+    assert set(apartment_world._world_entity_hash_table.keys()) == set(
+        apartment_world_copy._world_entity_hash_table.keys()
     )
 
 
@@ -755,21 +787,47 @@ def test_copy_connections(pr2_world_state_reset):
         pr2_copy.get_degree_of_freedom_by_name("torso_lift_joint").id
     ].position = 0.3
     pr2_copy.notify_state_change()
+    original_torso_state = pr2_world_state_reset.get_connection_by_name(
+        "torso_lift_joint"
+    ).origin
+    copied_and_updated_torso_state = pr2_copy.get_connection_by_name(
+        "torso_lift_joint"
+    ).origin
 
     assert_raises(
         AssertionError,
         np.testing.assert_array_almost_equal,
-        pr2_world_state_reset.get_connection_by_name("torso_lift_joint").origin.to_np(),
-        pr2_copy.get_connection_by_name("torso_lift_joint").origin.to_np(),
+        original_torso_state,
+        copied_and_updated_torso_state,
     )
 
 
 def test_copy_two_times(pr2_world_state_reset):
     pr2_copy = deepcopy(pr2_world_state_reset)
     pr2_copy_2 = deepcopy(pr2_copy)
+    pr2_copy_3 = deepcopy(pr2_copy_2)
     for connection in pr2_world_state_reset.connections:
         pr2_copy_connection = pr2_copy_2.get_connection_by_name(connection.name)
+        pr2_copy_3_connection = pr2_copy_3.get_connection_by_name(connection.name)
         assert connection.name == pr2_copy_connection.name
+        assert connection.name == pr2_copy_3_connection.name
+
+
+def test_copy_drawer(apartment_world_copy):
+    handle = Handle(root=apartment_world_copy.get_body_by_name("handle_cab10_t"))
+    drawer = Drawer(
+        root=apartment_world_copy.get_body_by_name("cabinet10_drawer_top"),
+        handle=handle,
+    )
+    with apartment_world_copy.modify_world():
+        apartment_world_copy.add_semantic_annotation(handle)
+        apartment_world_copy.add_semantic_annotation(drawer)
+
+    apartment_copy = deepcopy(apartment_world_copy)
+    copied_handle = apartment_copy.get_semantic_annotation_by_name(handle.name)
+    copied_drawer = apartment_copy.get_semantic_annotation_by_name(drawer.name)
+    assert copied_handle == handle
+    assert copied_drawer == drawer
 
 
 def test_copy_id(pr2_world_state_reset):

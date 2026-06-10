@@ -10,35 +10,31 @@ GeneratorList -- implementation of generator list wrappers.
 from __future__ import annotations
 
 import math
-import os
 from copy import deepcopy
-from inspect import isgeneratorfunction
 from typing import Union, Iterator
 
 import numpy as np
 from typing_extensions import (
     Tuple,
-    Callable,
     List,
     Dict,
     TYPE_CHECKING,
     Sequence,
-    Any,
-    Iterable,
 )
 
-from semantic_digital_twin.spatial_types.spatial_types import (
-    Pose,
-    Quaternion,
-    HomogeneousTransformationMatrix,
-    Point3,
-)
-from semantic_digital_twin.world_description.world_entity import Body
 from pycram.tf_transformations import (
     quaternion_about_axis,
     quaternion_multiply,
-    quaternion_matrix,
 )
+from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
+from semantic_digital_twin.collision_checking.collision_rules import AllowSelfCollisions
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.spatial_types.spatial_types import (
+    Pose,
+    Point3,
+)
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
     from pycram.view_manager import CameraDescription

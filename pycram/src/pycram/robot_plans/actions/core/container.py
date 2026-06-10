@@ -7,7 +7,7 @@ import numpy as np
 from typing_extensions import Any, Dict
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.factories import and_
+from krrood.entity_query_language.factories import and_, ConditionType
 from pycram.config.action_conf import ActionConfig
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
@@ -16,16 +16,18 @@ from pycram.datastructures.enums import (
     VerticalAlignment,
 )
 from pycram.datastructures.grasp import GraspDescription
+from pycram.locations.pose_validator import IsReachableBy
 from pycram.plans.factories import sequential
-from pycram.pose_validator import reachability_validator
 from pycram.querying.predicates import GripperIsFree
-from pycram.robot_plans.actions.base import ActionDescription, DescriptionType
+from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.core.pick_up import GraspingAction
 from pycram.robot_plans.motions.container import OpeningMotion, ClosingMotion
 from pycram.robot_plans.motions.gripper import MoveGripperMotion
 from pycram.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.reasoning.robot_predicates import is_body_in_gripper
+from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -51,12 +53,12 @@ class OpenAction(ActionDescription):
 
     def execute(self) -> None:
         arm = ViewManager.get_arm_view(self.arm, self.robot)
-        manipulator = arm.manipulator
+        end_effector = arm.end_effector
 
         grasp_description = GraspDescription(
             ApproachDirection.FRONT,
             VerticalAlignment.NoAlignment,
-            manipulator,
+            end_effector,
         )
 
         self.add_subplan(
@@ -74,21 +76,30 @@ class OpenAction(ActionDescription):
     @staticmethod
     def pre_condition(
         variables, context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression:
+    ) -> ConditionType:
         """
         The gripper with which to open the container has to be free and the handle has to be reachable.
         """
-        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
         test_world = deepcopy(context.world)
+        test_robot: AbstractRobot = test_world.get_semantic_annotation_by_id(
+            context.robot.id
+        )
+        end_effector = ViewManager.get_end_effector_view(variables["arm"], test_robot)
 
         return and_(
-            GripperIsFree(manipulator),
-            reachability_validator(
-                kwargs["object_designator"].global_pose,
-                manipulator.tool_frame,
-                context.robot.from_world(test_world),
-                test_world,
-                context.robot.full_body_controlled,
+            GripperIsFree(end_effector),
+            IsReachableBy(
+                world=test_world,
+                robot=test_world.get_semantic_annotations_by_type(type(context.robot))[
+                    0
+                ],
+                pose=kwargs["object_designator"].global_pose,
+                tip_link=end_effector.tool_frame,
+                grasp_description=GraspDescription(
+                    ApproachDirection.FRONT,
+                    VerticalAlignment.NoAlignment,
+                    next(end_effector.evaluate()),
+                ),
             ),
         )
 
@@ -99,12 +110,12 @@ class OpenAction(ActionDescription):
         """
         The handle has to be in the gripper of the robot and the container has to be open.
         """
-        manipulator = ViewManager.get_end_effector_view(kwargs["arm"], context.robot)
+        end_effector = ViewManager.get_end_effector_view(kwargs["arm"], context.robot)
         parent_connection = kwargs[
             "object_designator"
         ].get_first_parent_connection_of_type(ActiveConnection1DOF)
         return (
-            is_body_in_gripper(kwargs["object_designator"], manipulator) > 0.9
+            is_body_in_gripper(kwargs["object_designator"], end_effector) > 0.9
             or np.allclose(
                 kwargs["object_designator"].global_pose.to_position(),
                 ViewManager.get_end_effector_view(
@@ -136,12 +147,12 @@ class CloseAction(ActionDescription):
 
     def execute(self) -> None:
         arm = ViewManager.get_arm_view(self.arm, self.robot)
-        manipulator = arm.manipulator
+        end_effector = arm.end_effector
 
         grasp_description = GraspDescription(
             ApproachDirection.FRONT,
             VerticalAlignment.NoAlignment,
-            manipulator,
+            end_effector,
         )
 
         self.add_subplan(

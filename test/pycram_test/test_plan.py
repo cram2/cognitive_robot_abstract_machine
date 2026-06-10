@@ -42,8 +42,8 @@ from semantic_digital_twin.orm.model import (
     QuaternionMapping,
     PoseMapping,
 )
-from semantic_digital_twin.robots.abstract_robot import (
-    Manipulator,
+from semantic_digital_twin.robots.robot_parts import (
+    EndEffector,
 )
 
 
@@ -357,19 +357,19 @@ def test_pause_plan(immutable_model_world):
     ].position == pytest.approx(0.3, abs=0.1)
 
 
-def test_algebra_sequential_plan(mutable_model_world):
+def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     """
     Parameterize a SequentialPlan using krrood parameterizer, create a fully-factorized distribution and
     assert the correctness of sampled values after conditioning and truncation.
     """
-    world, robot_view, context = mutable_model_world
+    world, robot_view, context = apartment_world_pr2_copy_with_context
     context.evaluate_conditions = False
 
     target_location = underspecified(PoseMapping.from_point_mapping_quaternion_mapping)(
-        point_mapping=underspecified(Point3Mapping)(
+        position=underspecified(Point3Mapping)(
             x=..., y=..., z=0.0, reference_frame=None
         ),
-        quaternion_mapping=QuaternionMapping(x=0, y=0, z=0, w=1, reference_frame=None),
+        orientation=QuaternionMapping(x=0, y=0, z=0, w=1, reference_frame=None),
         reference_frame=variable_from([robot_view.root]),
     )
 
@@ -392,8 +392,8 @@ def test_algebra_sequential_plan(mutable_model_world):
     assert len(plan.root.children[1].children) == 1
 
 
-def test_parameterization_of_pick_up(mutable_model_world):
-    world, robot_view, context = mutable_model_world
+def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
+    world, robot_view, context = apartment_world_pr2_copy_with_context
     context.evaluate_conditions = False
 
     milk = world.get_body_by_name("milk.stl")
@@ -408,22 +408,23 @@ def test_parameterization_of_pick_up(mutable_model_world):
             vertical_alignment=...,
             rotate_gripper=...,
             manipulation_offset=0.05,
-            manipulator=variable(Manipulator, world.semantic_annotations),
+            end_effector=variable(EndEffector, world.semantic_annotations),
         ),
     )
     pick_up_description.resolve()
 
     parameters = UnderspecifiedParameters(pick_up_description)
 
-    assert len(parameters.variables) == 7
-
-    [manipulator_offset] = [
+    [end_effector_offset] = [
         v
         for v in parameters.variables.values()
         if v.name.endswith("manipulation_offset")
     ]
 
-    assert parameters.assignments_for_conditioning[manipulator_offset] == 0.05
+    assert (
+        parameters.conditioning_assignments_from_literal_values[end_effector_offset]
+        == 0.05
+    )
 
     context.query_backend = ProbabilisticBackend(
         model_registry=FullyFactorizedRegistry()

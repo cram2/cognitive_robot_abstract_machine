@@ -4,10 +4,10 @@ from typing_extensions import Optional, Tuple
 
 from krrood.entity_query_language.predicate import symbolic_function
 from pycram.datastructures.enums import Arms
-from semantic_digital_twin.robots.abstract_robot import (
-    AbstractRobot,
-    Manipulator,
+from semantic_digital_twin.robots.robot_parts import (
+    EndEffector,
     KinematicChain,
+    AbstractRobot,
     Neck,
 )
 
@@ -19,9 +19,9 @@ class ViewManager:
     @symbolic_function
     def get_end_effector_view(
         arm: Arms, robot_view: AbstractRobot
-    ) -> Optional[Manipulator]:
+    ) -> Optional[EndEffector]:
         arm = ViewManager.get_arm_view(arm, robot_view)
-        return arm.manipulator
+        return arm.end_effector
 
     @staticmethod
     def get_arm_view(arm: Arms, robot_view: AbstractRobot) -> Optional[KinematicChain]:
@@ -46,14 +46,14 @@ class ViewManager:
         :param robot_view: The robot view to search in.
         :return: The Manipulator object representing the arm.
         """
-        if len(robot_view.arms) == 1:
-            return (robot_view.manipulator_chains[0],)
+        if len(robot_view.get_arms()) == 1:
+            return (robot_view.get_arms()[0],)
         elif arm == Arms.LEFT:
-            return (robot_view.left_arm,)
+            return (robot_view.get_left_arm_if_specified(),)
         elif arm == Arms.RIGHT:
-            return (robot_view.right_arm,)
+            return (robot_view.get_right_arm_if_specified(),)
         elif arm == Arms.BOTH:
-            return robot_view.arms
+            return robot_view.get_arms()
         return None
 
     @staticmethod
@@ -64,7 +64,6 @@ class ViewManager:
         :param robot_view: The robot view to search in.
         :return: The Neck object representing the neck.
         """
-        if getattr(robot_view, "neck", Neck):
-            return robot_view.neck
-        else:
-            raise ValueError(f"The robot view {robot_view} has no neck.")
+        return next(
+            (part for part in robot_view._robot_parts if isinstance(part, Neck)), None
+        )

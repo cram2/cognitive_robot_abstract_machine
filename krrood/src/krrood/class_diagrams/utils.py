@@ -12,10 +12,14 @@ import builtins
 import typing_extensions
 from typing_extensions import Callable, get_args, get_origin
 from typing_extensions import List, Type, Any, Dict, Tuple, Generic
-from typing_extensions import TypeVar
+from typing_extensions import TypeVar, TypeVarTuple
 
+from krrood import logger
 from krrood.class_diagrams.exceptions import CouldNotResolveType
-from krrood.utils import get_scope_from_imports
+from krrood.utils import (
+    ensure_hashable,
+    get_scope_from_imports,
+)
 
 
 def classes_of_module(module) -> List[Type]:
@@ -34,12 +38,12 @@ def classes_of_module(module) -> List[Type]:
 
 
 def behaves_like_a_built_in_class(
-        clazz: Type,
+    clazz: Type,
 ) -> bool:
     return (
-            is_builtin_class(clazz)
-            or clazz == UUID
-            or (inspect.isclass(clazz) and issubclass(clazz, Enum))
+        is_builtin_class(clazz)
+        or clazz == UUID
+        or (inspect.isclass(clazz) and issubclass(clazz, Enum))
     )
 
 
@@ -121,23 +125,6 @@ class Role(Generic[T]):
     """
 
 
-def get_generic_type_param(cls, generic_base):
-    """
-    Given a subclass and its generic base, return the concrete type parameter(s).
-
-    Example:
-        get_generic_type_param(Employee, Role) -> (<class '__main__.Person'>,)
-    """
-    orig_bases = cls.__orig_bases__ if hasattr(cls, "__orig_bases__") else []
-    for base in orig_bases:
-        base_origin = get_origin(base)
-        if base_origin is None:
-            continue
-        if issubclass(get_origin(base), generic_base):
-            return get_args(base)
-    return None
-
-
 def get_type_hint_of_keyword_argument(callable_: Callable, name: str):
     """
     :param callable_: A callable to inspect
@@ -177,7 +164,7 @@ class TypeHintResolutionResult:
 
 
 def get_and_resolve_generic_type_hints_of_object_using_substitutions(
-        object_: Any, substitution: Dict[TypeVar, Type]
+    object_: Any, substitution: Dict[TypeVar, Type]
 ) -> Dict[str, TypeHintResolutionResult]:
     """
     Resolve generic type hints of an object using a substitution dictionary.
@@ -191,8 +178,8 @@ def get_and_resolve_generic_type_hints_of_object_using_substitutions(
 
 
 def resolve_type(
-        type_to_resolve: Any,
-        substitution: Dict[TypeVar, Any],
+    type_to_resolve: Any,
+    substitution: Dict[TypeVar, Any],
 ) -> TypeHintResolutionResult:
     """
     Resolve type variables in a type.
@@ -202,34 +189,44 @@ def resolve_type(
     :return: A TypeHintResolutionResult object containing the resolved type and a boolean indicating whether any
     substitutions were made.
     """
-    if isinstance(type_to_resolve, TypeVar):
-        if type_to_resolve not in substitution:
+    if isinstance(type_to_resolve, (TypeVar, TypeVarTuple)):
+        type_to_resolve_key = ensure_hashable(type_to_resolve)
+        if type_to_resolve_key not in substitution:
             return TypeHintResolutionResult(type_to_resolve, False, type_to_resolve)
         return TypeHintResolutionResult(
-            substitution[type_to_resolve], True, type_to_resolve
+            substitution[type_to_resolve_key], True, type_to_resolve
         )
 
     # If the type itself can be indexed (like List[T] or Optional[T])
-    params = getattr(type_to_resolve, "__parameters__", None)
-    if hasattr(type_to_resolve, "__getitem__") and params:
-        new_params = []
-        resolved: bool = False  # whether any substitutions were made
-        for param in params:
-            if param in substitution:
-                new_params.append(substitution[param])
-                resolved = True
-            else:
-                new_params.append(param)
-        subscript_param = new_params[0] if len(new_params) == 1 else tuple(new_params)
-        return TypeHintResolutionResult(
-            type_to_resolve[subscript_param], resolved, type_to_resolve)
+    parameters = getattr(type_to_resolve, "__parameters__", None)
+    if not (hasattr(type_to_resolve, "__getitem__") and parameters):
+        return TypeHintResolutionResult(type_to_resolve, False, type_to_resolve)
 
-    return TypeHintResolutionResult(type_to_resolve, False, type_to_resolve)
+    new_parameters = []
+    resolved: bool = False
+    for parameter in parameters:
+        if parameter not in substitution:
+            new_parameters.append(parameter)
+            continue
+
+        value = substitution[parameter]
+        if isinstance(parameter, TypeVarTuple) and isinstance(value, tuple):
+            new_parameters.extend(value)
+        else:
+            new_parameters.append(value)
+        resolved = True
+
+    subscript_parameter = (
+        new_parameters[0] if len(new_parameters) == 1 else tuple(new_parameters)
+    )
+    return TypeHintResolutionResult(
+        type_to_resolve[subscript_parameter], resolved, type_to_resolve
+    )
 
 
 @lru_cache
 def get_type_hints_of_object(
-        object_: Any, namespace: Tuple[Tuple[str, Any], ...] = ()
+    object_: Any, namespace: Tuple[Tuple[str, Any], ...] = ()
 ) -> Dict[str, Any]:
     """
     Get the type hints of an object. This is a workaround for the fact that get_type_hints() does not work with objects
@@ -263,7 +260,7 @@ def get_type_hints_of_object(
 
 
 def get_object_by_name_from_another_object_in_same_module(
-        name: str, object_: Any
+    name: str, object_: Any
 ) -> Any:
     """
     Get the object with the given name from another object in the same module.
@@ -290,5 +287,5 @@ def get_object_by_name_from_another_object_in_same_module(
         raise CouldNotResolveType(
             name,
             extra_information=f"Could not find {name} in {source_path}, could be a deprecated import statement or "
-                              f"a type defined in a module that is not imported in the source file.",
+            f"a type defined in a module that is not imported in the source file.",
         )

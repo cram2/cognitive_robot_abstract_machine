@@ -7,17 +7,21 @@ from dataclasses import dataclass
 from typing_extensions import Any, Dict
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.factories import and_, or_, not_, variable_from
+from krrood.entity_query_language.factories import (
+    and_,
+    or_,
+    not_,
+    variable_from,
+    ConditionType,
+)
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
     Arms,
     MovementType,
 )
 from pycram.datastructures.grasp import GraspDescription
+from pycram.locations.pose_validator import AreReachableBy
 from pycram.plans.factories import sequential, execute_single
-from pycram.pose_validator import (
-    pose_sequence_reachability_validator,
-)
 from pycram.querying.predicates import GripperIsFree
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.motions.gripper import (
@@ -28,6 +32,7 @@ from pycram.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.reasoning.predicates import allclose
 from semantic_digital_twin.reasoning.robot_predicates import is_body_in_gripper
+from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -86,11 +91,13 @@ class ReachAction(ActionDescription):
     @staticmethod
     def pre_condition(
         variables, context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression:
+    ) -> ConditionType:
         """
         The sequence in which the robot would reach the target pose needs to be achiveable
         """
-        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        end_effector = ViewManager.get_end_effector_view(
+            variables["arm"], context.robot
+        )
         test_world = deepcopy(context.world)
         grasp_pose_sequence = kwargs["grasp_description"]._pose_sequence(
             kwargs["target_pose"],
@@ -98,25 +105,26 @@ class ReachAction(ActionDescription):
             reverse=kwargs["reverse_reach_order"],
         )
         return and_(
-            pose_sequence_reachability_validator(
-                grasp_pose_sequence,
-                manipulator.tool_frame,
-                context.robot.from_world(test_world),
-                test_world,
-                context.robot.full_body_controlled,
+            AreReachableBy(
+                world=test_world,
+                robot=test_world.get_semantic_annotations_by_type(type(context.robot))[
+                    0
+                ],
+                pose_sequence=grasp_pose_sequence,
+                tip_link=end_effector.tool_frame,
             ),
         )
 
     @staticmethod
     def post_condition(
         variables, context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression | bool:
+    ) -> ConditionType | bool:
         """
         The end effector needs to be close to the target pose
         """
-        manipulator = ViewManager.get_end_effector_view(kwargs["arm"], context.robot)
+        end_effector = ViewManager.get_end_effector_view(kwargs["arm"], context.robot)
         return or_(
-            is_body_in_gripper(variable_from(kwargs["object_designator"]), manipulator)
+            is_body_in_gripper(variable_from(kwargs["object_designator"]), end_effector)
             > 0.9,
             allclose(
                 variable_from(kwargs["object_designator"].global_pose.to_position()),
@@ -189,23 +197,26 @@ class PickUpAction(ActionDescription):
     @staticmethod
     def pre_condition(
         variables: Dict, context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression:
+    ) -> ConditionType:
         """
         The gripper with which to grasp the object needs to be free and the object needs to be reachable
         """
-        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        end_effector = ViewManager.get_end_effector_view(
+            variables["arm"], context.robot
+        )
         test_world = deepcopy(context.world)
         grasp_pose_sequence = kwargs["grasp_description"].grasp_pose_sequence(
             kwargs["object_designator"]
         )
         return and_(
-            GripperIsFree(manipulator),
-            pose_sequence_reachability_validator(
-                grasp_pose_sequence,
-                manipulator.tool_frame,
-                context.robot.from_world(test_world),
-                test_world,
-                context.robot.full_body_controlled,
+            GripperIsFree(end_effector),
+            AreReachableBy(
+                world=test_world,
+                robot=test_world.get_semantic_annotations_by_type(type(context.robot))[
+                    0
+                ],
+                pose_sequence=grasp_pose_sequence,
+                tip_link=end_effector.tool_frame,
             ),
         )
 
@@ -216,10 +227,12 @@ class PickUpAction(ActionDescription):
         """
         The object needs to be in the griper frame
         """
-        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        end_effector = ViewManager.get_end_effector_view(
+            variables["arm"], context.robot
+        )
         return or_(
-            not_(GripperIsFree(manipulator)),
-            is_body_in_gripper(kwargs["object_designator"], manipulator) > 0.9,
+            not_(GripperIsFree(end_effector)),
+            is_body_in_gripper(kwargs["object_designator"], end_effector) > 0.9,
         )
 
 

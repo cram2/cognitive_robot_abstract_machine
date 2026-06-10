@@ -10,7 +10,7 @@ import itertools
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import Iterable, Tuple, Iterator
+from typing_extensions import Iterable, Optional, Tuple, Iterator
 
 from krrood.entity_query_language.core.base_expressions import (
     MultiArityExpression,
@@ -18,7 +18,9 @@ from krrood.entity_query_language.core.base_expressions import (
     OperationResult,
     SymbolicExpression,
 )
-from krrood.entity_query_language.utils import cartesian_product_while_passing_the_bindings_around
+from krrood.entity_query_language.utils import (
+    cartesian_product_while_passing_the_bindings_around,
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -29,21 +31,20 @@ class Union(MultiArityExpression):
 
     def _evaluate__(
         self,
-        sources: Bindings,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         yield from (
             self.get_result_and_update_truth_value(child_result)
             for child_result in itertools.chain(
-                *(var._evaluate_(sources, self) for var in self._operation_children_)
+                *(var._evaluate_(sources) for var in self._operation_children_)
             )
         )
 
     def get_result_and_update_truth_value(
         self, child_result: OperationResult
     ) -> OperationResult:
-        self._is_false_ = child_result.is_false
         return OperationResult(
-            child_result.bindings, self._is_false_, self, child_result
+            child_result.bindings, child_result.is_false, self, child_result
         )
 
     def add_child(self, child: SymbolicExpression) -> None:
@@ -71,20 +72,22 @@ class PerformsCartesianProduct(SymbolicExpression, ABC):
         """
         ...
 
-    def _evaluate_product_(self, sources: Bindings) -> Iterator[OperationResult]:
+    def _evaluate_product_(
+        self, sources: Optional[OperationResult]
+    ) -> Iterator[OperationResult]:
         """
         Evaluate the symbolic expressions by generating combinations of values from their evaluation generators.
 
-        :param sources: The current bindings.
+        :param sources: The current OperationResult carrying bindings, or None.
         :return: An Iterable of Bindings for each combination of values.
         """
         ordered_operands = self._optimize_operands_order_(sources)
         return cartesian_product_while_passing_the_bindings_around(
-            ordered_operands, sources, parent=self
+            ordered_operands, sources
         )
 
     def _optimize_operands_order_(
-        self, sources: Bindings
+        self, sources: Optional[OperationResult]
     ) -> Tuple[SymbolicExpression, ...]:
         """
         Should be overridden by derived classes if they can optimize the operands order.

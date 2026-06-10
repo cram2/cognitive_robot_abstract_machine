@@ -2,17 +2,33 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import Optional, Any, Dict
 
 from typing_extensions import Optional, Type, Any
 
 from pycram.datastructures.enums import DetectionTechnique, DetectionState
+from pycram.datastructures.grasp import GraspDescription
 from pycram.perception import PerceptionQuery
+from pycram.plans.factories import sequential
 from pycram.robot_plans.actions.base import ActionDescription
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from pycram.robot_plans.actions.core.navigation import NavigateAction
+from pycram.robot_plans.actions.core.robot_body import MoveManipulatorAction
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    RotationMatrix,
+    Vector3,
+)
+from semantic_digital_twin.spatial_types.spatial_types import (
+    Pose,
+    Point3,
+    Pose2D,
+)
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Region,
     SemanticAnnotation,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
 )
 
@@ -74,5 +90,82 @@ class DetectAction(ActionDescription):
         self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
     ):
         return
-        # if not result:
-        #     raise PerceptionObjectNotFound(self.object_designator, self.technique, self.region)
+
+
+@dataclass
+class MoveToReach(ActionDescription):
+    """
+    Let the robot move to a position facing the target and reach with a end_effector.
+    """
+
+    target_pose_offset_robot: Pose2D
+    """
+    The pose where the robot should stand with regard to the end_effector target pose. 2D since z-axis is not relevant.
+    """
+
+    hip_rotation: float
+    """
+    Additional yaw applied to the orientation facing the target directly.
+    """
+
+    target_pose_end_effector: Pose
+    """
+    Pose that should be reached by the end_effector.
+    """
+
+    grasp_description: GraspDescription
+    """
+    The semantic description for the reaching.
+    """
+
+    def execute(self):
+        grasp_orientation = self.grasp_description.grasp_orientation()
+        target_pose = Pose(
+            self.target_pose_end_effector.to_position(),
+            (
+                self.target_pose_end_effector.to_rotation_matrix()
+                @ grasp_orientation.to_rotation_matrix()
+            ).to_quaternion(),
+            self.target_pose_end_effector.reference_frame,
+        )
+        self.add_subplan(
+            sequential(
+                [
+                    NavigateAction(self.standing_pose),
+                    MoveManipulatorAction(
+                        target_pose,
+                        self.grasp_description.end_effector,
+                        allow_gripper_collision=False,
+                    ),
+                ]
+            )
+        ).perform()
+
+    @property
+    def standing_pose(self) -> Pose:
+        """
+        Calculates the pose where the robot should stand to reach the target.
+
+        :return: The calculated standing pose.
+        """
+        reference_T_target = self.target_pose_end_effector.to_homogeneous_matrix()
+        target_V_robot = -Vector3(
+            x=self.target_pose_offset_robot.x, y=self.target_pose_offset_robot.y
+        )
+        target_V_robot.scale(1.0)
+        world_z = Vector3.Z()
+        target_R_robot_pointing_to_target = RotationMatrix.from_vectors(
+            x=target_V_robot, z=world_z
+        ) @ RotationMatrix.from_rpy(yaw=self.hip_rotation)
+
+        target_T_robot = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            point=Point3(
+                x=self.target_pose_offset_robot.x,
+                y=self.target_pose_offset_robot.y,
+                z=-self.target_pose_end_effector.z,
+            ),
+            rotation_matrix=target_R_robot_pointing_to_target,
+            reference_frame=self.target_pose_end_effector.reference_frame,
+        )
+        reference_T_robot = reference_T_target @ target_T_robot
+        return reference_T_robot.to_pose()

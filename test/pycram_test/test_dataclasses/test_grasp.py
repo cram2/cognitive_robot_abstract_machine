@@ -48,26 +48,26 @@ def tracy_milk_world(tracy_world):
         tracy_copy.add_connection(connection)
         connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1, 0, 1)
 
-    return tracy_copy, Tracy.from_world(tracy_copy)
+    return tracy_copy, tracy_copy.get_semantic_annotations_by_type(Tracy)[0]
 
 
 @pytest.fixture(scope="session")
 def immutable_simple_pr2_holding_world(simple_pr2_world_setup):
     world, robot_view, context = simple_pr2_world_setup
     copy_world = deepcopy(world)
+    robot_view = copy_world.get_semantic_annotation_by_id(robot_view.id)
 
     milk = copy_world.get_body_by_name("milk.stl")
     tcp = copy_world.get_body_by_name("l_gripper_tool_frame")
     with copy_world.modify_world():
         copy_world.move_branch(milk, tcp)
-    view = PR2.from_world(copy_world)
-    return copy_world, view, Context(copy_world, view)
+    return copy_world, robot_view, Context(copy_world, robot_view)
 
 
 def test_grasp_pose_front(immutable_simple_pr2_world):
     world, robot_view, context = immutable_simple_pr2_world
 
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
@@ -93,7 +93,7 @@ def test_grasp_pose_front(immutable_simple_pr2_world):
 def test_grasp_pose_right(immutable_simple_pr2_world):
     world, robot_view, context = immutable_simple_pr2_world
 
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.RIGHT,
@@ -122,7 +122,7 @@ def test_grasp_pose_right(immutable_simple_pr2_world):
 def test_grasp_pose_left(immutable_simple_pr2_world):
     world, robot_view, context = immutable_simple_pr2_world
 
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.LEFT,
@@ -151,7 +151,7 @@ def test_grasp_pose_left(immutable_simple_pr2_world):
 def test_grasp_pose_top(immutable_simple_pr2_world):
     world, robot_view, context = immutable_simple_pr2_world
 
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
@@ -169,7 +169,7 @@ def test_grasp_pose_top(immutable_simple_pr2_world):
 def test_grasp_front_tracy(tracy_milk_world):
     world, robot_view = tracy_milk_world
 
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
@@ -187,7 +187,7 @@ def test_grasp_front_tracy(tracy_milk_world):
 def test_grasp_back_tracy(tracy_milk_world):
     world, robot_view = tracy_milk_world
 
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.BACK,
@@ -205,7 +205,7 @@ def test_grasp_back_tracy(tracy_milk_world):
 def test_grasp_top_tracy(tracy_milk_world):
     world, robot_view = tracy_milk_world
 
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
@@ -223,7 +223,7 @@ def test_grasp_top_tracy(tracy_milk_world):
 def test_grasp_left(tracy_milk_world):
     world, robot_view = tracy_milk_world
 
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.LEFT,
@@ -241,7 +241,7 @@ def test_grasp_left(tracy_milk_world):
 def test_grasp_sequence_front(immutable_simple_pr2_world):
     world, robot_view, context = immutable_simple_pr2_world
 
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
@@ -268,7 +268,7 @@ def test_grasp_sequence_front(immutable_simple_pr2_world):
 
 def test_man_axis(immutable_simple_pr2_world):
     world, robot_view, context = immutable_simple_pr2_world
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
@@ -281,7 +281,7 @@ def test_man_axis(immutable_simple_pr2_world):
 
 def test_lift_axis(immutable_simple_pr2_world):
     world, robot_view, context = immutable_simple_pr2_world
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
@@ -294,7 +294,7 @@ def test_lift_axis(immutable_simple_pr2_world):
 
 def test_lift_axis_tracy(tracy_milk_world):
     world, robot_view = tracy_milk_world
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
@@ -307,7 +307,7 @@ def test_lift_axis_tracy(tracy_milk_world):
 
 def test_man_axis_tracy(tracy_milk_world):
     world, robot_view = tracy_milk_world
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
@@ -320,7 +320,7 @@ def test_man_axis_tracy(tracy_milk_world):
 
 def test_man_axis_tracy_right(tracy_milk_world):
     world, robot_view = tracy_milk_world
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.RIGHT,
@@ -333,7 +333,7 @@ def test_man_axis_tracy_right(tracy_milk_world):
 
 def test_grasp_sequence(immutable_simple_pr2_world):
     world, robot_view, context = immutable_simple_pr2_world
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
@@ -368,7 +368,7 @@ def test_grasp_sequence(immutable_simple_pr2_world):
 
 def test_grasp_sequence_reverse(immutable_simple_pr2_holding_world):
     world, robot_view, context = immutable_simple_pr2_holding_world
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
@@ -403,7 +403,7 @@ def test_grasp_sequence_reverse(immutable_simple_pr2_holding_world):
 
 def test_grasp_sequence_front_tracy(tracy_milk_world):
     world, robot_view = tracy_milk_world
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
@@ -438,7 +438,7 @@ def test_grasp_sequence_front_tracy(tracy_milk_world):
 
 def test_grasp_sequence_right_tracy(tracy_milk_world):
     world, robot_view = tracy_milk_world
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.RIGHT,
@@ -471,7 +471,7 @@ def test_grasp_sequence_right_tracy(tracy_milk_world):
 
 def test_place_sequence(immutable_simple_pr2_holding_world):
     world, robot_view, context = immutable_simple_pr2_holding_world
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
@@ -496,7 +496,7 @@ def test_place_sequence(immutable_simple_pr2_holding_world):
 
 def test_place_sequence_right_tracy(tracy_milk_world):
     world, robot_view = tracy_milk_world
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.RIGHT,
@@ -533,7 +533,7 @@ def test_place_sequence_right_tracy(tracy_milk_world):
 
 def test_pose_sequence_top(immutable_simple_pr2_world):
     world, robot_view, context = immutable_simple_pr2_world
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
 
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
@@ -566,7 +566,7 @@ def test_pose_sequence_top(immutable_simple_pr2_world):
 
 def test_pose_sequence_top_tracy(tracy_milk_world):
     world, robot_view = tracy_milk_world
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.TOP,
@@ -597,7 +597,7 @@ def test_pose_sequence_top_tracy(tracy_milk_world):
 
 def test_pose_sequence_top_tracy_box(tracy_milk_world):
     world, robot_view = tracy_milk_world
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.TOP,
@@ -632,7 +632,7 @@ def test_pose_sequence_top_tracy_box(tracy_milk_world):
 def test_pose_sequence_180_flip(immutable_simple_pr2_world):
     world, robot_view, context = immutable_simple_pr2_world
 
-    man = robot_view.left_arm.manipulator
+    man = robot_view.left_arm.end_effector
     grasp_desc = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,

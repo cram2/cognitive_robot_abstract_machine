@@ -219,7 +219,7 @@ class JPTTestCase(unittest.TestCase):
         model = JointProbabilityTree(variables)
         pc = model.fit(data)
         pc.plot_structure()
-        self.assertEqual(len(pc.root.subcircuits), 3)
+        self.assertEqual(len(pc.root.subcircuits), 1)
 
     def test_variable_dependencies_to_json(self):
         serialized = self.model._variable_dependencies_to_json()

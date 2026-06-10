@@ -12,7 +12,7 @@ from typing import _GenericAlias
 import rustworkx as rx
 from typing_extensions import get_args, get_origin
 
-from krrood.utils import module_and_class_name, memoize
+from krrood.utils import module_and_class_name, memoize, get_generic_type_params
 
 try:
     from krrood.rustworkx_utils import RWXNode
@@ -37,7 +37,7 @@ from krrood.class_diagrams.attribute_introspector import (
     AttributeIntrospector,
     DataclassOnlyIntrospector,
 )
-from krrood.class_diagrams.utils import Role, get_generic_type_param, resolve_type
+from krrood.class_diagrams.utils import Role, resolve_type
 from krrood.class_diagrams.wrapped_field import WrappedField
 
 from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
@@ -640,7 +640,7 @@ class ClassDiagram:
                     is_role_subclass = False
 
                 if wrapped_field.is_role_taker and is_role_subclass:
-                    role_taker_type = get_generic_type_param(actual_cls, Role)[0]
+                    role_taker_type = get_generic_type_params(actual_cls, Role)[0]
                     if role_taker_type is target_type:
                         association_type = HasRoleTaker
 

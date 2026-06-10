@@ -26,7 +26,7 @@ from pycram.plans.factories import sequential, execute_single
 from pycram.robot_plans.actions.composite.facing import FaceAtAction
 from pycram.robot_plans.actions.composite.transporting import TransportAction
 from pycram.robot_plans.actions.core.container import OpenAction, CloseAction
-from pycram.robot_plans.actions.core.misc import DetectAction
+from pycram.robot_plans.actions.core.misc import DetectAction, MoveToReach
 from pycram.robot_plans.actions.core.navigation import NavigateAction, LookAtAction
 from pycram.robot_plans.actions.core.pick_up import (
     ReachAction,
@@ -42,6 +42,9 @@ from pycram.robot_plans.actions.core.robot_body import (
 )
 
 from pycram.view_manager import ViewManager
+from semantic_digital_twin.adapters.ros.visualization.pose_publisher import (
+    PosePublisher,
+)
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -53,7 +56,8 @@ from semantic_digital_twin.datastructures.definitions import (
     JointStateType,
     StaticJointState,
 )
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 
 try:
     from semantic_digital_twin.robots.garmi import Garmi
@@ -69,20 +73,21 @@ from semantic_digital_twin.spatial_types import (
     Point3,
     Quaternion,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 
 
 @pytest.fixture(
     scope="session",
     params=[
-        pytest.param(
-            "garmi",
-            marks=pytest.mark.skipif(
-                Garmi is None,
-                reason="GARMI semantic annotation not installed",
-            ),
-        ),
+        # TODO Garmi commented out until we get access to the robot description in CI
+        # pytest.param(
+        #     "garmi",
+        #     marks=pytest.mark.skipif(
+        #         Garmi is None,
+        #         reason="GARMI semantic annotation not installed",
+        #     ),
+        # ),
         "hsrb",
         "stretch",
         "tiago",
@@ -91,50 +96,66 @@ from semantic_digital_twin.world import World
 )
 def setup_multi_robot_apartment(
     request,
-    hsr_world_setup,
-    stretch_world,
-    tiago_world,
-    pr2_world_setup,
-    apartment_world_setup,
+    _hsr_world_setup,
+    _stretch_world_setup,
+    _tiago_world_setup,
+    _pr2_world_setup,
+    _apartment_world_setup,
 ):
-    apartment_copy = deepcopy(apartment_world_setup)
+    apartment_copy = deepcopy(_apartment_world_setup)
 
     if request.param == "hsrb":
-        hsr_copy = deepcopy(hsr_world_setup)
+        hsr_copy = deepcopy(_hsr_world_setup)
         apartment_copy.merge_world(hsr_copy)
-        view = HSRB.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(HSRB)
+        if not view:
+            view = HSRB.from_world(apartment_copy)
+        else:
+            view = view[0]
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
     elif request.param == "stretch":
-        stretch_copy = deepcopy(stretch_world)
+        stretch_copy = deepcopy(_stretch_world_setup)
         apartment_copy.merge_world(
             stretch_copy,
         )
-        view = Stretch.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(Stretch)
+        if not view:
+            view = Stretch.from_world(stretch_copy)
+        else:
+            view = view[0]
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
 
     elif request.param == "tiago":
-        tiago_copy = deepcopy(tiago_world)
+        tiago_copy = deepcopy(_tiago_world_setup)
         apartment_copy.merge_world(
             tiago_copy,
         )
-        view = Tiago.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(Tiago)
+        if not view:
+            view = Tiago.from_world(tiago_copy)
+        else:
+            view = view[0]
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
 
     elif request.param == "pr2":
-        pr2_copy = deepcopy(pr2_world_setup)
+        pr2_copy = deepcopy(_pr2_world_setup)
         apartment_copy.merge_world(
             pr2_copy,
         )
-        view = PR2.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(PR2)
+        if not view:
+            view = PR2.from_world(pr2_copy)
+        else:
+            view = view[0]
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -161,7 +182,13 @@ def immutable_multiple_robot_apartment(
 ) -> Generator[Tuple[World, AbstractRobot, Context]]:
     world, view = setup_multi_robot_apartment
     state = deepcopy(world.state._data)
+    full_body_controlled = (
+        view.mobile_base.full_body_controlled
+        if isinstance(view, HasMobileBase)
+        else False
+    )
     yield world, view, Context(world, view)
+    view.mobile_base.full_body_controlled = full_body_controlled
     world.state._data[:] = state
     world.notify_state_change()
 
@@ -169,8 +196,8 @@ def immutable_multiple_robot_apartment(
 @pytest.fixture
 def mutable_multiple_robot_apartment(setup_multi_robot_apartment):
     world, view = setup_multi_robot_apartment
-    copy_world = deepcopy(world)
-    copy_view = view.from_world(copy_world)
+    copy_world: World = deepcopy(world)
+    copy_view = copy_world.get_semantic_annotation_by_id(view.id)
     return copy_world, copy_view, Context(copy_world, copy_view)
 
 
@@ -180,7 +207,7 @@ def test_move_torso_multi(immutable_multiple_robot_apartment):
     with simulated_robot:
         plan.perform()
 
-    joint_state = view.torso.get_joint_state_by_type(TorsoState.HIGH)
+    joint_state = view.get_torso().get_joint_state_by_type(TorsoState.HIGH)
 
     for connection, target in joint_state.items():
         assert connection.position == pytest.approx(target, abs=0.01)
@@ -216,9 +243,9 @@ def test_move_gripper_multi(immutable_multiple_robot_apartment):
     with simulated_robot:
         plan.perform()
 
-    arm = view.arms[0]
-    open_state = arm.manipulator.get_joint_state_by_type(GripperState.OPEN)
-    close_state = arm.manipulator.get_joint_state_by_type(GripperState.CLOSE)
+    arm = view.get_arms()[0]
+    open_state = arm.end_effector.get_joint_state_by_type(GripperState.OPEN)
+    close_state = arm.end_effector.get_joint_state_by_type(GripperState.CLOSE)
 
     for connection, target in open_state.items():
         assert connection.position == pytest.approx(target, abs=0.02)
@@ -242,7 +269,7 @@ def test_park_arms_multi(immutable_multiple_robot_apartment):
 
     joints = []
     states = []
-    for arm in robot.arms:
+    for arm in robot.get_arms():
         joint_state = arm.get_joint_state_by_type(StaticJointState.PARK)
         joints.extend(joint_state.connections)
         states.extend(joint_state.target_values)
@@ -264,7 +291,7 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,
-        left_arm.manipulator,
+        left_arm.end_effector,
     )
     milk_body = world.get_body_by_name("milk.stl")
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -293,14 +320,14 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
     with simulated_robot:
         plan.perform()
 
-    manipulator_pose = left_arm.manipulator.tool_frame.global_transform
-    manipulator_position = manipulator_pose.to_position().to_np()
-    manipulator_orientation = manipulator_pose.to_quaternion().to_np()
+    end_effector_pose = left_arm.end_effector.tool_frame.global_transform
+    end_effector_position = end_effector_pose.to_position().to_np()
+    end_effector_orientation = end_effector_pose.to_quaternion().to_np()
 
     target_orientation = grasp_description.grasp_orientation()
 
-    assert manipulator_position[:3] == pytest.approx([1, -2, 0.8], abs=0.01)
-    compare_orientations(manipulator_orientation, target_orientation, decimal=2)
+    assert end_effector_position[:3] == pytest.approx([1, -2, 0.8], abs=0.01)
+    compare_orientations(end_effector_orientation, target_orientation, decimal=2)
 
 
 def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
@@ -308,7 +335,7 @@ def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
 
     if isinstance(robot, (Tiago)):
         # do not allow since
-        robot.full_body_controlled = False
+        robot.mobile_base.full_body_controlled = False
         robot.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(
                 1.7, 1.7, 0, reference_frame=world.root
@@ -318,7 +345,7 @@ def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
 
     if isinstance(robot, (Stretch)):
         # do not allow since
-        robot.full_body_controlled = False
+        robot.mobile_base.full_body_controlled = False
         robot.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(
                 2.12, 2.2, 0, reference_frame=world.root
@@ -328,7 +355,7 @@ def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
     # robot.full_body_controlled = True
     left_arm = ViewManager.get_arm_view(Arms.LEFT, robot)
     front_axis = tuple(
-        int(v) for v in left_arm.manipulator.front_facing_axis.to_np()[:3]
+        int(v) for v in left_arm.end_effector.front_facing_axis.to_np()[:3]
     )
     grasp_axis = AxisIdentifier.from_tuple(front_axis)
 
@@ -358,7 +385,7 @@ def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
     with simulated_robot:
         plan.perform()
 
-    tip_pose = left_arm.manipulator.tool_frame.global_transform
+    tip_pose = left_arm.end_effector.tool_frame.global_transform
     dist = np.linalg.norm(tip_pose.to_position() - np.array(target_pose.to_position()))
     assert dist < 0.01
 
@@ -370,7 +397,7 @@ def test_grasping(immutable_multiple_robot_apartment):
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,
-        left_arm.manipulator,
+        left_arm.end_effector,
     )
     grasping_action = GraspingAction(
         world.get_body_by_name("milk.stl"), Arms.LEFT, grasp_description
@@ -408,7 +435,7 @@ def test_pick_up_multi(mutable_multiple_robot_apartment):
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,
-        left_arm.manipulator,
+        left_arm.end_effector,
     )
 
     milk_body = world.get_body_by_name("milk.stl")
@@ -435,7 +462,7 @@ def test_pick_up_multi(mutable_multiple_robot_apartment):
 
     assert (
         world.get_connection(
-            left_arm.manipulator.tool_frame,
+            left_arm.end_effector.tool_frame,
             world.get_body_by_name("milk.stl"),
         )
         is not None
@@ -452,7 +479,7 @@ def test_place_multi(mutable_multiple_robot_apartment):
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,
-        left_arm.manipulator,
+        left_arm.end_effector,
     )
 
     milk_body = world.get_body_by_name("milk.stl")
@@ -484,7 +511,7 @@ def test_place_multi(mutable_multiple_robot_apartment):
 
     with pytest.raises(NoEdgeBetweenNodes):
         world.get_connection(
-            left_arm.manipulator.tool_frame,
+            left_arm.end_effector.tool_frame,
             world.get_body_by_name("milk.stl"),
         )
 
@@ -609,20 +636,48 @@ def test_facing(immutable_multiple_robot_apartment):
 def test_transport(mutable_multiple_robot_apartment, rclpy_node):
     world, robot, context = mutable_multiple_robot_apartment
 
+    VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+
     description = TransportAction(
         object_designator=world.get_body_by_name("milk.stl"),
         target_location=Pose(
-            Point3.from_iterable([3.2, 2.2, 0.95]),
+            Point3.from_iterable([3.1, 2.2, 0.95]),
             Quaternion.from_iterable([0.0, 0.0, 1.0, 0.0]),
             reference_frame=world.root,
         ),
         arm=Arms.RIGHT,
+        grasp_description=GraspDescription(
+            ApproachDirection.FRONT,
+            VerticalAlignment.NoAlignment,
+            ViewManager.get_end_effector_view(Arms.RIGHT, robot),
+        ),
     )
     plan = sequential([MoveTorsoAction(TorsoState.HIGH), description], context)
     with simulated_robot:
         plan.perform()
     milk_position = world.get_body_by_name("milk.stl").global_transform.to_np()[:3, 3]
-    dist = np.linalg.norm(milk_position - np.array([3.2, 2.2, 0.95]))
+    dist = np.linalg.norm(milk_position - np.array([3.1, 2.2, 0.95]))
     assert dist <= 0.02
 
     plan.plan.validate()
+
+
+def test_move_to_reach(immutable_multiple_robot_apartment):
+    world, robot, context = immutable_multiple_robot_apartment
+    move_to_reach = MoveToReach(
+        target_pose_offset_robot=Pose2D(0.2, -0.55),
+        target_pose_end_effector=Pose.from_xyz_rpy(
+            x=0.7, y=-1.3, z=0.9, reference_frame=world.root
+        ),
+        hip_rotation=0.0,
+        grasp_description=GraspDescription(
+            approach_direction=ApproachDirection.FRONT,
+            vertical_alignment=VerticalAlignment.NoAlignment,
+            rotate_gripper=False,
+            end_effector=world.get_semantic_annotations_by_type(EndEffector)[0],
+        ),
+    )
+
+    plan = execute_single(move_to_reach, context=context)
+    with simulated_robot:
+        plan.perform()

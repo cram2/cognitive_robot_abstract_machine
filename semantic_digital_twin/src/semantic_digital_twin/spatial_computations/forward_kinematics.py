@@ -24,11 +24,8 @@ from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
 
-if TYPE_CHECKING:
-    from semantic_digital_twin.world import World
 
-
-@dataclass
+@dataclass(eq=False)
 class ForwardKinematicsManager(ModelChangeCallback):
     """
     Visitor class for collection various forward kinematics expressions in a world model.
@@ -59,16 +56,13 @@ class ForwardKinematicsManager(ModelChangeCallback):
 
     body_id_to_all_fk_index: Dict[UUID, int] = field(init=False, repr=False)
 
-    def _notify(self, **kwargs):
+    def on_model_change(self, **kwargs):
         if len(self._world.kinematic_structure_entities) == 0:
             return
         self.update_root_T_kse_expression_cache()
         clear_memoization_cache(self)
         self.compile()
         self.recompute()  # we need to recompute because other model updaters might need fk.
-
-    def __hash__(self):
-        return hash(id(self))
 
     def update_root_T_kse_expression_cache(self):
         self.root_T_kse_expression_cache = {

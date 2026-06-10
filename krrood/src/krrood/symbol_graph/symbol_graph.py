@@ -16,7 +16,11 @@ from typing_extensions import (
     DefaultDict,
     Callable,
     ClassVar,
+    TYPE_CHECKING,
 )
+
+if TYPE_CHECKING:
+    from krrood.entity_query_language.explanation.explanation import InferenceExplanation
 
 from krrood import logger
 from krrood.class_diagrams import ClassDiagram
@@ -452,6 +456,19 @@ class Symbol:
     _cache_instances_: ClassVar[bool] = True
     """
     Whether instances of this class should be cached or not in the symbol graph.
+    """
+
+    _inference_explanation_: Optional[InferenceExplanation] = field(
+        default=None, init=False, repr=False, compare=False
+    )
+    """
+    Holds the :class:`~krrood.entity_query_language.explanation.explanation.InferenceExplanation`
+    for this instance when it was produced by an EQL inference variable, ``None`` otherwise.
+
+    Declared with ``init=False`` so that it is never a constructor parameter in any
+    subclass.  The field is initialised to ``None`` automatically by the dataclass
+    machinery and populated later by
+    :func:`~krrood.entity_query_language.explanation.explanation.register_inference`.
     """
 
     def __new__(cls, *args, **kwargs):
