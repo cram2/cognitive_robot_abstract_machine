@@ -18,17 +18,20 @@ The module uses:
    This is typically the first annotator in a pipeline.
 """
 
+from __future__ import annotations
 from timeit import default_timer as timer
 
 from py_trees.common import Status
 from py_trees.composites import Sequence
 from py_trees.display import unicode_tree
-from typing_extensions import List, Optional
+from typing_extensions import TYPE_CHECKING, List, Optional
 
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.descriptors.camera_configs.components import TfComponent
-from robokudo.io.camera_interface import CameraInterface
+
+if TYPE_CHECKING:
+    from robokudo.io.camera_interface import CameraInterface
+    from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 
 
 class CollectionReaderAnnotator(BaseAnnotator):
