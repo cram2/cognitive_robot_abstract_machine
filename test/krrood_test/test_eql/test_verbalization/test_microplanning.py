@@ -23,8 +23,8 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
     build_between,
     has_pair,
 )
+from krrood.entity_query_language.verbalization.fragments.features import Definiteness
 from krrood.entity_query_language.verbalization.microplanning.referring import (
-    ArticleSelection,
     ReferringExpressions,
 )
 from krrood.entity_query_language.verbalization.rendering.determiner_processor import (
@@ -44,20 +44,20 @@ def test_noun_for_parts_first_then_subsequent_mention():
     refer = ReferringExpressions()
     var = variable(Robot, domain=[])
 
-    article, label = refer.noun_for_parts(var)
-    assert (article, label) == (ArticleSelection.INDEFINITE, "Robot")
+    definiteness, label = refer.noun_for_parts(var)
+    assert (definiteness, label) == (Definiteness.INDEFINITE, "Robot")
 
     # Second mention of the same variable becomes definite.
-    article, label = refer.noun_for_parts(var)
-    assert (article, label) == (ArticleSelection.DEFINITE, "Robot")
+    definiteness, label = refer.noun_for_parts(var)
+    assert (definiteness, label) == (Definiteness.DEFINITE, "Robot")
 
 
 def test_noun_for_parts_numbered_variable_takes_no_article():
     var = variable(Robot, domain=[])
     refer = ReferringExpressions(disambiguation_map={var._id_: "Robot 2"})
 
-    article, label = refer.noun_for_parts(var)
-    assert (article, label) == (ArticleSelection.NONE, "Robot 2")
+    definiteness, label = refer.noun_for_parts(var)
+    assert (definiteness, label) == (Definiteness.BARE, "Robot 2")
 
 
 def test_seen_reference_is_none_until_mentioned_then_definite():

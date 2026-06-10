@@ -15,6 +15,8 @@ from krrood.entity_query_language.verbalization.fragments.features import Number
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.rendering.morphology_processor import (
     MorphologyProcessor,
+)
+from krrood.entity_query_language.verbalization.rendering.realization import (
     realize_subtree,
 )
 

@@ -31,16 +31,15 @@ from krrood.entity_query_language.verbalization.microplanning.binding_scope impo
     BindingScope,
 )
 from krrood.entity_query_language.verbalization.microplanning.config import RenderConfig
+from krrood.entity_query_language.verbalization.fragments.features import Definiteness
 from krrood.entity_query_language.verbalization.microplanning.referring import (
-    ArticleSelection,
     ReferringExpressions,
 )
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 
-# Re-exported so callers can keep importing ArticleSelection from this module.
-__all__ = ["ArticleSelection", "VerbalizationContext"]
+__all__ = ["VerbalizationContext"]
 
 
 @dataclass
@@ -120,7 +119,7 @@ class VerbalizationContext:
         """Delegate to :meth:`ReferringExpressions.pronoun_for`."""
         return self.referring.pronoun_for(root)
 
-    def noun_for_parts(self, var) -> tuple[ArticleSelection, str]:
+    def noun_for_parts(self, var) -> tuple[Definiteness, str]:
         """Delegate to :meth:`ReferringExpressions.noun_for_parts`."""
         return self.referring.noun_for_parts(var)
 

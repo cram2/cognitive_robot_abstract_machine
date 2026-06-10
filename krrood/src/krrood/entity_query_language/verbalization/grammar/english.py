@@ -79,7 +79,7 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
     has_pair,
     RangeFold,
 )
-from krrood.entity_query_language.verbalization.rendering.morphology_processor import (
+from krrood.entity_query_language.verbalization.rendering.realization import (
     realize_subtree,
 )
 from krrood.entity_query_language.verbalization.grammar.assembly.chains import (
@@ -148,10 +148,10 @@ class VariableRule(PhraseRule):
     def build(self, node, ctx: Ctx):
         if ctx.number is Number.PLURAL:
             return self._plural(node, ctx)
-        article, label = ctx.refer.noun_for_parts(node)
+        definiteness, label = ctx.refer.noun_for_parts(node)
         return NounPhrase(
             head=RoleFragment.for_variable(label, node),
-            definiteness=article.definiteness(),
+            definiteness=definiteness,
         )
 
     @staticmethod

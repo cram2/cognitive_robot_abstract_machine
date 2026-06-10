@@ -556,7 +556,7 @@ text = verbalize_expression(query, renderer=ParagraphRenderer(MarkdownFormatter(
 - {py:func}`~krrood.entity_query_language.verbalization.verbalizer.verbalize_expression` — unified entry point; accepts optional ``renderer`` kwarg for colour/layout
 - {py:class}`~krrood.entity_query_language.verbalization.pipeline.VerbalizationPipeline`
 - {py:class}`~krrood.entity_query_language.verbalization.context.VerbalizationContext`
-- {py:class}`~krrood.entity_query_language.verbalization.context.ArticleSelection`
+- {py:class}`~krrood.entity_query_language.verbalization.fragments.features.Definiteness`
 - {py:class}`~krrood.entity_query_language.verbalization.rule_engine.VerbalizationRule`
 - {py:class}`~krrood.entity_query_language.verbalization.rule_engine.RuleEngine`
 

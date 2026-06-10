@@ -23,7 +23,6 @@ from __future__ import annotations
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
-from enum import Enum, auto
 from typing import TYPE_CHECKING
 from typing_extensions import Dict, List, Optional
 
@@ -44,29 +43,6 @@ from krrood.entity_query_language.verbalization.vocabulary.english import Pronou
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-
-
-class ArticleSelection(Enum):
-    """
-    Which article form a noun phrase should take.
-
-    :cvar NONE: Numbered variable (e.g. ``Robot 1``) — no article prepended.
-    :cvar DEFINITE: Subsequent mention of a single-typed variable → ``"the"``.
-    :cvar INDEFINITE: First mention of a single-typed variable → ``"a"`` / ``"an"``.
-    """
-
-    NONE = auto()  # numbered variable — no article
-    DEFINITE = auto()  # subsequent mention → "the"
-    INDEFINITE = auto()  # first mention → "a" / "an"
-
-    def definiteness(self) -> Definiteness:
-        """The realisation feature this coreference decision maps to (consumed by the
-        determiner phase): ``NONE`` → ``BARE``, else the matching definiteness."""
-        return {
-            ArticleSelection.NONE: Definiteness.BARE,
-            ArticleSelection.DEFINITE: Definiteness.DEFINITE,
-            ArticleSelection.INDEFINITE: Definiteness.INDEFINITE,
-        }[self]
 
 
 def _aggregation_source_ids(expression) -> set:
@@ -247,15 +223,18 @@ class ReferringExpressions:
             return None
         return Pronouns.ITS.as_fragment()
 
-    def noun_for_parts(self, var) -> tuple[ArticleSelection, str]:
+    def noun_for_parts(self, var) -> tuple[Definiteness, str]:
         """
-        Return ``(ArticleSelection, label)`` for *var*.
+        Return ``(Definiteness, label)`` for *var* — the coreference decision, expressed
+        directly as the realisation feature the determiner phase consumes.
 
         Consults :attr:`disambiguation_map` for the display label, then :attr:`seen`
-        for first vs. subsequent mention, recording the mention as a side effect.
+        for first vs. subsequent mention, recording the mention as a side effect: a
+        numbered variable (*"Robot 2"*) is ``BARE``, a first mention ``INDEFINITE``
+        (*"a Robot"*), a subsequent mention ``DEFINITE`` (*"the Robot"*).
 
         :param var: A :class:`~krrood.entity_query_language.core.variable.Variable` instance.
-        :return: Tuple of ``(ArticleSelection, display_label)``.
+        :return: Tuple of ``(Definiteness, display_label)``.
         :rtype: tuple
         """
         type_name = (
@@ -266,10 +245,6 @@ class ReferringExpressions:
         label = self.disambiguation_map.get(var._id_, type_name)
         is_numbered = label != type_name
         if var._id_ in self.seen:
-            return (
-                ArticleSelection.NONE if is_numbered else ArticleSelection.DEFINITE
-            ), label
+            return (Definiteness.BARE if is_numbered else Definiteness.DEFINITE), label
         self.seen[var._id_] = RoleFragment(text=label, role=SemanticRole.VARIABLE)
-        return (
-            ArticleSelection.NONE if is_numbered else ArticleSelection.INDEFINITE
-        ), label
+        return (Definiteness.BARE if is_numbered else Definiteness.INDEFINITE), label

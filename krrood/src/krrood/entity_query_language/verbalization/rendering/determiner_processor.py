@@ -34,8 +34,8 @@ from __future__ import annotations
 from dataclasses import replace
 
 from krrood.entity_query_language.verbalization.fragments.base import (
-    BlockFragment,
     flatten_fragment_to_plain_text,
+    map_fragment,
     NounPhrase,
     PhraseFragment,
     RoleFragment,
@@ -54,20 +54,11 @@ class DeterminerProcessor:
 
     def process(self, fragment: VerbFragment) -> VerbFragment:
         """Return a new tree with every ``NounPhrase`` lowered (idempotent on NP-free trees)."""
-        match fragment:
-            case NounPhrase():
-                return self._lower(fragment)
-            case PhraseFragment(parts=parts, separator=separator):
-                return PhraseFragment(
-                    parts=[self.process(p) for p in parts], separator=separator
-                )
-            case BlockFragment(header=header, items=items):
-                return BlockFragment(
-                    header=None if header is None else self.process(header),
-                    items=[self.process(i) for i in items],
-                )
-            case _:
-                return fragment
+        return map_fragment(fragment, self._lower_if_noun_phrase)
+
+    def _lower_if_noun_phrase(self, leaf: VerbFragment) -> VerbFragment:
+        """``map_fragment`` leaf hook — a ``NounPhrase`` is a leaf to be lowered, else identity."""
+        return self._lower(leaf) if isinstance(leaf, NounPhrase) else leaf
 
     def _lower(self, np: NounPhrase) -> VerbFragment:
         head = self._agree_head(self.process(np.head), np.number)

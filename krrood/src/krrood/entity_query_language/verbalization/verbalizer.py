@@ -25,15 +25,9 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     flatten_fragment_to_plain_text,
 )
 from krrood.entity_query_language.verbalization.grammar.registry import ALL_PHRASE_RULES
-from krrood.entity_query_language.verbalization.rendering.determiner_processor import (
-    DeterminerProcessor,
+from krrood.entity_query_language.verbalization.rendering.realization import (
+    realize_tree,
 )
-from krrood.entity_query_language.verbalization.rendering.morphology_processor import (
-    MorphologyProcessor,
-)
-
-_DETERMINER = DeterminerProcessor()
-_MORPHOLOGY = MorphologyProcessor()
 
 
 @dataclass
@@ -71,9 +65,7 @@ class EQLVerbalizer:
         """
         if context is None:
             context = VerbalizationContext.from_expression(expression)
-        fragment = fold(expression, context, ALL_PHRASE_RULES)
-        fragment = _DETERMINER.process(fragment)
-        return _MORPHOLOGY.process(fragment)
+        return realize_tree(fold(expression, context, ALL_PHRASE_RULES))
 
     def verbalize(
         self,
