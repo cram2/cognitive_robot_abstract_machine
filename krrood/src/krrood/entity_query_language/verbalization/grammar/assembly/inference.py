@@ -6,7 +6,7 @@ into an ``IF … THEN …`` :class:`~krrood.entity_query_language.verbalization.
 Realisation sub-steps are methods sharing ``self.ctx`` (recursion via ``self.ctx.child``,
 coreference via ``self.ctx.refer``).  This assembler only decides + *tags* grammatical
 :class:`~krrood.entity_query_language.verbalization.fragments.features.Number` (via
-``agreement`` / the lexicon frames); the actual copula agreement and noun pluralisation are
+``Copulas.for_number`` / the lexicon frames); the actual copula agreement and noun pluralisation are
 applied once, later, by the
 :class:`~krrood.entity_query_language.verbalization.rendering.morphology_processor.MorphologyProcessor`
 pass.  This is the realisation half of the planner/assembler split (see
@@ -39,7 +39,7 @@ from krrood.entity_query_language.verbalization.grammar.planning.inference impor
     AntecedentInfo,
     ConsequentBinding,
     InferencePlanner,
-    PlannedCondition,
+    ConditionPlan,
     RuleStructure,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
@@ -123,12 +123,12 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
                 self.ctx.refer.mark_introduced(sel)
 
     def _condition_frags(
-        self, conditions: List[PlannedCondition], antecedent: AntecedentInfo
+        self, conditions: List[ConditionPlan], antecedent: AntecedentInfo
     ) -> List[VerbFragment]:
         return [self._condition_frag(pc, antecedent) for pc in conditions]
 
     def _condition_frag(
-        self, pc: PlannedCondition, antecedent: AntecedentInfo
+        self, pc: ConditionPlan, antecedent: AntecedentInfo
     ) -> VerbFragment:
         """Render one condition: a *"whose <attr> is …"* modifier when foldable, else recurse."""
         if pc.whose_attr is None:

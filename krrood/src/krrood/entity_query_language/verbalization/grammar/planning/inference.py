@@ -51,7 +51,7 @@ class AggregationStatus(Enum):
 
 
 @dataclass
-class PlannedCondition:
+class ConditionPlan:
     """One antecedent WHERE condition, with the foldability decided up front.
 
     ``whose_attr`` is the (singular) attribute name when the condition is a single-hop
@@ -80,7 +80,7 @@ class AntecedentInfo:
     aggregation_status: AggregationStatus
     """Whether this antecedent is a group key, aggregated, or neither."""
 
-    conditions: List[PlannedCondition] = field(default_factory=list)
+    conditions: List[ConditionPlan] = field(default_factory=list)
     """All WHERE conditions attributable to this antecedent (foldability pre-decided)."""
 
 
@@ -273,7 +273,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
             return current
         return None
 
-    def _extract_root_info(self, root) -> Tuple[str, List[PlannedCondition]]:
+    def _extract_root_info(self, root) -> Tuple[str, List[ConditionPlan]]:
         """Return ``(type_name, own_conditions)`` for a root Variable or Entity."""
         if isinstance(root, Entity):
             root.build()
@@ -283,7 +283,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
                 if var and getattr(var, "_type_", None)
                 else "entity"
             )
-            conditions: List[PlannedCondition] = []
+            conditions: List[ConditionPlan] = []
             if root._where_expression_ is not None:
                 conditions = [
                     self._planned(e)
@@ -307,9 +307,9 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
 
     # ── condition foldability (the *whose* analysis — decided here, not in assembly) ──
 
-    def _planned(self, condition) -> PlannedCondition:
+    def _planned(self, condition) -> ConditionPlan:
         """Wrap a raw condition with its pre-decided *whose*-foldability."""
-        return PlannedCondition(
+        return ConditionPlan(
             expression=condition, whose_attr=self._whose_attr(condition)
         )
 

@@ -157,7 +157,7 @@ def select(node, rules: Sequence[PhraseRule], ctx: Ctx) -> Optional[PhraseRule]:
     ``applies`` guards without a rule-class hierarchy.
 
     :param node: The EQL expression being dispatched.
-    :param rules: The grammar (e.g. ``ALL_PHRASE_RULES``).
+    :param rules: The grammar (e.g. ``RULES``).
     :param ctx: The per-node context, passed to each rule's :meth:`~PhraseRule.when`.
     :return: The chosen rule, or ``None`` (caller supplies the fallback).
     """

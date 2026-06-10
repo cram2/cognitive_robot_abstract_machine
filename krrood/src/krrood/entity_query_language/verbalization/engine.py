@@ -29,7 +29,7 @@ from krrood.entity_query_language.verbalization.grammar.phrase_rule import (
     PhraseRule,
     select,
 )
-from krrood.entity_query_language.verbalization.grammar.registry import ALL_PHRASE_RULES
+from krrood.entity_query_language.verbalization.grammar.english import RULES
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.context import VerbalizationContext
@@ -58,13 +58,13 @@ def fold(
 
     :param node: Any EQL expression.
     :param context: The verbalization context (services + render config).
-    :param rules: Grammar to dispatch over; defaults to ``ALL_PHRASE_RULES``.
+    :param rules: Grammar to dispatch over; defaults to ``RULES``.
     :param fallback: Optional handler for nodes no grammar rule covers; it should
         recurse back through :func:`fold` for its children.
     :return: The fragment for *node*.
     :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
     """
-    rules = ALL_PHRASE_RULES if rules is None else rules
+    rules = RULES if rules is None else rules
 
     node_id = getattr(node, "_id_", None)
     if node_id is not None:

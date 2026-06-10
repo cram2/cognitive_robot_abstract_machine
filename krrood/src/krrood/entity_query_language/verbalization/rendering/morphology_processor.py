@@ -44,10 +44,10 @@ class MorphologyProcessor:
 
     def process(self, fragment: VerbFragment) -> VerbFragment:
         """Return a new tree with all plural-tagged leaves agreed/inflected (idempotent)."""
-        return map_fragment(fragment, self._agree)
+        return map_fragment(fragment, self._inflect)
 
     @staticmethod
-    def _agree(leaf: VerbFragment) -> VerbFragment:
+    def _inflect(leaf: VerbFragment) -> VerbFragment:
         if not isinstance(leaf, (WordFragment, RoleFragment)):
             return leaf
         if leaf.number is not Number.PLURAL:

@@ -58,10 +58,10 @@ class DeterminerProcessor:
 
     def _lower_if_noun_phrase(self, leaf: VerbFragment) -> VerbFragment:
         """``map_fragment`` leaf hook — a ``NounPhrase`` is a leaf to be lowered, else identity."""
-        return self._lower(leaf) if isinstance(leaf, NounPhrase) else leaf
+        return self._lower_noun_phrase(leaf) if isinstance(leaf, NounPhrase) else leaf
 
-    def _lower(self, np: NounPhrase) -> VerbFragment:
-        head = self._agree_head(self.process(np.head), np.number)
+    def _lower_noun_phrase(self, np: NounPhrase) -> VerbFragment:
+        head = self._tag_number(self.process(np.head), np.number)
         determiner = self._determiner(np.definiteness, np.number, head)
         head_group_parts = [*([determiner] if determiner is not None else []), head]
         head_group = (
@@ -77,7 +77,7 @@ class DeterminerProcessor:
         )
 
     @staticmethod
-    def _agree_head(head: VerbFragment, number: Number) -> VerbFragment:
+    def _tag_number(head: VerbFragment, number: Number) -> VerbFragment:
         """Tag the head leaf with the phrase's number (the morphology pass inflects it)."""
         if isinstance(head, (WordFragment, RoleFragment)):
             return replace(head, number=number)

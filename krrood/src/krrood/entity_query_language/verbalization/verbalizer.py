@@ -24,7 +24,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     VerbFragment,
     flatten_fragment_to_plain_text,
 )
-from krrood.entity_query_language.verbalization.grammar.registry import ALL_PHRASE_RULES
+from krrood.entity_query_language.verbalization.grammar.english import RULES
 from krrood.entity_query_language.verbalization.rendering.realization import (
     realize_tree,
 )
@@ -69,7 +69,7 @@ class EQLVerbalizer:
         # expression verbalized twice reads "a Robot" then "the Robot".  Snapshot BEFORE the
         # fold, which records this build's own mentions in the same set.
         already_seen = set(context.seen)
-        fragment = fold(expression, context, ALL_PHRASE_RULES)
+        fragment = fold(expression, context, RULES)
         return realize_tree(fragment, already_seen=already_seen)
 
     def verbalize(

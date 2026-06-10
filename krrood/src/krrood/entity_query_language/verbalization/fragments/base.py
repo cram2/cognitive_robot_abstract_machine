@@ -8,8 +8,8 @@ The fragment hierarchy forms the output IR that renderers traverse:
 * :class:`PhraseFragment` — inline sequence of fragments joined by a separator.
 * :class:`BlockFragment` — named structural block with header + bullet items.
 
-Joining utilities (:func:`join_with`, :func:`oxford_and`) produce
-:class:`PhraseFragment` trees from lists of fragments.
+The joining utility :func:`oxford_and` produces a :class:`PhraseFragment` tree from a list
+of fragments (Oxford-comma style).
 """
 
 from __future__ import annotations
@@ -426,29 +426,6 @@ def flatten_fragment_to_plain_text(fragment: VerbFragment) -> str:
 
 
 # ── Fragment joining utilities ─────────────────────────────────────────────────
-
-
-def join_with(parts: list[VerbFragment], separator: VerbFragment) -> VerbFragment:
-    """
-    Interleave *parts* with *separator* between each adjacent pair.
-
-    :param parts: Fragments to join.
-    :type parts: list[VerbFragment]
-    :param separator: Separator fragment inserted between adjacent items.
-    :type separator: VerbFragment
-    :return: A single fragment (or the sole item when ``len(parts) == 1``).
-    :rtype: VerbFragment
-    """
-    if not parts:
-        return WordFragment(text="")
-    if len(parts) == 1:
-        return parts[0]
-    result: list[VerbFragment] = []
-    for i, fragment in enumerate(parts):
-        result.append(fragment)
-        if i < len(parts) - 1:
-            result.append(separator)
-    return PhraseFragment(parts=result, separator="")
 
 
 def oxford_and(parts: list[VerbFragment], conjunction: VerbFragment) -> VerbFragment:

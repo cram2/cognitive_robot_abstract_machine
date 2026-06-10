@@ -25,14 +25,18 @@ from pathlib import Path
 
 import pytest
 
-from krrood.entity_query_language.verbalization.rendering.source_link_resolver import AutoAPIResolver
+from krrood.entity_query_language.verbalization.rendering.source_link_resolver import (
+    AutoAPIResolver,
+)
 from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 
 _PROJECT_ROOT = Path(__file__).parents[4]
 _DOC_EQL_USER = _PROJECT_ROOT / "krrood" / "doc" / "eql" / "user"
-_MOCK_HTML = _DOC_EQL_USER / "api_mock" / "autoapi" / "verbalization_domain" / "index.html"
+_MOCK_HTML = (
+    _DOC_EQL_USER / "api_mock" / "autoapi" / "verbalization_domain" / "index.html"
+)
 _CONFIG_YML = _PROJECT_ROOT / "krrood" / "doc" / "_config.yml"
 _TEST_TMP = _DOC_EQL_USER / "test_tmp"
 
@@ -51,6 +55,7 @@ def verbalization_domain():
         sys.path.insert(0, canonical)
     try:
         import importlib
+
         mod = importlib.import_module("verbalization_domain")
         return mod
     finally:
@@ -100,9 +105,9 @@ def test_mock_html_robot_class_anchor(verbalization_domain):
     url = resolver.resolve(SourceRef(owner_type=Robot))
     assert url is not None
     anchor = url.split("#")[1]
-    assert anchor in ids, (
-        f"Anchor '{anchor}' missing from mock HTML. Found: {sorted(ids)}"
-    )
+    assert (
+        anchor in ids
+    ), f"Anchor '{anchor}' missing from mock HTML. Found: {sorted(ids)}"
 
 
 def test_mock_html_robot_name_attribute_anchor(verbalization_domain):

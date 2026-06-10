@@ -6,6 +6,7 @@ specifically that semantic roles (VARIABLE, ATTRIBUTE, KEYWORD, …) are preserv
 inside constraint clauses, binding phrases, grouped-by, ordered-by, and set_of
 output.  They complement the plain-text regression tests in test_verbalization.py.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -16,29 +17,51 @@ import pytest
 
 import krrood.entity_query_language.factories as eql
 from krrood.entity_query_language.factories import (
-    an, a, entity, flat_variable, inference, match_variable, variable,
+    an,
+    a,
+    entity,
+    flat_variable,
+    inference,
+    match_variable,
+    variable,
 )
 from krrood.entity_query_language.verbalization.fragments.base import (
-    BlockFragment, PhraseFragment, RoleFragment, VerbFragment, WordFragment,
+    BlockFragment,
+    PhraseFragment,
+    RoleFragment,
+    VerbFragment,
+    WordFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
-from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer, verbalize_expression
+from krrood.entity_query_language.verbalization.verbalizer import (
+    EQLVerbalizer,
+    verbalize_expression,
+)
 from ...dataset.semantic_world_like_classes import (
-    Cabinet, Container, Drawer, FixedConnection, Handle, PrismaticConnection,
+    Cabinet,
+    Container,
+    Drawer,
+    FixedConnection,
+    Handle,
+    PrismaticConnection,
 )
 from ...dataset.department_and_employee import Department, Employee
 
-
 # ── Fragment-tree helpers ──────────────────────────────────────────────────────
 
-def _collect_role_fragments(frag: VerbFragment, role: SemanticRole) -> list[RoleFragment]:
+
+def _collect_role_fragments(
+    frag: VerbFragment, role: SemanticRole
+) -> list[RoleFragment]:
     """Recursively collect all RoleFragments with the given role."""
     found: list[RoleFragment] = []
     _walk(frag, role, found)
     return found
 
 
-def _walk(frag: VerbFragment, role: SemanticRole, accumulator: list[RoleFragment]) -> None:
+def _walk(
+    frag: VerbFragment, role: SemanticRole, accumulator: list[RoleFragment]
+) -> None:
     if isinstance(frag, RoleFragment) and frag.role == role:
         accumulator.append(frag)
     elif isinstance(frag, PhraseFragment):
@@ -73,12 +96,15 @@ def _walk_texts(frag: VerbFragment, accumulator: list[str]) -> None:
 
 # ── 1. Constraint fragments retain semantic roles ──────────────────────────────
 
+
 def test_constraint_fragment_preserves_variable_role(doors_and_drawers_world):
     """'such that' clause must contain VARIABLE-role fragments, not plain WordFragments."""
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(parent=pc.child, child=handle)
+    fc = match_variable(FixedConnection, world.connections)(
+        parent=pc.child, child=handle
+    )
     drawer = inference(Drawer)(container=fc.parent)
 
     frag = EQLVerbalizer().build(drawer)
@@ -86,12 +112,12 @@ def test_constraint_fragment_preserves_variable_role(doors_and_drawers_world):
     var_frags = _collect_role_fragments(frag, SemanticRole.VARIABLE)
     var_texts = [f.text for f in var_frags]
     # PrismaticConnection and Handle appear in the such-that clause
-    assert any("PrismaticConnection" in t for t in var_texts), (
-        f"Expected VARIABLE role for PrismaticConnection in {var_texts!r}"
-    )
-    assert any("Handle" in t for t in var_texts), (
-        f"Expected VARIABLE role for Handle in {var_texts!r}"
-    )
+    assert any(
+        "PrismaticConnection" in t for t in var_texts
+    ), f"Expected VARIABLE role for PrismaticConnection in {var_texts!r}"
+    assert any(
+        "Handle" in t for t in var_texts
+    ), f"Expected VARIABLE role for Handle in {var_texts!r}"
 
 
 def test_constraint_fragment_preserves_attribute_role(doors_and_drawers_world):
@@ -99,43 +125,50 @@ def test_constraint_fragment_preserves_attribute_role(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(parent=pc.child, child=handle)
+    fc = match_variable(FixedConnection, world.connections)(
+        parent=pc.child, child=handle
+    )
     drawer = inference(Drawer)(container=fc.parent, handle=fc.child)
 
     frag = EQLVerbalizer().build(drawer)
 
     attr_frags = _collect_role_fragments(frag, SemanticRole.ATTRIBUTE)
     attr_texts = [f.text for f in attr_frags]
-    assert "parent" in attr_texts or "container" in attr_texts, (
-        f"Expected ATTRIBUTE role for 'parent'/'container' in {attr_texts!r}"
-    )
+    assert (
+        "parent" in attr_texts or "container" in attr_texts
+    ), f"Expected ATTRIBUTE role for 'parent'/'container' in {attr_texts!r}"
 
 
 # ── 2. Binding override resolves field-ref in constraints ──────────────────────
+
 
 def test_binding_override_replaces_entity_ref_in_constraint(doors_and_drawers_world):
     """The 'such that' clause must use field-reference paths, not raw entity names."""
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(parent=pc.child, child=handle)
+    fc = match_variable(FixedConnection, world.connections)(
+        parent=pc.child, child=handle
+    )
     drawer = inference(Drawer)(container=fc.parent, handle=fc.child)
 
     text = verbalize_expression(drawer)
 
     # The constraint should reference the field paths, not the raw chain
-    assert "the container of the Drawer" in text, (
-        f"Expected field-ref substitution in: {text!r}"
-    )
-    assert "the handle of the Drawer" in text, (
-        f"Expected field-ref substitution in: {text!r}"
-    )
+    assert (
+        "the container of the Drawer" in text
+    ), f"Expected field-ref substitution in: {text!r}"
+    assert (
+        "the handle of the Drawer" in text
+    ), f"Expected field-ref substitution in: {text!r}"
 
 
 # ── 3. WHERE keyword role ──────────────────────────────────────────────────────
 
+
 def test_where_keyword_has_keyword_role():
     """'where' in an InstantiatedVariable binding must carry KEYWORD semantic role."""
+
     @dataclass
     class Box:
         item: Any
@@ -151,9 +184,7 @@ def test_where_keyword_has_keyword_role():
 
     kw_frags = _collect_role_fragments(frag, SemanticRole.KEYWORD)
     kw_texts = [f.text for f in kw_frags]
-    assert "where" in kw_texts, (
-        f"Expected KEYWORD role for 'where', got: {kw_texts!r}"
-    )
+    assert "where" in kw_texts, f"Expected KEYWORD role for 'where', got: {kw_texts!r}"
 
 
 def test_such_that_keyword_has_keyword_role(doors_and_drawers_world):
@@ -161,39 +192,45 @@ def test_such_that_keyword_has_keyword_role(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(parent=pc.child, child=handle)
+    fc = match_variable(FixedConnection, world.connections)(
+        parent=pc.child, child=handle
+    )
     drawer = inference(Drawer)(container=fc.parent)
 
     frag = EQLVerbalizer().build(drawer)
 
     kw_frags = _collect_role_fragments(frag, SemanticRole.KEYWORD)
     kw_texts = [f.text for f in kw_frags]
-    assert "such that" in kw_texts, (
-        f"Expected KEYWORD role for 'such that', got: {kw_texts!r}"
-    )
+    assert (
+        "such that" in kw_texts
+    ), f"Expected KEYWORD role for 'such that', got: {kw_texts!r}"
 
 
 # ── 4. GroupedBy variables retain roles ───────────────────────────────────────
+
 
 def test_grouped_by_vars_are_role_fragments(departments_and_employees_fixture):
     """Variables inside a grouped-by clause must be VARIABLE-role fragments."""
     _, _ = departments_and_employees_fixture
     emp = variable(Employee, domain=None)
     avg_salary = eql.average(emp.salary)
-    query = a(so := eql.set_of(emp.department, avg_salary)
-              .grouped_by(emp.department)
-              .having(avg_salary > 30000))
+    query = a(
+        so := eql.set_of(emp.department, avg_salary)
+        .grouped_by(emp.department)
+        .having(avg_salary > 30000)
+    )
 
     frag = EQLVerbalizer().build(query)
 
     var_frags = _collect_role_fragments(frag, SemanticRole.VARIABLE)
     var_texts = [f.text for f in var_frags]
-    assert any("Employee" in t for t in var_texts), (
-        f"Expected VARIABLE role for Employee in {var_texts!r}"
-    )
+    assert any(
+        "Employee" in t for t in var_texts
+    ), f"Expected VARIABLE role for Employee in {var_texts!r}"
 
 
 # ── 5. OrderedBy direction is a vocabulary fragment ───────────────────────────
+
 
 def test_ordered_by_direction_fragment(handles_and_containers_world):
     """The direction word in ordered-by must come from SortDirections (not a bare string)."""
@@ -213,9 +250,9 @@ def test_ordered_by_direction_fragment(handles_and_containers_world):
     # 'descending' must be a fragment leaf, not embedded in a larger string
     word_leaf_texts = []
     _collect_word_leaves(frag, word_leaf_texts)
-    assert "descending" in word_leaf_texts, (
-        f"'descending' should be a standalone leaf fragment, got: {word_leaf_texts!r}"
-    )
+    assert (
+        "descending" in word_leaf_texts
+    ), f"'descending' should be a standalone leaf fragment, got: {word_leaf_texts!r}"
 
 
 def _collect_word_leaves(frag: VerbFragment, accumulator: list[str]) -> None:
@@ -233,6 +270,7 @@ def _collect_word_leaves(frag: VerbFragment, accumulator: list[str]) -> None:
 
 # ── 6. set_of selected vars are role fragments ────────────────────────────────
 
+
 def test_set_of_vars_are_role_fragments(departments_and_employees_fixture):
     """Selected variables in a set_of query must be VARIABLE-role fragments."""
     _, _ = departments_and_employees_fixture
@@ -245,12 +283,13 @@ def test_set_of_vars_are_role_fragments(departments_and_employees_fixture):
 
     var_frags = _collect_role_fragments(frag, SemanticRole.VARIABLE)
     var_texts = [f.text for f in var_frags]
-    assert any("Employee" in t for t in var_texts), (
-        f"Expected VARIABLE role for Employee in {var_texts!r}"
-    )
+    assert any(
+        "Employee" in t for t in var_texts
+    ), f"Expected VARIABLE role for Employee in {var_texts!r}"
 
 
 # ── 7. WHERE clause in entity query retains roles when binding overrides exist ─
+
 
 def test_where_clause_with_instantiated_var_preserves_roles(doors_and_drawers_world):
     """WHERE clause on an entity query whose selected var is InstantiatedVariable
@@ -258,7 +297,9 @@ def test_where_clause_with_instantiated_var_preserves_roles(doors_and_drawers_wo
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(parent=pc.child, child=handle)
+    fc = match_variable(FixedConnection, world.connections)(
+        parent=pc.child, child=handle
+    )
     drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
 
     query = entity(drawer_var)
@@ -267,14 +308,20 @@ def test_where_clause_with_instantiated_var_preserves_roles(doors_and_drawers_wo
     # The If/Then rule form is used; both VARIABLE and ATTRIBUTE roles must appear
     var_frags = _collect_role_fragments(frag, SemanticRole.VARIABLE)
     attr_frags = _collect_role_fragments(frag, SemanticRole.ATTRIBUTE)
-    assert var_frags, "Expected at least one VARIABLE-role fragment in rule verbalization"
-    assert attr_frags, "Expected at least one ATTRIBUTE-role fragment in rule verbalization"
+    assert (
+        var_frags
+    ), "Expected at least one VARIABLE-role fragment in rule verbalization"
+    assert (
+        attr_frags
+    ), "Expected at least one ATTRIBUTE-role fragment in rule verbalization"
 
 
 # ── 8. Nested InstantiatedVariable — such-that count and field-ref ─────────────
 
+
 def test_double_nested_constraint_field_refs(doors_and_drawers_world):
     """Wrapper(drawer=Drawer(...)) — the such-that clause uses field-ref paths."""
+
     @dataclass
     class Wrapper:
         drawer: Any
@@ -282,7 +329,9 @@ def test_double_nested_constraint_field_refs(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(parent=pc.child, child=handle)
+    fc = match_variable(FixedConnection, world.connections)(
+        parent=pc.child, child=handle
+    )
     drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
     wrapper_var = inference(Wrapper)(drawer=drawer_var)
 
@@ -294,6 +343,7 @@ def test_double_nested_constraint_field_refs(doors_and_drawers_world):
 
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def departments_and_employees_fixture():

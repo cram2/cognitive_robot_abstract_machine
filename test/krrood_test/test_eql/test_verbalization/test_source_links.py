@@ -48,7 +48,6 @@ from krrood.entity_query_language.verbalization.rendering.source_link_resolver i
 )
 from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
 
-
 # ── Test fixtures ──────────────────────────────────────────────────────────────
 
 
@@ -62,6 +61,7 @@ class _Sensor:
 @dataclass
 class _SensorChild(_Sensor):
     """Subclass to verify MRO walking (kept for potential future use)."""
+
     extra: str
 
 
@@ -105,8 +105,12 @@ def test_source_ref_is_frozen():
 
 def test_source_ref_equality():
     assert SourceRef(owner_type=_Sensor) == SourceRef(owner_type=_Sensor)
-    assert SourceRef(owner_type=_Sensor, attribute="level") == SourceRef(owner_type=_Sensor, attribute="level")
-    assert SourceRef(owner_type=_Sensor) != SourceRef(owner_type=_Sensor, attribute="level")
+    assert SourceRef(owner_type=_Sensor, attribute="level") == SourceRef(
+        owner_type=_Sensor, attribute="level"
+    )
+    assert SourceRef(owner_type=_Sensor) != SourceRef(
+        owner_type=_Sensor, attribute="level"
+    )
 
 
 # ── AutoAPIResolver ────────────────────────────────────────────────────────────
@@ -154,6 +158,7 @@ def test_autoapi_resolver_module_path_uses_slashes():
 def test_autoapi_resolver_no_warning_when_html_root_not_set(caplog):
     """Without html_root, resolve() never logs a warning."""
     import logging
+
     r = AutoAPIResolver(base_url="https://docs.example.com")
     with caplog.at_level(logging.WARNING):
         r.resolve(SourceRef(owner_type=_Sensor))
@@ -164,6 +169,7 @@ def test_autoapi_resolver_warns_when_local_page_missing(tmp_path):
     """When html_root is set and the AutoAPI page is absent, a WARNING is logged."""
     from unittest.mock import patch as _patch
     import krrood.entity_query_language.verbalization.rendering.source_link_resolver as _slr
+
     r = AutoAPIResolver(base_url="https://docs.example.com", html_root=tmp_path)
     with _patch.object(_slr._log, "warning") as mock_warn:
         url = r.resolve(SourceRef(owner_type=_Sensor))
@@ -176,6 +182,7 @@ def test_autoapi_resolver_no_warning_when_page_exists(tmp_path):
     """When the AutoAPI page exists on disk, no WARNING is logged."""
     from unittest.mock import patch as _patch
     import krrood.entity_query_language.verbalization.rendering.source_link_resolver as _slr
+
     module_path = _Sensor.__module__.replace(".", "/")
     page = tmp_path / "autoapi" / module_path / "index.html"
     page.parent.mkdir(parents=True)
@@ -278,7 +285,15 @@ def test_autoapi_resolver_for_package_html_file_exists():
     for parent in pkg_file.parents:
         if (parent / "pyproject.toml").exists():
             module_path = Query.__module__.replace(".", "/")
-            html_file = parent / "doc" / "_build" / "html" / "autoapi" / module_path / "index.html"
+            html_file = (
+                parent
+                / "doc"
+                / "_build"
+                / "html"
+                / "autoapi"
+                / module_path
+                / "index.html"
+            )
             assert html_file.exists(), f"Expected autoapi page at {html_file}"
             return
     pytest.fail("krrood package root not found")
@@ -288,7 +303,9 @@ def test_autoapi_resolver_for_package_html_file_exists():
 def test_autoapi_resolver_for_package_end_to_end_html():
     """Full pipeline with for_package() produces <a> tags pointing at the local docs."""
     x = variable(EQLVerbalizer, [])
-    text = VerbalizationPipeline.html(link_resolver=_krrood_resolver).verbalize(an(entity(x)))
+    text = VerbalizationPipeline.html(link_resolver=_krrood_resolver).verbalize(
+        an(entity(x))
+    )
     assert "localhost" in text
     assert "EQLVerbalizer" in text
 
@@ -304,7 +321,10 @@ def test_plain_formatter_wrap_link_is_noop():
 def test_html_formatter_wrap_link_produces_anchor():
     f = HTMLFormatter()
     result = f.wrap_link("Robot", "http://example.com")
-    assert result == '<a target="_blank" rel="noopener" href="http://example.com">Robot</a>'
+    assert (
+        result
+        == '<a target="_blank" rel="noopener" href="http://example.com">Robot</a>'
+    )
 
 
 def test_html_formatter_wrap_link_preserves_inner_markup():
@@ -317,7 +337,9 @@ def test_html_formatter_wrap_link_preserves_inner_markup():
 
 def test_ansi_formatter_wrap_link_osc8_enabled():
     f = ANSIFormatter()
-    object.__setattr__(f, "_hyperlinks_enabled", True)  # force-enable for test isolation
+    object.__setattr__(
+        f, "_hyperlinks_enabled", True
+    )  # force-enable for test isolation
     result = f.wrap_link("Robot", "http://example.com")
     assert "\033]8;;http://example.com\033\\" in result
     assert "Robot" in result
@@ -444,7 +466,9 @@ def test_pipeline_ansi_with_resolver_and_osc8_emits_escape():
     r = variable(_Sensor, [])
     resolver = _ConstantResolver("http://example.com/sensor")
     with patch.dict("os.environ", {"VTE_VERSION": "6800"}, clear=False):
-        text = VerbalizationPipeline.ansi(link_resolver=resolver).verbalize(an(entity(r)))
+        text = VerbalizationPipeline.ansi(link_resolver=resolver).verbalize(
+            an(entity(r))
+        )
     assert "\033]8;;" in text
 
 
@@ -457,7 +481,9 @@ def test_pipeline_ansi_with_resolver_no_osc8_logs_warning_and_no_osc8():
     env = {"VTE_VERSION": "", "TERM_PROGRAM": "unknown", "TERM": "xterm"}
     with patch.dict("os.environ", env, clear=False):
         with _patch.object(pipeline_mod._log, "warning") as mock_warn:
-            text = VerbalizationPipeline.ansi(link_resolver=resolver).verbalize(an(entity(r)))
+            text = VerbalizationPipeline.ansi(link_resolver=resolver).verbalize(
+                an(entity(r))
+            )
     assert "\033]8;;" not in text
     mock_warn.assert_called_once()
     assert "OSC 8" in mock_warn.call_args[0][0]
@@ -568,9 +594,11 @@ def test_display_in_jupyter_calls_ipython_display():
     with _patch.object(pipeline_mod, "_is_ipython", return_value=True):
         with _patch.dict(
             "sys.modules",
-            {"IPython.display": MagicMock(
-                display=mock_ipython_display, HTML=mock_html_cls
-            )},
+            {
+                "IPython.display": MagicMock(
+                    display=mock_ipython_display, HTML=mock_html_cls
+                )
+            },
         ):
             pipeline.display(an(entity(x)))
 

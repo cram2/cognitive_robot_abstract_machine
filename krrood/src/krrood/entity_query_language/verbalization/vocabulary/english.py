@@ -221,6 +221,13 @@ class Copulas(VocabEnum):
     IS_NOT = OperatorWord("is not")
     ARE = OperatorWord("are")
 
+    @classmethod
+    def for_number(cls, number: Number) -> RoleFragment:
+        """The copula tagged with *number* (``OPERATOR`` role) for a directly-built leaf; the
+        morphology pass agrees it (*is* / *are*).  This is the one seam for copulas not produced
+        via ``ctx.child`` recursion (e.g. an InstantiatedVariable field binding)."""
+        return RoleFragment(text=cls.IS.text, role=SemanticRole.OPERATOR, number=number)
+
 
 class Prepositions(VocabEnum):
     """Prepositions used in possessive path phrases (OF, OF THE) and aggregate scopes (AMONG)."""

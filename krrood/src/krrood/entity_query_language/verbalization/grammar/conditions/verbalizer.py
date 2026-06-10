@@ -28,18 +28,20 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.factory import phrase, role
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
-from krrood.entity_query_language.verbalization.grammar import agreement
 from krrood.entity_query_language.verbalization.grammar.assembly.base import Assembler
+from krrood.entity_query_language.verbalization.grammar.conditions.operator_phrase import (
+    comparator_operator,
+)
 from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
     single_hop_attr,
 )
 from krrood.entity_query_language.verbalization.microplanning.coordination import (
     build_between,
 )
-from krrood.entity_query_language.verbalization.operator_phrase import (
-    comparator_operator,
+from krrood.entity_query_language.verbalization.vocabulary.english import (
+    Copulas,
+    Keywords,
 )
-from krrood.entity_query_language.verbalization.vocabulary.english import Keywords
 from krrood.entity_query_language.verbalization.vocabulary.words import Number
 
 
@@ -92,7 +94,7 @@ class ConditionVerbalizer(Assembler[Any, None]):
         return phrase(
             Keywords.WHOSE.as_fragment(),
             self._attr_noun(attr_name, number),
-            agreement.copula(number),
+            Copulas.for_number(number),
             value,
         )
 

@@ -9,9 +9,9 @@ microplanning services (``ctx.refer`` / ``ctx.scope`` / ``ctx.config``), morphol
 coordination module, and the lexicon — so each rule is responsible for a single
 construct's surface composition.
 
-:data:`RULES` lists one instance per rule; the registry exposes them as queryable
-data.  Families are ported here one at a time; until a construct's rule is present the
-engine falls back to the legacy dispatcher (strangler migration).
+:data:`RULES` lists one instance per rule — plain data, so the grammar itself is
+EQL-queryable (e.g. ``entity(rule).where(rule.construct == Comparator)`` over
+``domain=RULES``).  ``select`` decides specificity, so the list order is irrelevant.
 """
 
 from __future__ import annotations
@@ -41,7 +41,6 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 )
 from krrood.entity_query_language.operators.logical_quantifiers import Exists, ForAll
 from krrood.entity_query_language.verbalization.fragments.base import (
-    join_with,
     NounPhrase,
     oxford_and,
     PhraseFragment,
@@ -248,7 +247,11 @@ class OrRule(PhraseRule):
         if len(parts) == 1:
             return parts[0]
         head_with_comma = PhraseFragment(
-            parts=[join_with(parts[:-1], word(", ")), word(",")], separator=""
+            parts=[
+                PhraseFragment(parts=parts[:-1], separator=", "),
+                word(","),
+            ],
+            separator="",
         )
         return phrase(
             Logicals.EITHER.as_fragment(),

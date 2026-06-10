@@ -46,7 +46,9 @@ from krrood.entity_query_language.verbalization.rendering.renderer import (
     HierarchicalRenderer,
     ParagraphRenderer,
 )
-from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
+from krrood.entity_query_language.verbalization.fragments.base import (
+    flatten_fragment_to_plain_text,
+)
 from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
 from ...dataset.semantic_world_like_classes import (
     Drawer,
@@ -593,7 +595,9 @@ def _find_block_with_keyword(
     """Return the first BlockFragment whose header text contains keyword."""
     if not isinstance(fragment, BlockFragment):
         return None
-    if fragment.header is not None and keyword in flatten_fragment_to_plain_text(fragment.header):
+    if fragment.header is not None and keyword in flatten_fragment_to_plain_text(
+        fragment.header
+    ):
         return fragment
     for item in fragment.items:
         found = _find_block_with_keyword(item, keyword)

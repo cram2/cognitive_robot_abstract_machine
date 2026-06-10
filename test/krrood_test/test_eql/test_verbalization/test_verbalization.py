@@ -101,15 +101,13 @@ class BankTransaction:
 
 
 def test_all_rules_registry_is_populated():
-    """ALL_PHRASE_RULES must be non-empty after import — otherwise every expression
-    falls back to its name string and verbalization is silently broken."""
-    from krrood.entity_query_language.verbalization.grammar.registry import (
-        ALL_PHRASE_RULES,
-    )
+    """RULES must be non-empty after import — otherwise every expression falls back to
+    its name string and verbalization is silently broken."""
+    from krrood.entity_query_language.verbalization.grammar.english import RULES
 
-    assert len(ALL_PHRASE_RULES) > 0, (
-        "ALL_PHRASE_RULES is empty — the grammar was not imported before the "
-        "registry snapshot. Ensure registry.py collects grammar/english.py RULES."
+    assert len(RULES) > 0, (
+        "RULES is empty — the grammar was not imported, so every expression would "
+        "fall back to its name string."
     )
 
 
