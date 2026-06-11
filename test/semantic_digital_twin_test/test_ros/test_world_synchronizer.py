@@ -149,6 +149,24 @@ def wait_for_sync_kse_and_return_ids(
     return body_ids_1, body_ids_2
 
 
+def wait_for_condition(condition, timeout: float = 5.0, interval: float = 0.05) -> bool:
+    """
+    Waits until the condition callable returns True, or until the timeout is reached.
+
+    :param condition: A callable returning a truthy value once the awaited state is reached.
+    :param timeout: The maximum time to wait, in seconds. Defaults to 5.0.
+    :param interval: The time interval between checks, in seconds. Defaults to 0.05.
+
+    :return: The final result of the condition.
+    """
+    start = time.time()
+    while time.time() - start < timeout:
+        if condition():
+            return True
+        time.sleep(interval)
+    return bool(condition())
+
+
 def test_state_synchronization(rclpy_node):
     w1 = create_dummy_world()
     w2 = create_dummy_world()
@@ -292,7 +310,8 @@ def test_model_synchronization_creation_only(rclpy_node):
 
         c = Connection6DoF.create_with_dofs(parent=b2, child=new_body, world=w1)
         w1.add_connection(c)
-    time.sleep(0.5)
+    wait_for_sync_kse_and_return_ids(w1, w2)
+    wait_for_condition(lambda: len(w2.connections) == 1)
     assert len(w1.kinematic_structure_entities) == 2
     assert len(w2.kinematic_structure_entities) == 2
     assert len(w1.connections) == 1
