@@ -45,14 +45,12 @@ jobs:
             ${{ runner.os }}-cache-
 
       - name: Build ORM
-        if: ${{inputs.repo_lowercase == 'pycram' || inputs.repo_lowercase == 'semantic_digital_twin'}}
+        if: ${{inputs.repo_lowercase == 'coraplex' || inputs.repo_lowercase == 'semantic_digital_twin'}}
         run: |
           cd cognitive_robot_abstract_machine/${{ inputs.lib }}/scripts/
           source /opt/ros/overlay_ws/install/setup.bash
           source /opt/ros/cram-env/bin/activate
           python generate_orm.py
-      - name: Run Script
-        run: |
 
       - name: Run Script
         run: |

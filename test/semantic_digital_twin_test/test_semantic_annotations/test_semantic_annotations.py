@@ -167,12 +167,12 @@ def test_has_hinge_has_slider_aggregate_bodies():
     assert set(drawer.kinematic_structure_entities) == expected_drawer_bodies
 
 
-def test_semantic_annotation_hash(apartment_world_setup):
-    semantic_annotation1 = Handle(root=apartment_world_setup.bodies[0])
-    semantic_annotation2 = Handle(root=apartment_world_setup.bodies[0])
-    with apartment_world_setup.modify_world():
-        apartment_world_setup.add_semantic_annotation(semantic_annotation1)
-        apartment_world_setup.add_semantic_annotation(semantic_annotation2)
+def test_semantic_annotation_hash(apartment_world_copy):
+    semantic_annotation1 = Handle(root=apartment_world_copy.bodies[0])
+    semantic_annotation2 = Handle(root=apartment_world_copy.bodies[0])
+    with apartment_world_copy.modify_world():
+        apartment_world_copy.add_semantic_annotation(semantic_annotation1)
+        apartment_world_copy.add_semantic_annotation(semantic_annotation2)
 
     # hash of semantic annotations should be based on their properties, not ids
     assert id(semantic_annotation1) != id(semantic_annotation2)
@@ -180,8 +180,8 @@ def test_semantic_annotation_hash(apartment_world_setup):
     assert semantic_annotation1 == semantic_annotation2
 
 
-def test_handle_semantic_annotation_eql(apartment_world_setup):
-    body = variable(type_=Body, domain=apartment_world_setup.bodies)
+def test_handle_semantic_annotation_eql(apartment_world_copy):
+    body = variable(type_=Body, domain=apartment_world_copy.bodies)
     query = an(
         entity(inference(Handle)(root=body)).where(
             in_("handle", body.name.name.lower())
@@ -201,13 +201,13 @@ def test_handle_semantic_annotation_eql(apartment_world_setup):
     ],
 )
 def test_infer_apartment_semantic_annotation(
-        semantic_annotation_type,
-        update_existing_semantic_annotations,
-        scenario,
-        apartment_world_setup,
+    semantic_annotation_type,
+    update_existing_semantic_annotations,
+    scenario,
+    apartment_world_copy,
 ):
     fit_rules_and_assert_semantic_annotations(
-        apartment_world_setup,
+        apartment_world_copy,
         semantic_annotation_type,
         update_existing_semantic_annotations,
         scenario,
@@ -228,11 +228,11 @@ def test_generated_semantic_annotations(kitchen_world):
 
 
 @pytest.mark.order("third_to_last")
-def test_apartment_semantic_annotations(apartment_world_setup):
-    world_reasoner = WorldReasoner(apartment_world_setup)
+def test_apartment_semantic_annotations(apartment_world_copy):
+    world_reasoner = WorldReasoner(apartment_world_copy)
     world_reasoner.fit_semantic_annotations(
         [Handle, Drawer, Wardrobe],
-        world_factory=lambda: apartment_world_setup,
+        world_factory=lambda: apartment_world_copy,
         scenario=None,
     )
 
@@ -246,23 +246,24 @@ def test_apartment_semantic_annotations(apartment_world_setup):
 
 
 @pytest.mark.order("second_to_last")
-def test_explain_inferred_semantic_annotations(apartment_world_setup):
-    world_reasoner = WorldReasoner(apartment_world_setup)
+def test_explain_inferred_semantic_annotations(apartment_world_copy):
+    world_reasoner = WorldReasoner(apartment_world_copy)
     found_semantic_annotations = list(world_reasoner.infer_semantic_annotations())
     drawer = next(ann for ann in found_semantic_annotations if isinstance(ann, Drawer))
     explanation = explain_inference(drawer)
     assert explanation is not None
     assert isinstance(explanation.query_root, SymbolicExpression)
     assert explanation.get_satisfied_conditions_as_string() == (
-        '(Handle.root == FixedConnection.child)'
-        '\nAND (FixedConnection.parent == PrismaticConnection.child)')
+        "(Handle.root == FixedConnection.child)"
+        "\nAND (FixedConnection.parent == PrismaticConnection.child)"
+    )
     visualize = False
     if visualize:
         explanation.condition_graph().visualize(filename="drawer_explanation.pdf")
 
 
 def fit_rules_and_assert_semantic_annotations(
-        world, semantic_annotation_type, update_existing_semantic_annotations, scenario
+    world, semantic_annotation_type, update_existing_semantic_annotations, scenario
 ):
     world_reasoner = WorldReasoner(world)
     world_reasoner.fit_semantic_annotations(
@@ -278,22 +279,22 @@ def fit_rules_and_assert_semantic_annotations(
     )
 
 
-def test_semantic_annotation_serialization_deserialization_once(apartment_world_setup):
-    handle_body = apartment_world_setup.bodies[0]
-    door_body = apartment_world_setup.bodies[1]
+def test_semantic_annotation_serialization_deserialization_once(apartment_world_copy):
+    handle_body = apartment_world_copy.bodies[0]
+    door_body = apartment_world_copy.bodies[1]
 
     handle = Handle(root=handle_body)
     door = Door(root=door_body, handle=handle)
-    with apartment_world_setup.modify_world():
-        apartment_world_setup.add_semantic_annotation(handle)
-        apartment_world_setup.add_semantic_annotation(door)
+    with apartment_world_copy.modify_world():
+        apartment_world_copy.add_semantic_annotation(handle)
+        apartment_world_copy.add_semantic_annotation(door)
 
     door_se = door.to_json()
 
-    with apartment_world_setup.modify_world():
-        apartment_world_setup.remove_semantic_annotation(door)
+    with apartment_world_copy.modify_world():
+        apartment_world_copy.remove_semantic_annotation(door)
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(apartment_world_setup)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(apartment_world_copy)
     kwargs = tracker.create_kwargs()
 
     door_de = Door.from_json(door_se, **kwargs)

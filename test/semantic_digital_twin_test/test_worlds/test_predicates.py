@@ -27,6 +27,7 @@ from semantic_digital_twin.reasoning.robot_predicates import (
 )
 from semantic_digital_twin.robots.robot_parts import Camera, EndEffector
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -446,20 +447,25 @@ def test_blocking(pr2_world_copy):
 def test_region_is_occupied(pr2_world_state_reset):
     view = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
 
-    target_region = BoundingBox(
-        3, 2, 0, 4, 3, 2, pr2_world_state_reset.root.global_pose
+    target_box = BoundingBox(0, 0, 0, 1, 1, 1, HomogeneousTransformationMatrix())
+    assert not is_place_occupied(
+        target_box,
+        Pose.from_xyz_rpy(2.5, 2, 0, reference_frame=pr2_world_state_reset.root),
+        pr2_world_state_reset,
     )
-    assert not is_place_occupied(target_region, pr2_world_state_reset)
 
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         3.5, 2.5, 0
     )
     pr2_world_state_reset.notify_state_change()
 
-    assert is_place_occupied(target_region, pr2_world_state_reset)
+    assert is_place_occupied(target_box, view.root.global_pose, pr2_world_state_reset)
 
     assert not is_place_occupied(
-        target_region, pr2_world_state_reset, view.bodies_with_collision
+        target_box,
+        Pose.from_xyz_rpy(3.5, 2.5, 1, 0, reference_frame=pr2_world_state_reset.root),
+        pr2_world_state_reset,
+        view.bodies_with_collision,
     )
 
 
@@ -467,16 +473,12 @@ def test_is_pose_free_for_robot(pr2_apartment_state_reset):
     view = pr2_apartment_state_reset.get_semantic_annotations_by_type(PR2)[0]
     assert is_pose_free_for_robot(
         view,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
-            2, -2, 0, reference_frame=pr2_apartment_state_reset.root
-        ),
+        Pose.from_xyz_rpy(2, -2, 0, reference_frame=pr2_apartment_state_reset.root),
     )
 
     assert not is_pose_free_for_robot(
         view,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
-            2.5, 2, 0, reference_frame=pr2_apartment_state_reset.root
-        ),
+        Pose.from_xyz_rpy(3, 2, 0, reference_frame=pr2_apartment_state_reset.root),
     )
 
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -485,16 +487,25 @@ def test_is_pose_free_for_robot(pr2_apartment_state_reset):
 
     assert is_pose_free_for_robot(
         view,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
-            2, -2, 0, reference_frame=pr2_apartment_state_reset.root
-        ),
+        Pose.from_xyz_rpy(2, -2, 0, reference_frame=pr2_apartment_state_reset.root),
     )
 
     assert is_pose_free_for_robot(
         view,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
-            2.1, -2.1, 0, reference_frame=pr2_apartment_state_reset.root
-        ),
+        Pose.from_xyz_rpy(2.1, -2.1, 0, reference_frame=pr2_apartment_state_reset.root),
+    )
+
+
+def test_is_pose_free_for_robot_with_robot_pose(pr2_apartment_state_reset):
+    view = pr2_apartment_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    assert is_pose_free_for_robot(
+        view,
+        Pose.from_xyz_rpy(2, -2, 0, reference_frame=pr2_apartment_state_reset.root),
+    )
+
+    assert is_pose_free_for_robot(
+        view,
+        view.root.global_pose,
     )
 
 

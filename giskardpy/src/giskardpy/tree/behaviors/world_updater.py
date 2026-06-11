@@ -28,4 +28,4 @@ class ProcessWorldUpdate(GiskardBehavior):
         return Status.RUNNING
 
     def process_goal(self):
-        GiskardBlackboard().giskard.model_synchronizer.apply_missed_messages()
+        GiskardBlackboard().giskard.world_synchronizer.apply_missed_messages()

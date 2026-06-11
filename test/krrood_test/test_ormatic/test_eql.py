@@ -50,8 +50,8 @@ from krrood.entity_query_language.factories import (
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
-from pycram.robot_plans.actions.core.pick_up import PickUpAction
-from pycram.orm.ormatic_interface import PickUpActionDAO, GraspDescriptionDAO
+from coraplex.robot_plans.actions.core.pick_up import PickUpAction
+from coraplex.orm.ormatic_interface import PickUpActionDAO, GraspDescriptionDAO
 from krrood.entity_query_language.query.query import UnificationDict
 
 
@@ -882,7 +882,7 @@ def test_set_of_move_action_transitive(session):
     """
     Verify that set_of with both direct and transitive attributes generates correct JOINs.
     This simulates the pattern of MoveToReachDAO.robot_x and
-    MoveToReachDAO.grasp_description.rotate_gripper from pycram.
+    MoveToReachDAO.grasp_description.rotate_gripper from coraplex.
     """
     from sqlalchemy.orm import aliased
 

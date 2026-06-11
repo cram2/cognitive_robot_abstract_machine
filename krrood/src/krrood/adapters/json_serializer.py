@@ -8,7 +8,7 @@ from abc import ABC
 from dataclasses import dataclass, fields, is_dataclass
 from dataclasses import field
 from types import NoneType
-from typing import List, Optional, TypeAlias
+from typing import List, Optional, TypeAlias, TYPE_CHECKING
 
 import numpy as np
 from typing_extensions import Dict, Any, Self, Union, Type, TypeVar
@@ -45,7 +45,7 @@ leaf_types = (
 
 JSON_DICT_TYPE = Dict[str, Any]  # Commonly referred JSON dict
 JSON_RETURN_TYPE = Union[
-    JSON_DICT_TYPE, list[JSON_DICT_TYPE], *leaf_types
+    JSON_DICT_TYPE, List[Any], *leaf_types
 ]  # Commonly referred JSON types
 JSON_IS_CLASS = "__is_class__"
 """
@@ -53,9 +53,15 @@ We need to remember if something is a class, because the type of a class is ofte
 """
 
 
-# TODO: Manage to have JSONData as a proper type alias for the JSON typehints, while keeping everything ormaticable @tomsch420
-class JSONData:
-    pass
+if TYPE_CHECKING:
+    JSONData: TypeAlias = JSON_RETURN_TYPE
+else:
+
+    class JSONData:
+        """
+        Represents raw JSON data. Use this type for type hints when you want to tell KRROOD that something is
+        JSON data that should not be further processed (e.g. by from_json()).
+        """
 
 
 @dataclass

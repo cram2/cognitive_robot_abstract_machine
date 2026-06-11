@@ -260,7 +260,7 @@ class TiagoLeftArm(Arm[TiagoLeftGripper]):
             mapping=dict(
                 zip(
                     self.active_connections,
-                    [1.57, 0.33, 1.57, 1.57, 0.0, 1.1, 0.0],
+                    [0, -0.8, 1.57, 1.57, -2.0, 1.1, 0.0],
                 )
             ),
             state_type=StaticJointState.PARK,
@@ -306,7 +306,7 @@ class TiagoRightArm(Arm[TiagoRightGripper]):
             mapping=dict(
                 zip(
                     self.active_connections,
-                    [1.57, 0.33, 1.57, 1.57, 0.0, 1.1, 0.0],
+                    [0, -0.8, 1.57, 1.57, -2.0, 1.1, 0.0],
                 )
             ),
             state_type=StaticJointState.PARK,

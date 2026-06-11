@@ -1,4 +1,7 @@
+import time
+
 import numpy as np
+import os
 import pytest
 from requests import HTTPError
 
@@ -14,10 +17,6 @@ from semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer import (
     BoxDecomposer,
 )
 from semantic_digital_twin.pipeline.pipeline import Pipeline
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Book,
-    BookFront,
-)
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
 )
@@ -30,17 +29,17 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
 )
 
-from pycram.motion_executor import simulated_robot
+from coraplex.motion_executor import simulated_robot
 
-from pycram.plans.factories import execute_single, sequential
+from coraplex.plans.factories import execute_single, sequential
 
-from pycram.robot_plans.actions.core.navigation import NavigateAction
+from coraplex.robot_plans.actions.core.navigation import NavigateAction
 
-from pycram.datastructures.dataclasses import Context
+from coraplex.datastructures.dataclasses import Context
 
-from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 
-from pycram.robot_plans.actions.core.pick_up import PickUpAction
+from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 
 from semantic_digital_twin.datastructures.definitions import TorsoState
 
@@ -80,20 +79,25 @@ def get_sage10k_scene():
     try:
         loader = Sage10kDatasetLoader()
         return loader.create_scene(scene_url=Sage10kDatasetLoader.available_scenes()[0])
-    except HTTPError as e:
+    except HTTPError:
         return None
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def sage10k_scene():
-    return get_sage10k_scene()
+    worker = os.environ.get("PYTEST_XDIST_WORKER")
+    if worker:
+        worker_num = int(worker.removeprefix("gw"))
+        time.sleep(worker_num)
+    scene = get_sage10k_scene()
+    if scene is None:
+        pytest.skip("Sage10k dataset not available")
+
+    return scene
 
 
-@pytest.mark.skipif(get_sage10k_scene() is None, reason="Sage10k dataset not available")
 def test_loader(rclpy_node, sage10k_scene):
     scene = sage10k_scene
-    if scene is None:
-        return
     world = scene.create_world()
     pub = VizMarkerPublisher(
         _world=world,
@@ -107,11 +111,8 @@ def test_loader(rclpy_node, sage10k_scene):
     )
 
 
-@pytest.mark.skipif(get_sage10k_scene() is None, reason="Sage10k dataset not available")
 def test_different_decomposition_methods(rclpy_node, sage10k_scene):
     scene = sage10k_scene
-    if scene is None:
-        return
     for room in scene.rooms:
         new_objects = []
         for obj in room.objects:

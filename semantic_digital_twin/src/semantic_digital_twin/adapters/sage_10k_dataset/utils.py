@@ -37,7 +37,7 @@ def create_hsrb_in_world(world: World):
 
     urdf_dir = os.path.join(
         Path(files("semantic_digital_twin")).parent.parent.parent,
-        "pycram",
+        "coraplex",
         "resources",
         "robots",
     )

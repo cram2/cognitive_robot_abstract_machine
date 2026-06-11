@@ -25,6 +25,7 @@ from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import Vector3, Point3
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
+    Pose,
 )
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import BoundingBox
@@ -556,7 +557,7 @@ class ContainsType(Predicate):
 
 @symbolic_function
 def is_place_occupied(
-    box: BoundingBox, world: World, allowed_bodies: List[Body] = None
+    box: BoundingBox, pose: Pose, world: World, allowed_bodies: List[Body] = None
 ) -> bool:
     """
     Checks if the given region (as a box at its pose) intersects with any collidable
@@ -575,10 +576,7 @@ def is_place_occupied(
     # Build a mesh for the region box at its current pose
     region_box_shape = box.as_shape()  # returns a Box centered at the region
     region_mesh = region_box_shape.mesh.copy()
-    # region_mesh.apply_transform(region_box_shape.origin.to_np())
-    region_mesh.apply_transform(
-        world.transform(region_box_shape.origin, world.root).to_np()
-    )
+    region_mesh.apply_transform(world.transform(pose, world.root).to_np())
 
     # Prepare collision manager with the region mesh
     cm = CollisionManager()

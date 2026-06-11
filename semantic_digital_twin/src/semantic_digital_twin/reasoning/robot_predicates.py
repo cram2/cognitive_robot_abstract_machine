@@ -26,7 +26,9 @@ from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     EndEffector,
 )
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -188,19 +190,15 @@ def is_gripper_holding_something(gripper: EndEffector) -> bool:
 
 
 @symbolic_function
-def is_pose_free_for_robot(
-    robot: AbstractRobot, pose: HomogeneousTransformationMatrix
-) -> bool:
-    robot_bb = robot.mobile_base.bounding_box.transform_to_origin(
-        robot.root.global_pose
-    )
-    target_bb = BoundingBox(
-        robot_bb.min_x,
-        robot_bb.min_y,
-        robot_bb.min_z,
-        robot_bb.max_x,
-        robot_bb.max_y,
-        robot_bb.max_z,
+def is_pose_free_for_robot(robot: AbstractRobot, pose: Pose) -> bool:
+    return not is_place_occupied(
+        robot.mobile_base.bounding_box,
         pose,
+        robot._world,
+        robot.bodies_with_collision
+        + [
+            kse
+            for annotation in robot._world.get_semantic_annotations_by_type(Floor)
+            for kse in annotation.kinematic_structure_entities
+        ],
     )
-    return not is_place_occupied(target_bb, robot._world, robot.bodies_with_collision)

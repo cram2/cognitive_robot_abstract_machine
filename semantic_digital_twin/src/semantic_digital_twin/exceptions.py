@@ -375,6 +375,43 @@ class MissingPublishChangesKWARG(UsageError):
 
 
 @dataclass
+class StateUpdateContainsUnknownDegreesOfFreedomError(UsageError):
+    """
+    Raised when a WorldStateUpdate is received that contains one or more DOF identifiers
+    absent from the world state index.  This indicates a severe model/state desynchronization
+    that must be investigated rather than silently ignored.
+    """
+
+    unknown_identifiers: List[UUID]
+    """
+    List of unknown DOF UUIDs that were attempted to update the state of
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"Received a WorldStateUpdate containing {len(self.unknown_identifiers)} "
+            f"DOF identifier(s) absent from the world state index: "
+            f"{self.unknown_identifiers}. "
+            "This means the world model and state are severely out of sync."
+        )
+
+
+@dataclass
+class ApplyMissedMessagesWhileWorldIsBeingModifiedError(UsageError):
+    """
+    Raised when apply_missed_messages is called while a modify_world context is active on the synchronizer's world.
+    Applying missed messages requires entering a modify_world context internally, which would conflict
+    with any currently active modify_world context due to mismatching publish_changes policies.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            "apply_missed_messages must not be called while a modify_world context is active on the synchronizer's world. "
+            "Call apply_missed_messages after the modify_world context has exited."
+        )
+
+
+@dataclass
 class DuplicateWorldEntityError(UsageError):
     world_entities: List[WorldEntity]
 

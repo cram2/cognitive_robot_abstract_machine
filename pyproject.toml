@@ -13,7 +13,7 @@ authors = [{ name = "AICOR Institute", email = "you@example.com" }]
 # Add dependencies on all workspace members by their distribution names
 # uv will resolve these to editable installs via [tool.uv.sources]
 dependencies = [
-  "pycram-robotics",
+  "coraplex",
   "giskardpy",
   "semantic_digital_twin",
   "krrood",
@@ -23,12 +23,12 @@ dependencies = [
   "physics_simulators",
   "experiments",
   "ipykernel>=7.2.0",
-  "lark-parser>=0.12.0",
+  "lark-parser>=0.12.0"
 ]
 
 [tool.uv.workspace]
 members = [
-  "pycram",
+  "coraplex",
   "giskardpy",
   "semantic_digital_twin",
   "krrood",
@@ -40,7 +40,7 @@ members = [
 ]
 
 [tool.uv.sources]
-pycram-robotics       = { workspace = true }
+coraplex       = { workspace = true }
 giskardpy             = { workspace = true }
 semantic_digital_twin = { workspace = true }
 krrood                = { workspace = true }
@@ -54,7 +54,7 @@ experiments           = { workspace = true }
 package-mode = false
 
 [tool.poetry.dependencies]
-pycram-robotics = { path = "pycram", develop = true }
+coraplex = { path = "coraplex", develop = true }
 giskardpy = { path = "giskardpy", develop = true }
 semantic_digital_twin = { path = "semantic_digital_twin", develop = true }
 krrood = { path = "krrood", develop = true }

@@ -30,8 +30,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.adapters.ros.world_fetcher import FetchWorldServer
 from semantic_digital_twin.adapters.ros.world_synchronizer import (
-    ModelSynchronizer,
-    StateSynchronizer,
+    WorldSynchronizer,
     ModelReloadSynchronizer,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -63,8 +62,7 @@ class Giskard:
     robot_interface_config: RobotInterfaceConfig
     qp_controller_config: QPControllerConfig = field(default_factory=QPControllerConfig)
     executor: Executor = field(init=False)
-    model_synchronizer: ModelSynchronizer = field(init=False)
-    state_synchronizer: StateSynchronizer = field(init=False)
+    world_synchronizer: WorldSynchronizer = field(init=False)
     tf_publisher: TFPublisher = field(init=False)
     viz_marker_publisher: VizMarkerPublisher = field(init=False)
     model_reload_synchronizer: ModelReloadSynchronizer = field(init=False)
@@ -124,14 +122,10 @@ class Giskard:
             )
             self.model_reload_synchronizer = None
 
-        self.model_synchronizer = ModelSynchronizer(
+        self.world_synchronizer = WorldSynchronizer(
             _world=self.world_config.world, node=rospy.node
         )
-        self.model_synchronizer.pause()
-        self.state_synchronizer = StateSynchronizer(
-            _world=self.world_config.world, node=rospy.node
-        )
-        self.state_synchronizer.pause()
+        self.world_synchronizer.pause()
         self.world_fetcher = FetchWorldServer(
             node=rospy.node, world=self.world_config.world
         )

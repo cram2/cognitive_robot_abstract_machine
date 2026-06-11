@@ -203,30 +203,49 @@ class WorldModelUpdateContextManager:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            # If error, clean up before re-raising
+            if exc_val:
+                model_manager = self.world._model_manager
+                model_manager._active_world_model_update_context_manager_ids.remove(
+                    self._id
+                )
+                if not model_manager._active_world_model_update_context_manager_ids:
+                    model_manager.current_model_modification_block = (
+                        WorldModelModificationBlock()
+                    )
+                    self.world.world_is_being_modified = False
+                    model_manager._current_modifications_will_be_published = None
+                raise exc_val
 
-        if exc_val:
-            raise exc_val
+            self.world.delete_orphaned_dofs()
+            clear_memoization_cache(self.world)
+            model_manager = self.world._model_manager
+            model_manager._active_world_model_update_context_manager_ids.remove(
+                self._id
+            )
 
-        self.world.delete_orphaned_dofs()
-        clear_memoization_cache(self.world)
-        model_manager = self.world._model_manager
-        model_manager._active_world_model_update_context_manager_ids.remove(self._id)
+            # if there are still open context managers dont publish yet
+            if model_manager._active_world_model_update_context_manager_ids:
+                return
 
-        if not model_manager._active_world_model_update_context_manager_ids:
             model_manager.model_modification_blocks.append(
                 model_manager.current_model_modification_block
             )
             model_manager.current_model_modification_block = (
                 WorldModelModificationBlock()
             )
-            if exc_type is None:
-                self.world._notify_model_change(publish_changes=self.publish_changes)
-
-            self.world.world_is_being_modified = False
-            model_manager._current_modifications_will_be_published = None
-
-        # keep outside the if block, as it needs to be released as many times as it was acquired
-        self.world._world_lock.release()
+            try:
+                if exc_type is None:
+                    self.world._notify_model_change(
+                        publish_changes=self.publish_changes
+                    )
+            finally:
+                self.world.world_is_being_modified = False
+                model_manager._current_modifications_will_be_published = None
+        finally:
+            # keep outside the if block, as it needs to be released as many times as it was acquired
+            self.world._world_lock.release()
 
 
 def atomic_world_modification(func=None, modification: Type[WorldModification] = None):
@@ -269,9 +288,10 @@ def atomic_world_modification(func=None, modification: Type[WorldModification] =
                 modification.from_kwargs(bound_args)
             )
 
-            result = func(current_world, *args, **kwargs)
-
-            current_world._current_active_atomic_world_modification = None
+            try:
+                result = func(current_world, *args, **kwargs)
+            finally:
+                current_world._current_active_atomic_world_modification = None
             return result
 
         return wrapper
@@ -339,7 +359,7 @@ class WorldModelManager:
         """
         self.version += 1
         for callback in self.model_change_callbacks:
-            callback.notify(**kwargs)
+            callback.notify_model_change(**kwargs)
 
 
 _LRU_CACHE_SIZE: int = 2048
@@ -1861,7 +1881,7 @@ class World(HasSimulatorProperties):
             crashes if its not the case. Also using this in a method that is called a lot, it may cause performance
             issues because of unnecessary recompilations.
         """
-        self._forward_kinematic_manager._notify()
+        self._forward_kinematic_manager.notify_model_change()
         self._forward_kinematic_manager.recompute()
 
     # %% Inverse Kinematics

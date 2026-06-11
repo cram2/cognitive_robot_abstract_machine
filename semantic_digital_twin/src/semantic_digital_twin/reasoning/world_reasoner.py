@@ -73,7 +73,7 @@ class WorldReasoner:
                 setattr(self.world, attr_name, attr_value)
             else:
                 for semantic_annotation in attr_value:
-                    self.world.add_semantic_annotation(semantic_annotation)
+                    self.world.add_semantic_annotation_recursively(semantic_annotation)
 
     def fit_semantic_annotations(
         self,
