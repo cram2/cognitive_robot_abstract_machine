@@ -21,7 +21,7 @@ from krrood.entity_query_language.factories import (
     variable,
 )
 from pycram.exceptions import ContextIsUnavailable
-from designator import Designator
+from pycram.designator import Designator
 from pycram.plans.plan_node import PlanNode, ActionNode
 from semantic_digital_twin.world import World
 from pycram.datastructures.dataclasses import Context

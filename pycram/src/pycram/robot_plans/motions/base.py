@@ -9,7 +9,7 @@ from typing import Optional
 from typing_extensions import TypeVar, Type
 
 from giskardpy.motion_statechart.graph_node import Task
-from designator import Designator
+from pycram.designator import Designator
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from pycram.alternative_motion_mapping import AlternativeMotion
 

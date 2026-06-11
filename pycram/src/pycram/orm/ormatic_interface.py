@@ -91,7 +91,7 @@ import pycram.locations.pose_validator
 import pycram.motion_executor
 import pycram.orm.model
 import pycram.perception
-import designator
+import pycram.designator
 import pycram.plans.failures
 import pycram.plans.plan_callbacks
 import pycram.plans.plan_entity
@@ -3364,7 +3364,7 @@ class DerivativeMap_floatDAO(
     }
 
 
-class DesignatorDAO(Base, DataAccessObject[designator.Designator]):
+class DesignatorDAO(Base, DataAccessObject[pycram.designator.Designator]):
 
     __tablename__ = "DesignatorDAO"
 

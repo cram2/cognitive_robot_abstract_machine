@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from plans.executables import Executable, ModelChangeExecutable
+from pycram.plans.executables import Executable, ModelChangeExecutable
 from pycram.plans.plan_node import PlanNode
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body

@@ -20,7 +20,7 @@ from typing_extensions import (
 
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import Goal
-from plans.executables import (
+from pycram.plans.executables import (
     GiskardExecutable,
     Executable,
     LanguageExecutable,

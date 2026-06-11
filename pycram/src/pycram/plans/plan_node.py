@@ -12,7 +12,7 @@ from typing_extensions import Union, Dict
 
 from giskardpy.motion_statechart.graph_node import Task
 from krrood.entity_query_language.query.match import Match
-from plans.executables import Executable, MotionExecutable, ConditionExecutable
+from pycram.plans.executables import Executable, MotionExecutable, ConditionExecutable
 
 from pycram.datastructures.enums import TaskStatus
 from pycram.plans.failures import PlanFailure
@@ -20,8 +20,8 @@ from pycram.motion_executor import MotionExecutor
 
 from pycram.plans.plan_entity import PlanEntity
 from pycram.datastructures.execution_data import ExecutionData
-from designator import Designator
-from utils import group_by_type
+from pycram.designator import Designator
+from pycram.utils import group_by_type
 
 if TYPE_CHECKING:
     from pycram.robot_plans import ActionDescription, BaseMotion
@@ -324,7 +324,11 @@ class PlanNode(PlanEntity, ABC):
                 result.extend(exec)
             else:
                 new_mappings = self.merge_motion_mappings(exec)
-                result.append(MotionExecutable(motion_mappings=new_mappings))
+                result.append(
+                    MotionExecutable(
+                        motion_mappings=new_mappings, context=self.plan.context
+                    )
+                )
         return result
 
     def merge_motion_mappings(self, motions: List[MotionExecutable]):

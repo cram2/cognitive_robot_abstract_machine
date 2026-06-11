@@ -1,17 +1,21 @@
-from plans.attachment_nodes import ModelChangeNode
-from plans.executables import ConditionExecutable, MotionExecutable, LanguageExecutable
+from pycram.plans.attachment_nodes import ModelChangeNode
+from pycram.plans.executables import (
+    ConditionExecutable,
+    MotionExecutable,
+    LanguageExecutable,
+)
 from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
 from pycram.plans.factories import execute_single
 from pycram.robot_plans.actions.core.pick_up import ReachAction, PickUpAction
 from pycram.robot_plans.actions.core.robot_body import MoveTorsoAction
-from robot_plans import MoveToolCenterPointMotion
+from pycram.robot_plans.motions.gripper import MoveToolCenterPointMotion
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.semantic_annotations.position_descriptions import (
     VerticalSemanticDirection,
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose
-from utils import split_list_by_type
+from pycram.utils import split_list_by_type
 
 
 def test_parse_simple_action(immutable_model_world):
@@ -72,7 +76,7 @@ def test_parse_pick_up(immutable_model_world):
 
     plan.notify()
 
-    plan.plan.plot()
+    # plan.plan.plot()
 
     executable = plan.parse()
 
