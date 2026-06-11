@@ -6,6 +6,7 @@ import pytest
 import time
 
 from semantic_digital_twin.datastructures.definitions import StaticJointState
+from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionBetweenGroups,
@@ -823,17 +824,17 @@ def test_hard_constraints_violated(cylinder_bot_world: World, rclpy_node):
 
 
 @pytest.mark.parametrize(
-    "fix_name, tool_frame_id",
+    "fix_name, tool_frame_id, robot_type",
     [
-        ("tracy_world", "r_gripper_tool_frame"),
-        ("daisy_world", "right_gripper_tool_frame"),
+        ("tracy_world", "r_gripper_tool_frame", Tracy),
+        ("daisy_world", "right_gripper_tool_frame", DAiSy),
     ],
 )
 def test_collision_for_robot_with_static_base(
-    fix_name, tool_frame_id, request, rclpy_node
+    fix_name, tool_frame_id, robot_type, request, rclpy_node
 ):
     world = request.getfixturevalue(fix_name)
-    robot = world.get_semantic_annotations_by_type(AbstractRobot)[0]
+    robot = world.get_semantic_annotations_by_type(robot_type)[0]
 
     tool_frame = world.get_body_by_name(tool_frame_id)
     with world.modify_world():

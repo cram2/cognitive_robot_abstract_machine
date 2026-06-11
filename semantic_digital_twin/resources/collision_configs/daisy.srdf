@@ -3,76 +3,197 @@
   <disable_self_collision link1="left_base_link_inertia" link2="left_shoulder_link" reason="Unknown"/>
   <disable_self_collision link1="left_base_link_inertia" link2="left_upper_arm_link" reason="Unknown"/>
   <disable_self_collision link1="left_base_link_inertia" link2="right_base_link_inertia" reason="Unknown"/>
+  <disable_self_collision link1="left_base_link_inertia" link2="right_shoulder_link" reason="Unknown"/>
+  <disable_self_collision link1="left_base_link_inertia" link2="right_upper_arm_link" reason="Unknown"/>
   <disable_self_collision link1="left_base_link_inertia" link2="table" reason="Unknown"/>
-  <disable_self_collision link1="left_gripper_base_link" link2="left_wrist_1_link" reason="Unknown"/>
+  <disable_self_collision link1="left_forearm_link" link2="left_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="left_forearm_link" link2="left_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="left_forearm_link" link2="right_base_link_inertia" reason="Unknown"/>
+  <disable_self_collision link1="left_forearm_link" link2="right_base_link_inertia" reason="Unknown"/>
+  <disable_self_collision link1="left_forearm_link" link2="right_shoulder_link" reason="Unknown"/>
+  <disable_self_collision link1="left_forearm_link" link2="right_shoulder_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_base_link" link2="left_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_base_link" link2="left_gripper_right_finger_tip_link" reason="Unknown"/>
   <disable_self_collision link1="left_gripper_base_link" link2="left_wrist_2_link" reason="Unknown"/>
-  <disable_self_collision link1="left_gripper_base_link" link2="left_wrist_3_link" reason="Unknown"/>
-  <disable_self_collision link1="left_gripper_base_link" link2="right_base_link_inertia" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_base_link" link2="left_wrist_2_link" reason="Unknown"/>
   <disable_self_collision link1="left_gripper_left_finger_link" link2="left_gripper_base_link" reason="Unknown"/>
-  <disable_self_collision link1="left_gripper_left_finger_link" link2="left_wrist_1_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_link" link2="left_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_link" link2="left_gripper_left_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_link" link2="left_gripper_left_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_link" link2="left_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_link" link2="left_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_link" link2="left_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_link" link2="left_gripper_right_finger_tip_link" reason="Unknown"/>
   <disable_self_collision link1="left_gripper_left_finger_link" link2="left_wrist_2_link" reason="Unknown"/>
-  <disable_self_collision link1="left_gripper_left_finger_link" link2="left_wrist_3_link" reason="Unknown"/>
-  <disable_self_collision link1="left_gripper_left_finger_link" link2="right_base_link_inertia" reason="Unknown"/>
-  <disable_self_collision link1="left_gripper_left_finger_link" link2="right_wrist_1_link" reason="Unknown"/>
-  <disable_self_collision link1="left_gripper_left_finger_link" link2="right_wrist_2_link" reason="Unknown"/>
-  <disable_self_collision link1="left_gripper_left_finger_link" link2="right_wrist_3_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_link" link2="left_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_tip_link" link2="left_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_tip_link" link2="left_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_tip_link" link2="left_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_tip_link" link2="left_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_tip_link" link2="left_gripper_right_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_tip_link" link2="left_gripper_right_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_tip_link" link2="left_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_left_finger_tip_link" link2="left_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_mounting_plate" link2="left_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_mounting_plate" link2="left_gripper_left_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_mounting_plate" link2="left_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_mounting_plate" link2="left_gripper_right_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_mounting_plate" link2="left_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_right_finger_link" link2="left_gripper_base_link" reason="Unknown"/>
   <disable_self_collision link1="left_gripper_right_finger_link" link2="left_gripper_base_link" reason="Unknown"/>
   <disable_self_collision link1="left_gripper_right_finger_link" link2="left_gripper_left_finger_link" reason="Unknown"/>
-  <disable_self_collision link1="left_gripper_right_finger_link" link2="left_wrist_1_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_right_finger_link" link2="left_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_right_finger_link" link2="left_gripper_right_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_right_finger_link" link2="left_wrist_2_link" reason="Unknown"/>
   <disable_self_collision link1="left_gripper_right_finger_link" link2="left_wrist_2_link" reason="Unknown"/>
   <disable_self_collision link1="left_gripper_right_finger_link" link2="left_wrist_3_link" reason="Unknown"/>
-  <disable_self_collision link1="left_gripper_right_finger_link" link2="right_base_link_inertia" reason="Unknown"/>
-  <disable_self_collision link1="left_gripper_right_finger_link" link2="right_wrist_1_link" reason="Unknown"/>
-  <disable_self_collision link1="left_gripper_right_finger_link" link2="right_wrist_2_link" reason="Unknown"/>
-  <disable_self_collision link1="left_gripper_right_finger_link" link2="right_wrist_3_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_right_finger_tip_link" link2="left_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_right_finger_tip_link" link2="left_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_right_finger_tip_link" link2="left_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_right_finger_tip_link" link2="left_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="left_gripper_right_finger_tip_link" link2="left_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="left_shoulder_link" link2="left_base_link_inertia" reason="Unknown"/>
+  <disable_self_collision link1="left_shoulder_link" link2="right_base_link_inertia" reason="Unknown"/>
+  <disable_self_collision link1="left_shoulder_link" link2="right_shoulder_link" reason="Unknown"/>
+  <disable_self_collision link1="left_upper_arm_link" link2="left_base_link_inertia" reason="Unknown"/>
+  <disable_self_collision link1="left_upper_arm_link" link2="left_forearm_link" reason="Unknown"/>
   <disable_self_collision link1="left_upper_arm_link" link2="left_forearm_link" reason="Unknown"/>
   <disable_self_collision link1="left_upper_arm_link" link2="left_shoulder_link" reason="Unknown"/>
+  <disable_self_collision link1="left_upper_arm_link" link2="left_shoulder_link" reason="Unknown"/>
   <disable_self_collision link1="left_upper_arm_link" link2="right_base_link_inertia" reason="Unknown"/>
-  <disable_self_collision link1="left_upper_arm_link" link2="table" reason="Unknown"/>
+  <disable_self_collision link1="left_upper_arm_link" link2="right_base_link_inertia" reason="Unknown"/>
+  <disable_self_collision link1="left_upper_arm_link" link2="right_shoulder_link" reason="Unknown"/>
+  <disable_self_collision link1="left_upper_arm_link" link2="right_shoulder_link" reason="Unknown"/>
   <disable_self_collision link1="left_wrist_1_link" link2="left_forearm_link" reason="Unknown"/>
-  <disable_self_collision link1="left_wrist_2_link" link2="left_forearm_link" reason="Unknown"/>
-  <disable_self_collision link1="left_wrist_2_link" link2="left_wrist_1_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_forearm_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_gripper_left_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_gripper_left_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_gripper_left_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_gripper_left_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_gripper_right_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_gripper_right_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_1_link" link2="left_wrist_3_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_2_link" link2="left_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="left_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="left_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="left_gripper_left_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="left_gripper_left_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="left_gripper_left_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="left_gripper_left_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="left_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="left_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="left_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="left_gripper_right_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="left_gripper_right_finger_tip_link" reason="Unknown"/>
   <disable_self_collision link1="left_wrist_3_link" link2="left_wrist_1_link" reason="Unknown"/>
   <disable_self_collision link1="left_wrist_3_link" link2="left_wrist_2_link" reason="Unknown"/>
-  <disable_self_collision link1="right_base_link_inertia" link2="left_forearm_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="left_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="right_gripper_left_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="right_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="left_wrist_3_link" link2="right_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="right_base_link_inertia" link2="left_base_link_inertia" reason="Unknown"/>
   <disable_self_collision link1="right_base_link_inertia" link2="left_shoulder_link" reason="Unknown"/>
-  <disable_self_collision link1="right_forearm_link" link2="left_shoulder_link" reason="Unknown"/>
-  <disable_self_collision link1="right_forearm_link" link2="right_wrist_1_link" reason="Unknown"/>
-  <disable_self_collision link1="right_forearm_link" link2="right_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_base_link" link2="right_gripper_mounting_plate" reason="Unknown"/>
   <disable_self_collision link1="right_gripper_base_link" link2="right_gripper_right_finger_link" reason="Unknown"/>
-  <disable_self_collision link1="right_gripper_base_link" link2="right_wrist_1_link" reason="Unknown"/>
   <disable_self_collision link1="right_gripper_base_link" link2="right_wrist_2_link" reason="Unknown"/>
-  <disable_self_collision link1="right_gripper_base_link" link2="right_wrist_3_link" reason="Unknown"/>
-  <disable_self_collision link1="right_gripper_left_finger_link" link2="left_wrist_1_link" reason="Unknown"/>
-  <disable_self_collision link1="right_gripper_left_finger_link" link2="left_wrist_3_link" reason="Unknown"/>
   <disable_self_collision link1="right_gripper_left_finger_link" link2="right_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_link" link2="right_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_link" link2="right_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_link" link2="right_gripper_mounting_plate" reason="Unknown"/>
   <disable_self_collision link1="right_gripper_left_finger_link" link2="right_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_link" link2="right_gripper_right_finger_tip_link" reason="Unknown"/>
   <disable_self_collision link1="right_gripper_left_finger_link" link2="right_wrist_1_link" reason="Unknown"/>
   <disable_self_collision link1="right_gripper_left_finger_link" link2="right_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_link" link2="right_wrist_2_link" reason="Unknown"/>
   <disable_self_collision link1="right_gripper_left_finger_link" link2="right_wrist_3_link" reason="Unknown"/>
-  <disable_self_collision link1="right_gripper_right_finger_link" link2="left_shoulder_link" reason="Unknown"/>
-  <disable_self_collision link1="right_gripper_right_finger_link" link2="left_wrist_1_link" reason="Unknown"/>
-  <disable_self_collision link1="right_gripper_right_finger_link" link2="left_wrist_3_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_tip_link" link2="right_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_tip_link" link2="right_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_tip_link" link2="right_gripper_left_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_tip_link" link2="right_gripper_left_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_tip_link" link2="right_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_tip_link" link2="right_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_tip_link" link2="right_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_tip_link" link2="right_gripper_right_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_tip_link" link2="right_gripper_right_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_tip_link" link2="right_wrist_1_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_tip_link" link2="right_wrist_1_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_tip_link" link2="right_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_tip_link" link2="right_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_left_finger_tip_link" link2="right_wrist_3_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_mounting_plate" link2="right_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_mounting_plate" link2="right_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_mounting_plate" link2="right_gripper_right_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_mounting_plate" link2="right_wrist_1_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_mounting_plate" link2="right_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_right_finger_link" link2="right_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_right_finger_link" link2="right_gripper_left_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_right_finger_link" link2="right_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_right_finger_link" link2="right_gripper_right_finger_tip_link" reason="Unknown"/>
   <disable_self_collision link1="right_gripper_right_finger_link" link2="right_wrist_1_link" reason="Unknown"/>
   <disable_self_collision link1="right_gripper_right_finger_link" link2="right_wrist_2_link" reason="Unknown"/>
-  <disable_self_collision link1="right_gripper_right_finger_link" link2="right_wrist_3_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_right_finger_link" link2="right_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_right_finger_tip_link" link2="right_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_right_finger_tip_link" link2="right_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_right_finger_tip_link" link2="right_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_right_finger_tip_link" link2="right_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_right_finger_tip_link" link2="right_wrist_1_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_right_finger_tip_link" link2="right_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="right_gripper_right_finger_tip_link" link2="right_wrist_3_link" reason="Unknown"/>
   <disable_self_collision link1="right_shoulder_link" link2="left_base_link_inertia" reason="Unknown"/>
-  <disable_self_collision link1="right_shoulder_link" link2="left_forearm_link" reason="Unknown"/>
   <disable_self_collision link1="right_shoulder_link" link2="left_shoulder_link" reason="Unknown"/>
-  <disable_self_collision link1="right_shoulder_link" link2="left_upper_arm_link" reason="Unknown"/>
-  <disable_self_collision link1="right_shoulder_link" link2="left_wrist_1_link" reason="Unknown"/>
   <disable_self_collision link1="right_shoulder_link" link2="right_base_link_inertia" reason="Unknown"/>
-  <disable_self_collision link1="right_shoulder_link" link2="right_upper_arm_link" reason="Unknown"/>
-  <disable_self_collision link1="right_shoulder_link" link2="table" reason="Unknown"/>
+  <disable_self_collision link1="right_shoulder_link" link2="right_base_link_inertia" reason="Unknown"/>
   <disable_self_collision link1="right_upper_arm_link" link2="left_base_link_inertia" reason="Unknown"/>
   <disable_self_collision link1="right_upper_arm_link" link2="left_shoulder_link" reason="Unknown"/>
+  <disable_self_collision link1="right_upper_arm_link" link2="left_shoulder_link" reason="Unknown"/>
+  <disable_self_collision link1="right_upper_arm_link" link2="right_base_link_inertia" reason="Unknown"/>
   <disable_self_collision link1="right_upper_arm_link" link2="right_base_link_inertia" reason="Unknown"/>
   <disable_self_collision link1="right_upper_arm_link" link2="right_forearm_link" reason="Unknown"/>
-  <disable_self_collision link1="right_upper_arm_link" link2="table" reason="Unknown"/>
-  <disable_self_collision link1="right_wrist_1_link" link2="left_shoulder_link" reason="Unknown"/>
+  <disable_self_collision link1="right_upper_arm_link" link2="right_forearm_link" reason="Unknown"/>
+  <disable_self_collision link1="right_upper_arm_link" link2="right_shoulder_link" reason="Unknown"/>
+  <disable_self_collision link1="right_upper_arm_link" link2="right_shoulder_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_1_link" link2="right_forearm_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_1_link" link2="right_forearm_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_1_link" link2="right_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_1_link" link2="right_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_1_link" link2="right_gripper_left_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_1_link" link2="right_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_1_link" link2="right_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_1_link" link2="right_gripper_right_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_1_link" link2="right_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_1_link" link2="right_wrist_3_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_2_link" link2="right_forearm_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_2_link" link2="right_forearm_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_2_link" link2="right_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_2_link" link2="right_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_2_link" link2="right_gripper_right_finger_tip_link" reason="Unknown"/>
   <disable_self_collision link1="right_wrist_2_link" link2="right_wrist_1_link" reason="Unknown"/>
-  <disable_self_collision link1="right_wrist_2_link" link2="right_wrist_3_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_3_link" link2="right_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_3_link" link2="right_gripper_base_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_3_link" link2="right_gripper_left_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_3_link" link2="right_gripper_left_finger_tip_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_3_link" link2="right_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_3_link" link2="right_gripper_mounting_plate" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_3_link" link2="right_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_3_link" link2="right_gripper_right_finger_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_3_link" link2="right_gripper_right_finger_tip_link" reason="Unknown"/>
   <disable_self_collision link1="right_wrist_3_link" link2="right_wrist_1_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_3_link" link2="right_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="right_wrist_3_link" link2="right_wrist_2_link" reason="Unknown"/>
+  <disable_self_collision link1="table" link2="left_base_link_inertia" reason="Unknown"/>
+  <disable_self_collision link1="table" link2="left_forearm_link" reason="Unknown"/>
+  <disable_self_collision link1="table" link2="left_shoulder_link" reason="Unknown"/>
   <disable_self_collision link1="table" link2="left_shoulder_link" reason="Unknown"/>
   <disable_self_collision link1="table" link2="right_base_link_inertia" reason="Unknown"/>
+  <disable_self_collision link1="table" link2="right_base_link_inertia" reason="Unknown"/>
+  <disable_self_collision link1="table" link2="right_shoulder_link" reason="Unknown"/>
+  <disable_self_collision link1="table" link2="right_shoulder_link" reason="Unknown"/>
 </robot>
