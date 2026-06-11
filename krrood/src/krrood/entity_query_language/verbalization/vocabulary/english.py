@@ -245,6 +245,17 @@ class Conjunctions(VocabEnum):
     OR = PlainWord("or")
 
 
+class Punctuation(VocabEnum):
+    """Structural punctuation tokens — role-less, like the brackets around a SetOf tuple
+    (*"(v1, v2)"*) and the comma in a coordinated list (*"a, b, or c"*).  Kept in the lexicon
+    so no punctuation literal is hard-coded in the grammar.  :attr:`COMMA`'s ``text`` also seeds
+    the *", "* list separator passed to :class:`PhraseFragment`."""
+
+    COMMA = PlainWord(",")
+    OPEN_PAREN = PlainWord("(")
+    CLOSE_PAREN = PlainWord(")")
+
+
 class Pronouns(VocabEnum):
     """Coreference pronouns standing in for a previously introduced variable."""
 

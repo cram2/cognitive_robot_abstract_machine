@@ -80,6 +80,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Keywords,
     Logicals,
     Prepositions,
+    Punctuation,
 )
 from krrood.entity_query_language.verbalization.vocabulary.words import ChildForm
 from krrood.ormatic.utils import classes_of_module
@@ -246,8 +247,10 @@ class OrRule(PhraseRule):
             return parts[0]
         head_with_comma = PhraseFragment(
             parts=[
-                PhraseFragment(parts=parts[:-1], separator=", "),
-                WordFragment(text=","),
+                PhraseFragment(
+                    parts=parts[:-1], separator=Punctuation.COMMA.text + " "
+                ),
+                Punctuation.COMMA.as_fragment(),
             ],
             separator="",
         )
@@ -274,9 +277,9 @@ class NotRule(PhraseRule):
                 Logicals.NOT.as_fragment(),
                 PhraseFragment(
                     parts=[
-                        WordFragment(text="("),
+                        Punctuation.OPEN_PAREN.as_fragment(),
                         child_fragment,
-                        WordFragment(text=")"),
+                        Punctuation.CLOSE_PAREN.as_fragment(),
                     ],
                     separator="",
                 ),
@@ -378,7 +381,7 @@ class ForAllRule(PhraseRule):
             parts=[
                 Logicals.FOR_ALL.as_fragment(),
                 variable_fragment,
-                WordFragment(text=","),
+                Punctuation.COMMA.as_fragment(),
                 condition_fragment,
             ]
         )

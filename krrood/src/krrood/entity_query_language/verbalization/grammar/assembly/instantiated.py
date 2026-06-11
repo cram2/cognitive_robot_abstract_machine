@@ -26,7 +26,6 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     PhraseFragment,
     RoleFragment,
     VerbFragment,
-    WordFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
@@ -44,6 +43,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Conjunctions,
     Copulas,
     Keywords,
+    Punctuation,
 )
 from krrood.entity_query_language.verbalization.vocabulary.words import Number
 
@@ -122,7 +122,11 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
             joined = oxford_and(binding_frags, Conjunctions.AND.as_fragment())
             modifiers.append(
                 PhraseFragment(
-                    parts=[WordFragment(text=","), Keywords.WHERE.as_fragment(), joined]
+                    parts=[
+                        Punctuation.COMMA.as_fragment(),
+                        Keywords.WHERE.as_fragment(),
+                        joined,
+                    ]
                 )
             )
         if constraint_frags:
@@ -130,7 +134,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
             modifiers.append(
                 PhraseFragment(
                     parts=[
-                        WordFragment(text=","),
+                        Punctuation.COMMA.as_fragment(),
                         Keywords.SUCH_THAT.as_fragment(),
                         joined_c,
                     ]

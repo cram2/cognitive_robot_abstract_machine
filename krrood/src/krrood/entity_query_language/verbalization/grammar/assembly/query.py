@@ -34,7 +34,6 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     RoleFragment,
     SubjectScope,
     VerbFragment,
-    WordFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.features import Definiteness
 from krrood.entity_query_language.verbalization.grammar.assembly.aggregation_value import (
@@ -57,6 +56,7 @@ from krrood.entity_query_language.verbalization.grammar.planning.query import (
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     FallbackNouns,
     Keywords,
+    Punctuation,
 )
 
 
@@ -115,9 +115,15 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             variable_fragments = [
                 self.ctx.child(variable) for variable in node._selected_variables_
             ]
-            vars_phrase = PhraseFragment(parts=variable_fragments, separator=", ")
+            vars_phrase = PhraseFragment(
+                parts=variable_fragments, separator=Punctuation.COMMA.text + " "
+            )
             selection = PhraseFragment(
-                parts=[WordFragment(text="("), vars_phrase, WordFragment(text=")")],
+                parts=[
+                    Punctuation.OPEN_PAREN.as_fragment(),
+                    vars_phrase,
+                    Punctuation.CLOSE_PAREN.as_fragment(),
+                ],
                 separator="",
             )
             return self._query_body(

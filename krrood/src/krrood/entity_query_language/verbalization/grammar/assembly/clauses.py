@@ -22,7 +22,6 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     oxford_and,
     PhraseFragment,
     VerbFragment,
-    WordFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.features import Number
 from krrood.entity_query_language.verbalization.grammar.assembly.base import Assembler
@@ -35,6 +34,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Conjunctions,
     Copulas,
     Keywords,
+    Punctuation,
     SortDirections,
 )
 
@@ -74,7 +74,8 @@ class GroupedByAssembler(Assembler[Any, GroupPlan]):
 
     def _keys_phrase(self, variables) -> VerbFragment:
         return PhraseFragment(
-            parts=[self.ctx.child(variable) for variable in variables], separator=", "
+            parts=[self.ctx.child(variable) for variable in variables],
+            separator=Punctuation.COMMA.text + " ",
         )
 
 
@@ -89,9 +90,9 @@ class OrderedByAssembler(Assembler[Any, None]):
         )
         paren = PhraseFragment(
             parts=[
-                WordFragment(text="("),
+                Punctuation.OPEN_PAREN.as_fragment(),
                 direction.as_fragment(),
-                WordFragment(text=")"),
+                Punctuation.CLOSE_PAREN.as_fragment(),
             ],
             separator="",
         )
