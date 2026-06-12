@@ -313,12 +313,10 @@ class HSRBHeadRGBDCamera(Camera):
 @dataclass(eq=False)
 class HSRBNeck(
     Neck[
-        Union[
-            HSRBHeadCenterCamera,
-            HSRBHeadLeftCamera,
-            HSRBHeadRightCamera,
-            HSRBHeadRGBDCamera,
-        ]
+        HSRBHeadCenterCamera,
+        HSRBHeadLeftCamera,
+        HSRBHeadRightCamera,
+        HSRBHeadRGBDCamera,
     ],
 ):
 

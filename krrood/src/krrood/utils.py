@@ -854,13 +854,7 @@ def _handle_import_node(
     for alias in node.names:
         module_name = alias.name
         asname = alias.asname or alias.name
-        try:
-            module = get_and_import_module(module_name, package_name)
-        except (ImportError, Exception) as e:
-            logger.debug(
-                f"Skipping unimportable module {module_name!r}: {e}"
-            )
-            continue
+        module = get_and_import_module(module_name, package_name)
         scope[asname] = module
 
 
@@ -894,23 +888,13 @@ def _handle_import_from_node(
 
     module = None
     if resolved_module_name is not None:
-        try:
-            module = get_and_import_module(resolved_module_name, package_name)
-        except (ImportError, Exception) as e:
-            logger.debug(
-                f"Skipping unimportable module {resolved_module_name!r} "
-                f"while building scope for {file_path}: {e}"
-            )
-            return package_name
+        module = get_and_import_module(resolved_module_name, package_name)
 
     if module is None and resolved_package_name and resolved_module_name:
         # Fallback already attempted in _import_module_safely; keep for parity
-        try:
-            module = get_and_import_module(
-                f"{resolved_package_name}.{resolved_module_name}", None
-            )
-        except (ImportError, Exception):
-            pass
+        module = get_and_import_module(
+            f"{resolved_package_name}.{resolved_module_name}", None
+        )
 
     for alias in node.names:
         name = alias.name
