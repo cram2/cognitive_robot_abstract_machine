@@ -362,14 +362,8 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         :param world: The world to copy to.
         :return: A copy of this shape with references to the given world.
         """
-        reference_frame = self.origin.reference_frame
-        if reference_frame is not None:
-            reference_frame = world.get_kinematic_structure_entity_by_id(
-                reference_frame.id
-            )
 
         clean_copy = self.copy_without_reference_frame()
-        clean_copy.origin.reference_frame = reference_frame
         return clean_copy
 
     def copy_without_reference_frame(self):
@@ -400,7 +394,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
             return
 
         if new_reference_frame._world is None:
-            raise MissingWorldError()
+            return
 
         if origin_reference_frame._world != new_reference_frame._world:
             raise MismatchingWorld(
