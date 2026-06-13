@@ -12,21 +12,15 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootKinematicStructureEntity,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     WheeledDrive,
     FixedConnection,
-    PrismaticConnection,
-    RevoluteConnection,
-    Connection6DoF,
+    ActiveConnection,
     ActiveConnectionParameters,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import (
-    DegreeOfFreedomLimits,
-)
 from semantic_digital_twin.world_description.geometry import (
-    Shape,
     Scale,
     Color,
     Box,
@@ -59,7 +53,10 @@ class WorldEntitySpawnSpecification(ABC):
         parent: KinematicStructureEntity | None = None,
     ):
         """
-        If parent is None, world.root is used as a parent
+        Instantiate the World Entity and add it to the given world.
+
+        :param parent: The entity to attach to. If None, ``world.root`` is used.
+        :param parent_T_self: Overrides the specification's stored default pose. If None, the stored default is used.
         """
 
 
@@ -308,11 +305,10 @@ class RegionSpecification(KinematicStructureEntitySpecification):
 @dataclass
 class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
     """
-    Represents a specification for semantic annotations that have a root structure.
-
-    The classmethods in this class correctly expose the same signature as the KinematicStructureEntitySpecification, because
-    the goal is that this signature is automatically passed on to create a root_specification without the user needing to first
-    create one by hand
+    Declarative description of a semantic annotation rooted in a single kinematic
+    structure entity. The annotation type owns the parent connection type (via its
+    ``_parent_connection_type``); this specification only supplies the connection
+    parameters for active connections.
     """
 
     name: Union[str, PrefixedName]
@@ -325,7 +321,7 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
     The type of the semantic annotation that is a subclass of HasRootKinematicStructureEntity.
     """
 
-    root_specification: Optional[KinematicStructureEntitySpecification]
+    root_specification: Optional[KinematicStructureEntitySpecification] = None
     """
     The specification of the root kinematic structure entity of the annotation.
     """
@@ -333,6 +329,10 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
     active_connection_parameters: ActiveConnectionParameters | None = field(
         default=None
     )
+    """
+    Parameters (axis, multiplier, offset) for the parent connection. 
+    If set and the semantic annotation's _parent_connection_type is not Active1DOFConnection, it is just ignored
+    """
 
     annotation_kwargs: dict[
         str,
@@ -342,9 +342,13 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
         ],
     ] = field(default_factory=dict)
     """
-    The keyword arguments to pass to the annotation constructor. 
-    If the values are WorldEntitySpecification, they will be spawned when this Specification is spawned
+    The keyword arguments to pass to the annotation constructor.
+    If the values are SemanticAnnotationWithRootSpecification, they will be spawned when this Specification is spawned
     """
+
+    def __post_init__(self):
+        if isinstance(self.name, str):
+            self.name = PrefixedName(self.name)
 
     def spawn(
         self,
@@ -363,13 +367,17 @@ class BodyAndConnectionSpecification(WorldEntitySpawnSpecification):
 
     connection_type: Type[Connection] = field(default=FixedConnection)
 
-    parent_T_child: HomogeneousTransformationMatrix = field(
+    parent_T_self: HomogeneousTransformationMatrix = field(
         default_factory=HomogeneousTransformationMatrix
     )
 
     active_connection_parameters: ActiveConnectionParameters | None = field(
         default=None
     )
+    """
+    Parameters (axis, multiplier, offset) for the parent connection. 
+    If set and the semantic annotation's _parent_connection_type is not Active1DOFConnection, it is just ignored
+    """
 
     def spawn(
         self,
@@ -377,16 +385,15 @@ class BodyAndConnectionSpecification(WorldEntitySpawnSpecification):
         world: World,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
         parent: KinematicStructureEntity | None = None,
-    ):
-        pass
+    ): ...
 
 
 @dataclass
 class WorldSpecification:
-    robot_semantic_annotation: Type[AbstractRobot]
+    robot_semantic_annotation: Optional[Type[AbstractRobot]] = None
     drive_connection_type: Type[WheeledDrive] | None = None
     world_T_odom: HomogeneousTransformationMatrix | None = None
     odom_T_robot_start: HomogeneousTransformationMatrix | None = None
     starting_objects: list[WorldEntitySpawnSpecification] = field(default_factory=list)
 
-    def create(self) -> World: ...
+    def to_world(self) -> World: ...
