@@ -5,7 +5,7 @@ from typing_extensions import Optional
 
 
 @dataclass(frozen=True)
-class SourceRef:
+class SourceReference:
     """
     A reference to the Python source entity — a class, or an attribute of a class — that a
     fragment names.
@@ -21,7 +21,7 @@ class SourceRef:
     to the class itself (e.g. for type-name labels like *"Robot"*)."""
 
     @classmethod
-    def for_type(cls, t: object) -> Optional[SourceRef]:
+    def for_type(cls, t: object) -> Optional[SourceReference]:
         """
         :param t: Candidate type (any value accepted; non-types return ``None``).
         :return: A source reference for the class when *t* is a real ``type``, else ``None``.
@@ -29,7 +29,9 @@ class SourceRef:
         return cls(owner_type=t) if isinstance(t, type) else None
 
     @classmethod
-    def for_attribute(cls, owner: object, attribute_name: str) -> Optional[SourceRef]:
+    def for_attribute(
+        cls, owner: object, attribute_name: str
+    ) -> Optional[SourceReference]:
         """
         :param owner: Candidate owner class (any value; non-types return ``None``).
         :param attribute_name: Canonical attribute name on *owner*.

@@ -2,15 +2,15 @@
 Tests for source-link hyperlink support in EQL verbalization.
 
 Coverage:
-- SourceRef: frozen dataclass, cls-only and cls+attribute forms
+- SourceReference: frozen dataclass, cls-only and cls+attribute forms
 - AutoAPIResolver: Sphinx AutoAPI URL structure; for_package() auto-detection
 - Formatter.wrap_link: PlainFormatter (no-op), HTMLFormatter (<a>), ANSIFormatter (OSC 8)
 - ANSIFormatter OSC 8 detection: enabled / disabled paths
-- RoleFragment.source_ref: default None, explicit value
+- RoleFragment.source_reference: default None, explicit value
 - FragmentRenderer._render_role: link injected when resolver + ref both present
 - ParagraphRenderer / HierarchicalRenderer: <a> tags appear in HTML output
 - VerbalizationPipeline: html() with link_resolver produces clickable class names
-- Verbalizer: source_ref propagation for Variable, Attribute chain, bool Attribute
+- Verbalizer: source_reference propagation for Variable, Attribute chain, bool Attribute
 """
 
 from __future__ import annotations
@@ -32,7 +32,9 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     WordFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
-from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
+from krrood.entity_query_language.verbalization.fragments.source_reference import (
+    SourceReference,
+)
 from krrood.entity_query_language.verbalization.pipeline import VerbalizationPipeline
 from krrood.entity_query_language.verbalization.rendering.formatter import (
     ANSIFormatter,
@@ -71,44 +73,44 @@ class _ConstantResolver:
     def __init__(self, url: str = "http://example.com/source") -> None:
         self._url = url
 
-    def resolve(self, ref: SourceRef) -> Optional[str]:
+    def resolve(self, ref: SourceReference) -> Optional[str]:
         return self._url
 
 
 class _NoneResolver:
     """Stub resolver that always returns None (no link available)."""
 
-    def resolve(self, ref: SourceRef) -> Optional[str]:
+    def resolve(self, ref: SourceReference) -> Optional[str]:
         return None
 
 
-# ── SourceRef ─────────────────────────────────────────────────────────────────
+# ── SourceReference ─────────────────────────────────────────────────────────────────
 
 
 def test_source_ref_cls_only():
-    ref = SourceRef(owner_type=_Sensor)
+    ref = SourceReference(owner_type=_Sensor)
     assert ref.owner_type is _Sensor
     assert ref.attribute is None
 
 
 def test_source_ref_with_attribute():
-    ref = SourceRef(owner_type=_Sensor, attribute="level")
+    ref = SourceReference(owner_type=_Sensor, attribute="level")
     assert ref.owner_type is _Sensor
     assert ref.attribute == "level"
 
 
 def test_source_ref_is_frozen():
-    ref = SourceRef(owner_type=_Sensor)
+    ref = SourceReference(owner_type=_Sensor)
     with pytest.raises((AttributeError, TypeError)):
         ref.owner_type = int  # type: ignore[misc]
 
 
 def test_source_ref_equality():
-    assert SourceRef(owner_type=_Sensor) == SourceRef(owner_type=_Sensor)
-    assert SourceRef(owner_type=_Sensor, attribute="level") == SourceRef(
+    assert SourceReference(owner_type=_Sensor) == SourceReference(owner_type=_Sensor)
+    assert SourceReference(owner_type=_Sensor, attribute="level") == SourceReference(
         owner_type=_Sensor, attribute="level"
     )
-    assert SourceRef(owner_type=_Sensor) != SourceRef(
+    assert SourceReference(owner_type=_Sensor) != SourceReference(
         owner_type=_Sensor, attribute="level"
     )
 
@@ -118,7 +120,7 @@ def test_source_ref_equality():
 
 def test_autoapi_resolver_class_url_structure():
     r = AutoAPIResolver(base_url="https://docs.example.com")
-    url = r.resolve(SourceRef(owner_type=_Sensor))
+    url = r.resolve(SourceReference(owner_type=_Sensor))
     assert url is not None
     assert url.startswith("https://docs.example.com/autoapi/")
     assert "#" in url
@@ -126,7 +128,7 @@ def test_autoapi_resolver_class_url_structure():
 
 def test_autoapi_resolver_class_anchor_contains_qualname():
     r = AutoAPIResolver(base_url="https://docs.example.com")
-    url = r.resolve(SourceRef(owner_type=_Sensor))
+    url = r.resolve(SourceReference(owner_type=_Sensor))
     assert url is not None
     anchor = url.split("#")[1]
     assert "_Sensor" in anchor
@@ -134,7 +136,7 @@ def test_autoapi_resolver_class_anchor_contains_qualname():
 
 def test_autoapi_resolver_attribute_anchor_contains_attr():
     r = AutoAPIResolver(base_url="https://docs.example.com")
-    url = r.resolve(SourceRef(owner_type=_Sensor, attribute="level"))
+    url = r.resolve(SourceReference(owner_type=_Sensor, attribute="level"))
     assert url is not None
     anchor = url.split("#")[1]
     assert "level" in anchor
@@ -143,13 +145,13 @@ def test_autoapi_resolver_attribute_anchor_contains_attr():
 def test_autoapi_resolver_strips_trailing_slash_from_base():
     r1 = AutoAPIResolver(base_url="https://docs.example.com/")
     r2 = AutoAPIResolver(base_url="https://docs.example.com")
-    ref = SourceRef(owner_type=_Sensor)
+    ref = SourceReference(owner_type=_Sensor)
     assert r1.resolve(ref) == r2.resolve(ref)
 
 
 def test_autoapi_resolver_module_path_uses_slashes():
     r = AutoAPIResolver(base_url="https://docs.example.com")
-    url = r.resolve(SourceRef(owner_type=_Sensor))
+    url = r.resolve(SourceReference(owner_type=_Sensor))
     assert url is not None
     path_part = url.split("/autoapi/")[1].split("/index.html")[0]
     assert "." not in path_part
@@ -161,7 +163,7 @@ def test_autoapi_resolver_no_warning_when_html_root_not_set(caplog):
 
     r = AutoAPIResolver(base_url="https://docs.example.com")
     with caplog.at_level(logging.WARNING):
-        r.resolve(SourceRef(owner_type=_Sensor))
+        r.resolve(SourceReference(owner_type=_Sensor))
     assert not caplog.records
 
 
@@ -172,7 +174,7 @@ def test_autoapi_resolver_warns_when_local_page_missing(tmp_path):
 
     r = AutoAPIResolver(base_url="https://docs.example.com", html_root=tmp_path)
     with _patch.object(_slr._log, "warning") as mock_warn:
-        url = r.resolve(SourceRef(owner_type=_Sensor))
+        url = r.resolve(SourceReference(owner_type=_Sensor))
     assert url is not None, "resolve() must still return the URL"
     mock_warn.assert_called_once()
     assert "_Sensor" in str(mock_warn.call_args)
@@ -189,7 +191,7 @@ def test_autoapi_resolver_no_warning_when_page_exists(tmp_path):
     page.write_text("")
     r = AutoAPIResolver(base_url="https://docs.example.com", html_root=tmp_path)
     with _patch.object(_slr._log, "warning") as mock_warn:
-        r.resolve(SourceRef(owner_type=_Sensor))
+        r.resolve(SourceReference(owner_type=_Sensor))
     mock_warn.assert_not_called()
 
 
@@ -268,7 +270,7 @@ def test_autoapi_resolver_for_package_url_for_real_class():
     """URL for a real krrood class has the correct module-path structure."""
     from krrood.entity_query_language.query.query import Query
 
-    url = _krrood_resolver.resolve(SourceRef(owner_type=Query))
+    url = _krrood_resolver.resolve(SourceReference(owner_type=Query))
     assert url is not None
     assert "krrood/entity_query_language/query/query/index.html" in url
     assert "#krrood.entity_query_language.query.query.Query" in url
@@ -381,18 +383,18 @@ def test_ansi_formatter_unknown_terminal_disables_hyperlinks():
         assert f._hyperlinks_enabled is False
 
 
-# ── RoleFragment.source_ref ────────────────────────────────────────────────────
+# ── RoleFragment.source_reference ────────────────────────────────────────────────────
 
 
 def test_role_fragment_source_ref_defaults_to_none():
     frag = RoleFragment(text="Robot", role=SemanticRole.VARIABLE)
-    assert frag.source_ref is None
+    assert frag.source_reference is None
 
 
 def test_role_fragment_accepts_source_ref():
-    ref = SourceRef(owner_type=_Sensor)
-    frag = RoleFragment(text="Sensor", role=SemanticRole.VARIABLE, source_ref=ref)
-    assert frag.source_ref is ref
+    ref = SourceReference(owner_type=_Sensor)
+    frag = RoleFragment(text="Sensor", role=SemanticRole.VARIABLE, source_reference=ref)
+    assert frag.source_reference is ref
 
 
 # ── FragmentRenderer._render_role ─────────────────────────────────────────────
@@ -401,8 +403,8 @@ def test_role_fragment_accepts_source_ref():
 def test_paragraph_renderer_injects_link_when_resolver_and_ref_present():
     resolver = _ConstantResolver("http://example.com")
     r = ParagraphRenderer(HTMLFormatter(), resolver)
-    ref = SourceRef(owner_type=_Sensor)
-    frag = RoleFragment(text="Sensor", role=SemanticRole.VARIABLE, source_ref=ref)
+    ref = SourceReference(owner_type=_Sensor)
+    frag = RoleFragment(text="Sensor", role=SemanticRole.VARIABLE, source_reference=ref)
     result = r.render(frag)
     assert 'href="http://example.com"' in result
     assert "Sensor" in result
@@ -410,8 +412,8 @@ def test_paragraph_renderer_injects_link_when_resolver_and_ref_present():
 
 def test_paragraph_renderer_no_link_when_no_resolver():
     r = ParagraphRenderer(HTMLFormatter())
-    ref = SourceRef(owner_type=_Sensor)
-    frag = RoleFragment(text="Sensor", role=SemanticRole.VARIABLE, source_ref=ref)
+    ref = SourceReference(owner_type=_Sensor)
+    frag = RoleFragment(text="Sensor", role=SemanticRole.VARIABLE, source_reference=ref)
     result = r.render(frag)
     assert "<a " not in result
     assert "Sensor" in result
@@ -419,8 +421,8 @@ def test_paragraph_renderer_no_link_when_no_resolver():
 
 def test_paragraph_renderer_no_link_when_resolver_returns_none():
     r = ParagraphRenderer(HTMLFormatter(), _NoneResolver())
-    ref = SourceRef(owner_type=_Sensor)
-    frag = RoleFragment(text="Sensor", role=SemanticRole.VARIABLE, source_ref=ref)
+    ref = SourceReference(owner_type=_Sensor)
+    frag = RoleFragment(text="Sensor", role=SemanticRole.VARIABLE, source_reference=ref)
     result = r.render(frag)
     assert "<a " not in result
 
@@ -436,9 +438,11 @@ def test_paragraph_renderer_no_link_when_no_source_ref():
 def test_hierarchical_renderer_injects_link():
     resolver = _ConstantResolver("http://example.com")
     r = HierarchicalRenderer(HTMLFormatter(), resolver)
-    ref = SourceRef(owner_type=_Sensor)
+    ref = SourceReference(owner_type=_Sensor)
     block = BlockFragment(
-        header=RoleFragment(text="Sensor", role=SemanticRole.VARIABLE, source_ref=ref),
+        header=RoleFragment(
+            text="Sensor", role=SemanticRole.VARIABLE, source_reference=ref
+        ),
         items=[WordFragment("some condition")],
     )
     result = r.render(block)
@@ -489,13 +493,13 @@ def test_pipeline_ansi_with_resolver_no_osc8_logs_warning_and_no_osc8():
     assert "OSC 8" in mock_warn.call_args[0][0]
 
 
-# ── Verbalizer source_ref propagation ─────────────────────────────────────────
+# ── Verbalizer source_reference propagation ─────────────────────────────────────────
 
 
-def _collect_source_refs(fragment: Fragment) -> list[SourceRef]:
-    """Recursively collect all non-None SourceRef values from a fragment tree."""
+def _collect_source_refs(fragment: Fragment) -> list[SourceReference]:
+    """Recursively collect all non-None SourceReference values from a fragment tree."""
     match fragment:
-        case RoleFragment(source_ref=ref) if ref is not None:
+        case RoleFragment(source_reference=ref) if ref is not None:
             return [ref]
         case PhraseFragment(parts=parts):
             return [r for p in parts for r in _collect_source_refs(p)]
@@ -533,8 +537,8 @@ def test_comparator_fragment_has_both_class_and_attr_refs():
     refs = _collect_source_refs(frag)
     class_refs = [r for r in refs if r.owner_type is _Sensor and r.attribute is None]
     attr_refs = [r for r in refs if r.owner_type is _Sensor and r.attribute == "level"]
-    assert class_refs, "Expected a SourceRef for the _Sensor class"
-    assert attr_refs, "Expected a SourceRef for _Sensor.level"
+    assert class_refs, "Expected a SourceReference for the _Sensor class"
+    assert attr_refs, "Expected a SourceReference for _Sensor.level"
 
 
 # ── VerbalizationPipeline.display / display_fragment ──────────────────────────

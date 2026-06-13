@@ -12,7 +12,9 @@ from krrood.entity_query_language.verbalization.fragments.features import (
     Separator,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
-from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
+from krrood.entity_query_language.verbalization.fragments.source_reference import (
+    SourceReference,
+)
 from krrood.entity_query_language.verbalization.chain_utils import PathStep
 from krrood.entity_query_language.verbalization.exceptions import UnloweredFragmentError
 
@@ -68,7 +70,7 @@ class RoleFragment(HasText, HasNumber, Fragment):
     role: SemanticRole
     """Semantic role that determines this token's colour markup."""
 
-    source_ref: Optional[SourceRef] = None
+    source_reference: Optional[SourceReference] = None
     """Optional reference to the Python class or attribute this fragment represents."""
 
     @classmethod
@@ -89,7 +91,9 @@ class RoleFragment(HasText, HasNumber, Fragment):
         return cls(
             text=label,
             role=SemanticRole.VARIABLE,
-            source_ref=SourceRef.for_type(getattr(expression, "_type_", None)),
+            source_reference=SourceReference.for_type(
+                getattr(expression, "_type_", None)
+            ),
             number=number,
         )
 
@@ -111,7 +115,7 @@ class RoleFragment(HasText, HasNumber, Fragment):
         return cls(
             text=attribute_name,
             role=SemanticRole.ATTRIBUTE,
-            source_ref=SourceRef.for_attribute(owner, attribute_name),
+            source_reference=SourceReference.for_attribute(owner, attribute_name),
             number=number,
         )
 
@@ -225,7 +229,7 @@ def fold_fragment(
     fragment: Fragment,
     *,
     word: Callable[[str], _T],
-    role: Callable[[str, SemanticRole, Optional[SourceRef]], _T],
+    role: Callable[[str, SemanticRole, Optional[SourceReference]], _T],
     phrase: Callable[[List[_T], str], _T],
     block: Callable[[BlockFragment], _T],
 ) -> _T:
@@ -249,7 +253,7 @@ def fold_fragment(
 
     :param fragment: Root of the fragment tree.
     :param word: Handler for ``WordFragment`` text.
-    :param role: Handler for ``RoleFragment`` ``(text, role, source_ref)``.
+    :param role: Handler for ``RoleFragment`` ``(text, role, source_reference)``.
     :param phrase: Handler for ``PhraseFragment`` ``(folded_parts, separator)``.
     :param block: Handler for a raw ``BlockFragment`` (controls its own recursion).
     :return: The folded value.
@@ -257,7 +261,7 @@ def fold_fragment(
     match fragment:
         case WordFragment(text=text):
             return word(text)
-        case RoleFragment(text=text, role=semantic_role, source_ref=ref):
+        case RoleFragment(text=text, role=semantic_role, source_reference=ref):
             return role(text, semantic_role, ref)
         case PhraseFragment(parts=parts, separator=separator):
             folded = [

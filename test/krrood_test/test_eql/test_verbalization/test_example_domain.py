@@ -25,7 +25,9 @@ from pathlib import Path
 import pytest
 
 from krrood.entity_query_language.verbalization import example_domain
-from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
+from krrood.entity_query_language.verbalization.fragments.source_reference import (
+    SourceReference,
+)
 from krrood.entity_query_language.verbalization.rendering.source_link_resolver import (
     AutoAPIResolver,
 )
@@ -84,7 +86,7 @@ def test_classes_belong_to_the_real_module():
 def test_resolver_builds_real_autoapi_url_for_class():
     """The GitHub Pages resolver points a class at the module's real AutoAPI page."""
     resolver = AutoAPIResolver(base_url=_GITHUB_PAGES_BASE)
-    url = resolver.resolve(SourceRef(owner_type=example_domain.Robot))
+    url = resolver.resolve(SourceReference(owner_type=example_domain.Robot))
     assert url is not None
     assert url.startswith(_GITHUB_PAGES_BASE)
     assert f"autoapi/{_MODULE_PATH}/index.html" in url
@@ -100,7 +102,7 @@ def test_resolver_builds_real_autoapi_url_for_fields():
         ("BankTransaction", "amount_details"),
     ]:
         cls = getattr(example_domain, cls_name)
-        url = resolver.resolve(SourceRef(owner_type=cls, attribute=field_name))
+        url = resolver.resolve(SourceReference(owner_type=cls, attribute=field_name))
         assert url is not None
         assert f"autoapi/{_MODULE_PATH}/index.html" in url
         assert url.endswith(f"#{_MODULE}.{cls_name}.{field_name}")

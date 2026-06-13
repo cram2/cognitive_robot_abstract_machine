@@ -14,7 +14,9 @@ from krrood.entity_query_language.core.mapped_variable import (
     MappedVariable,
 )
 from krrood.entity_query_language.core.variable import Literal, Variable
-from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
+from krrood.entity_query_language.verbalization.fragments.source_reference import (
+    SourceReference,
+)
 
 
 @dataclass(frozen=True)
@@ -22,14 +24,14 @@ class PathStep:
     """
     One hop of a navigation chain — a display name and the source reference it links to.
 
-    Replaces a bare ``(name, source_ref)`` tuple so the two halves are named (``.name`` /
-    ``.source_ref``) rather than positional.
+    Replaces a bare ``(name, source_reference)`` tuple so the two halves are named (``.name`` /
+    ``.source_reference``) rather than positional.
     """
 
     name: str
     """The display text for this hop (e.g. ``"amount"``, ``"handle[0]"``, ``"()"``)."""
 
-    source_ref: Optional[SourceRef] = None
+    source_reference: Optional[SourceReference] = None
     """The attribute's source reference, or ``None`` for composite / index / call hops."""
 
 
@@ -112,7 +114,7 @@ def build_path_parts(chain: list[MappedVariable]) -> list[PathStep]:
         if isinstance(node, Attribute):
             name = node._attribute_name_
             owner = node._owner_class_
-            ref: Optional[SourceRef] = SourceRef.for_attribute(owner, name)
+            ref: Optional[SourceReference] = SourceReference.for_attribute(owner, name)
             while i + 1 < len(chain) and isinstance(chain[i + 1], Index):
                 i += 1
                 name += f"[{repr(chain[i]._key_)}]"

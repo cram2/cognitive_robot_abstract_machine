@@ -7,7 +7,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing_extensions import Optional, Protocol
 
-from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
+from krrood.entity_query_language.verbalization.fragments.source_reference import (
+    SourceReference,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -18,7 +20,7 @@ class SourceLinkResolver(Protocol):
     cannot be located.
     """
 
-    def resolve(self, ref: SourceRef) -> Optional[str]:
+    def resolve(self, ref: SourceReference) -> Optional[str]:
         """
         Resolve *ref* to a URL string.
 
@@ -42,7 +44,7 @@ class AutoAPIResolver:
     """Optional local path to the Sphinx HTML output directory.  When set, resolution verifies
     that the AutoAPI page exists on disk and logs a warning if it does not."""
 
-    def resolve(self, ref: SourceRef) -> Optional[str]:
+    def resolve(self, ref: SourceReference) -> Optional[str]:
         """
         Resolve *ref* to a Sphinx AutoAPI page URL.
 

@@ -50,21 +50,21 @@ class FragmentRenderer(ABC):
         """
         ...
 
-    def _render_role(self, text: str, role, source_ref) -> str:
+    def _render_role(self, text: str, role, source_reference) -> str:
         """
         Colorise *text* for *role* and, when a resolver and source ref are present, wrap the
         result with a hyperlink.
 
         :param text: Plain display text.
         :param role: Semantic role for colour lookup.
-        :param source_ref: Source reference for link resolution; may be ``None``.
+        :param source_reference: Source reference for link resolution; may be ``None``.
         :return: Coloured (and optionally linked) string.
         """
         colored = self.formatter.colorize(text, role)
-        if source_ref is not None and self.link_resolver is not None:
-            url = self.link_resolver.resolve(source_ref)
+        if source_reference is not None and self.link_resolver is not None:
+            url = self.link_resolver.resolve(source_reference)
             if url is not None:
-                tooltip = docstring_for_source_ref(source_ref)
+                tooltip = docstring_for_source_ref(source_reference)
                 return self.formatter.wrap_link(colored, url, tooltip=tooltip)
         return colored
 

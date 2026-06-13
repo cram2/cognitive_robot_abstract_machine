@@ -15,7 +15,9 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     Fragment,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
-from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
+from krrood.entity_query_language.verbalization.fragments.source_reference import (
+    SourceReference,
+)
 from krrood.entity_query_language.verbalization.grammar.assembly.base import Assembler
 from krrood.entity_query_language.verbalization.grammar.planning.instantiated import (
     BindingPlan,
@@ -98,8 +100,8 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
                 RoleFragment(
                     text=type_name,
                     role=SemanticRole.VARIABLE,
-                    source_ref=(
-                        SourceRef.for_type(instantiated_type)
+                    source_reference=(
+                        SourceReference.for_type(instantiated_type)
                         if isinstance(instantiated_type, type)
                         else None
                     ),

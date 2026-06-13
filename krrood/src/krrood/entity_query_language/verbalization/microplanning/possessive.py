@@ -18,7 +18,9 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 def _attribute_fragment(step: PathStep) -> RoleFragment:
     """:return: A role-tagged attribute fragment for *step*."""
     return RoleFragment(
-        text=step.name, role=SemanticRole.ATTRIBUTE, source_ref=step.source_ref
+        text=step.name,
+        role=SemanticRole.ATTRIBUTE,
+        source_reference=step.source_reference,
     )
 
 

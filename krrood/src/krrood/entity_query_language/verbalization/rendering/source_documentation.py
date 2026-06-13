@@ -7,7 +7,9 @@ from functools import lru_cache
 
 from typing_extensions import Dict, Optional
 
-from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
+from krrood.entity_query_language.verbalization.fragments.source_reference import (
+    SourceReference,
+)
 
 
 def first_docstring_line(documented_object: object) -> Optional[str]:
@@ -72,19 +74,19 @@ def _attribute_docstrings(cls: type) -> Dict[str, str]:
     return docstrings
 
 
-def docstring_for_source_ref(source_ref: SourceRef) -> Optional[str]:
+def docstring_for_source_ref(source_reference: SourceReference) -> Optional[str]:
     """
     Attribute documentation follows the project convention of a bare string expression
     immediately below the field definition (a PEP 257 attribute docstring).
 
-    :param source_ref: The source reference to document.
-    :return: The first docstring line for the class or field *source_ref* points at, or ``None``
+    :param source_reference: The source reference to document.
+    :return: The first docstring line for the class or field *source_reference* points at, or ``None``
         when no documentation is found.
     """
-    if source_ref.attribute is None:
-        return first_docstring_line(source_ref.owner_type)
-    for klass in source_ref.owner_type.__mro__:
-        line = _attribute_docstrings(klass).get(source_ref.attribute)
+    if source_reference.attribute is None:
+        return first_docstring_line(source_reference.owner_type)
+    for klass in source_reference.owner_type.__mro__:
+        line = _attribute_docstrings(klass).get(source_reference.attribute)
         if line is not None:
             return line
     return None
