@@ -7,7 +7,6 @@ from typing import Union, Optional
 from typing_extensions import Self, Type, Any
 
 from random_events.product_algebra import Event
-from semantic_digital_twin.adapters.urdf import connection_type_map
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.mixins import (
@@ -21,6 +20,7 @@ from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
     RevoluteConnection,
     Connection6DoF,
+    ActiveConnectionParameters,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -64,18 +64,6 @@ class WorldEntitySpawnSpecification(ABC):
 
 
 @dataclass
-class ConnectionSpecification:
-
-    connection_type: Type[Union[FixedConnection, Connection6DoF]]
-
-    parent_T_child: HomogeneousTransformationMatrix = field(
-        default_factory=HomogeneousTransformationMatrix
-    )
-
-    def to_connection(self, parent, child, world) -> Connection: ...
-
-
-@dataclass
 class KinematicStructureEntitySpecification(WorldEntitySpawnSpecification):
     """
     Declarative, world-independent description of a kinematic structure entity.
@@ -92,10 +80,6 @@ class KinematicStructureEntitySpecification(WorldEntitySpawnSpecification):
     """
     Prototype shapes with origins expressed in the entity frame.
     """
-
-    parent_connection_specification: ConnectionSpecification = field(
-        default_factory=ConnectionSpecification
-    )
 
     child_specification: list[WorldEntitySpawnSpecification] = field(
         default_factory=list
@@ -346,10 +330,14 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
     The specification of the root kinematic structure entity of the annotation.
     """
 
+    active_connection_parameters: ActiveConnectionParameters | None = field(
+        default=None
+    )
+
     annotation_kwargs: dict[
         str,
         Union[
-            WorldEntitySpawnSpecification,
+            SemanticAnnotationWithRootSpecification,
             Any,
         ],
     ] = field(default_factory=dict)
@@ -369,12 +357,36 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
 
 
 @dataclass
+class BodyAndConnectionSpecification(WorldEntitySpawnSpecification):
+
+    body_specification: BodySpecification
+
+    connection_type: Type[Connection] = field(default=FixedConnection)
+
+    parent_T_child: HomogeneousTransformationMatrix = field(
+        default_factory=HomogeneousTransformationMatrix
+    )
+
+    active_connection_parameters: ActiveConnectionParameters | None = field(
+        default=None
+    )
+
+    def spawn(
+        self,
+        name: Union[str, PrefixedName],
+        world: World,
+        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        parent: KinematicStructureEntity | None = None,
+    ):
+        pass
+
+
+@dataclass
 class WorldSpecification:
     robot_semantic_annotation: Type[AbstractRobot]
     drive_connection_type: Type[WheeledDrive] | None = None
     world_T_odom: HomogeneousTransformationMatrix | None = None
     odom_T_robot_start: HomogeneousTransformationMatrix | None = None
-    starting_objects: list[BodySpecification] = field(default_factory=list)
+    starting_objects: list[WorldEntitySpawnSpecification] = field(default_factory=list)
 
-    @classmethod
     def create(self) -> World: ...
