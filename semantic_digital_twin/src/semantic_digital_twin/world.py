@@ -994,6 +994,27 @@ class World(HasSimulatorProperties):
         actuator.remove_from_world()
         self.actuators.remove(actuator)
 
+    def remove_branch_from_world(self, root: KinematicStructureEntity):
+        """
+        Removes a branch of kinematic structure entities and their connections from the world.
+        :param root: The root entity of the branch to be removed.
+        """
+        kinematic_structure_entities = self.get_kinematic_structure_entities_of_branch(
+            root
+        )
+        connections = self.get_connections_of_branch(root)
+        parent_connection = root.parent_connection
+        connections = (
+            connections + [parent_connection]
+            if parent_connection is not None
+            else connections
+        )
+        with self.modify_world():
+            for connection in connections:
+                self.remove_connection(connection)
+            for kinematic_structure_entity in kinematic_structure_entities:
+                self.remove_kinematic_structure_entity(kinematic_structure_entity)
+
     # %% Other Atomic World Modifications
     @atomic_world_modification(modification=SetDofHasHardwareInterface)
     def set_dofs_has_hardware_interface(

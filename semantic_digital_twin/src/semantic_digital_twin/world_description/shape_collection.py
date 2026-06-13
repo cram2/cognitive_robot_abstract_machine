@@ -66,29 +66,7 @@ class ShapeCollection(SubclassJSONSerializer):
         if self.reference_frame is None:
             return
         for shape in self.shapes:
-            self._transform_to_own_frame(shape)
-
-    def _transform_to_own_frame(self, shape: Shape):
-        """
-        Transform the shape to this collections' frame in-place.
-        :param shape: The shape to transform.
-        """
-        if shape.origin.reference_frame is None:
-            # If we don’t have a world, fall back to the owning body/frame
-            shape.origin.reference_frame = self.reference_frame
-        elif (
-            self.reference_frame is not None
-            and shape.origin.reference_frame != self.reference_frame
-            and self.reference_frame._world is not None
-        ):
-            logger.warning(
-                f"Transformed shape {shape} to {self.reference_frame} since it was in a different "
-                f"reference frame than the collection."
-            )
-            shape.origin = self.reference_frame._world.transform(
-                shape.origin,
-                self.reference_frame,
-            )
+            shape._transform_to_frame(self.reference_frame)
 
     def __getitem__(self, index: int) -> Shape:
         return self.shapes[index]
@@ -108,6 +86,14 @@ class ShapeCollection(SubclassJSONSerializer):
                 shape,
             )
         self.shapes.append(shape)
+
+    def copy_without_reference_frame(self):
+        """
+        Creates a copy of this shape collection without the reference frame.
+        """
+        return ShapeCollection(
+            shapes=[shape.copy_without_reference_frame() for shape in self.shapes]
+        )
 
     @cached_property
     def combined_mesh(self) -> Trimesh:
