@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing_extensions import Iterable, List, Optional, Set, Tuple
+from typing_extensions import Iterable, List, Optional, Set
 import uuid
 
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -20,6 +20,17 @@ from krrood.entity_query_language.verbalization.microplanning.possessive import 
     pronominal_path,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import Pronouns
+
+
+@dataclass(frozen=True)
+class SubjectFrame:
+    """One entry of the coreference pass's subject stack — the current pronoun-eligible subject."""
+
+    subject_id: Optional[uuid.UUID]
+    """The subject's referent id, or ``None`` for a scope with no single subject (e.g. ``SetOf``)."""
+
+    number: Number
+    """The subject's grammatical number — selects *"its"* (singular) vs. *"their"* (plural)."""
 
 
 @dataclass
@@ -44,10 +55,8 @@ class CoreferenceProcessor:
     _seen: Set[uuid.UUID] = field(init=False, default_factory=set)
     """Referent ids already mentioned at the current point of the walk."""
 
-    _subject_stack: List[Tuple[Optional[uuid.UUID], Number]] = field(
-        init=False, default_factory=list
-    )
-    """Stack of ``(subject_id, subject_number)`` frames — the number selects *"its"*/*"their"*."""
+    _subject_stack: List[SubjectFrame] = field(init=False, default_factory=list)
+    """Stack of :class:`SubjectFrame` entries — the number selects *"its"*/*"their"*."""
 
     def process(
         self,
@@ -72,7 +81,7 @@ class CoreferenceProcessor:
             case SubjectScope(
                 subject_id=subject_id, child=child, subject_number=subject_number
             ):
-                self._subject_stack.append((subject_id, subject_number))
+                self._subject_stack.append(SubjectFrame(subject_id, subject_number))
                 try:
                     return self._walk(child)
                 finally:
@@ -91,7 +100,7 @@ class CoreferenceProcessor:
         the possessive *"the … of <root>"* (resolving the root noun phrase for first/subsequent
         mention)."""
         if self._pronominalises(possessive_chain):
-            _, subject_number = self._subject_stack[-1]
+            subject_number = self._subject_stack[-1].number
             pronoun = (
                 Pronouns.THEIR if subject_number is Number.PLURAL else Pronouns.ITS
             )
@@ -109,7 +118,7 @@ class CoreferenceProcessor:
             return False
         if (
             not self._subject_stack
-            or self._subject_stack[-1][0] != possessive_chain.root_referent_id
+            or self._subject_stack[-1].subject_id != possessive_chain.root_referent_id
         ):
             return False
         # A numbered root ("Robot 2") renders BARE and is never pronominalised.
