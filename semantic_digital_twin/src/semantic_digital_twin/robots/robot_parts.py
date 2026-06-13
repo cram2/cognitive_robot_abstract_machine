@@ -74,6 +74,7 @@ from semantic_digital_twin.world_description.world_modification import (
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
+    from semantic_digital_twin.api.specifications import BodySpecification
 else:
     World = Any
 
@@ -267,6 +268,16 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         scale: Scale = None,
         **kwargs,
     ) -> Self:
+        raise UselessConceptError(
+            message="The bodies needed for RobotParts should already exist in the world after parsing a URDF"
+        )
+
+    @classmethod
+    def get_default_specification_from_scale(
+        cls,
+        name: Union[str, PrefixedName],
+        scale: Scale = None,
+    ) -> BodySpecification:
         raise UselessConceptError(
             message="The bodies needed for RobotParts should already exist in the world after parsing a URDF"
         )

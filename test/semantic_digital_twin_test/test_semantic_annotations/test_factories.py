@@ -998,6 +998,141 @@ class TestFactories(unittest.TestCase):
             (door_right, door_left),
         )
 
+    #################################################################
+    # Characterization of the scale -> geometry generation.
+    # These pin the geometry that create_with_new_body_in_world(scale=...)
+    # currently produces, so the upcoming get_default_specification_from_scale
+    # extraction (and the later factory rewire) provably preserves it.
+    #################################################################
+
+    @staticmethod
+    def _world_with_root() -> World:
+        world = World()
+        with world.modify_world():
+            world.add_body(Body(name=PrefixedName("root")))
+        return world
+
+    def test_characterize_base_body_geometry(self):
+        world = self._world_with_root()
+        with world.modify_world():
+            milk = Milk.create_with_new_body_in_world(
+                name=PrefixedName("milk"), world=world, scale=Scale(0.2, 0.3, 0.4)
+            )
+        collision = milk.root.collision
+        # base path assigns one collection to both collision and visual
+        self.assertIs(collision, milk.root.visual)
+        self.assertEqual(len(collision), 1)
+        np.testing.assert_allclose(
+            collision.combined_mesh.bounds,
+            [[-0.1, -0.15, -0.2], [0.1, 0.15, 0.2]],
+        )
+
+    def test_characterize_case_body_geometry(self):
+        world = self._world_with_root()
+        with world.modify_world():
+            drawer = Drawer.create_with_new_body_in_world(
+                name=PrefixedName("drawer"), world=world, scale=Scale(0.3, 0.4, 0.5)
+            )
+        collision = drawer.root.collision
+        self.assertIs(collision, drawer.root.visual)
+        # hollow container -> more than one box
+        self.assertGreater(len(collision), 1)
+        # outer extents still equal the scale
+        np.testing.assert_allclose(
+            collision.combined_mesh.bounds,
+            [[-0.15, -0.2, -0.25], [0.15, 0.2, 0.25]],
+        )
+
+    def test_characterize_handle_geometry(self):
+        world = self._world_with_root()
+        with world.modify_world():
+            handle = Handle.create_with_new_body_in_world(
+                name=PrefixedName("handle"),
+                world=world,
+                scale=Scale(0.1, 0.05, 0.05),
+                thickness=0.01,
+            )
+        collision = handle.root.collision
+        self.assertIs(collision, handle.root.visual)
+        self.assertGreater(len(collision), 1)
+        np.testing.assert_allclose(
+            collision.combined_mesh.bounds,
+            [[-0.1, -0.025, -0.025], [0.0, 0.025, 0.025]],
+        )
+
+    def test_characterize_door_geometry(self):
+        world = self._world_with_root()
+        with world.modify_world():
+            door = Door.create_with_new_body_in_world(
+                name=PrefixedName("door"), world=world, scale=Scale(0.03, 1, 2)
+            )
+        collision = door.root.collision
+        self.assertIs(collision, door.root.visual)
+        self.assertEqual(len(collision), 1)
+        np.testing.assert_allclose(
+            collision.combined_mesh.bounds,
+            [[-0.015, -0.5, -1.0], [0.015, 0.5, 1.0]],
+        )
+
+    def test_characterize_door_invalid_plane(self):
+        world = self._world_with_root()
+        with self.assertRaises(InvalidPlaneDimensions):
+            with world.modify_world():
+                Door.create_with_new_body_in_world(
+                    name=PrefixedName("door"), world=world, scale=Scale(2, 1, 1)
+                )
+
+    def test_characterize_floor_geometry(self):
+        world = self._world_with_root()
+        with world.modify_world():
+            floor = Floor.create_with_new_body_in_world(
+                name=PrefixedName("floor"), world=world, scale=Scale(2, 2, 0.1)
+            )
+        collision = floor.root.collision
+        self.assertIs(collision, floor.root.visual)
+        # floor is a single polytope mesh
+        self.assertEqual(len(collision), 1)
+        np.testing.assert_allclose(
+            collision.combined_mesh.bounds,
+            [[-1.0, -1.0, -0.05], [1.0, 1.0, 0.05]],
+        )
+
+    def test_characterize_wall_geometry(self):
+        world = self._world_with_root()
+        with world.modify_world():
+            wall = Wall.create_with_new_body_in_world(
+                name=PrefixedName("wall"), world=world, scale=Scale(0.1, 4, 2)
+            )
+        collision = wall.root.collision
+        self.assertIs(collision, wall.root.visual)
+        # wall event runs z from 0..scale.z, not centered
+        np.testing.assert_allclose(
+            collision.combined_mesh.bounds,
+            [[-0.05, -2.0, 0.0], [0.05, 2.0, 2.0]],
+        )
+
+    def test_characterize_wall_invalid_plane(self):
+        world = self._world_with_root()
+        with self.assertRaises(InvalidPlaneDimensions):
+            with world.modify_world():
+                Wall.create_with_new_body_in_world(
+                    name=PrefixedName("wall"), world=world, scale=Scale(2, 1, 1)
+                )
+
+    def test_characterize_aperture_region_geometry(self):
+        world = self._world_with_root()
+        with world.modify_world():
+            aperture = Aperture.create_with_new_region_in_world(
+                name=PrefixedName("aperture"), world=world, scale=Scale(0.1, 1, 2)
+            )
+        # region geometry lives on .area, not .collision
+        area = aperture.root.area
+        self.assertEqual(len(area), 1)
+        np.testing.assert_allclose(
+            area.combined_mesh.bounds,
+            [[-0.05, -0.5, -1.0], [0.05, 0.5, 1.0]],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

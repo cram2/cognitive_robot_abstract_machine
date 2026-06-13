@@ -57,7 +57,6 @@ from semantic_digital_twin.exceptions import (
     BrokenWorldModificationHistoryError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_computations.forward_kinematics import (
     ForwardKinematicsManager,
 )
@@ -119,6 +118,8 @@ from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDec
 
 if TYPE_CHECKING:
     from semantic_digital_twin.spatial_types import GenericSpatialType
+    from semantic_digital_twin.robots.robot_parts import AbstractRobot
+
 
 logger = logging.getLogger("semantic_digital_twin")
 
@@ -565,6 +566,7 @@ class World(HasSimulatorProperties):
 
     @property
     def robot_bodies_with_collision(self) -> List[Body]:
+        from semantic_digital_twin.robots.robot_parts import AbstractRobot
         return [
             body
             for robot in self.get_semantic_annotations_by_type(AbstractRobot)
@@ -573,6 +575,7 @@ class World(HasSimulatorProperties):
 
     @property
     def robot_body_to_robot_mapping(self) -> dict[Body, AbstractRobot]:
+        from semantic_digital_twin.robots.robot_parts import AbstractRobot
         return {
             body: robot
             for robot in self.get_semantic_annotations_by_type(AbstractRobot)

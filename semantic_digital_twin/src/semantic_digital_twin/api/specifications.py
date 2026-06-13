@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Union, Optional
+from typing import Union, Optional, TYPE_CHECKING
 
 from typing_extensions import Self, Type, Any, Generic, TypeVar
 
@@ -10,10 +10,6 @@ from krrood.patterns.subclass_safe_generic import AbstractSubClassSafeGeneric
 from krrood.utils import get_generic_type_params
 from random_events.product_algebra import Event
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
-from semantic_digital_twin.semantic_annotations.mixins import (
-    HasRootKinematicStructureEntity,
-)
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
@@ -43,6 +39,13 @@ from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
     Connection,
 )
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.semantic_annotations.mixins import (
+        HasRootKinematicStructureEntity,
+    )
+    from semantic_digital_twin.robots.robot_parts import AbstractRobot
+
 
 DomainObjectType = TypeVar("DomainObjectType", bound=KinematicStructureEntity)
 
