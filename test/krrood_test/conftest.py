@@ -148,8 +148,12 @@ def doors_and_drawers_world() -> World:
 
 @pytest.fixture(autouse=True)
 def cleanup_after_test():
-    # Setup: runs before each krrood_test
-    SymbolGraph()
+    # Rebuild a clean, package-scoped symbol graph before each test. Scoping to the same
+    # packages as generate_sqlalchemy_interface keeps Symbol subclasses imported from other
+    # packages (e.g. coraplex / semantic_digital_twin pulled in during collection) out of the
+    # class diagram, so they cannot leak in and corrupt type resolution for later tests.
+    SymbolGraph.clear()
+    SymbolGraph(packages=["krrood", "test.krrood"])
     yield
     SymbolGraph().clear()
 

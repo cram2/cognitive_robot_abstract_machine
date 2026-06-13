@@ -1,4 +1,10 @@
 import pytest
+
+# This module persists coraplex robot-plan actions, which require coraplex and its ROS
+# message dependencies. Skip cleanly (rather than erroring at collection) when ROS is not
+# available, so the partial coraplex import cannot pollute the shared symbol graph either.
+pytest.importorskip("geometry_msgs", reason="coraplex robot plans require a ROS environment")
+
 from sqlalchemy import select, func, case
 from sqlalchemy.exc import MultipleResultsFound
 from sqlalchemy.orm import aliased
