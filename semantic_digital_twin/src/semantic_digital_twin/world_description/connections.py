@@ -101,8 +101,11 @@ class ActiveConnection(Connection):
         return self.has_hardware_interface
 
 
-@dataclass
-class ActiveConnectionParameters:
+@dataclass(eq=False)
+class ActiveConnection1DOF(ActiveConnection, ABC):
+    """
+    Superclass for active connections with 1 degree of freedom.
+    """
 
     axis: Vector3 = field(kw_only=True)
     """
@@ -120,17 +123,6 @@ class ActiveConnectionParameters:
     Movement along the axis is offset by this value. Useful if Connections share DoFs.
     """
 
-
-@dataclass(eq=False)
-class ActiveConnection1DOF(ActiveConnection, ABC):
-    """
-    Superclass for active connections with 1 degree of freedom.
-    """
-
-    active_connection_parameters: ActiveConnectionParameters = field(
-        default_factory=ActiveConnectionParameters
-    )
-
     dof_id: UUID = field(kw_only=True)
     """
     UUID of a Degree of freedom to control movement along the axis.
@@ -140,30 +132,6 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
     """
     Dynamic properties of the joint.
     """
-
-    @property
-    def offset(self) -> float:
-        return self.active_connection_parameters.offset
-
-    @offset.setter
-    def offset(self, value: float) -> None:
-        self.active_connection_parameters.offset = value
-
-    @property
-    def axis(self) -> Vector3:
-        return self.active_connection_parameters.axis
-
-    @axis.setter
-    def axis(self, value: Vector3) -> None:
-        self.active_connection_parameters.axis = value
-
-    @property
-    def multiplier(self) -> float:
-        return self.active_connection_parameters.multiplier
-
-    @multiplier.setter
-    def multiplier(self, value: float) -> None:
-        self.active_connection_parameters.multiplier = value
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
