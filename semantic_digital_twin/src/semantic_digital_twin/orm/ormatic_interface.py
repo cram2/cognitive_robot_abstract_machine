@@ -9197,11 +9197,6 @@ class BodyAndConnectionSpecificationDAO(
         TypeType, nullable=False, use_existing_column=True
     )
 
-    body_specification_id: Mapped[int] = mapped_column(
-        ForeignKey("BodySpecificationDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
     parent_T_self_id: Mapped[int] = mapped_column(
         ForeignKey(
             "HomogeneousTransformationMatrixMappingDAO.database_id", use_alter=True
@@ -9215,12 +9210,6 @@ class BodyAndConnectionSpecificationDAO(
         use_existing_column=True,
     )
 
-    body_specification: Mapped[BodySpecificationDAO] = relationship(
-        "BodySpecificationDAO",
-        uselist=False,
-        foreign_keys=[body_specification_id],
-        post_update=True,
-    )
     parent_T_self: Mapped[HomogeneousTransformationMatrixMappingDAO] = relationship(
         "HomogeneousTransformationMatrixMappingDAO",
         uselist=False,
@@ -9359,25 +9348,12 @@ class SemanticAnnotationWithRootSpecificationDAO(
         TypeType, nullable=False, use_existing_column=True
     )
 
-    root_specification_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey(
-            "KinematicStructureEntitySpecificationDAO.database_id", use_alter=True
-        ),
-        nullable=True,
-        use_existing_column=True,
-    )
     axis_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
         ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    root_specification: Mapped[KinematicStructureEntitySpecificationDAO] = relationship(
-        "KinematicStructureEntitySpecificationDAO",
-        uselist=False,
-        foreign_keys=[root_specification_id],
-        post_update=True,
-    )
     axis: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO", uselist=False, foreign_keys=[axis_id], post_update=True
     )

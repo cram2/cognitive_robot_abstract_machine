@@ -66,10 +66,20 @@ class FixedConnection(Connection):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         name: Optional[PrefixedName] = None,
+        parent_T_connection_expression: Optional[
+            HomogeneousTransformationMatrix
+        ] = None,
         *args,
         **kwargs,
     ) -> Self:
-        return FixedConnection(parent=parent, child=child, name=name, **kwargs)
+
+        return cls(
+            parent=parent,
+            child=child,
+            name=name,
+            parent_T_connection_expression=parent_T_connection_expression
+            or HomogeneousTransformationMatrix(),
+        )
 
 
 @dataclass(eq=False)
@@ -165,8 +175,11 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        axis: Vector3,
         name: Optional[PrefixedName] = None,
+        parent_T_connection_expression: Optional[
+            HomogeneousTransformationMatrix
+        ] = None,
+        axis: Optional[Vector3] = None,
         multiplier: float = 1.0,
         offset: float = 0.0,
         dof_limits: Optional[DegreeOfFreedomLimits] = None,
@@ -182,14 +195,19 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         :param world: The motion world in which to add the degree of freedom.
         :param parent: The parent kinematic structure entity.
         :param child: The child kinematic structure entity.
-        :param axis: The axis vector defining the joint relation.
         :param name: Optional specific name for the DOF entity. If not provided, a
                      default name is generated based on the parent and child.
+        :param parent_T_connection_expression: Optional transform of the connection in the parent frame.
+        :param axis: The axis vector defining the joint relation (required for active connections).
         :param multiplier: A scaling factor applied to the DOF's motion. Defaults to 1.0.
         :param offset: A constant offset value applied to the DOF's motion. Defaults to 0.0.
         :return: An instance of the class representing the defined relationship with
                  its DOF added to the world.
         """
+        if axis is None:
+            raise ValueError(
+                f"{cls.__name__} is an active connection and requires an axis."
+            )
         name = name or cls._generate_default_name(parent=parent, child=child)
         dof = DegreeOfFreedom(name=PrefixedName("dof", str(name)), limits=dof_limits)
         world.add_degree_of_freedom(dof)
@@ -197,6 +215,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
             name=name,
             parent=parent,
             child=child,
+            parent_T_connection_expression=parent_T_connection_expression,
             axis=axis,
             multiplier=multiplier,
             offset=offset,
@@ -473,6 +492,9 @@ class Connection6DoF(Connection):
         Creates an instance of the class with automatically generated degrees of freedom (DoFs)
         for the provided parent and child kinematic entities within the specified world.
 
+        The ``axis``/``multiplier``/``offset``/``dof_limits`` parameters are accepted for
+        interface consistency with active connections and ignored here.
+
         This method initializes and adds the required degrees of freedom to the world,
         and sets their properties accordingly. It generates a name for the connection if
         none is provided, and ensures valid initial state for relevant degrees of freedom.
@@ -710,6 +732,9 @@ class OmniDrive(WheeledDrive):
         Creates an instance of the class with automatically generated degrees of freedom
         (DOFs) for translation on the x and y axes, rotation along roll, pitch, and yaw
         axes, and velocity limits for translation and rotation.
+
+        The ``axis``/``multiplier``/``offset``/``dof_limits`` parameters are accepted for
+        interface consistency with active connections and ignored here.
 
         This method modifies the provided world to add all required degrees of freedom
         and their limits, based on the provided settings. Names for the degrees of
@@ -1004,6 +1029,9 @@ class DifferentialDrive(WheeledDrive):
         """
         Creates an instance of the class with automatically generated DoFs for translation on the x-axis,
         rotation along roll, pitch, and yaw axes, and velocity limits for translation and rotation.
+
+        The ``axis``/``multiplier``/``offset``/``dof_limits`` parameters are accepted for
+        interface consistency with active connections and ignored here.
 
         :param world: The world where the configuration is being applied, and degrees of freedom are added.
         :param parent: The parent kinematic structure entity.

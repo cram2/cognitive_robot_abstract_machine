@@ -2,10 +2,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Union, Optional, assert_never
+from typing import Union, Optional
 
-from typing_extensions import Self, Type, Any
+from typing_extensions import Self, Type, Any, Generic, TypeVar
 
+from krrood.patterns.subclass_safe_generic import AbstractSubClassSafeGeneric
+from krrood.utils import get_generic_type_params
 from random_events.product_algebra import Event
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -42,59 +44,7 @@ from semantic_digital_twin.world_description.world_entity import (
     Connection,
 )
 
-
-def _build_connection(
-    world: World,
-    parent: KinematicStructureEntity,
-    child: KinematicStructureEntity,
-    connection_type: Type[Connection],
-    parent_T_child: Optional[HomogeneousTransformationMatrix],
-    axis: Optional[Vector3] = None,
-    multiplier: float = 1.0,
-    offset: float = 0.0,
-) -> Connection:
-    """
-    Build a connection of ``connection_type`` between ``parent`` and ``child``.
-
-    The pose offset is carried in the connection expression (so no two-phase
-    ``.origin`` assignment is needed), mirroring
-    :meth:`HasRootKinematicStructureEntity._create_with_connection_in_world`.
-
-    :param parent_T_child: Pose of the child in the parent frame. Defaults to identity.
-    :param axis: Movement axis, required for active (1-DoF) connections, ignored otherwise.
-    :param multiplier: DoF multiplier for active connections.
-    :param offset: DoF offset for active connections.
-    """
-    pose = parent_T_child or HomogeneousTransformationMatrix()
-    pose.reference_frame = parent
-    pose.child_frame = child
-
-    if connection_type is FixedConnection:
-        return FixedConnection(
-            parent=parent, child=child, parent_T_connection_expression=pose
-        )
-    if issubclass(connection_type, ActiveConnection1DOF):
-        if axis is None:
-            raise ValueError(
-                f"Active connection {connection_type.__name__} requires axis."
-            )
-
-        return connection_type.create_with_dofs(
-            world=world,
-            parent=parent,
-            child=child,
-            axis=axis,
-            multiplier=multiplier,
-            offset=offset,
-            parent_T_connection_expression=pose,
-        )
-    # Connection6DoF and other passive multi-DoF connections.
-    return connection_type.create_with_dofs(
-        world=world,
-        parent=parent,
-        child=child,
-        parent_T_connection_expression=pose,
-    )
+DomainObjectType = TypeVar("DomainObjectType", bound=KinematicStructureEntity)
 
 
 @dataclass
@@ -116,13 +66,117 @@ class WorldEntitySpawnSpecification(ABC):
         :param name: Overrides the specification's own name. If None, the spec's name is used.
         """
 
+    @staticmethod
+    def _to_prefixed_name(
+        name: Union[str, PrefixedName, None],
+    ) -> Optional[PrefixedName]:
+        """Normalize a name to a :class:`PrefixedName`, passing ``None`` through."""
+        return PrefixedName(name) if isinstance(name, str) else name
+
+    @staticmethod
+    def _require_axis_for_active_connection(
+        connection_type: Type[Connection], axis: Optional[Vector3]
+    ) -> None:
+        """Raise if an active connection is requested without a movement axis."""
+        if axis is None and issubclass(connection_type, ActiveConnection):
+            raise ValueError(
+                f"{connection_type.__name__} is an active connection, so axis is required."
+            )
+
+    @staticmethod
+    def _build_connection(
+        world: World,
+        parent: KinematicStructureEntity,
+        child: KinematicStructureEntity,
+        connection_type: Type[Connection],
+        parent_T_child: Optional[HomogeneousTransformationMatrix],
+        axis: Optional[Vector3] = None,
+        multiplier: float = 1.0,
+        offset: float = 0.0,
+    ) -> Connection:
+        """
+        Build a connection of ``connection_type`` between ``parent`` and ``child``.
+
+        The parent_T_child offset is carried in the connection expression (so no two-phase
+        ``.origin`` assignment is needed), mirroring
+        :meth:`HasRootKinematicStructureEntity._create_with_connection_in_world`.
+
+        :param parent_T_child: Pose of the child in the parent frame. Defaults to identity.
+        :param axis: Movement axis, required for active (1-DoF) connections, ignored otherwise.
+        :param multiplier: DoF multiplier for active connections.
+        :param offset: DoF offset for active connections.
+        """
+        parent_T_child = parent_T_child or HomogeneousTransformationMatrix()
+        parent_T_child.reference_frame = parent
+        parent_T_child.child_frame = child
+
+        if issubclass(connection_type, ActiveConnection1DOF) and axis is None:
+            raise ValueError(
+                f"Active connection {connection_type.__name__} requires axis."
+            )
+
+        return connection_type.create_with_dofs(
+            world=world,
+            parent=parent,
+            child=child,
+            axis=axis,
+            multiplier=multiplier,
+            offset=offset,
+            parent_T_connection_expression=parent_T_child,
+        )
+
+    def _attach(
+        self,
+        world: World,
+        entity: KinematicStructureEntity,
+        parent: Optional[KinematicStructureEntity],
+        connection_type: Type[Connection],
+        parent_T_self: Optional[HomogeneousTransformationMatrix],
+        *,
+        axis: Optional[Vector3] = None,
+        multiplier: float = 1.0,
+        offset: float = 0.0,
+        annotation: Optional[HasRootKinematicStructureEntity] = None,
+        children: (
+            tuple[WorldEntitySpawnSpecification, ...]
+            | list[WorldEntitySpawnSpecification]
+        ) = (),
+    ) -> None:
+        """
+        Attach ``entity`` to ``parent`` (default ``world.root``) with a connection, optionally
+        register ``annotation``, then spawn ``children`` beneath ``entity`` — all in one
+        ``modify_world`` block.
+        """
+        parent = parent or world.root
+        with world.modify_world():
+            connection = self._build_connection(
+                world,
+                parent,
+                entity,
+                connection_type,
+                parent_T_self,
+                axis,
+                multiplier,
+                offset,
+            )
+            world.add_connection(connection)
+            if annotation is not None:
+                world.add_semantic_annotation(annotation)
+            for child in children:
+                child.spawn(world, parent=entity)
+
 
 @dataclass
-class KinematicStructureEntitySpecification(WorldEntitySpawnSpecification):
+class KinematicStructureEntitySpecification(
+    Generic[DomainObjectType], AbstractSubClassSafeGeneric, WorldEntitySpawnSpecification
+):
     """
     Declarative, world-independent description of a kinematic structure entity.
     A specification is reusable: every materialization copies the prototype shapes and the
     pose, so the specification never becomes bound to an entity or world.
+
+    The concrete domain-object type (e.g. ``Body``/``Region``) is bound as the generic
+    parameter by each subclass and resolved at runtime in :meth:`to_domain_object`.
     """
 
     name: Union[str, PrefixedName]
@@ -143,25 +197,37 @@ class KinematicStructureEntitySpecification(WorldEntitySpawnSpecification):
     """
 
     def __post_init__(self):
-        if isinstance(self.name, str):
-            self.name = PrefixedName(self.name)
+        self.name = self._to_prefixed_name(self.name)
 
-    @abstractmethod
+    def to_domain_object(
+        self, name: Union[str, PrefixedName, None] = None
+    ) -> DomainObjectType:
+        """Materialize a new, world-independent kinematic structure entity from this spec."""
+        domain_object_type = get_generic_type_params(
+            self, KinematicStructureEntitySpecification
+        )[0]
+        return domain_object_type.from_shape_collection(
+            self._to_prefixed_name(name) or self.name,
+            self.shapes.copy_without_reference_frame(),
+        )
+
     def spawn(
         self,
         world: World,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
         name: Union[str, PrefixedName, None] = None,
-    ):
-        pass
-
-    def _spawn_children(
-        self, world: World, parent_entity: KinematicStructureEntity
-    ) -> None:
-        """Spawn every child specification as a child of ``parent_entity``."""
-        for child in self.child_specification:
-            child.spawn(world, parent=parent_entity)
+    ) -> KinematicStructureEntity:
+        entity = self.to_domain_object(name)
+        self._attach(
+            world,
+            entity,
+            parent,
+            FixedConnection,
+            parent_T_self,
+            children=self.child_specification,
+        )
+        return entity
 
     @classmethod
     def box(
@@ -180,8 +246,8 @@ class KinematicStructureEntitySpecification(WorldEntitySpawnSpecification):
         :return: The created specification.
         """
         return cls(
-            name=name,
-            shapes=Box(
+            name,
+            Box(
                 scale=scale,
                 origin=origin or HomogeneousTransformationMatrix(),
                 color=color or Color(),
@@ -205,8 +271,8 @@ class KinematicStructureEntitySpecification(WorldEntitySpawnSpecification):
         :return: The created specification.
         """
         return cls(
-            name=name,
-            shapes=Sphere(
+            name,
+            Sphere(
                 radius=radius,
                 origin=origin or HomogeneousTransformationMatrix(),
                 color=color or Color(),
@@ -232,8 +298,8 @@ class KinematicStructureEntitySpecification(WorldEntitySpawnSpecification):
         :return: The created specification.
         """
         return cls(
-            name=name,
-            shapes=Cylinder(
+            name,
+            Cylinder(
                 width=width,
                 height=height,
                 origin=origin or HomogeneousTransformationMatrix(),
@@ -260,8 +326,8 @@ class KinematicStructureEntitySpecification(WorldEntitySpawnSpecification):
         :return: The created specification.
         """
         return cls(
-            name=name,
-            shapes=Mesh(
+            name,
+            Mesh(
                 filename=filename,
                 origin=origin or HomogeneousTransformationMatrix(),
                 scale=scale or Scale(),
@@ -291,7 +357,7 @@ class KinematicStructureEntitySpecification(WorldEntitySpawnSpecification):
 
 
 @dataclass
-class BodySpecification(KinematicStructureEntitySpecification):
+class BodySpecification(KinematicStructureEntitySpecification[Body]):
 
     inertial: Optional[Inertial] = None
     """
@@ -304,82 +370,29 @@ class BodySpecification(KinematicStructureEntitySpecification):
     collision and visual (one collection); an empty list means no visual geometry.
     """
 
-    def to_body(self, name: Optional[Union[str, PrefixedName]] = None) -> Body:
+    def to_domain_object(self, name: Union[str, PrefixedName, None] = None) -> Body:
         """
         Create a new, world-independent body from this specification.
         :param name: Optional name override, e.g. for spawning multiple bodies
                      from the same specification.
         :return: The created body.
         """
-        if isinstance(name, str):
-            name = PrefixedName(name)
-
-        shape_copy = self.shapes.copy_without_reference_frame()
-        visual_shapes = (
-            self.visual_shapes.copy_without_reference_frame()
-            if self.visual_shapes
-            else shape_copy
-        )
-
-        body = Body(
-            name=name or self.name,
-            collision=shape_copy,
-            visual=visual_shapes,
-        )
+        if self.visual_shapes is None:
+            body = super().to_domain_object(name)
+        else:
+            body = Body(
+                name=self._to_prefixed_name(name) or self.name,
+                collision=self.shapes.copy_without_reference_frame(),
+                visual=self.visual_shapes.copy_without_reference_frame(),
+            )
         if self.inertial is not None:
             body.inertial = deepcopy(self.inertial)
         return body
 
-    def spawn(
-        self,
-        world: World,
-        parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
-        name: Union[str, PrefixedName, None] = None,
-    ) -> Body:
-        parent = parent or world.root
-        body = self.to_body(name)
-        with world.modify_world():
-            connection = _build_connection(
-                world, parent, body, FixedConnection, parent_T_self, None
-            )
-            world.add_connection(connection)
-            self._spawn_children(world, body)
-        return body
-
 
 @dataclass
-class RegionSpecification(KinematicStructureEntitySpecification):
-
-    def to_region(self, name: Optional[Union[str, PrefixedName]] = None) -> Region:
-        """
-        Create a new, world-independent region from this specification.
-        :param name: Optional name override.
-        :return: The created region.
-        """
-        if isinstance(name, str):
-            name = PrefixedName(name)
-        return Region(
-            name=name or self.name,
-            area=self.shapes.copy_without_reference_frame(),
-        )
-
-    def spawn(
-        self,
-        world: World,
-        parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
-        name: Union[str, PrefixedName, None] = None,
-    ) -> Region:
-        parent = parent or world.root
-        region = self.to_region(name)
-        with world.modify_world():
-            connection = _build_connection(
-                world, parent, region, FixedConnection, parent_T_self, None
-            )
-            world.add_connection(connection)
-            self._spawn_children(world, region)
-        return region
+class RegionSpecification(KinematicStructureEntitySpecification[Region]):
+    pass
 
 
 @dataclass
@@ -435,16 +448,10 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
     """
 
     def __post_init__(self):
-        if isinstance(self.name, str):
-            self.name = PrefixedName(self.name)
-        if self.axis is None and issubclass(
-            self.semantic_annotation_type._parent_connection_type, ActiveConnection
-        ):
-            raise ValueError(
-                f"{self.semantic_annotation_type.__name__} attaches via "
-                f"{self.semantic_annotation_type._parent_connection_type.__name__}, "
-                f"which is an active connection, so axis is required."
-            )
+        self.name = self._to_prefixed_name(self.name)
+        self._require_axis_for_active_connection(
+            self.semantic_annotation_type._parent_connection_type, self.axis
+        )
 
     def spawn(
         self,
@@ -453,17 +460,12 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
         parent_T_self: HomogeneousTransformationMatrix | None = None,
         name: Union[str, PrefixedName, None] = None,
     ) -> HasRootKinematicStructureEntity:
-        parent = parent or world.root
-        name = name or self.name
+        name = self._to_prefixed_name(name) or self.name
 
         if self.root_specification is None:
             root_entity = Body(name=name)
-        elif isinstance(self.root_specification, RegionSpecification):
-            root_entity = self.root_specification.to_region(name)
-        elif isinstance(self.root_specification, BodySpecification):
-            root_entity = self.root_specification.to_body(name)
         else:
-            assert_never(self.root_specification)
+            root_entity = self.root_specification.to_domain_object(name)
 
         for value in self.annotation_kwargs.values():
             if isinstance(value, WorldEntitySpawnSpecification):
@@ -476,21 +478,23 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
             name=name, root=root_entity, **self.annotation_kwargs
         )
 
-        with world.modify_world():
-            connection = _build_connection(
-                world,
-                parent,
-                root_entity,
-                self.semantic_annotation_type._parent_connection_type,
-                parent_T_self,
-                self.axis,
-                self.multiplier,
-                self.offset,
-            )
-            world.add_connection(connection)
-            world.add_semantic_annotation(instance)
-            if self.root_specification is not None:
-                self.root_specification._spawn_children(world, root_entity)
+        children = (
+            self.root_specification.child_specification
+            if self.root_specification is not None
+            else ()
+        )
+        self._attach(
+            world,
+            root_entity,
+            parent,
+            self.semantic_annotation_type._parent_connection_type,
+            parent_T_self,
+            axis=self.axis,
+            multiplier=self.multiplier,
+            offset=self.offset,
+            annotation=instance,
+            children=children,
+        )
         return instance
 
 
@@ -522,11 +526,7 @@ class BodyAndConnectionSpecification(WorldEntitySpawnSpecification):
     """
 
     def __post_init__(self):
-        if self.axis is None and issubclass(self.connection_type, ActiveConnection):
-            raise ValueError(
-                f"connection_type {self.connection_type.__name__} is an active connection, "
-                f"so axis is required."
-            )
+        self._require_axis_for_active_connection(self.connection_type, self.axis)
 
     def spawn(
         self,
@@ -535,22 +535,19 @@ class BodyAndConnectionSpecification(WorldEntitySpawnSpecification):
         parent_T_self: HomogeneousTransformationMatrix | None = None,
         name: Union[str, PrefixedName, None] = None,
     ) -> Body:
-        parent = parent or world.root
-        body = self.body_specification.to_body(name)
+        body = self.body_specification.to_domain_object(name)
         pose = parent_T_self or self.parent_T_self
-        with world.modify_world():
-            connection = _build_connection(
-                world,
-                parent,
-                body,
-                self.connection_type,
-                pose,
-                self.axis,
-                self.multiplier,
-                self.offset,
-            )
-            world.add_connection(connection)
-            self.body_specification._spawn_children(world, body)
+        self._attach(
+            world,
+            body,
+            parent,
+            self.connection_type,
+            pose,
+            axis=self.axis,
+            multiplier=self.multiplier,
+            offset=self.offset,
+            children=self.body_specification.child_specification,
+        )
         return body
 
 
