@@ -216,10 +216,10 @@ class KinematicStructureEntitySpecification(
     def spawn(
         self,
         world: World,
+        name: Union[str, PrefixedName, None] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
-        name: Union[str, PrefixedName, None] = None,
-    ) -> KinematicStructureEntity:
+    ) -> DomainObjectType:
         entity = self.to_domain_object(name)
         self._attach(
             world,
@@ -472,9 +472,9 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
     def spawn(
         self,
         world: World,
+        name: Union[str, PrefixedName, None] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
-        name: Union[str, PrefixedName, None] = None,
     ) -> HasRootKinematicStructureEntity:
         name = self._to_prefixed_name(name) or self.name
 
@@ -547,9 +547,9 @@ class BodyAndConnectionSpecification(WorldEntitySpawnSpecification):
     def spawn(
         self,
         world: World,
+        name: Union[str, PrefixedName, None] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
-        name: Union[str, PrefixedName, None] = None,
     ) -> Body:
         body = self.body_specification.to_domain_object(name)
         pose = parent_T_self or self.parent_T_self
