@@ -54,9 +54,9 @@ class WorldEntitySpawnSpecification(ABC):
     def spawn(
         self,
         world: World,
+        name: Union[str, PrefixedName, None] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
-        name: Union[str, PrefixedName, None] = None,
     ):
         """
         Instantiate the World Entity and add it to the given world.
@@ -168,7 +168,9 @@ class WorldEntitySpawnSpecification(ABC):
 
 @dataclass
 class KinematicStructureEntitySpecification(
-    Generic[DomainObjectType], AbstractSubClassSafeGeneric, WorldEntitySpawnSpecification
+    Generic[DomainObjectType],
+    AbstractSubClassSafeGeneric,
+    WorldEntitySpawnSpecification,
 ):
     """
     Declarative, world-independent description of a kinematic structure entity.
@@ -236,6 +238,7 @@ class KinematicStructureEntitySpecification(
         scale: Scale,
         color: Optional[Color] = None,
         origin: Optional[HomogeneousTransformationMatrix] = None,
+        child_specification: list[WorldEntitySpawnSpecification] | None = None,
     ) -> Self:
         """
         Specification for a kinematic structure entity with a single box shape.
@@ -252,6 +255,7 @@ class KinematicStructureEntitySpecification(
                 origin=origin or HomogeneousTransformationMatrix(),
                 color=color or Color(),
             ).as_shape_collection(),
+            child_specification=child_specification or [],
         )
 
     @classmethod
@@ -261,6 +265,7 @@ class KinematicStructureEntitySpecification(
         radius: float,
         color: Optional[Color] = None,
         origin: Optional[HomogeneousTransformationMatrix] = None,
+        child_specification: list[WorldEntitySpawnSpecification] | None = None,
     ) -> Self:
         """
         Specification for a kinematic structure entity with a single sphere shape.
@@ -277,6 +282,7 @@ class KinematicStructureEntitySpecification(
                 origin=origin or HomogeneousTransformationMatrix(),
                 color=color or Color(),
             ).as_shape_collection(),
+            child_specification=child_specification or [],
         )
 
     @classmethod
@@ -287,6 +293,7 @@ class KinematicStructureEntitySpecification(
         height: float,
         color: Optional[Color] = None,
         origin: Optional[HomogeneousTransformationMatrix] = None,
+        child_specification: list[WorldEntitySpawnSpecification] | None = None,
     ) -> Self:
         """
         Specification for a kinematic structure entity with a single cylinder shape.
@@ -305,6 +312,7 @@ class KinematicStructureEntitySpecification(
                 origin=origin or HomogeneousTransformationMatrix(),
                 color=color or Color(),
             ).as_shape_collection(),
+            child_specification=child_specification or [],
         )
 
     @classmethod
@@ -315,6 +323,7 @@ class KinematicStructureEntitySpecification(
         scale: Optional[Scale] = None,
         color: Optional[Color] = None,
         origin: Optional[HomogeneousTransformationMatrix] = None,
+        child_specification: list[WorldEntitySpawnSpecification] | None = None,
     ) -> Self:
         """
         Specification for a kinematic structure entity with a single mesh shape loaded from a file.
@@ -333,10 +342,16 @@ class KinematicStructureEntitySpecification(
                 scale=scale or Scale(),
                 color=color or Color(),
             ).as_shape_collection(),
+            child_specification=child_specification or [],
         )
 
     @classmethod
-    def from_event(cls, name: Union[str, PrefixedName], event: Event) -> Self:
+    def from_event(
+        cls,
+        name: Union[str, PrefixedName],
+        event: Event,
+        child_specification: list[WorldEntitySpawnSpecification] | None = None,
+    ) -> Self:
         """
         Specification whose shapes are the bounding boxes of a random event.
         This is the construction used by semantic annotations with composite
@@ -353,6 +368,7 @@ class KinematicStructureEntitySpecification(
             shapes=BoundingBoxCollection.from_event(anchor, event)
             .as_shapes()
             .copy_without_reference_frame(),
+            child_specification=child_specification or [],
         )
 
 
