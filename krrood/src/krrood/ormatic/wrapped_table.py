@@ -7,7 +7,16 @@ from functools import cached_property, lru_cache
 from inspect import isclass
 
 import sqlalchemy
-from typing_extensions import List, Dict, TYPE_CHECKING, Optional, Set, Type, TypeVar, get_origin
+from typing_extensions import (
+    List,
+    Dict,
+    TYPE_CHECKING,
+    Optional,
+    Set,
+    Type,
+    TypeVar,
+    get_origin,
+)
 
 from krrood.adapters.json_serializer import JSONData
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
@@ -584,7 +593,7 @@ class WrappedTable:
                     if issubclass(type_endpoint, am.original_class())
                 ]
             )
-            or issubclass(wrapped_field.type_endpoint, dict)
+            or (isclass(type_endpoint) and issubclass(type_endpoint, dict))
         ):
             logger.info(f"Skipping underspecified generic field.")
 
@@ -694,9 +703,7 @@ class WrappedTable:
             ]
             return result
         except KeyError:
-            raise WrappedTableNotFound(
-                type_=type_endpoint, wrapped_field=wrapped_field
-            )
+            raise WrappedTableNotFound(type_=type_endpoint, wrapped_field=wrapped_field)
 
     def create_one_to_one_relationship(self, wrapped_field: WrappedField):
         """
