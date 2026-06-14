@@ -1001,8 +1001,9 @@ class TestFactories(unittest.TestCase):
     #################################################################
     # Characterization of the scale -> geometry generation.
     # These pin the geometry that create_with_new_body_in_world(scale=...)
-    # currently produces, so the upcoming get_default_specification_from_scale
-    # extraction (and the later factory rewire) provably preserves it.
+    # currently produces, so the get_default_body_specification /
+    # get_default_region_specification extraction (and the later factory
+    # rewire) provably preserves it.
     #################################################################
 
     @staticmethod

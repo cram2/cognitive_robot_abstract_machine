@@ -137,7 +137,7 @@ class Handle(HasRootBody):
         )
 
     @classmethod
-    def get_default_specification_from_scale(
+    def get_default_body_specification(
         cls,
         name: Union[str, PrefixedName],
         scale: Scale = Scale(0.1, 0.02, 0.02),
@@ -223,7 +223,7 @@ class Aperture(HasRootRegion):
         )
 
     @classmethod
-    def get_default_specification_from_scale(
+    def get_default_region_specification(
         cls,
         name: Union[str, PrefixedName],
         scale: Scale = Scale(),
@@ -240,6 +240,13 @@ class Aperture(HasRootRegion):
         return RegionSpecification.from_event(
             name, scale.to_simple_event().as_composite_set()
         )
+
+    @classmethod
+    def _default_root_specification(
+        cls, name: Union[str, PrefixedName], *args, **kwargs
+    ) -> RegionSpecification:
+        """Root spec for the Aperture annotation: its default region area geometry spec."""
+        return cls.get_default_region_specification(name, *args, **kwargs)
 
 
 @dataclass(eq=False)
@@ -327,7 +334,7 @@ class Door(HasHandle, HasHinge):
         return door
 
     @classmethod
-    def get_default_specification_from_scale(
+    def get_default_body_specification(
         cls,
         name: Union[str, PrefixedName],
         scale: Scale = Scale(0.03, 1, 2),
@@ -343,7 +350,7 @@ class Door(HasHandle, HasHinge):
         """
         if not (scale.x < scale.y and scale.x < scale.z):
             raise InvalidPlaneDimensions(scale, clazz=Door)
-        return super().get_default_specification_from_scale(name, scale)
+        return super().get_default_body_specification(name, scale)
 
     def calculate_world_T_hinge_based_on_handle(
         self, opening_axis: Vector3
@@ -534,7 +541,7 @@ class Floor(HasSupportingSurface):
         )
 
     @classmethod
-    def get_default_specification_from_scale(
+    def get_default_body_specification(
         cls,
         name: Union[str, PrefixedName],
         scale: Scale = Scale(),
@@ -649,7 +656,7 @@ class Wall(HasApertures):
         )
 
     @classmethod
-    def get_default_specification_from_scale(
+    def get_default_body_specification(
         cls,
         name: Union[str, PrefixedName],
         scale: Scale = Scale(),

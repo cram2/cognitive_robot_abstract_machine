@@ -273,7 +273,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         )
 
     @classmethod
-    def get_default_specification_from_scale(
+    def get_default_body_specification(
         cls,
         name: Union[str, PrefixedName],
         scale: Scale = None,

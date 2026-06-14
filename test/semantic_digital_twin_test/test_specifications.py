@@ -290,9 +290,10 @@ def test_world_specification_annotation_starting_object():
 
 
 #####################################################################
-# get_default_specification_from_scale reproduces the geometry that
-# create_with_new_body_in_world(scale=...) generates, for every class
-# that implements its own geometry-generating factory override.
+# get_default_body_specification / get_default_region_specification
+# reproduce the geometry that create_with_new_body_in_world(scale=...)
+# (and Aperture's region factory) generate, for every class that
+# implements its own geometry-generating factory override.
 #####################################################################
 
 
@@ -312,7 +313,7 @@ def test_default_spec_matches_base_body(empty_world):
         factory = Milk.create_with_new_body_in_world(
             name=PrefixedName("milk"), world=empty_world, scale=scale
         )
-    spec_body = Milk.get_default_specification_from_scale(
+    spec_body = Milk.get_default_body_specification(
         "milk", scale
     ).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
@@ -325,7 +326,7 @@ def test_default_spec_matches_case_body(empty_world):
         factory = Drawer.create_with_new_body_in_world(
             name=PrefixedName("drawer"), world=empty_world, scale=scale
         )
-    spec_body = Drawer.get_default_specification_from_scale(
+    spec_body = Drawer.get_default_body_specification(
         "drawer", scale
     ).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
@@ -341,7 +342,7 @@ def test_default_spec_matches_case_body_with_wall_thickness(empty_world):
             scale=scale,
             wall_thickness=0.05,
         )
-    spec_body = Drawer.get_default_specification_from_scale(
+    spec_body = Drawer.get_default_body_specification(
         "drawer", scale, wall_thickness=0.05
     ).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
@@ -353,7 +354,7 @@ def test_default_spec_matches_handle(empty_world):
         factory = Handle.create_with_new_body_in_world(
             name=PrefixedName("handle"), world=empty_world, scale=scale, thickness=0.01
         )
-    spec_body = Handle.get_default_specification_from_scale(
+    spec_body = Handle.get_default_body_specification(
         "handle", scale, thickness=0.01
     ).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
@@ -365,7 +366,7 @@ def test_default_spec_matches_door(empty_world):
         factory = Door.create_with_new_body_in_world(
             name=PrefixedName("door"), world=empty_world, scale=scale
         )
-    spec_body = Door.get_default_specification_from_scale(
+    spec_body = Door.get_default_body_specification(
         "door", scale
     ).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
@@ -373,7 +374,7 @@ def test_default_spec_matches_door(empty_world):
 
 def test_default_spec_door_validates_plane():
     with pytest.raises(Exception):
-        Door.get_default_specification_from_scale("door", Scale(2, 1, 1))
+        Door.get_default_body_specification("door", Scale(2, 1, 1))
 
 
 def test_default_spec_matches_floor(empty_world):
@@ -382,7 +383,7 @@ def test_default_spec_matches_floor(empty_world):
         factory = Floor.create_with_new_body_in_world(
             name=PrefixedName("floor"), world=empty_world, scale=scale
         )
-    spec_body = Floor.get_default_specification_from_scale(
+    spec_body = Floor.get_default_body_specification(
         "floor", scale
     ).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
@@ -394,7 +395,7 @@ def test_default_spec_matches_wall(empty_world):
         factory = Wall.create_with_new_body_in_world(
             name=PrefixedName("wall"), world=empty_world, scale=scale
         )
-    spec_body = Wall.get_default_specification_from_scale(
+    spec_body = Wall.get_default_body_specification(
         "wall", scale
     ).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
@@ -406,7 +407,7 @@ def test_default_spec_matches_aperture_region(empty_world):
         factory = Aperture.create_with_new_region_in_world(
             name=PrefixedName("aperture"), world=empty_world, scale=scale
         )
-    spec_region = Aperture.get_default_specification_from_scale(
+    spec_region = Aperture.get_default_region_specification(
         "aperture", scale
     ).to_domain_object()
     _assert_same_geometry(spec_region.area, factory.root.area)
@@ -416,4 +417,106 @@ def test_default_spec_robot_part_raises():
     # AbstractRobotPart's geometry must come from URDF parsing, not from scale,
     # so it raises just like its create_with_new_body_in_world override.
     with pytest.raises(UselessConceptError):
-        AbstractRobotPart.get_default_specification_from_scale("part", Scale(1, 1, 1))
+        AbstractRobotPart.get_default_body_specification("part", Scale(1, 1, 1))
+
+
+#####################################################################
+# get_default_annotation_specification wraps the geometry spec into a
+# SemanticAnnotationWithRootSpecification that spawns an annotation
+# equivalent to create_with_new_body_in_world.
+#####################################################################
+
+
+def _fresh_world() -> World:
+    world = World()
+    with world.modify_world():
+        world.add_body(Body(name=PrefixedName("root", "world")))
+    return world
+
+
+def test_annotation_spec_base_body(empty_world):
+    scale = Scale(0.2, 0.3, 0.4)
+    spec = Milk.get_default_annotation_specification("milk", scale)
+    assert isinstance(spec, SemanticAnnotationWithRootSpecification)
+    assert spec.semantic_annotation_type is Milk
+    assert isinstance(spec.root_specification, BodySpecification)
+
+    annotation = spec.spawn(empty_world)
+    assert isinstance(annotation, Milk)
+    assert annotation in empty_world.semantic_annotations
+    assert isinstance(annotation.root.parent_connection, FixedConnection)
+
+    factory_world = _fresh_world()
+    with factory_world.modify_world():
+        factory = Milk.create_with_new_body_in_world(
+            name=PrefixedName("milk_factory"), world=factory_world, scale=scale
+        )
+    _assert_same_geometry(annotation.root.collision, factory.root.collision)
+
+
+def test_annotation_spec_active_slider(empty_world):
+    scale = Scale(0.1, 0.1, 0.1)
+    spec = Slider.get_default_annotation_specification(
+        "slider", scale, active_axis=Vector3.Z()
+    )
+    annotation = spec.spawn(empty_world)
+    assert isinstance(annotation, Slider)
+    assert isinstance(annotation.root.parent_connection, PrismaticConnection)
+
+
+def test_annotation_spec_active_requires_axis():
+    # Slider's parent connection is active, so the spec construction must demand an axis.
+    with pytest.raises(ValueError):
+        Slider.get_default_annotation_specification("slider", Scale(0.1, 0.1, 0.1))
+
+
+def test_annotation_spec_case_forwards_wall_thickness(empty_world):
+    scale = Scale(0.4, 0.5, 0.6)
+    spec = Drawer.get_default_annotation_specification(
+        "drawer", scale, wall_thickness=0.05
+    )
+    annotation = spec.spawn(empty_world)
+    factory_world = _fresh_world()
+    with factory_world.modify_world():
+        factory = Drawer.create_with_new_body_in_world(
+            name=PrefixedName("drawer_factory"),
+            world=factory_world,
+            scale=scale,
+            wall_thickness=0.05,
+        )
+    _assert_same_geometry(annotation.root.collision, factory.root.collision)
+
+
+def test_annotation_spec_handle_forwards_thickness(empty_world):
+    scale = Scale(0.1, 0.05, 0.05)
+    spec = Handle.get_default_annotation_specification("handle", scale, thickness=0.01)
+    annotation = spec.spawn(empty_world)
+    factory_world = _fresh_world()
+    with factory_world.modify_world():
+        factory = Handle.create_with_new_body_in_world(
+            name=PrefixedName("handle_factory"),
+            world=factory_world,
+            scale=scale,
+            thickness=0.01,
+        )
+    _assert_same_geometry(annotation.root.collision, factory.root.collision)
+
+
+def test_annotation_spec_aperture_region(empty_world):
+    scale = Scale(0.1, 1, 2)
+    spec = Aperture.get_default_annotation_specification("aperture", scale)
+    assert isinstance(spec.root_specification, RegionSpecification)
+
+    annotation = spec.spawn(empty_world)
+    assert isinstance(annotation, Aperture)
+    factory_world = _fresh_world()
+    with factory_world.modify_world():
+        factory = Aperture.create_with_new_region_in_world(
+            name=PrefixedName("aperture_factory"), world=factory_world, scale=scale
+        )
+    _assert_same_geometry(annotation.root.area, factory.root.area)
+
+
+def test_annotation_spec_robot_part_raises():
+    with pytest.raises(UselessConceptError):
+        AbstractRobotPart.get_default_annotation_specification("part", Scale(1, 1, 1))
