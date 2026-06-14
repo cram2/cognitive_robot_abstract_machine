@@ -8,7 +8,7 @@ import time
 from collections import defaultdict, deque
 from typing import Dict, Deque, List, Optional, Tuple, Type, TypeVar
 
-from .object_state import ObjectState
+from semantic_digital_twin.semantic_annotations.object_state import ObjectState
 
 # Generic type variable bound to ObjectState child-classes
 T = TypeVar("T", bound=ObjectState)
