@@ -72,6 +72,9 @@ from krrood.entity_query_language.operators.aggregators import Aggregator, Count
 from krrood.entity_query_language.operators.set_operations import (
     MultiArityExpressionThatPerformsACartesianProduct,
 )
+from krrood.entity_query_language._monitoring import (
+    monitored,
+)
 from krrood.entity_query_language.utils import (
     T,
 )
@@ -85,6 +88,7 @@ A function that maps the results of a query to a new set of results.
 """
 
 
+@monitored
 @dataclass(eq=False, repr=False)
 class Query(
     MultiArityExpressionThatPerformsACartesianProduct, CanBehaveLikeAVariable[T], ABC
@@ -391,7 +395,7 @@ class Query(
 
     def _evaluate__(
         self,
-        sources: Bindings,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
         Evaluate the query by constraining values, updating conclusions,
@@ -415,7 +419,7 @@ class Query(
         """
         return OperationResult(
             {v._id_: child_result[v._id_] for v in self._selected_variables_},
-            self._is_false_,
+            child_result.is_false,
             self,
             child_result,
         )
@@ -482,7 +486,7 @@ class Query(
         for i, id_ in enumerate(self._distinct_on_ids_):
             if id_ in res:
                 continue
-            var_value = self._distinct_on[i]._evaluate_(copy(res), parent=self)
+            var_value = self._distinct_on[i]._evaluate_(OperationResult(copy(res)))
             res[id_] = next(var_value).value
 
     @cached_property

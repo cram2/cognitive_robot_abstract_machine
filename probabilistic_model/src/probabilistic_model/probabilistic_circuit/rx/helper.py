@@ -149,3 +149,27 @@ def fully_factorized(
         root.add_subcircuit(distribution)
 
     return root.probabilistic_circuit
+
+
+def multiply_distributions(
+    distribution: ProbabilisticCircuit, expansion: ProbabilisticCircuit
+):
+    """
+    Expand the `distribution` by the `expansion` using factorization.
+    `distribution` is expanded in-place.
+
+    The resulting distribution is the product of the expansion and the distribution.
+
+    :param distribution: The probabilistic circuit to expand
+    :param expansion: The probabilistic circuit to use for expansion
+    :return: The expanded probabilistic circuit
+    """
+    old_distribution_root = distribution.root
+    expansion_root_index = expansion.root.index
+    remap = distribution.mount(expansion.root)
+    ff_root = remap[expansion_root_index]
+
+    new_root = ProductUnit(probabilistic_circuit=distribution)
+    new_root.add_subcircuit(ff_root)
+    new_root.add_subcircuit(old_distribution_root)
+    return distribution

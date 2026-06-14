@@ -18,6 +18,7 @@ on:
       - '.github/docker/Dockerfile'
       - '.github/docker/entrypoint.sh'
       - '.github/docker/setup_ros_workspace.sh'
+      - '.github/docker/setup_workspace.py'
 
 jobs:
   build_and_push_docker_image:

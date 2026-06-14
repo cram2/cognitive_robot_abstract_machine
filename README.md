@@ -66,11 +66,11 @@ Install poetry if you haven't already:
 
 ```bash
 pip install poetry
-``` 
+```
 
 Install the CRAM package along with its dependencies:
 
-```bash 
+```bash
 poetry install
 ```
 
@@ -88,7 +88,7 @@ sudo bash .github/docker/setup_ros_workspace.sh && source ~/.bashrc
 pytest test/<package>_test
 ```
 
-e.g. `pytest test/pycram_test`
+e.g. `pytest test/coraplex_test`
 
 ## Contribution
 

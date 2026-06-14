@@ -33,3 +33,4 @@
 
 ## Misc
 - If you find a package that could be replaced by a more powerful one, let us know
+- Always use the Python interpreter that is set as the current project interpreter for running tests and commands

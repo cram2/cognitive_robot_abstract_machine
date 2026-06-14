@@ -4,7 +4,7 @@
 # Workspace directory (override via OVERLAY_WS env var)
 export OVERLAY_WS="${OVERLAY_WS:-$HOME/ros2_ws}"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 
 # Ensure python3 is available
 if ! command -v python3 &> /dev/null; then

@@ -5,12 +5,11 @@ from typing import Type, Optional, Any, TYPE_CHECKING
 from typing_extensions import get_origin
 
 
-from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
-
 from krrood.ormatic.exceptions import NoGenericError, NoDAOFoundError
 from krrood.utils import recursive_subclasses
 
 if TYPE_CHECKING:
+    from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
     from krrood.ormatic.data_access_objects.dao import DataAccessObject
     from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 
@@ -78,6 +77,19 @@ def get_dao_class(
     return None
 
 
+def clear_dao_lookup_caches() -> None:
+    """
+    Clear all caches that map domain classes to DAO classes.
+
+    This has to be called whenever a new DataAccessObject or AlternativeMapping
+    subclass is created, since previously failed lookups (cached as None) would
+    otherwise stay stale forever.
+    """
+    _get_clazz_by_original_clazz.cache_clear()
+    get_dao_class.cache_clear()
+    get_alternative_mapping.cache_clear()
+
+
 @lru_cache(maxsize=None)
 def get_alternative_mapping(
     original_clazz: Type,
@@ -88,6 +100,8 @@ def get_alternative_mapping(
     :param original_clazz: The domain class.
     :return: The corresponding alternative mapping or None.
     """
+    from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
+
     return _get_clazz_by_original_clazz(AlternativeMapping, original_clazz)
 
 

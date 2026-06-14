@@ -1,383 +1,453 @@
 from __future__ import annotations
 
+from abc import ABC
 from dataclasses import dataclass
-from typing import Self
+from typing import Self, Union, List
 
-from semantic_digital_twin.robots.robot_mixins import HasNeck, SpecifiesLeftRightArm
-from semantic_digital_twin.datastructures.definitions import StaticJointState, GripperState, TorsoState
+from semantic_digital_twin.datastructures.definitions import (
+    GripperState,
+    StaticJointState,
+    TorsoState,
+)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import (
-    Neck,
-    Finger,
-    ParallelGripper,
+from semantic_digital_twin.robots.robot_part_mixins import (
+    HasLeftRightArm,
+    HasNeck,
+    HasTorso,
+    HasMobileBase,
+    HasFingers,
+    TGenericFingerOtherThanThumb,
+)
+from semantic_digital_twin.robots.robot_parts import (
+    AbstractRobot,
     Arm,
     Camera,
-    FieldOfView,
+    Finger,
+    Neck,
     Torso,
-    AbstractRobot,
+    MobileBase,
+    EndEffector,
 )
+from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
-from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
 
 
 @dataclass(eq=False)
-class Justin(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
-    """
-    Class that describes the Justin Robot.
-    """
+class JustinLeftThumb(Finger):
 
-    def load_srdf(self):
-        """
-        Loads the SRDF file for the Justin robot, if it exists.
-        """
-        ...
+    def setup_hardware_interfaces(self):
+        pass
+
+    def setup_joint_states(self) -> List[JointState]:
+        return []
 
     @classmethod
-    def from_world(cls, world: World) -> Self:
-        """
-        Creates a Justin robot view from the given world.
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "left_1thumb_base"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "left_1thumb4"
+            ),
+        )
 
-        :param world: The world from which to create the robot view.
 
-        :return: A Justin robot view.
-        """
+@dataclass(eq=False)
+class JustinLeftIndexFinger(Finger):
 
-        with world.modify_world():
-            justin = cls(
-                name=PrefixedName(name="rollin_justin", prefix=world.name),
-                root=world.get_body_by_name("base_footprint"),
-                _world=world,
-            )
+    def setup_hardware_interfaces(self):
+        pass
 
-            # Create left arm
-            left_gripper_thumb = Finger(
-                name=PrefixedName("left_gripper_thumb", prefix=justin.name.name),
-                root=world.get_body_by_name("left_1thumb_base"),
-                tip=world.get_body_by_name("left_1thumb4"),
-                _world=world,
-            )
+    def setup_joint_states(self) -> List[JointState]:
+        return []
 
-            left_gripper_tip_finger = Finger(
-                name=PrefixedName("left_gripper_tip_finger", prefix=justin.name.name),
-                root=world.get_body_by_name("left_2tip_base"),
-                tip=world.get_body_by_name("left_2tip4"),
-                _world=world,
-            )
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "left_2tip_base"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "left_2tip4"),
+        )
 
-            left_gripper_middle_finger = Finger(
-                name=PrefixedName(
-                    "left_gripper_middle_finger", prefix=justin.name.name
-                ),
-                root=world.get_body_by_name("left_3middle_base"),
-                tip=world.get_body_by_name("left_3middle4"),
-                _world=world,
-            )
 
-            left_gripper_ring_finger = Finger(
-                name=PrefixedName("left_gripper_ring_finger", prefix=justin.name.name),
-                root=world.get_body_by_name("left_4ring_base"),
-                tip=world.get_body_by_name("left_4ring4"),
-                _world=world,
-            )
+@dataclass(eq=False)
+class JustinLeftMiddleFinger(Finger):
 
-            left_gripper = ParallelGripper(
-                name=PrefixedName("left_gripper", prefix=justin.name.name),
-                root=world.get_body_by_name("left_arm7"),
-                tool_frame=world.get_body_by_name("l_gripper_tool_frame"),
-                front_facing_orientation=Quaternion(0.707, -0.707, 0.707, -0.707),
-                front_facing_axis=Vector3(0, 0, 1),
-                thumb=left_gripper_thumb,
-                finger=left_gripper_tip_finger,
-                _world=world,
-            )
-            left_arm = Arm(
-                name=PrefixedName("left_arm", prefix=justin.name.name),
-                root=world.get_body_by_name("base_link"),
-                tip=world.get_body_by_name("left_arm7"),
-                manipulator=left_gripper,
-                _world=world,
-            )
+    def setup_hardware_interfaces(self):
+        pass
 
-            justin.add_arm(left_arm)
+    def setup_joint_states(self) -> List[JointState]:
+        return []
 
-            # Create right arm
-            right_gripper_thumb = Finger(
-                name=PrefixedName("right_gripper_thumb", prefix=justin.name.name),
-                root=world.get_body_by_name("right_1thumb_base"),
-                tip=world.get_body_by_name("right_1thumb4"),
-                _world=world,
-            )
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "left_3middle_base"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "left_3middle4"
+            ),
+        )
 
-            right_gripper_tip_finger = Finger(
-                name=PrefixedName("right_gripper_tip_finger", prefix=justin.name.name),
-                root=world.get_body_by_name("right_2tip_base"),
-                tip=world.get_body_by_name("right_2tip4"),
-                _world=world,
-            )
 
-            right_gripper_middle_finger = Finger(
-                name=PrefixedName(
-                    "right_gripper_middle_finger", prefix=justin.name.name
-                ),
-                root=world.get_body_by_name("right_3middle_base"),
-                tip=world.get_body_by_name("right_3middle4"),
-                _world=world,
-            )
+@dataclass(eq=False)
+class JustinLeftRingFinger(Finger):
 
-            right_gripper_ring_finger = Finger(
-                name=PrefixedName("right_gripper_ring_finger", prefix=justin.name.name),
-                root=world.get_body_by_name("right_4ring_base"),
-                tip=world.get_body_by_name("right_4ring4"),
-                _world=world,
-            )
+    def setup_hardware_interfaces(self):
+        pass
 
-            right_gripper_finger_4 = Finger(
-                name=PrefixedName("right_gripper_finger_4", prefix=justin.name.name),
-                root=world.get_body_by_name("right_1thumb4"),
-                tip=world.get_body_by_name("right_1thumb4_tip"),
-                _world=world,
-            )
+    def setup_joint_states(self) -> List[JointState]:
+        return []
 
-            right_gripper = ParallelGripper(
-                name=PrefixedName("right_gripper", prefix=justin.name.name),
-                root=world.get_body_by_name("right_arm7"),
-                tool_frame=world.get_body_by_name("r_gripper_tool_frame"),
-                front_facing_orientation=Quaternion(0.707, 0.707, 0.707, 0.707),
-                front_facing_axis=Vector3(0, 0, 1),
-                thumb=right_gripper_thumb,
-                finger=right_gripper_tip_finger,
-                _world=world,
-            )
-            right_arm = Arm(
-                name=PrefixedName("right_arm", prefix=justin.name.name),
-                root=world.get_body_by_name("base_link"),
-                tip=world.get_body_by_name("right_arm7"),
-                manipulator=right_gripper,
-                _world=world,
-            )
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "left_4ring_base"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "left_4ring4"),
+        )
 
-            justin.add_arm(right_arm)
 
-            # Create camera and neck
+@dataclass(eq=False)
+class JustinRightThumb(Finger):
 
-            # real camera unknown at the moment of writing (also missing in urdf), so using dummy camera for now
-            camera = Camera(
-                name=PrefixedName("dummy_camera", prefix=justin.name.name),
-                root=world.get_body_by_name("head2"),
-                forward_facing_axis=Vector3(1, 0, 0),
-                field_of_view=FieldOfView(
-                    horizontal_angle=0.99483, vertical_angle=0.75049
-                ),
-                minimal_height=1.27,
-                maximal_height=1.85,
-                _world=world,
-            )
+    def setup_hardware_interfaces(self):
+        pass
 
-            neck = Neck(
-                name=PrefixedName("neck", prefix=justin.name.name),
-                sensors=[camera],
-                root=world.get_body_by_name("torso4"),
-                tip=world.get_body_by_name("head2"),
-                pitch_body=world.get_body_by_name("head1"),
-                yaw_body=world.get_body_by_name("head2"),
-                _world=world,
-            )
-            justin.add_neck(neck)
+    def setup_joint_states(self) -> List[JointState]:
+        return []
 
-            # Create torso
-            torso = Torso(
-                name=PrefixedName("torso", prefix=justin.name.name),
-                root=world.get_body_by_name("torso1"),
-                tip=world.get_body_by_name("torso4"),
-                _world=world,
-            )
-            justin.add_torso(torso)
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "right_1thumb_base"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "right_1thumb4"
+            ),
+        )
 
-            # Create states
-            left_arm_park = JointState.from_mapping(
-                name=PrefixedName("left_arm_park", prefix=justin.name.name),
-                mapping=dict(
-                    zip(
-                        [c for c in left_arm.connections if type(c) != FixedConnection],
-                        [
-                            0.0,
-                            0.0,
-                            0.174533,
-                            0.0,
-                            0.0,
-                            -1.9,
-                            0.0,
-                            1.0,
-                            0.0,
-                            -1.0,
-                            0.0,
-                        ],
-                    )
-                ),
-                state_type=StaticJointState.PARK,
-            )
 
-            left_arm.add_joint_state(left_arm_park)
+@dataclass(eq=False)
+class JustinRightIndexFinger(Finger):
 
-            right_arm_park = JointState.from_mapping(
-                name=PrefixedName("right_arm_park", prefix=justin.name.name),
-                mapping=dict(
-                    zip(
-                        [
-                            c
-                            for c in right_arm.connections
-                            if type(c) != FixedConnection
-                        ],
-                        [
-                            0.0,
-                            0.0,
-                            0.174533,
-                            0.0,
-                            0.0,
-                            -1.9,
-                            0.0,
-                            1.0,
-                            0.0,
-                            -1.0,
-                            0.0,
-                        ],
-                    )
-                ),
-                state_type=StaticJointState.PARK,
-            )
+    def setup_hardware_interfaces(self):
+        pass
 
-            right_arm.add_joint_state(right_arm_park)
+    def setup_joint_states(self) -> List[JointState]:
+        return []
 
-            left_gripper_joints = [
-                c for c in left_gripper.connections if type(c) != FixedConnection
-            ]
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "right_2tip_base"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "right_2tip4"),
+        )
 
-            left_gripper_open = JointState.from_mapping(
-                name=PrefixedName("left_gripper_open", prefix=justin.name.name),
-                mapping=dict(
-                    zip(
-                        left_gripper_joints,
-                        [0.0] * len(left_gripper_joints),
-                    )
-                ),
-                state_type=GripperState.OPEN,
-            )
 
-            left_gripper_close = JointState.from_mapping(
-                name=PrefixedName("left_gripper_close", prefix=justin.name.name),
-                mapping=dict(
-                    zip(
-                        left_gripper_joints,
-                        [
-                            0.0,
-                            0.523599,
-                            1.50098,
-                            1.76278,
-                            1.76278,
-                            0.0,
-                            0.523599,
-                            1.50098,
-                            1.76278,
-                            1.76278,
-                            0.0,
-                            0.523599,
-                            1.50098,
-                            1.76278,
-                            1.76278,
-                            0.0,
-                            0.523599,
-                            1.50098,
-                            1.76278,
-                            1.76278,
-                        ],
-                    )
-                ),
-                state_type=GripperState.CLOSE,
-            )
+@dataclass(eq=False)
+class JustinRightMiddleFinger(Finger):
 
-            left_gripper.add_joint_state(left_gripper_close)
-            left_gripper.add_joint_state(left_gripper_open)
+    def setup_hardware_interfaces(self):
+        pass
 
-            right_gripper_joints = [
-                c for c in right_gripper.connections if type(c) != FixedConnection
-            ]
+    def setup_joint_states(self) -> List[JointState]:
+        return []
 
-            right_gripper_open = JointState.from_mapping(
-                name=PrefixedName("right_gripper_open", prefix=justin.name.name),
-                mapping=dict(
-                    zip(
-                        right_gripper_joints,
-                        [0.0] * len(right_gripper_joints),
-                    )
-                ),
-                state_type=GripperState.OPEN,
-            )
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "right_3middle_base"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "right_3middle4"
+            ),
+        )
 
-            right_gripper_close = JointState.from_mapping(
-                name=PrefixedName("right_gripper_close", prefix=justin.name.name),
-                mapping=dict(
-                    zip(
-                        right_gripper_joints,
-                        [
-                            0.0,
-                            0.523599,
-                            1.50098,
-                            1.76278,
-                            1.76278,
-                            0.0,
-                            0.523599,
-                            1.50098,
-                            1.76278,
-                            1.76278,
-                            0.0,
-                            0.523599,
-                            1.50098,
-                            1.76278,
-                            1.76278,
-                            0.0,
-                            0.523599,
-                            1.50098,
-                            1.76278,
-                            1.76278,
-                        ],
-                    )
-                ),
-                state_type=GripperState.CLOSE,
-            )
 
-            right_gripper.add_joint_state(right_gripper_close)
-            right_gripper.add_joint_state(right_gripper_open)
+@dataclass(eq=False)
+class JustinRightRingFinger(Finger):
 
-            torso_joints = [
-                world.get_connection_by_name("torso2_joint"),
-                world.get_connection_by_name("torso3_joint"),
-                world.get_connection_by_name("torso4_joint"),
-            ]
+    def setup_hardware_interfaces(self):
+        pass
 
-            torso_low = JointState.from_mapping(
-                name=PrefixedName("torso_low", prefix=justin.name.name),
-                mapping=dict(zip(torso_joints, [-0.9, 2.33874, -1.57])),
-                state_type=TorsoState.LOW,
-            )
+    def setup_joint_states(self) -> List[JointState]:
+        return []
 
-            torso_mid = JointState.from_mapping(
-                name=PrefixedName("torso_mid", prefix=justin.name.name),
-                mapping=dict(zip(torso_joints, [-0.8, 1.57, -0.77])),
-                state_type=TorsoState.MID,
-            )
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "right_4ring_base"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "right_4ring4"
+            ),
+        )
 
-            torso_high = JointState.from_mapping(
-                name=PrefixedName("torso_high", prefix=justin.name.name),
-                mapping=dict(zip(torso_joints, [0.0, 0.174533, 0.0])),
-                state_type=TorsoState.HIGH,
-            )
 
-            torso.add_joint_state(torso_low)
-            torso.add_joint_state(torso_mid)
-            torso.add_joint_state(torso_high)
+@dataclass(eq=False)
+class JustinLeftHand(
+    EndEffector,
+    HasFingers[
+        JustinLeftThumb,
+        JustinLeftIndexFinger,
+        JustinLeftMiddleFinger,
+        JustinLeftRingFinger,
+    ],
+):
 
-            world.add_semantic_annotation(justin)
+    def setup_hardware_interfaces(self):
+        self._setup_hardware_interfaces_for_active_connections()
 
-        return justin
+    def setup_joint_states(self) -> List[JointState]:
+        gripper_joints = self.active_connections
+
+        gripper_open = JointState.from_mapping(
+            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            mapping=dict(zip(gripper_joints, [0.0] * len(gripper_joints))),
+            state_type=GripperState.OPEN,
+        )
+
+        gripper_close = JointState.from_mapping(
+            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            mapping=dict(zip(gripper_joints, [1.0] * len(gripper_joints))),
+            state_type=GripperState.CLOSE,
+        )
+
+        return [gripper_open, gripper_close]
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(robot_root, "left_arm7"),
+            tool_frame=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "l_gripper_tool_frame"
+            ),
+            front_facing_orientation=Quaternion(0.707, -0.707, 0.707, -0.707),
+        )
+
+
+@dataclass(eq=False)
+class JustinRightHand(
+    EndEffector,
+    HasFingers[
+        JustinRightThumb,
+        JustinRightRingFinger,
+        JustinRightIndexFinger,
+        JustinRightMiddleFinger,
+    ],
+):
+
+    def setup_hardware_interfaces(self):
+        self._setup_hardware_interfaces_for_active_connections()
+
+    def setup_joint_states(self) -> List[JointState]:
+        gripper_joints = self.active_connections
+
+        gripper_open = JointState.from_mapping(
+            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            mapping=dict(zip(gripper_joints, [0.0] * len(gripper_joints))),
+            state_type=GripperState.OPEN,
+        )
+
+        gripper_close = JointState.from_mapping(
+            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            mapping=dict(zip(gripper_joints, [1.0] * len(gripper_joints))),
+            state_type=GripperState.CLOSE,
+        )
+
+        return [gripper_open, gripper_close]
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(robot_root, "right_arm7"),
+            tool_frame=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "r_gripper_tool_frame"
+            ),
+            front_facing_orientation=Quaternion(0.707, 0.707, 0.707, 0.707),
+        )
+
+
+@dataclass(eq=False)
+class JustinLeftArm(Arm[JustinLeftHand]):
+
+    def setup_hardware_interfaces(self):
+        self._setup_hardware_interfaces_for_active_connections()
+
+    def setup_joint_states(self) -> List[JointState]:
+        arm_park = JointState.from_mapping(
+            name=PrefixedName("left_arm_park", prefix=self.name.name),
+            mapping=dict(
+                zip(self.active_connections, [0.0] * len(self.active_connections))
+            ),
+            state_type=StaticJointState.PARK,
+        )
+        return [arm_park]
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
+            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "left_arm7"),
+        )
+
+
+@dataclass(eq=False)
+class JustinRightArm(Arm[JustinRightHand]):
+
+    def setup_hardware_interfaces(self):
+        self._setup_hardware_interfaces_for_active_connections()
+
+    def setup_joint_states(self) -> List[JointState]:
+        arm_park = JointState.from_mapping(
+            name=PrefixedName("right_arm_park", prefix=self.name.name),
+            mapping=dict(
+                zip(self.active_connections, [0.0] * len(self.active_connections))
+            ),
+            state_type=StaticJointState.PARK,
+        )
+        return [arm_park]
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
+            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "right_arm7"),
+        )
+
+
+@dataclass(eq=False)
+class JustinCamera(Camera):
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(robot_root, "head2"),
+            forward_facing_axis=Vector3.Z(),
+            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            minimal_height=0.75049,
+            maximal_height=0.99483,
+            default_camera=True,
+        )
+
+    def setup_hardware_interfaces(self):
+        pass
+
+    def setup_joint_states(self) -> List[JointState]:
+        return []
+
+
+@dataclass(eq=False)
+class JustinNeck(Neck[JustinCamera]):
+
+    def setup_hardware_interfaces(self):
+        self._setup_hardware_interfaces_for_active_connections()
+
+    def setup_joint_states(self) -> List[JointState]:
+        return []
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(robot_root, "torso4"),
+            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "head2"),
+        )
+
+
+@dataclass(eq=False)
+class JustinTorso(
+    Torso, HasLeftRightArm[JustinLeftArm, JustinRightArm], HasNeck[JustinNeck]
+):
+
+    def setup_hardware_interfaces(self):
+        self._setup_hardware_interfaces_for_active_connections()
+
+    def setup_joint_states(self) -> List[JointState]:
+        return []
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
+            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "torso4"),
+        )
+
+
+@dataclass(eq=False)
+class JustinMobileBase(MobileBase, HasTorso[JustinTorso]):
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
+        )
+
+    def setup_hardware_interfaces(self):
+        pass
+
+    def setup_joint_states(self) -> List[JointState]:
+        return []
+
+
+@dataclass(eq=False)
+class Justin(AbstractRobot, HasMobileBase[JustinMobileBase]):
+    """
+    The Justin robot built by the DLR. https://www.dlr.de/en/rm/research/robotic-systems/humanoids/rollin-justin
+    """
+
+    def _setup_collision_rules(self):
+        pass
+
+    @classmethod
+    def get_ros_file_path(cls) -> str:
+        return "package://iai_dlr_rollin_justin/urdf/rollin_justin.urdf"
+
+    @classmethod
+    def _get_root_body_name(cls) -> str:
+        return "base_footprint"

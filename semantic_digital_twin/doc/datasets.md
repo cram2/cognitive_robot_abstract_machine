@@ -15,3 +15,16 @@ loader = Sage10kDatasetLoader()
 scene = loader.create_scene(scene_url=Sage10kDatasetLoader.available_scenes()[0])
 world = scene.create_world()
 ```
+
+## Sapien / PartNet
+
+Articulated assets from the [PartNet-Mobility](https://sapien.ucsd.edu/browse) dataset can be loaded with:
+
+```python
+from semantic_digital_twin.adapters.partnet_mobility_dataset.loader import PartNetMobilityDatasetLoader
+
+loader = PartNetMobilityDatasetLoader()
+world = loader.load(model_id=179) # model_id can be found at https://sapien.ucsd.edu/browse
+```
+
+Note that this requires the `sapien` library to be installed and the `SAPIEN_ACCESS_TOKEN` environment variable to be set.

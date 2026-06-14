@@ -32,11 +32,12 @@ jobs:
           - lib: giskardpy
           - lib: krrood
           - lib: semantic_digital_twin
-          - lib: pycram
+          - lib: coraplex
           - lib: random_events
           - lib: probabilistic_model
           - lib: physics_simulators
           - lib: robokudo
+          - lib: experiments
     uses: ./.github/workflows/ci_reusable.yml
     with:
       lib: ${{ matrix.lib }}
