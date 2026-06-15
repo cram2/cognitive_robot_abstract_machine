@@ -24,7 +24,7 @@ class TopLevelEntityRule(PhraseRule):
     enters_query_scope = True
 
     def when(self, node: Entity, context: RuleContext) -> bool:
-        return context.configuration.query_depth == 0
+        return context.configuration.query_depth == 0 and not context.inline
 
     def build(self, node: Entity, context: RuleContext) -> Fragment:
         return QueryAssembler(context).assemble(node)
@@ -45,7 +45,7 @@ class NestedEntityRule(PhraseRule):
     enters_query_scope = True
 
     def when(self, node: Entity, context: RuleContext) -> bool:
-        return context.configuration.query_depth > 0
+        return context.configuration.query_depth > 0 and not context.inline
 
     def build(self, node: Entity, context: RuleContext) -> Fragment:
         return QueryAssembler(context).assemble_nested(node)
@@ -66,11 +66,28 @@ class SetOfRule(PhraseRule):
         return QueryAssembler(context).assemble_set_of(node)
 
 
+class InlineEntityRule(PhraseRule):
+    """Entity in chain-root position → the inline-noun form (*"a Robot"*, no *"Find"*, its WHERE
+    deferred to the binding scope). Selected when the fold recurses with ``inline`` — so the chain
+    assembler just recurses the root and the dispatch picks the form, rather than type-checking and
+    calling the query assembler by hand."""
+
+    construct = Entity
+    name = "inline-entity"
+
+    def when(self, node: Entity, context: RuleContext) -> bool:
+        return context.inline
+
+    def build(self, node: Entity, context: RuleContext) -> Fragment:
+        return QueryAssembler(context).inline_noun(node)
+
+
 class ResultQuantifierRule(PhraseRule):
-    """Transparent wrapper (An / The / …) → delegate to the child."""
+    """Transparent wrapper (An / The / …) → delegate to the child, forwarding the render context
+    (an ``inline`` chain root stays inline through the wrapper)."""
 
     construct = ResultQuantifier
     name = "result-quantifier"
 
     def build(self, node: ResultQuantifier, context: RuleContext) -> Fragment:
-        return context.child(node._child_)
+        return context.child(node._child_, inline=context.inline)

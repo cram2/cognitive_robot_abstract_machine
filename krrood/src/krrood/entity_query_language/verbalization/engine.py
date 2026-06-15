@@ -26,6 +26,7 @@ def fold(
     services: MicroplanningServices,
     rules: Optional[Sequence[PhraseRule]] = None,
     number: Number = Number.SINGULAR,
+    inline: bool = False,
 ) -> Fragment:
     """
     Verbalize *node* by dispatching it to its matching grammar rule and recursing — the single
@@ -55,11 +56,12 @@ def fold(
             return override
 
     context = RuleContext(
-        child=lambda child_node, number=Number.SINGULAR: fold(
-            child_node, services, rules, number=number
+        child=lambda child_node, number=Number.SINGULAR, inline=False: fold(
+            child_node, services, rules, number=number, inline=inline
         ),
         services=services,
         number=number,
+        inline=inline,
     )
 
     rule = select(node, rules, context)

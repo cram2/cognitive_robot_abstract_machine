@@ -48,6 +48,11 @@ class RuleContext:
     """Grammatical number requested for this node.  A number-aware rule reads it to build a
     plural noun-phrase shape; every other rule ignores it (renders singular)."""
 
+    inline: bool = False
+    """``True`` when this node is being folded in chain-root position, so an ``Entity`` renders as
+    an inline noun rather than a *"Find …"* / nested phrase.  Per-fold (like ``number``): it
+    applies to this node only, resetting for its children."""
+
     @property
     def refer(self) -> ReferringExpressions:
         """:return: The referring-expression service (articles, coreference, pronouns)."""

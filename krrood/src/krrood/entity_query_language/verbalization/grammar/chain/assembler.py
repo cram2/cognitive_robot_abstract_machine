@@ -10,7 +10,6 @@ from krrood.entity_query_language.core.mapped_variable import (
     MappedVariable,
 )
 from krrood.entity_query_language.core.variable import Variable
-from krrood.entity_query_language.query.query import Entity
 from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.navigation_path import (
     build_path_parts,
@@ -28,9 +27,6 @@ from krrood.entity_query_language.verbalization.fragments.features import (
     Number,
 )
 from krrood.entity_query_language.verbalization.grammar.framework.assembler import Assembler
-from krrood.entity_query_language.verbalization.grammar.query.assembler import (
-    QueryAssembler,
-)
 from krrood.entity_query_language.verbalization.grammar.chain.planner import (
     ChainPlan,
     ChainPlanner,
@@ -40,9 +36,6 @@ from krrood.entity_query_language.verbalization.grammar.framework.specificity im
 )
 from krrood.entity_query_language.verbalization.microplanning.possessive import (
     possessive_path,
-)
-from krrood.entity_query_language.verbalization.subquery import (
-    unwrap_result_quantifiers,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
@@ -222,12 +215,11 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
     def _chain_root(self, root: SymbolicExpression) -> Fragment:
         """
         :param root: The chain root.
-        :return: The noun phrase for the chain root (an inline noun for entity roots).
+        :return: The noun phrase for the chain root. Recursed in ``inline`` position, so an entity
+            root is dispatched to the inline-noun form and anything else renders normally — the
+            chain assembler doesn't decide which, nor call the query assembler.
         """
-        inner = unwrap_result_quantifiers(root)
-        if isinstance(inner, Entity):
-            return QueryAssembler(self.context).inline_noun(inner)
-        return self.context.child(root)
+        return self.context.child(root, inline=True)
 
     def boolean_predicative(self, plan: ChainPlan, negated: bool = False) -> Fragment:
         """
