@@ -38,16 +38,18 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
     [having]"* scope.
 
     Reference: Reiter & Dale (2000) — aggregation; Gatt & Reiter (2009), SimpleNLG — realisation.
-
-    >>> transaction = variable(BankTransaction, [])
-    >>> verbalize_expression(an(entity(max(transaction.amount_details.amount))))
-    'Find the maximum of the amount of the amount_details of a BankTransaction'
     """
 
     planner = QueryPlanner
 
     def realize(self, node: Query, plan: QueryPlan) -> Fragment:
         """
+        The unconstrained aggregate value — *"the <aggregation> <leaf>"*; a constrained one adds an
+        *"among <population> …"* scope (see :meth:`_among_population`).
+
+        >>> verbalize_expression(an(entity(max(variable(BankTransaction, []).amount_details.amount))))
+        'Find the maximum of the amount of the amount_details of a BankTransaction'
+
         :param node: The aggregation value-subquery.
         :param plan: The query plan.
         :return: *"the <aggregation> <leaf>"*, optionally scoped *"among <source> …"*.
@@ -82,6 +84,13 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
         the shared :class:`ClauseComposer`; this method only places them inline. (Whether chains
         rooted at the population pronominalise is the coreference pass's concern, read from this
         query's provenance.)
+
+        >>> t1 = variable(BankTransaction, domain=None)
+        >>> t2 = variable(BankTransaction, domain=None)
+        >>> verbalize_expression(the(entity(t1).where(
+        ...     t1.amount_details.amount == an(entity(max(t2.amount_details.amount)).where(
+        ...         t2.booking_date < datetime.datetime(2024, 1, 1))))))
+        'Find the unique BankTransaction such that the amount of its amount_details is equal to the maximum amount among BankTransactions whose booking_date is before January 1, 2024'
 
         :param node: The aggregation value-subquery.
         :param plan: The query plan.

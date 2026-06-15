@@ -14,6 +14,7 @@ hyperlink to real API pages.
 
 from __future__ import annotations
 
+import datetime
 import doctest
 
 import pytest
@@ -94,6 +95,7 @@ _GLOBS.update(
     Not=Not,
     Exists=Exists,
     ForAll=ForAll,
+    datetime=datetime,
 )
 # The example-domain classes (defined in that module, not imported into it).
 _GLOBS.update(
