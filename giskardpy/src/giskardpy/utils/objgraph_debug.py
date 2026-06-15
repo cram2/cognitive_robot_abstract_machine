@@ -51,7 +51,7 @@ _LIMIT: int = int(os.environ.get("GISKARD_OBJGRAPH_LIMIT", "30"))
 #     for t in os.environ.get("GISKARD_OBJGRAPH_BACKREFS", "").split(",")
 #     if t.strip()
 # ]
-_BACKREF_TYPES = ["ForceZMonitor", "_ReachTopTask"]
+_BACKREF_TYPES = ["ForceZMonitor", "ReachTopTask"]
 
 _lock = threading.Lock()
 _periodic_thread: Optional[threading.Thread] = None
