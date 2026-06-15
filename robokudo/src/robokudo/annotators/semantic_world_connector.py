@@ -231,14 +231,14 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
         self,
         associated_hypotheses: list[tuple[ObjectHypothesis, ObjectBeliefState]],
     ) -> None:
-        """Publish a 2D image showing which SemDT body each hypothesis maps to."""
+        """Publish a 2D image showing which SemDT UUID each hypothesis maps to."""
         cas = self.get_cas()
         if not cas.contains(CASViews.COLOR_IMAGE):
             return
 
         visualization_img = cas.get_copy(CASViews.COLOR_IMAGE)
         object_hypotheses = [oh for oh, _ in associated_hypotheses]
-        body_names_by_hypothesis_id = {
+        labels_by_hypothesis_id = {
             id(oh): self.get_object_belief_label(object_belief)
             for oh, object_belief in associated_hypotheses
         }
@@ -246,14 +246,11 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
         draw_bounding_boxes_from_object_hypotheses(
             visualization_img,
             object_hypotheses,
-            lambda oh: body_names_by_hypothesis_id.get(id(oh), "unassociated"),
+            lambda oh: labels_by_hypothesis_id.get(id(oh), "unassociated"),
         )
         self.get_annotator_output_struct().set_image(visualization_img)
 
     @staticmethod
     def get_object_belief_label(object_belief: ObjectBeliefState) -> str:
-        """Return a compact display label for an object belief body's identity."""
-        body_name = object_belief.body.name
-        if body_name is not None:
-            return str(body_name)
-        return str(object_belief.uuid)[:8]
+        """Return a compact display label for an object belief UUID."""
+        return f"{str(object_belief.uuid)[:10]}..."
