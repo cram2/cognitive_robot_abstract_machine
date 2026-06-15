@@ -36,7 +36,7 @@ class JointPositionList(Task):
     """
     The weight of this task.
     """
-    max_velocity: float = field(default=0.1, kw_only=True)
+    max_velocity: float = field(default=1.0, kw_only=True)
     """
     The maximum velocity of the joints.
     """
