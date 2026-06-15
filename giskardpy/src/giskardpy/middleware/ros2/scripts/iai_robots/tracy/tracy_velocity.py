@@ -14,14 +14,6 @@ from giskardpy.utils import objgraph_debug
 
 
 def main():
-    import os
-
-    print(
-        f"GISKARD_OBJGRAPH="
-        f"{os.environ.get("GISKARD_OBJGRAPH")!r} -> enabled={objgraph_debug.ENABLED}",
-        flush=True,
-    )
-
     rospy.init_node("giskard")
     try:
         rospy.node.declare_parameters(
