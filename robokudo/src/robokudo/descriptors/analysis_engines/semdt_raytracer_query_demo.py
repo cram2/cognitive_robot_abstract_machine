@@ -32,6 +32,9 @@ class AnalysisEngine(AnalysisEngineInterface):
         plane_desc = PlaneAnnotator.Descriptor()
         plane_desc.parameters.distance_threshold = 0.01
 
+        query_result_desc = GenerateQueryResult.Descriptor()
+        query_result_desc.parameters.filter_by_query = True
+
         seq = Pipeline("SemDTRayTracerPipeline")
         seq.add_children(
             [
@@ -44,7 +47,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PointCloudClusterExtractor(),
                 ClusterColorAnnotator(),
                 ClusterPoseBBAnnotator(),
-                GenerateQueryResult(),
+                GenerateQueryResult(descriptor=query_result_desc),
                 ActionServerCheck(),
             ]
         )

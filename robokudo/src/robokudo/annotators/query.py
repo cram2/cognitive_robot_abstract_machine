@@ -72,7 +72,7 @@ from robokudo.utils.error_handling import (
     get_blackboard_exception,
     clear_blackboard_exception,
 )
-from robokudo.utils.query import QueryHandler
+from robokudo.utils.query import ObjectHypothesisQueryMatcher, QueryHandler
 from robokudo_msgs.action import Query
 
 
@@ -259,10 +259,21 @@ class GenerateQueryResult(BaseAnnotator):
     up and send it as a query reply.
     """
 
-    def __init__(self, name: str = "GenerateQueryResult"):
+    class Descriptor(BaseAnnotator.Descriptor):
+        class Parameters:
+            def __init__(self) -> None:
+                self.filter_by_query: bool = False
+                """Only return ObjectHypotheses matching requested query attributes."""
+
+        parameters = Parameters()
+
+    def __init__(
+        self, name: str = "GenerateQueryResult", descriptor: Descriptor = Descriptor()
+    ):
         """Initialize query result generator.
 
         :param name: Annotator name, defaults to "GenerateQueryResult"
+        :param descriptor: Annotator configuration descriptor
         """
         self.rk_logger = logging.getLogger(PACKAGE_NAME)
 
@@ -294,8 +305,9 @@ class GenerateQueryResult(BaseAnnotator):
             BoundingBox3D: self.bb_size_converter,
             BoundingBox3DAnnotation: self.bb_size_converter,
         }
+        self.query_matcher = ObjectHypothesisQueryMatcher()
 
-        super().__init__(name=name)
+        super().__init__(name=name, descriptor=descriptor)
 
     def update(self) -> Status:
         """Generate query result from current CAS annotations.
@@ -317,11 +329,22 @@ class GenerateQueryResult(BaseAnnotator):
         cas = self.get_cas()
         annotations = cas.annotations
         object_hypotheses_count = 0
+        skipped_object_hypotheses_count = 0
         query_result = []
         result = Query.Result()
+        requested_object = None
+        if self.descriptor.parameters.filter_by_query and cas.contains(CASViews.QUERY):
+            query = cas.get(CASViews.QUERY)
+            requested_object = getattr(query, "obj", None)
 
         for annotation in annotations:
             if not isinstance(annotation, ObjectHypothesis):
+                continue
+
+            if requested_object is not None and not self.query_matcher.matches(
+                annotation, requested_object
+            ):
+                skipped_object_hypotheses_count += 1
                 continue
 
             object_designator = ObjectDesignator()
@@ -351,7 +374,8 @@ class GenerateQueryResult(BaseAnnotator):
         QueryHandler.send_answer(result)
 
         self.feedback_message = (
-            f"Send result for {object_hypotheses_count} object hypotheses"
+            f"Send result for {object_hypotheses_count} object hypotheses "
+            f"({skipped_object_hypotheses_count} filtered by query)"
         )
         return Status.SUCCESS
 
