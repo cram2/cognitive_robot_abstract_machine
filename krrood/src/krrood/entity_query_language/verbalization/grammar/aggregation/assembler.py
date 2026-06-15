@@ -32,8 +32,6 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Keywords,
     Prepositions,
 )
-from krrood.entity_query_language.verbalization.vocabulary.words import ChildForm
-
 
 class AggregationValueAssembler(Assembler[Query, QueryPlan]):
     """
@@ -62,11 +60,10 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
             return self.context.child(aggregation_data.aggregator)
 
         aggregation_kind = AGGREGATION_KIND[type(aggregation_data.aggregator)]
-        plural_leaf = aggregation_kind.value.child_form == ChildForm.PLURAL
         leaf_fragment = RoleFragment.for_attribute(
             aggregation_data.leaf._owner_class_,
             aggregation_data.leaf._attribute_name_,
-            number=Number.of(plural_leaf),
+            number=aggregation_kind.child_number,
         )
 
         aggregate = NounPhrase(
@@ -81,13 +78,14 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
 
     def _scope(self, node: Query, plan: QueryPlan, aggregate: Fragment) -> Fragment:
         """
-        The plural source population is the scope's discourse subject, so chains rooted at it
-        pronominalise to *"their …"*.
+        Build the *"among …"* scope of a constrained aggregation — the source population followed
+        by its restrictions and any HAVING clause. (Whether chains rooted at the population
+        pronominalise is the coreference pass's concern, read from this query's provenance.)
 
         :param node: The aggregation value-subquery.
         :param plan: The query plan.
         :param aggregate: The already-built aggregate noun phrase.
-        :return: *"<aggregate> among <plural source> [whose …] [such that … their …] [having …]"*.
+        :return: *"<aggregate> among <source> [whose …] [such that …] [having …]"*.
         """
         source = plan.aggregation_data.source
         source_fragment = (

@@ -206,17 +206,10 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
             :attr:`ChainPlan.is_single_variable_attribute`).
         :return: The bare plural *"attributes of Roots"*.
         """
-        root = plan.root
-        numbered = self.context.refer.numbered_label(root)
         attribute = plan.chain[0]
-        root_noun_phrase = NounPhrase(
-            head=RoleFragment.for_variable(numbered.text, root),
-            number=Number.SINGULAR if numbered.is_numbered else Number.PLURAL,
-            definiteness=(
-                Definiteness.BARE if numbered.is_numbered else Definiteness.INDEFINITE
-            ),
-            referent_id=root._id_,
-        )
+        # The root's plural noun phrase ("Robots" / "Robot 2") is the variable rule's job; recurse
+        # for it rather than rebuilding its number/definiteness/label here.
+        root_noun_phrase = self.context.child(plan.root, number=Number.PLURAL)
         return NounPhrase(
             head=RoleFragment.for_attribute(
                 attribute._owner_class_, attribute._attribute_name_

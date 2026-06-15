@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum
 
-from typing_extensions import Callable, Dict, Optional
+from typing_extensions import Callable, Dict, List, Optional
 
 from krrood.entity_query_language.operators.comparator import not_contains
 
@@ -178,6 +178,36 @@ class Aggregations(VocabEnum):
     MIN = AggregationWord("minimum", child_form=ChildForm.SINGULAR_OF)
     MODE = AggregationWord("mode of")
     MULTI_MODE = AggregationWord("all modes of")
+
+    @property
+    def has_child(self) -> bool:
+        """:return: ``True`` when the aggregation takes a complement (*"sum of <x>"*); ``False``
+        for a childless aggregate (*"count of all"*)."""
+        return self.value.child_form is not ChildForm.NONE
+
+    @property
+    def child_number(self) -> Number:
+        """:return: The grammatical number the complement is rendered in — plural after an *"… of"*
+        word (*"sum of amounts"*), singular otherwise (*"maximum … amount"*). This is the lexical
+        fact callers used to recompute from ``child_form``."""
+        return (
+            Number.PLURAL
+            if self.value.child_form is ChildForm.PLURAL
+            else Number.SINGULAR
+        )
+
+    def complement(self, child: Fragment) -> List[Fragment]:
+        """
+        :param child: The already-rendered complement, built at :attr:`child_number`.
+        :return: The complement modifiers — a leading *"of"* when the word needs one
+            (*"maximum of …"*), else the child alone (an *"… of"* word carries its own *"of"*);
+            empty for a childless aggregate.
+        """
+        if self.value.child_form is ChildForm.NONE:
+            return []
+        if self.value.child_form is ChildForm.SINGULAR_OF:
+            return [Prepositions.OF.as_fragment(), child]
+        return [child]
 
 
 class Copulas(VocabEnum):

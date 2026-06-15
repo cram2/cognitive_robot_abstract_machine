@@ -5,10 +5,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     Fragment,
     NounPhrase,
 )
-from krrood.entity_query_language.verbalization.fragments.features import (
-    Definiteness,
-    Number,
-)
+from krrood.entity_query_language.verbalization.fragments.features import Definiteness
 from krrood.entity_query_language.verbalization.grammar.aggregation.kinds import (
     AGGREGATION_KIND,
 )
@@ -16,8 +13,6 @@ from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule im
     PhraseRule,
     RuleContext,
 )
-from krrood.entity_query_language.verbalization.vocabulary.english import Prepositions
-from krrood.entity_query_language.verbalization.vocabulary.words import ChildForm
 
 
 class AggregatorRule(PhraseRule):
@@ -31,20 +26,15 @@ class AggregatorRule(PhraseRule):
     name = "aggregator"
 
     def build(self, node: Aggregator, context: RuleContext) -> Fragment:
-        aggregation_kind = AGGREGATION_KIND[type(node)]
-        aggregation_word = aggregation_kind.value
-        aggregation_fragment = aggregation_kind.as_fragment()
-
-        if aggregation_word.child_form is ChildForm.NONE:
-            return aggregation_fragment  # childless aggregate, e.g. "count of all"
-        if aggregation_word.child_form == ChildForm.SINGULAR_OF:
-            child_fragment = context.child(node._child_)
-            modifiers = [Prepositions.OF.as_fragment(), child_fragment]
-        else:
-            child_fragment = context.child(node._child_, number=Number.PLURAL)
-            modifiers = [child_fragment]
+        # The aggregation word owns its complement realisation (the "of" and the child's number);
+        # the rule only chooses the structure — a childless aggregate is the bare word, otherwise a
+        # definite noun phrase around the lexicon-built complement.
+        kind = AGGREGATION_KIND[type(node)]
+        if not kind.has_child:
+            return kind.as_fragment()  # childless aggregate, e.g. "count of all"
+        child_fragment = context.child(node._child_, number=kind.child_number)
         return NounPhrase(
-            head=aggregation_fragment,
+            head=kind.as_fragment(),
             definiteness=Definiteness.DEFINITE,
-            modifiers=modifiers,
+            modifiers=kind.complement(child_fragment),
         )
