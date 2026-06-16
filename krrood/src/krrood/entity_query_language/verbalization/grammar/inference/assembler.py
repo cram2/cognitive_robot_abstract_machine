@@ -22,8 +22,8 @@ from krrood.entity_query_language.verbalization.grammar.framework.assembler impo
 from krrood.entity_query_language.verbalization.grammar.conditions.assembler import (
     ConditionAssembler,
 )
-from krrood.entity_query_language.verbalization.grammar.conditions.restriction_assembler import (
-    RestrictionAssembler,
+from krrood.entity_query_language.verbalization.grammar.conditions.forms import (
+    as_subject_restrictions,
 )
 from krrood.entity_query_language.verbalization.grammar.inference.planner import (
     AggregationStatus,
@@ -31,12 +31,6 @@ from krrood.entity_query_language.verbalization.grammar.inference.planner import
     ConsequentBinding,
     InferencePlanner,
     RuleStructure,
-)
-from krrood.entity_query_language.verbalization.grammar.query.planner import (
-    RestrictionPlan,
-)
-from krrood.entity_query_language.verbalization.microplanning.coordination import (
-    fold_range_pairs,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
@@ -106,9 +100,10 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         intro = self._antecedent_intro(antecedent)
         if not antecedent.conditions or antecedent.variable is None:
             return intro
-        restriction = RestrictionAssembler(self.context).render(
-            RestrictionPlan(folded=fold_range_pairs(antecedent.conditions)),
+        restriction = as_subject_restrictions(
+            antecedent.conditions,
             antecedent.variable,
+            self.context,
             self._number(antecedent),
         )
         header = (

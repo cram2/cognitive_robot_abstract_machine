@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
-from typing_extensions import List, Optional, Union
+from typing_extensions import List, Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
@@ -18,10 +18,6 @@ from krrood.entity_query_language.query.query import Entity, Query, SetOf
 from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
 from krrood.entity_query_language.verbalization.grammar.conditions.restriction import (
     restriction_subject,
-)
-from krrood.entity_query_language.verbalization.microplanning.coordination import (
-    RangeFold,
-    fold_range_pairs,
 )
 from krrood.entity_query_language.verbalization.subquery import (
     aggregation_leaf_attribute,
@@ -47,15 +43,15 @@ class SelectionKind(Enum):
 
 @dataclass(frozen=True)
 class RestrictionPlan:
-    """A subject's WHERE condition, range-folded into conjuncts — the *content* of the restriction.
+    """A subject's WHERE condition decomposed into its conjuncts — the *content* of the restriction.
 
-    Choosing each conjunct's surface form and slot (a *"whose"* predicate, a superlative selection
-    modifier, or a standalone residual clause) is the assembler's concern via the condition-form
-    registry, so the plan carries only the folded conjuncts, not a pre-decided placement.
+    Everything downstream of the raw conjuncts (range-folding a bound pair, choosing each conjunct's
+    surface form and slot) is the placement registry's concern at render time, so the plan carries
+    only the flattened conjuncts, neither folded nor placed.
     """
 
-    folded: List[Union[SymbolicExpression, RangeFold]] = field(default_factory=list)
-    """The range-folded WHERE conjuncts (each a ``RangeFold`` or a raw expression)."""
+    conditions: List[SymbolicExpression] = field(default_factory=list)
+    """The subject's WHERE conjuncts (an ``AND`` flattened to a list, not range-folded)."""
 
 
 @dataclass(frozen=True)
@@ -166,15 +162,14 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         return restriction_subject(self.node, self._selected)
 
     def _subject_restriction(self) -> Optional[RestrictionPlan]:
-        """:return: The subject's WHERE range-folded into conjuncts (placement is the assembler's
-        concern), or ``None`` when there is no groupable subject or no WHERE."""
+        """:return: The subject's WHERE flattened into conjuncts (folding and placement are the
+        registry's concern), or ``None`` when there is no groupable subject or no WHERE.
+        """
         condition = self._where_condition()
         subject = self._subject()
         if condition is None or subject is None:
             return None
-        return RestrictionPlan(
-            folded=fold_range_pairs(flatten_operands(condition, AND))
-        )
+        return RestrictionPlan(conditions=flatten_operands(condition, AND))
 
     # ── clauses ──────────────────────────────────────────────────────────────
 

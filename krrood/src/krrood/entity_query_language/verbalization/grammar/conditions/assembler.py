@@ -73,18 +73,19 @@ class ConditionAssembler(Assembler[Comparator, None]):
             ]
         )
 
-    def verbalize(self, conditions: List[SymbolicExpression]) -> List[Fragment]:
+    def as_statements(self, conditions: List[SymbolicExpression]) -> List[Fragment]:
         """
-        Verbalize a list of conditions — the single general entry a caller uses when it has *some
-        conditions* to say (a ``where`` block, an ``AND``'s operands). The verbalizer decides
+        Say a list of conditions as standalone statements — the entry a caller uses when the
+        conditions stand on their own (an ``AND``'s operands, a ``where`` block), as opposed to
+        attaching to a subject noun (:func:`as_subject_restrictions`). The verbalizer decides
         everything inside: it reduces the conjuncts (a complementary lower/upper bound pair on one
         chain becomes one *"… is between …"*) and says each resulting condition.
 
-        The caller only knows it has conditions and that this verbalizer says them; it never sees
-        the folding, nor chooses among the per-form methods below.
+        The caller only knows it has conditions and that this says them; it never sees the folding,
+        nor chooses among the per-form methods below.
 
-        :param conditions: The conditions to verbalize, in order.
-        :return: One fragment per condition (after reduction), in order.
+        :param conditions: The conditions to say, in order.
+        :return: One standalone-statement fragment per condition (after reduction), in order.
         """
         return [self.context.child(item) for item in fold_range_pairs(list(conditions))]
 

@@ -144,7 +144,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         points: List[Fragment] = [
             self._group_point(group) for group in plan.groups if group.concrete
         ]
-        points += ConditionAssembler(self.context).verbalize(plan.other_conditions)
+        points += ConditionAssembler(self.context).as_statements(plan.other_conditions)
         if not points:
             return None
         return BlockFragment(header=Keywords.GIVEN_THAT.as_fragment(), items=points)
@@ -185,7 +185,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         """
         if not plan.where_conditions:
             return None
-        points = ConditionAssembler(self.context).verbalize(plan.where_conditions)
+        points = ConditionAssembler(self.context).as_statements(plan.where_conditions)
         return BlockFragment(header=Keywords.WHERE.as_fragment(), items=points)
 
     # ── shared ───────────────────────────────────────────────────────────────

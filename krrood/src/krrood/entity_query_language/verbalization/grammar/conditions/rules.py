@@ -76,7 +76,7 @@ class AndRule(PhraseRule):
     name = "and"
 
     def build(self, node: AND, context: RuleContext) -> Fragment:
-        parts = ConditionAssembler(context).verbalize(flatten_operands(node, AND))
+        parts = ConditionAssembler(context).as_statements(flatten_operands(node, AND))
         if len(parts) == 1:
             return parts[0]
         return oxford_comma(parts, Conjunctions.AND.as_fragment())

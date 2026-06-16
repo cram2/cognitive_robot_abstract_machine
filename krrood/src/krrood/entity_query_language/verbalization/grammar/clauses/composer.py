@@ -11,8 +11,8 @@ from krrood.entity_query_language.verbalization.grammar.clauses.assembler import
     HavingAssembler,
     OrderedByAssembler,
 )
-from krrood.entity_query_language.verbalization.grammar.conditions.restriction_assembler import (
-    RestrictionAssembler,
+from krrood.entity_query_language.verbalization.grammar.conditions.forms import (
+    as_subject_restrictions,
     RestrictionFragments,
 )
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
@@ -35,12 +35,12 @@ class ClauseComposer:
     context: RuleContext
 
     def restriction(self, plan: QueryPlan) -> Optional[RestrictionFragments]:
-        """:return: The rendered subject-restriction pieces (superlatives / whose / residual), or
+        """:return: The placed subject-restriction pieces (superlatives / whose / residual), or
         ``None`` when the query has no groupable subject restriction."""
         if plan.subject_restriction is None:
             return None
-        return RestrictionAssembler(self.context).render(
-            plan.subject_restriction, plan.subject
+        return as_subject_restrictions(
+            plan.subject_restriction.conditions, plan.subject, self.context
         )
 
     def grouped_by(self, node: Query) -> Optional[Fragment]:

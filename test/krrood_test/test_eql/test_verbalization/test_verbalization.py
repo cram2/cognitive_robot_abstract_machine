@@ -1595,9 +1595,10 @@ def test_inference_planner_decomposes_rule_without_rendering(
     assert form.slot is Slot.WHOSE
 
 
-def test_query_planner_folds_subject_restriction_without_placing():
-    """The QueryPlanner only range-folds the WHERE into conjuncts — choosing each conjunct's
-    surface form/slot is the condition-form registry's concern, not the plan's."""
+def test_query_planner_collects_subject_restriction_without_placing():
+    """The QueryPlanner only flattens the WHERE into conjuncts — range-folding and choosing each
+    conjunct's surface form/slot are the condition-form registry's concern, not the plan's.
+    """
     from krrood.entity_query_language.verbalization.grammar.query.planner import (
         QueryPlanner,
         SelectionKind,
@@ -1619,10 +1620,10 @@ def test_query_planner_folds_subject_restriction_without_placing():
     assert plan.subject is not None
     assert plan.is_aggregation_subquery is False
 
-    # The plan carries only the folded conjuncts — no placement decision.
+    # The plan carries only the raw conjuncts — no folding, no placement decision.
     assert plan.subject_restriction is not None
-    assert len(plan.subject_restriction.folded) == 1
-    conjunct = plan.subject_restriction.folded[0]
+    assert len(plan.subject_restriction.conditions) == 1
+    conjunct = plan.subject_restriction.conditions[0]
 
     # "battery > 50" is a single-hop, non-boolean attribute predicate → the registry selects the
     # whose-predicate form (slot WHOSE: "whose battery is greater than 50").
