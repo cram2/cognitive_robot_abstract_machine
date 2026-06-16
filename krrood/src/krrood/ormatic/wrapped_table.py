@@ -125,6 +125,48 @@ class AssociationObject:
         short_number = str(number)[:62]
         return f"_{short_number}"
 
+    @property
+    def primary_key(self) -> ColumnConstructor:
+        """
+        :return: The primary key column constructor for this association table.
+        """
+        return ColumnConstructor(
+            self.primary_key_name,
+            "Mapped[int]",
+            "mapped_column(Integer, primary_key=True)",
+        )
+
+    @property
+    def columns(self) -> List[ColumnConstructor]:
+        """
+        :return: The foreign key column constructors for the left and right sides.
+        """
+        return [
+            ColumnConstructor(
+                self.left_foreign_key,
+                "Mapped[int]",
+                f"mapped_column(ForeignKey('{self.left_primary_key}'))",
+            ),
+            ColumnConstructor(
+                self.right_foreign_key,
+                "Mapped[int]",
+                f"mapped_column(ForeignKey('{self.right_primary_key}'))",
+            ),
+        ]
+
+    @property
+    def relationships(self) -> List[ColumnConstructor]:
+        """
+        :return: The relationship constructors for this association table.
+        """
+        return [
+            ColumnConstructor(
+                "target",
+                f"Mapped[{self.right_table_name}]",
+                f"relationship('{self.right_table_name}', foreign_keys=[{self.right_foreign_key}])",
+            )
+        ]
+
 
 @dataclass
 class WrappedTable:
@@ -529,16 +571,16 @@ class WrappedTable:
         """
 
         # check underspecified generic fields
-        if (
-            wrapped_field.is_underspecified_generic
-            and isclass(wrapped_field.type_endpoint)
-            and not any(
-                [
+        if isclass(wrapped_field.type_endpoint) and (
+            (
+                wrapped_field.is_underspecified_generic
+                and not any(
                     am
                     for am in self.ormatic.alternative_mappings
                     if issubclass(wrapped_field.type_endpoint, am.original_class())
-                ]
+                )
             )
+            or issubclass(wrapped_field.type_endpoint, dict)
         ):
             logger.info(f"Skipping underspecified generic field.")
 

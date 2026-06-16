@@ -350,7 +350,7 @@ class KinematicChain(AbstractRobotPart, ABC):
         This is a list of connections between the bodies in the kinematic chain
         """
         if self.root == self.tip:
-            return [self.root.parent_connection]
+            return []
         return self._world.compute_chain_of_connections(self.root, self.tip)
 
 
@@ -678,6 +678,19 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         except AttributeError:
             pass
 
+    @property
+    def _one_dof_connections(self) -> list[ActiveConnection1DOF]:
+        """
+        All 1-DOF active connections that belong to this robot. Velocity limit
+        adjustments must only touch the robot's own joints, never unrelated
+        environment joints (drawers, doors, ...) in the same world.
+        """
+        return [
+            connection
+            for connection in self.connections
+            if isinstance(connection, ActiveConnection1DOF)
+        ]
+
     def tighten_dof_velocity_limits_of_1dof_connections(
         self,
         new_limits: DefaultDict[ActiveConnection1DOF, float],
@@ -694,7 +707,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             new velocity limits. The keys are of type `ActiveConnection1DOF`, and the
             values represent the new velocity limits specific to each connection.
         """
-        for connection in self._world.get_connections_by_type(ActiveConnection1DOF):
+        for connection in self._one_dof_connections:
             connection.raw_dof._overwrite_dof_limits(
                 new_lower_limits=DerivativeMap(
                     None, -new_limits[connection], None, None
@@ -723,7 +736,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         """
         connections_with_velocity_limits = [
             (connection, connection.raw_dof.limits.upper.velocity)
-            for connection in self._world.get_connections_by_type(ActiveConnection1DOF)
+            for connection in self._one_dof_connections
             if connection.raw_dof.limits.upper.velocity is not None
         ]
         if not connections_with_velocity_limits:

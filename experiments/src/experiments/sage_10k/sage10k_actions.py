@@ -3,12 +3,12 @@ from dataclasses import dataclass
 import rustworkx
 
 from krrood.entity_query_language.factories import underspecified, variable
-from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from pycram.datastructures.grasp import GraspDescription
-from pycram.plans.factories import sequential
-from pycram.robot_plans.actions.base import ActionDescription
-from pycram.robot_plans.actions.core.container import OpenAction
-from pycram.robot_plans.actions.core.misc import MoveToReach
+from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+from coraplex.datastructures.grasp import GraspDescription
+from coraplex.plans.factories import sequential
+from coraplex.robot_plans.actions.base import ActionDescription
+from coraplex.robot_plans.actions.core.container import OpenAction
+from coraplex.robot_plans.actions.core.misc import MoveToReach
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Door
 from semantic_digital_twin.spatial_types import Pose2D, Pose

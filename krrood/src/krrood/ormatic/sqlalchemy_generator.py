@@ -3,13 +3,10 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
-import sys
 from dataclasses import dataclass, field
 from typing_extensions import TextIO, TYPE_CHECKING
 
 import jinja2
-
-from krrood.utils import run_black_on_file
 
 if TYPE_CHECKING:
     from krrood.ormatic.ormatic import ORMatic
@@ -49,16 +46,14 @@ class SQLAlchemyGenerator:
 
         :param file: The file to write to
         """
-        # Load the template
         template = self.env.get_template("sqlalchemy_model.py.jinja")
 
-        # Render the template
-        output = template.render(
-            ormatic=self.ormatic,
+        output = template.render(ormatic=self.ormatic)
+
+        result = subprocess.run(
+            ["ruff", "format", "--stdin-filename", "output.py", "-"],
+            input=output, capture_output=True, text=True, check=True,
         )
+        output = result.stdout
 
-        # Write the output to the file
         file.write(output)
-
-        # format the output with black
-        run_black_on_file(str(file.name))

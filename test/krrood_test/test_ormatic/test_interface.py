@@ -1,9 +1,11 @@
 import pytest
-from sqlalchemy import select, inspect
+from sqlalchemy import select, inspect, event as sa_event
+from sqlalchemy.orm.exc import DetachedInstanceError
 
 from krrood.ormatic.data_access_objects.alternative_mappings import (
     FunctionMapping,
 )
+from krrood.ormatic.data_access_objects.dao import selectin_loading
 from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
 from krrood.ormatic.data_access_objects.helper import (
     to_dao,
@@ -865,3 +867,87 @@ def test_path_custom_type(session, database):
     reconstructed = queried.from_dao()
     assert isinstance(reconstructed.path, Path)
     assert reconstructed == path
+
+
+def test_selectin_loading_preloads_relationships(session, database):
+    """
+    Within selectin_loading(), relationship attributes are loaded during the
+    query and remain accessible after the instance is detached from the session.
+    Without the context manager the relationship is not pre-loaded, so accessing
+    it on a detached instance raises DetachedInstanceError.
+    """
+    p1 = KRROODPosition(1, 2, 3)
+    p2 = KRROODPosition(2, 3, 4)
+    positions = KRROODPositions([p1, p2], ["a"])
+    session.add(to_dao(positions))
+    session.commit()
+    session.expunge_all()
+
+    # With selectin_loading: the relationship is pre-fetched during the query.
+    with selectin_loading(session):
+        dao_eager = session.scalars(select(KRROODPositionsDAO)).one()
+    session.expunge_all()
+    # The positions list was loaded inside the context, so it is accessible on
+    # the now-detached instance without any further database access.
+    assert len(dao_eager.positions) == 2
+
+    # Without selectin_loading: the relationship is not pre-fetched.
+    dao_lazy = session.scalars(select(KRROODPositionsDAO)).one()
+    session.expunge_all()
+    with pytest.raises(DetachedInstanceError):
+        _ = dao_lazy.positions
+
+
+def test_selectin_loading_reduces_queries_during_from_dao(session, database):
+    """
+    selectin_loading bulk-fetches all relationships in O(1) queries so that
+    from_dao() makes zero additional DB round-trips.  Without it, from_dao()
+    triggers an N+1 pattern: one query to load the association objects plus one
+    per individual target relationship accessed during traversal.
+    """
+    N = 30
+    positions = KRROODPositions(
+        [KRROODPosition(float(i), float(i), float(i)) for i in range(N)],
+        ["s"],
+    )
+    session.add(to_dao(positions))
+    session.commit()
+    session.expunge_all()
+
+    engine = session.bind
+    query_count = [0]
+
+    def _count(conn, cursor, statement, parameters, context, executemany):
+        query_count[0] += 1
+
+    sa_event.listen(engine, "after_cursor_execute", _count)
+    try:
+        # Without selectin_loading: from_dao() lazy-loads each relationship while
+        # the DAO is still attached to the session, producing N+1 queries (one for
+        # the association table, one per target KRROODPositionDAO).
+        dao_lazy = session.scalars(select(KRROODPositionsDAO)).one()
+        query_count[0] = 0
+        dao_lazy.from_dao()
+        queries_without = query_count[0]
+
+        session.expunge_all()
+
+        # With selectin_loading: all relationships are bulk-fetched during the
+        # initial query; from_dao() afterwards hits the DB zero times.
+        with selectin_loading(session):
+            dao_eager = session.scalars(select(KRROODPositionsDAO)).one()
+        query_count[0] = 0
+        dao_eager.from_dao()
+        queries_with = query_count[0]
+    finally:
+        sa_event.remove(engine, "after_cursor_execute", _count)
+
+    # from_dao() without selectin_loading must issue more than one query
+    # (at minimum the association load + one per target).
+    assert queries_without > 1, (
+        f"Expected N+1 lazy queries but got {queries_without}"
+    )
+    # from_dao() with selectin_loading must issue no queries at all.
+    assert queries_with == 0, (
+        f"Expected 0 queries with selectin_loading but got {queries_with}"
+    )

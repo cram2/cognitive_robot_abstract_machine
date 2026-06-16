@@ -10,7 +10,7 @@ from krrood.entity_query_language.factories import variable_from, entity, variab
 from polytope import bounding_box
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from random_events.product_algebra import Event
-from random_events.set import Set
+from random_events.set import Set as EventSet
 from random_events.variable import Symbolic
 from semantic_digital_twin.reasoning.predicates import is_supported_by
 from typing_extensions import (
@@ -18,6 +18,7 @@ from typing_extensions import (
     List,
     Optional,
     Self,
+    Set,
     Iterable,
     Type,
 )
@@ -111,6 +112,9 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         min = Point3.from_iterable(self.root.combined_mesh.bounds[0])
         max = Point3.from_iterable(self.root.combined_mesh.bounds[1])
         return min, max
+
+    def __hash__(self):
+        return hash((self.__class__, self.root))
 
     @classproperty
     def _parent_connection_type(self) -> Type[Connection]:
@@ -774,9 +778,13 @@ class HasSupportingSurface(HasStorageSpace, ABC):
                 supporting_body=self.root,
             )
         )
-        objects = an(entity(
-            semantic_annotation := variable(HasRootBody, domain=self._world.semantic_annotations)
-        ).where(semantic_annotation.root == body)).evaluate()
+        objects = an(
+            entity(
+                semantic_annotation := variable(
+                    HasRootBody, domain=self._world.semantic_annotations
+                )
+            ).where(semantic_annotation.root == body)
+        ).evaluate()
         for obj in objects:
             if obj in self.objects:
                 continue
@@ -937,7 +945,8 @@ class HasSupportingSurface(HasStorageSpace, ABC):
         surface_circuit_root = SumUnit(probabilistic_circuit=surface_circuit)
 
         objects_of_interest_variable = Symbolic(
-            name="objects_of_interest", domain=Set.from_iterable(objects_of_interest)
+            name="objects_of_interest",
+            domain=EventSet.from_iterable(objects_of_interest),
         )
 
         for object_of_interest in objects_of_interest:

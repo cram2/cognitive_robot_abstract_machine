@@ -81,7 +81,35 @@ class EvaluationTracker(EvaluationObserver):
             return
         evaluated = evaluation_context.data.get(EvaluationContextKey.EVALUATED_IDS_KEY)
         if evaluated is not None and result.evaluated_expression_ids is None:
-            result.evaluated_expression_ids = OrderedSet(evaluated)
+            result.evaluated_expression_ids = self._snapshot_evaluated(
+                evaluation_context, evaluated
+            )
+
+    @staticmethod
+    def _snapshot_evaluated(evaluation_context, evaluated):
+        """
+        Return an immutable snapshot of the cumulative *evaluated* id set, reusing the cached one
+        when the set has not grown since it was taken.
+
+        The evaluated-id set is only ever extended (never reduced), so its length uniquely
+        identifies its contents. Caching the snapshot keyed on that length collapses the previous
+        per-result copy (O(n) each, O(n^2) overall) into one copy per growth event. The returned
+        snapshot is shared between results and must be treated as read-only.
+
+        :param evaluation_context: The active evaluation context whose ``data`` holds the cache.
+        :param evaluated: The live cumulative :class:`OrderedSet` of evaluated expression ids.
+        :return: A snapshot :class:`OrderedSet` safe to stamp onto a result.
+        """
+        cached = evaluation_context.data.get(EvaluationContextKey.EVALUATED_SNAPSHOT_KEY)
+        current_length = len(evaluated)
+        if cached is None or cached[0] != current_length:
+            snapshot = OrderedSet(evaluated)
+            evaluation_context.data[EvaluationContextKey.EVALUATED_SNAPSHOT_KEY] = (
+                current_length,
+                snapshot,
+            )
+            return snapshot
+        return cached[1]
 
 
 class SatisfiedConditionTracker(EvaluationObserver):

@@ -1,12 +1,12 @@
 import enum
-import json
 import importlib
+import json
 import pathlib
 
-from sqlalchemy import TypeDecorator, types
-from sqlalchemy import types
-from typing_extensions import Type, Optional
+from sqlalchemy import Dialect, TypeDecorator, types
+from typing_extensions import Optional, Type
 
+from krrood.adapters.json_serializer import JSONData
 from krrood.utils import module_and_class_name
 
 
@@ -17,11 +17,16 @@ class TypeType(TypeDecorator):
     """
 
     impl = types.String(256)
+    cache_ok = True
 
-    def process_bind_param(self, value: Type, dialect):
+    def process_bind_param(
+        self, value: Optional[Type], dialect: Dialect
+    ) -> Optional[str]:
+        if value is None:
+            return None
         return module_and_class_name(value)
 
-    def process_result_value(self, value: impl, dialect) -> Optional[Type]:
+    def process_result_value(self, value: impl, dialect: Dialect) -> Optional[Type]:
         if value is None:
             return None
 
@@ -38,14 +43,16 @@ class PolymorphicEnumType(TypeDecorator):
     impl = types.String(512)
     cache_ok = True
 
-    def process_bind_param(self, value: Optional[enum.Enum], dialect) -> Optional[str]:
+    def process_bind_param(
+        self, value: Optional[enum.Enum], dialect: Dialect
+    ) -> Optional[str]:
         if value is None:
             return None
         # Store as 'module.path.ClassName.MEMBER_NAME'
         return f"{value.__class__.__module__}.{value.__class__.__name__}.{value.name}"
 
     def process_result_value(
-        self, value: Optional[str], dialect
+        self, value: Optional[str], dialect: Dialect
     ) -> Optional[enum.Enum]:
         if value is None:
             return None
@@ -72,12 +79,16 @@ class JSONDataType(TypeDecorator):
     impl = types.String
     cache_ok = True
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(self, value: Optional[JSONData], dialect: Dialect):
         """Store the value as-is (already JSON-serializable)."""
+        if value is None:
+            return None
         return json.dumps(value)
 
-    def process_result_value(self, value, dialect):
+    def process_result_value(self, value: impl, dialect: Dialect):
         """Return the value as-is (raw JSON, not deserialized)."""
+        if value is None:
+            return None
         return json.loads(value)
 
 
@@ -89,13 +100,15 @@ class PathType(TypeDecorator):
     impl = types.Text
     cache_ok = True
 
-    def process_bind_param(self, value: pathlib.Path, dialect) -> Optional[str]:
+    def process_bind_param(
+        self, value: Optional[pathlib.Path], dialect: Dialect
+    ) -> Optional[str]:
         if value is not None:
             return str(value)
         return value
 
     def process_result_value(
-        self, value: Optional[str], dialect
+        self, value: Optional[str], dialect: Dialect
     ) -> Optional[pathlib.Path]:
         if value is not None:
             return pathlib.Path(value)

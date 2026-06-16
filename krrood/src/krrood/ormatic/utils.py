@@ -228,18 +228,28 @@ def _get_type_hints_cached(clazz: Type) -> Dict[str, Any]:
         return {}
 
 
+@lru_cache(maxsize=None)
+def _get_default_type_mappings():
+    """
+    :return: The (cached) default type mappings used by ORMatic.
+    """
+    from krrood.ormatic.ormatic import ORMatic
+
+    return ORMatic.get_type_mappings()
+
+
 def get_python_type_from_sqlalchemy_column(column: Column):
     """
     This function returns the python type of an sqlalchemy column.
     :param column: The sqlalchemy column.
     :return: The python type of the column.
     """
-    from krrood.ormatic.ormatic import ORMatic
+    type_mappings = _get_default_type_mappings()
 
-    if type(column.type) in ORMatic.get_type_mappings().values():
+    if type(column.type) in type_mappings.values():
         python_type = [
             key
-            for key, value in ORMatic.get_type_mappings().items()
+            for key, value in type_mappings.items()
             if value == type(column.type)
         ]
     else:

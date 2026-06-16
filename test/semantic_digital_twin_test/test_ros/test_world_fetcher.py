@@ -8,7 +8,7 @@ from semantic_digital_twin.adapters.ros.world_fetcher import (
     FetchWorldServer,
     fetch_world_from_service,
 )
-from semantic_digital_twin.adapters.ros.world_synchronizer import ModelSynchronizer
+from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
@@ -227,11 +227,11 @@ def test_pr2_collision_rules(rclpy_node, pr2_world_state_reset):
     pr2_world_copy = fetch_world_from_service(
         rclpy_node,
     )
-    synchronizer_1 = ModelSynchronizer(
+    synchronizer_1 = WorldSynchronizer(
         node=rclpy_node,
         _world=pr2_world_state_reset,
     )
-    synchronizer_2 = ModelSynchronizer(
+    synchronizer_2 = WorldSynchronizer(
         node=rclpy_node,
         _world=pr2_world_copy,
     )

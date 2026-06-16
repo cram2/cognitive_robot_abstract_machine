@@ -1,4 +1,8 @@
 import unittest
+from copy import deepcopy
+
+import numpy as np
+import pytest
 
 from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -9,7 +13,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Door,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Vector3
+from semantic_digital_twin.spatial_types.spatial_types import (
+    Vector3,
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -18,6 +25,9 @@ from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.inertial_properties import Inertial
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body, Actuator
 from semantic_digital_twin.world_description.world_modification import (
     WorldModelModificationBlock,
@@ -227,6 +237,90 @@ class ConnectionModificationTestCase(unittest.TestCase):
 
         self.assertEqual(len(w2.actuators), 1)
         self.assertEqual(w2.actuators[0].id, actuator.id)
+
+
+def test_connection_t_child_expression_survives_json_roundtrip():
+
+    world = World()
+    root = Body(name=PrefixedName("root", prefix="review"))
+    child = Body(name=PrefixedName("child", prefix="review"))
+    connection_T_child = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=1.0, y=2.0, z=3.0, child_frame=child
+    )
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(child)
+        connection = FixedConnection(
+            parent=root,
+            child=child,
+            connection_T_child_expression=connection_T_child,
+        )
+        world.add_connection(connection)
+
+    tracker_kwargs = WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs()
+    restored = from_json(connection.to_json(), **tracker_kwargs)
+
+    np.testing.assert_allclose(
+        restored.connection_T_child_expression.to_np(),
+        connection.connection_T_child_expression.to_np(),
+    )
+
+
+def test_body_inertial_survives_world_deepcopy():
+    world = World()
+    body = Body(name=PrefixedName("heavy_body", prefix="review"))
+    collision = Box(
+        scale=Scale(),
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
+    )
+    body.collision = ShapeCollection([collision], reference_frame=body)
+    body.inertial = Inertial(mass=5.0)
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body)
+
+    copied_world = deepcopy(world)
+    copied_body = copied_world.get_body_by_name("heavy_body")
+
+    assert copied_body.inertial is not None
+    assert copied_body.inertial.mass == pytest.approx(5.0)
+
+
+def test_design_09_failed_atomic_modification_is_not_recorded():
+    """world.py:283-289: atomic_world_modification appends the modification to the
+    current block *before* executing the function. If the function raises and the
+    caller catches the error inside the modify_world block, a phantom modification
+    stays in the history."""
+
+    world = World()
+    root = Body(name=PrefixedName("root", prefix="review"))
+    child = Body(name=PrefixedName("child", prefix="review"))
+    collision = Box(
+        scale=Scale(),
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=child),
+    )
+    child.collision = ShapeCollection([collision], reference_frame=child)
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(child)
+        connection = FixedConnection(parent=root, child=child)
+        world.add_connection(connection)
+
+    outside_parent = Body(name=PrefixedName("outside_parent", prefix="review"))
+    outside_child = Body(name=PrefixedName("outside_child", prefix="review"))
+
+    with world.modify_world():
+        bad_connection = FixedConnection(parent=outside_parent, child=outside_child)
+        try:
+            # bodies were never added to the world -> their graph indices are None
+            world._add_connection(bad_connection)
+        except Exception:
+            pass
+
+        block = world._model_manager.current_model_modification_block
+        assert len(block) == 0, (
+            "a failed atomic modification was recorded in the history: "
+            f"{block.modifications}"
+        )
 
 
 if __name__ == "__main__":

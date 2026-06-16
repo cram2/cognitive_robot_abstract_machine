@@ -1,0 +1,76 @@
+name: Jupyter Notebook Examples
+
+on:
+  push:
+    branches:
+      - dev
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - dev
+      - main
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+defaults:
+  run:
+    shell: bash
+    working-directory: .
+
+jobs:
+  test-notebooks:
+    name: Test Jupyter Notebooks
+    runs-on: ubuntu-22.04
+    container:
+      image: "coraplex/coraplex:jazzy"
+
+    steps:
+
+      - name: Checkout CoraPlex
+        uses: actions/checkout@v3
+        with:
+          path: "ros/src/coraplex"
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          submodules: "false"
+
+      # For debugging
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+
+      - name: Update CoraPlex source files
+        run: |
+          rm -rf /opt/ros/overlay_ws/src/coraplex/* 
+          cd /opt/ros/overlay_ws/src/coraplex
+          rm -rf .git .github .gitignore .gitmodules .readthedocs.yaml
+          cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/coraplex /opt/ros/overlay_ws/src
+
+      # ----------------------------------------------------------------------------------------------------------------
+
+      - name: Install python dependencies
+        run: |
+          source /opt/ros/overlay_ws/src/coraplex-venv/bin/activate
+          pip install --upgrade pip --root-user-action=ignore
+          cd /opt/ros/overlay_ws/src/coraplex
+          pip install -r requirements.txt
+          pip install jupytext treon
+
+      # ----------------------------------------------------------------------------------------------------------------
+      - name: Convert Notebooks
+        run: |
+          source /opt/ros/overlay_ws/src/coraplex-venv/bin/activate
+          cd /opt/ros/overlay_ws/src/coraplex/examples
+          rm -rf tmp
+          mkdir tmp
+          python -m jupytext --to notebook *.md
+          mv *.ipynb tmp && cd tmp
+
+      - name: Run tests
+        run: |
+          source /opt/ros/overlay_ws/install/setup.bash
+          source /opt/ros/overlay_ws/src/coraplex-venv/bin/activate
+          cd /opt/ros/overlay_ws/src/coraplex/examples/tmp
+          python -m treon -v --exclude=migrate_neems.ipynb --exclude=improving_actions.ipynb

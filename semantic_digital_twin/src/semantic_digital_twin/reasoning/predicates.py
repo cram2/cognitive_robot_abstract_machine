@@ -25,6 +25,7 @@ from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import Vector3, Point3
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
+    Pose,
 )
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import BoundingBox
@@ -165,15 +166,13 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
         )
     )
 
-    mask_without_occluders = segmentation_mask_without_occlusion[
-        segmentation_mask_without_occlusion == copied_body.index
-    ].nonzero()
+    # pixels where the target body is visible when nothing else is in the scene
+    target_pixels = segmentation_mask_without_occlusion == copied_body.index
 
-    mask_with_occluders = segmentation_mask_with_occlusion[
-        mask_without_occluders != body.index
-    ]
-    indices = np.unique(mask_with_occluders)
-    indices = indices[indices > -1]
+    # whatever covers those pixels in the real scene (except the target itself)
+    # is occluding the target
+    indices = np.unique(segmentation_mask_with_occlusion[target_pixels])
+    indices = indices[(indices > -1) & (indices != body.index)]
     bodies = [camera._world.kinematic_structure[i] for i in indices]
     return bodies
 
@@ -556,7 +555,7 @@ class ContainsType(Predicate):
 
 @symbolic_function
 def is_place_occupied(
-    box: BoundingBox, world: World, allowed_bodies: List[Body] = None
+    box: BoundingBox, pose: Pose, world: World, allowed_bodies: List[Body] = None
 ) -> bool:
     """
     Checks if the given region (as a box at its pose) intersects with any collidable
@@ -575,10 +574,7 @@ def is_place_occupied(
     # Build a mesh for the region box at its current pose
     region_box_shape = box.as_shape()  # returns a Box centered at the region
     region_mesh = region_box_shape.mesh.copy()
-    # region_mesh.apply_transform(region_box_shape.origin.to_np())
-    region_mesh.apply_transform(
-        world.transform(region_box_shape.origin, world.root).to_np()
-    )
+    region_mesh.apply_transform(world.transform(pose, world.root).to_np())
 
     # Prepare collision manager with the region mesh
     cm = CollisionManager()

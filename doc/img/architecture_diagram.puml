@@ -1,6 +1,6 @@
 @startuml
 skinparam componentStyle uml2
-package "PyCRAM" <<Component>> {
+package "CoraPlex" <<Component>> {
     [Plans] as Plans
     [Designators] as Designators
     [Motion Executor] as MotionExecutor

@@ -22,10 +22,7 @@ from rclpy.action.client import ClientGoalHandle
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
-from semantic_digital_twin.adapters.ros.world_synchronizer import (
-    ModelSynchronizer,
-    StateSynchronizer,
-)
+from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
@@ -54,11 +51,8 @@ class GiskardWrapper:
             )
             self.world = fetch_world_from_service(self.node_handle, timeout_seconds=300)
             self.node_handle.get_logger().info("world synced")
-            self.model_synchronizer = ModelSynchronizer(
+            self.world_synchronizer = WorldSynchronizer(
                 _world=self.world, node=self.node_handle, synchronous=True
-            )
-            self.state_synchronizer = StateSynchronizer(
-                _world=self.world, node=self.node_handle
             )
         giskard_topic = f"{self.giskard_node_name}/command"
         self._client = MyActionClient(self.node_handle, JsonAction, giskard_topic)

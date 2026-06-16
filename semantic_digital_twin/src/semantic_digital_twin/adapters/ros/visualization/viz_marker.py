@@ -94,7 +94,7 @@ class VizMarkerPublisher(ModelChangeCallback):
             MarkerArray, self.topic_name, self.qos_profile
         )
         time.sleep(0.2)
-        self.notify()
+        self.notify_model_change()
         time.sleep(0.2)
 
     def with_tf_publisher(self):
@@ -112,7 +112,7 @@ class VizMarkerPublisher(ModelChangeCallback):
             return body.visual.shapes if body.visual.shapes else body.collision.shapes
         raise ValueError(f"Unsupported shape_source: {self.shape_source!r}")
 
-    def _notify(self, **kwargs):
+    def on_model_change(self, **kwargs):
         self.markers = MarkerArray()
         for body in self._world.bodies:
             shapes = self._select_shapes(body)

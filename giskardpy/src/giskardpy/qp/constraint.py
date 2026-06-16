@@ -965,10 +965,19 @@ class GiskardConstraint(ABC):
     name: str
 
     expression: Scalar
+    """
+    The expression that is being constrained.
+    """
 
     quadratic_weight: sm.ScalarData
+    """
+    The quadratic weight of this constraint. Describes how expensive it is to violate.
+    """
 
     linear_weight: sm.ScalarData = field(default=0)
+    """
+    The linear weight of this constraint. Its only hear for completeness sake, I haven't found a use case for it.
+    """
 
     normalization_factor: float
     """

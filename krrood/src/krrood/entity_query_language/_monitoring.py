@@ -9,12 +9,12 @@ imports.
 
 from __future__ import annotations
 
-import inspect
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import wraps
 from typing_extensions import Any, Optional, Type, Callable, Union
 
-from krrood.entity_query_language._stack import CallStack, StackFrame
+from krrood.entity_query_language._stack import CallStack
 from krrood.singleton import SingletonMeta
 
 
@@ -30,6 +30,11 @@ class MonitoredRegistry(metaclass=SingletonMeta):
     Set of classes that are currently being monitored.
     """
 
+    _is_disabled: bool = field(default=False)
+    """
+    When True, stack capture is skipped for all monitored classes.
+    """
+
     def __call__(self, cls: Type) -> Type:
         """Decorate a class to automatically record its creation stack as a :class:`CallStack`."""
         cls._is_monitored_ = True
@@ -39,11 +44,10 @@ class MonitoredRegistry(metaclass=SingletonMeta):
 
         @wraps(original_post_init)
         def new_post_init(self, *args, **kwargs):
-            raw_frames = inspect.stack()[1:]
-            stack = CallStack(
-                [StackFrame.from_frame_info(frame_info) for frame_info in raw_frames]
-            )
-            self._creation_stack = stack.filter()  # drop site-packages immediately
+            if not monitored._is_disabled:
+                # ``skip=1`` drops this ``new_post_init`` frame so capture starts at the caller
+                # of ``__post_init__``; site-packages frames are filtered during the walk.
+                self._creation_stack = CallStack.capture(skip=1)
             original_post_init(self, *args, **kwargs)
 
         cls.__post_init__ = new_post_init
@@ -66,6 +70,15 @@ class MonitoredRegistry(metaclass=SingletonMeta):
         self._monitored.discard(cls)
         if hasattr(cls, "_is_monitored_"):
             del cls._is_monitored_
+
+    @contextmanager
+    def disabled(self):
+        """Context manager that suppresses stack capture for all monitored classes."""
+        self._is_disabled = True
+        try:
+            yield
+        finally:
+            self._is_disabled = False
 
     @property
     def monitored_classes(self) -> tuple[type, ...]:

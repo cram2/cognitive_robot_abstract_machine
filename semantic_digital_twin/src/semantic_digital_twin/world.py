@@ -51,6 +51,10 @@ from semantic_digital_twin.exceptions import (
     MismatchingPublishChangesAttribute,
     AtomicWorldModificationNotAtomic,
     SemanticAnnotationCircularDependencyError,
+    WorldValidationError,
+    WorldIsNotATreeError,
+    WorldContainsOrphanedDegreeOfFreedom,
+    BrokenWorldModificationHistoryError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -133,9 +137,9 @@ class ResetStateContextManager:
 
     This class is designed to allow operations to be performed on a `World`
     object, ensuring that its state can be safely returned to its previous
-    condition upon leaving the context. If no exceptions occur within the
-    context, the original state of the `World` instance is restored, and the
-    state change is notified.
+    condition upon leaving the context. The original state of the `World`
+    instance is restored even if an exception occurs within the context, and
+    the state change is notified.
     """
 
     def __init__(self, world: World):
@@ -150,9 +154,6 @@ class ResetStateContextManager:
         exc_val: Optional[Exception],
         exc_tb: Optional[type],
     ) -> None:
-        if exc_val:
-            raise exc_val
-
         self.world.state._data[:] = self.state
         self.world.notify_state_change()
 
@@ -203,30 +204,56 @@ class WorldModelUpdateContextManager:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            # If error, clean up before re-raising
+            if exc_val:
+                model_manager = self.world._model_manager
+                model_manager._active_world_model_update_context_manager_ids.remove(
+                    self._id
+                )
+                # the modifications applied before the error are not rolled back,
+                # so cached queries must be invalidated
+                clear_memoization_cache(self.world)
+                if not model_manager._active_world_model_update_context_manager_ids:
+                    if len(model_manager.current_model_modification_block):
+                        raise BrokenWorldModificationHistoryError(
+                            world=self.world, potential_cause=exc_val
+                        )
+                    model_manager.current_model_modification_block = (
+                        WorldModelModificationBlock()
+                    )
+                    self.world.world_is_being_modified = False
+                    model_manager._current_modifications_will_be_published = None
+                raise exc_val
 
-        if exc_val:
-            raise exc_val
+            self.world.delete_orphaned_dofs()
+            clear_memoization_cache(self.world)
+            model_manager = self.world._model_manager
+            model_manager._active_world_model_update_context_manager_ids.remove(
+                self._id
+            )
 
-        self.world.delete_orphaned_dofs()
-        clear_memoization_cache(self.world)
-        model_manager = self.world._model_manager
-        model_manager._active_world_model_update_context_manager_ids.remove(self._id)
+            # if there are still open context managers dont publish yet
+            if model_manager._active_world_model_update_context_manager_ids:
+                return
 
-        if not model_manager._active_world_model_update_context_manager_ids:
             model_manager.model_modification_blocks.append(
                 model_manager.current_model_modification_block
             )
             model_manager.current_model_modification_block = (
                 WorldModelModificationBlock()
             )
-            if exc_type is None:
-                self.world._notify_model_change(publish_changes=self.publish_changes)
-
-            self.world.world_is_being_modified = False
-            model_manager._current_modifications_will_be_published = None
-
-        # keep outside the if block, as it needs to be released as many times as it was acquired
-        self.world._world_lock.release()
+            try:
+                if exc_type is None:
+                    self.world._notify_model_change(
+                        publish_changes=self.publish_changes
+                    )
+            finally:
+                self.world.world_is_being_modified = False
+                model_manager._current_modifications_will_be_published = None
+        finally:
+            # keep outside the if block, as it needs to be released as many times as it was acquired
+            self.world._world_lock.release()
 
 
 def atomic_world_modification(func=None, modification: Type[WorldModification] = None):
@@ -249,6 +276,10 @@ def atomic_world_modification(func=None, modification: Type[WorldModification] =
         def wrapper(current_world: World, *args, **kwargs):
             if current_world._current_active_atomic_world_modification is not None:
                 raise AtomicWorldModificationNotAtomic(func, current_world)
+            if (
+                not current_world._model_manager._active_world_model_update_context_manager_ids
+            ):
+                raise MissingWorldModificationContextError(func)
             current_world._current_active_atomic_world_modification = func
 
             # bind args and kwargs
@@ -261,17 +292,17 @@ def atomic_world_modification(func=None, modification: Type[WorldModification] =
             # Build a dict with all arguments (including positional), excluding 'self'
             bound_args = dict(bound.arguments)
             bound_args.pop("self", None)
-            if (
-                not current_world._model_manager._active_world_model_update_context_manager_ids
-            ):
-                raise MissingWorldModificationContextError(func)
+            recorded_modification = modification.from_kwargs(bound_args)
+
+            try:
+                result = func(current_world, *args, **kwargs)
+            finally:
+                current_world._current_active_atomic_world_modification = None
+            # only record the modification after the function succeeded, otherwise a
+            # caught exception leaves a phantom modification in the history
             current_world.get_world_model_manager().current_model_modification_block.append(
-                modification.from_kwargs(bound_args)
+                recorded_modification
             )
-
-            result = func(current_world, *args, **kwargs)
-
-            current_world._current_active_atomic_world_modification = None
             return result
 
         return wrapper
@@ -339,7 +370,7 @@ class WorldModelManager:
         """
         self.version += 1
         for callback in self.model_change_callbacks:
-            callback.notify(**kwargs)
+            callback.notify_model_change(**kwargs)
 
 
 _LRU_CACHE_SIZE: int = 2048
@@ -463,19 +494,21 @@ class World(HasSimulatorProperties):
         return hash((id(self), self._model_manager.version))
 
     def __str__(self):
-        return f"{self.__class__.name} v{self._model_manager.version}.{self.state.version}."
+        return f"{self.__class__.__name__} v{self._model_manager.version}.{self.state.version}."
 
     def validate(self) -> bool:
         """
         Validate the world.
 
         The world must be a tree.
-        :return: True if the world is valid, raises an AssertionError otherwise.
+        :return: True if the world is valid, raises a WorldValidationError otherwise.
         """
         if self.is_empty():
             return True
-        assert len(self.kinematic_structure_entities) == (len(self.connections) + 1)
-        assert rx.is_weakly_connected(self.kinematic_structure)
+        if len(self.kinematic_structure_entities) != (len(self.connections) + 1):
+            raise WorldIsNotATreeError(world=self)
+        if not rx.is_weakly_connected(self.kinematic_structure):
+            raise WorldIsNotATreeError(world=self)
         self._validate_dofs()
         return True
 
@@ -483,9 +516,10 @@ class World(HasSimulatorProperties):
         actual_dofs = {
             dof for connection in self.connections for dof in connection.dofs
         }
-        assert actual_dofs == set(
-            self.degrees_of_freedom
-        ), "self.degrees_of_freedom does not match the actual dofs used in connections. Did you forget to call self.delete_orphaned_dofs()?"
+        if actual_dofs != set(self.degrees_of_freedom):
+            raise WorldContainsOrphanedDegreeOfFreedom(
+                world=self, actual_dofs=actual_dofs
+            )
 
     # %% Properties
     @property
@@ -1238,7 +1272,10 @@ class World(HasSimulatorProperties):
         return self._get_world_entity_by_hash(hash(id))
 
     def get_semantic_annotation_by_id(self, id: UUID) -> SemanticAnnotation:
-        return [s for s in self.semantic_annotations if s.id == id][0]
+        matches = [s for s in self.semantic_annotations if s.id == id]
+        if not matches:
+            raise WorldEntityWithIDNotFoundError(id)
+        return matches[0]
 
     def _get_world_entity_by_hash(self, entity_hash: int) -> GenericWorldEntity:
         """
@@ -1867,7 +1904,7 @@ class World(HasSimulatorProperties):
             crashes if its not the case. Also using this in a method that is called a lot, it may cause performance
             issues because of unnecessary recompilations.
         """
-        self._forward_kinematic_manager._notify()
+        self._forward_kinematic_manager.notify_model_change()
         self._forward_kinematic_manager.recompute()
 
     # %% Inverse Kinematics
@@ -1928,11 +1965,14 @@ class World(HasSimulatorProperties):
         for semantic_annotation in reversed(self.semantic_annotations):
             self.remove_semantic_annotation(semantic_annotation)
 
-        for kinematic_structure_entity in self.kinematic_structure_entities:
-            self.remove_kinematic_structure_entity(kinematic_structure_entity)
-
+        # connections must be removed before the kinematic structure entities:
+        # removing a node makes rustworkx silently drop its edges, so the
+        # connections would never be detached from the world otherwise
         for connection in self.connections:
             self.remove_connection(connection)
+
+        for kinematic_structure_entity in self.kinematic_structure_entities:
+            self.remove_kinematic_structure_entity(kinematic_structure_entity)
 
         for degree_of_freedom in copy(self.degrees_of_freedom):
             self.remove_degree_of_freedom(degree_of_freedom)

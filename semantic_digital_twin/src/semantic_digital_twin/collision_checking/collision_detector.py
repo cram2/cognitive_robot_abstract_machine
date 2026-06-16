@@ -119,7 +119,7 @@ class CollisionDetectorModelUpdater(ModelChangeCallback):
         self._world = self.collision_detector._world
         super().__post_init__()
 
-    def _notify(self, **kwargs):
+    def on_model_change(self, **kwargs):
         if self._world.is_empty():
             return
         self.collision_detector.sync_world_model()
@@ -155,7 +155,7 @@ class CollisionDetectorModelUpdater(ModelChangeCallback):
         return self.compiled_collision_fks.evaluate()
 
 
-@dataclass
+@dataclass(eq=False)
 class CollisionDetectorStateUpdater(StateChangeCallback):
     """
     Updates the collision detector's collision FK cache when the world state changes.
@@ -170,7 +170,7 @@ class CollisionDetectorStateUpdater(StateChangeCallback):
         self._world = self.collision_detector._world
         super().__post_init__()
 
-    def _notify(self, **kwargs):
+    def on_state_change(self, **kwargs):
         if self._world.is_empty():
             return
         self.collision_detector.world_model_updater.compiled_collision_fks.evaluate()
@@ -193,8 +193,8 @@ class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
         self.world_state_updater = CollisionDetectorStateUpdater(
             collision_detector=self
         )
-        self.world_model_updater.notify()
-        self.world_state_updater.notify()
+        self.world_model_updater.on_model_change()
+        self.world_state_updater.on_state_change()
 
     def get_all_collision_fks(self) -> np.ndarray:
         return self.world_model_updater.compiled_collision_fks._out

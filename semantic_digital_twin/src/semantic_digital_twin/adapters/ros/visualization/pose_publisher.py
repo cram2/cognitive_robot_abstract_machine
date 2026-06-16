@@ -64,7 +64,7 @@ class PosePublisher(ModelChangeCallback):
     )
     """QoS profile for the publisher."""
 
-    def _notify(self, *args, **kwargs):
+    def on_model_change(self, **kwargs):
         if self.lifetime > 0 and time.time() >= self.end_time:
             self.pause()
         marker_array = self._create_marker_array()
@@ -81,7 +81,7 @@ class PosePublisher(ModelChangeCallback):
         time.sleep(0.2)
         self.end_time = time.time() + self.lifetime
 
-        self._notify()
+        self.on_model_change()
 
     def with_tf_publisher(self):
         """

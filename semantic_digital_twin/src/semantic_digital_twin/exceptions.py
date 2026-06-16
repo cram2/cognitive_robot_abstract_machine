@@ -1,7 +1,7 @@
 from __future__ import annotations, absolute_import
 
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Set
 from uuid import UUID
 
 from typing_extensions import (
@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.spatial_types import Vector3, Point3
     from semantic_digital_twin.world_description.degree_of_freedom import (
         DegreeOfFreedomLimits,
+        DegreeOfFreedom,
     )
     from semantic_digital_twin.world_description.world_modification import (
         WorldModification,
@@ -197,6 +198,72 @@ class UsageError(LogicalError):
     """
     An exception raised when an incorrect usage of the API is encountered.
     """
+
+
+@dataclass
+class WorldValidationError(LogicalError):
+    """
+    Raised when the world fails validation, e.g., when the kinematic structure is not a tree.
+    """
+
+    world: World
+    """
+    The world that failed validation.
+    """
+
+
+@dataclass
+class WorldIsNotATreeError(WorldValidationError):
+    """
+    Raised when the kinematic structure of the world is not a tree during validation.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"The world is not a tree: found {len(self.world.kinematic_structure_entities)} kinematic "
+            f"structure entities but {len(self.world.connections)} connections."
+        )
+        super().__post_init__()
+
+
+@dataclass
+class BrokenWorldModificationHistoryError(WorldValidationError):
+    """
+    Raised when the world's modification history was detected to be broken.
+    """
+
+    potential_cause: Optional[DataclassException] = None
+    """
+    The exception that was thrown and caused the world's modification history to be broken.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"The world's modification history was detected to be broken. "
+            f"The world is {self.world}"
+            f" Potential cause: {self.potential_cause}"
+        )
+        super().__post_init__()
+
+
+@dataclass
+class WorldContainsOrphanedDegreeOfFreedom(WorldValidationError):
+    """
+    Raised when the kinematic structure of the world contains orphaned degrees of freedom during validation.
+    """
+
+    actual_dofs: Set[DegreeOfFreedom]
+    """
+    The actual degrees of freedom used in connections.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            "self.degrees_of_freedom does not match the actual dofs used in connections. The orphaned degrees of freedom are: "
+            f"{set(self.world.degrees_of_freedom) - self.actual_dofs}"
+            " Did you forget to call self.delete_orphaned_dofs()?"
+        )
+        super().__post_init__()
 
 
 @dataclass
@@ -375,6 +442,43 @@ class MissingPublishChangesKWARG(UsageError):
 
 
 @dataclass
+class StateUpdateContainsUnknownDegreesOfFreedomError(UsageError):
+    """
+    Raised when a WorldStateUpdate is received that contains one or more DOF identifiers
+    absent from the world state index.  This indicates a severe model/state desynchronization
+    that must be investigated rather than silently ignored.
+    """
+
+    unknown_identifiers: List[UUID]
+    """
+    List of unknown DOF UUIDs that were attempted to update the state of
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"Received a WorldStateUpdate containing {len(self.unknown_identifiers)} "
+            f"DOF identifier(s) absent from the world state index: "
+            f"{self.unknown_identifiers}. "
+            "This means the world model and state are severely out of sync."
+        )
+
+
+@dataclass
+class ApplyMissedMessagesWhileWorldIsBeingModifiedError(UsageError):
+    """
+    Raised when apply_missed_messages is called while a modify_world context is active on the synchronizer's world.
+    Applying missed messages requires entering a modify_world context internally, which would conflict
+    with any currently active modify_world context due to mismatching publish_changes policies.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            "apply_missed_messages must not be called while a modify_world context is active on the synchronizer's world. "
+            "Call apply_missed_messages after the modify_world context has exited."
+        )
+
+
+@dataclass
 class DuplicateWorldEntityError(UsageError):
     world_entities: List[WorldEntity]
 
@@ -464,6 +568,7 @@ class WorldEntityNotFoundError(UsageError):
             self.message = f"WorldEntity with name {self.name_or_hash} not found"
         else:
             self.message = f"WorldEntity with hash {self.name_or_hash} not found"
+        super().__post_init__()
 
 
 @dataclass
@@ -492,11 +597,15 @@ class MissingWorldError(UsageError):
 
 
 @dataclass
-class WorldEntityWithIDNotFoundError(UsageError):
-    id: UUID
+class WorldEntityWithIDNotFoundError(WorldEntityNotFoundError):
+    name_or_hash: UUID = None
 
     def __post_init__(self):
-        self.message = f"WorldEntity with id {self.id} not found"
+        self.message = f"WorldEntity with id {self.name_or_hash} not found"
+
+    @property
+    def id(self) -> UUID:
+        return self.name_or_hash
 
 
 @dataclass

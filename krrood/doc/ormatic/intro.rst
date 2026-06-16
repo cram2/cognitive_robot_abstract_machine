@@ -65,7 +65,7 @@ Core Assumptions and Modeling Rules
 To ensure unambiguous translation and an ergonomic generated ORM, ORMatic adheres to the following rules for dataclass modeling:
 
 - **Protected Fields:** Any dataclass field name beginning with ``_`` is ignored for persistence. These protected fields are suitable for transient or derived runtime data.
-- **Optional Types:** The only supported union is :py:class:`Optional[T] <typing.Optional>`. Other unions should be modeled using a shared superclass.
+- **Optional Types:** The only guaranteed supported union is :py:class:`Optional[T] <typing.Optional>`. Other unions are modeled using a shared superclass if there exists a common base that is not `object`.
 - **Collections:** Iterables must be non-optional and non-nested. For an "optional list," use a default factory that returns an empty collection.
 - **Inheritance and Polymorphism:** Inheritance is supported and generates `joined-table <https://docs.sqlalchemy.org/en/20/orm/inheritance.html>`_ inheritance. Note that only the *first* base class in a multiple inheritance structure is considered for queries using abstract classes.
 - **Type Discipline:** Dataclass fields require concrete, non-ambiguous type annotations. Prefer small dataclasses or value objects over primitive types when modeling relationships.
