@@ -216,7 +216,7 @@ class DotGraphViewer(QWidget):
         if self.topic_selector.currentText() == "":
             # Find all topics of type ExecutionState
             topics = rospy.node.get_topic_names_and_types()
-            target_type = "giskard_msgs/action/JsonAction_FeedbackMessage"
+            target_type = "json_msgs/action/JsonAction_FeedbackMessage"
             execution_state_topics = [
                 name for name, types in topics if target_type in types
             ]

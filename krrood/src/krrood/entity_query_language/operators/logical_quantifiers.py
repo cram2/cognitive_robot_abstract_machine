@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import List, Iterable
 
-from krrood.entity_query_language.core.base_expressions import Bindings, OperationResult
+from krrood.entity_query_language.core.base_expressions import OperationResult
 from krrood.entity_query_language.operators.core_logical_operators import (
     LogicalBinaryOperator,
 )
@@ -53,18 +53,20 @@ class ForAll(QuantifiedConditional):
 
     def _evaluate__(
         self,
-        sources: Bindings,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         solution_set = None
 
-        for var_val in self.variable._evaluate_(sources, parent=self):
+        for var_val in self.variable._evaluate_(sources):
             if solution_set is None:
-                solution_set = self.get_all_candidate_solutions(var_val.bindings)
+                solution_set = self.get_all_candidate_solutions(var_val)
             else:
                 solution_set = [
                     sol
                     for sol in solution_set
-                    if self.evaluate_condition({**sol, **var_val.bindings})
+                    if self.evaluate_condition(
+                        OperationResult({**sol, **var_val.bindings})
+                    )
                 ]
             if not solution_set:
                 solution_set = []
@@ -72,13 +74,15 @@ class ForAll(QuantifiedConditional):
 
         # Yield the remaining bindings (non-universal) merged with the incoming sources
         yield from [
-            OperationResult({**sources, **sol}, False, self) for sol in solution_set
+            OperationResult(sources.bindings | sol, False, self) for sol in solution_set
         ]
 
-    def get_all_candidate_solutions(self, sources: Bindings):
+    def get_all_candidate_solutions(self, var_val: OperationResult):
         values_that_satisfy_condition = []
         # Evaluate the condition under this particular universal value
-        for condition_val in self.condition._evaluate_(sources, parent=self):
+        for condition_val in self._evaluate_child_as_condition_(
+            self.condition, var_val
+        ):
             if condition_val.is_false:
                 continue
             condition_val_bindings = {
@@ -89,8 +93,10 @@ class ForAll(QuantifiedConditional):
             values_that_satisfy_condition.append(condition_val_bindings)
         return values_that_satisfy_condition
 
-    def evaluate_condition(self, sources: Bindings) -> bool:
-        for condition_val in self.condition._evaluate_(sources, parent=self):
+    def evaluate_condition(self, sources: OperationResult) -> bool:
+        for condition_val in self._evaluate_child_as_condition_(
+            self.condition, sources
+        ):
             return condition_val.is_true
         return False
 
@@ -108,14 +114,39 @@ class Exists(QuantifiedConditional):
 
     def _evaluate__(
         self,
-        sources: Bindings,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
-        seen_var_values = []
-        for val in self.condition._evaluate_(sources, parent=self):
-            var_val = val[self.variable._id_]
-            if val.is_true and var_val not in seen_var_values:
-                seen_var_values.append(var_val)
-                yield OperationResult(val.bindings, False, self)
+        for val in self._evaluate_child_as_condition_(self.variable, sources):
+            if val.is_false or self.variable._id_ not in val.bindings:
+                continue
+            val = val.update(sources.bindings)
+            for cond_val in self._evaluate_child_as_condition_(self.condition, val):
+                if cond_val.is_true:
+                    yield OperationResult(
+                        sources.bindings
+                        | {
+                            id_: val.bindings[id_]
+                            for id_ in self._ids_of_variables_to_add_to_sources_
+                            if id_ in val.bindings
+                        },
+                        is_false=False,
+                        operand=self,
+                        previous_operation_result=val,
+                    )
+                    return
 
-    def _invert_(self):
-        return ForAll(self.variable, self.condition._invert_())
+        # Negation as failure: no variable value satisfied the condition.
+        yield OperationResult(sources.bindings, is_false=True, operand=self)
+
+    @cached_property
+    def _ids_of_variables_to_add_to_sources_(self):
+        """
+        :return: The ids of the variables that are selected in the root query except the variable of this quantifier.
+        """
+        if self._root_query_ is None:
+            return []
+        return [
+            v._id_
+            for v in self._root_query_._selected_variables_
+            if v._id_ != self.variable._id_
+        ]

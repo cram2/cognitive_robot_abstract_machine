@@ -7,6 +7,7 @@ from typing_extensions import Optional, List, Dict, Tuple, TYPE_CHECKING, Any
 
 try:
     import matplotlib as mpl
+
     # Ensure a non-interactive backend for headless environments
     # Needs to be done before importing pyplot
     try:
@@ -38,22 +39,22 @@ class GraphVisualizer:
     """
 
     def __init__(
-            self,
-            node: RWXNode,
-            figsize=(80, 80),
-            node_size=7000,
-            font_size=25,
-            spacing_x: float = 4,
-            spacing_y: float = 4,
-            curve_scale: float = 0.5,
-            layout: str = "tidy",
-            edge_style: str = "orthogonal",
-            label_max_chars_per_line: Optional[int] = 13,
-            orthogonal_spline_ratio_threshold: float = 3,
-            orthogonal_crossings_threshold: int = 4,
-            orthogonal_min_length_threshold: Optional[float] = 4,
-            filename: str = "pdf_graph.pdf",
-            title: str = "Directed Query Graph (Top to Bottom)",
+        self,
+        node: RWXNode,
+        figsize=(80, 80),
+        node_size=7000,
+        font_size=25,
+        spacing_x: float = 4,
+        spacing_y: float = 4,
+        curve_scale: float = 0.5,
+        layout: str = "tidy",
+        edge_style: str = "orthogonal",
+        label_max_chars_per_line: Optional[int] = 13,
+        orthogonal_spline_ratio_threshold: float = 3,
+        orthogonal_crossings_threshold: int = 4,
+        orthogonal_min_length_threshold: Optional[float] = 4,
+        filename: str = "pdf_graph.pdf",
+        title: str = "Directed Query Graph (Top to Bottom)",
     ):
         self.node = node
         self.params = dict(
@@ -98,12 +99,14 @@ class GraphVisualizer:
     @classmethod
     def _check_dependencies(cls):
         if mpl is None:
-            raise ModuleNotFoundError("matplotlib must be installed to visualize the graph. (pip install matplotlib)",
-                                      name="matplotlib")
+            raise ModuleNotFoundError(
+                "matplotlib must be installed to visualize the graph. (pip install matplotlib)",
+                name="matplotlib",
+            )
         elif np is None:
             raise ModuleNotFoundError(
                 "numpy must be installed to visualize the graph. (pip install numpy)",
-                name="numpy"
+                name="numpy",
             )
 
     def _build_rooted_subgraph(self):
@@ -172,7 +175,7 @@ class GraphVisualizer:
             return {nid: idx for idx, nid in enumerate(layer_nodes)}
 
         def sort_by_barycenter(
-                current_layer: List[int], reference_layer: List[int], use_preds: bool
+            current_layer: List[int], reference_layer: List[int], use_preds: bool
         ) -> List[int]:
             ref_pos = compute_order_index(reference_layer)
 
@@ -341,16 +344,16 @@ class GraphVisualizer:
                     if _dist_pt_seg_l(xn, yn, ax_, ay_, bx_, by_) < thr:
                         near_hits += 1
         cong_factor = (
-                1.0 + min(1.5, near_hits / float(max(1, len(ordered_nodes)))) * 0.35
+            1.0 + min(1.5, near_hits / float(max(1, len(ordered_nodes)))) * 0.35
         )
         base_w, base_h = 12.0, 9.0
         w_scale = (
-                max(1.0, (max_width / 2.0) * label_factor_w)
-                * float(self.params["spacing_x"])
-                * cong_factor
+            max(1.0, (max_width / 2.0) * label_factor_w)
+            * float(self.params["spacing_x"])
+            * cong_factor
         )
         h_scale = (
-                max(1.0, (depth / 3.0)) * float(self.params["spacing_y"]) * cong_factor
+            max(1.0, (depth / 3.0)) * float(self.params["spacing_y"]) * cong_factor
         )
         self.ctx["figsize"] = (base_w * w_scale, base_h * h_scale)
 
@@ -577,10 +580,10 @@ class GraphVisualizer:
         return float(np.hypot(px - cx, py - cy))
 
     def _seg_blocked(
-            self,
-            p_start: Tuple[float, float],
-            p_end: Tuple[float, float],
-            ignore: Tuple[int, int],
+        self,
+        p_start: Tuple[float, float],
+        p_end: Tuple[float, float],
+        ignore: Tuple[int, int],
     ):
         """Return True if the segment p_start->p_end intersects any obstacle rectangle.
         Uses a robust Cohen–Sutherland style clipping check to detect any intersection,
@@ -650,7 +653,9 @@ class GraphVisualizer:
         prev_ortho_segments = self.ctx["prev_ortho_segments"]
         x_extent = self.ctx["x_extent"]
         y_extent = self.ctx["y_extent"]
-        arrow_color = "#666666"
+        ordered_nodes = self.ctx.get("ordered_nodes", [])
+        default_arrow_color = "#666666"
+        faded_arrow_color = "#cccccc"
 
         def within_x(xp: float) -> bool:
             return 0.0 <= xp <= x_extent
@@ -661,6 +666,12 @@ class GraphVisualizer:
         for idx, (u, v) in enumerate(edges):
             x0, y0 = norm_pos[u]
             x1, y1 = norm_pos[v]
+            target_node = ordered_nodes[v] if v < len(ordered_nodes) else None
+            edge_color = (
+                faded_arrow_color
+                if getattr(target_node, "faded", False)
+                else default_arrow_color
+            )
             # congestion probe (for arc/spline)
             near_count = 0
             nearest = None
@@ -673,7 +684,7 @@ class GraphVisualizer:
                     min_d = d
                     nearest = (cx, cy)
                 if (min(x0, x1) <= cx <= max(x0, x1)) and (
-                        min(y0, y1) <= cy <= max(y0, y1)
+                    min(y0, y1) <= cy <= max(y0, y1)
                 ):
                     if self._dist_pt_seg(cx, cy, x0, y0, x1, y1) < 0.06:
                         near_count += 1
@@ -725,7 +736,7 @@ class GraphVisualizer:
                         arrowstyle="-|>",
                         mutation_scale=16,
                         linewidth=4.0,
-                        color=arrow_color,
+                        color=edge_color,
                         alpha=0.5,
                         zorder=4,
                         clip_on=False,
@@ -743,7 +754,7 @@ class GraphVisualizer:
                         arrowstyle="-|>",
                         mutation_scale=16,
                         linewidth=4.0,
-                        color=arrow_color,
+                        color=edge_color,
                         alpha=0.5,
                         zorder=4,
                         clip_on=False,
@@ -759,9 +770,9 @@ class GraphVisualizer:
                     p2 = (xm, y0)
                     p3 = (xm, y1)
                     if (
-                            within_x(xm)
-                            and not self._seg_blocked(p1, p2, ignore=(u, v))
-                            and not self._seg_blocked(p2, p3, ignore=(u, v))
+                        within_x(xm)
+                        and not self._seg_blocked(p1, p2, ignore=(u, v))
+                        and not self._seg_blocked(p2, p3, ignore=(u, v))
                     ):
                         return [p1, p2, p3]
                     return None
@@ -772,9 +783,9 @@ class GraphVisualizer:
                     p2 = (x0, ym)
                     p3 = (x1, ym)
                     if (
-                            within_y(ym)
-                            and not self._seg_blocked(p1, p2, ignore=(u, v))
-                            and not self._seg_blocked(p2, p3, ignore=(u, v))
+                        within_y(ym)
+                        and not self._seg_blocked(p1, p2, ignore=(u, v))
+                        and not self._seg_blocked(p2, p3, ignore=(u, v))
                     ):
                         return [p1, p2, p3]
                     return None
@@ -786,10 +797,10 @@ class GraphVisualizer:
                     p3 = (x1, ym)
                     p4 = (x1, y1)
                     if (
-                            within_y(ym)
-                            and (not self._seg_blocked(p1, p2, ignore=(u, v)))
-                            and (not self._seg_blocked(p2, p3, ignore=(u, v)))
-                            and (not self._seg_blocked(p3, p4, ignore=(u, v)))
+                        within_y(ym)
+                        and (not self._seg_blocked(p1, p2, ignore=(u, v)))
+                        and (not self._seg_blocked(p2, p3, ignore=(u, v)))
+                        and (not self._seg_blocked(p3, p4, ignore=(u, v)))
                     ):
                         return [p1, p2, p3, p4]
                     return None
@@ -809,35 +820,35 @@ class GraphVisualizer:
                         if abs(ax0 - ax1) < 1e-12:  # vertical
                             xv = ax0
                             for (
-                                    ori,
-                                    x0s,
-                                    y0s,
-                                    x1s,
-                                    y1s,
-                                    u_prev,
-                                    v_prev,
+                                ori,
+                                x0s,
+                                y0s,
+                                x1s,
+                                y1s,
+                                u_prev,
+                                v_prev,
                             ) in prev_ortho_segments:
                                 if (
-                                        ori == "v"
-                                        and min(y0s, y1s) <= ay0 <= max(y0s, y1s)
-                                        and abs(x0s - xv) < 1e-9
+                                    ori == "v"
+                                    and min(y0s, y1s) <= ay0 <= max(y0s, y1s)
+                                    and abs(x0s - xv) < 1e-9
                                 ):
                                     crosses += 1
                         else:  # horizontal
                             yh = ay0
                             for (
-                                    ori,
-                                    x0s,
-                                    y0s,
-                                    x1s,
-                                    y1s,
-                                    u_prev,
-                                    v_prev,
+                                ori,
+                                x0s,
+                                y0s,
+                                x1s,
+                                y1s,
+                                u_prev,
+                                v_prev,
                             ) in prev_ortho_segments:
                                 if (
-                                        ori == "h"
-                                        and min(x0s, x1s) <= ax0 <= max(x0s, x1s)
-                                        and abs(y0s - yh) < 1e-9
+                                    ori == "h"
+                                    and min(x0s, x1s) <= ax0 <= max(x0s, x1s)
+                                    and abs(y0s - yh) < 1e-9
                                 ):
                                     crosses += 1
                     return crosses
@@ -871,12 +882,12 @@ class GraphVisualizer:
                 cross_thr = int(self.params.get("orthogonal_crossings_threshold", 2))
                 min_len_thr = self.params.get("orthogonal_min_length_threshold", None)
                 should_min_len = (min_len_thr is not None) and (
-                        straight_len > float(min_len_thr)
+                    straight_len > float(min_len_thr)
                 )
                 if (
-                        (length_ratio > ratio_thr)
-                        or (crosses > cross_thr)
-                        or should_min_len
+                    (length_ratio > ratio_thr)
+                    or (crosses > cross_thr)
+                    or should_min_len
                 ):
                     # Fallback to spline for problematic or long orthogonal path
                     dvec = np.array([x1 - x0, y1 - y0], dtype=float)
@@ -921,7 +932,7 @@ class GraphVisualizer:
                                 arrowstyle="-|>",
                                 mutation_scale=16,
                                 linewidth=4.0,
-                                color=arrow_color,
+                                color=edge_color,
                                 alpha=0.5,
                                 zorder=4,
                                 clip_on=False,
@@ -939,10 +950,10 @@ class GraphVisualizer:
                         pre_pts.append(p)
                     else:
                         if (
-                                float(
-                                    np.hypot(p[0] - pre_pts[-1][0], p[1] - pre_pts[-1][1])
-                                )
-                                > 1e-12
+                            float(
+                                np.hypot(p[0] - pre_pts[-1][0], p[1] - pre_pts[-1][1])
+                            )
+                            > 1e-12
                         ):
                             pre_pts.append(p)
                 pts = pre_pts if len(pre_pts) >= 2 else pts
@@ -1016,7 +1027,7 @@ class GraphVisualizer:
                     arrowstyle="-|>",
                     mutation_scale=16,
                     linewidth=4.0,
-                    color=arrow_color,
+                    color=edge_color,
                     alpha=0.5,
                     zorder=4,
                     clip_on=False,
@@ -1065,7 +1076,7 @@ class GraphVisualizer:
                 arrowstyle="-|>",
                 mutation_scale=16,
                 linewidth=4.0,
-                color=arrow_color,
+                color=edge_color,
                 alpha=0.5,
                 zorder=4,
                 clip_on=False,
@@ -1081,14 +1092,24 @@ class GraphVisualizer:
         colors = [
             n.color.color if n.color else ColorLegend().color for n in ordered_nodes
         ]
+        edgecolors = [
+            getattr(n, "border_color", None) or (
+                "#cccccc" if getattr(n, "faded", False) else "black"
+            )
+            for n in ordered_nodes
+        ]
+        linewidths = [
+            3.5 if getattr(n, "border_color", None) else 2.0
+            for n in ordered_nodes
+        ]
         # Base node markers
         ax.scatter(
             norm_pos[:, 0],
             norm_pos[:, 1],
             s=size_per_node,
             c=colors,
-            edgecolors="black",
-            linewidths=2.0,
+            edgecolors=edgecolors,
+            linewidths=linewidths,
             alpha=0.95,
             zorder=2,
         )
@@ -1122,6 +1143,7 @@ class GraphVisualizer:
                 va="center",
                 fontsize=font_size,
                 fontweight="medium",
+                color="black",
                 wrap=True,
                 bbox=dict(boxstyle="round,pad=0.28", facecolor="white", alpha=0.85),
                 zorder=3,
@@ -1159,18 +1181,38 @@ class GraphVisualizer:
                 markeredgewidth=2.5,
             )
             handles.append(enclosed_handle)
+        # Add red-border legend entry when any node has an unsatisfied/skipped marker
+        any_unsatisfied = any(
+            getattr(n, "border_color", None) is not None for n in ordered_nodes
+        )
+        if any_unsatisfied:
+            unsatisfied_handle = Line2D(
+                [0],
+                [0],
+                marker="o",
+                linestyle="None",
+                label="Not satisfied (red border)",
+                markerfacecolor="none",
+                markeredgecolor="red",
+                markeredgewidth=3.5,
+                markersize=10,
+            )
+            handles.append(unsatisfied_handle)
         fw, fh = fig.get_size_inches()
         scale = 0.7 * (max(0.5, fw / 12.0) + max(0.5, fh / 9.0))
         legend_fs = float(np.clip(10.0 * scale, 8.0, 28.0))
         title_fs = float(np.clip(legend_fs * 1.1, 9.0, 32.0))
-        ax.legend(
+        legend = ax.legend(
             handles=handles,
             title="Node types",
             loc="upper left",
             framealpha=0.9,
+            facecolor="white",
+            labelcolor="black",
             fontsize=legend_fs,
             title_fontsize=title_fs,
         )
+        legend.get_title().set_color("black")
 
     def _style_and_save(self, fig, ax):
         # White backgrounds

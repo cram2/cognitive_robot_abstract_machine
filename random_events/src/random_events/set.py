@@ -6,6 +6,7 @@ from typing_extensions import Hashable, Optional
 from typing import Any, Iterable, Self, Dict, Optional, Tuple
 from dataclasses import field, dataclass
 
+from krrood.adapters.json_serializer import to_json, from_json
 from random_events.sigma_algebra import AbstractSimpleSet, AbstractCompositeSet
 import random_events_lib as rl
 
@@ -101,13 +102,13 @@ class SetElement(AbstractSimpleSet):
     def to_json(self) -> Dict[str, Any]:
         return {
             **super().to_json(),
-            "value": self.element,
-            "content": list(self.all_elements),
+            "value": to_json(self.element),
+            "content": to_json(list(self.all_elements)),
         }
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls.from_data(data["value"], data["content"])
+        return cls.from_data(from_json(data["value"]), from_json(data["content"]))
 
     def as_composite_set(self) -> AbstractCompositeSet:
         return Set.from_simple_sets(self)

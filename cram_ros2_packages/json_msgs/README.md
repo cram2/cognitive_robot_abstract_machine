@@ -1,1 +1,0 @@
-# giskard_msgs

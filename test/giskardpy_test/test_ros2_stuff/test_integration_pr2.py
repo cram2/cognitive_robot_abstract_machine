@@ -79,7 +79,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidCollisionBetweenGroups,
 )
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot, ParallelGripper
+from semantic_digital_twin.robots.robot_parts import EndEffector, AbstractRobot
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -175,12 +175,20 @@ class PR2Tester(GiskardTester):
         )
 
     @property
-    def l_gripper_annotation(self) -> ParallelGripper:
-        return next(sa for sa in self.robot.manipulators if "left" in str(sa.name))
+    def l_gripper_annotation(self) -> EndEffector:
+        return next(
+            sa
+            for sa in self.robot.get_end_effectors()
+            if "left" in str(sa.name).lower()
+        )
 
     @property
-    def r_gripper_annotation(self) -> ParallelGripper:
-        return next(sa for sa in self.robot.manipulators if "right" in str(sa.name))
+    def r_gripper_annotation(self) -> EndEffector:
+        return next(
+            sa
+            for sa in self.robot.get_end_effectors()
+            if "right" in str(sa.name).lower()
+        )
 
     def get_l_gripper_links(self) -> Set[Body]:
         return set(b for b in self.l_gripper_annotation.bodies if b.has_collision())

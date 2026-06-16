@@ -1119,12 +1119,12 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                     unit.log_truncated_of_simple_event_in_place(
                         simple_event, singleton_allowed
                     )
-                elif isinstance(unit, ProductUnit):
-                    unit.log_forward()
-                elif isinstance(unit, SumUnit):
-                    unit.log_forward_conditioning()
                 else:
-                    raise IntractableError(f"Unit of type {type(unit)} not supported.")
+                    unit: InnerUnit
+                    if isinstance(unit, SumUnit):
+                        unit.log_forward_conditioning()
+                    else:
+                        unit.log_forward()
 
         root = self.root
         [
@@ -1665,6 +1665,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         This will also remove the nodes in other and their descendants from their circuit.
 
         :param other: The other unit to mount.
+        :returns: A mapping from the indices of the nodes in `other` to the nodes in `self` that were added.
         """
         if other.probabilistic_circuit is not None:
             descendants = other.probabilistic_circuit.descendants(other)

@@ -50,6 +50,7 @@ from krrood.entity_query_language.query.quantifiers import (
 from krrood.entity_query_language.utils import (
     cartesian_product_while_passing_the_bindings_around,
 )
+from krrood.entity_query_language.core.base_expressions import OperationResult
 from ...dataset.example_classes import (
     KRROODVectorsWithProperty,
 )
@@ -72,7 +73,7 @@ def test_variable_from_type_setting(handles_and_containers_world):
     world = handles_and_containers_world
     B = variable_from(world.bodies)
     assert (
-            B._type_ is None
+        B._type_ is None
     ), "The type of the variable should be None when created only from a domain."
 
 
@@ -86,7 +87,7 @@ def test_empty_conditions(handles_and_containers_world, doors_and_drawers_world)
 
 
 def test_empty_conditions_and_no_domain(
-        handles_and_containers_world, doors_and_drawers_world
+    handles_and_containers_world, doors_and_drawers_world
 ):
     world = handles_and_containers_world
     world2 = doors_and_drawers_world
@@ -115,7 +116,7 @@ def test_reevaluation_of_simple_query(handles_and_containers_world):
 
 
 def test_filtering_connections_without_joining_with_parent_or_child_queries(
-        handles_and_containers_world,
+    handles_and_containers_world,
 ):
     world = handles_and_containers_world
 
@@ -142,7 +143,9 @@ def test_generate_with_using_attribute_and_callables(handles_and_containers_worl
 
     def generate_handles():
         B = variable(Body, domain=world.bodies)
-        yield from an(entity(B).where(B.name.startswith("Handle"))).evaluate()
+        query = an(entity(B).where(B.name.startswith("Handle")))
+        visualize_query_graph(query)
+        yield from query.evaluate()
 
     handles = list(generate_handles())
     assert len(handles) == 3, "Should generate 3 handles."
@@ -279,11 +282,11 @@ def test_reevaluation_of_or_and_query(handles_and_containers_world):
 
     handles_and_container1 = list(query.evaluate())
     assert (
-            len(handles_and_container1) == 2
+        len(handles_and_container1) == 2
     ), "Should generate one handle and one container."
     handles_and_container1 = list(query.evaluate())
     assert (
-            len(handles_and_container1) == 2
+        len(handles_and_container1) == 2
     ), "Re-eval: Should generate one handle and one container."
 
 
@@ -346,7 +349,7 @@ def test_reevaluate_with_multi_and(handles_and_containers_world):
         all_solutions[0], Container
     ), "Re-eval: The generated item should be of type Container."
     assert (
-            all_solutions[0].name == "Container1"
+        all_solutions[0].name == "Container1"
     ), "Re-eval: The generated item should be of type Container."
 
 
@@ -368,7 +371,7 @@ def test_generate_with_more_than_one_source(handles_and_containers_world):
 
     all_solutions = list(solutions.evaluate())
     assert (
-            len(all_solutions) == 2
+        len(all_solutions) == 2
     ), "Should generate components for two possible drawer."
     for sol in all_solutions:
         assert sol[C] == sol[FC].parent
@@ -412,7 +415,7 @@ def test_generate_with_more_than_one_source_optimized(handles_and_containers_wor
 
     all_solutions = list(query.evaluate())
     assert (
-            len(all_solutions) == 2
+        len(all_solutions) == 2
     ), "Should generate components for two possible drawer."
     for sol in all_solutions:
         assert isinstance(sol[FC].parent, Container)
@@ -618,7 +621,7 @@ def test_generate_with_using_inherited_predicate(handles_and_containers_world):
             ),
         )
     )
-
+    visualize_query_graph(query)
     body_pairs = list(query.evaluate())
     body_pairs = [
         (body_pair[body1], body_pair[body2], body_pair[body3])
@@ -662,7 +665,7 @@ def test_select_predicate(handles_and_containers_world):
     handle1 = query.tolist()[0]
     assert isinstance(handle1, HasName), "Should generate a handle."
     assert (
-            handle1.body.name == "Handle1"
+        handle1.body.name == "Handle1"
     ), "The generated handle should have the expected name."
 
 
@@ -704,7 +707,7 @@ def test_equivalent_to_contains_type_using_exists():
     fb = variable(FruitBox, domain=None)
     fruit_box_query = an(
         entity(fb).where(
-            exists(fb, HasType(flat_variable(fb.fruits), Apple)),
+            exists(var:=flat_variable(fb.fruits), HasType(var, Apple)),
         )
     )
 
@@ -919,9 +922,9 @@ def test_multiple_dependent_selectables(handles_and_containers_world):
     world_cabinets = [c for c in world.views if isinstance(c, Cabinet)]
     cabinet_drawer_pairs_expected = [(c, d) for c in world_cabinets for d in c.drawers]
     assert {
-               (res[cabinet], res[cabinet_drawers])
-               for res in cabinet_drawer_pairs_query.evaluate()
-           } == set(cabinet_drawer_pairs_expected)
+        (res[cabinet], res[cabinet_drawers])
+        for res in cabinet_drawer_pairs_query.evaluate()
+    } == set(cabinet_drawer_pairs_expected)
 
 
 def test_flatten_iterable_attribute(handles_and_containers_world):
@@ -948,10 +951,19 @@ def test_flatten_iterable_attribute_and_use_not_equal(handles_and_containers_wor
     query = an(entity(drawers).where(drawer_1 != drawers))
 
     results = list(query.evaluate())
-
+    visualize_query_graph(query)
     # We should get one row for each drawer and the parent view preserved
     assert len(results) == 2
     assert {row.handle.name for row in results} == {"Handle2", "Handle3"}
+
+
+def visualize_query_graph(query, **kwargs):
+    try:
+        from krrood.entity_query_language.query_graph import QueryGraph
+
+        QueryGraph(query).visualize(**kwargs)
+    except ImportError as e:
+        print(f"Failed to visualize query graph: {e}")
 
 
 def test_exists_and_for_all(handles_and_containers_world):
@@ -1137,7 +1149,7 @@ def test_chain_evaluate_variables():
     var1 = variable(int, [1, 2])
     var2 = variable(int, [3, 4])
     values = []
-    for val in cartesian_product_while_passing_the_bindings_around((var1, var2), {}):
+    for val in cartesian_product_while_passing_the_bindings_around((var1, var2), None):
         values.append(tuple(val.bindings.values()))
     assert values == [(1, 3), (1, 4), (2, 3), (2, 4)]
 
@@ -1193,6 +1205,34 @@ def test_type_availability_in_mapped_variables(handles_and_containers_world):
     assert first_drawer_handle._type_ is Handle
 
 
+def test_root_caches_all_descendant_ids_for_nested_queries():
+    """
+    Test that the root of a query has all descendant IDs in its _expression_id_cache_,
+    including those from nested sub-queries.
+    """
+    var = variable(int, [1, 2, 3, 4])
+
+    # Single-level query: root should cache all descendants
+    inner = the(entity(var).where(var == 2))
+    outer = an(entity(var).where(var != inner))
+    root = outer._root_
+    for descendant in root._descendants_:
+        assert descendant._id_ in root._expression_id_cache_, (
+            f"{descendant} (id={descendant._id_}) missing from root._expression_id_cache_"
+        )
+
+    # Doubly-nested: the inside the inside an
+    var2 = variable(int, [1, 2, 3, 4])
+    innermost = the(entity(var2).where(var2 == 1))
+    middle = the(entity(var2).where(var2 != innermost))
+    outermost = an(entity(var2).where(var2 != middle))
+    root2 = outermost._root_
+    for descendant in root2._descendants_:
+        assert descendant._id_ in root2._expression_id_cache_, (
+            f"{descendant} (id={descendant._id_}) missing from root2._expression_id_cache_"
+        )
+
+
 def test_indexing_on_dict_field():
     @dataclass
     class ItemWithDictionary:
@@ -1219,6 +1259,7 @@ def test_indexing_on_dict_field():
 
     i = variable(ItemWithDictionary, world.items)
     q = an(entity(i).where(i.attrs["score"] == 2))
+    visualize_query_graph(q)
     res = list(q.evaluate())
     assert {x.name for x in res} == {"B", "C"}
 
@@ -1296,12 +1337,6 @@ def test_presentation_example():
         Robot("Robot3", 75, [Task("Task5", False), Task("Task6", True)]),
     ]
     r = variable(Robot, robots)
-    q = an(entity(r).where(
-        r.battery > 50, not_(r.tasks[0].completed)
-    )
-    )
-    visualize = False
-    if visualize:
-        from krrood.entity_query_language.query_graph import QueryGraph
-        QueryGraph(q).visualize((20, 20), spacing_x=2, spacing_y=2)
+    q = an(entity(r).where(r.battery > 50, not_(r.tasks[0].completed)))
+    visualize_query_graph(q, figure_size=(20, 20), spacing_x=2, spacing_y=2)
     assert q.tolist() == [robots[2]]

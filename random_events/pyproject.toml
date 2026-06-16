@@ -26,8 +26,8 @@ classifiers = [
 ]
 
 [project.urls]
-"Source" = "https://github.com/tomsch420/random-events"
-"Bug Tracker" = "https://github.com/tomsch420/random-events/issues"
+"Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
+"Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
