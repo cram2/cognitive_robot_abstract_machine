@@ -11,7 +11,6 @@ from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.qp.exceptions import EmptyProblemException
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from giskardpy.utils import objgraph_debug
 from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
     WorldStateTrajectoryPlotter,

@@ -22,24 +22,8 @@ class ProcessWorldUpdate(GiskardBehavior):
         else:
             if not self.worker_thread.is_alive():
                 self.worker_thread = None
-                version = GiskardBlackboard().executor.context.world._model_manager.version
                 rospy.node.get_logger().info(
-                    f"Finished world update, model version: {version}."
-                )
-                objgraph_debug.report_growth(label=f"After world update version {version}")
-                objgraph_debug.count_types(
-                    [
-                        "Compiled",
-                        "Collision",
-                        "Matrix",
-                        "Connection",
-                        "Body",
-                        "DegreeOfFreedom",
-                        "Monitor",
-                        "Task",
-                        "CollisionObject",
-                    ],
-                    label=f"v={version}",
+                    f"Finished world update, model version: {GiskardBlackboard().executor.context.world._model_manager.version}."
                 )
                 return Status.SUCCESS
         return Status.RUNNING

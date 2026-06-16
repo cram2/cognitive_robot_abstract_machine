@@ -1,30 +1,22 @@
-"""
-Lightweight objgraph-based leak diagnostics for the giskard process.
+"""objgraph-based memory leak diagnostics for the giskard process.
 
-Everything here is a no-op unless the environment variable ``GISKARD_OBJGRAPH``
-is truthy ("1"/"true"/"yes"/"on"), so it is safe to leave the call sites in
-place and costs nothing in normal runs.
+Every function is a no-op unless the environment variable ``GISKARD_OBJGRAPH``
+is truthy ("1"/"true"/"yes")
 
-Can be used to check memory leaks or if something derived from the world
-(compiled functions, collision objects, copies of bodies/expressions, old
-collision matrices, ...) accumulates per model update and is never freed,
-slowing the control loop until motion degrades.
+Use it to find objects that accumulate on every world model update and are never
+freed (compiled functions, collision objects, body and expression copies, old
+collision matrices), which slows the control loop over time. The helpers
+snapshot Python object growth around the suspect events so the leaking types
+become visible.
 
-These helpers snapshot Python object growth around the relevant events so the
-leaking type(s) become visible.
-
-Usage
------
-Run the giskard script with::
-
+Usage:
     GISKARD_OBJGRAPH=1 ros2 run ... tracy_velocity.py
-    # or: GISKARD_OBJGRAPH=1 python3 tracy_velocity.py
+    GISKARD_OBJGRAPH=1 python3 tracy_velocity.py
 
-Optional tuning via env vars:
-    GISKARD_OBJGRAPH_LIMIT     how many types to list (default 30)
-    GISKARD_OBJGRAPH_PERIODIC  seconds between background growth dumps (0=off)
-    GISKARD_OBJGRAPH_BACKREFS  comma-separated type names to dump backref chains
-                               for (text, no graphviz needed) on each report
+Environment variables:
+    GISKARD_OBJGRAPH_LIMIT         how many types to list (default 30)
+    GISKARD_OBJGRAPH_PERIODIC      seconds between background growth dumps (0 disables)
+    GISKARD_OBJGRAPH_BACKREF_DEPTH how many referrer levels to walk (default 6)
 """
 
 from __future__ import annotations
@@ -35,7 +27,7 @@ import sys
 import threading
 import time
 import types
-from typing import Iterable, List, Optional
+from typing import Iterable, Optional
 
 
 def _truthy(value: Optional[str]) -> bool:
@@ -46,12 +38,8 @@ _FORCE_ENABLE: bool = False
 
 ENABLED: bool = _FORCE_ENABLE or _truthy(os.environ.get("GISKARD_OBJGRAPH"))
 _LIMIT: int = int(os.environ.get("GISKARD_OBJGRAPH_LIMIT", "30"))
-# _BACKREF_TYPES: List[str] = [
-#     t.strip()
-#     for t in os.environ.get("GISKARD_OBJGRAPH_BACKREFS", "").split(",")
-#     if t.strip()
-# ]
-_BACKREF_TYPES = ["ForceZMonitor", "ReachTopTask"]
+# Types whose retainer chains are dumped on every growth report.
+_BACKREF_TYPES = []
 
 _lock = threading.Lock()
 _periodic_thread: Optional[threading.Thread] = None
@@ -59,7 +47,7 @@ _periodic_thread: Optional[threading.Thread] = None
 
 def _objgraph():
     try:
-        import objgraph  # noqa: WPS433 (lazy import so the dep is optional)
+        import objgraph  # lazy import keeps objgraph an optional dependency
 
         return objgraph
     except ImportError:
@@ -71,10 +59,10 @@ def _objgraph():
 
 
 def report_growth(label: str = "") -> None:
-    """Print the types that reached a new peak live-count since the last call.
+    """Print the types that reached a new peak live count since the last call.
 
-    Call this around the event you suspect of leaking (e.g. after each world
-    model update). A type with a positive delta on every event is the leak.
+    Call this around an event you suspect of leaking, for example after each
+    world model update. A type with a positive delta on every event is the leak.
     """
     if not ENABLED:
         return
@@ -85,7 +73,7 @@ def report_growth(label: str = "") -> None:
         gc.collect()
         header = f" — {label}" if label else ""
         print(f"\n[objgraph] ===== growth since last report{header} =====", flush=True)
-        # show_growth() prints only types whose count hit a new max, with deltas.
+        # Prints only types whose live count reached a new maximum, with deltas.
         objgraph.show_growth(limit=_LIMIT)
         for type_name in _BACKREF_TYPES:
             _dump_backref_chain(objgraph, type_name)
@@ -108,9 +96,9 @@ def report_most_common(label: str = "") -> None:
 
 
 def count_types(substrings: Iterable[str], label: str = "") -> None:
-    """Print live instance counts for every type whose name contains any of
-    ``substrings``. Useful to watch specific suspects (e.g. "Compiled",
-    "Collision", "Matrix", "World", "Body")."""
+    """Print live instance counts for every type whose name contains any of the
+    given substrings. Use it to watch specific suspects such as "Compiled",
+    "Collision", "Matrix", "World" or "Body"."""
     if not ENABLED:
         return
     objgraph = _objgraph()
@@ -132,36 +120,18 @@ def count_types(substrings: Iterable[str], label: str = "") -> None:
         print("[objgraph] =====================================\n", flush=True)
 
 
-def _describe(obj) -> str:
-    """Short, safe description of a referrer: its type plus a hint at what it is."""
-    try:
-        cls = type(obj)
-        name = f"{cls.__module__}.{cls.__name__}"
-    except Exception:
-        return "?"
-    try:
-        if isinstance(obj, dict):
-            keys = list(obj.keys())[:4]
-            return f"dict(len={len(obj)}, keys~={keys})"
-        if isinstance(obj, (list, tuple, set, frozenset)):
-            return f"{cls.__name__}(len={len(obj)})"
-    except Exception:
-        pass
-    return name
-
-
 def _dump_backref_chain(
     objgraph, type_name: str, depth: int = None, max_frontier: int = 400
 ) -> None:
-    """Show *what keeps the OLDEST (i.e. leaked) instance of ``type_name`` alive*.
+    """Show what keeps the oldest (and therefore leaked) instance of type_name alive.
 
-    For each backward hop we print a histogram of referrer types — so the real
-    external holder shows up even when an object is referenced by dozens of its
-    own siblings (which would otherwise hide in a "+N more"). Uses a single
-    ``gc.get_referrers(*frontier)`` scan per level (cheap, bounded by ``depth``),
-    not objgraph.find_backref_chain (unbounded, hangs on big casadi graphs).
+    At each backward hop it prints a histogram of referrer types, so the real
+    external holder is visible even when the object is referenced by many of its
+    own siblings. It runs one gc.get_referrers() scan per level, bounded by
+    depth, instead of objgraph.find_backref_chain, which is unbounded and hangs
+    on large casadi graphs.
 
-    Depth defaults to GISKARD_OBJGRAPH_BACKREF_DEPTH (or 4).
+    Depth defaults to GISKARD_OBJGRAPH_BACKREF_DEPTH, or 6 if that is unset.
     """
     import collections
 
@@ -171,8 +141,8 @@ def _dump_backref_chain(
     if not objs:
         print(f"[objgraph]   (no live instances of {type_name})")
         return
-    # Oldest instance is the one that should already have been freed if there
-    # were no leak, so its referrers point at the actual retainer.
+    # Without a leak the oldest instance would already be freed, so its
+    # referrers point at whatever is actually retaining it.
     target = objs[0]
     print(
         f"[objgraph]   referrer-type histogram up from OLDEST {type_name} "
@@ -197,8 +167,7 @@ def _dump_backref_chain(
         indent = "    " * (level + 1)
         summary = ", ".join(f"{name}×{cnt}" for name, cnt in hist.most_common(12))
         print(f"[objgraph]   {indent}L{level + 1} ({len(referrers)}): {summary}")
-        # Cap frontier so deeper levels stay cheap; drop bare container types from
-        # the carry-forward set only if it would otherwise explode.
+        # Cap the frontier so deeper levels stay cheap.
         frontier = referrers[:max_frontier]
 
 
@@ -211,12 +180,12 @@ def _typename(obj) -> str:
 
 
 def start_periodic(interval_seconds: Optional[float] = None) -> None:
-    """Optionally start a background thread that prints growth every N seconds.
+    """Start a background thread that prints growth every interval_seconds.
 
-    Off unless ``GISKARD_OBJGRAPH_PERIODIC`` (or the argument) is > 0. A periodic
-    dump catches leaks even where there is no obvious per-event hook, but mixes
-    in transient control-loop objects, so the per-event ``report_growth`` hook is
-    usually clearer.
+    Does nothing unless GISKARD_OBJGRAPH_PERIODIC (or the argument) is greater
+    than zero. A periodic dump catches leaks where there is no obvious per-event
+    hook, but it mixes in transient control-loop objects, so the per-event
+    report_growth hook is usually clearer.
     """
     global _periodic_thread
     if not ENABLED:
