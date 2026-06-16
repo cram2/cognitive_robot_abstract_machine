@@ -10,7 +10,7 @@ from krrood.entity_query_language.factories import variable_from, entity, variab
 from polytope import bounding_box
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from random_events.product_algebra import Event
-from random_events.set import Set
+from random_events.set import Set as EventSet
 from random_events.variable import Symbolic
 from semantic_digital_twin.reasoning.predicates import is_supported_by
 from typing_extensions import (
@@ -18,6 +18,7 @@ from typing_extensions import (
     List,
     Optional,
     Self,
+    Set,
     Iterable,
     Type,
 )
@@ -74,6 +75,7 @@ if TYPE_CHECKING:
         Slider,
         Aperture,
     )
+    from semantic_digital_twin.world import World
 
 
 @dataclass(eq=False)
@@ -110,6 +112,9 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         min = Point3.from_iterable(self.root.combined_mesh.bounds[0])
         max = Point3.from_iterable(self.root.combined_mesh.bounds[1])
         return min, max
+
+    def __hash__(self):
+        return hash((self.__class__, self.root))
 
     @classproperty
     def _parent_connection_type(self) -> Type[Connection]:
@@ -291,6 +296,18 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
     def global_transform(self) -> HomogeneousTransformationMatrix:
         return self.root.global_transform
 
+    @property
+    def connections(self) -> list[Connection]:
+        return self._world.get_connections_of_branch(self.root)
+
+    def _kinematic_structure_entities(
+        self, visited: Set[int]
+    ) -> list[KinematicStructureEntity]:
+        if id(self) in visited:
+            return []
+        visited.add(id(self))
+        return self._world.get_kinematic_structure_entities_of_branch(self.root)
+
 
 @dataclass(eq=False)
 class HasRootBody(HasRootKinematicStructureEntity, ABC):
@@ -305,13 +322,6 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
     """
     The root body of the semantic annotation.
     """
-
-    @property
-    def bodies(self) -> Iterable[Body]:
-        """
-        The bodies that are part of the semantic annotation.
-        """
-        return [self.root]
 
     @classmethod
     def create_with_new_body_in_world(
@@ -370,13 +380,6 @@ class HasRootRegion(HasRootKinematicStructureEntity, ABC):
     """
     The root region of the semantic annotation.
     """
-
-    @property
-    def regions(self) -> Iterable[Region]:
-        """
-        The regions that are part of the semantic annotation.
-        """
-        return [self.root]
 
     @classmethod
     def create_with_new_region_in_world(
@@ -488,6 +491,19 @@ class HasHinge(HasRootBody, ABC):
         )
         self.hinge = hinge
 
+    def _kinematic_structure_entities(
+        self, visited: Set[int]
+    ) -> list[KinematicStructureEntity]:
+        if id(self) in visited:
+            return []
+        visited.add(id(self))
+        kinematic_structure_entities = (
+            self._world.get_kinematic_structure_entities_of_branch(self.root)
+        )
+        if self.hinge is not None:
+            kinematic_structure_entities.append(self.hinge.root)
+        return kinematic_structure_entities
+
 
 @dataclass(eq=False)
 class HasSlider(HasRootKinematicStructureEntity, ABC):
@@ -514,6 +530,19 @@ class HasSlider(HasRootKinematicStructureEntity, ABC):
             slider.root,
         )
         self.slider = slider
+
+    def _kinematic_structure_entities(
+        self, visited: Set[int]
+    ) -> list[KinematicStructureEntity]:
+        if id(self) in visited:
+            return []
+        visited.add(id(self))
+        kinematic_structure_entities = (
+            self._world.get_kinematic_structure_entities_of_branch(self.root)
+        )
+        if self.slider is not None:
+            kinematic_structure_entities.append(self.slider.root)
+        return kinematic_structure_entities
 
 
 @dataclass(eq=False)
@@ -749,9 +778,13 @@ class HasSupportingSurface(HasStorageSpace, ABC):
                 supporting_body=self.root,
             )
         )
-        objects = an(entity(
-            semantic_annotation := variable(HasRootBody, domain=self._world.semantic_annotations)
-        ).where(semantic_annotation.root == body)).evaluate()
+        objects = an(
+            entity(
+                semantic_annotation := variable(
+                    HasRootBody, domain=self._world.semantic_annotations
+                )
+            ).where(semantic_annotation.root == body)
+        ).evaluate()
         for obj in objects:
             if obj in self.objects:
                 continue
@@ -912,7 +945,8 @@ class HasSupportingSurface(HasStorageSpace, ABC):
         surface_circuit_root = SumUnit(probabilistic_circuit=surface_circuit)
 
         objects_of_interest_variable = Symbolic(
-            name="objects_of_interest", domain=Set.from_iterable(objects_of_interest)
+            name="objects_of_interest",
+            domain=EventSet.from_iterable(objects_of_interest),
         )
 
         for object_of_interest in objects_of_interest:

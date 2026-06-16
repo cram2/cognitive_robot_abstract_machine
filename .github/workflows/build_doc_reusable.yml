@@ -25,7 +25,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: ${{ inputs.use_container && 'pycram/semantic_world:jazzy' || '' }}
+      image: ${{ inputs.use_container && 'coraplex/semantic_world:jazzy' || '' }}
     defaults:
       run:
         shell: ${{ inputs.use_container && 'bash -ieo pipefail {0}' || 'bash' }}
@@ -65,7 +65,7 @@ jobs:
           node-version: '18'
 
       - name: Install Graphviz
-        if: ${{ inputs.lib == 'pycram' || inputs.lib == 'probabilistic_model' || inputs.lib == 'random_events' || inputs.lib == 'krrood' || inputs.lib == 'semantic_digital_twin' }}
+        if: ${{ inputs.lib == 'coraplex' || inputs.lib == 'probabilistic_model' || inputs.lib == 'random_events' || inputs.lib == 'krrood' || inputs.lib == 'semantic_digital_twin' }}
         run: |
           sudo apt-get update
           sudo apt-get install graphviz libgraphviz-dev -y
@@ -76,7 +76,7 @@ jobs:
         run: |
           pip install -U pip setuptools wheel pybind11
           pip install pygraphviz
-          pip install -e ../krrood ../random_events ../probabilistic_model ../pycram ../semantic_digital_twin ../giskardpy
+          pip install -e ../krrood ../random_events ../probabilistic_model ../coraplex ../semantic_digital_twin ../giskardpy
           [ -f requirements-dev.txt ] && pip install -r requirements-dev.txt || echo "No requirements-dev.txt"
           [ -f requirements.txt ] && pip install -r requirements.txt || echo "No requirements.txt"
           pip install .
@@ -95,7 +95,7 @@ jobs:
           pip install -e $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/krrood \
                       -e $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/random_events \
                       -e $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/probabilistic_model \
-                      -e $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/pycram \
+                      -e $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/coraplex \
                       -e $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/semantic_digital_twin \
                       -e $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/giskardpy
           pip install -r requirements.txt && pip install . && pip install -r doc/requirements.txt

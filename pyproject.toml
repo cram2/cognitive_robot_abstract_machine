@@ -13,7 +13,7 @@ authors = [{ name = "AICOR Institute", email = "you@example.com" }]
 # Add dependencies on all workspace members by their distribution names
 # uv will resolve these to editable installs via [tool.uv.sources]
 dependencies = [
-  "pycram-robotics",
+  "coraplex",
   "giskardpy",
   "semantic_digital_twin",
   "krrood",
@@ -21,14 +21,15 @@ dependencies = [
   "probabilistic_model",
   "robokudo",
   "physics_simulators",
+  "experiments",
   "segmind",
   "ipykernel>=7.2.0",
-  "lark-parser>=0.12.0",
+  "lark-parser>=0.12.0"
 ]
 
 [tool.uv.workspace]
 members = [
-  "pycram",
+  "coraplex",
   "giskardpy",
   "semantic_digital_twin",
   "krrood",
@@ -36,11 +37,12 @@ members = [
   "probabilistic_model",
   "physics_simulators",
   "robokudo",
+  "experiments",
   "segmind"
 ]
 
 [tool.uv.sources]
-pycram-robotics       = { workspace = true }
+coraplex       = { workspace = true }
 giskardpy             = { workspace = true }
 semantic_digital_twin = { workspace = true }
 krrood                = { workspace = true }
@@ -49,12 +51,13 @@ random_events         = { workspace = true }
 robokudo              = { workspace = true }
 physics_simulators    = { workspace = true }
 segmind               = { workspace = true }
+experiments           = { workspace = true }
 
 [tool.poetry]
 package-mode = false
 
 [tool.poetry.dependencies]
-pycram-robotics = { path = "pycram", develop = true }
+coraplex = { path = "coraplex", develop = true }
 giskardpy = { path = "giskardpy", develop = true }
 semantic_digital_twin = { path = "semantic_digital_twin", develop = true }
 krrood = { path = "krrood", develop = true }
@@ -62,6 +65,7 @@ random_events = { path = "random_events", develop = true }
 probabilistic_model = { path = "probabilistic_model", develop = true }
 robokudo = { path = "robokudo", develop = true }
 physics_simulators = { path = "physics_simulators", develop = true }
+experiments = { path = "experiments", develop = true }
 segmind = { path = "segmind", develop = true }
 
 [tool.setuptools]

@@ -46,7 +46,8 @@ from krrood.entity_query_language.exceptions import (
 from krrood.entity_query_language.operators.set_operations import (
     MultiArityExpressionThatPerformsACartesianProduct,
 )
-from krrood.entity_query_language.utils import ensure_hashable, is_iterable
+from krrood.entity_query_language.utils import is_iterable
+from krrood.utils import ensure_hashable
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
 from krrood.utils import memoize
 
@@ -67,10 +68,10 @@ class Where(Filter, UnaryExpression):
     def condition(self) -> SymbolicExpression:
         return self._child_
 
-    def _evaluate__(self, sources: Bindings) -> Iterator[OperationResult]:
+    def _evaluate__(self, sources: OperationResult) -> Iterator[OperationResult]:
         yield from (
             result
-            for result in self._child_._evaluate_(sources, parent=self)
+            for result in self._evaluate_child_as_condition_(self._child_, sources)
             if result.is_true
         )
 
@@ -102,17 +103,17 @@ class Having(Filter, BinaryExpression):
 
     def _evaluate__(
         self,
-        sources: Bindings,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         yield from (
             OperationResult(
                 grouping_result.bindings | annotated_result.bindings,
-                self._is_false_,
+                annotated_result.is_false,
                 self,
             )
-            for grouping_result in self.grouped_by._evaluate_(sources, parent=self)
-            for annotated_result in self.condition._evaluate_(
-                grouping_result.bindings, parent=self
+            for grouping_result in self.grouped_by._evaluate_(sources)
+            for annotated_result in self._evaluate_child_as_condition_(
+                self.condition, grouping_result
             )
             if annotated_result.is_true
         )
@@ -152,8 +153,8 @@ class OrderedBy(BinaryExpression, DerivedExpression):
         """
         return self.right
 
-    def _evaluate__(self, sources: Bindings) -> Iterator[OperationResult]:
-        results = list(self.left._evaluate_(sources, parent=self))
+    def _evaluate__(self, sources: OperationResult) -> Iterator[OperationResult]:
+        results = list(self.left._evaluate_(sources))
         yield from sorted(
             results,
             key=self.apply_key,
@@ -167,7 +168,9 @@ class OrderedBy(BinaryExpression, DerivedExpression):
         var = self.variable
         var_id = var._id_
         if var_id not in result.all_bindings:
-            variable_value = next(var._evaluate_(result.all_bindings, self)).value
+            variable_value = next(
+                var._evaluate_(OperationResult(result.all_bindings))
+            ).value
         else:
             variable_value = result.all_bindings[var_id]
         if self.key:
@@ -202,7 +205,9 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
     The variables to group the results by their values.
     """
 
-    def _evaluate__(self, sources: Bindings = None) -> Iterator[OperationResult]:
+    def _evaluate__(
+        self, sources: Optional[OperationResult] = None
+    ) -> Iterator[OperationResult]:
         """
         Generate results grouped by the specified variables in the grouped_by clause.
 
@@ -227,7 +232,7 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         yield from groups.values()
 
     def get_groups_and_group_key_count(
-        self, sources: Bindings
+        self, sources: Optional[OperationResult]
     ) -> Tuple[GroupBindings, Dict[GroupKey, int]]:
         """
         Create a dictionary of groups and a dictionary of group keys to their corresponding counts starting from the

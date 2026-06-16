@@ -65,7 +65,10 @@ qtcreator-*
 
 # Catkin custom files
 CATKIN_IGNORE
+
+# Package Managers
 poetry.lock
+uv.lock
 
 # Created during tests
 file::memory:

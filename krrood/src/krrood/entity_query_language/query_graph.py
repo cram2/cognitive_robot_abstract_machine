@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from uuid import UUID
 
-from typing_extensions import ClassVar, Optional, Dict
+from ordered_set import OrderedSet
+from typing_extensions import ClassVar, Optional, Dict, Any
 
 from krrood.entity_query_language.rules.conclusion import Conclusion
 from krrood.entity_query_language.rules.conclusion_selector import ConclusionSelector
@@ -20,8 +22,19 @@ from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
     Filter,
 )
-from krrood.entity_query_language.core.variable import Variable, Literal
-from krrood.entity_query_language.core.mapped_variable import MappedVariable
+from krrood.entity_query_language.evaluation import is_condition_participant
+from krrood.entity_query_language.core.variable import (
+    Variable,
+    Literal,
+    InstantiatedVariable,
+)
+from krrood.entity_query_language.core.mapped_variable import (
+    MappedVariable,
+    Attribute,
+    Index,
+    FlatVariable,
+    Call,
+)
 from krrood.entity_query_language.operators.comparator import Comparator
 
 from krrood.rustworkx_utils import (
@@ -31,6 +44,22 @@ from krrood.rustworkx_utils import (
 )
 
 import rustworkx as rx
+
+_UNSATISFIED_BORDER_COLOR: str = "red"
+
+
+def _is_faded_gate(node, satisfied_condition_ids: OrderedSet[UUID]) -> bool:
+    """Return True if *node* is an unsatisfied condition participant.
+
+    Such nodes act as "gates" that the BFS in
+    :meth:`QueryGraph._propagate_faded_subtrees` refuses to traverse through.
+    """
+    expr = node.data
+    if expr is None:
+        return False
+    if not is_condition_participant(expr):
+        return False
+    return expr._id_ not in satisfied_condition_ids
 
 
 @dataclass
@@ -42,6 +71,12 @@ class QueryGraph:
     query: SymbolicExpression
     """
     An expression representing the query.
+    """
+    satisfied_condition_ids: Optional[OrderedSet[UUID]] = None
+    """
+    Optional frozenset of satisfied condition UUIDs for coloring condition nodes.
+    When provided, unsatisfied condition nodes are colored grey, while satisfied
+    condition nodes keep their type-based color.
     """
     graph: rx.PyDAG = field(init=False, default_factory=rx.PyDAG)
     """
@@ -62,6 +97,51 @@ class QueryGraph:
         if isinstance(self.query, Query):
             self.query.build()
         self.construct_graph()
+        if self.satisfied_condition_ids is not None:
+            self._propagate_faded_subtrees()
+
+    def _propagate_faded_subtrees(self):
+        """Mark unsatisfied condition nodes and their exclusive descendants as faded.
+
+        A node is faded when every path from the root to that node passes through
+        at least one unsatisfied condition node.  We compute this by BFS from the
+        root, refusing to traverse *through* unsatisfied condition nodes, then
+        marking every node the BFS did **not** reach as faded.
+
+        Exception: descendants of a *satisfied* QuantifiedConditional (Exists/ForAll)
+        are always reachable even though their internal condition IDs are not tracked
+        in the outer satisfied_condition_ids set.  The BFS carries a skip_gate flag
+        for exactly this case.
+        """
+        from krrood.entity_query_language.operators.logical_quantifiers import (
+            QuantifiedConditional,
+        )
+
+        root_node = self.expression_node_map.get(self.query._root_)
+        if root_node is None:
+            return
+
+        reachable: set = set()
+        queue: list = [(root_node, False)]  # (node, skip_gate)
+        while queue:
+            node, skip_gate = queue.pop(0)
+            if node.id in reachable:
+                continue
+            if not skip_gate and _is_faded_gate(node, self.satisfied_condition_ids):
+                continue
+            reachable.add(node.id)
+            child_skip_gate = skip_gate or (
+                isinstance(node.data, QuantifiedConditional)
+                and node.data._id_ in self.satisfied_condition_ids
+            )
+            for child in node.children:
+                if child.id not in reachable:
+                    queue.append((child, child_skip_gate))
+
+        for node in self.expression_node_map.values():
+            if node.id not in reachable:
+                node.faded = True
+                node.border_color = _UNSATISFIED_BORDER_COLOR
 
     def visualize(
         self,
@@ -74,6 +154,7 @@ class QueryGraph:
         layout: str = "tidy",
         edge_style: str = "orthogonal",
         label_max_chars_per_line: Optional[int] = 13,
+        filename: str = "query_graph.pdf",
     ):
         """
         Visualizes the graph using the specified layout and style options.
@@ -96,8 +177,40 @@ class QueryGraph:
             layout=layout,
             edge_style=edge_style,
             label_max_chars_per_line=label_max_chars_per_line,
+            filename=filename,
         )
         return visualizer.render()
+
+    @staticmethod
+    def get_expression_name(expression: Any) -> str:
+        """
+        Retrieves the name of a symbolic expression for visualization purposes.
+
+        :param expression: The symbolic expression to get the name for.
+        :type expression: SymbolicExpression
+        :return: The name of the expression.
+        """
+        match expression:
+            case Attribute():
+                return f".{expression._name_.split('.')[-1]}"
+            case Index():
+                return f"[{expression._name_.split('[')[-1]}"
+            case FlatVariable():
+                return "Flatten"
+            case Call():
+                expression: Call
+                args = [
+                    QueryGraph.get_expression_name(arg) for arg in expression._args_
+                ]
+                kwargs = [f"{k}={v}" for k, v in expression._kwargs_.items()]
+                args_and_kwargs = args + kwargs
+                return f"({','.join(args_and_kwargs)})"
+            case Query():
+                return f"({','.join(QueryGraph.get_expression_name(v) for v in expression._selected_variables_)})"
+            case SymbolicExpression():
+                return expression._name_
+            case _:
+                return repr(expression)
 
     def construct_graph(
         self,
@@ -111,11 +224,17 @@ class QueryGraph:
         if expression in self.expression_node_map:
             return self.expression_node_map[expression]
 
+        is_satisfied = (
+            self.satisfied_condition_ids is not None
+            and is_condition_participant(expression)
+            and expression._id_ in self.satisfied_condition_ids
+        )
         node = QueryNode(
-            expression._name_,
+            self.get_expression_name(expression),
             self.graph,
-            color=ColorLegend.from_expression(expression),
+            color=ColorLegend.from_expression(expression, self.satisfied_condition_ids),
             data=expression,
+            is_satisfied=is_satisfied,
         )
         self.expression_node_map[expression] = node
 
@@ -155,7 +274,11 @@ class ColorLegend(RXUtilsColorLegend):
     """
 
     @classmethod
-    def from_expression(cls, expression: SymbolicExpression) -> ColorLegend:
+    def from_expression(
+        cls,
+        expression: SymbolicExpression,
+        satisfied_condition_ids: Optional[OrderedSet[UUID]] = None,
+    ) -> ColorLegend:
         name = expression.__class__.__name__
         color = "white"
         match expression:
@@ -192,6 +315,7 @@ class ColorLegend(RXUtilsColorLegend):
             case Conclusion():
                 name = "Conclusion"
                 color = "#8cf2ff"
+
         return cls(name=name, color=color)
 
 
@@ -202,3 +326,9 @@ class QueryNode(RXUtilsNode):
     """
 
     enclosed_name: ClassVar[str] = "Selected Variable"
+    is_satisfied: bool = field(default=False)
+    """
+    True if this node's expression is a condition participant whose evaluation
+    result was True. Grounded directly on satisfied_condition_ids, not derived
+    from the faded propagation pass.
+    """

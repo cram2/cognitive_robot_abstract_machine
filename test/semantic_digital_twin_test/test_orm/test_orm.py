@@ -1,4 +1,6 @@
 import os
+import time
+from copy import deepcopy
 
 import numpy as np
 from krrood.ormatic.utils import create_engine
@@ -30,26 +32,10 @@ from krrood.ormatic.data_access_objects.helper import to_dao
 
 import pytest
 
-urdf_dir = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "..",
-    "..",
-    "..",
-    "semantic_digital_twin",
-    "resources",
-    "urdf",
-)
-table_path = os.path.join(urdf_dir, "table.urdf")
-
 
 @pytest.fixture
 def engine():
     return create_engine("sqlite:///:memory:")
-
-
-@pytest.fixture
-def table_world():
-    return URDFParser.from_file(file_path=table_path).parse()
 
 
 @pytest.fixture
@@ -145,8 +131,13 @@ def test_pr2_world(pr2_world_state_reset, session):
     session.add(dao)
     session.commit()
 
+    to_dao(pr2_world_state_reset).from_dao()
+
     queried_world = session.scalar(select(WorldMappingDAO))
     reconstructed: World = queried_world.from_dao()
+
+    # confirm the modification history
+    deepcopy(reconstructed)
 
     q = select(RevoluteConnectionDAO)
     r = session.scalars(q).all()

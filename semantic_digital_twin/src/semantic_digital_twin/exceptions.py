@@ -1,7 +1,7 @@
 from __future__ import annotations, absolute_import
 
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Set
 from uuid import UUID
 
 from typing_extensions import (
@@ -21,6 +21,10 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.robots.robot_parts import (
+        AbstractRobot,
+        AbstractRobotPart,
+    )
     from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.geometry import Scale
     from semantic_digital_twin.world_description.world_entity import (
@@ -31,9 +35,10 @@ if TYPE_CHECKING:
     from semantic_digital_twin.spatial_types.spatial_types import (
         SpatialType,
     )
-    from semantic_digital_twin.spatial_types import Vector3
+    from semantic_digital_twin.spatial_types import Vector3, Point3
     from semantic_digital_twin.world_description.degree_of_freedom import (
         DegreeOfFreedomLimits,
+        DegreeOfFreedom,
     )
     from semantic_digital_twin.world_description.world_modification import (
         WorldModification,
@@ -196,6 +201,72 @@ class UsageError(LogicalError):
 
 
 @dataclass
+class WorldValidationError(LogicalError):
+    """
+    Raised when the world fails validation, e.g., when the kinematic structure is not a tree.
+    """
+
+    world: World
+    """
+    The world that failed validation.
+    """
+
+
+@dataclass
+class WorldIsNotATreeError(WorldValidationError):
+    """
+    Raised when the kinematic structure of the world is not a tree during validation.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"The world is not a tree: found {len(self.world.kinematic_structure_entities)} kinematic "
+            f"structure entities but {len(self.world.connections)} connections."
+        )
+        super().__post_init__()
+
+
+@dataclass
+class BrokenWorldModificationHistoryError(WorldValidationError):
+    """
+    Raised when the world's modification history was detected to be broken.
+    """
+
+    potential_cause: Optional[DataclassException] = None
+    """
+    The exception that was thrown and caused the world's modification history to be broken.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"The world's modification history was detected to be broken. "
+            f"The world is {self.world}"
+            f" Potential cause: {self.potential_cause}"
+        )
+        super().__post_init__()
+
+
+@dataclass
+class WorldContainsOrphanedDegreeOfFreedom(WorldValidationError):
+    """
+    Raised when the kinematic structure of the world contains orphaned degrees of freedom during validation.
+    """
+
+    actual_dofs: Set[DegreeOfFreedom]
+    """
+    The actual degrees of freedom used in connections.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            "self.degrees_of_freedom does not match the actual dofs used in connections. The orphaned degrees of freedom are: "
+            f"{set(self.world.degrees_of_freedom) - self.actual_dofs}"
+            " Did you forget to call self.delete_orphaned_dofs()?"
+        )
+        super().__post_init__()
+
+
+@dataclass
 class InvalidConnectionLimits(UsageError):
     """
     Raised when the lower limit is not less than the upper limit for a degree of freedom.
@@ -233,6 +304,21 @@ class MismatchingWorld(UsageError):
 
     def __post_init__(self):
         self.message = f"The two entities have mismatching worlds. Expected world: {self.expected_world}, given world: {self.given_world}"
+
+
+@dataclass
+class SemanticAnnotationCircularDependencyError(UsageError):
+    """
+    Raised when a circular dependency between semantic annotations is detected.
+    """
+
+    semantic_annotations: List[SemanticAnnotation]
+    """
+    The list of semantic annotations that in which a circular dependency is detected.
+    """
+
+    def __post_init__(self):
+        self.message = f"The following semantic annotations have circular dependencies: {self.semantic_annotations}"
 
 
 @dataclass
@@ -276,6 +362,14 @@ class InvalidPlaneDimensions(UsageError):
 
     def __post_init__(self):
         self.message = f"The Dimensions {self.scale} are invalid for the class {self.clazz.__name__}"
+
+
+@dataclass
+class UselessConceptError(UsageError):
+    """
+    Used to indicate that the operation the user is trying to perform is not useful in the current context, even
+    though it might be technically possible.
+    """
 
 
 @dataclass
@@ -348,11 +442,71 @@ class MissingPublishChangesKWARG(UsageError):
 
 
 @dataclass
+class StateUpdateContainsUnknownDegreesOfFreedomError(UsageError):
+    """
+    Raised when a WorldStateUpdate is received that contains one or more DOF identifiers
+    absent from the world state index.  This indicates a severe model/state desynchronization
+    that must be investigated rather than silently ignored.
+    """
+
+    unknown_identifiers: List[UUID]
+    """
+    List of unknown DOF UUIDs that were attempted to update the state of
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"Received a WorldStateUpdate containing {len(self.unknown_identifiers)} "
+            f"DOF identifier(s) absent from the world state index: "
+            f"{self.unknown_identifiers}. "
+            "This means the world model and state are severely out of sync."
+        )
+
+
+@dataclass
+class ApplyMissedMessagesWhileWorldIsBeingModifiedError(UsageError):
+    """
+    Raised when apply_missed_messages is called while a modify_world context is active on the synchronizer's world.
+    Applying missed messages requires entering a modify_world context internally, which would conflict
+    with any currently active modify_world context due to mismatching publish_changes policies.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            "apply_missed_messages must not be called while a modify_world context is active on the synchronizer's world. "
+            "Call apply_missed_messages after the modify_world context has exited."
+        )
+
+
+@dataclass
 class DuplicateWorldEntityError(UsageError):
     world_entities: List[WorldEntity]
 
     def __post_init__(self):
         self.message = f"WorldEntities {self.world_entities} are duplicates, while world entity elements should be unique."
+
+
+@dataclass
+class DuplicateRobotAssignmentsError(UsageError):
+    """
+    Raised when a robot part is assigned to multiple robots, which should not happen.
+    """
+
+    robot_part: AbstractRobotPart
+    """
+    The robot part that is assigned to multiple robots.
+    """
+
+    robots: list[AbstractRobot]
+    """
+    The robots that are already assigned to the robot part.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"Robot part {self.robot_part} is assigned to multiple robots: {self.robots}."
+            f" Each robot part should be assigned to at most one robot."
+        )
 
 
 @dataclass
@@ -414,14 +568,44 @@ class WorldEntityNotFoundError(UsageError):
             self.message = f"WorldEntity with name {self.name_or_hash} not found"
         else:
             self.message = f"WorldEntity with hash {self.name_or_hash} not found"
+        super().__post_init__()
 
 
 @dataclass
-class WorldEntityWithIDNotFoundError(UsageError):
-    id: UUID
+class MissingDefaultCameraError(UsageError):
+    """
+    Raised when trying to access the default camera of a robot that does not have a default camera.
+    """
+
+    robot: Type[AbstractRobot]
+    """
+    The robot that does not have a default camera.
+    """
 
     def __post_init__(self):
-        self.message = f"WorldEntity with id {self.id} not found"
+        self.message = f"Robot {self.robot.name} does not have a default camera."
+
+
+@dataclass
+class MissingWorldError(UsageError):
+    """
+    Raised when trying to access a world that is None, but a world is required for the operation.
+    """
+
+    def __post_init__(self):
+        self.message = f"The world you are trying to access is None."
+
+
+@dataclass
+class WorldEntityWithIDNotFoundError(WorldEntityNotFoundError):
+    name_or_hash: UUID = None
+
+    def __post_init__(self):
+        self.message = f"WorldEntity with id {self.name_or_hash} not found"
+
+    @property
+    def id(self) -> UUID:
+        return self.name_or_hash
 
 
 @dataclass
@@ -431,6 +615,21 @@ class AlreadyBelongsToAWorldError(UsageError):
 
     def __post_init__(self):
         self.message = f"Cannot add a {self.type_trying_to_add} that already belongs to another world {self.world.name}."
+
+
+@dataclass
+class DoesNotBelongToAWorldError(UsageError):
+    """
+    Raised when trying to use a world entity that does not belong to any world in a context where it must belong to a world.
+    """
+
+    world_entity: WorldEntity
+    """
+    The world entity that does not belong to a world.
+    """
+
+    def __post_init__(self):
+        self.message = f"WorldEntity {self.world_entity} does not belong to a world."
 
 
 class NotJsonSerializable(JSONSerializationError): ...
@@ -545,3 +744,18 @@ class AtomicWorldModificationNotAtomic(DataclassException):
             f"{self.modification.__name__} tried to perform an atomic world modification anyways."
         )
         super().__post_init__()
+
+
+@dataclass
+class PointOccupiedError(DataclassException):
+    """
+    Error that is raised when a pose is occupied or not in the search space of a Connectivity Graphs.
+    """
+
+    point: Point3
+    """
+    The point that is occupied.
+    """
+
+    def __post_init__(self):
+        self.message = f"The point {self.point} is occupied."

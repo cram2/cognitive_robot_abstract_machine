@@ -31,9 +31,8 @@ def test_get_scope_from_imports_wildcard():
 
 def test_get_scope_from_imports_invalid():
     source = "import non_existent_module_xyz"
-    # Should not raise exception, but log warning
-    scope = get_scope_from_imports(source=source)
-    assert "non_existent_module_xyz" not in scope
+    with pytest.raises(ModuleNotFoundError):
+        scope = get_scope_from_imports(source=source)
 
 def test_get_scope_from_imports_tree():
     source = "import os"

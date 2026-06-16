@@ -8,37 +8,16 @@
 from __future__ import annotations
 
 import logging
-import os
-from dataclasses import is_dataclass
+from pathlib import Path
+
+import trimesh
+
+import semantic_digital_twin
+import semantic_digital_twin.orm.model
 
 import semantic_digital_twin.adapters.procthor.procthor_resolver
-import semantic_digital_twin.collision_checking.collision_detector
-import semantic_digital_twin.collision_checking.collision_groups
-import semantic_digital_twin.collision_checking.collision_manager
-import semantic_digital_twin.collision_checking.collision_rules
-import semantic_digital_twin.collision_checking.collision_variable_managers
-import semantic_digital_twin.orm.model
-import semantic_digital_twin.orm.ormatic_interface
-import semantic_digital_twin.reasoning.predicates
-import semantic_digital_twin.robots.abstract_robot
-import semantic_digital_twin.robots.hsrb
-import semantic_digital_twin.robots.pr2
-import semantic_digital_twin.semantic_annotations.semantic_annotations
-import semantic_digital_twin.world  # ensure the module attribute exists on the package
-import semantic_digital_twin.world_description.degree_of_freedom
-import semantic_digital_twin.world_description.geometry
-import semantic_digital_twin.world_description.shape_collection
-import semantic_digital_twin.world_description.world_entity
 from krrood.adapters.json_serializer import SubclassJSONSerializer
-from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.ormatic import ORMatic
-from krrood.ormatic.type_dict import TypeDict
-from krrood.ormatic.utils import classes_of_module, classes_of_package
-from krrood.utils import recursive_subclasses
-from semantic_digital_twin.adapters.procthor.procthor_parser import ProcTHORParser
-import semantic_digital_twin.adapters.sage_10k_dataset
-from semantic_digital_twin.callbacks.callback import ModelChangeCallback
-from semantic_digital_twin.orm.model import *  # type: ignore
 from semantic_digital_twin.reasoning.predicates import ContainsType
 from semantic_digital_twin.semantic_annotations.position_descriptions import (
     SemanticDirection,
@@ -51,12 +30,8 @@ from semantic_digital_twin.world import (
     WorldModelUpdateContextManager,
 )
 
-all_classes = set(classes_of_package(semantic_digital_twin))
-all_classes -= set(classes_of_module(semantic_digital_twin.orm.ormatic_interface))
-all_classes -= set(classes_of_package(semantic_digital_twin.adapters))
-all_classes |= set(classes_of_package(semantic_digital_twin.adapters.sage_10k_dataset))
 # remove classes that should not be mapped
-all_classes -= {
+ignore_classes = {
     ResetStateContextManager,
     WorldModelUpdateContextManager,
     ForwardKinematicsManager,
@@ -65,47 +40,35 @@ all_classes -= {
     SemanticDirection,
     SubclassJSONSerializer,
 }
-# keep only dataclasses that are NOT AlternativeMapping subclasses
-all_classes = {
-    c for c in all_classes if is_dataclass(c) and not issubclass(c, AlternativeMapping)
-}
-
-alternative_mappings = [
-    am
-    for am in recursive_subclasses(AlternativeMapping)
-    if am.original_class() in all_classes and not am.__module__.startswith("test.")
-]
 
 
 def generate_orm():
     """
-    Generate the ORM classes for the pycram package.
+    Generate the ORM classes for the coraplex package.
     """
 
     logging.basicConfig(level=logging.INFO)  # Or your preferred config
     logging.getLogger("krrood").setLevel(logging.DEBUG)
 
-    class_diagram = ClassDiagram(
-        list(sorted(all_classes, key=lambda c: c.__name__, reverse=True))
+    ormatic = ORMatic.from_package(
+        [semantic_digital_twin],
+        ormatic_interface_dependencies=[],
+        ignored_classes=ignore_classes,
+        type_mappings={
+            trimesh.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
+        },
+    )
+    ormatic.make_all_tables()
+    ormatic_interface_path = (
+        Path(__file__).parent.parent
+        / "src"
+        / "semantic_digital_twin"
+        / "orm"
+        / "ormatic_interface.py"
     )
 
-    instance = ORMatic(
-        class_dependency_graph=class_diagram,
-        type_mappings=TypeDict(
-            {
-                trimesh.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
-            }
-        ),
-        alternative_mappings=alternative_mappings,
-    )
-    instance.make_all_tables()
-
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.abspath(
-        os.path.join(script_dir, "..", "src", "semantic_digital_twin", "orm")
-    )
-    with open(os.path.join(path, "ormatic_interface.py"), "w") as f:
-        instance.to_sqlalchemy_file(f)
+    with open(ormatic_interface_path, "w") as f:
+        ormatic.to_sqlalchemy_file(f)
 
 
 if __name__ == "__main__":

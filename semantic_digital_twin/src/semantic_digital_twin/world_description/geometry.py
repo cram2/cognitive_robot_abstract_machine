@@ -420,9 +420,12 @@ class Mesh(Shape):
         origin = from_json(data["origin"], **kwargs)
         scale = from_json(data["scale"], **kwargs)
         file_type = data["file_type"]
-        return cls.from_trimesh(
+        color = from_json(data["color"], **kwargs)
+        instance = cls.from_trimesh(
             mesh=mesh, origin=origin, scale=scale, file_type=file_type
         )
+        instance.color = color
+        return instance
 
     @classmethod
     def add_uv(cls, mesh: trimesh.Trimesh, uv: np.ndarray) -> trimesh.Trimesh:
@@ -467,7 +470,8 @@ class Mesh(Shape):
         """
         mesh = trimesh.load_mesh(self.filename)
         mesh.apply_scale(self.scale.to_np())
-        mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
+        if not isinstance(mesh.visual, TextureVisuals):
+            mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
         return mesh
 
     @classmethod
@@ -531,7 +535,7 @@ class Mesh(Shape):
             visual=trimesh.visual.TextureVisuals(uv=uv_unindexed, image=texture_image),
         )
 
-        return Mesh.from_trimesh(mesh=mesh, origin=origin, scale=scale, file_type="obj")
+        return Mesh.from_trimesh(mesh=mesh, origin=origin, scale=scale, file_type="obj", texture_file_path=texture_file_path)
 
     @classmethod
     def from_trimesh(
@@ -556,7 +560,7 @@ class Mesh(Shape):
 
         # Each export gets its own subdir so material.mtl files never collide
         subdir = tempfile.mkdtemp(dir=dirname)
-        tmp_path = os.path.join(subdir, f"mesh.{file_type}")
+        tmp_path = os.path.join(subdir, f"{os.path.basename(subdir)}.{file_type}")
 
         try:
             mesh.export(tmp_path, file_type=file_type)

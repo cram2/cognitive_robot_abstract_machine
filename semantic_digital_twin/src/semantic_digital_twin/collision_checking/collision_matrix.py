@@ -140,10 +140,14 @@ class CollisionMatrix:
         return hash(id(self))
 
     def apply_buffer(self, buffer: float):
-        for collision in self.collision_checks:
-            collision.distance = (
-                collision.distance + buffer if collision.distance else None
+        self.collision_checks = {
+            CollisionCheck(
+                check.body_a,
+                check.body_b,
+                check.distance + buffer if check.distance is not None else None,
             )
+            for check in self.collision_checks
+        }
 
     @classmethod
     def create_all_checks(cls, distance: float, world: World) -> Self:

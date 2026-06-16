@@ -73,3 +73,14 @@ class CouldNotResolveType(DataclassException):
             f"Could not resolve type {self.type_name}.\n{self.extra_information}"
         )
         super().__post_init__()
+
+
+@dataclass
+class MockedClassInstantiationError(DataclassException):
+    """
+    Raised when an attempt is made to instantiate a MockedClass.
+    """
+
+    def __post_init__(self):
+        self.message = "MockedClass cannot be instantiated directly"
+        super().__post_init__()

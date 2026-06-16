@@ -4,7 +4,8 @@ import importlib
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum, auto
+from enum import Enum, auto, StrEnum
+from pathlib import Path
 from types import FunctionType
 from typing import Set, Generic
 
@@ -18,6 +19,7 @@ from krrood.ormatic.data_access_objects.alternative_mappings import (
     T,
 )
 from krrood.symbol_graph.symbol_graph import Symbol
+from ..dataset.semantic_world_like_classes import Body
 
 
 # check that custom enums works
@@ -42,7 +44,7 @@ class KRROODPosition(Symbol):
     z: float
 
     @classmethod
-    def from_abc(cls, a: float, b: float, c: float) -> Position:
+    def from_abc(cls, a: float, b: float, c: float) -> KRROODPosition:
         return KRROODPosition(a, b, c)
 
 
@@ -131,6 +133,18 @@ class KRROODCup(KRROODPhysicalObject):
 
 class KRROODBowl(KRROODPhysicalObject):
     pass
+
+
+@dataclass(unsafe_hash=True)
+class NestedAction:
+    obj: Body
+    pose: KRROODPose
+
+
+@dataclass
+class EnumAction:
+    obj: Body
+    enum: TestEnum
 
 
 @dataclass
@@ -703,3 +717,8 @@ class GenericClassAssociation:
     associated_value_not_parametrized_list: List[GenericClass] = field(
         default_factory=list
     )
+
+
+@dataclass
+class PathAssociation:
+    path: Path

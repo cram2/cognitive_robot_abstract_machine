@@ -18,3 +18,4 @@ If you are interested in the internals of EQL or wish to extend it:
 3.  **[Variable System](variable_system.md)**: A deep dive into how symbolic variables and domains are handled internally.
 4.  **[Execution Engine](execution_engine.md)**: Details on the mechanics of query evaluation and result binding.
 5.  **[Graph and Visualization](graph_and_visualization.md)**: Tools and techniques for debugging and visualizing query plans and execution graphs.
+6.  **[Inference Explanation Internals](inference_explanation.md)**: How the `InferenceExplanation` system is implemented, including the observer pipeline, Symbol inheritance design, weakref lifecycle management, and the `lru_cache` memory-leak fix.
