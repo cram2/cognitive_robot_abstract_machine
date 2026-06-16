@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import doctest
 from dataclasses import is_dataclass, dataclass, field
 from typing import Type
 
@@ -11,7 +12,7 @@ from krrood.class_diagrams.class_diagram import (
     AssociationThroughRoleTaker,
 )
 from krrood.class_diagrams.utils import classes_of_module, T
-from krrood.patterns.role import Role
+from krrood.patterns.role import Role, role_taker_field
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from ..dataset.role_and_ontology import university_ontology_like_classes
 from ..dataset.role_and_ontology.university_ontology_like_classes_without_descriptors import (
@@ -23,6 +24,27 @@ from ..dataset.role_and_ontology.university_ontology_like_classes_without_descri
     RepresentativeAsSecondRole,
     DelegateAsThirdRole,
 )
+
+
+def test_role_class_docstring_examples_execute_with_documented_results():
+    # Runs the doctest embedded in the Role class docstring and verifies that every
+    # documented result matches reality, so the docstring example cannot silently drift.
+    #
+    # The example defines a role class inline, so it runs in a dedicated namespace
+    # rather than the role module's own namespace. The role module enables
+    # ``from __future__ import annotations``; reusing that namespace would turn the
+    # example annotations into strings the class diagram cannot resolve for inline
+    # classes. A fresh namespace keeps annotations as real objects.
+    namespace = {
+        "Role": Role,
+        "role_taker_field": role_taker_field,
+        "__name__": "role_docstring_example",
+    }
+    docstring_test = doctest.DocTestParser().get_doctest(
+        Role.__doc__, namespace, name="Role", filename=__file__, lineno=0
+    )
+    results = doctest.DocTestRunner(verbose=False).run(docstring_test)
+    assert results.failed == 0
 
 
 def test_getting_and_setting_attribute_for_role_and_role_taker():

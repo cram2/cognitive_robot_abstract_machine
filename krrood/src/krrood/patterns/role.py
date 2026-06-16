@@ -86,17 +86,13 @@ class Role(Symbol, SubClassSafeGeneric[T]):
     non-role entity at the bottom of the taker chain, so any collection or dictionary keyed
     by the taker automatically reflects the role:
     >>> from dataclasses import dataclass
-    >>> from krrood.patterns.role import Role, role_taker_field
-    >>>
     >>> @dataclass(unsafe_hash=True)
-    >>> class Person:
-    >>>     name: str
-    >>>
+    ... class Person:
+    ...     name: str
     >>> @dataclass(eq=False)
-    >>> class Student(Role[Person]):
-    >>>     person: Person = role_taker_field()
-    >>>     major: str = ""
-    >>>
+    ... class Student(Role[Person]):
+    ...     person: Person = role_taker_field()
+    ...     major: str = ""
     >>> person = Person(name="Alice")
     >>> student = Student(person=person)
     >>> student.name is person.name
