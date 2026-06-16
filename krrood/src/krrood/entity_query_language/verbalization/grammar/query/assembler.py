@@ -21,7 +21,9 @@ from krrood.entity_query_language.verbalization.fragments.features import (
 from krrood.entity_query_language.verbalization.grammar.aggregation.assembler import (
     AggregationValueAssembler,
 )
-from krrood.entity_query_language.verbalization.grammar.framework.assembler import Assembler
+from krrood.entity_query_language.verbalization.grammar.framework.assembler import (
+    Assembler,
+)
 from krrood.entity_query_language.verbalization.grammar.clauses.composer import (
     ClauseComposer,
 )
@@ -82,7 +84,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         """:return: *"Find <a Robot where …> such that …"* — the selected variable is itself an entity."""
         selection = self._as_noun(node.selected_variable)
         return self._query_body(
-            node, plan, selection, where_item=self._where_clause(plan)
+            node, plan, selection, where_items=[self._where_clause(plan)]
         )
 
     def _realize_empty(self, node: Query, plan: QueryPlan) -> Fragment:
@@ -91,7 +93,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             node,
             plan,
             FallbackNouns.ENTITY.plural_fragment(),
-            where_item=self._where_clause(plan),
+            where_items=[self._where_clause(plan)],
         )
 
     def assemble_nested(self, node: Query) -> Fragment:
@@ -128,7 +130,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             node,
             plan,
             selection,
-            where_item=self._where_clause(plan),
+            where_items=[self._where_clause(plan)],
             find_header=Keywords.FIND_SETS_OF.as_fragment(),
         )
 
@@ -139,10 +141,10 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         plain-variable selection with its WHERE woven in."""
         variable = node.selected_variable
         selected = self._build_selection(node, variable, plan)
-        selected, where_item = self._apply_subject_restrictions(plan, selected)
+        selected, where_items = self._apply_subject_restrictions(plan, selected)
         # No scope marker: the engine stamps this body with its query node, and the coreference
         # pass reads the focus for that query from the discourse view.
-        return self._query_body(node, plan, selected, where_item=where_item)
+        return self._query_body(node, plan, selected, where_items=where_items)
 
     def _build_selection(
         self, node: Query, variable: SymbolicExpression, plan: QueryPlan
@@ -162,20 +164,21 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
 
     def _apply_subject_restrictions(
         self, plan: QueryPlan, selected: Fragment
-    ) -> Tuple[Fragment, Optional[Fragment]]:
-        """:return: The WHERE woven into the selection — *"<selected> whose <grouped>"* plus a
-        separate *"such that <residual>"* clause item (``None`` when absent)."""
+    ) -> Tuple[Fragment, List[Optional[Fragment]]]:
+        """:return: The selection with its inline superlative modifiers attached, and the WHERE's
+        clause items — the *"whose"* group (a sub-list of points in hierarchical) then a separate
+        *"such that <residual>"* clause (each ``None`` when absent)."""
         rendered = ClauseComposer(self.context).restriction(plan)
         if rendered is None:
-            return selected, None
-        if rendered.modifiers:
-            selected = PhraseFragment(parts=[selected, *rendered.modifiers])
-        where_item = (
+            return selected, []
+        if rendered.inline_modifiers:
+            selected = PhraseFragment(parts=[selected, *rendered.inline_modifiers])
+        residual = (
             PhraseFragment(parts=[Keywords.SUCH_THAT.as_fragment(), rendered.residual])
             if rendered.residual is not None
             else None
         )
-        return selected, where_item
+        return selected, [rendered.whose, residual]
 
     # ── noun forms ───────────────────────────────────────────────────────────
 
@@ -194,7 +197,11 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         modifiers: List[Fragment] = []
         rendered = ClauseComposer(self.context).restriction(plan)
         if rendered is not None:
-            modifiers.extend(rendered.modifiers)
+            modifiers.extend(rendered.inline_modifiers)
+            # A nested noun is an inline phrase, so the "whose" block flattens to "whose a, and b"
+            # (the renderer expands a block into points only at the item level, not inside a phrase).
+            if rendered.whose is not None:
+                modifiers.append(rendered.whose)
             if rendered.residual is not None:
                 modifiers.append(
                     PhraseFragment(
@@ -218,18 +225,19 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         node: Query,
         plan: QueryPlan,
         selection: Fragment,
-        where_item: Optional[Fragment],
+        where_items: List[Optional[Fragment]],
         find_header: Optional[Fragment] = None,
     ) -> Fragment:
-        """:return: *"Find <selection>"* + the present clauses (*such that … grouped by … having
-        … ordered by …*) as block items — absent clauses (``None``) are simply skipped.
+        """:return: *"Find <selection>"* + the present clauses (the subject restriction's *"whose"*
+        / *"such that"*, then *grouped by … having … ordered by …*) as block items — absent
+        clauses (``None``) are simply skipped.
         """
         if find_header is None:
             find_header = Keywords.FIND.as_fragment()
         header = PhraseFragment(parts=[find_header, selection])
         clauses = [
             clause
-            for clause in [where_item, *self._trailing_clauses(node)]
+            for clause in [*where_items, *self._trailing_clauses(node)]
             if clause is not None
         ]
         return BlockFragment(header=header, items=clauses)

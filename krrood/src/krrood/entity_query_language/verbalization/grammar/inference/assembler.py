@@ -13,7 +13,6 @@ from krrood.entity_query_language.verbalization.navigation_path import (
 )
 from krrood.entity_query_language.verbalization.fragments.base import (
     BlockFragment,
-    oxford_comma,
     PhraseFragment,
     Fragment,
 )
@@ -25,7 +24,6 @@ from krrood.entity_query_language.verbalization.grammar.conditions.assembler imp
 )
 from krrood.entity_query_language.verbalization.grammar.conditions.restriction_assembler import (
     RestrictionAssembler,
-    RestrictionFragments,
 )
 from krrood.entity_query_language.verbalization.grammar.inference.planner import (
     AggregationStatus,
@@ -100,9 +98,11 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         return items or [Keywords.TRUE.as_fragment()]
 
     def _antecedent(self, antecedent: AntecedentInformation) -> Fragment:
-        """:return: *"there's a <Type> whose <conditions>"* — the existential intro with the
-        antecedent's conditions woven in by the shared restriction machinery (the same *"whose …,
-        and …"* / *"such that …"* form a query selection uses)."""
+        """:return: The antecedent as a bulleted list entry whose conditions hang beneath it — the
+        existential intro woven with its conditions by the shared restriction machinery (the same
+        *"whose"* group / *"such that …"* form a query selection uses). Inline / in paragraph this
+        reads *"there's a <Type> whose a, and b"*; in hierarchical the conditions are sub-points.
+        """
         intro = self._antecedent_intro(antecedent)
         if not antecedent.conditions or antecedent.variable is None:
             return intro
@@ -111,16 +111,23 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
             antecedent.variable,
             self._number(antecedent),
         )
-        return self._weave(intro, restriction)
-
-    @staticmethod
-    def _weave(intro: Fragment, restriction: RestrictionFragments) -> Fragment:
-        """:return: The intro with its restriction modifiers attached and any residual appended as a
-        *"such that …"* clause."""
-        parts: List[Fragment] = [intro, *restriction.modifiers]
+        header = (
+            PhraseFragment(parts=[intro, *restriction.inline_modifiers])
+            if restriction.inline_modifiers
+            else intro
+        )
+        items: List[Fragment] = []
+        if restriction.whose is not None:
+            items.append(restriction.whose)
         if restriction.residual is not None:
-            parts += [Keywords.SUCH_THAT.as_fragment(), restriction.residual]
-        return PhraseFragment(parts=parts) if len(parts) > 1 else intro
+            items.append(
+                PhraseFragment(
+                    parts=[Keywords.SUCH_THAT.as_fragment(), restriction.residual]
+                )
+            )
+        if not items:
+            return header
+        return BlockFragment(header=header, items=items, bulleted_header=True)
 
     def _antecedent_intro(self, antecedent: AntecedentInformation) -> Fragment:
         """:return: *"there's a <Type>"* / *"there are <Types>"* — the antecedent's existential intro."""
@@ -145,9 +152,10 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
     # ── THEN clause ───────────────────────────────────────────────────────────
 
     def _then_items(self, structure: RuleStructure) -> List[Fragment]:
-        """:return: *"there's a <Consequent> whose <field> is <value>, and …"* — the THEN clause, its
-        field bindings gathered under one *"whose …, and …"* envelope (the same form a query
-        subject restriction uses)."""
+        """:return: The consequent as a single bulleted entry — *"there's a <Consequent>"* with its
+        field bindings under one *"whose"* group (the same form a query subject restriction uses):
+        *"whose <field> is <value>, and …"* inline / in paragraph, sub-points in hierarchical.
+        """
         intro: Fragment = ExistentialPhrase.for_number(Number.SINGULAR).build_phrase(
             structure.consequent_type
         )
@@ -157,13 +165,12 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         ]
         if not bindings:
             return [intro]
-        whose = PhraseFragment(
-            parts=[
-                Keywords.WHOSE.as_fragment(),
-                oxford_comma(bindings, Conjunctions.AND.as_fragment()),
-            ]
+        whose = BlockFragment(
+            header=Keywords.WHOSE.as_fragment(),
+            items=bindings,
+            conjunction=Conjunctions.AND.as_fragment(),
         )
-        return [PhraseFragment(parts=[intro, whose])]
+        return [BlockFragment(header=intro, items=[whose], bulleted_header=True)]
 
     def _binding_predicate(self, binding: ConsequentBinding) -> Fragment:
         """:return: The bare *"<field> is/are <value>"* predicate for one consequent binding (the

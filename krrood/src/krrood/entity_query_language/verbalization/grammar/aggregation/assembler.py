@@ -16,7 +16,9 @@ from krrood.entity_query_language.verbalization.fragments.features import (
 from krrood.entity_query_language.verbalization.grammar.aggregation.kinds import (
     AGGREGATION_KIND,
 )
-from krrood.entity_query_language.verbalization.grammar.framework.assembler import Assembler
+from krrood.entity_query_language.verbalization.grammar.framework.assembler import (
+    Assembler,
+)
 from krrood.entity_query_language.verbalization.grammar.clauses.composer import (
     ClauseComposer,
 )
@@ -29,6 +31,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Keywords,
     Prepositions,
 )
+
 
 class AggregationValueAssembler(Assembler[Query, QueryPlan]):
     """
@@ -112,7 +115,10 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
         composer = ClauseComposer(self.context)
         rendered = composer.restriction(plan)
         if rendered is not None:
-            parts.extend(rendered.modifiers)
+            parts.extend(rendered.inline_modifiers)
+            # This aggregate value is an inline noun phrase, so the "whose" block flattens inline.
+            if rendered.whose is not None:
+                parts.append(rendered.whose)
             if rendered.residual is not None:
                 parts += [Keywords.SUCH_THAT.as_fragment(), rendered.residual]
 

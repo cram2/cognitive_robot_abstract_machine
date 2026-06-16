@@ -87,7 +87,13 @@ class ParagraphRenderer(FragmentRenderer):
         """
 
         def _block(block: BlockFragment) -> str:
-            prose = ", ".join(self.render(i) for i in block.items)
+            rendered = [self.render(item) for item in block.items]
+            if block.conjunction is not None and len(rendered) > 1:
+                # Oxford coordination: "a, b, and c" (the comma before the conjunction is the
+                # ", "-join itself, matching the project's house style, incl. "a, and b").
+                conjunction = self.render(block.conjunction)
+                rendered[-1] = f"{conjunction}{self.formatter.space}{rendered[-1]}"
+            prose = ", ".join(rendered)
             if block.header is None:
                 return prose
             header_str = self.render(block.header)
@@ -137,10 +143,26 @@ class HierarchicalRenderer(FragmentRenderer):
             case BlockFragment(header=header, items=items):
                 lines: list[str] = []
                 if header is not None:
-                    lines.append(self.formatted_indent * depth + self._inline(header))
+                    bullet = (
+                        self.bullet.value + self.formatter.space
+                        if fragment.bulleted_header
+                        else ""
+                    )
+                    lines.append(
+                        self.formatted_indent * depth + bullet + self._inline(header)
+                    )
                     depth = depth + 1
-                for item in items:
-                    lines.append(self._render_item(item, depth))
+                last = len(items) - 1
+                for index, item in enumerate(items):
+                    # The coordinating conjunction (when any) joins the last item — "… and c".
+                    conjunction = (
+                        fragment.conjunction
+                        if fragment.conjunction is not None
+                        and index == last
+                        and last > 0
+                        else None
+                    )
+                    lines.append(self._render_item(item, depth, conjunction))
                 return self.formatter.newline.join(lines)
             case _:
                 return self.formatted_indent * depth + self._inline(fragment)
@@ -150,8 +172,11 @@ class HierarchicalRenderer(FragmentRenderer):
         """:return: The indentation string, with spaces replaced by the formatter's space character."""
         return self.indent_size.value.replace(" ", self.formatter.space)
 
-    def _render_item(self, fragment: Fragment, depth: int) -> str:
-        """Render one item, prepending the bullet at its indentation level."""
+    def _render_item(
+        self, fragment: Fragment, depth: int, conjunction: Optional[Fragment] = None
+    ) -> str:
+        """Render one item, prepending the bullet at its indentation level (and a coordinating
+        conjunction when this is the last item of a coordinated block)."""
         match fragment:
             case BlockFragment():
                 return self.render(fragment, depth)
@@ -161,14 +186,34 @@ class HierarchicalRenderer(FragmentRenderer):
                     + self.bullet.value
                     + self.formatter.space
                 )
-                return prefix + self._inline(fragment)
+                content = self._inline(fragment)
+                if conjunction is not None:
+                    content = (
+                        f"{self._inline(conjunction)}{self.formatter.space}{content}"
+                    )
+                return prefix + content
 
     def _inline(self, fragment: Fragment) -> str:
-        """Render a non-block fragment as a flat inline string."""
+        """Render a fragment as a flat inline string. A nested block is flattened to prose (its
+        items coordinated as in paragraph rendering) rather than expanded into bullets — bullets are
+        for a block that sits at the item level, not one embedded in a phrase (e.g. a *"whose …"*
+        modifier inside an inline noun phrase)."""
+
+        def _flatten(block: BlockFragment) -> str:
+            rendered = [self._inline(item) for item in block.items]
+            if block.conjunction is not None and len(rendered) > 1:
+                conjunction = self._inline(block.conjunction)
+                rendered[-1] = f"{conjunction}{self.formatter.space}{rendered[-1]}"
+            prose = ", ".join(rendered)
+            if block.header is None:
+                return prose
+            header_str = self._inline(block.header)
+            return f"{header_str}{self.formatter.space}{prose}" if prose else header_str
+
         return fold_fragment(
             fragment,
             word=lambda text: text,
             role=lambda text, role, reference: self._render_role(text, role, reference),
             phrase=lambda parts, separator: separator.join(parts),
-            block=lambda block: self.render(block, 0),
+            block=_flatten,
         )

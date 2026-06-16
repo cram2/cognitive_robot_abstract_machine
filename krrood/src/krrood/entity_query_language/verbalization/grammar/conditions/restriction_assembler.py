@@ -6,8 +6,8 @@ from typing_extensions import List, Optional
 
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.verbalization.fragments.base import (
+    BlockFragment,
     oxford_comma,
-    PhraseFragment,
     Fragment,
 )
 from krrood.entity_query_language.verbalization.grammar.conditions.forms import (
@@ -31,19 +31,21 @@ from krrood.entity_query_language.verbalization.vocabulary.words import Number
 
 @dataclass(frozen=True)
 class RestrictionFragments:
-    """The rendered pieces of a subject restriction, for the caller to place.
+    """The rendered pieces of a subject restriction, for the caller to place — each goes to a
+    different sentence position, so they are kept apart rather than pre-joined."""
 
-    Only two pieces, because they go to two different sentence positions: the *modifiers* attach to
-    the selection noun, the *residual* becomes a separate clause. The finer superlative-vs-appositive
-    split is internal — callers always place those together — so it is not exposed."""
+    inline_modifiers: List[Fragment] = field(default_factory=list)
+    """Superlative selection phrases (*"with the maximum amount"*) that attach inline, right after
+    the selection noun."""
 
-    modifiers: List[Fragment] = field(default_factory=list)
-    """The noun-attaching modifiers, in order — superlative selection phrases (*"with the maximum
-    amount"*) then the appositive *"whose <grouped>"* — placed right after the selection noun."""
+    whose: Optional[Fragment] = None
+    """The *"whose"* group as a coordinated block (header *"whose"*, one bare predicate per item,
+    Oxford-joined) — a sub-list of points in hierarchical rendering, *"whose a, and b"* inline /
+    in paragraph. ``None`` when nothing folds into a *"whose"*."""
 
     residual: Optional[Fragment] = None
     """The residual condition for a separate *"such that …"* / *"where …"* clause; the caller picks
-    the keyword and position. ``None`` when the WHERE folds entirely into modifiers."""
+    the keyword and position. ``None`` when the WHERE folds entirely into the other pieces."""
 
 
 @dataclass
@@ -90,18 +92,16 @@ class RestrictionAssembler:
         standalone = self._of_slot(placed, Slot.STANDALONE)
 
         whose = (
-            PhraseFragment(
-                parts=[
-                    Keywords.WHOSE.as_fragment(),
-                    oxford_comma(grouped, Conjunctions.AND.as_fragment()),
-                ]
+            BlockFragment(
+                header=Keywords.WHOSE.as_fragment(),
+                items=grouped,
+                conjunction=Conjunctions.AND.as_fragment(),
             )
             if grouped
             else None
         )
-        modifiers = superlatives + ([whose] if whose is not None else [])
         return RestrictionFragments(
-            modifiers=modifiers, residual=self._join(standalone)
+            inline_modifiers=superlatives, whose=whose, residual=self._join(standalone)
         )
 
     @staticmethod
