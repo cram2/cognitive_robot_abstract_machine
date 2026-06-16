@@ -30,6 +30,8 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.exceptions import (
+    InsufficientVectorsError,
+    ReferenceFrameMismatchError,
     SpatialTypesError,
     SpatialTypeNotJsonSerializable,
 )
@@ -114,8 +116,10 @@ class SpatialType:
                     reference_frame = spatial_object.reference_frame
                     continue
                 if reference_frame != spatial_object.reference_frame:
-                    raise SpatialTypesError(
-                        message=f"Reference frames of input parameters don't match ({reference_frame} != {spatial_object.reference_frame})."
+                    raise ReferenceFrameMismatchError(
+                        expected_frame=reference_frame,
+                        actual_frame=spatial_object.reference_frame,
+                        context=f"input parameter of type {type(spatial_object).__name__}",
                     )
         return reference_frame
 
@@ -712,9 +716,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         - x, y, and z provided: all three used directly
         """
         if x is None and y is None and z is None:
-            raise SpatialTypesError(
-                message="from_vectors requires at least two vectors"
-            )
+            raise InsufficientVectorsError(x=x, y=y, z=z)
         if x is not None and y is not None and z is None:
             z = x.cross(y)
         elif x is not None and y is None and z is not None:

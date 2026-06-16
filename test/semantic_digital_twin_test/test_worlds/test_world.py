@@ -23,6 +23,7 @@ from semantic_digital_twin.exceptions import (
     NonMonotonicTimeError,
     WorldEntityNotFoundError,
     BrokenWorldModificationHistoryError,
+    WorldEntityNotFoundError,
 )
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
@@ -1341,6 +1342,131 @@ def test_copy_for_world():
     copied_milk = milk.copy_for_world(w2)
 
     assert copied_milk.root == b1_w2
+
+
+def make_bodies(*names: tuple) -> list:
+    return [Body(name=PrefixedName(name, prefix)) for name, prefix in names]
+
+
+def test_suggest_typo_in_string_name():
+    bodies = make_bodies(("torso_lift_link", "pr2"), ("head_pan_link", "pr2"))
+    suggestions = World._suggest_world_entity_names("torso_lft_link", bodies)
+    assert suggestions == [PrefixedName("torso_lift_link", "pr2")]
+
+
+def test_suggest_typo_in_prefixed_name():
+    bodies = make_bodies(("torso_lift_link", "pr2"), ("head_pan_link", "pr2"))
+    suggestions = World._suggest_world_entity_names(
+        PrefixedName("torso_lft_link", "pr2"), bodies
+    )
+    assert suggestions == [PrefixedName("torso_lift_link", "pr2")]
+
+
+def test_suggest_same_bare_name_with_different_prefix():
+    bodies = make_bodies(("base_link", "pr2"), ("head_pan_link", "pr2"))
+    suggestions = World._suggest_world_entity_names(
+        PrefixedName("base_link", "kitchen"), bodies
+    )
+    assert suggestions == [PrefixedName("base_link", "pr2")]
+
+
+def test_suggest_returns_all_prefixes_of_exact_bare_name_match():
+    bodies = make_bodies(("base_link", "pr2"), ("base_link", "kitchen"))
+    suggestions = World._suggest_world_entity_names(
+        PrefixedName("base_link", "unknown"), bodies
+    )
+    assert suggestions == [
+        PrefixedName("base_link", "pr2"),
+        PrefixedName("base_link", "kitchen"),
+    ]
+
+
+def test_suggest_exact_bare_name_matches_rank_before_fuzzy_matches():
+    # the fuzzy candidate comes first in the iterable to prove ordering is by match
+    # quality, not iteration order
+    bodies = make_bodies(("torsoo", "b"), ("torso", "a"))
+    suggestions = World._suggest_world_entity_names(PrefixedName("torso", "x"), bodies)
+    assert suggestions == [PrefixedName("torso", "a"), PrefixedName("torsoo", "b")]
+
+
+def test_suggest_fuzzy_match_expands_to_all_prefixes():
+    bodies = make_bodies(("torso_lift_link", "pr2"), ("torso_lift_link", "pr2_copy"))
+    suggestions = World._suggest_world_entity_names("torso_lft_link", bodies)
+    assert suggestions == [
+        PrefixedName("torso_lift_link", "pr2"),
+        PrefixedName("torso_lift_link", "pr2_copy"),
+    ]
+
+
+def test_suggest_no_duplicates_when_exact_match_is_also_fuzzy_match():
+    bodies = make_bodies(("torso", "pr2"))
+    suggestions = World._suggest_world_entity_names(
+        PrefixedName("torso", "wrong"), bodies
+    )
+    assert suggestions == [PrefixedName("torso", "pr2")]
+
+
+def test_suggest_respects_default_max_suggestions():
+    bodies = make_bodies(*[("base_link", prefix) for prefix in "abcde"])
+    suggestions = World._suggest_world_entity_names(
+        PrefixedName("base_link", "unknown"), bodies
+    )
+    assert suggestions == [
+        PrefixedName("base_link", "a"),
+        PrefixedName("base_link", "b"),
+        PrefixedName("base_link", "c"),
+    ]
+
+
+def test_suggest_respects_explicit_max_suggestions():
+    bodies = make_bodies(*[("base_link", prefix) for prefix in "abcde"])
+    suggestions = World._suggest_world_entity_names(
+        PrefixedName("base_link", "unknown"), bodies, max_suggestions=2
+    )
+    assert len(suggestions) == 2
+
+
+def test_suggest_no_similar_names_returns_empty():
+    bodies = make_bodies(("alpha", None), ("beta", None))
+    assert World._suggest_world_entity_names("quaternion", bodies) == []
+
+
+def test_suggest_empty_iterable_returns_empty():
+    assert World._suggest_world_entity_names("anything", []) == []
+    assert (
+        World._suggest_world_entity_names(PrefixedName("anything", "prefix"), []) == []
+    )
+
+
+def test_not_found_error_contains_suggestions(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    with pytest.raises(WorldEntityNotFoundError) as exc_info:
+        world.get_kinematic_structure_entity_by_name("rooot")
+    assert exc_info.value.suggestions == [PrefixedName("root", "world")]
+    assert "Suggestion: did you mean" in str(exc_info.value)
+    assert "world/root" in str(exc_info.value)
+
+
+def test_not_found_error_with_wrong_prefix_suggests_existing_entity(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    with pytest.raises(WorldEntityNotFoundError) as exc_info:
+        world.get_body_by_name(PrefixedName("l1", "wrong_prefix"))
+    assert exc_info.value.suggestions == [l1.name]
+
+
+def test_not_found_error_without_suggestions(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    with pytest.raises(WorldEntityNotFoundError) as exc_info:
+        world.get_body_by_name("quaternion_flux_capacitor")
+    assert exc_info.value.suggestions == []
+    assert "Suggestion" not in str(exc_info.value)
+
+
+def test_not_found_error_suggestions_for_connections(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    with pytest.raises(WorldEntityNotFoundError) as exc_info:
+        world.get_connection_by_name("l1_T_l3")
+    assert PrefixedName("l1_T_l2") in exc_info.value.suggestions
 
 
 def test_clearing_the_world_detaches_connections():

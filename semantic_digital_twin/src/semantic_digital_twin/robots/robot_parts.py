@@ -268,7 +268,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         **kwargs,
     ) -> Self:
         raise UselessConceptError(
-            message="The bodies needed for RobotParts should already exist in the world after parsing a URDF"
+            reason="The bodies needed for RobotParts should already exist in the world after parsing a URDF"
         )
 
     @property

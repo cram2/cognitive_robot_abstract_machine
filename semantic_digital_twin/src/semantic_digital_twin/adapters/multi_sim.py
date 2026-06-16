@@ -5,7 +5,6 @@ import inspect
 import os
 from typing import Tuple
 
-import shutil
 import time
 import trimesh
 from abc import ABC, abstractmethod
@@ -24,7 +23,6 @@ from physics_simulators.base_simulator import (
     SimulatorConstraints,
 )
 from krrood.utils import recursive_subclasses
-from krrood.exceptions import DataclassException
 from scipy.spatial.transform import Rotation
 from trimesh.visual import TextureVisuals
 
@@ -33,6 +31,10 @@ from semantic_digital_twin.callbacks.callback import (
     StateChangeCallback,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import (
+    QuaternionConversionError,
+    MujocoEntityNotFoundError,
+)
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -88,8 +90,7 @@ def cas_pose_to_list(pose: HomogeneousTransformationMatrix) -> List[float]:
     try:
         quat = Rotation.from_matrix(rotation_matrix).as_quat(scalar_first=True)
     except Exception as e:
-        error_msg = f"Error converting rotation matrix to quaternion. Rotation matrix:\n{rotation_matrix}\nError message: {str(e)}"
-        raise MultiSimError(error_msg)
+        raise QuaternionConversionError(rotation_matrix, str(e))
     return [pos[0], pos[1], pos[2], quat[0], quat[1], quat[2], quat[3]]
 
 
@@ -135,11 +136,6 @@ class GeomVisibilityAndCollisionType(IntEnum):
     """
     Undefined geometry type (variant 2).
     """
-
-
-@dataclass
-class MultiSimError(DataclassException):
-    """Base class for all MultiSim-related exceptions."""
 
 
 @dataclass(eq=False)
@@ -677,26 +673,6 @@ class CameraConverter(EntityConverter, ABC):
         camera_props = EntityConverter._convert(self, entity)
         camera_props["body"] = entity.body.name.name
         return camera_props
-
-
-class MujocoError(MultiSimError):
-    """
-    Base class for all MuJoCo-related exceptions.
-    """
-
-
-class MujocoEntityNotFoundError(MujocoError):
-    """
-    Raised when a MuJoCo entity of a given type and name cannot be found.
-    """
-
-    entity_name: str
-    entity_type: mujoco.mjtObj
-    action: str = "find"
-
-    def __post_init__(self):
-        self.message = f"Failed to {self.action}: type={self.entity_type}, name='{self.entity_name}'"
-        super().__post_init__()
 
 
 @dataclass
