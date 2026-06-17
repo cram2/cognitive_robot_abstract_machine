@@ -123,7 +123,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
         the state version.
         """
         self.version += 1
-        for callback in self.state_change_callbacks:
+        for callback in list(self.state_change_callbacks):
             callback.notify_state_change(**kwargs)
 
     def clear(self):

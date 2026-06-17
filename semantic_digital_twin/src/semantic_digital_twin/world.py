@@ -205,6 +205,9 @@ class WorldModelUpdateContextManager:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        # Whether deferred network publications should be flushed after the lock is released, will be set true when
+        # existing the last modification block.
+        run_pending_publications = False
         try:
             # If error, clean up before re-raising
             if exc_val:
@@ -216,6 +219,8 @@ class WorldModelUpdateContextManager:
                 # so cached queries must be invalidated
                 clear_memoization_cache(self.world)
                 if not model_manager._active_world_model_update_context_manager_ids:
+                    # discard publications buffered before the error; they must not be sent
+                    model_manager.pending_publications.clear()
                     if len(model_manager.current_model_modification_block):
                         raise BrokenWorldModificationHistoryError(
                             world=self.world, potential_cause=exc_val
@@ -249,12 +254,17 @@ class WorldModelUpdateContextManager:
                     self.world._notify_model_change(
                         publish_changes=self.publish_changes
                     )
+                    run_pending_publications = True
             finally:
                 self.world.world_is_being_modified = False
                 model_manager._current_modifications_will_be_published = None
         finally:
             # keep outside the if block, as it needs to be released as many times as it was acquired
             self.world._world_lock.release()
+            # Flush deferred publications only after the lock is fully released, so a synchronous
+            # publish does not block the receiving executor that needs the lock to apply/acknowledge.
+            if run_pending_publications:
+                self.world._model_manager.flush_pending_publications()
 
 
 def atomic_world_modification(func=None, modification: Type[WorldModification] = None):
@@ -363,6 +373,15 @@ class WorldModelManager:
     Indicates if the current modifications will be published via a synchronizer. If None, then there are no active contexts.
     """
 
+    pending_publications: List[Callable[[], None]] = field(
+        init=False, default_factory=list, repr=False
+    )
+    """
+    Network publications deferred while the world is being modified. They are flushed (executed)
+    only after ``_world_lock`` has been released, so that a synchronous publish waiting for
+    acknowledgments never blocks the receiving executor that must acquire the lock to apply/ack.
+    """
+
     def update_model_version_and_notify_callbacks(self, **kwargs) -> None:
         """
         Notifies the system of a model change and updates necessary states, caches,
@@ -370,8 +389,20 @@ class WorldModelManager:
         for model changes.
         """
         self.version += 1
-        for callback in self.model_change_callbacks:
+        for callback in list(self.model_change_callbacks):
             callback.notify_model_change(**kwargs)
+
+    def flush_pending_publications(self) -> None:
+        """
+        Execute and clear all publications that were deferred during a world modification.
+
+        Must be called *after* ``_world_lock`` is released so that publishing (and, in synchronous
+        mode, waiting for acknowledgments) does not happen while holding the lock.
+        """
+        pending = self.pending_publications
+        self.pending_publications = []
+        for publish in pending:
+            publish()
 
 
 _LRU_CACHE_SIZE: int = 2048
@@ -1609,7 +1640,7 @@ class World(HasSimulatorProperties):
         )
         self.notify_state_change(publish_changes=publish_changes, **kwargs)
 
-        for callback in self.state.state_change_callbacks:
+        for callback in list(self.state.state_change_callbacks):
             callback.update_previous_world_state()
 
         self.validate()
