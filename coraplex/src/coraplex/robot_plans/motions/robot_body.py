@@ -84,4 +84,6 @@ class LookingMotion(BaseMotion):
             tip_link=self.camera.root,
             goal_point=self.target.to_position(),
             pointing_axis=self.camera.forward_facing_axis,
+            max_velocity=1.0,
+            threshold=0.5,
         )

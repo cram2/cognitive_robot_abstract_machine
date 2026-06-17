@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from typing_extensions import TypeVar, ClassVar, TYPE_CHECKING, Optional, Type
 
+from krrood.adapters.json_serializer import list_like_classes
 from krrood.ormatic.data_access_objects.base import HasGeneric
 from .datastructures.enums import ExecutionType
 from .motion_executor import MotionExecutor
@@ -37,7 +38,7 @@ class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
             if (
                 issubclass(alternative, motion)
                 and alternative.original_class() == robot_view.__class__
-                and MotionExecutor.execution_type == alternative.execution_type
+                and MotionExecutor.execution_type in (alternative.execution_type if isinstance(alternative.execution_type,  list_like_classes) else [alternative.execution_type])
             ):
                 return alternative
         return None

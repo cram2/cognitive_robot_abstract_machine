@@ -149,6 +149,11 @@ class TFPublisher(StateChangeCallback):
     Only published every n-th state update.
     """
 
+    tf_prefix: str = field(default="")
+    """
+    Tf prefix for the tf topic
+    """
+
     def __post_init__(self):
         super().__post_init__()
         self.tf_pub = self.node.create_publisher(TFMessage, self.tf_topic, 10)

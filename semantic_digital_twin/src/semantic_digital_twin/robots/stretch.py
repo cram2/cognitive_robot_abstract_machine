@@ -8,6 +8,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Self, Union, List
 
+from semantic_digital_twin.robots.robot_mixins import HasNeck, HasArms
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     SelfCollisionMatrixRule,
@@ -371,5 +372,14 @@ class Stretch(AbstractRobot, HasMobileBase[StretchMobileBase]):
         )
 
     def _setup_velocity_limits(self):
-        vel_limits = defaultdict(lambda: 1.0)
+        vel_limits = defaultdict(lambda: 0.1)
+        vel_limits[self._world.get_connection_by_name("joint_gripper_finger_left")] = (
+            0.01
+        )
+        vel_limits[self._world.get_connection_by_name("joint_gripper_finger_right")] = (
+            0.01
+        )
+        vel_limits[self._world.get_connection_by_name("joint_wrist_yaw")] = 0.4
+        vel_limits[self._world.get_connection_by_name("joint_head_tilt")] = 0.5
+        vel_limits[self._world.get_connection_by_name("joint_head_pan")] = 0.5
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)

@@ -158,41 +158,60 @@ class PickUpAction(ActionDescription):
     """
 
     def execute(self) -> None:
+
+        target_pre_pose, target_pose, lift_to_pose = (
+            self.grasp_description._pose_sequence(
+                self.object_designator.global_pose, self.object_designator
+            )
+        )
+
         self.add_subplan(
             sequential(
                 children=[
                     MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm),
-                    ReachAction(
-                        target_pose=self.object_designator.global_pose,
-                        object_designator=self.object_designator,
-                        arm=self.arm,
-                        grasp_description=self.grasp_description,
+                    MoveToolCenterPointMotion(
+                        target_pre_pose, self.arm, allow_gripper_collision=False
                     ),
+                    MoveToolCenterPointMotion(
+                        target_pose,
+                        self.arm,
+                        allow_gripper_collision=False,
+                        movement_type=MovementType.CARTESIAN,
+                    ),
+                    # ReachAction(
+                    #     target_pose=self.object_designator.global_pose,
+                    #     object_designator=self.object_designator,
+                    #     arm=self.arm,
+                    #     grasp_description=self.grasp_description,
+                    # ),
                     MoveGripperMotion(motion=GripperState.CLOSE, gripper=self.arm),
+                    MoveToolCenterPointMotion(
+                        lift_to_pose,
+                        self.arm,
+                        allow_gripper_collision=True,
+                        movement_type=MovementType.TRANSLATION,
+                    ),
                 ]
             )
         ).perform()
         end_effector = ViewManager.get_end_effector_view(self.arm, self.robot)
 
         # Attach the object to the end effector
-        with self.world.modify_world():
-            self.world.move_branch_with_fixed_connection(
-                self.object_designator, end_effector.tool_frame
-            )
+        # with self.world.modify_world():
+        #     self.world.move_branch_with_fixed_connection(
+        #         self.object_designator, end_effector.tool_frame
+        #     )
 
-        _, _, lift_to_pose = self.grasp_description.grasp_pose_sequence(
-            self.object_designator
-        )
-        self.add_subplan(
-            execute_single(
-                MoveToolCenterPointMotion(
-                    lift_to_pose,
-                    self.arm,
-                    allow_gripper_collision=True,
-                    movement_type=MovementType.TRANSLATION,
-                )
-            )
-        ).perform()
+        # self.add_subplan(
+        #     execute_single(
+        #         MoveToolCenterPointMotion(
+        #             lift_to_pose,
+        #             self.arm,
+        #             allow_gripper_collision=True,
+        #             movement_type=MovementType.TRANSLATION,
+        #         )
+        #     )
+        # ).perform()
 
     @staticmethod
     def pre_condition(

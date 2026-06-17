@@ -28,7 +28,7 @@ class JointPositionList(Task):
     """
     The goal joint state.
     """
-    threshold: float = field(default=0.01, kw_only=True)
+    threshold: float = field(default=0.02, kw_only=True)
     """
     If all joint position errors are smaller than this threshold, the task's observation state is true.
     """

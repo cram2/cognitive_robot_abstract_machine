@@ -81,10 +81,14 @@ class DetectAction(ActionDescription):
         if not self.object_sem_annotation:
             self.object_sem_annotation = SemanticEnvironmentAnnotation
         query = PerceptionQuery(
-            self.object_sem_annotation, region_bb, self.robot, self.world
+            self.object_sem_annotation, region_bb, self.robot, self.world, self.context
         )
 
-        return query.from_world()
+        return (
+            query.from_world()
+            if MotionExecutor.execution_type == ExecutionType.SIMULATED
+            else query.from_robokudo()
+        )
 
     def validate(
         self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None

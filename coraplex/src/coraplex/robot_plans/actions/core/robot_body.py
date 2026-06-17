@@ -119,6 +119,87 @@ class ParkArmsAction(ActionDescription):
 
 
 @dataclass
+class StretchExtendArm(ActionDescription):
+
+    def execute(self) -> None:
+        arm_joint_states = 0.0725
+        self.add_subplan(
+            execute_single(
+                MoveJointsMotion(
+                    names=[
+                        "joint_arm_l0",
+                        "joint_arm_l1",
+                        "joint_arm_l2",
+                        "joint_arm_l3",
+                    ],
+                    positions=[
+                        arm_joint_states,
+                        arm_joint_states,
+                        arm_joint_states,
+                        arm_joint_states,
+                    ],
+                ),
+            )
+        ).perform()
+
+
+@dataclass
+class StretchRetractArm(ActionDescription):
+
+    def execute(self) -> None:
+        self.add_subplan(
+            execute_single(
+                MoveJointsMotion(
+                    names=[
+                        "joint_arm_l0",
+                        "joint_arm_l1",
+                        "joint_arm_l2",
+                        "joint_arm_l3",
+                    ],
+                    positions=[
+                        0,
+                        0,
+                        0,
+                        0,
+                    ],
+                ),
+            )
+        ).perform()
+
+
+@dataclass
+class StretchTorsoShelfPickPlaceHeight(ActionDescription):
+
+    def execute(self) -> None:
+        self.add_subplan(
+            execute_single(
+                MoveJointsMotion(
+                    names=[
+                        "joint_lift",
+                    ],
+                    positions=[0.6],
+                ),
+            )
+        ).perform()
+
+
+@dataclass
+class StretchTorsoTablePickPlaceHeight(ActionDescription):
+
+    def execute(self) -> None:
+        self.add_subplan(
+            execute_single(
+                MoveJointsMotion(
+                    names=[
+                        "joint_lift",
+                    ],
+                    positions=[0.66],
+                ),
+            )
+        ).perform()
+
+
+@dataclass
 class CarryAction(ActionDescription):
     """
     Parks the robot's arms. And align the arm with the given Axis of a frame.

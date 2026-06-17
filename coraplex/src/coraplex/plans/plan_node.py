@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from coraplex.robot_plans import ActionDescription, BaseMotion
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pycram")
 
 
 def sort_by_layer_index(nodes: Iterable[PlanNode]) -> Iterable[PlanNode]:
@@ -260,7 +260,7 @@ class PlanNode(PlanEntity):
         """
         Perform the node and update the fields of this node.
         """
-
+        logger.debug(f"Performing node: {str(self)}")
         for parent in self.path:
             if parent.status == TaskStatus.INTERRUPTED:
                 self.status = TaskStatus.INTERRUPTED
@@ -356,38 +356,16 @@ class DesignatorNode(PlanNode, ABC):
     The designator that is managed by this node.
     """
 
-    def __post_init__(self):
-        self.designator.plan_node = self
-
-    def __repr__(self):
-        return f"{type(self.designator).__name__}"
-
-
-@dataclass(eq=False, repr=False)
-class ActionNode(DesignatorNode):
-    """
-    A node representing a fully specified action.
-    """
-
-    execution_data: ExecutionData = None
-    """
-    Additional data that  is collected before and after the execution of the action.
-    """
-
     motion_executor: MotionExecutor = None
     """
     Instance of the MotionExecutor used to execute the motion chart of the sub-motions of this action.
     """
 
-    _world_modification_block_length_pre_perform: Optional[int] = None
-    """
-    The last model modification block before the execution of this node. 
-    Used to check if the model has changed during execution.
-    """
+    def __post_init__(self):
+        self.designator.plan_node = self
 
-    @property
-    def action(self) -> ActionDescription:
-        return self.designator
+    def __repr__(self):
+        return f"{type(self.designator).__name__}"
 
     def collect_motions(self) -> List[Task]:
         """
@@ -396,9 +374,9 @@ class ActionNode(DesignatorNode):
         """
         return [
             motion_node.motion.motion_chart
-            for motion_node in self.descendants
+            for motion_node in self.descendants + [self]
             if isinstance(motion_node, MotionNode)
-            and self is motion_node.parent_action_node
+            # and self is motion_node.parent_action_node
         ]
 
     def construct_motion_state_chart(self):
@@ -419,6 +397,28 @@ class ActionNode(DesignatorNode):
         """
         self.construct_motion_state_chart()
         self.motion_executor.execute()
+
+
+@dataclass(eq=False, repr=False)
+class ActionNode(DesignatorNode):
+    """
+    A node representing a fully specified action.
+    """
+
+    execution_data: ExecutionData = None
+    """
+    Additional data that  is collected before and after the execution of the action.
+    """
+
+    _world_modification_block_length_pre_perform: Optional[int] = None
+    """
+    The last model modification block before the execution of this node. 
+    Used to check if the model has changed during execution.
+    """
+
+    @property
+    def action(self) -> ActionDescription:
+        return self.designator
 
     def create_execution_data_pre_perform(self):
         """
@@ -445,6 +445,9 @@ class ActionNode(DesignatorNode):
         )
 
     def _perform(self):
+        logger.debug(
+            f"Performing node: {str(self)} with params: {[f for f in self.action.fields]}"
+        )
         self.create_execution_data_pre_perform()
 
         result = self.action.perform()
@@ -475,6 +478,8 @@ class MotionNode(DesignatorNode):
 
         :return: The return value of the Motion Designator
         """
+        if not any([isinstance(node, ActionNode) for node in self.path]):
+            return self.execute_motion_state_chart()
         return self.motion.perform()
 
     @property

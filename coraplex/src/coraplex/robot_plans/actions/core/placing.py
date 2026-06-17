@@ -12,6 +12,7 @@ from coraplex.datastructures.enums import (
     Arms,
     ApproachDirection,
     VerticalAlignment,
+    MovementType,
 )
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.plans.factories import sequential, execute_single
@@ -65,17 +66,30 @@ class PlaceAction(ActionDescription):
             )
         )
 
+        object_height = (
+            self.object_designator.collision.max_point[2]
+            - self.object_designator.collision.min_point[2]
+        )
+        self.target_location.z += object_height / 2
+
+        target_pre_pose, target_pose, retract_pose = previous_grasp._pose_sequence(
+            self.target_location, self.object_designator, reverse=True
+        )
+
         self.add_subplan(
             sequential(
                 [
-                    ReachAction(
-                        self.target_location,
+                    MoveToolCenterPointMotion(
+                        target_pre_pose, self.arm, allow_gripper_collision=False
+                    ),
+                    MoveToolCenterPointMotion(
+                        target_pose,
                         self.arm,
-                        previous_grasp,
-                        self.object_designator,
-                        reverse_reach_order=True,
+                        allow_gripper_collision=False,
+                        movement_type=MovementType.CARTESIAN,
                     ),
                     MoveGripperMotion(GripperState.OPEN, self.arm),
+                    MoveToolCenterPointMotion(retract_pose, self.arm),
                 ]
             )
         ).perform()
@@ -85,21 +99,21 @@ class PlaceAction(ActionDescription):
         obj_transform = self.world.compute_forward_kinematics(
             world_root, self.object_designator
         )
-        with self.world.modify_world():
-            self.world.remove_connection(self.object_designator.parent_connection)
-            connection = Connection6DoF.create_with_dofs(
-                parent=world_root, child=self.object_designator, world=self.world
-            )
-            self.world.add_connection(connection)
-            connection.origin = obj_transform
+        # with self.world.modify_world():
+        #     self.world.remove_connection(self.object_designator.parent_connection)
+        #     connection = Connection6DoF.create_with_dofs(
+        #         parent=world_root, child=self.object_designator, world=self.world
+        #     )
+        #     self.world.add_connection(connection)
+        #     connection.origin = obj_transform
 
-        _, _, retract_pose = previous_grasp._pose_sequence(
-            self.target_location, self.object_designator, reverse=True
-        )
-
-        self.add_subplan(
-            execute_single(MoveToolCenterPointMotion(retract_pose, self.arm))
-        ).perform()
+        # _, _, retract_pose = previous_grasp._pose_sequence(
+        #     self.target_location, self.object_designator, reverse=True
+        # )
+        #
+        # self.add_subplan(
+        #     execute_single(MoveToolCenterPointMotion(retract_pose, self.arm))
+        # ).perform()
 
     @staticmethod
     def pre_condition(

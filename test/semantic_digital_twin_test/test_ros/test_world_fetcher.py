@@ -252,3 +252,6 @@ def test_pr2_collision_rules(rclpy_node, pr2_world_state_reset):
     assert len(pr2_world_state_reset.collision_manager.rules) - 1 == len(
         pr2_world_copy.collision_manager.rules
     )
+
+    copy_pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    assert len(copy_pr2.torso.joint_states) !=0

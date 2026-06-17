@@ -74,6 +74,7 @@ if TYPE_CHECKING:
         Hinge,
         Slider,
         Aperture,
+        ShelfLayer,
     )
     from semantic_digital_twin.world import World
 
@@ -595,6 +596,34 @@ class HasDoors(HasRootKinematicStructureEntity, ABC):
 
         self._attach_child_entity_in_kinematic_structure(door.root)
         self.doors.append(door)
+
+
+@dataclass(eq=False)
+class HasShelfLayers(HasRootBody, ABC):
+    """
+    A mixin class for semantic annotations that have shelf layers.
+    """
+
+    shelf_layers: List[ShelfLayer] = field(
+        default_factory=list, hash=False, kw_only=True
+    )
+    """
+    The shelf layers of the semantic annotation.
+    """
+
+    @synchronized_attribute_modification
+    def add_shelf_layer(
+        self,
+        shelf_layer: ShelfLayer,
+    ):
+        """
+        Add a shelf layer to the semantic annotation.
+
+        :param shelf_layer: The shelf layer to add.
+        """
+
+        self._attach_child_entity_in_kinematic_structure(shelf_layer.root)
+        self.shelf_layers.append(shelf_layer)
 
 
 @dataclass(eq=False)

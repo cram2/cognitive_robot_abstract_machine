@@ -20,10 +20,10 @@ from semantic_digital_twin.world_description.connections import (
 
 class StretchStandaloneInterface(StandAloneRobotInterfaceConfig):
 
-    def __init__(self, drive_joint_name: str = "brumbrum"):
+    def __init__(self):
         super().__init__(
             [
-                drive_joint_name,
+                # self.world.get_connections_by_type(DifferentialDrive)[0].name,
                 "joint_gripper_finger_left",
                 "joint_gripper_finger_right",
                 "joint_right_wheel",
@@ -59,16 +59,16 @@ class StretchVelocityInterface(RobotInterfaceConfig):
 
         self.sync_joint_state_topic("/joint_states")
         joints = [
-            "joint_arm_l0",
-            "joint_lift",
-            "joint_wrist_yaw",
-            "joint_wrist_pitch",
-            "joint_wrist_roll",
-            "joint_head_pan",
-            "joint_head_pan",
-            "joint_gripper_finger_left",
-            "joint_right_wheel",
-            "joint_left_wheel",
+            "joint_arm_l0",  # 0
+            "joint_lift",  # 1
+            "joint_wrist_yaw",  # 2
+            "joint_wrist_pitch",  # 3
+            "joint_wrist_roll",  # 4
+            "joint_head_pan",  # 5
+            "joint_head_tilt",  # 6
+            "joint_gripper_finger_left",  # 7
+            "joint_right_wheel",  # 8
+            "joint_left_wheel",  # 9
         ]
         self.add_joint_velocity_group_controller(
             cmd_topic="/joint_velocity_cmd", connections=joints

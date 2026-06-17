@@ -16,6 +16,8 @@ from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 
 from typing import TYPE_CHECKING
 
+from ....world_description.world_entity import KinematicStructureEntity
+
 if TYPE_CHECKING:
     from ....world import World
 

@@ -36,7 +36,7 @@ ActionResult = TypeVar("ActionResult")
 ActionFeedback = TypeVar("ActionFeedback")
 
 
-@dataclass
+@dataclass(eq=False, repr=False)
 class ActionServerTask(
     MotionStatechartNode,
     ABC,
@@ -99,13 +99,11 @@ class ActionServerTask(
         future.add_done_callback(self.result_callback)
 
     def result_callback(self, future):
-        self._result = future.result().result
-        logger.info(
-            f"Action server {self.action_topic} returned result: {self._result}"
-        )
+        self._result = future.result()
+        logger.info(f"Action server {self.action_topic} done.")
 
 
-@dataclass
+@dataclass(eq=False, repr=False)
 class NavigateActionServerTask(
     ActionServerTask[
         NavigateToPose,
@@ -158,7 +156,7 @@ class NavigateActionServerTask(
         Builds the motion state node this includes creating the action client and setting the observation expression.
         The observation is true if the robot is within 1cm of the target pose.
         """
-        super().build_msg(context)
+        super().build(context)
         artifacts = NodeArtifacts()
         root_T_goal = context.world.transform(
             target_frame=context.world.root, spatial_object=self.target_pose
@@ -182,6 +180,31 @@ class NavigateActionServerTask(
         self._action_client.wait_for_server()
 
         return artifacts
+
+    def on_start(self, context: MotionStatechartContext):
+        """
+        Creates a goal and sends it to the action server asynchronously.
+        """
+        future = self._action_client.send_goal_async(self._msg)
+        future.add_done_callback(self.goal_response_callback)
+
+    def goal_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            logger.error("Goal rejected by navigation server")
+            return
+
+        logger.info("Sent query to navigate_to_pose")
+
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self.result_callback)
+
+    def result_callback(self, future):
+        result_response = future.result()
+        self._result = result_response.result
+        logger.info(
+            f"Finished navigation with response status: {result_response.status} and result code: {self._result.error_code}"
+        )
 
     def on_tick(self, context: MotionStatechartContext) -> ObservationStateValues:
         if self._result:

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging
 import threading
 import time
@@ -9,6 +10,10 @@ from typing_extensions import TYPE_CHECKING
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import LifeCycleValues
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    UpdateTemporaryCollisionRules,
+)
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.graph_node import Task
@@ -19,7 +24,10 @@ from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.ros_executor import Ros2Executor
 from coraplex.datastructures.enums import ExecutionType
 from coraplex.exceptions import MotionDidNotFinish
-
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
+)
+from semantic_digital_twin.robots.abstract_robot import Arm, Manipulator
 from semantic_digital_twin.world import World
 
 if TYPE_CHECKING:
@@ -60,6 +68,19 @@ class MotionExecutor:
     def construct_msc(self):
         self.motion_state_chart = MotionStatechart()
         sequence_node = Sequence(nodes=self.motions)
+        # self.motion_state_chart.add_node(ExternalCollisionAvoidance())
+        # manipulator_bodies = []
+        # for manipulator in self.world.get_semantic_annotations_by_type(Manipulator):
+        #     manipulator_bodies.extend(manipulator.bodies_with_collision)
+        # self.motion_state_chart.add_node(
+        #     UpdateTemporaryCollisionRules(
+        #         temporary_rules=[
+        #             AllowCollisionBetweenGroups(
+        #                 self.world.bodies_with_collision, manipulator_bodies
+        #             )
+        #         ]
+        #     )
+        # )
         self.motion_state_chart.add_node(sequence_node)
 
         self.motion_state_chart.add_node(EndMotion.when_true(sequence_node))
@@ -132,14 +153,17 @@ class MotionExecutor:
         while True:
             if self.plan_node.is_paused:
                 raise NotImplementedError("Pause not implemented for real execution")
-            elif self.plan_node.is_interrupted or kill_event.is_set():
+            elif self.plan_node.is_interrupted:
                 giskard_wrapper.cancel_goal_async()
+                break
+            elif kill_event.is_set():
+                break
             time.sleep(0.01)
 
     def _execute_for_real(self):
         from giskardpy.middleware.ros2.python_interface import GiskardWrapper
 
-        giskard = GiskardWrapper(self.ros_node)
+        giskard = GiskardWrapper(self.ros_node, world=self.world)
 
         kill_event = threading.Event()
         interrupt_thread = threading.Thread(
