@@ -843,14 +843,18 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):
             and self.parent_T_connection_expression.reference_frame != self.parent
         ):
             raise ReferenceFrameMismatchError(
-                self.parent, self.parent_T_connection_expression.reference_frame
+                expected_frame=self.parent,
+                actual_frame=self.parent_T_connection_expression.reference_frame,
+                context=f"parent_T_connection_expression of connection '{self.name}'",
             )
         if (
             self.connection_T_child_expression.child_frame is not None
             and self.connection_T_child_expression.child_frame != self.child
         ):
             raise ReferenceFrameMismatchError(
-                self.parent, self.connection_T_child_expression.child_frame
+                expected_frame=self.child,
+                actual_frame=self.connection_T_child_expression.child_frame,
+                context=f"child frame of connection_T_child_expression of connection '{self.name}'",
             )
 
         self.parent_T_connection_expression.reference_frame = self.parent
@@ -1030,6 +1034,24 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):
             parent_T_connection_expression=parent_T_connection_expression,
             connection_T_child_expression=connection_T_child_expression,
             name=PrefixedName(self.name.name, prefix=self.name.prefix),
+        )
+
+    def copy_with_new_parent(
+        self,
+        new_parent: KinematicStructureEntity,
+        parent_T_connection_expression: HomogeneousTransformationMatrix,
+    ) -> Self:
+        """
+        Create a copy of this connection re-parented under ``new_parent``, using
+        ``parent_T_connection_expression`` as the new parent offset and keeping the same child and
+        ``connection_T_child_expression``. Subclasses carrying extra state (e.g. an active degree of
+        freedom) override this to preserve it. Used to move a branch without collapsing its connection.
+        """
+        return self.__class__(
+            parent=new_parent,
+            child=self.child,
+            parent_T_connection_expression=parent_T_connection_expression,
+            connection_T_child_expression=self.connection_T_child_expression,
         )
 
     def update_references_for_world(self, world: World):

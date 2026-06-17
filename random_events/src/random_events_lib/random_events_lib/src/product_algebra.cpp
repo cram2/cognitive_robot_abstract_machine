@@ -161,14 +161,19 @@ SimpleSetSetPtr_t SimpleEvent::complement() {
 
     auto result = make_shared_simple_set_set();
 
-    // 1) Get all keys in variable_map once, sorted
+    // 1) Get all keys and values in variable_map once, sorted (O(v) total)
     auto all_keys = map_keys_to_vector(variable_map);
     size_t vcount = all_keys.size();
 
+    // Pre-extract values so inner loops use O(1) indexed access instead of O(log v) map lookups
+    std::vector<AbstractCompositeSetPtr_t> all_values;
+    all_values.reserve(vcount);
+    for (auto const &k : all_keys) all_values.push_back(variable_map->at(k));
+
     // 2) For each index i = 0..vcount−1, build a complement event
     for (size_t idx = 0; idx < vcount; ++idx) {
-        auto const &var_i = all_keys[idx];
-        auto const &assign_i = variable_map->at(var_i);
+        auto const &var_i    = all_keys[idx];
+        auto const &assign_i = all_values[idx];
 
         // 2a) Build current_complement event
         auto current_complement = make_shared_simple_event();
@@ -178,9 +183,9 @@ SimpleSetSetPtr_t SimpleEvent::complement() {
         auto compl_i = assign_i->complement();
         cur_map->insert({var_i, compl_i});
 
-        // 2c) For every variable before var_i (0..idx−1), assign original
+        // 2c) For every variable before var_i (0..idx−1), assign original (O(1) per lookup)
         for (size_t k = 0; k < idx; ++k) {
-            cur_map->insert({ all_keys[k], variable_map->at(all_keys[k]) });
+            cur_map->insert({ all_keys[k], all_values[k] });
         }
         // 2d) For every variable after var_i (idx+1..vcount−1), assign full domain
         for (size_t k = idx + 1; k < vcount; ++k) {
@@ -237,9 +242,10 @@ std::string *SimpleEvent::non_empty_to_string() {
     for (auto const &kv : *variable_map) {
         // format "<var_name>: <assignment_string>"
         //   - var_name is a std::string*, so *kv.first->name is variable name
-        std::string varpart = *kv.first->name;        // copy var name
-        std::string assignstr = *kv.second->to_string(); // ask composite for its string (heap‐alloc)
-        delete kv.second->to_string(); // avoid leaking the returned pointer
+        std::string varpart = *kv.first->name;
+        std::string *raw_assign = kv.second->to_string();
+        std::string assignstr = std::move(*raw_assign);
+        delete raw_assign;
 
         // Build "var: assign" local
         std::string combined;
@@ -402,7 +408,7 @@ void Event::fill_missing_variables() const {
     }
 
     // 2) Now call the overload for every SimpleEvent
-    auto shared_vars = std::make_shared<VariableSet>(all_vars.begin(), all_vars.end());
+    auto shared_vars = std::make_shared<VariableSet>(std::move(all_vars));
     for (auto const &simple_event_ptr : *simple_sets) {
         auto casted = static_cast<SimpleEvent *>(simple_event_ptr.get());
         casted->fill_missing_variables(shared_vars);
@@ -424,25 +430,96 @@ VariableSet Event::get_variables_from_simple_events() const {
     return result;
 }
 
-std::tuple<EventPtr_t, bool> Event::simplify_once() {
-    // We want to find any two SimpleEvents that differ in exactly one variable,
-    // merge their assignments on that variable, and rebuild the composite.
-    //
-    // The original made a vector of size n, then used unique_combinations, then on each pair:
-    //   - Called get_variables() twice (O(v log v) each)
-    //   - Looped over variables, did map lookups, etc.
-    //   - If mergeable, built a brand‐new composite in O(n + v) time and returned.
-    //   - Otherwise, continued all n(n−1)/2 checks (cost ~O(n^2 (v log v + n))).
-    //
-    // We optimize by:
-    //   1) Building one single vector<AbstractSimpleSetPtr_t> of size n (no change)
-    //   2) For each i<j, directly inspect the two ordered maps (they have the same key‐sets because every Event should have fill_missing_variables first)
-    //   3) Compare the two maps in one sweep (walk the two variable_map containers in lockstep), counting mismatches.  That costs O(v) instead of O(v log v).  
-    //   4) If exactly one mismatch, we build the new merged SimpleEvent by copying variable_map once (O(v log v)), and then unioning the two composite‐sets at that variable (O(T_union)).  
-    //   5) Assemble the new Event by inserting n−2 other SimpleEvents in one shot (range‐insert).
-    // This reduces each pair’s comparison to O(v) rather than O(v log v), and each merge to O(v log v + (n−2) log n).
+// ---------------------------------------------------------------------------
+// try_merge_pair: O(v) check whether two SimpleEvents can be merged.
+//
+// Two SimpleEvents are “merge-compatible” if they differ in exactly one
+// variable (their value for that variable may differ; all other variable
+// assignments must be equal).  If so, returns the merged SimpleEvent whose
+// differing-variable assignment is the union of both values.
+// Otherwise returns nullptr.
+//
+// Assumes fill_missing_variables() has been called so both maps have
+// identical key sets — the lockstep walk exploits this for speed.
+// ---------------------------------------------------------------------------
+static SimpleEventPtr_t try_merge_pair(const SimpleEventPtr_t &A,
+                                       const SimpleEventPtr_t &B)
+{
+    auto &mapA = A->variable_map;
+    auto &mapB = B->variable_map;
 
-    // 1) Copy pointers into a vector
+    auto itA = mapA->cbegin(), endA = mapA->cend();
+    auto itB = mapB->cbegin(), endB = mapB->cend();
+
+    size_t mismatch_count = 0;
+    AbstractVariablePtr_t mismatch_var = nullptr;
+    AbstractCompositeSetPtr_t mismatch_val_A = nullptr;  // A’s value at mismatch
+    AbstractCompositeSetPtr_t mismatch_val_B = nullptr;  // B’s value at mismatch
+
+    while (itA != endA && itB != endB) {
+        if (*(itA->first) < *(itB->first)) {
+            if (++mismatch_count > 1) return nullptr;
+            mismatch_var   = itA->first;
+            mismatch_val_A = itA->second;
+            ++itA;
+        } else if (*(itB->first) < *(itA->first)) {
+            if (++mismatch_count > 1) return nullptr;
+            mismatch_var   = itB->first;
+            mismatch_val_B = itB->second;
+            ++itB;
+        } else {
+            if (!(*(itA->second) == *(itB->second))) {
+                if (++mismatch_count > 1) return nullptr;
+                mismatch_var   = itA->first;
+                mismatch_val_A = itA->second;
+                mismatch_val_B = itB->second;  // saved here — avoids B->at() later
+            }
+            ++itA; ++itB;
+        }
+    }
+    while (itA != endA) {
+        if (++mismatch_count > 1) return nullptr;
+        mismatch_var = itA->first; mismatch_val_A = itA->second;
+        ++itA;
+    }
+    while (itB != endB) {
+        if (++mismatch_count > 1) return nullptr;
+        mismatch_var = itB->first; mismatch_val_B = itB->second;
+        ++itB;
+    }
+
+    if (mismatch_count != 1) return nullptr;
+
+    // Compute the union value for the differing variable.
+    // If one side is missing (asymmetric key sets), union with the variable’s domain.
+    AbstractCompositeSetPtr_t union_val;
+    if (mismatch_val_A && mismatch_val_B) {
+        union_val = mismatch_val_A->union_with(mismatch_val_B);
+    } else if (mismatch_val_A) {
+        union_val = mismatch_val_A->union_with(mismatch_var->get_domain());
+    } else {
+        union_val = mismatch_val_B->union_with(mismatch_var->get_domain());
+    }
+
+    // Build merged SimpleEvent: copy mapA entries, replace the mismatch variable.
+    auto merged = make_shared_simple_event();
+    auto &mmap  = merged->variable_map;
+    for (auto const &kv : *mapA) {
+        if (*(kv.first) == *mismatch_var) {
+            mmap->insert({kv.first, union_val});
+        } else {
+            mmap->insert({kv.first, kv.second});
+        }
+    }
+    // If the mismatch variable was only in B, add it.
+    if (!mismatch_val_A) {
+        mmap->insert({mismatch_var, union_val});
+    }
+
+    return merged;
+}
+
+std::tuple<EventPtr_t, bool> Event::simplify_once() {
     std::vector<SimpleEventPtr_t> vec;
     vec.reserve(simple_sets->size());
     for (auto const &ptr : *simple_sets) {
@@ -450,118 +527,67 @@ std::tuple<EventPtr_t, bool> Event::simplify_once() {
     }
     size_t n = vec.size();
 
-    // 2) For i<j pairs:
     for (size_t i = 0; i < n; ++i) {
         for (size_t j = i + 1; j < n; ++j) {
-            auto &A = vec[i]->variable_map;  // map<AbstractVariablePtr_t, AbstractCompositeSetPtr_t>
-            auto &B = vec[j]->variable_map;
-            // Both A and B should have identical keys (because fill_missing_variables() was run),
-            // so we can walk them in lockstep.  But to be robust, we do a two‐iterator sweep on both maps:
-            auto itA = A->begin(), endA = A->end();
-            auto itB = B->begin(), endB = B->end();
-
-            size_t mismatch_count = 0;
-            AbstractVariablePtr_t mismatch_var = nullptr;
-
-            while (itA != endA && itB != endB) {
-                // Compare variable pointers
-                if (*(itA->first) < *(itB->first)) {
-                    // A has a key not in B → mismatch
-                    mismatch_count++;
-                    mismatch_var = itA->first;
-                    ++itA;
-                }
-                else if (*(itB->first) < *(itA->first)) {
-                    // B has a key not in A → mismatch
-                    mismatch_count++;
-                    mismatch_var = itB->first;
-                    ++itB;
-                }
-                else {
-                    // Same key
-                    if (!(*(itA->second) == *(itB->second))) {
-                        mismatch_count++;
-                        mismatch_var = itA->first;
-                    }
-                    ++itA; 
-                    ++itB;
-                }
-                if (mismatch_count > 1) {
-                    break;
-                }
-            }
-            // If one map has leftover keys, each is a mismatch:
-            if (mismatch_count <= 1) {
-                while (itA != endA) {
-                    mismatch_count++;
-                    mismatch_var = itA->first;
-                    ++itA;
-                    if (mismatch_count > 1) break;
-                }
-                while (itB != endB && mismatch_count <= 1) {
-                    mismatch_count++;
-                    mismatch_var = itB->first;
-                    ++itB;
-                }
-            }
-
-            // 3) If exactly one mismatch, we can merge
-            if (mismatch_count == 1) {
-                // Build a brand‐new SimpleEvent “merged”
-                auto merged_event = make_shared_simple_event();
-                auto &mmap = merged_event->variable_map;
-
-                // Copy all keys from A (or B) since they now have approximately the same key set.
-                // We can just walk A’s map in order.
-                for (auto const &kv : *A) {
-                    auto var = kv.first;
-                    if (var == mismatch_var) {
-                        // union A[var] ∪ B[var]
-                        auto unioned = kv.second->union_with(B->at(var));
-                        mmap->insert({var, unioned});
-                    } else {
-                        mmap->insert({var, kv.second});
-                    }
-                }
-
-                // Build the new Event composite:
+            auto merged = try_merge_pair(vec[i], vec[j]);
+            if (merged) {
                 auto result = make_shared_event();
-                // Insert the merged event first
-                result->simple_sets->insert(merged_event);
-
-                // Now insert all others except i,j.  Instead of inserting one‐by‐one (O((n−2) log n)),
-                // we gather them in a vector and do a single range‐insert at the end.
-
-                // Prepare a local vector of the other pointers
-                std::vector<AbstractSimpleSetPtr_t> to_insert;
-                to_insert.reserve(n - 2);
+                result->simple_sets->insert(merged);
                 for (size_t k = 0; k < n; ++k) {
-                    if (k == i || k == j) continue;
-                    to_insert.push_back(vec[k]);
+                    if (k != i && k != j) result->simple_sets->insert(vec[k]);
                 }
-                result->simple_sets->insert(to_insert.begin(), to_insert.end());
-
                 return std::make_tuple(result, true);
             }
         }
     }
-
-    // No simplification found—return a copy of this Event
-    {
-        auto self_copy = make_shared_event();
-        self_copy->simple_sets = make_shared_simple_set_set(*simple_sets);
-        return std::make_tuple(self_copy, false);
-    }
+    auto self_copy = make_shared_event();
+    self_copy->simple_sets = make_shared_simple_set_set(*simple_sets);
+    return std::make_tuple(self_copy, false);
 }
 
 AbstractCompositeSetPtr_t Event::simplify() {
-    auto [current, changed] = simplify_once();
-    while (changed) {
-        auto [next, next_changed] = current->simplify_once();
-        current = next;
-        changed = next_changed;
+    // ---------------------------------------------------------------------------
+    // O(n²) greedy in-place simplification.
+    //
+    // The old approach called simplify_once() in a loop: each call scanned all
+    // n(n-1)/2 pairs, returned on the FIRST merge, then restarted from (0,0).
+    // For k merges this costs O(k × n²) ≈ O(n³).
+    //
+    // The new approach stays at position i after a successful merge: the newly
+    // merged element at i is immediately rechecked against remaining j’s before
+    // advancing i.  Each pair is examined at most once per outer while-pass,
+    // giving O(n²) total — a factor of O(n) improvement for large events.
+    // ---------------------------------------------------------------------------
+    std::vector<SimpleEventPtr_t> vec;
+    vec.reserve(simple_sets->size());
+    for (auto const &ptr : *simple_sets) {
+        vec.push_back(std::static_pointer_cast<SimpleEvent>(ptr));
     }
-    return current;
+
+    bool any_merge = true;
+    while (any_merge) {
+        any_merge = false;
+        for (size_t i = 0; i < vec.size(); ++i) {
+            for (size_t j = i + 1; j < vec.size(); ) {
+                auto merged = try_merge_pair(vec[i], vec[j]);
+                if (merged) {
+                    vec[i] = merged;           // replace i with merged element
+                    vec.erase(vec.begin() + static_cast<std::ptrdiff_t>(j));
+                    any_merge = true;
+                    // do NOT advance j — recheck new vec[i] against the element
+                    // that just slid into position j (and all subsequent ones)
+                } else {
+                    ++j;
+                }
+            }
+        }
+    }
+
+    auto result = make_shared_event();
+    for (auto const &se : vec) {
+        result->simple_sets->insert(se);
+    }
+    return result;
 }
 
 AbstractCompositeSetPtr_t Event::make_new_empty() const {

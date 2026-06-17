@@ -1,7 +1,7 @@
 import json
 import os
 import threading
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import ClassVar, Optional, Set, Type, List, Dict
@@ -10,11 +10,14 @@ from uuid import UUID
 import numpy as np
 import rclpy  # type: ignore
 import std_msgs.msg
-from krrood.adapters.json_serializer import from_json, to_json
-from krrood.ormatic.data_access_objects.helper import to_dao
 from rclpy.node import Node as RosNode
 from rclpy.publisher import Publisher
 from rclpy.subscription import Subscription
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from krrood.adapters.json_serializer import from_json, to_json
+from krrood.ormatic.data_access_objects.helper import to_dao
 from semantic_digital_twin.adapters.ros.messages import (
     MetaData,
     WorldStateUpdate,
@@ -40,8 +43,6 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     WorldEntityWithClassBasedID,
 )
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 
 @dataclass
@@ -132,6 +133,12 @@ class Synchronizer(WorldEntityWithClassBasedID):
     Condition variable used to block synchronous publication until all expected acknowledgments have been received.
     """
 
+    _publish_lock: threading.Lock = field(default_factory=threading.Lock)
+    """
+    Serializes :meth:`publish` so concurrent publications cannot unintentionally override the shared
+    acknowledgment-tracking state (``_current_publication_event_id`` / ``_received_acknowledgments``).
+    """
+
     def __post_init__(self):
         self.subscriber = self.node.create_subscription(
             std_msgs.msg.String,
@@ -163,20 +170,24 @@ class Synchronizer(WorldEntityWithClassBasedID):
             process_id=os.getpid(),
         )
 
-    def subscription_callback(self, msg: std_msgs.msg.String):
+    def subscription_callback(self, message: std_msgs.msg.String):
         """
         Wrap the origin subscription callback by self-skipping and disabling the next world callback.
+        Holds the world lock while deserializing to ensure no changes happen while building the tracker and
+        running from_json.
 
-        :param msg: The incoming ROS string message containing a serialized synchronization message.
+        :param message: The incoming ROS string message containing a serialized synchronization message.
         """
-        tracker = WorldEntityWithIDKwargsTracker.from_world(self._world)
+        with self._world._world_lock:
+            tracker = WorldEntityWithIDKwargsTracker.from_world(self._world)
+            deserialized_message = from_json(
+                json.loads(message.data), **tracker.create_kwargs()
+            )
 
-        msg = from_json(json.loads(msg.data), **tracker.create_kwargs())
+            if deserialized_message.meta_data == self.meta_data:
+                return
 
-        if msg.meta_data == self.meta_data:
-            return
-
-        self._subscription_callback(msg)
+            self._subscription_callback(deserialized_message)
 
     def acknowledge_message(self, message: message_type):
         if self.acknowledge_publisher is None:
@@ -248,31 +259,28 @@ class Synchronizer(WorldEntityWithClassBasedID):
 
         :param msg: The message to publish.
         """
-        self._current_publication_event_id = msg.publication_event_id
 
-        if self.synchronous:
-            with self._acknowledge_condition_variable:
-                self._expected_acknowledgment_count = self._snapshot_subscribers()
-                self._received_acknowledgments = set()
-                self.publisher.publish(
-                    std_msgs.msg.String(data=json.dumps(to_json(msg)))
-                )
-
-                success = self._acknowledge_condition_variable.wait_for(
-                    lambda: len(self._received_acknowledgments)
-                    >= self._expected_acknowledgment_count,
-                    timeout=self.wait_for_synchronization_timeout,
-                )
-                if not success:
-                    self.node.get_logger().warning(
-                        "Message was not acknowledged, timeout"
-                    )
-
-                self._current_publication_event_id = None
-                self._expected_acknowledgment_count = 0
-                self._received_acknowledgments = set()
-        else:
+        if not self.synchronous:
             self.publisher.publish(std_msgs.msg.String(data=json.dumps(to_json(msg))))
+            return
+
+        with self._publish_lock, self._acknowledge_condition_variable:
+            self._current_publication_event_id = msg.publication_event_id
+            self._expected_acknowledgment_count = self._snapshot_subscribers()
+            self._received_acknowledgments = set()
+            self.publisher.publish(std_msgs.msg.String(data=json.dumps(to_json(msg))))
+
+            success = self._acknowledge_condition_variable.wait_for(
+                lambda: len(self._received_acknowledgments)
+                >= self._expected_acknowledgment_count,
+                timeout=self.wait_for_synchronization_timeout,
+            )
+            if not success:
+                self.node.get_logger().warning("Message was not acknowledged, timeout")
+
+            self._current_publication_event_id = None
+            self._expected_acknowledgment_count = 0
+            self._received_acknowledgments = set()
 
     def close(self):
         """
@@ -322,7 +330,7 @@ class ModelReloadSynchronizer(Synchronizer):
         Save the current world model to the database and publish the primary key to the ROS topic such that other
         processes can subscribe to the model changes and update their worlds.
         """
-        from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+        from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO  # type: ignore
 
         dao = to_dao(self._world)
         self.session.add(dao)
@@ -395,7 +403,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         default_factory=list, init=False, repr=False
     )
     """
-    Buffer for messages received while the synchronizer is paused. 
+    Buffer for messages received while the synchronizer is paused.
     These messages can be applied later by calling ``apply_missed_messages()``.
     """
 
@@ -421,7 +429,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             ],
         )
         update = WorldUpdate(meta_data=self.meta_data, modification_block=model_block)
-        self.publish(update)
+        self._publish_or_defer(update)
 
     def on_state_change(self, **kwargs):
         publish_changes = kwargs.get("publish_changes")
@@ -440,8 +448,26 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             states=list(changes.values()),
         )
         update = WorldUpdate(meta_data=self.meta_data, state_update=state_message)
-        self.publish(update)
+        self._publish_or_defer(update)
         self.update_previous_world_state()
+
+    def _publish_or_defer(self, update: WorldUpdate) -> None:
+        """
+        Publishes ``update`` now, or defers it until the world lock is released.
+
+        When this callback fires from within a ``modify_world`` context, ``_world_lock`` is held by
+        the modifying thread. Publishing (and, in synchronous mode, waiting for acknowledgments)
+        while holding the lock would block the receiving executor that must acquire the lock to
+        apply and acknowledge, resulting in a cross-process deadlock. We therefore defer the publish to
+        the world's ``pending_publications``, which are flushed after the lock is released. Outside a
+        modification (usually just during state changes) no lock is held, so we publish directly.
+        """
+        if self._world.world_is_being_modified:
+            self._world.get_world_model_manager().pending_publications.append(
+                lambda: self.publish(update)
+            )
+        else:
+            self.publish(update)
 
     def compute_state_changes(self) -> Dict[UUID, float]:
         """Return only DOF positions that changed since the last snapshot."""
@@ -477,17 +503,28 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             self.acknowledge_message(message)
 
     def apply_message(self, message: WorldUpdate):
-        """Apply model first, then state — preserves the ordering invariant."""
-        if message.modification_block is not None:
-            self._apply_model(message.modification_block)
-        if message.state_update is not None:
-            self._apply_state(message.state_update)
+        """Apply model first, then state — preserves the ordering invariant.
+
+        Both are applied under a single hold of ``_world_lock`` so a combined update is
+        atomic: no other thread can observe the new model structure without its accompanying state.
+        """
+        with self._world._world_lock:
+            if message.modification_block is not None:
+                self._apply_model(message.modification_block)
+            if message.state_update is not None:
+                self._apply_state(message.state_update)
 
     def _apply_model(self, modification_block_message: ModificationBlock):
+        """
+        Applies the model and recompiles the world structure before applying the new state
+        """
         with self._world.modify_world(publish_changes=False):
             modification_block_message.modifications.apply(self._world)
 
     def _apply_state(self, state_update_message: WorldStateUpdate):
+        """
+        Applies the state, and raises a StateUpdateContainsUnknownDegreesOfFreedomError if we receive unknown degree of freedom
+        """
         identifier_index_state_triples = [
             (identifier, self._world.state._index.get(identifier), state_value)
             for identifier, state_value in zip(
@@ -529,8 +566,11 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             return
         pending_messages = self.missed_messages
         self.missed_messages = []
-        for message in pending_messages:
-            self.apply_message(message)
+        # Hold the world lock across the whole batch so the buffered messages apply atomically: a
+        # concurrent modify_world on another thread serializes behind it instead of interleaving.
+        with self._world._world_lock:
+            for message in pending_messages:
+                self.apply_message(message)
         for message in pending_messages:
             self.acknowledge_message(message)
 

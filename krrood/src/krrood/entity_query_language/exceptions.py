@@ -62,9 +62,11 @@ class GreaterThanExpectedNumberOfSolutions(QuantificationNotSatisfiedError):
     For further details, see :doc:`/krrood/doc/eql/result_quantifiers`.
     """
 
-    def __post_init__(self):
-        self.message = f"More than {self.expected_number} solutions found for the expression {self.expression}."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"More than {self.expected_number} solutions found for the expression {self.expression}."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -81,12 +83,14 @@ class LessThanExpectedNumberOfSolutions(QuantificationNotSatisfiedError):
     The number of solutions found.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Found {self.found_number} solutions which is less than the expected {self.expected_number} "
             f"solutions for the expression {self.expression}."
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -128,13 +132,15 @@ class VariableCannotBeEvaluated(DataclassException):
 
     variable: Variable
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Variable {self.variable} cannot be evaluated because of missing or invalid information."
             f"The variable couldn't be identified as one of (already bound, has a domain, or is inferred,"
             f"Check that the variable is correctly defined and that all required information is provided."
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -159,9 +165,11 @@ class TryingToModifyAnAlreadyBuiltQuery(UsageError):
     The query that has already been built.
     """
 
-    def __post_init__(self):
-        self.message = f"{self.query} was already built."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"{self.query} was already built."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -174,9 +182,11 @@ class UnsupportedExpressionTypeForDistinct(UsageError):
 
     unsupported_expression_type: Type[SymbolicExpression]
 
-    def __post_init__(self):
-        self.message = f"Distinct operation is not supported for expression type {self.unsupported_expression_type}"
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Distinct operation is not supported for expression type {self.unsupported_expression_type}"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -192,9 +202,11 @@ class NoConditionsProvided(UsageError):
     The query that has no conditions in its where/having statement.
     """
 
-    def __post_init__(self):
-        self.message = f"No conditions were provided to the where/having statement of the query {self.query}"
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"No conditions were provided to the where/having statement of the query {self.query}"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -210,14 +222,16 @@ class NestedAggregationError(UsageError):
     The parent aggregator.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Aggregator {self.parent_aggregator} has a child aggregator {self.parent_aggregator._child_}."
             f"Aggregations cannot be nested within another aggregation unless the inner aggregation is explicitly "
             f"grouped, E.g. eql.max(eql.count(...).grouped_by(...)) ), or wrapped in an entity query, "
             f"E.g. eql.max(entity(eql.count(...)))"
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -247,13 +261,15 @@ class UnsupportedAggregationOfAGroupedByVariable(AggregationUsageError):
     The grouped_by operation that contains the grouped_by variable that is being aggregated over.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Aggregation over grouped_by variable that is not Count "
             f"{self.grouped_by.aggregators_of_grouped_by_variables} in the grouped_by operation"
             f" {self.grouped_by}"
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -277,13 +293,15 @@ class NonAggregatedSelectedVariablesError(AggregationUsageError):
     The aggregated variables.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"The variables {self.non_aggregated_variables} are neither aggregated nor grouped by, they cannot be selected"
             f" along with the aggregated variables {self.aggregated_variables}. You can only select variables that are"
             f" either aggregated or are in the grouped by variables {self.grouped_by_builder.variables_to_group_by}."
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -296,9 +314,11 @@ class NonAggregatorInHavingConditionsError(AggregationUsageError):
 
     non_aggregators: Tuple[Selectable, ...]
 
-    def __post_init__(self):
-        self.message = f"The having condition of the query {self.query} contains non-aggregators {self.non_aggregators}."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"The having condition of the query {self.query} contains non-aggregators {self.non_aggregators}."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -314,13 +334,14 @@ class AggregatorInWhereConditionsError(AggregationUsageError):
     The aggregators in the where condition.
     """
 
-    def __post_init__(self):
-        self.message = (
-            f"The where condition of the query {self.query} contains aggregators {self.aggregators}."
-            f"If you want filter using aggregators, use `QueryObjectquery.having()` instead. Or wrap the aggregator"
-            f"in a subquery e.g. `an(entity(...).where(entity(eql.count(...)) > n))`"
+    def error_message(self) -> str:
+        return f"The where condition of the query {self.query} contains aggregators {self.aggregators}."
+
+    def suggest_correction(self) -> str:
+        return (
+            "if you want to filter using aggregators, use `QueryObjectquery.having()` instead, or wrap the "
+            "aggregator in a subquery e.g. `an(entity(...).where(entity(eql.count(...)) > n))`."
         )
-        super().__post_init__()
 
 
 @dataclass
@@ -333,12 +354,11 @@ class NoKwargsInMatchVar(UsageError):
 
     match_variable: Match
 
-    def __post_init__(self):
-        self.message = (
-            f"The match variable {self.match_variable} was used without any keyword arguments."
-            f"If you don't want to specify keyword arguments use variable() instead"
-        )
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"The match variable {self.match_variable} was used without any keyword arguments."
+
+    def suggest_correction(self) -> str:
+        return "if you don't want to specify keyword arguments use variable() instead."
 
 
 @dataclass
@@ -352,9 +372,11 @@ class WrongSelectableType(UsageError):
     wrong_variable_type: Type
     expected_types: List[Type]
 
-    def __post_init__(self):
-        self.message = f"Select expects one of {self.expected_types}, instead {self.wrong_variable_type} was given."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Select expects one of {self.expected_types}, instead {self.wrong_variable_type} was given."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -383,13 +405,15 @@ class LiteralConditionError(UsageError):
     The literal conditions that are given to the query.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"The following Literal {self.literal_conditions} was given to the query {self.query}."
             f"Literal conditions are not allowed in queries, as they are always"
             f"either True or False, independent on any other values/bindings in the query"
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -405,12 +429,14 @@ class CannotProcessResultOfGivenChildType(UsageError):
     The unsupported child type.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"The child type {self.unsupported_child_type} cannot have its results processed"
             f" during evaluation because it doesn't implement the `_process_result_` method."
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -423,12 +449,14 @@ class NonPositiveLimitValue(UsageError):
 
     wrong_limit_value: int
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Quantifier limit value must be a positive integer (i.e., greater than 0),"
             f" instead got {self.wrong_limit_value}"
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -459,9 +487,11 @@ class UnSupportedOperand(UnsupportedOperation):
     The operand that is not supported by the operation.
     """
 
-    def __post_init__(self):
-        self.message = f"{self.unsupported_operand} cannot be used as an operand for {self.operation} operations."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"{self.unsupported_operand} cannot be used as an operand for {self.operation} operations."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -477,16 +507,15 @@ class UnsupportedNegation(UnsupportedOperation):
     The type of the operation that is being negated.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Symbolic NOT operations on {self.operation_type} types"
-            f" operands are not allowed, you can negate the conditions instead,"
-            f" as negating them is most likely not what you want"
+            f" operands are not allowed, as negating them is most likely not what you want"
             f" because it is ambiguous and can be very expensive to compute."
-            f"To Negate Conditions do:"
-            f" `not_(condition)` instead of `not_(an(entity(..., condition)))`."
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return "negate the conditions instead: `not_(condition)` instead of `not_(an(entity(..., condition)))`."
 
 
 @dataclass
@@ -510,6 +539,31 @@ class QuantificationConsistencyError(QuantificationSpecificationError):
 
 
 @dataclass
+class InvalidQuantificationRangeError(QuantificationConsistencyError):
+    """
+    Raised when the upper quantification bound is smaller than the lower bound.
+
+    For further details, see :doc:`/krrood/doc/eql/result_quantifiers`.
+    """
+
+    at_least: Any
+    """
+    The lower bound of the quantification range.
+    """
+
+    at_most: Any
+    """
+    The upper bound of the quantification range.
+    """
+
+    def error_message(self) -> str:
+        return f"at_most {self.at_most} cannot be less than at_least {self.at_least}."
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
 class NegativeQuantificationError(QuantificationConsistencyError):
     """
     Raised when the quantification constraints specified on the query results have a negative value.
@@ -517,7 +571,11 @@ class NegativeQuantificationError(QuantificationConsistencyError):
     For further details, see :doc:`/krrood/doc/eql/result_quantifiers`.
     """
 
-    message: str = f"ResultQuantificationConstraint must be a non-negative integer."
+    def error_message(self) -> str:
+        return "ResultQuantificationConstraint must be a non-negative integer."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -537,9 +595,11 @@ class InvalidChildType(UsageError):
     The list of valid child types.
     """
 
-    def __post_init__(self):
-        self.message = f"The child type {self.invalid_child_type} is not valid. It must be a subclass of {self.correct_child_types}"
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"The child type {self.invalid_child_type} is not valid. It must be a subclass of {self.correct_child_types}"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -557,9 +617,11 @@ class NoExpressionFoundForGivenID(DataclassException):
     The ID of the expression that was not found.
     """
 
-    def __post_init__(self):
-        self.message = f"No expression found for ID: {self.expression_id} during evaluation of {self.symbolic_expression}."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"No expression found for ID: {self.expression_id} during evaluation of {self.symbolic_expression}."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -582,9 +644,11 @@ class NoneWrappedFieldError(ClassDiagramError):
     clazz: Type
     attr_name: str
 
-    def __post_init__(self):
-        self.message = f"Field '{self.attr_name}' of class '{self.clazz.__name__}' is not wrapped by a WrappedField."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Field '{self.attr_name}' of class '{self.clazz.__name__}' is not wrapped by a WrappedField."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -606,9 +670,11 @@ class NoChildToReplace(DataclassException):
     The new child that was attempted to be set.
     """
 
-    def __post_init__(self):
-        self.message = f"Expression '{self.expression}' has no child '{self.old_child}' to replace with '{self.new_child}'."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Expression '{self.expression}' has no child '{self.old_child}' to replace with '{self.new_child}'."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -622,8 +688,11 @@ class GenerativeBackendQueryIsNotUnderspecifiedVariable(DataclassException):
     The query that was passed to the generative backend.
     """
 
-    def __post_init__(self):
-        self.message = f"Query {self.expression} is not an underspecified variable inside a generative backend."
+    def error_message(self) -> str:
+        return f"Query {self.expression} is not an underspecified variable inside a generative backend."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -634,13 +703,15 @@ class CalledMatchMultipleTimes(DataclassException):
 
     match: AbstractMatchExpression
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Match expression '{self.match}' was called multiple times. "
             f"Match acts like a constructor and hence should not be called multiple times. "
             f"Invoking the `__call__` method multiple times has unexpected side effects."
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -649,15 +720,19 @@ class UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
 ):
     attribute_match: AttributeMatch
 
-    def __post_init__(self):
-        self.message = (
-            "If you want to use EQL to generate answers,"
-            f"assignments in underspecified queries must be concrete objects or a symbolic expression."
-            f"If the assignment is Ellipsis it must, the type of the field must be an Enum, otherwise EQL cant"
-            f"generate it. If your looking for more flexible generations, try ProbabilisticBackend."
+    def error_message(self) -> str:
+        return (
+            "If you want to use EQL to generate answers, "
+            f"assignments in underspecified queries must be concrete objects or a symbolic expression. "
+            f"If the assignment is Ellipsis, the type of the field must be an Enum, otherwise EQL can't "
+            f"generate it. "
             f"Got {self.attribute_match.name_from_variable_access_path} = {self.attribute_match.assigned_variable._type_}."
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return (
+            "if you're looking for more flexible generations, try ProbabilisticBackend."
+        )
 
 
 @dataclass
@@ -671,8 +746,8 @@ class MatchTypeCannotBeDetermined(DataclassException):
     The match that failed to infer its type.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Match type cannot be determined for {self.match}. "
             f"Tried to infer the type from {self.match.factory}."
             f"The factory given to the match must ether be a classmethod the returns its class or a "
@@ -680,3 +755,6 @@ class MatchTypeCannotBeDetermined(DataclassException):
             f"TYPE_CHECKING). If that is not an option for you, set the `target_type` of the "
             f"`underspecified` method."
         )
+
+    def suggest_correction(self) -> str:
+        return ""

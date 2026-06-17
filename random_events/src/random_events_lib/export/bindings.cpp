@@ -15,8 +15,7 @@ PYBIND11_MODULE(random_events_lib, handle) {
         .def("contains", &AbstractSimpleSet::contains)
         .def("is_empty", &AbstractSimpleSet::is_empty)
         .def("difference_with", [](AbstractSimpleSet &x, AbstractSimpleSet &y) {
-            auto const p = AbstractSimpleSetPtr_t(&y);
-            return *x.difference_with(p);
+            return *x.difference_with(y.share_more());
         })
         .def ("__repr__", &AbstractSimpleSet::to_string)
         .def("__eq__", &AbstractSimpleSet::operator==)
@@ -38,6 +37,11 @@ PYBIND11_MODULE(random_events_lib, handle) {
         .def("union_with", pybind11::overload_cast<const AbstractSimpleSetPtr_t&>(&AbstractCompositeSet::union_with), "Union this with a simple set.")
         .def("difference_with", pybind11::overload_cast<const AbstractCompositeSetPtr_t&>(&AbstractCompositeSet::difference_with), "Difference this with another composite set.")
         .def("difference_with", pybind11::overload_cast<const AbstractSimpleSetPtr_t&>(&AbstractCompositeSet::difference_with), "Difference this with a simple set.")
+        .def("subtract_disjoint", &AbstractCompositeSet::subtract_disjoint,
+             "Subtract a composite set from this via incremental bounded subtraction. "
+             "Precondition: this composite set must already be a disjoint union. "
+             "Equivalent to (this & ~other) but stays bounded inside the same space as this composite set, "
+             "avoids complement() across the full ambient space, and never calls make_disjoint().")
         .def("add_new_simple_set", &AbstractCompositeSet::add_new_simple_set)
         .def("__eq__", &AbstractCompositeSet::operator==)
         .def("__lt__", &AbstractCompositeSet::operator<);
@@ -84,7 +88,17 @@ PYBIND11_MODULE(random_events_lib, handle) {
         .def(py::init([](SimpleSetSet_t const &x) {
             auto p = std::make_shared<SimpleSetSet_t>(x);
             return std::make_shared<Interval>(p);
-        }));
+        }))
+        .def("__hash__", [](const Interval &x) {
+            size_t h = x.simple_sets->size();
+            for (const auto &ss : *x.simple_sets) {
+                auto si = std::static_pointer_cast<SimpleInterval>(ss);
+                h ^= std::hash<double>()(si->lower) ^ (std::hash<double>()(si->upper) << 1)
+                   ^ (std::hash<int>()(static_cast<int>(si->left))  << 2)
+                   ^ (std::hash<int>()(static_cast<int>(si->right)) << 3);
+            }
+            return h;
+        });
 
 
     handle.def("closed", &closed, "Create a closed interval");
@@ -132,7 +146,15 @@ PYBIND11_MODULE(random_events_lib, handle) {
             return std::make_shared<Set>(q, p);
         }))
         .def_property("all_elements", [](Set const &x){return *x.all_elements;},
-            [](Set &x, std::set<long long> const &v){x.all_elements = make_shared_all_elements(v);});
+            [](Set &x, std::set<long long> const &v){x.all_elements = make_shared_all_elements(v);})
+        .def("__hash__", [](const Set &x) {
+            size_t h = x.simple_sets->size();
+            for (const auto &ss : *x.simple_sets) {
+                auto se = std::static_pointer_cast<SetElement>(ss);
+                h ^= std::hash<int>{}(se->element_index);
+            }
+            return h;
+        });
 
     py::class_<SimpleEvent, AbstractSimpleSet, std::shared_ptr<SimpleEvent>>(handle, "SimpleEvent")
         .def(py::init())
@@ -175,6 +197,14 @@ PYBIND11_MODULE(random_events_lib, handle) {
         .def("marginal", [](const Event &x, VariableSet const &y) {
             auto const p = make_shared_variable_set(y);
             return x.marginal(p);
+        })
+        .def("__hash__", [](const Event &x) {
+            size_t h = x.simple_sets->size();
+            for (const auto &ss : *x.simple_sets) {
+                auto se = std::static_pointer_cast<SimpleEvent>(ss);
+                h ^= VariableMapHash{}(*se->variable_map);
+            }
+            return h;
         });
 
 

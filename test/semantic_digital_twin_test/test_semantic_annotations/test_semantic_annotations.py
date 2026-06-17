@@ -157,10 +157,10 @@ def test_has_hinge_has_slider_aggregate_bodies():
         world.add_semantic_annotation(slider)
         world.add_semantic_annotation(drawer)
         world.add_semantic_annotation(door)
-        door.add_handle(handle2)
-        door.add_hinge(hinge)
-        drawer.add_handle(handle1)
-        drawer.add_slider(slider)
+        door.add(handle2)
+        door.add(hinge)
+        drawer.add(handle1)
+        drawer.add(slider)
 
     expected_door_bodies = {door_body, handle2_body, hinge_body}
     expected_drawer_bodies = {drawer_body, handle1_body, slider_body}

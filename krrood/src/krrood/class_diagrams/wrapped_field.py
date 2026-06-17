@@ -206,16 +206,23 @@ class WrappedField:
         return issubclass(self.type_endpoint, enum.Enum)
 
     @cached_property
-    def is_one_to_one_relationship(self) -> bool:
+    def is_many_to_one_relationship(self) -> bool:
+        """
+        ..note:: One-to-one relationships are not possible as its not enforceable that nobody references to the other side.
+        See `one-to-one relationships <https://docs.sqlalchemy.org/en/21/orm/basic_relationships.html#one-to-one>`_
+        """
         return not self.is_container and not self.is_builtin_type
 
     @cached_property
-    def is_one_to_many_relationship(self) -> bool:
+    def is_many_to_many_relationship(self) -> bool:
+        """
+        ..note:: One-to-many relationships are not possible as its not enforceable that nobody references to the other side.
+        """
         return self.is_container and not self.is_builtin_type and not self.is_optional
 
     @cached_property
     def is_iterable(self):
-        return self.is_one_to_many_relationship and hasattr(
+        return self.is_many_to_many_relationship and hasattr(
             self.container_type, "__iter__"
         )
 
@@ -234,7 +241,7 @@ class WrappedField:
     @cached_property
     def is_role_taker(self) -> bool:
         return (
-            self.is_one_to_one_relationship
+            self.is_many_to_one_relationship
             and not self.is_optional
             and self.field.default == MISSING
             and self.field.default_factory == MISSING

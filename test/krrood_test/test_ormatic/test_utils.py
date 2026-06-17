@@ -1,11 +1,10 @@
 import pytest
-from _pytest import raises
-
 from krrood.ormatic.exceptions import UnsupportedColumnType
-from krrood.utils import inheritance_path_length
 from krrood.ormatic.utils import get_python_type_from_sqlalchemy_column
+from krrood.utils import inheritance_path_length
 from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.world_description.world_entity import Body
+
 from ..dataset.example_classes import *
 
 
@@ -38,8 +37,8 @@ def test_distance_between_classes():
 
 
 def test_sqlalchemy_column_type_extraction():
-    from sqlalchemy import Column, Integer, String, Boolean
     from krrood.ormatic.custom_types import PolymorphicEnumType
+    from sqlalchemy import Boolean, Column, Integer, String
 
     assert get_python_type_from_sqlalchemy_column(Column(Integer)) == int
     assert get_python_type_from_sqlalchemy_column(Column(String)) == str

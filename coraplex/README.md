@@ -1,11 +1,21 @@
-![](doc/source/_static/images/new_coraplex_logo_clean.svg#gh-light-mode-only)
-![](doc/source/_static/images/new_coraplex_logo_clean_dark.svg#gh-dark-mode-only)
+<img src="./doc/source/_static/images/cora-plex-dark.png" width="400">
 
 
+### Cite
+
+```bibtex
+@software{coraplex,
+  author  = {Dech, Jonas and Hassouna, Vanessa and Krohm, Luca},
+  title   = {CoraPlex: A Python Framework for Cognitive Orchestrated Reasoning Architecture Planning Executive},
+  url     = {https://github.com/cram2/cognitive_robot_abstract_machine/tree/main/coraplex},
+  version = {2.0.0},
+  year    = {2024}
+}
+```
 
 ## Key Features
 
-- Intent-based task specification: express “what” to do using designators; the framework decides the concrete “how” at run time.
+- Intent-based task specification: express "what" to do using designators; the framework decides the concrete "how" at run time.
 - Late binding and adaptability: defer grounding of actions, motions, objects, and locations until execution to match the current world and robot state.
 - Composable plans: build behaviors as trees of plan nodes with clear control-flow constructs (sequential, parallel, retry, repeat, monitor).
 - Introspection and observability: plans track node status, timing, and context for debugging, visualization, and monitoring.
@@ -56,6 +66,4 @@ Source documentation is located in the `doc` directory. Instructions for buildin
 
 ## Examples
 
-Comprehensive examples are provided as Jupyter Notebooks in the `examples` folder and documented in the [Examples section](https://coraplex.readthedocs.io/en/latest/notebooks/intro.html). Refer to the examples folder's `README` for instructions on executing these notebooks.
-
-
+Comprehensive examples are provided as Jupyter Notebooks in the `examples` folder and documented in the [Examples section](https://coraplex.readthedocs.io/en/latest/notebooks/intro.html).

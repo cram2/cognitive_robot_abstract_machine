@@ -871,10 +871,9 @@ def test_path_custom_type(session, database):
 
 def test_selectin_loading_preloads_relationships(session, database):
     """
-    Within selectin_loading(), relationship attributes are loaded during the
-    query and remain accessible after the instance is detached from the session.
-    Without the context manager the relationship is not pre-loaded, so accessing
-    it on a detached instance raises DetachedInstanceError.
+    Relationship attributes are loaded eagerly (the generated relationships use
+    lazy='selectin') and remain accessible after the instance is detached from
+    the session, with or without the selectin_loading() context manager.
     """
     p1 = KRROODPosition(1, 2, 3)
     p2 = KRROODPosition(2, 3, 4)
@@ -891,19 +890,18 @@ def test_selectin_loading_preloads_relationships(session, database):
     # the now-detached instance without any further database access.
     assert len(dao_eager.positions) == 2
 
-    # Without selectin_loading: the relationship is not pre-fetched.
+    # Without selectin_loading: the mapper-level lazy='selectin' configuration
+    # still pre-fetches the relationship during the query.
     dao_lazy = session.scalars(select(KRROODPositionsDAO)).one()
     session.expunge_all()
-    with pytest.raises(DetachedInstanceError):
-        _ = dao_lazy.positions
+    assert len(dao_lazy.positions) == 2
 
 
 def test_selectin_loading_reduces_queries_during_from_dao(session, database):
     """
-    selectin_loading bulk-fetches all relationships in O(1) queries so that
-    from_dao() makes zero additional DB round-trips.  Without it, from_dao()
-    triggers an N+1 pattern: one query to load the association objects plus one
-    per individual target relationship accessed during traversal.
+    All relationships are bulk-fetched in O(1) queries during the initial read
+    (mapper-level lazy='selectin'), so from_dao() makes zero additional DB
+    round-trips, with or without the selectin_loading() context manager.
     """
     N = 30
     positions = KRROODPositions(
@@ -922,9 +920,8 @@ def test_selectin_loading_reduces_queries_during_from_dao(session, database):
 
     sa_event.listen(engine, "after_cursor_execute", _count)
     try:
-        # Without selectin_loading: from_dao() lazy-loads each relationship while
-        # the DAO is still attached to the session, producing N+1 queries (one for
-        # the association table, one per target KRROODPositionDAO).
+        # Without selectin_loading: the mapper-level lazy='selectin' already
+        # bulk-fetches all relationships during the initial query.
         dao_lazy = session.scalars(select(KRROODPositionsDAO)).one()
         query_count[0] = 0
         dao_lazy.from_dao()
@@ -942,12 +939,10 @@ def test_selectin_loading_reduces_queries_during_from_dao(session, database):
     finally:
         sa_event.remove(engine, "after_cursor_execute", _count)
 
-    # from_dao() without selectin_loading must issue more than one query
-    # (at minimum the association load + one per target).
-    assert queries_without > 1, (
-        f"Expected N+1 lazy queries but got {queries_without}"
+    # from_dao() must issue no queries at all in either case.
+    assert queries_without == 0, (
+        f"Expected 0 queries without selectin_loading but got {queries_without}"
     )
-    # from_dao() with selectin_loading must issue no queries at all.
     assert queries_with == 0, (
         f"Expected 0 queries with selectin_loading but got {queries_with}"
     )

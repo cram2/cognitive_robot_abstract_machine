@@ -191,14 +191,14 @@ def reliability_experiment(
     session.commit()
     writing_to_database_duration = time.perf_counter() - t0
 
-    t0 = time.perf_counter()
     with selectin_loading(session):
+        t0 = time.perf_counter()
         fetched = session.scalars(select(PlanMappingDAO)).one()
-    reading_from_database_duration = time.perf_counter() - t0
+        reading_from_database_duration = time.perf_counter() - t0
 
-    t0 = time.perf_counter()
-    fetched.from_dao()
-    reconstruction_duration = time.perf_counter() - t0
+        t0 = time.perf_counter()
+        fetched.from_dao()
+        reconstruction_duration = time.perf_counter() - t0
 
     drop_database(session.bind)
     session.close()

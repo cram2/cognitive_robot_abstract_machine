@@ -56,7 +56,7 @@ with world.modify_world():
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.15),
         world=world,
     )
-    drawer.add_handle(handle)
+    drawer.add(handle)
 
     slider = Slider.create_with_new_body_in_world(
         name=PrefixedName("drawer_slider"),
@@ -64,7 +64,7 @@ with world.modify_world():
         world=world,
         active_axis=Vector3.X()
     )
-    drawer.add_slider(slider)
+    drawer.add(slider)
 
     dresser = Dresser.create_with_new_body_in_world(
         name=PrefixedName("dresser"),
@@ -72,7 +72,7 @@ with world.modify_world():
         world=world,
     )
 
-    dresser.add_drawer(drawer)
+    dresser.add(drawer)
 
 rt = RayTracer(world)
 rt.update_scene()

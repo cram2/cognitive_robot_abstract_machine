@@ -1,4 +1,3 @@
-pytest>=7.1.1
 open3d>=0.15.2
 numpy>=1.22.3
 pydot>=1.4.2

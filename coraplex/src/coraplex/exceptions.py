@@ -26,12 +26,13 @@ class ContextIsUnavailable(DataclassException):
     The instance where the plan node is None.
     """
 
-    def __post_init__(self):
-        self.message = (
-            f"{self.instance} has no plan node. Did you forget to call `add_subplan` when creating"
-            f"plans inside actions?"
+    def error_message(self) -> str:
+        return f"{self.instance} has no plan node."
+
+    def suggest_correction(self) -> str:
+        return (
+            "did you forget to call `add_subplan` when creating plans inside actions?"
         )
-        super().__post_init__()
 
 
 @dataclass
@@ -41,13 +42,15 @@ class ConditionNotSatisfied(PlanFailure):
     action: Type[ActionDescription]
     condition: ConditionType
 
-    def __post_init__(self):
+    def error_message(self) -> str:
+        prefix = "Pre" if self.pre_condition else "Post"
         if isinstance(self.condition, bool):
-            self.message = f"{"Pre" if self.pre_condition else "Post"}-Condition for Action '{self.action.__name__}' is not satisfied"
-        else:
-            false_statements = get_false_statements(self.condition)
-            self.message = f"{"Pre" if self.pre_condition else "Post"}-Condition for Action '{self.action.__name__}' is not satisfied, following statements are false: {[s._name_ for s in false_statements]}"
-        super().__post_init__()
+            return f"{prefix}-Condition for Action '{self.action.__name__}' is not satisfied"
+        false_statements = get_false_statements(self.condition)
+        return f"{prefix}-Condition for Action '{self.action.__name__}' is not satisfied, following statements are false: {[s._name_ for s in false_statements]}"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -55,7 +58,8 @@ class MotionDidNotFinish(PlanFailure):
 
     failed_motions: List[MotionStatechartNode]
 
-    def __post_init__(self):
-        self.message = (
-            f"Motion did not finish, following motions failed: {self.failed_motions}"
-        )
+    def error_message(self) -> str:
+        return f"Motion did not finish, following motions failed: {self.failed_motions}"
+
+    def suggest_correction(self) -> str:
+        return ""

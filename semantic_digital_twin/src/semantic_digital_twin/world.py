@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import annotations
 
+import difflib
 import inspect
 import logging
 import threading
@@ -55,6 +56,7 @@ from semantic_digital_twin.exceptions import (
     WorldIsNotATreeError,
     WorldContainsOrphanedDegreeOfFreedom,
     BrokenWorldModificationHistoryError,
+    MismatchingWorld,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_computations.forward_kinematics import (
@@ -205,6 +207,9 @@ class WorldModelUpdateContextManager:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        # Whether deferred network publications should be flushed after the lock is released, will be set true when
+        # existing the last modification block.
+        run_pending_publications = False
         try:
             # If error, clean up before re-raising
             if exc_val:
@@ -216,6 +221,8 @@ class WorldModelUpdateContextManager:
                 # so cached queries must be invalidated
                 clear_memoization_cache(self.world)
                 if not model_manager._active_world_model_update_context_manager_ids:
+                    # discard publications buffered before the error; they must not be sent
+                    model_manager.pending_publications.clear()
                     if len(model_manager.current_model_modification_block):
                         raise BrokenWorldModificationHistoryError(
                             world=self.world, potential_cause=exc_val
@@ -228,15 +235,16 @@ class WorldModelUpdateContextManager:
                 raise exc_val
 
             self.world.delete_orphaned_dofs()
-            clear_memoization_cache(self.world)
             model_manager = self.world._model_manager
             model_manager._active_world_model_update_context_manager_ids.remove(
                 self._id
             )
-
             # if there are still open context managers dont publish yet
             if model_manager._active_world_model_update_context_manager_ids:
                 return
+
+            # only clean up caches in the last modification block
+            clear_memoization_cache(self.world)
 
             model_manager.model_modification_blocks.append(
                 model_manager.current_model_modification_block
@@ -249,12 +257,17 @@ class WorldModelUpdateContextManager:
                     self.world._notify_model_change(
                         publish_changes=self.publish_changes
                     )
+                    run_pending_publications = True
             finally:
                 self.world.world_is_being_modified = False
                 model_manager._current_modifications_will_be_published = None
         finally:
             # keep outside the if block, as it needs to be released as many times as it was acquired
             self.world._world_lock.release()
+            # Flush deferred publications only after the lock is fully released, so a synchronous
+            # publish does not block the receiving executor that needs the lock to apply/acknowledge.
+            if run_pending_publications:
+                self.world._model_manager.flush_pending_publications()
 
 
 def atomic_world_modification(func=None, modification: Type[WorldModification] = None):
@@ -363,6 +376,15 @@ class WorldModelManager:
     Indicates if the current modifications will be published via a synchronizer. If None, then there are no active contexts.
     """
 
+    pending_publications: List[Callable[[], None]] = field(
+        init=False, default_factory=list, repr=False
+    )
+    """
+    Network publications deferred while the world is being modified. They are flushed (executed)
+    only after ``_world_lock`` has been released, so that a synchronous publish waiting for
+    acknowledgments never blocks the receiving executor that must acquire the lock to apply/ack.
+    """
+
     def update_model_version_and_notify_callbacks(self, **kwargs) -> None:
         """
         Notifies the system of a model change and updates necessary states, caches,
@@ -370,8 +392,20 @@ class WorldModelManager:
         for model changes.
         """
         self.version += 1
-        for callback in self.model_change_callbacks:
+        for callback in list(self.model_change_callbacks):
             callback.notify_model_change(**kwargs)
+
+    def flush_pending_publications(self) -> None:
+        """
+        Execute and clear all publications that were deferred during a world modification.
+
+        Must be called *after* ``_world_lock`` is released so that publishing (and, in synchronous
+        mode, waiting for acknowledgments) does not happen while holding the lock.
+        """
+        pending = self.pending_publications
+        self.pending_publications = []
+        for publish in pending:
+            publish()
 
 
 _LRU_CACHE_SIZE: int = 2048
@@ -795,7 +829,6 @@ class World(HasSimulatorProperties):
         :param semantic_annotation: The semantic annotation instance to be added. Its name must be unique within
             the current context.
 
-        :raises AddingAnExistingSemanticAnnotationError: If the semantic annotation already exists
         """
         self._raise_error_if_belongs_to_other_world(semantic_annotation)
         if self.is_semantic_annotation_in_world(semantic_annotation):
@@ -812,8 +845,6 @@ class World(HasSimulatorProperties):
 
         :param semantic_annotation: The semantic annotation instance to be added. Its name must be unique within
             the current context.
-
-        :raises AddingAnExistingSemanticAnnotationError: If the semantic annotation already exists
         """
         self._raise_error_if_belongs_to_other_world(semantic_annotation)
         if self.is_semantic_annotation_in_world(semantic_annotation):
@@ -1190,12 +1221,12 @@ class World(HasSimulatorProperties):
         )
         match matches:
             case []:
-                if isinstance(name, PrefixedName):
-                    logger.warning(
-                        f"No world entity with PrefixedName {name} found. Did you want a general matching of {name.name}?"
-                        f"If so, please provide only the string name."
-                    )
-                raise WorldEntityNotFoundError(name)
+                raise WorldEntityNotFoundError(
+                    name,
+                    suggestions=self._suggest_world_entity_names(
+                        name, world_entity_iterable
+                    ),
+                )
             case [entity]:
                 return entity
             case _:
@@ -1234,6 +1265,40 @@ class World(HasSimulatorProperties):
         self, name: Union[str, PrefixedName]
     ) -> List[Connection]:
         return self._get_world_entities_by_name_from_iterable(name, self.connections)
+
+    @staticmethod
+    def _suggest_world_entity_names(
+        name: Union[str, PrefixedName],
+        world_entity_iterable: Iterable[GenericWorldEntity],
+        max_suggestions: int = 3,
+    ) -> List[PrefixedName]:
+        """
+        Compute "did you mean" candidates for a failed lookup of `name`.
+
+        Entities whose bare name matches exactly (i.e. only the prefix differs) are
+        suggested first, followed by the closest spelling matches.
+
+        :param name: The name that was searched for but not found.
+        :param world_entity_iterable: The iterable that was searched.
+        :param max_suggestions: The maximum number of suggestions to return.
+        :return: The names of existing world entities that closely match `name`.
+        """
+        candidates = [world_entity.name for world_entity in world_entity_iterable]
+        searched_name = name.name if isinstance(name, PrefixedName) else name
+        suggestions = [
+            candidate for candidate in candidates if candidate.name == searched_name
+        ]
+        close_names = difflib.get_close_matches(
+            searched_name,
+            {candidate.name for candidate in candidates},
+            n=max_suggestions,
+        )
+        suggestions += [
+            candidate
+            for candidate in candidates
+            if candidate.name in close_names and candidate not in suggestions
+        ]
+        return suggestions[:max_suggestions]
 
     @staticmethod
     def _get_world_entities_by_name_from_iterable(
@@ -1494,48 +1559,67 @@ class World(HasSimulatorProperties):
         self,
         branch_root: KinematicStructureEntity,
         new_parent: KinematicStructureEntity,
+        enable_unsafe_inside_world_block: bool = False,
     ) -> None:
         """
-        Destroys the connection between branch_root and its parent, and moves it to a new parent using a new connection
-        of the same type. The pose of body with respect to root stays the same.
+        Move ``branch_root`` under ``new_parent``, recreating its parent connection so the connection
+        type (and, for active joints, the degree of freedom) is preserved and the branch keeps its
+        world pose. No-op if ``branch_root`` is already a child of ``new_parent``.
+
+        A :class:`Connection6DoF` carries its pose in its degrees of freedom, so it is recreated with
+        fresh DOFs whose origin is set to the world-preserving pose. Every other connection keeps its
+        degree of freedom and only its parent offset is recomputed
+        (see :meth:`~...world_entity.Connection.copy_with_new_parent`).
 
         :param branch_root: The root of the branch to be moved.
         :param new_parent: The new parent of the branch.
+        :param enable_unsafe_inside_world_block: If ``True``, compute the preserved pose with
+            :meth:`_manually_compute_world_root_T_self` instead of the forward kinematics manager. This
+            skips the FK recompile and lets the move happen within a single still-open ``modify_world``
+            block (used when attaching freshly created entities). It is slower than the FK manager.
         """
-        # Ensure FK is up to date before computing the relative pose
-        # can be problematic in a large merge world block
-        self.update_forward_kinematics()
+        if branch_root._world != new_parent._world:
+            raise MismatchingWorld(branch_root._world, new_parent._world)
 
-        new_connection = None
-        new_parent_T_root = self.compute_forward_kinematics(new_parent, branch_root)
+        if branch_root.parent_kinematic_structure_entity == new_parent:
+            return
+
+        if not enable_unsafe_inside_world_block:
+            # Ensure FK is up to date before computing the relative pose; this recompile can be
+            # problematic in a large merge-world block, which is what the manual path is for.
+            self.update_forward_kinematics()
+
         old_connection = branch_root.parent_connection
 
-        assert isinstance(
-            old_connection, (FixedConnection, Connection6DoF)
-        ), "The branch root must be connected to a Connection6DoF or FixedConnection."
-
-        match old_connection:
-            case FixedConnection():
-                new_connection = FixedConnection(
-                    parent=new_parent,
-                    child=branch_root,
-                    _world=self,
-                    parent_T_connection_expression=new_parent_T_root,
-                )
-
-            case Connection6DoF():
-                new_connection = Connection6DoF.create_with_dofs(
-                    parent=new_parent,
-                    child=branch_root,
-                    world=self,
-                )
-
+        if isinstance(old_connection, Connection6DoF):
+            new_parent_T_branch_root = self.compute_forward_kinematics(
+                new_parent, branch_root, enable_unsafe_inside_world_block
+            )
+            new_connection = Connection6DoF.create_with_dofs(
+                parent=new_parent, child=branch_root, world=self
+            )
+        else:
+            # Relocate the connection frame so the branch keeps its world pose, then let the connection
+            # copy itself under the new parent (preserving its type and degree of freedom).
+            new_parent_T_connection = HomogeneousTransformationMatrix(
+                (
+                    self.compute_forward_kinematics(
+                        new_parent,
+                        old_connection.parent,
+                        enable_unsafe_inside_world_block,
+                    )
+                    @ old_connection.parent_T_connection_expression
+                ).evaluate()
+            )
+            new_connection = old_connection.copy_with_new_parent(
+                new_parent, new_parent_T_connection
+            )
         with self.modify_world():
             self.add_connection(new_connection)
             self.remove_connection(old_connection)
 
-        if isinstance(new_connection, Connection6DoF):
-            new_connection.origin = new_parent_T_root
+        if isinstance(old_connection, Connection6DoF):
+            new_connection.origin = new_parent_T_branch_root
 
     def move_branch_to_new_world(self, new_root: KinematicStructureEntity) -> World:
         """
@@ -1601,7 +1685,7 @@ class World(HasSimulatorProperties):
         )
         self.notify_state_change(publish_changes=publish_changes, **kwargs)
 
-        for callback in self.state.state_change_callbacks:
+        for callback in list(self.state.state_change_callbacks):
             callback.update_previous_world_state()
 
         self.validate()
@@ -1871,7 +1955,10 @@ class World(HasSimulatorProperties):
 
     # %% Forward Kinematics
     def compute_forward_kinematics(
-        self, root: KinematicStructureEntity, tip: KinematicStructureEntity
+        self,
+        root: KinematicStructureEntity,
+        tip: KinematicStructureEntity,
+        enable_unsafe_inside_world_block: bool = False,
     ) -> HomogeneousTransformationMatrix:
         """
         Compute the forward kinematics from the root KinematicStructureEntity to the tip KinematicStructureEntity.
@@ -1881,9 +1968,12 @@ class World(HasSimulatorProperties):
 
         :param root: Root KinematicStructureEntity, for which the kinematics are computed.
         :param tip: Tip KinematicStructureEntity, to which the kinematics are computed.
+        :param enable_unsafe_inside_world_block: Whether to use the forward kinematic manager
         :return: Transformation matrix representing the relative pose of the tip KinematicStructureEntity with respect to the root KinematicStructureEntity.
         """
-        return self._forward_kinematic_manager.compute(root, tip)
+        if not enable_unsafe_inside_world_block:
+            return self._forward_kinematic_manager.compute(root, tip)
+        return self._manually_compute_entity_a_T_entity_b(root, tip)
 
     def compose_forward_kinematics_expression(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
@@ -1924,6 +2014,56 @@ class World(HasSimulatorProperties):
         """
         self._forward_kinematic_manager.notify_model_change()
         self._forward_kinematic_manager.recompute()
+
+    def _manually_compute_entity_a_T_entity_b(
+        self,
+        entity_a: KinematicStructureEntity,
+        entity_b: KinematicStructureEntity,
+    ) -> HomogeneousTransformationMatrix:
+        """
+        Computes the transform entity_a_T_entity_b without using the forward kinematics manager.
+
+        :param entity_a: The entity which is going to be the reference frame of the transform
+        :param entity_b: The entity which is going to be the child frame of the transform
+        """
+        root_T_reference = (
+            HomogeneousTransformationMatrix()
+            if entity_a == self.root
+            else self._manually_compute_world_root_T_self(entity_a)
+        )
+        root_T_target = (
+            HomogeneousTransformationMatrix()
+            if entity_b == self.root
+            else self._manually_compute_world_root_T_self(entity_b)
+        )
+        return HomogeneousTransformationMatrix(
+            (root_T_reference.inverse() @ root_T_target).evaluate()
+        )
+
+    def _manually_compute_world_root_T_self(
+        self, entity: KinematicStructureEntity
+    ) -> HomogeneousTransformationMatrix:
+        """
+        Computes world_root_T_self without using the world's forward kinematics manager. This is done to avoid having to
+        recompile and compute the forwardkinematics in this case.
+        This can be used in cases were you need to calculate global poses for Kinematic Structure Entities which have
+        been added to the world in the currently active World.modify_world() block.
+
+        :param entity: The entity to compute the root_T_entity for.
+
+        :return: The root_T_entity of the entity.
+        """
+        world = entity._world
+        future_root_T_self = entity.parent_connection.origin_expression
+        parent_entity = entity.parent_kinematic_structure_entity
+        while True:
+            if parent_entity == world.root:
+                break
+            future_root_T_self = (
+                parent_entity.parent_connection.origin_expression @ future_root_T_self
+            )
+            parent_entity = parent_entity.parent_kinematic_structure_entity
+        return future_root_T_self
 
     # %% Inverse Kinematics
     def compute_inverse_kinematics(
