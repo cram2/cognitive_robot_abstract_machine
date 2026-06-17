@@ -279,7 +279,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         scale: Scale = None,
     ) -> BodySpecification:
         raise UselessConceptError(
-            message="The bodies needed for RobotParts should already exist in the world after parsing a URDF"
+            reason="The bodies needed for RobotParts should already exist in the world after parsing a URDF"
         )
 
     @property
