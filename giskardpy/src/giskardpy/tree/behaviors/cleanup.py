@@ -18,9 +18,6 @@ class CleanUp(GiskardBehavior):
                 context=executor.context
             )
         executor.context.cleanup()
-        base_len = getattr(executor, "float_variable_data_base_len", None)
-        if base_len is not None:
-            executor.context.float_variable_data.truncate(base_len)
         self.get_blackboard().runtime = None
 
     def update(self):

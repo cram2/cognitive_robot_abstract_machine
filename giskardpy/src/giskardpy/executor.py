@@ -113,9 +113,6 @@ class Executor:
     def __post_init__(self):
         self.pacer.target_frequency = self.context.qp_controller_config.target_frequency
         self._create_control_cycles_variable()
-        self.float_variable_data_base_len = len(
-            self.context.float_variable_data.variables
-        )
 
     def _create_control_cycles_variable(self):
         self.context.control_cycle_variable = FloatVariable("control_cycles")
@@ -212,7 +209,6 @@ class Executor:
             life_cycle_variables=self.motion_statechart.life_cycle_state.life_cycle_symbols(),
             float_variables=self.context.float_variable_data.variables,
         )
-
         if self.qp_controller.has_not_free_variables():
             raise EmptyProblemException()
 

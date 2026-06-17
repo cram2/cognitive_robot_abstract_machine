@@ -579,8 +579,6 @@ class MotionStatechart(SubclassJSONSerializer):
         for node in self.nodes:
             node.cleanup(context)
 
-        self.history.history.clear()
-
     def draw(self, file_name: str):
         """
         Uses graphviz to draw the motion statechart and safe it at `file_name`.

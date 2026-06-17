@@ -38,7 +38,6 @@ def main():
         ),
     )
     objgraph_debug.report_growth(label="giskard startup baseline")
-    objgraph_debug.report_growth(label="giskard startup baseline")
     objgraph_debug.start_periodic()
 
     giskard.live()
