@@ -9,5 +9,8 @@ class DatabaseNotAvailableError(DataclassException):
     Exception raised when a database is not available.
     """
 
-    def __post_init__(self):
-        self.message = f"Database not available. Check environment variable SEMANTIC_DIGITAL_TWIN_DATABASE_URI."
+    def error_message(self) -> str:
+        return f"Database not available. Check environment variable SEMANTIC_DIGITAL_TWIN_DATABASE_URI."
+
+    def suggest_correction(self) -> str:
+        return ""

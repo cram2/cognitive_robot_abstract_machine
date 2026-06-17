@@ -25,7 +25,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: ${{ inputs.use_container && 'coraplex/semantic_world:jazzy' || '' }}
+      image: ${{ inputs.use_container && env.IMAGE_NAME || '' }}
     defaults:
       run:
         shell: ${{ inputs.use_container && 'bash -ieo pipefail {0}' || 'bash' }}

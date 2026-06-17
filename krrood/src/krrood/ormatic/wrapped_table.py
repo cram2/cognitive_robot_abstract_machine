@@ -163,7 +163,7 @@ class AssociationObject:
             ColumnConstructor(
                 "target",
                 f"Mapped[{self.right_table_name}]",
-                f"relationship('{self.right_table_name}', foreign_keys=[{self.right_foreign_key}])",
+                f"relationship('{self.right_table_name}', foreign_keys=[{self.right_foreign_key}], lazy='selectin')",
             )
         ]
 
@@ -297,7 +297,9 @@ class WrappedTable:
             if self.ormatic.inheritance_strategy == InheritanceStrategy.JOINED:
                 self.mapper_args.update(
                     {
-                        "'inherit_condition'": f"{self.primary_key_name} == {self.parent_table.full_primary_key_name}"
+                        "'inherit_condition'": f"{self.primary_key_name} == {self.parent_table.full_primary_key_name}",
+                        # batch subclass-table loads instead of one SELECT per instance
+                        "'polymorphic_load'": "'selectin'",
                     }
                 )
 
@@ -724,6 +726,8 @@ class WrappedTable:
         rel_name = f"{wrapped_field.field.name}"
         rel_type = f"Mapped[{target_wrapped_table.tablename}]"
         # relationships have to be post updated since since it won't work in the case of subclasses with another ref otherwise
+        # they also stay lazy: eager selectin would cascade through many-to-one
+        # cycles at query time; from_dao resolves them via the identity map instead
         rel_constructor = f"relationship('{target_wrapped_table.tablename}', uselist=False, foreign_keys=[{fk_name}], post_update=True)"
         self.relationships.append(
             ColumnConstructor(rel_name, rel_type, rel_constructor)
@@ -780,7 +784,8 @@ class WrappedTable:
             f"relationship('{association_table.name}', "
             f"collection_class={container_name}, "
             f"cascade='all, delete-orphan', "
-            f"foreign_keys='[{association_table.name}.{association_table.left_foreign_key}]')"
+            f"foreign_keys='[{association_table.name}.{association_table.left_foreign_key}]', "
+            f"lazy='selectin')"
         )
 
         self.relationships.append(

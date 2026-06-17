@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import annotations
 
+import difflib
 import inspect
 import logging
 import threading
@@ -792,7 +793,6 @@ class World(HasSimulatorProperties):
         :param semantic_annotation: The semantic annotation instance to be added. Its name must be unique within
             the current context.
 
-        :raises AddingAnExistingSemanticAnnotationError: If the semantic annotation already exists
         """
         self._raise_error_if_belongs_to_other_world(semantic_annotation)
         if self.is_semantic_annotation_in_world(semantic_annotation):
@@ -809,8 +809,6 @@ class World(HasSimulatorProperties):
 
         :param semantic_annotation: The semantic annotation instance to be added. Its name must be unique within
             the current context.
-
-        :raises AddingAnExistingSemanticAnnotationError: If the semantic annotation already exists
         """
         self._raise_error_if_belongs_to_other_world(semantic_annotation)
         if self.is_semantic_annotation_in_world(semantic_annotation):
@@ -1166,12 +1164,12 @@ class World(HasSimulatorProperties):
         )
         match matches:
             case []:
-                if isinstance(name, PrefixedName):
-                    logger.warning(
-                        f"No world entity with PrefixedName {name} found. Did you want a general matching of {name.name}?"
-                        f"If so, please provide only the string name."
-                    )
-                raise WorldEntityNotFoundError(name)
+                raise WorldEntityNotFoundError(
+                    name,
+                    suggestions=self._suggest_world_entity_names(
+                        name, world_entity_iterable
+                    ),
+                )
             case [entity]:
                 return entity
             case _:
@@ -1210,6 +1208,40 @@ class World(HasSimulatorProperties):
         self, name: Union[str, PrefixedName]
     ) -> List[Connection]:
         return self._get_world_entities_by_name_from_iterable(name, self.connections)
+
+    @staticmethod
+    def _suggest_world_entity_names(
+        name: Union[str, PrefixedName],
+        world_entity_iterable: Iterable[GenericWorldEntity],
+        max_suggestions: int = 3,
+    ) -> List[PrefixedName]:
+        """
+        Compute "did you mean" candidates for a failed lookup of `name`.
+
+        Entities whose bare name matches exactly (i.e. only the prefix differs) are
+        suggested first, followed by the closest spelling matches.
+
+        :param name: The name that was searched for but not found.
+        :param world_entity_iterable: The iterable that was searched.
+        :param max_suggestions: The maximum number of suggestions to return.
+        :return: The names of existing world entities that closely match `name`.
+        """
+        candidates = [world_entity.name for world_entity in world_entity_iterable]
+        searched_name = name.name if isinstance(name, PrefixedName) else name
+        suggestions = [
+            candidate for candidate in candidates if candidate.name == searched_name
+        ]
+        close_names = difflib.get_close_matches(
+            searched_name,
+            {candidate.name for candidate in candidates},
+            n=max_suggestions,
+        )
+        suggestions += [
+            candidate
+            for candidate in candidates
+            if candidate.name in close_names and candidate not in suggestions
+        ]
+        return suggestions[:max_suggestions]
 
     @staticmethod
     def _get_world_entities_by_name_from_iterable(

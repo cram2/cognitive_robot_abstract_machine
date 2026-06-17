@@ -14,7 +14,7 @@ classifiers = [
 license = {text = "MIT"}
 
 dependencies = [
-    "mujoco",
+    "mujoco==3.9.0",
 ]
 
 [tool.setuptools]

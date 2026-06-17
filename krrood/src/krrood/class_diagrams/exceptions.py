@@ -16,9 +16,11 @@ class ClassIsUnMappedInClassDiagram(DataclassException):
     The class that is not mapped in the class diagram.
     """
 
-    def __post_init__(self):
-        self.message = f"Class {self.class_} is not mapped in the class diagram"
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Class {self.class_} is not mapped in the class diagram"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -41,12 +43,14 @@ class MissingContainedTypeOfContainer(DataclassException):
     The container type that is missing its contained type.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Container type {self.container_type} is missing its contained type"
             f" for field '{self.field_name}' of class {self.class_}, please specify it."
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -68,11 +72,13 @@ class CouldNotResolveType(DataclassException):
     Additional information about the error.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Could not resolve type {self.type_name}.\n{self.extra_information}"
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -81,6 +87,8 @@ class MockedClassInstantiationError(DataclassException):
     Raised when an attempt is made to instantiate a MockedClass.
     """
 
-    def __post_init__(self):
-        self.message = "MockedClass cannot be instantiated directly"
-        super().__post_init__()
+    def error_message(self) -> str:
+        return "MockedClass cannot be instantiated directly"
+
+    def suggest_correction(self) -> str:
+        return ""

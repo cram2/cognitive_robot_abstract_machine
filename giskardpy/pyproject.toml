@@ -34,3 +34,11 @@ include = ["giskardpy*"]
 [tool.setuptools.dynamic]
 version = {attr = "giskardpy.__version__"}
 dependencies = {file = "requirements.txt"}
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0,<8.0.0",
+    "pytest-asyncio>=0.23.0,<0.24.0"
+
+]
+

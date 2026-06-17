@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from typing_extensions import TextIO, TYPE_CHECKING
 
@@ -51,7 +52,7 @@ class SQLAlchemyGenerator:
         output = template.render(ormatic=self.ormatic)
 
         result = subprocess.run(
-            ["ruff", "format", "--stdin-filename", "output.py", "-"],
+            [sys.executable, "-m", "ruff", "format", "--stdin-filename", "output.py", "-"],
             input=output, capture_output=True, text=True, check=True,
         )
         output = result.stdout

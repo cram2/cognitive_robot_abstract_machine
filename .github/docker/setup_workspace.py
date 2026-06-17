@@ -201,7 +201,7 @@ def main():
             ["iai_tracy_bringup", "iai_tracy_ur"],
         ),
         Repository(
-            "https://github.com/maltehue/ros2_robotiq_gripper.git",
+            "https://github.com/code-iai/ros2_robotiq_gripper.git",
             "iai_dualarm",
             "ros2_robotiq_gripper",
             [
