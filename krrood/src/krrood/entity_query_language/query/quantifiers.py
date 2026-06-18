@@ -22,6 +22,7 @@ from krrood.entity_query_language.core.base_expressions import (
 )
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
 from krrood.entity_query_language.exceptions import (
+    InvalidQuantificationRangeError,
     NegativeQuantificationError,
     QuantificationConsistencyError,
     GreaterThanExpectedNumberOfSolutions,
@@ -147,9 +148,7 @@ class Range(ResultQuantificationConstraint):
         Validate quantification constraints are consistent.
         """
         if self.at_most.value < self.at_least.value:
-            raise QuantificationConsistencyError(
-                message=f"at_most {self.at_most} cannot be less than at_least {self.at_least}."
-            )
+            raise InvalidQuantificationRangeError(self.at_least, self.at_most)
 
     def assert_satisfaction(
         self, number_of_solutions: int, quantifier: ResultQuantifier, done: bool

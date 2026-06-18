@@ -60,7 +60,7 @@ def wall_door_handle_world():
         door.root.visual.dye_shapes(Color(R=0.55, G=0.27, B=0.07))
 
     with world.modify_world():
-        wall.add_aperture(door.entry_way)
+        wall.add(door.entry_way)
 
     with world.modify_world():
         handle = Handle.create_with_new_body_in_world(
@@ -75,7 +75,7 @@ def wall_door_handle_world():
             scale=Scale(0.05, 0.02, 0.2),
         )
         handle.root.visual.dye_shapes(Color(R=0.8, G=0.8, B=0.1))
-        door.add_handle(handle)
+        door.add(handle)
 
     world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
     with world.modify_world():
@@ -89,7 +89,7 @@ def wall_door_handle_world():
                 upper=DerivativeMap(position=np.pi / 2, velocity=1.0),
             ),
         )
-        door.add_hinge(hinge)
+        door.add(hinge)
 
     return world, wall, door, handle
 
@@ -111,7 +111,9 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
     with simulated_robot:
         execute_single(Sage10kOpenDoor(door), context=context).perform()
 
-    assert np.isclose(door.hinge.root.parent_connection.position, np.pi / 2, atol=2e-2)
+    assert np.isclose(
+        door.mechanical_joint.root.parent_connection.position, np.pi / 2, atol=2e-2
+    )
 
 
 def test_translate_free_space_to_where_condition(wall_door_handle_world):

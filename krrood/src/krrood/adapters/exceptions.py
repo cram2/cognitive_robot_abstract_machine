@@ -17,8 +17,11 @@ class JSONSerializationError(DataclassException):
 class MissingTypeError(JSONSerializationError):
     """Raised when the 'type' field is missing in the JSON data."""
 
-    def __post_init__(self):
-        self.message = f"Missing {JSON_TYPE_NAME} field in JSON data"
+    def error_message(self) -> str:
+        return f"Missing {JSON_TYPE_NAME} field in JSON data"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -27,8 +30,11 @@ class InvalidTypeFormatError(JSONSerializationError):
 
     invalid_type_value: str
 
-    def __post_init__(self):
-        self.message = f"Invalid type format: {self.invalid_type_value}"
+    def error_message(self) -> str:
+        return f"Invalid type format: {self.invalid_type_value}"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -37,8 +43,11 @@ class UnknownModuleError(JSONSerializationError):
 
     module_name: str
 
-    def __post_init__(self):
-        self.message = f"Unknown module in type: {self.module_name}"
+    def error_message(self) -> str:
+        return f"Unknown module in type: {self.module_name}"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -48,10 +57,13 @@ class ClassNotFoundError(JSONSerializationError):
     class_name: str
     module_name: str
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Class '{self.class_name}' not found in module '{self.module_name}'"
         )
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -60,8 +72,11 @@ class ClassNotSerializableError(JSONSerializationError):
 
     clazz: Type
 
-    def __post_init__(self):
-        self.message = f"Class '{self.clazz.__name__}' cannot be serialized"
+    def error_message(self) -> str:
+        return f"Class '{self.clazz.__name__}' cannot be serialized"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -70,5 +85,8 @@ class ClassNotDeserializableError(JSONSerializationError):
 
     clazz: Type
 
-    def __post_init__(self):
-        self.message = f"Class '{self.clazz.__name__}' cannot be deserialized"
+    def error_message(self) -> str:
+        return f"Class '{self.clazz.__name__}' cannot be deserialized"
+
+    def suggest_correction(self) -> str:
+        return ""

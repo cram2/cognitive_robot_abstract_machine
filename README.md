@@ -57,6 +57,12 @@ then install packages:
 uv sync --active
 ```
 
+If you also want the development dependencies, run:
+
+```bash
+uv sync --extra dev --active 
+```
+
 
 ### Alternative: Poetry
 

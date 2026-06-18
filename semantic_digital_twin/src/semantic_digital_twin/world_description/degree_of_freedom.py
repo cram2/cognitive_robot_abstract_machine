@@ -9,7 +9,10 @@ import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
 from semantic_digital_twin.world_description.world_entity import WorldEntityWithID
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import UsageError, InvalidConnectionLimits
+from semantic_digital_twin.exceptions import (
+    InvalidConnectionLimits,
+    MimicDofLimitOverwriteError,
+)
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
 
 
@@ -225,9 +228,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
             If a new upper limit is None, no change is applied for that derivative.
         """
         if not isinstance(self.variables.position, sm.FloatVariable):
-            raise UsageError(
-                message="Cannot overwrite limits of mimic DOFs, use .raw_dof._overwrite_dof_limits instead."
-            )
+            raise MimicDofLimitOverwriteError(self.name)
         for derivative in Derivatives.range(Derivatives.position, Derivatives.jerk):
             if new_lower_limits[derivative] is not None:
                 if self.limits.lower[derivative] is None:

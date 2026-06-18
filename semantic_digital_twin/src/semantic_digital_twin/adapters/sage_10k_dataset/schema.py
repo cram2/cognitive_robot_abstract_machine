@@ -648,7 +648,7 @@ class Sage10kDoor(Sage10kWithID):
         body.visual = geometry_with_texture
 
         with world.modify_world():
-            wall_annotation.add_aperture(annotation.entry_way)
+            wall_annotation.add(annotation.entry_way)
 
         self._create_handle_in_world(world, annotation)
         self._create_hinge_in_world(world, annotation)
@@ -697,7 +697,7 @@ class Sage10kDoor(Sage10kWithID):
                 world_root_T_self=world_root_T_handle,
                 scale=Scale(0.05, 0.02, 0.2),
             )
-            door.add_handle(handle)
+            door.add(handle)
         return handle
 
     def _create_hinge_in_world(self, world: World, door: Door) -> Hinge:
@@ -724,7 +724,7 @@ class Sage10kDoor(Sage10kWithID):
                 world_root_T_self=world_root_T_hinge,
                 connection_limits=DegreeOfFreedomLimits(lower=lower, upper=upper),
             )
-            door.add_hinge(hinge)
+            door.add(hinge)
 
         return hinge
 

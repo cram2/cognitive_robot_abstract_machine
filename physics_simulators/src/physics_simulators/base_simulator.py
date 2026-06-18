@@ -62,6 +62,7 @@ class SimulatorRenderer:
 
     def close(self):
         """Close the renderer"""
+        atexit.unregister(self.close)
         self._is_running = False
 
 
@@ -320,6 +321,7 @@ class BaseSimulator:
         """
         Stop the simulator, close the renderer and join the simulation thread if it exists and is alive.
         """
+        atexit.unregister(self.stop)
         if self.renderer.is_running():
             self.renderer.close()
         if self.render_thread is not None and self.render_thread.is_alive():

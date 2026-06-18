@@ -4,6 +4,7 @@ import logging
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, fields
+from enum import StrEnum
 from functools import lru_cache
 
 import sqlalchemy.inspection
@@ -90,6 +91,15 @@ class SingleRelationship:
     domain_type: Type
     """The expected domain type of the related object."""
 
+    foreign_key_attribute: Optional[str] = None
+    """
+    The attribute name of the local foreign key column for many-to-one
+    relationships, or ``None`` if the foreign key is on the remote side.
+    """
+
+    target_dao_class: Optional[Type] = None
+    """The DAO class this relationship points to."""
+
 
 @dataclass(frozen=True)
 class CollectionRelationship:
@@ -108,6 +118,12 @@ class CollectionRelationship:
 
     domain_type: Type
     """The expected domain type of the items in the collection."""
+
+    association_target_relationship: Optional[SingleRelationship] = None
+    """
+    The ``target`` relationship of the association class, if any. Used to
+    resolve association targets via the identity map instead of lazy loads.
+    """
 
 
 @dataclass(frozen=True)
@@ -151,6 +167,40 @@ class DataAccessObjectConversionPlan:
     """
 
 
+def _build_single_relationship(
+    relationship: RelationshipProperty, domain_type: Type
+) -> SingleRelationship:
+    """
+    Build a :class:`SingleRelationship` descriptor from a SQLAlchemy relationship property.
+
+    For many-to-one relationships the local foreign key column is recorded as
+    ``foreign_key_attribute``.  During ``from_dao`` this lets
+    :func:`_read_single_relationship` resolve the related instance via
+    ``Session.get`` (an identity-map lookup) instead of triggering a lazy load.
+    SQLAlchemy disables its built-in identity-map shortcut (``use_get``) for
+    targets deep in joined-table inheritance hierarchies, so without this
+    explicit FK read every many-to-one access on an unloaded attribute would
+    emit a separate SELECT.
+
+    :param relationship: The SQLAlchemy relationship property to inspect.
+    :param domain_type: The expected domain type of the related object.
+    :return: A :class:`SingleRelationship` ready for use in a
+        :class:`DataAccessObjectConversionPlan`.
+    """
+    local_columns = list(relationship.local_columns)
+    foreign_key_attribute = (
+        local_columns[0].key
+        if relationship.direction == MANYTOONE and len(local_columns) == 1
+        else None
+    )
+    return SingleRelationship(
+        key=relationship.key,
+        domain_type=domain_type,
+        foreign_key_attribute=foreign_key_attribute,
+        target_dao_class=relationship.mapper.class_,
+    )
+
+
 @lru_cache(maxsize=None)
 def _get_conversion_plan(dao_class: Type) -> DataAccessObjectConversionPlan:
     """
@@ -166,9 +216,8 @@ def _get_conversion_plan(dao_class: Type) -> DataAccessObjectConversionPlan:
     for relationship in mapper.relationships:
         if DataAccessObject._is_single_relationship(relationship):
             single_relationships.append(
-                SingleRelationship(
-                    key=relationship.key,
-                    domain_type=relationship.mapper.class_.original_class(),
+                _build_single_relationship(
+                    relationship, relationship.mapper.class_.original_class()
                 )
             )
         elif relationship.direction in (ONETOMANY, MANYTOMANY):
@@ -177,11 +226,15 @@ def _get_conversion_plan(dao_class: Type) -> DataAccessObjectConversionPlan:
                 target_relationship = sqlalchemy.inspection.inspect(
                     target_dao_clazz
                 ).relationships["target"]
+                domain_type = target_relationship.mapper.class_.original_class()
                 collection_relationships.append(
                     CollectionRelationship(
                         key=relationship.key,
                         association_class=target_dao_clazz,
-                        domain_type=target_relationship.mapper.class_.original_class(),
+                        domain_type=domain_type,
+                        association_target_relationship=_build_single_relationship(
+                            target_relationship, domain_type
+                        ),
                     )
                 )
             else:
@@ -322,6 +375,81 @@ def _has_post_init(clazz: Type) -> bool:
     :return: Whether the class defines a ``__post_init__``.
     """
     return hasattr(clazz, "__post_init__")
+
+
+class _SessionInfoKey(StrEnum):
+    """Session-info keys written into ``Session.info`` by the krrood ORM layer."""
+
+    BULK_LOADING_FLAG = "krrood_bulk_loading"
+    BULK_LOADED_MAPPERS = "krrood_bulk_loaded_mappers"
+    PLAIN_LOAD = "krrood_plain_load"
+
+
+def _bulk_load_target_table_if_enabled(
+    session: sqlalchemy.orm.Session, target_dao_class: Type
+) -> None:
+    """
+    Load all rows of the target's root mapper into the identity map, once per
+    session and root mapper. Only active inside :func:`selectin_loading`.
+
+    When a whole object graph is reconstructed, every row of a referenced class
+    is typically needed, so loading the full table once is far cheaper than one
+    SELECT per instance.
+
+    :param session: The session to load into.
+    :param target_dao_class: The DAO class about to be fetched.
+    """
+    if not session.info.get(_SessionInfoKey.BULK_LOADING_FLAG, False):
+        return
+    root_mapper = sqlalchemy.inspection.inspect(target_dao_class).base_mapper
+    loaded = session.info.setdefault(_SessionInfoKey.BULK_LOADED_MAPPERS, {})
+    if root_mapper in loaded:
+        return
+    # keep strong references to the rows: the identity map is weak, so the
+    # instances would be garbage collected (and the map emptied) otherwise
+    loaded[root_mapper] = session.scalars(
+        sqlalchemy.select(root_mapper.class_).execution_options(
+            **{_SessionInfoKey.PLAIN_LOAD: True}
+        )
+    ).all()
+
+
+def _read_single_relationship(
+    instance: Any, relationship: SingleRelationship
+) -> Optional[DataAccessObject]:
+    """
+    Read the value of a single-valued relationship on a DAO or association object.
+
+    For unloaded many-to-one relationships this resolves the target through
+    ``Session.get`` using the local foreign key, which hits the identity map.
+    Plain attribute access would emit one SELECT per access, because SQLAlchemy
+    disables its identity-map shortcut (``use_get``) for targets deep in
+    joined-table inheritance hierarchies.
+
+    :param instance: The object to read the relationship from.
+    :param relationship: The relationship to read.
+    :return: The related DAO instance or None.
+    """
+    key = relationship.key
+    if relationship.foreign_key_attribute is None or key in instance.__dict__:
+        return getattr(instance, key)
+    session = sqlalchemy.orm.object_session(instance)
+    if session is None:
+        return getattr(instance, key)
+    foreign_key_value = getattr(instance, relationship.foreign_key_attribute)
+    if foreign_key_value is not None:
+        _bulk_load_target_table_if_enabled(session, relationship.target_dao_class)
+    value = (
+        session.get(
+            relationship.target_dao_class,
+            foreign_key_value,
+            execution_options={_SessionInfoKey.PLAIN_LOAD: True},
+        )
+        if foreign_key_value is not None
+        else None
+    )
+    sqlalchemy.orm.attributes.set_committed_value(instance, key, value)
+    return value
 
 
 @lru_cache(maxsize=None)
@@ -861,7 +989,10 @@ class DataAccessObject(HasGeneric[T]):
         # Populate all relationships
         for relationship in plan.single_relationships:
             self._populate_single_relationship(
-                domain_object, relationship.key, getattr(self, relationship.key), state
+                domain_object,
+                relationship.key,
+                _read_single_relationship(self, relationship),
+                state,
             )
         for relationship in plan.collection_relationships:
             self._populate_collection_relationship(
@@ -902,7 +1033,7 @@ class DataAccessObject(HasGeneric[T]):
         plan = _get_conversion_plan(type(self))
 
         for relationship in plan.single_relationships:
-            value = getattr(self, relationship.key)
+            value = _read_single_relationship(self, relationship)
             if value is not None:
                 value.from_dao(state=state)
 
@@ -911,9 +1042,11 @@ class DataAccessObject(HasGeneric[T]):
             if not value:
                 continue
             if relationship.association_class is not None:
+                target_relationship = relationship.association_target_relationship
                 for item in value:
-                    if item.target is not None:
-                        item.target.from_dao(state=state)
+                    target = _read_single_relationship(item, target_relationship)
+                    if target is not None:
+                        target.from_dao(state=state)
             else:
                 for item in value:
                     item.from_dao(state=state)
@@ -1091,30 +1224,38 @@ class DataAccessObject(HasGeneric[T]):
 @contextmanager
 def selectin_loading(session: sqlalchemy.orm.Session):
     """
-    Context manager that applies selectin loading to all top-level ORM queries executed
-    within its scope.
+    Context manager that optimizes bulk reads of whole object graphs.
 
-    Without this context manager (or ``lazy='selectin'`` on individual relationships),
-    relationship accesses default to lazy loading, which can cause N+1 queries when
-    converting large object graphs via :meth:`DataAccessObject.from_dao`.
+    Top-level ORM queries executed within its scope use selectin loading for
+    their relationships. Additionally, identity-map misses during
+    :meth:`DataAccessObject.from_dao` bulk-load the entire table of the missed
+    class instead of fetching one row at a time, so reconstructing a graph that
+    spans (most of) the database takes O(tables) instead of O(rows) queries.
+
+    Use this context manager when you want call `from_dao()` on the result, as it is ~3 times faster.
 
     Usage::
 
         with selectin_loading(session):
             dao = session.scalars(select(SomeDAO)).one()
-        domain_obj = dao.from_dao()
+            domain_obj = dao.from_dao()
 
     :param session: The SQLAlchemy session whose queries should use selectin loading.
     """
 
     def _add_selectin(orm_execute_state: sqlalchemy.orm.ORMExecuteState) -> None:
+        if orm_execute_state.execution_options.get(_SessionInfoKey.PLAIN_LOAD, False):
+            return None
         if orm_execute_state.is_select and not orm_execute_state.is_relationship_load:
             return orm_execute_state.invoke_statement(
                 statement=orm_execute_state.statement.options(selectinload("*"))
             )
 
     event.listen(session, "do_orm_execute", _add_selectin)
+    session.info[_SessionInfoKey.BULK_LOADING_FLAG] = True
     try:
         yield
     finally:
+        session.info[_SessionInfoKey.BULK_LOADING_FLAG] = False
+        session.info.pop(_SessionInfoKey.BULK_LOADED_MAPPERS, None)
         event.remove(session, "do_orm_execute", _add_selectin)
