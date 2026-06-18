@@ -5,7 +5,6 @@ import numpy as np
 
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import Arms
-from pycram.external_interfaces.sparql_queries.mixing import safe_get_mixing_knowledge
 from pycram.locations.locations import CostmapLocation
 from pycram.motion_executor import (
     simulated_robot_with_collision,
@@ -62,15 +61,12 @@ from .utils.demo_utils import (
 from .utils.experiment_logging import (
     BASE_RESULT_FIELDNAMES,
     append_csv_row,
-    assistance_type_from_knowledge,
     body_name as _body_name,
     build_base_result_row,
     format_attempt_error as _format_attempt_error,
     initialize_csv,
     is_collision_like_failure as _is_collision_like_failure,
-    knowledge_source,
     new_run_id,
-    required_prerequisite_text,
     robot_name as _robot_name,
     tool_name as _tool_name,
 )
@@ -133,8 +129,6 @@ def _record_bowl_result(
     phase,
     failures,
     *,
-    knowledge_motion,
-    knowledge_mixing_tool,
     task_instance_id,
     experiment_condition,
     baseline_name,
@@ -142,24 +136,9 @@ def _record_bowl_result(
     seed,
     world_name,
     run_id,
-    knowledge_query_success,
-    knowledge_query_error,
-    knowledge_prior_task,
-    knowledge_cutting_tool,
-    knowledge_cutting_position,
-    knowledge_repetition,
-    required_prerequisite,
-    prerequisite_source,
-    prerequisite_satisfied_initially,
-    autonomous_execution_feasible,
     feasibility_reason,
     robot_decision,
     decision_reason,
-    assistance_requested,
-    assistance_type,
-    assistance_completed,
-    task_blocked_by_prerequisite,
-    task_resumed_after_assistance,
     final_success,
     total_attempts,
     retry_count,
@@ -181,8 +160,6 @@ def _record_bowl_result(
         phase,
         failures,
         bowl_name=bowl_name,
-        knowledge_motion=knowledge_motion,
-        knowledge_mixing_tool=knowledge_mixing_tool,
         task_name=task_name,
         run_id=run_id,
         task_instance_id=task_instance_id,
@@ -190,24 +167,9 @@ def _record_bowl_result(
         world_name=world_name,
         experiment_condition=experiment_condition,
         baseline_name=baseline_name,
-        knowledge_query_success=knowledge_query_success,
-        knowledge_query_error=knowledge_query_error,
-        knowledge_prior_task=knowledge_prior_task,
-        knowledge_cutting_tool=knowledge_cutting_tool,
-        knowledge_cutting_position=knowledge_cutting_position,
-        knowledge_repetition=knowledge_repetition,
-        required_prerequisite=required_prerequisite,
-        prerequisite_source=prerequisite_source,
-        prerequisite_satisfied_initially=prerequisite_satisfied_initially,
-        autonomous_execution_feasible=autonomous_execution_feasible,
         feasibility_reason=feasibility_reason,
         robot_decision=robot_decision,
         decision_reason=decision_reason,
-        assistance_requested=assistance_requested,
-        assistance_type=assistance_type,
-        assistance_completed=assistance_completed,
-        task_blocked_by_prerequisite=task_blocked_by_prerequisite,
-        task_resumed_after_assistance=task_resumed_after_assistance,
         final_success=final_success,
         total_attempts=total_attempts,
         retry_count=retry_count,
@@ -225,8 +187,6 @@ def _record_bowl_result(
 def _results_csv_fieldnames():
     return [
         "bowl_name",
-        "knowledge_motion",
-        "knowledge_mixing_tool",
         *BASE_RESULT_FIELDNAMES,
         *MIXING_PROGRESS_FIELDNAMES,
     ]
@@ -589,7 +549,6 @@ def main_mixing(
     robot_name = _robot_name(context.robot)
     world_name = environment_name
     run_id = new_run_id()
-    mixing_knowledge = safe_get_mixing_knowledge(MIXING_QUERY_TASK)
 
     print("[setup] closing grippers", flush=True)
     with simulated_robot_without_collision:
@@ -673,8 +632,6 @@ def main_mixing(
             ),
         )
         common_result_kwargs = {
-            "knowledge_motion": mixing_knowledge.get("motion") or "",
-            "knowledge_mixing_tool": mixing_knowledge.get("mixing_tool") or "",
             "task_instance_id": bowl_name,
             "experiment_condition": EXPERIMENT_CONDITION,
             "baseline_name": BASELINE_NAME,
@@ -682,21 +639,6 @@ def main_mixing(
             "seed": effective_seed,
             "world_name": world_name,
             "run_id": run_id,
-            "knowledge_query_success": mixing_knowledge.get("query_success", False),
-            "knowledge_query_error": mixing_knowledge.get("query_error", ""),
-            "knowledge_prior_task": "",
-            "knowledge_cutting_tool": "",
-            "knowledge_cutting_position": "",
-            "knowledge_repetition": "",
-            "required_prerequisite": required_prerequisite_text(mixing_knowledge),
-            "prerequisite_source": knowledge_source(mixing_knowledge),
-            "prerequisite_satisfied_initially": not bool(
-                mixing_knowledge.get("required_prerequisites")
-            ),
-            "autonomous_execution_feasible": not bool(
-                mixing_knowledge.get("required_prerequisites")
-            ),
-            "assistance_type": assistance_type_from_knowledge(mixing_knowledge),
         }
         try:
             pickup_pose, pickup_resolve_elapsed = _timed(
@@ -725,10 +667,6 @@ def main_mixing(
                 feasibility_reason="navigation_target_resolution_failed",
                 robot_decision="skip_object",
                 decision_reason="pickup_pose_unavailable",
-                assistance_requested=False,
-                assistance_completed=False,
-                task_blocked_by_prerequisite=False,
-                task_resumed_after_assistance=False,
                 final_success=False,
                 total_attempts=attempt_count,
                 retry_count=0,
@@ -799,10 +737,6 @@ def main_mixing(
                         feasibility_reason="ok",
                         robot_decision=decision,
                         decision_reason=decision_reason,
-                        assistance_requested=False,
-                        assistance_completed=False,
-                        task_blocked_by_prerequisite=False,
-                        task_resumed_after_assistance=False,
                         final_success=True,
                         total_attempts=attempt_count,
                         retry_count=max(0, attempt_count - 1),
@@ -878,34 +812,16 @@ def main_mixing(
             attempt_failures,
             **common_result_kwargs,
             feasibility_reason=(
-                "prerequisite_requires_human_assistance"
-                if common_result_kwargs["required_prerequisite"]
-                else (
-                    "mixing_motion_stalled_after_phase_reached"
-                    if partial_mix_stalled
-                    else "collision_or_motion_failure"
-                )
+                "mixing_motion_stalled_after_phase_reached"
+                if partial_mix_stalled
+                else "collision_or_motion_failure"
             ),
-            robot_decision=(
-                "request_human_help"
-                if common_result_kwargs["required_prerequisite"]
-                else "task_failed"
-            ),
+            robot_decision="task_failed",
             decision_reason=(
-                "knowledge_base_prerequisite_detected"
-                if common_result_kwargs["required_prerequisite"]
-                else (
-                    "partial_mix_stalled"
-                    if partial_mix_stalled
-                    else "all_mix_attempts_failed"
-                )
+                "partial_mix_stalled"
+                if partial_mix_stalled
+                else "all_mix_attempts_failed"
             ),
-            assistance_requested=bool(common_result_kwargs["required_prerequisite"]),
-            assistance_completed=False,
-            task_blocked_by_prerequisite=bool(
-                common_result_kwargs["required_prerequisite"]
-            ),
-            task_resumed_after_assistance=False,
             final_success=False,
             total_attempts=attempt_count,
             retry_count=max(0, attempt_count - 1),

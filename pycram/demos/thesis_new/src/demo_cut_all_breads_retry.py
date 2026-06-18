@@ -7,7 +7,6 @@ from pycram.motion_executor import (
     simulated_robot_with_collision,
 )
 
-from pycram.external_interfaces.sparql_queries.cutting import safe_get_cutting_knowledge
 from pycram.plans.factories import sequential
 from pycram.robot_plans.actions.composite.tool_based import CuttingAction
 from pycram.robot_plans.actions.core.navigation import NavigateAction
@@ -91,7 +90,6 @@ EXPERIMENT_CONDITION = "full_system"
 BASELINE_NAME = "base_system"
 TASK_NAME = "bread_cutting"
 CUTTING_QUERY_VERB = "cut:Slicing"
-CUTTING_QUERY_FOODON = "FOODON_00003523"
 session = None
 CUTTING_RING_DISTANCE = 0.55
 CUTTING_RING_STD = 12.0
@@ -193,24 +191,9 @@ def _record_bread_result(
     seed,
     world_name,
     run_id,
-    knowledge_query_success,
-    knowledge_query_error,
-    knowledge_prior_task,
-    knowledge_cutting_tool,
-    knowledge_cutting_position,
-    knowledge_repetition,
-    required_prerequisite,
-    prerequisite_source,
-    prerequisite_satisfied_initially,
-    autonomous_execution_feasible,
     feasibility_reason,
     robot_decision,
     decision_reason,
-    assistance_requested,
-    assistance_type,
-    assistance_completed,
-    task_blocked_by_prerequisite,
-    task_resumed_after_assistance,
     final_success,
     total_attempts,
     retry_count,
@@ -239,24 +222,9 @@ def _record_bread_result(
         world_name=world_name,
         experiment_condition=experiment_condition,
         baseline_name=baseline_name,
-        knowledge_query_success=knowledge_query_success,
-        knowledge_query_error=knowledge_query_error,
-        knowledge_prior_task=knowledge_prior_task,
-        knowledge_cutting_tool=knowledge_cutting_tool,
-        knowledge_cutting_position=knowledge_cutting_position,
-        knowledge_repetition=knowledge_repetition,
-        required_prerequisite=required_prerequisite,
-        prerequisite_source=prerequisite_source,
-        prerequisite_satisfied_initially=prerequisite_satisfied_initially,
-        autonomous_execution_feasible=autonomous_execution_feasible,
         feasibility_reason=feasibility_reason,
         robot_decision=robot_decision,
         decision_reason=decision_reason,
-        assistance_requested=assistance_requested,
-        assistance_type=assistance_type,
-        assistance_completed=assistance_completed,
-        task_blocked_by_prerequisite=task_blocked_by_prerequisite,
-        task_resumed_after_assistance=task_resumed_after_assistance,
         final_success=final_success,
         total_attempts=total_attempts,
         retry_count=retry_count,
@@ -764,9 +732,6 @@ def main_cutting(
     robot_name = _robot_name(context.robot)
     world_name = environment_name
     run_id = new_run_id()
-    cutting_knowledge = safe_get_cutting_knowledge(
-        cut_cfg["query_verb"], CUTTING_QUERY_FOODON
-    )
     print("[setup] closing grippers", flush=True)
     with simulated_robot_without_collision:
         _, _ = _timed(
@@ -863,18 +828,6 @@ def main_cutting(
             "seed": effective_seed,
             "world_name": world_name,
             "run_id": run_id,
-            "knowledge_query_success": cutting_knowledge.get("query_success", False),
-            "knowledge_query_error": cutting_knowledge.get("query_error", ""),
-            "knowledge_prior_task": cutting_knowledge.get("prior_task") or "",
-            "knowledge_cutting_tool": cutting_knowledge.get("cutting_tool") or "",
-            "knowledge_cutting_position": cutting_knowledge.get("cutting_position")
-            or "",
-            "knowledge_repetition": cutting_knowledge.get("repetition") or "",
-            "required_prerequisite": "",
-            "prerequisite_source": "",
-            "prerequisite_satisfied_initially": True,
-            "autonomous_execution_feasible": True,
-            "assistance_type": "",
         }
         try:
             pickup_pose, pickup_resolve_elapsed = _timed(
@@ -903,10 +856,6 @@ def main_cutting(
                 feasibility_reason="navigation_target_resolution_failed",
                 robot_decision="skip_object",
                 decision_reason="pickup_pose_unavailable",
-                assistance_requested=False,
-                assistance_completed=False,
-                task_blocked_by_prerequisite=False,
-                task_resumed_after_assistance=False,
                 final_success=False,
                 total_attempts=attempt_count,
                 retry_count=0,
@@ -1035,10 +984,6 @@ def main_cutting(
                         feasibility_reason="ok",
                         robot_decision=decision,
                         decision_reason=decision_reason,
-                        assistance_requested=False,
-                        assistance_completed=False,
-                        task_blocked_by_prerequisite=False,
-                        task_resumed_after_assistance=False,
                         final_success=True,
                         total_attempts=attempt_count,
                         retry_count=max(0, attempt_count - 1),
@@ -1122,10 +1067,6 @@ def main_cutting(
             feasibility_reason="collision_or_motion_failure",
             robot_decision="task_failed",
             decision_reason="all_cut_attempts_failed",
-            assistance_requested=False,
-            assistance_completed=False,
-            task_blocked_by_prerequisite=False,
-            task_resumed_after_assistance=False,
             final_success=False,
             total_attempts=attempt_count,
             retry_count=max(0, attempt_count - 1),

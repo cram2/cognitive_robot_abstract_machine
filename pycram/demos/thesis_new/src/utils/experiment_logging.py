@@ -13,24 +13,9 @@ BASE_RESULT_FIELDNAMES = [
     "world_name",
     "experiment_condition",
     "baseline_name",
-    "knowledge_query_success",
-    "knowledge_query_error",
-    "knowledge_prior_task",
-    "knowledge_cutting_tool",
-    "knowledge_cutting_position",
-    "knowledge_repetition",
-    "required_prerequisite",
-    "prerequisite_source",
-    "prerequisite_satisfied_initially",
-    "autonomous_execution_feasible",
     "feasibility_reason",
     "robot_decision",
     "decision_reason",
-    "assistance_requested",
-    "assistance_type",
-    "assistance_completed",
-    "task_blocked_by_prerequisite",
-    "task_resumed_after_assistance",
     "final_success",
     "robot_name",
     "outcome",
@@ -155,18 +140,6 @@ def format_attempt_error(exc):
 
 def is_collision_like_failure(exc):
     return isinstance(exc, (TimeoutError, NavigationGoalNotReachedError))
-
-
-def required_prerequisite_text(knowledge):
-    return "|".join(knowledge.get("required_prerequisites", []))
-
-
-def knowledge_source(knowledge):
-    return "knowledge_base" if knowledge.get("query_success") else "none"
-
-
-def assistance_type_from_knowledge(knowledge):
-    return "|".join(knowledge.get("required_prerequisites", []))
 
 
 def new_run_id():
