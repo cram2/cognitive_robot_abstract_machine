@@ -712,6 +712,7 @@ class KinematicStructureEntitySpecificationDAO_child_specification_association(
     target: Mapped[WorldEntitySpawnSpecificationDAO] = relationship(
         "WorldEntitySpawnSpecificationDAO",
         foreign_keys=[target_worldentityspawnspecificationdao_id],
+        lazy="selectin",
     )
 
 
@@ -1536,6 +1537,7 @@ class WorldSpecificationDAO_starting_objects_association(
     target: Mapped[WorldEntitySpawnSpecificationDAO] = relationship(
         "WorldEntitySpawnSpecificationDAO",
         foreign_keys=[target_worldentityspawnspecificationdao_id],
+        lazy="selectin",
     )
 
 
@@ -9698,33 +9700,32 @@ class BodyAndConnectionSpecificationDAO(
         TypeType, nullable=False, use_existing_column=True
     )
 
-    parent_T_self_id: Mapped[int] = mapped_column(
-        ForeignKey(
-            "HomogeneousTransformationMatrixMappingDAO.database_id", use_alter=True
-        ),
-        nullable=True,
-        use_existing_column=True,
-    )
     axis_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
         ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
-
-    parent_T_self: Mapped[HomogeneousTransformationMatrixMappingDAO] = relationship(
-        "HomogeneousTransformationMatrixMappingDAO",
-        uselist=False,
-        foreign_keys=[parent_T_self_id],
-        post_update=True,
+    connection_limits_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("DegreeOfFreedomLimitsDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
     )
+
     axis: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO", uselist=False, foreign_keys=[axis_id], post_update=True
+    )
+    connection_limits: Mapped[DegreeOfFreedomLimitsDAO] = relationship(
+        "DegreeOfFreedomLimitsDAO",
+        uselist=False,
+        foreign_keys=[connection_limits_id],
+        post_update=True,
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "BodyAndConnectionSpecificationDAO",
         "inherit_condition": database_id
         == WorldEntitySpawnSpecificationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9747,6 +9748,13 @@ class KinematicStructureEntitySpecificationDAO(
         nullable=True,
         use_existing_column=True,
     )
+    parent_T_self_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "HomogeneousTransformationMatrixMappingDAO.database_id", use_alter=True
+        ),
+        nullable=True,
+        use_existing_column=True,
+    )
 
     shapes: Mapped[ShapeCollectionDAO] = relationship(
         "ShapeCollectionDAO", uselist=False, foreign_keys=[shapes_id], post_update=True
@@ -9760,12 +9768,20 @@ class KinematicStructureEntitySpecificationDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[KinematicStructureEntitySpecificationDAO_child_specification_association.source_kinematicstructureentityspecificationdao_id]",
+        lazy="selectin",
+    )
+    parent_T_self: Mapped[HomogeneousTransformationMatrixMappingDAO] = relationship(
+        "HomogeneousTransformationMatrixMappingDAO",
+        uselist=False,
+        foreign_keys=[parent_T_self_id],
+        post_update=True,
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "KinematicStructureEntitySpecificationDAO",
         "inherit_condition": database_id
         == WorldEntitySpawnSpecificationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9806,6 +9822,7 @@ class BodySpecificationDAO(
         "polymorphic_identity": "BodySpecificationDAO",
         "inherit_condition": database_id
         == KinematicStructureEntitySpecificationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9825,6 +9842,7 @@ class RegionSpecificationDAO(
         "polymorphic_identity": "RegionSpecificationDAO",
         "inherit_condition": database_id
         == KinematicStructureEntitySpecificationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9854,15 +9872,27 @@ class SemanticAnnotationWithRootSpecificationDAO(
         nullable=True,
         use_existing_column=True,
     )
+    connection_limits_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("DegreeOfFreedomLimitsDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
 
     axis: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO", uselist=False, foreign_keys=[axis_id], post_update=True
+    )
+    connection_limits: Mapped[DegreeOfFreedomLimitsDAO] = relationship(
+        "DegreeOfFreedomLimitsDAO",
+        uselist=False,
+        foreign_keys=[connection_limits_id],
+        post_update=True,
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "SemanticAnnotationWithRootSpecificationDAO",
         "inherit_condition": database_id
         == WorldEntitySpawnSpecificationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -19544,6 +19574,7 @@ class WorldSpecificationDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldSpecificationDAO_starting_objects_association.source_worldspecificationdao_id]",
+        lazy="selectin",
     )
 
 

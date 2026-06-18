@@ -19,6 +19,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Slider,
     Handle,
+    Hinge,
     Door,
     Floor,
     Wall,
@@ -30,9 +31,14 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     PrismaticConnection,
+    RevoluteConnection,
     Connection6DoF,
     OmniDrive,
 )
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedomLimits,
+)
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.geometry import Scale, Box
 from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -66,10 +72,9 @@ def test_region_specification_spawns(empty_world):
 
 
 def test_body_and_connection_pose_and_name_override(empty_world):
-    spec = BodyAndConnectionSpecification(
-        body_specification=BodySpecification.box("box", Scale(1, 1, 1)),
-        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3),
-    )
+    body_spec = BodySpecification.box("box", Scale(1, 1, 1))
+    body_spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3)
+    spec = BodyAndConnectionSpecification(body_specification=body_spec)
     body = spec.spawn(empty_world, name="renamed")
     assert body.name == PrefixedName("renamed")
     root_T_body = empty_world.compute_forward_kinematics(empty_world.root, body)
@@ -77,10 +82,9 @@ def test_body_and_connection_pose_and_name_override(empty_world):
 
 
 def test_body_and_connection_spawn_arg_overrides_stored_pose(empty_world):
-    spec = BodyAndConnectionSpecification(
-        body_specification=BodySpecification.box("box", Scale(1, 1, 1)),
-        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1),
-    )
+    body_spec = BodySpecification.box("box", Scale(1, 1, 1))
+    body_spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
+    spec = BodyAndConnectionSpecification(body_specification=body_spec)
     body = spec.spawn(
         empty_world,
         parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=5),
@@ -150,7 +154,8 @@ def test_active_annotation_requires_parameters():
         )
 
 
-def test_spec_valued_annotation_kwargs_not_supported(empty_world):
+def test_spec_valued_annotation_kwargs_on_non_part_whole_raises(empty_world):
+    # Milk is not a part-whole annotation, so it has no `add` to route a nested spec through.
     spec = SemanticAnnotationWithRootSpecification(
         name="milk",
         semantic_annotation_type=Milk,
@@ -520,3 +525,153 @@ def test_annotation_spec_aperture_region(empty_world):
 def test_annotation_spec_robot_part_raises():
     with pytest.raises(UselessConceptError):
         AbstractRobotPart.get_default_annotation_specification("part", Scale(1, 1, 1))
+
+
+#####################################################################
+# Nested annotations: spec-valued annotation_kwargs are spawned and
+# mounted via the part-whole `add`, keyed by the target field name.
+#####################################################################
+
+
+def _spawn_with_parts(world, whole_type, whole_scale, parts):
+    """Spawn ``whole_type`` from its default annotation spec, with ``parts`` as nested annotations."""
+    return whole_type.get_default_annotation_specification(
+        "whole", whole_scale, annotation_kwargs=parts
+    ).spawn(world)
+
+
+def test_nested_handle_attaches_as_child(empty_world):
+    handle_part = Handle.get_default_annotation_specification(
+        "handle", Scale(0.1, 0.05, 0.05)
+    )
+    drawer = _spawn_with_parts(
+        empty_world, Drawer, Scale(0.4, 0.5, 0.6), {"handle": handle_part}
+    )
+    assert isinstance(drawer.handle, Handle)
+    assert drawer.handle.root.parent_connection.parent is drawer.root
+    assert isinstance(drawer.handle.root.parent_connection, FixedConnection)
+
+
+def test_nested_mechanical_joint_reparents_whole(empty_world):
+    hinge_part = Hinge.get_default_annotation_specification(
+        "hinge", Scale(0.05, 0.05, 0.05), active_axis=Vector3.Z()
+    )
+    drawer = _spawn_with_parts(
+        empty_world, Drawer, Scale(0.4, 0.5, 0.6), {"mechanical_joint": hinge_part}
+    )
+    assert isinstance(drawer.mechanical_joint, Hinge)
+    # whole_parent -(revolute)-> hinge -(fixed)-> whole
+    assert drawer.root.parent_connection.parent is drawer.mechanical_joint.root
+    assert drawer.mechanical_joint.root.parent_connection.parent is empty_world.root
+    assert isinstance(
+        drawer.mechanical_joint.root.parent_connection, RevoluteConnection
+    )
+
+
+def test_nested_aperture_cuts_geometry(empty_world):
+    plain_wall = Wall.get_default_annotation_specification(
+        "plain_wall", Scale(0.1, 2, 2)
+    ).spawn(empty_world)
+    plain_shape_count = len(plain_wall.root.collision.shapes)
+
+    aperture_part = Aperture.get_default_annotation_specification(
+        "hole", Scale(0.1, 0.5, 0.5)
+    )
+    wall = _spawn_with_parts(
+        empty_world, Wall, Scale(0.1, 2, 2), {"apertures": aperture_part}
+    )
+    assert len(wall.apertures) == 1
+    assert isinstance(wall.apertures[0], Aperture)
+    # cutting the aperture out of the wall changes its collision geometry
+    assert len(wall.root.collision.shapes) != plain_shape_count
+
+
+def test_nested_part_placement_is_relative_to_whole(empty_world):
+    handle_part = Handle.get_default_annotation_specification(
+        "handle", Scale(0.1, 0.05, 0.05)
+    )
+    handle_part.root_specification.parent_T_self = (
+        HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
+    )
+    drawer = _spawn_with_parts(
+        empty_world, Drawer, Scale(0.4, 0.5, 0.6), {"handle": handle_part}
+    )
+    drawer_T_handle = empty_world.compute_forward_kinematics(
+        drawer.root, drawer.handle.root
+    )
+    np.testing.assert_allclose(
+        drawer_T_handle.to_position().to_np()[:3], [0, 0.5, 0], atol=1e-9
+    )
+
+
+def test_annotation_connection_limits_threaded(empty_world):
+    limits = DegreeOfFreedomLimits(
+        lower=DerivativeMap(velocity=-1.5), upper=DerivativeMap(velocity=1.5)
+    )
+    spec = Slider.get_default_annotation_specification(
+        "slider", Scale(0.1, 0.1, 0.1), active_axis=Vector3.Z(), connection_limits=limits
+    )
+    slider = spec.spawn(empty_world)
+    dof_limits = slider.root.parent_connection.dof.limits
+    assert dof_limits.upper.velocity == 1.5
+    assert dof_limits.lower.velocity == -1.5
+
+
+def test_inert_annotation_kwargs_reach_constructor(empty_world):
+    existing_handle = Handle.get_default_annotation_specification(
+        "existing", Scale(0.1, 0.05, 0.05)
+    ).spawn(empty_world)
+    drawer = Drawer.get_default_annotation_specification(
+        "drawer", Scale(0.4, 0.5, 0.6), annotation_kwargs={"handle": existing_handle}
+    ).spawn(empty_world)
+    assert drawer.handle is existing_handle
+
+
+def test_nested_composite_matches_imperative(empty_world):
+    scale = Scale(0.4, 0.5, 0.6)
+    handle_scale = Scale(0.1, 0.05, 0.05)
+    hinge_scale = Scale(0.05, 0.05, 0.05)
+
+    drawer = Drawer.get_default_annotation_specification(
+        "drawer",
+        scale,
+        annotation_kwargs={
+            "handle": Handle.get_default_annotation_specification(
+                "handle", handle_scale
+            ),
+            "mechanical_joint": Hinge.get_default_annotation_specification(
+                "hinge", hinge_scale, active_axis=Vector3.Z()
+            ),
+        },
+    ).spawn(empty_world)
+
+    assert isinstance(drawer.handle, Handle)
+    assert isinstance(drawer.mechanical_joint, Hinge)
+    assert drawer.handle.root.parent_connection.parent is drawer.root
+    assert drawer.root.parent_connection.parent is drawer.mechanical_joint.root
+
+    imperative_world = _fresh_world()
+    with imperative_world.modify_world():
+        imperative_drawer = Drawer.create_with_new_body_in_world(
+            name=PrefixedName("drawer_imperative"), world=imperative_world, scale=scale
+        )
+        imperative_handle = Handle.create_with_new_body_in_world(
+            name=PrefixedName("handle_imperative"),
+            world=imperative_world,
+            scale=handle_scale,
+        )
+        imperative_hinge = Hinge.create_with_new_body_in_world(
+            name=PrefixedName("hinge_imperative"),
+            world=imperative_world,
+            scale=hinge_scale,
+            active_axis=Vector3.Z(),
+        )
+        imperative_drawer.add(imperative_handle)
+        imperative_drawer.add(imperative_hinge)
+
+    _assert_same_geometry(
+        drawer.root.collision, imperative_drawer.root.collision
+    )
+    _assert_same_geometry(
+        drawer.handle.root.collision, imperative_handle.root.collision
+    )

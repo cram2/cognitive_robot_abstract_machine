@@ -206,6 +206,7 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         active_axis: Optional[Vector3] = None,
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
+        connection_limits: Optional[DegreeOfFreedomLimits] = None,
         annotation_kwargs: Optional[dict] = None,
         **geometry_kwargs,
     ) -> SemanticAnnotationWithRootSpecification:
@@ -226,6 +227,7 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         :param active_axis: Movement axis for an active parent connection (e.g. Slider/Hinge).
         :param connection_multiplier: DoF multiplier for an active parent connection.
         :param connection_offset: DoF offset for an active parent connection.
+        :param connection_limits: DoF limits for an active parent connection.
         :param annotation_kwargs: Extra keyword arguments for the annotation constructor.
         :return: The annotation specification.
         """
@@ -239,6 +241,7 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
             axis=active_axis,
             multiplier=connection_multiplier,
             offset=connection_offset,
+            connection_limits=connection_limits,
             annotation_kwargs=annotation_kwargs or {},
         )
 

@@ -6,6 +6,7 @@ from typing import Union, Optional, TYPE_CHECKING
 
 from typing_extensions import Self, Type, Any, Generic, TypeVar
 
+from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.patterns.subclass_safe_generic import AbstractSubClassSafeGeneric
 from krrood.utils import get_generic_type_params
 from random_events.product_algebra import Event
@@ -28,6 +29,9 @@ from semantic_digital_twin.world_description.geometry import (
     Sphere,
     Cylinder,
 )
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedomLimits,
+)
 from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import (
     ShapeCollection,
@@ -43,6 +47,7 @@ from semantic_digital_twin.world_description.world_entity import (
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.mixins import (
         HasRootKinematicStructureEntity,
+        PartWholeRelationshipField,
     )
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
@@ -96,6 +101,7 @@ class WorldEntitySpawnSpecification(ABC):
         axis: Optional[Vector3] = None,
         multiplier: float = 1.0,
         offset: float = 0.0,
+        dof_limits: Optional[DegreeOfFreedomLimits] = None,
     ) -> Connection:
         """
         Build a connection of ``connection_type`` between ``parent`` and ``child``.
@@ -108,6 +114,7 @@ class WorldEntitySpawnSpecification(ABC):
         :param axis: Movement axis, required for active (1-DoF) connections, ignored otherwise.
         :param multiplier: DoF multiplier for active connections.
         :param offset: DoF offset for active connections.
+        :param dof_limits: Degree-of-freedom limits for active connections.
         """
         parent_T_child = parent_T_child or HomogeneousTransformationMatrix()
         parent_T_child.reference_frame = parent
@@ -125,6 +132,7 @@ class WorldEntitySpawnSpecification(ABC):
             axis=axis,
             multiplier=multiplier,
             offset=offset,
+            dof_limits=dof_limits,
             parent_T_connection_expression=parent_T_child,
         )
 
@@ -139,11 +147,9 @@ class WorldEntitySpawnSpecification(ABC):
         axis: Optional[Vector3] = None,
         multiplier: float = 1.0,
         offset: float = 0.0,
+        dof_limits: Optional[DegreeOfFreedomLimits] = None,
         annotation: Optional[HasRootKinematicStructureEntity] = None,
-        children: (
-            tuple[WorldEntitySpawnSpecification, ...]
-            | list[WorldEntitySpawnSpecification]
-        ) = (),
+        children: list[WorldEntitySpawnSpecification] = None,
     ) -> None:
         """
         Attach ``entity`` to ``parent`` (default ``world.root``) with a connection, optionally
@@ -161,10 +167,14 @@ class WorldEntitySpawnSpecification(ABC):
                 axis,
                 multiplier,
                 offset,
+                dof_limits,
             )
             world.add_connection(connection)
             if annotation is not None:
                 world.add_semantic_annotation(annotation)
+
+            if children is None:
+                return
             for child in children:
                 child.spawn(world, parent=entity)
 
@@ -201,6 +211,14 @@ class KinematicStructureEntitySpecification(
     The child specifications of this specification. If set, the spawned entity will be a parent of the children.
     """
 
+    parent_T_self: HomogeneousTransformationMatrix = field(
+        default_factory=HomogeneousTransformationMatrix
+    )
+    """
+    Default placement of the entity in its parent frame, used by :meth:`spawn` when the caller does not
+    override it. Identity by default.
+    """
+
     def __post_init__(self):
         self.name = self._to_prefixed_name(self.name)
 
@@ -229,7 +247,7 @@ class KinematicStructureEntitySpecification(
             entity,
             parent,
             FixedConnection,
-            parent_T_self,
+            parent_T_self or self.parent_T_self,
             children=self.child_specification,
         )
         return entity
@@ -454,16 +472,24 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
     DoF offset for the parent connection (active connections only).
     """
 
+    connection_limits: Optional[DegreeOfFreedomLimits] = None
+    """
+    Degree-of-freedom limits for the parent connection (active connections only).
+    """
+
     annotation_kwargs: dict[
         str,
         Union[
             SemanticAnnotationWithRootSpecification,
+            list[SemanticAnnotationWithRootSpecification],
             Any,
         ],
     ] = field(default_factory=dict)
     """
-    The keyword arguments to pass to the annotation constructor.
-    Spec-valued entries (nested annotations) are not yet supported and raise NotImplementedError.
+    Everything the annotation references, keyed by the constructor/part-whole field name. Inert values
+    are passed to the annotation constructor. Spec-valued entries (``WorldEntitySpawnSpecification``,
+    i.e. nested annotations) are spawned during :meth:`spawn` and mounted via the annotation's part-whole
+    :meth:`~...mixins.PartWholeRelationship.add`, using the dict key as the target field name.
     """
 
     def __post_init__(self):
@@ -479,41 +505,105 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> HasRootKinematicStructureEntity:
+        from semantic_digital_twin.semantic_annotations.mixins import (
+            PartWholeRelationship,
+        )
+
         name = self._to_prefixed_name(name) or self.name
+
+        plain_kwargs = {}
+        part_semantic_annotation_specs = {}
+        other_semantic_annotation_specs = {}
+        kinematic_structure_entity_specs = {}
+        other_specs = {}
+
+        for key, value in self.annotation_kwargs.items():
+
+            if not isinstance(value, WorldEntitySpawnSpecification):
+                plain_kwargs[key] = value
+                continue
+
+            if isinstance(value, KinematicStructureEntitySpecification):
+                kinematic_structure_entity_specs[key] = value
+                continue
+
+            if isinstance(value, SemanticAnnotationWithRootSpecification):
+                semantic_annotation_wrapped_class = WrappedClass(
+                    value.semantic_annotation_type
+                )
+                field_of_interest = next(
+                    field
+                    for field in semantic_annotation_wrapped_class.fields
+                    if field.name == key
+                )
+                if isinstance(field_of_interest, PartWholeRelationshipField):
+                    part_semantic_annotation_specs[key] = value
+                else:
+                    other_semantic_annotation_specs[key] = value
+                continue
+
+            other_specs[key] = value
+
+        if part_semantic_annotation_specs and not issubclass(
+            self.semantic_annotation_type, PartWholeRelationship
+        ):
+            raise NotImplementedError(
+                "Spec-valued annotation_kwargs (nested annotations) are only supported on part-whole "
+                "annotations; pass already-constructed values for other annotation types."
+            )
+
+        if other_semantic_annotation_specs:
+            raise NotImplementedError(
+                "Non-PartWholeRelationshipFields are not supported yet"
+            )
+
+        if other_specs:
+            raise NotImplementedError(
+                f"Not sure how to handle these cases yet: { {k: type(v) for k, v in other_specs.items()} }"
+            )
 
         if self.root_specification is None:
             root_entity = Body(name=name)
         else:
             root_entity = self.root_specification.to_domain_object(name)
 
-        for value in self.annotation_kwargs.values():
-            if isinstance(value, WorldEntitySpawnSpecification):
-                raise NotImplementedError(
-                    "Spec-valued annotation_kwargs (nested annotations) are not yet "
-                    "supported. Pass already-constructed values instead."
-                )
+        for key, value in kinematic_structure_entity_specs.items():
+            resolved_kinematic_structure_entity = value.spawn(world, root_entity)
+            plain_kwargs[key] = resolved_kinematic_structure_entity
 
         instance = self.semantic_annotation_type(
-            name=name, root=root_entity, **self.annotation_kwargs
+            name=name, root=root_entity, **plain_kwargs
         )
 
+        effective_pose = parent_T_self or (
+            self.root_specification.parent_T_self
+            if self.root_specification is not None
+            else None
+        )
         children = (
             self.root_specification.child_specification
             if self.root_specification is not None
             else ()
         )
-        self._attach(
-            world,
-            root_entity,
-            parent,
-            self.semantic_annotation_type._parent_connection_type,
-            parent_T_self,
-            axis=self.axis,
-            multiplier=self.multiplier,
-            offset=self.offset,
-            annotation=instance,
-            children=children,
-        )
+
+        with world.modify_world():
+            self._attach(
+                world,
+                root_entity,
+                parent,
+                self.semantic_annotation_type._parent_connection_type,
+                effective_pose,
+                axis=self.axis,
+                multiplier=self.multiplier,
+                offset=self.offset,
+                dof_limits=self.connection_limits,
+                annotation=instance,
+                children=children,
+            )
+            for field_name, part_spec in part_semantic_annotation_specs.items():
+                part = part_spec.spawn(world, parent=root_entity)
+                instance.add(part, field_name=field_name)
+
         return instance
 
 
@@ -523,10 +613,6 @@ class BodyAndConnectionSpecification(WorldEntitySpawnSpecification):
     body_specification: BodySpecification
 
     connection_type: Type[Connection] = field(default=FixedConnection)
-
-    parent_T_self: HomogeneousTransformationMatrix = field(
-        default_factory=HomogeneousTransformationMatrix
-    )
 
     axis: Optional[Vector3] = None
     """
@@ -544,6 +630,11 @@ class BodyAndConnectionSpecification(WorldEntitySpawnSpecification):
     DoF offset for the parent connection (active connections only).
     """
 
+    connection_limits: Optional[DegreeOfFreedomLimits] = None
+    """
+    Degree-of-freedom limits for the parent connection (active connections only).
+    """
+
     def __post_init__(self):
         self._require_axis_for_active_connection(self.connection_type, self.axis)
 
@@ -555,7 +646,7 @@ class BodyAndConnectionSpecification(WorldEntitySpawnSpecification):
         parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> Body:
         body = self.body_specification.to_domain_object(name)
-        pose = parent_T_self or self.parent_T_self
+        pose = parent_T_self or self.body_specification.parent_T_self
         self._attach(
             world,
             body,
@@ -565,6 +656,7 @@ class BodyAndConnectionSpecification(WorldEntitySpawnSpecification):
             axis=self.axis,
             multiplier=self.multiplier,
             offset=self.offset,
+            dof_limits=self.connection_limits,
             children=self.body_specification.child_specification,
         )
         return body
