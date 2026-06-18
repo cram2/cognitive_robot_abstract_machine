@@ -7,6 +7,7 @@ import numpy as np
 import trimesh
 from CGAL.CGAL_AABB_tree import AABB_tree_Triangle_3_soup
 from CGAL.CGAL_Kernel import Point_3, Triangle_3
+from trimesh.collision import CollisionManager
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -43,6 +44,14 @@ class GraspScorer:
     
     penalty_collision: float = -1000.0
     """Penalty applied when the gripper collides with the object mesh."""
+
+    collision_tolerance: float = 1e-6
+    """Maximum penetration depth (in meters) tolerated before a contact counts as a collision.
+
+    ..note:: A parallel-jaw grasp makes its fingers flush with the object surface, which
+        registers as zero-depth contact. Without a tolerance such valid grasps would be
+        wrongly penalized as collisions.
+    """
     
     penalty_clearance: float = -1000.0
     """Penalty applied when the gripper hits or dips below the ground plane."""
@@ -73,6 +82,25 @@ class GraspScorer:
             triangles.append(Triangle_3(p1, p2, p3))
         return triangles
 
+    @staticmethod
+    def _penetration_depth(gripper_mesh: trimesh.Trimesh, object_mesh: trimesh.Trimesh) -> float:
+        """
+        Computes the deepest interpenetration between the gripper and the object.
+
+        A flush surface contact yields a depth of (numerically) zero, whereas an actual
+        overlap yields the maximum penetration distance.
+
+        :param gripper_mesh: The gripper mesh already placed at the grasp pose.
+        :param object_mesh: The 3D mesh of the target object.
+        :return: The maximum penetration depth in meters, or 0.0 when the meshes do not overlap.
+        """
+        collision_manager = CollisionManager()
+        collision_manager.add_object("object", object_mesh)
+        is_colliding, contacts = collision_manager.in_collision_single(gripper_mesh, return_data=True)
+        if not is_colliding:
+            return 0.0
+        return max(contact.depth for contact in contacts)
+
     def calculate_grasp_score(
             self,
             grasp_pose: Pose,
@@ -97,8 +125,12 @@ class GraspScorer:
         gripper_at_pose.apply_transform(grasp_pose_matrix)
 
         # --- 1. Collision Check ---
+        # Broad phase: the CGAL tree cheaply rejects grippers that are clear of the object.
+        # Narrow phase: only a penetration deeper than the tolerance counts as a real collision,
+        # so the flush finger contact of a valid grasp is not mistaken for one.
         gripper_cgal_triangles = self._trimesh_to_cgal_triangles(gripper_at_pose)
-        if any(object_tree.do_intersect(triangle) for triangle in gripper_cgal_triangles):
+        potentially_colliding = any(object_tree.do_intersect(triangle) for triangle in gripper_cgal_triangles)
+        if potentially_colliding and self._penetration_depth(gripper_at_pose, object_mesh) > self.collision_tolerance:
             total_score += self.penalty_collision
 
         # --- 2. Clearance Check ---
@@ -117,8 +149,10 @@ class GraspScorer:
         ray_origins_world = trimesh.transform_points(ray_origins_local, grasp_pose_matrix)
         ray_directions_world = trimesh.transform_points(ray_directions_local, grasp_pose_matrix, translate=False)
 
+        # Keep only the nearest hit per ray; otherwise a ray crossing the object also
+        # reports its exit face, yielding two hits per finger instead of one contact.
         locations, index_ray, index_triangle = object_mesh.ray.intersects_location(
-            ray_origins=ray_origins_world, ray_directions=ray_directions_world
+            ray_origins=ray_origins_world, ray_directions=ray_directions_world, multiple_hits=False
         )
 
         # Grade the contact instead of pass/fail
