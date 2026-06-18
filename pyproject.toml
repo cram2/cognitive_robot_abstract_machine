@@ -30,7 +30,8 @@ dependencies = [
 dev = [
     "pytest>=7.0.0,<8.0.0",
     "pytest-asyncio>=0.23.0,<0.24.0",
-    "pytest-xdist"
+    "pytest-xdist",
+    "objgraph",
 
 ]
 
@@ -101,3 +102,8 @@ experiments = { path = "experiments", develop = true }
 
 [tool.setuptools]
 packages = []
+
+[tool.docformatter]
+make-summary-multi-line = true
+pre-summary-newline = true
+close-quotes-on-newline = true

@@ -21,11 +21,12 @@ on:
         type: boolean
         default: false
 
+
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: ${{ inputs.use_container && env.IMAGE_NAME || '' }}
+      image: ${{ inputs.use_container && format('ghcr.io/{0}:jazzy', github.repository) || '' }}
     defaults:
       run:
         shell: ${{ inputs.use_container && 'bash -ieo pipefail {0}' || 'bash' }}
@@ -33,23 +34,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          path: ${{ inputs.use_container && 'ros/src/semantic_digital_twin' || '.' }}
-          submodules: ${{ inputs.use_container && 'false' || 'true' }}
+          path: '.'
+          submodules: 'true'
 
       - name: Initialize submodules explicitly
         run: |
-          ${{ inputs.use_container && 'cd ros/src/semantic_digital_twin' || '' }}
           git config --global --add safe.directory "*"
           git submodule sync --recursive
           git submodule update --init --recursive
-
-      - name: Update semantic_digital_twin source files (Container only)
-        if: ${{ inputs.use_container }}
-        run: |
-          rm -rf /opt/ros/semantic_digital_twin/*
-          cd /opt/ros/semantic_digital_twin
-          rm -rf .git .github .gitignore .gitmodules .readthedocs.yaml
-          cp -r $GITHUB_WORKSPACE/ros/src/semantic_digital_twin/semantic_digital_twin/* /opt/ros/semantic_digital_twin/
 
       - name: Set up Python (Non-container)
         if: ${{ !inputs.use_container }}
@@ -84,23 +76,20 @@ jobs:
         if: ${{ inputs.use_container }}
         run: |
           sudo apt-get update
-          source /opt/ros/semantic_digital_twin-venv/bin/activate
+          source /opt/ros/cram-env/bin/activate
           pip install -U pip uv
-          cd $GITHUB_WORKSPACE/ros/src/semantic_digital_twin
-          # --active syncs into the already-activated ROS venv; --inexact keeps
-          # the existing ROS packages instead of pruning to the lockfile.
           uv sync --extra doc --active --inexact
           uv pip install pygraphviz
 
       - name: Strip exercise-tagged cells (semantic_digital_twin only)
         if: ${{ inputs.lib == 'semantic_digital_twin' }}
         run: |
-          cd /opt/ros/semantic_digital_twin/doc/self_assessment/exercises
-          source /opt/ros/semantic_digital_twin-venv/bin/activate
+          cd $GITHUB_WORKSPACE/semantic_digital_twin/doc/self_assessment/exercises
+          source /opt/ros/cram-env/bin/activate
           find . -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
             ipynb="${f%.md}.ipynb"
             jupytext --from md:myst --to ipynb "$f" -o "$ipynb"
-            jupyter nbconvert --config /opt/ros/semantic_digital_twin/scripts/configs/nb_remove_exercises.json \
+            jupyter nbconvert --config $GITHUB_WORKSPACE/semantic_digital_twin/scripts/configs/nb_remove_exercises.json \
               --to notebook --inplace \
               "$ipynb"
             jupytext --to md:myst "$ipynb" -o "$f"
@@ -116,9 +105,9 @@ jobs:
       - name: Build the book (Container)
         if: ${{ inputs.use_container }}
         run: |
-          cd /opt/ros/semantic_digital_twin
           source /opt/ros/overlay_ws/install/setup.bash
-          source /opt/ros/semantic_digital_twin-venv/bin/activate
+          source /opt/ros/cram-env/bin/activate
+          cd $GITHUB_WORKSPACE/${{ inputs.lib }}
           jupyter-book build ${{ inputs.doc_path }}
 
       - name: Upload artifact (Non-container)
@@ -133,4 +122,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact_name }}
-          path: "/opt/ros/semantic_digital_twin/doc/_build/html"
+          path: "${{ inputs.lib }}/${{ inputs.doc_path }}/_build/html"

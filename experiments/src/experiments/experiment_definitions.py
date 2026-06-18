@@ -4,6 +4,8 @@ import statistics
 from dataclasses import dataclass
 from typing import List
 
+from krrood.class_diagrams.utils import get_type_hints_of_object
+
 
 from krrood.class_diagrams.attribute_introspector import (
     DataclassOnlyIntrospector,
@@ -62,9 +64,11 @@ class ExperimentResult:
     @classmethod
     def recursive_fields(cls) -> List[DiscoveredAttribute]:
         result = []
+        type_hints = get_type_hints_of_object(cls)
         for field_ in cls.introspector().discover(cls):
-            if issubclass(field_.field.type, ExperimentResult):
-                result.extend(field_.field.type.recursive_fields())
+            resolved_type = type_hints[field_.field.name]
+            if issubclass(resolved_type, ExperimentResult):
+                result.extend(resolved_type.recursive_fields())
             else:
                 result.append(field_)
         return result

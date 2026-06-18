@@ -20,16 +20,20 @@ class UniformDistribution(ContinuousDistributionWithFiniteSupport):
     def log_conditional_from_simple_interval_if_not_singleton(
         self, interval: SimpleInterval
     ) -> Tuple[Optional[ContinuousDistribution], float]:
-        probability = self.probability_of_simple_event(
-            SimpleEvent.from_data({self.variable: interval})
-        )
-        if probability == 0.0:
-            return None, -np.inf
-
         # construct new interval
         new_interval = self.interval.intersection_with(interval)
 
         if new_interval.is_empty():
+            return None, -np.inf
+
+        # the probability of the interval, computed directly from the CDF to avoid
+        # constructing a SimpleEvent (the dominant cost when truncating many leaves,
+        # e.g. during truncation over a composite event)
+        cdf_values = self.cumulative_distribution_function(
+            simple_interval_as_array(interval).reshape(-1, 1)
+        )
+        probability = cdf_values[1] - cdf_values[0]
+        if probability <= 0.0:
             return None, -np.inf
 
         return self.__class__(variable=self.variable, interval=new_interval), np.log(

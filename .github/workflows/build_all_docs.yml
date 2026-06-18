@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch: {}
 
 jobs:
@@ -102,24 +99,6 @@ jobs:
         with:
           name: random-events-doc
           path: aggregate/random_events
-
-      - name: Verify aggregate contents
-        run: |
-          echo "== aggregate/ top level =="
-          ls -la aggregate
-          echo
-          for d in krrood coraplex semantic_digital_twin probabilistic_model random_events; do
-            echo "== aggregate/$d (top 20 entries) =="
-            find "aggregate/$d" -maxdepth 1 | head -20
-            echo "-- first lines of aggregate/$d/index.html (or its redirect target) --"
-            if [ -f "aggregate/$d/index.html" ]; then
-              head -c 2000 "aggregate/$d/index.html"
-            else
-              echo "(no index.html found at aggregate/$d/index.html)"
-            fi
-            echo
-            echo
-          done
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

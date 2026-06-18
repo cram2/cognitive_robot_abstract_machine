@@ -381,7 +381,7 @@ class JointProbabilityTree(SubclassJSONSerializer):
                 for index, variable in enumerate(self.variables)
                 if variable in self.numeric_targets
             ],
-            dtype=int,
+            dtype=np.int64,
         )
         symbolic_vars = np.array(
             [
@@ -389,10 +389,10 @@ class JointProbabilityTree(SubclassJSONSerializer):
                 for index, variable in enumerate(self.variables)
                 if variable in self.symbolic_targets
             ],
-            dtype=int,
+            dtype=np.int64,
         )
 
-        invert_impurity = np.array([0] * len(self.symbolic_targets), dtype=int)
+        invert_impurity = np.array([0] * len(self.symbolic_targets), dtype=np.int64)
 
         n_sym_vars_total = len(self.symbolic_variables)
         n_num_vars_total = len(self.numeric_variables)
@@ -403,7 +403,7 @@ class JointProbabilityTree(SubclassJSONSerializer):
                 for index, variable in enumerate(self.variables)
                 if variable in self.numeric_features
             ],
-            dtype=int,
+            dtype=np.int64,
         )
         symbolic_features = np.array(
             [
@@ -411,26 +411,34 @@ class JointProbabilityTree(SubclassJSONSerializer):
                 for index, variable in enumerate(self.variables)
                 if variable in self.symbolic_features
             ],
-            dtype=int,
+            dtype=np.int64,
         )
 
         symbols = np.array(
-            [len(variable.domain.simple_sets) for variable in self.symbolic_variables]
+            [len(variable.domain.simple_sets) for variable in self.symbolic_variables],
+            dtype=np.int64,
         )
         max_variances = np.array(
             [
                 annotated_variable.standard_deviation**2
                 for annotated_variable in self.annotated_variables
-            ]
+                if annotated_variable.variable in self.numeric_targets
+            ],
+            dtype=np.float64,
         )
 
         min_impurity_improvement = np.array(
             [
                 annotated_variable.min_impurity_improvement
                 for annotated_variable in self.annotated_variables
-                if annotated_variable.variable in self.features
+                if annotated_variable.variable in self.numeric_features
+            ]
+            + [
+                annotated_variable.min_impurity_improvement
+                for annotated_variable in self.annotated_variables
+                if annotated_variable.variable in self.symbolic_features
             ],
-            dtype=float,
+            dtype=np.float64,
         )
 
         dependency_indices = dict()
