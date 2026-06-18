@@ -6,7 +6,6 @@ from typing import Union, Optional, TYPE_CHECKING
 
 from typing_extensions import Self, Type, Any, Generic, TypeVar
 
-from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.patterns.subclass_safe_generic import AbstractSubClassSafeGeneric
 from krrood.utils import get_generic_type_params
 from random_events.product_algebra import Event
@@ -47,7 +46,6 @@ from semantic_digital_twin.world_description.world_entity import (
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.mixins import (
         HasRootKinematicStructureEntity,
-        PartWholeRelationshipField,
     )
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
@@ -156,11 +154,10 @@ class WorldEntitySpawnSpecification(ABC):
         register ``annotation``, then spawn ``children`` beneath ``entity`` — all in one
         ``modify_world`` block.
         """
-        parent = parent or world.root
         with world.modify_world():
             connection = self._build_connection(
                 world,
-                parent,
+                parent or world.root,
                 entity,
                 connection_type,
                 parent_T_self,
@@ -172,10 +169,7 @@ class WorldEntitySpawnSpecification(ABC):
             world.add_connection(connection)
             if annotation is not None:
                 world.add_semantic_annotation(annotation)
-
-            if children is None:
-                return
-            for child in children:
+            for child in children or []:
                 child.spawn(world, parent=entity)
 
 
@@ -506,70 +500,56 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
         parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> HasRootKinematicStructureEntity:
         from semantic_digital_twin.semantic_annotations.mixins import (
-            PartWholeRelationship,
+            _wrapped_part_whole_relationship_fields,
         )
 
         name = self._to_prefixed_name(name) or self.name
 
+        part_whole_fields_by_name = {
+            wrapped_field.name: wrapped_field
+            for wrapped_field in _wrapped_part_whole_relationship_fields(
+                self.semantic_annotation_type
+            )
+        }
+
         plain_kwargs = {}
         part_semantic_annotation_specs = {}
-        other_semantic_annotation_specs = {}
-        kinematic_structure_entity_specs = {}
-        other_specs = {}
+        unsupported_specs = {}
 
         for key, value in self.annotation_kwargs.items():
+            wrapped_field = part_whole_fields_by_name.get(key)
+            value_is_sequence = isinstance(value, (list, tuple))
+            items = list(value) if value_is_sequence else [value]
+            all_nested_annotation_specs = bool(items) and all(
+                isinstance(item, SemanticAnnotationWithRootSpecification)
+                for item in items
+            )
 
-            if not isinstance(value, WorldEntitySpawnSpecification):
+            # A part-whole field takes one nested annotation spec, or a list of them for a
+            # to-many relationship.
+            if (
+                wrapped_field is not None
+                and all_nested_annotation_specs
+                and (wrapped_field.is_many_to_many_relationship or not value_is_sequence)
+            ):
+                part_semantic_annotation_specs[key] = items
+            elif any(isinstance(item, WorldEntitySpawnSpecification) for item in items):
+                unsupported_specs[key] = value
+            else:
                 plain_kwargs[key] = value
-                continue
 
-            if isinstance(value, KinematicStructureEntitySpecification):
-                kinematic_structure_entity_specs[key] = value
-                continue
-
-            if isinstance(value, SemanticAnnotationWithRootSpecification):
-                semantic_annotation_wrapped_class = WrappedClass(
-                    value.semantic_annotation_type
-                )
-                field_of_interest = next(
-                    field
-                    for field in semantic_annotation_wrapped_class.fields
-                    if field.name == key
-                )
-                if isinstance(field_of_interest, PartWholeRelationshipField):
-                    part_semantic_annotation_specs[key] = value
-                else:
-                    other_semantic_annotation_specs[key] = value
-                continue
-
-            other_specs[key] = value
-
-        if part_semantic_annotation_specs and not issubclass(
-            self.semantic_annotation_type, PartWholeRelationship
-        ):
+        if unsupported_specs:
             raise NotImplementedError(
-                "Spec-valued annotation_kwargs (nested annotations) are only supported on part-whole "
-                "annotations; pass already-constructed values for other annotation types."
-            )
-
-        if other_semantic_annotation_specs:
-            raise NotImplementedError(
-                "Non-PartWholeRelationshipFields are not supported yet"
-            )
-
-        if other_specs:
-            raise NotImplementedError(
-                f"Not sure how to handle these cases yet: { {k: type(v) for k, v in other_specs.items()} }"
+                "Only nested part-whole annotation specs are supported in annotation_kwargs. These "
+                "entries are not (e.g. raw entity specs, storage occupants, or non-part-whole fields): "
+                f"{ {key: type(value).__name__ for key, value in unsupported_specs.items()} } "
+                f"on {self.semantic_annotation_type.__name__}."
             )
 
         if self.root_specification is None:
             root_entity = Body(name=name)
         else:
             root_entity = self.root_specification.to_domain_object(name)
-
-        for key, value in kinematic_structure_entity_specs.items():
-            resolved_kinematic_structure_entity = value.spawn(world, root_entity)
-            plain_kwargs[key] = resolved_kinematic_structure_entity
 
         instance = self.semantic_annotation_type(
             name=name, root=root_entity, **plain_kwargs
@@ -600,9 +580,10 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
                 annotation=instance,
                 children=children,
             )
-            for field_name, part_spec in part_semantic_annotation_specs.items():
-                part = part_spec.spawn(world, parent=root_entity)
-                instance.add(part, field_name=field_name)
+            for field_name, part_specs in part_semantic_annotation_specs.items():
+                for part_spec in part_specs:
+                    part = part_spec.spawn(world, parent=root_entity)
+                    instance.add(part, field_name=field_name)
 
         return instance
 

@@ -1,3 +1,4 @@
+import copy
 from pathlib import Path
 
 import numpy as np
@@ -25,6 +26,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wall,
     Aperture,
     Drawer,
+    Table,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
@@ -154,13 +156,17 @@ def test_active_annotation_requires_parameters():
         )
 
 
-def test_spec_valued_annotation_kwargs_on_non_part_whole_raises(empty_world):
-    # Milk is not a part-whole annotation, so it has no `add` to route a nested spec through.
+def test_nested_annotation_on_non_part_whole_field_raises(empty_world):
+    # Milk has no part-whole field, so a nested annotation spec cannot be mounted onto it.
     spec = SemanticAnnotationWithRootSpecification(
         name="milk",
         semantic_annotation_type=Milk,
-        root_specification=None,
-        annotation_kwargs={"foo": BodySpecification.box("nested", Scale(1, 1, 1))},
+        root_specification=BodySpecification.box("milk", Scale(0.1, 0.1, 0.2)),
+        annotation_kwargs={
+            "handle": Handle.get_default_annotation_specification(
+                "handle", Scale(0.1, 0.05, 0.05)
+            )
+        },
     )
     with pytest.raises(NotImplementedError):
         spec.spawn(empty_world)
@@ -586,6 +592,41 @@ def test_nested_aperture_cuts_geometry(empty_world):
     assert len(wall.root.collision.shapes) != plain_shape_count
 
 
+def test_nested_list_valued_parts_on_to_many_field(empty_world):
+    aperture_a = Aperture.get_default_annotation_specification(
+        "hole_a", Scale(0.1, 0.5, 0.5)
+    )
+    aperture_a.root_specification.parent_T_self = (
+        HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.8)
+    )
+    aperture_b = Aperture.get_default_annotation_specification(
+        "hole_b", Scale(0.1, 0.5, 0.5)
+    )
+    aperture_b.root_specification.parent_T_self = (
+        HomogeneousTransformationMatrix.from_xyz_rpy(y=0.8)
+    )
+    wall = Wall.get_default_annotation_specification(
+        "wall", Scale(0.1, 3, 3), annotation_kwargs={"apertures": [aperture_a, aperture_b]}
+    ).spawn(empty_world)
+    assert len(wall.apertures) == 2
+    assert all(isinstance(aperture, Aperture) for aperture in wall.apertures)
+
+
+def test_list_value_on_singular_part_field_raises(empty_world):
+    spec = Drawer.get_default_annotation_specification(
+        "drawer",
+        Scale(0.4, 0.5, 0.6),
+        annotation_kwargs={
+            "handle": [
+                Handle.get_default_annotation_specification("h1", Scale(0.1, 0.05, 0.05)),
+                Handle.get_default_annotation_specification("h2", Scale(0.1, 0.05, 0.05)),
+            ]
+        },
+    )
+    with pytest.raises(NotImplementedError):
+        spec.spawn(empty_world)
+
+
 def test_nested_part_placement_is_relative_to_whole(empty_world):
     handle_part = Handle.get_default_annotation_specification(
         "handle", Scale(0.1, 0.05, 0.05)
@@ -625,6 +666,72 @@ def test_inert_annotation_kwargs_reach_constructor(empty_world):
         "drawer", Scale(0.4, 0.5, 0.6), annotation_kwargs={"handle": existing_handle}
     ).spawn(empty_world)
     assert drawer.handle is existing_handle
+
+
+def test_raw_entity_spec_in_annotation_kwargs_raises(empty_world):
+    # Raw entity specs (e.g. a supporting-surface region) are not supported in annotation_kwargs.
+    spec = Table.get_default_annotation_specification(
+        "table",
+        Scale(1, 1, 0.5),
+        annotation_kwargs={
+            "supporting_surface": RegionSpecification.box("surface", Scale(1, 1, 0.01))
+        },
+    )
+    with pytest.raises(NotImplementedError):
+        spec.spawn(empty_world)
+
+
+def test_storage_objects_spec_in_annotation_kwargs_raises(empty_world):
+    # IsStorageSpace.objects is not a part-whole relationship, so spec-based occupants are unsupported.
+    spec = Table.get_default_annotation_specification(
+        "table",
+        Scale(1, 1, 0.5),
+        annotation_kwargs={
+            "objects": [
+                Milk.get_default_annotation_specification("milk", Scale(0.1, 0.1, 0.2))
+            ]
+        },
+    )
+    with pytest.raises(NotImplementedError):
+        spec.spawn(empty_world)
+
+
+def test_complex_spawned_world_is_deepcopyable(empty_world):
+    Drawer.get_default_annotation_specification(
+        "drawer",
+        Scale(0.4, 0.5, 0.6),
+        annotation_kwargs={
+            "handle": Handle.get_default_annotation_specification(
+                "handle", Scale(0.1, 0.05, 0.05)
+            ),
+            "mechanical_joint": Hinge.get_default_annotation_specification(
+                "hinge", Scale(0.05, 0.05, 0.05), active_axis=Vector3.Z()
+            ),
+        },
+    ).spawn(empty_world)
+    Wall.get_default_annotation_specification(
+        "wall",
+        Scale(0.1, 2, 2),
+        annotation_kwargs={
+            "apertures": Aperture.get_default_annotation_specification(
+                "hole", Scale(0.1, 0.5, 0.5)
+            )
+        },
+    ).spawn(empty_world)
+    Milk.get_default_annotation_specification("milk", Scale(0.1, 0.1, 0.2)).spawn(
+        empty_world
+    )
+
+    world_copy = copy.deepcopy(empty_world)
+
+    assert world_copy is not empty_world
+    assert len(world_copy.kinematic_structure_entities) == len(
+        empty_world.kinematic_structure_entities
+    )
+    assert len(world_copy.connections) == len(empty_world.connections)
+    assert len(list(world_copy.semantic_annotations)) == len(
+        list(empty_world.semantic_annotations)
+    )
 
 
 def test_nested_composite_matches_imperative(empty_world):
