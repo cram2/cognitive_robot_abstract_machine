@@ -149,8 +149,7 @@ class MotionEvent(EventWithOneTrackedObject, ABC):
     The pose of the object at the end of the event.
     """
 
-    def __post_init__(self):
-        super().__post_init__()
+
 
 
 @dataclass(init=False, unsafe_hash=True)

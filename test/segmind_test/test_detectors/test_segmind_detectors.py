@@ -101,7 +101,7 @@ def test_support_detector(_simple_apartment_setup):
     assert len(events_of(segmind_context, LossOfSupportEvent)) == 1
 
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box2.global_pose.x, box2.global_pose.y,
-                                                                                 box2.global_pose.z + 0.575)
+                                                                                 box2.global_pose.z + 0.56)
     segmind_executor.tick()
     assert len(events_of(segmind_context, SupportEvent)) == 3
     assert len(events_of(segmind_context, LossOfSupportEvent)) == 2
