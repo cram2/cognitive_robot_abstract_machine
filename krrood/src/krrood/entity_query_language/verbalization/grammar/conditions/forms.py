@@ -26,6 +26,9 @@ from krrood.entity_query_language.verbalization.grammar.conditions.recognition i
     single_hop_attribute,
     superlative_aggregation,
 )
+from krrood.entity_query_language.verbalization.grammar.conditions.transforms import (
+    render_absence,
+)
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
     RuleContext,
 )
@@ -253,7 +256,7 @@ class AbsenceForm(StandaloneForm):
 
     @classmethod
     def render(cls, request: Placement, context: RuleContext) -> Fragment:
-        return ConditionAssembler(context).absence(request.item, number=request.number)
+        return render_absence(request.item, context, number=request.number)
 
 
 def place(request: Placement, context: RuleContext) -> Placed:
