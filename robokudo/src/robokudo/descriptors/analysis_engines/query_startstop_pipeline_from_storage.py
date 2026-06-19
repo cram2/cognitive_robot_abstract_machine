@@ -41,7 +41,7 @@ from robokudo.behaviours.action_server_checks import (
     ActionServerNoPreemptRequest,
     AbortGoal,
 )
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 

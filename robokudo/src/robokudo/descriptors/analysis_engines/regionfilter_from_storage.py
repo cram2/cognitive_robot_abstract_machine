@@ -26,7 +26,7 @@ from robokudo.annotators.region_filter import RegionFilter
 from robokudo.annotators.world_descriptor_bootstrap import (
     WorldDescriptorBootstrapAnnotator,
 )
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 

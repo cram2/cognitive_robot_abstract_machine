@@ -22,7 +22,7 @@ from robokudo.annotators.object_hypothesis_visualizer import ObjectHypothesisVis
 
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
 
 
 class AnalysisEngine(AnalysisEngineInterface):

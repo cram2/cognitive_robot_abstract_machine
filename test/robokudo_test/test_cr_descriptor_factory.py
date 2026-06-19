@@ -5,11 +5,10 @@ from robokudo.descriptors.camera_configs.config_mongodb_playback import (
     MongoCameraConfig,
 )
 from robokudo.io.storage_reader_interface import StorageReaderInterface
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
 
 
 class TestCrDescriptorFactory(object):
-
     @pytest.mark.skipif(
         os.getenv("CI") == "true",
         reason="module temporarily disabled until storage functionality is migrated to ormatic",

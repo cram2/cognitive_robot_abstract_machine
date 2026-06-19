@@ -17,7 +17,7 @@ from robokudo.annotators.query import (
     GenerateQueryResult,
 )
 from robokudo.behaviours.action_server_checks import ActionServerNoPreemptRequest
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
 
 
 class AnalysisEngine(AnalysisEngineInterface):

@@ -31,7 +31,7 @@ from robokudo.annotators.query import QueryAnnotator, QueryReply
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 from robokudo.behaviours.action_server_checks import ActionServerCheck
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
 
 
 class AnalysisEngine(AnalysisEngineInterface):
