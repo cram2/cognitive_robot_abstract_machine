@@ -28,25 +28,22 @@ import time
 from semantic_digital_twin.world import World
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
-from semantic_digital_twin.robots.soft_trunk import SoftTrunk, SoftTrunkSection
+from semantic_digital_twin.datastructures.soft_trunk import SoftTrunk, SoftTrunkSection
 
 if not rclpy.ok():
     rclpy.init()
 node = rclpy.create_node("soft_robotics_examples")
 thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
 thread.start()
-
-def update_visualization(world, tf_pub, viz_pub):
-    """Push current world state to RViz."""
-    world.notify_state_change()
-    tf_pub.notify()
-    viz_pub.notify()
 ```
 
 ## 1. Piecewise Constant Curvature (PCC)
 PCC approximates the robot as a series of circular arcs. 
 
 ### 1.1 Build PCC Robot
+
+
+Open RViz, and set fixed frame to "piecewise_constant_curvature/base".
 
 ```{code-cell} ipython3
 world_pcc = World()
@@ -67,12 +64,15 @@ trunk_pcc = SoftTrunk.build_piecewise_constant_curvature(world_pcc, sections)
 tf_pcc = TFPublisher(_world=world_pcc, node=node)
 viz_pcc = VizMarkerPublisher(_world=world_pcc, node=node)
 
-print("PCC Robot Ready. Set fixed frame to 'pcc/base' in RViz.")
+tf_pcc.add_to_world(world_pcc)
+viz_pcc.add_to_world(world_pcc)
+world_pcc.notify_state_change()
 
-# To see the robot model in RViz, we need to push the initial state to the visualization
-update_visualization(world_pcc, tf_pcc, viz_pcc)
+print("PCC Robot Ready. Set fixed frame to 'piecewise_constant_curvature/base' in RViz.")
+
 ```
 
+<!-- #region -->
 ### 1.2 Animating PCC
 
 
@@ -80,15 +80,16 @@ This loop animates the Piecewise Constant Curvature (PCC) model by continuously 
 
 - **Curvature ($\kappa$):** We apply a sine wave to the curvature. By subtracting the section index (`t - section`), we create a phase shift. This results in a wave-like motion that propagates from the base to the tip.
 - **Bending Plane ($\phi$):** We increase the bending plane angle linearly over time. This causes the entire robot to rotate or spiral its bending direction around the central axis.
+<!-- #endregion -->
 
 ```{code-cell} ipython3
 print("Starting PCC Animation")
 try:
     for t in np.linspace(0, 10, 200):
-        for section, (k_dof, p_dof) in enumerate(trunk_pcc.pcc_sections):
+        for section, (k_dof, p_dof) in enumerate(trunk_pcc.piecewise_constant_curvature_sections):
             world_pcc.state[k_dof.id].position = 1.5 * np.sin(t - section * 1.0)    
             world_pcc.state[p_dof.id].position = t * 0.5
-        update_visualization(world_pcc, tf_pcc, viz_pcc)
+        world_pcc.notify_state_change()
         time.sleep(0.03)
 except KeyboardInterrupt:
     print("Stopped.")
@@ -147,7 +148,7 @@ target_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
 
 # Update marker and visualize target
 goal_connection.origin = target_pose
-update_visualization(world_pcc, tf_pcc, viz_pcc)
+world_pcc.notify_state_change()
 
 # Solve the IK
 try:
@@ -156,7 +157,7 @@ try:
     # Pass the tip from the robot's manipulator chain
     ik_results = ik_solver.solve(
         root=world_pcc.root,
-        tip=trunk_pcc.manipulator_chains[0].tip,
+        tip=trunk_pcc.arms[0].tip,
         target=target_pose,
         max_iterations=500,
         dt=0.1
@@ -167,17 +168,21 @@ try:
         world_pcc.state[dof.id].position = position
     
     # Final Refresh
-    update_visualization(world_pcc, tf_pcc, viz_pcc)
+    world_pcc.notify_state_change()
     print("Success: Robot reached the target marker!")
 
 except Exception as e:
     print(f"IK Failed: {e}")
+    print("The target may be out of reach or the solver may have failed to converge. Try running again for a different random target!")
 ```
 
 ## 2. Cosserat Rod
 Cosserat models allow for torsion (twist) and stretching, which PCC cannot represent.
 
 ### 2.1 Build Cosserat Robot
+
+
+Open RViz, and set fixed frame to "cosserat/base".
 
 ```{code-cell} ipython3
 world_cosserat = World()
@@ -197,12 +202,14 @@ trunk_cos = SoftTrunk.build_cosserat(world_cosserat, sections)
 tf_cos = TFPublisher(_world=world_cosserat, node=node)
 viz_cos = VizMarkerPublisher(_world=world_cosserat, node=node)
 
-print("Cosserat Robot Ready. Set fixed frame to 'cosserat/base' in RViz.")
+tf_cos.add_to_world(world_cosserat)
+viz_cos.add_to_world(world_cosserat)
+world_cosserat.notify_state_change()
 
-# To see the robot model in RViz, we need to push the initial state to the visualization
-update_visualization(world_cosserat, tf_cos, viz_cos)
+print("Cosserat Robot Ready. Set fixed frame to 'cosserat/base' in RViz.")
 ```
 
+<!-- #region -->
 ### 2.2 Animating Cosserat
 
 
@@ -211,6 +218,7 @@ This loop demonstrates the capabilities of the Cosserat Rod model by manipulatin
 -  **Bending ($u_x, u_y$):** By applying a sine wave to the X-axis and a cosine wave to the Y-axis, the robot performs a circular motion, sweeping around its central axis.
 -  **Torsion ($u_z$):** We oscillate the torsion parameter to show the robot twisting back and forth around its own spine. This is a feature of the Cosserat model that is not possible with standard PCC.
 -  **Extension ($v_z$):** We vary the extension strain between 0.5 and 1.5. This causes the robot to stretch and shrink in total length, also not possible with standard PCC.
+<!-- #endregion -->
 
 ```{code-cell} ipython3
 try:
@@ -221,7 +229,7 @@ try:
             world_cosserat.state[by.id].position = 2.0 * np.cos(t) # Curvature (Bending Y)
             world_cosserat.state[tor.id].position = 1.5 * np.sin(t * 0.5) # Torsion (Twisting)      
             world_cosserat.state[ext.id].position = 1.0 + 0.5 * np.sin(t) # Strecthing
-        update_visualization(world_cosserat, tf_cos, viz_cos)
+        world_cosserat.notify_state_change()
         time.sleep(0.03)
 except KeyboardInterrupt:
     print("Stopped.")
@@ -291,7 +299,7 @@ target_pose_cos = HomogeneousTransformationMatrix.from_xyz_rpy(
 
 # Update marker and visualize target
 cos_goal_connection.origin = target_pose_cos
-update_visualization(world_cosserat, tf_cos, viz_cos)
+world_cosserat.notify_state_change()
 
 # Solve the IK
 try:
@@ -299,7 +307,7 @@ try:
     
     ik_results_cos = ik_solver_cos.solve(
         root=world_cosserat.root,
-        tip=trunk_cos.manipulator_chains[0].tip,
+        tip=trunk_cos.arms[0].tip,
         target=target_pose_cos,
         max_iterations=500,
         dt=0.1,
@@ -311,17 +319,19 @@ try:
         world_cosserat.state[dof.id].position = position
     
     # Final Refresh
-    update_visualization(world_cosserat, tf_cos, viz_cos)
+    world_cosserat.notify_state_change()
     print("Success: Cosserat model reached the target marker!")
 
 except Exception as e:
     print(f"Cosserat IK Failed: {e}")
 ```
 
+<!-- #region -->
 ## 3. Workspace Reachability Analysis
 
 
 This experiment performs a statistical evaluation of the reachable workspace for both the Piecewise Constant Curvature (PCC) and Cosserat Rod models. For each model, 100 random trials are performed. In each trial, a target pose is generated within a defined bounding box. The Inverse Kinematics (IK) solver attempts to reach the target within 300 iterations. A trial is marked as a Success if the final Euclidean distance between the robot tip and the target is less than 3 cm.
+<!-- #endregion -->
 
 ```{code-cell} ipython3
 import numpy as np
@@ -351,7 +361,7 @@ def run_reachability_study(world, robot, solver, num_trials=100):
     times = []
     
     # Identify the tip body from the primary manipulator chain
-    tip_body = robot.manipulator_chains[0].tip
+    tip_body = robot.arms[0].tip
 
     def reset_robot_state():
         """Helper to reset robot to a neutral starting nudge using robot properties."""
