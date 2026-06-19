@@ -144,6 +144,13 @@ class SoftTrunk(SemanticAnnotation):
         """
         Builds a soft robot using the Piecewise Constant Curvature (PCC) model.
 
+        PCC is a geometric approximation that assumes soft segments deform into perfect circular arcs.
+
+        Ref: Robert J Webster III and Bryan A Jones,
+            “Design and kinematic modeling of constant curvature continuum robots: A review,”
+            The International Journal of Robotics Research, vol. 29, no. 13, pp. 1661-1683,
+            2010.
+
         :param world: The world from which to create the robot view.
 
         :param sections: A list of section configurations defining the robot's morphology.
@@ -240,6 +247,14 @@ class SoftTrunk(SemanticAnnotation):
     ) -> SoftTrunk:
         """
         Builds a soft robot using the differential Cosserat Rod Theory.
+
+        This is a differential model that solves the robot's shape by integrating local
+        strain rates. Unlike PCC, it can represent axial torsion (twisting) and
+        longitudinal extension (stretching).
+
+        Ref: Kelan Luo, “Modeling of continuum robots: A review,”
+            Journal of Physics: Conference Series, vol. 2634, pp.012029,
+            Nov. 2023.
 
         :param world: The world from which to create the robot view.
 
