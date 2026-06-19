@@ -1,29 +1,28 @@
 from __future__ import annotations
 
+import dataclasses
+import inspect
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, MISSING, Field
+from functools import lru_cache
 from typing import Tuple
 
 import numpy as np
 import trimesh
-from krrood.entity_query_language.factories import variable_from, entity, variable, an
-from polytope import bounding_box
-from probabilistic_model.distributions.gaussian import GaussianDistribution
-from random_events.product_algebra import Event
-from random_events.set import Set as EventSet
-from random_events.variable import Symbolic
-from semantic_digital_twin.reasoning.predicates import is_supported_by
 from typing_extensions import (
     TYPE_CHECKING,
     List,
     Optional,
     Self,
     Set,
-    Iterable,
     Type,
 )
 
+from krrood.class_diagrams.class_diagram import WrappedClass
+from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.entity_query_language.factories import variable_from, entity, variable, an
 from krrood.ormatic.utils import classproperty
+from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     uniform_measure_of_event,
@@ -34,11 +33,17 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
+from random_events.product_algebra import Event
+from random_events.set import Set as EventSet
+from random_events.variable import Symbolic
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
-    MismatchingWorld,
+    AmbiguousPart,
+    CannotBeAPartOf,
+    UnknownPartWholeRelationshipField,
 )
+from semantic_digital_twin.reasoning.predicates import is_supported_by
 from semantic_digital_twin.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
@@ -71,9 +76,8 @@ if TYPE_CHECKING:
         Drawer,
         Door,
         Handle,
-        Hinge,
-        Slider,
         Aperture,
+        MechanicalJoint,
     )
     from semantic_digital_twin.world import World
 
@@ -180,117 +184,19 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
 
         return self_instance
 
-    def get_new_grandparent(
-        self,
-        parent_kinematic_structure_entity: KinematicStructureEntity,
-    ):
+    def _mount_strategy(self, main_has_root_body_annotation: HasRootBody) -> None:
         """
-        Determine the new grandparent entity when changing the kinematic structure.
+        Realize the relationship between this annotation (as a part) and the
+        ``main_has_root_body_annotation`` (the whole) in the kinematic structure. The default is to
+        become a kinematic child of the whole; parts with a different strategy (e.g. mechanical
+        joints that re-parent the whole, apertures that cut it) override this.
 
-        :param parent_kinematic_structure_entity: The entity that will be the new parent.
-        :return: The entity that will be the new grandparent.
+        :param main_has_root_body_annotation: The annotation (the whole) this one is being added to
+            as a part.
         """
-        grandparent_kinematic_structure_entity = (
-            parent_kinematic_structure_entity.parent_connection.parent
+        main_has_root_body_annotation._world.move_branch(
+            self.root, main_has_root_body_annotation.root, True
         )
-        new_hinge_parent = (
-            grandparent_kinematic_structure_entity
-            if grandparent_kinematic_structure_entity != self.root
-            else self.root.parent_kinematic_structure_entity
-        )
-        return new_hinge_parent
-
-    def _attach_parent_entity_in_kinematic_structure(
-        self,
-        new_parent_entity: KinematicStructureEntity,
-    ):
-        """
-        Attach a new parent entity to this entity in the kinematic structure.
-
-        :param new_parent_entity: The new parent entity to attach.
-        """
-        if new_parent_entity._world != self._world:
-            raise MismatchingWorld(self._world, new_parent_entity._world)
-        if new_parent_entity == self.root.parent_kinematic_structure_entity:
-            return
-
-        world = self._world
-
-        root_T_self = self._offline_root_T_entity(self.root)
-        root_T_new_parent = self._offline_root_T_entity(new_parent_entity)
-
-        new_parent_T_self = root_T_new_parent.inverse() @ root_T_self
-
-        parent_C_self = self.root.parent_connection
-        world.remove_connection(parent_C_self)
-
-        new_parent_C_self = FixedConnection(
-            parent=new_parent_entity,
-            child=self.root,
-            parent_T_connection_expression=HomogeneousTransformationMatrix(
-                new_parent_T_self.evaluate()
-            ),
-        )
-        world.add_connection(new_parent_C_self)
-
-    def _attach_child_entity_in_kinematic_structure(
-        self,
-        child_kinematic_structure_entity: KinematicStructureEntity,
-    ):
-        """
-        Attach a new child entity to this entity in the kinematic structure.
-
-        :param child_kinematic_structure_entity: The new child entity to attach.
-        """
-        if child_kinematic_structure_entity._world != self._world:
-            raise MismatchingWorld(self._world, child_kinematic_structure_entity._world)
-
-        if self == child_kinematic_structure_entity.parent_kinematic_structure_entity:
-            return
-
-        world = self._world
-        root_T_self = self._offline_root_T_entity(self.root)
-        root_T_new_child = self._offline_root_T_entity(child_kinematic_structure_entity)
-
-        self_T_new_child = root_T_self.inverse() @ root_T_new_child
-
-        parent_C_new_child = child_kinematic_structure_entity.parent_connection
-        world.remove_connection(parent_C_new_child)
-
-        self_C_new_child = FixedConnection(
-            parent=self.root,
-            child=child_kinematic_structure_entity,
-            parent_T_connection_expression=HomogeneousTransformationMatrix(
-                self_T_new_child.evaluate()
-            ),
-        )
-        world.add_connection(self_C_new_child)
-
-    def _offline_root_T_entity(
-        self, entity: KinematicStructureEntity
-    ) -> HomogeneousTransformationMatrix:
-        """
-        Computes root_T_entity without using the world's forward kinematics manager. This is done to avoid having to
-        recompile and compute the forwardkinematics in this case.
-        My reason of adding this is because otherwise, we would not be able to create for example a door and a handle
-        in one modification block, and add the handle to the door in the same block. we would need to close the
-        block, open a new one, and add the handle there. This is possible, but i think usage wise this is a lot nicer.
-
-        :param entity: The entity to compute the root_T_entity for.
-
-        :return: The root_T_entity of the entity.
-        """
-        world = entity._world
-        future_root_T_self = entity.parent_connection.origin_expression
-        parent_entity = entity.parent_kinematic_structure_entity
-        while True:
-            if parent_entity == world.root:
-                break
-            future_root_T_self = (
-                parent_entity.parent_connection.origin_expression @ future_root_T_self
-            )
-            parent_entity = parent_entity.parent_kinematic_structure_entity
-        return future_root_T_self
 
     @property
     def global_transform(self) -> HomogeneousTransformationMatrix:
@@ -419,77 +325,134 @@ class HasRootRegion(HasRootKinematicStructureEntity, ABC):
         )
 
 
+class PartWholeRelationshipField(dataclasses.Field):
+    """
+    Used to mark PartWhole relationships for specific dataclass fields so that we can identify them later on.
+    """
+
+
+def part_whole_relationship_field(**overrides):
+    """
+    Factory method for class PartWholeRelationshipField(dataclasses.Field)
+    """
+    params = inspect.signature(dataclasses.field).parameters
+
+    kwargs = {
+        name: param.default
+        for name, param in params.items()
+        if param.default is not inspect.Parameter.empty
+    }
+    kwargs.update(overrides)
+
+    return PartWholeRelationshipField(**kwargs)
+
+
+@lru_cache(maxsize=None)
+def _wrapped_part_whole_relationship_fields(
+    cls: Type[PartWholeRelationship],
+) -> list[WrappedField]:
+    """
+    Filters the fields of cls for all fields that are of type PartWholeRelationshipField, and returns them as a Wrapped Class.
+    """
+    return [
+        wrapped_part_whole_relationship_field
+        for wrapped_part_whole_relationship_field in WrappedClass(cls).fields
+        if isinstance(
+            wrapped_part_whole_relationship_field.field, PartWholeRelationshipField
+        )
+    ]
+
+
 @dataclass(eq=False)
-class HasApertures(HasRootBody, ABC):
+class PartWholeRelationship(HasRootKinematicStructureEntity, ABC):
+    """
+    Base for annotations that have structural *parts* (the part-whole relation).
+
+    Each part mixin (``HasHandle``, ``HasDoors``, ...) declares a typed part-whole relationship
+    field. The unified :meth:`add` routes a part to the field whose element type matches it and lets
+    the part mount itself (:meth:`HasRootKinematicStructureEntity._mount_strategy`).
+    """
+
+    @synchronized_attribute_modification
+    def add(
+        self, part: HasRootKinematicStructureEntity, *, field_name: str = ""
+    ) -> None:
+        """
+        Add ``part`` as a structural part, routing it to the matching part-whole relationship field
+        by type.
+
+        :param part: The part to add.
+        :param field_name: Optional name of the target part-whole relationship field. When given,
+            only that field is considered (and ``part`` must still match its element type), which
+            resolves the ambiguity when ``type(part)`` matches several fields. When empty (default),
+            the field is resolved by type alone.
+        :raises UnknownPartWholeRelationshipField: If ``field_name`` is given but is not a
+            part-whole relationship field of this annotation.
+        :raises CannotBeAPartOf: If no part-whole relationship field of this annotation accepts
+            ``type(part)``.
+        :raises AmbiguousPart: If ``type(part)`` matches more than one part-whole relationship field.
+        """
+        candidate_fields = _wrapped_part_whole_relationship_fields(type(self))
+        if field_name:
+            named_fields = [
+                wrapped_part_whole_relationship_field
+                for wrapped_part_whole_relationship_field in candidate_fields
+                if wrapped_part_whole_relationship_field.field.name == field_name
+            ]
+            if not named_fields:
+                raise UnknownPartWholeRelationshipField(
+                    self,
+                    field_name,
+                    [
+                        wrapped_part_whole_relationship_field.field.name
+                        for wrapped_part_whole_relationship_field in candidate_fields
+                    ],
+                )
+            candidate_fields = named_fields
+        matches = [
+            wrapped_part_whole_relationship_field
+            for wrapped_part_whole_relationship_field in candidate_fields
+            if isinstance(part, wrapped_part_whole_relationship_field.type_endpoint)
+        ]
+        if not matches:
+            raise CannotBeAPartOf(self, part)
+        if len(matches) > 1:
+            raise AmbiguousPart(self, part, [match.field for match in matches])
+
+        [match] = matches
+        part._mount_strategy(self)
+        if match.is_many_to_many_relationship:
+            getattr(self, match.field.name).append(part)
+        else:
+            setattr(self, match.field.name, part)
+
+
+@dataclass(eq=False)
+class HasApertures(HasRootBody, PartWholeRelationship, ABC):
     """
     A mixin class for semantic annotations that have apertures.
     """
 
-    apertures: List[Aperture] = field(default_factory=list, hash=False, kw_only=True)
+    apertures: List[Aperture] = part_whole_relationship_field(
+        default_factory=list, hash=False, kw_only=True
+    )
     """
     The apertures of the semantic annotation.
     """
 
-    @synchronized_attribute_modification
-    def add_aperture(self, aperture: Aperture):
-        """
-        Cuts a hole in the semantic annotation's body for the given body annotation.
-
-        :param aperture: The aperture to cut a hole for.
-        """
-        self._remove_aperture_geometry_from_parent(aperture)
-        self._attach_child_entity_in_kinematic_structure(aperture.root)
-        self.apertures.append(aperture)
-
-    def _remove_aperture_geometry_from_parent(self, aperture: Aperture):
-        """
-        Remove the geometry of the aperture from the parent body's collision and visual geometry.
-
-        :param aperture: The aperture whose geometry should be removed.
-        """
-
-        world = self._world
-        world.update_forward_kinematics()
-        hole_event = aperture.root.area.as_bounding_box_collection_in_frame(
-            self.root
-        ).event
-        wall_event = self.root.collision.as_bounding_box_collection_in_frame(
-            self.root
-        ).event
-        new_wall_event = wall_event - hole_event
-        new_bounding_box_collection = BoundingBoxCollection.from_event(
-            self.root, new_wall_event
-        ).as_shapes()
-
-        self.root.collision = new_bounding_box_collection
-        self.root.visual = new_bounding_box_collection
-
 
 @dataclass(eq=False)
-class HasHinge(HasRootBody, ABC):
+class HasMechanicalJoint(HasRootBody, PartWholeRelationship, ABC):
     """
-    A mixin class for semantic annotations that have hinge joints.
-    """
-
-    hinge: Optional[Hinge] = field(default=None)
-    """
-    The hinge of the semantic annotation.
+    A mixin class for semantic annotations that have mechanical joints.
     """
 
-    @synchronized_attribute_modification
-    def add_hinge(
-        self,
-        hinge: Hinge,
-    ):
-        """
-        Add a hinge to the semantic annotation.
-
-        :param hinge: The hinge to add.
-        """
-        self._attach_parent_entity_in_kinematic_structure(
-            hinge.root,
-        )
-        self.hinge = hinge
+    mechanical_joint: Optional[MechanicalJoint] = part_whole_relationship_field(
+        default=None
+    )
+    """
+    The mechanical joint of the semantic annotation.
+    """
 
     def _kinematic_structure_entities(
         self, visited: Set[int]
@@ -500,132 +463,53 @@ class HasHinge(HasRootBody, ABC):
         kinematic_structure_entities = (
             self._world.get_kinematic_structure_entities_of_branch(self.root)
         )
-        if self.hinge is not None:
-            kinematic_structure_entities.append(self.hinge.root)
+        if self.mechanical_joint is not None:
+            kinematic_structure_entities.append(self.mechanical_joint.root)
         return kinematic_structure_entities
 
 
 @dataclass(eq=False)
-class HasSlider(HasRootKinematicStructureEntity, ABC):
-    """
-    A mixin class for semantic annotations that have slider joints.
-    """
-
-    slider: Optional[Slider] = field(default=None)
-    """
-    The slider of the semantic annotation.
-    """
-
-    @synchronized_attribute_modification
-    def add_slider(
-        self,
-        slider: Slider,
-    ):
-        """
-        Add a slider to the semantic annotation.
-
-        :param slider: The slider to add.
-        """
-        self._attach_parent_entity_in_kinematic_structure(
-            slider.root,
-        )
-        self.slider = slider
-
-    def _kinematic_structure_entities(
-        self, visited: Set[int]
-    ) -> list[KinematicStructureEntity]:
-        if id(self) in visited:
-            return []
-        visited.add(id(self))
-        kinematic_structure_entities = (
-            self._world.get_kinematic_structure_entities_of_branch(self.root)
-        )
-        if self.slider is not None:
-            kinematic_structure_entities.append(self.slider.root)
-        return kinematic_structure_entities
-
-
-@dataclass(eq=False)
-class HasDrawers(HasRootKinematicStructureEntity, ABC):
+class HasDrawers(PartWholeRelationship, ABC):
     """
     A mixin class for semantic annotations that have drawers.
     """
 
-    drawers: List[Drawer] = field(default_factory=list, hash=False, kw_only=True)
+    drawers: List[Drawer] = part_whole_relationship_field(
+        default_factory=list, hash=False, kw_only=True
+    )
     """
     The drawers of the semantic annotation.
     """
 
-    @synchronized_attribute_modification
-    def add_drawer(
-        self,
-        drawer: Drawer,
-    ):
-        """
-        Add a drawer to the semantic annotation.
-
-        :param drawer: The drawer to add.
-        """
-
-        self._attach_child_entity_in_kinematic_structure(drawer.root)
-        self.drawers.append(drawer)
-
 
 @dataclass(eq=False)
-class HasDoors(HasRootKinematicStructureEntity, ABC):
+class HasDoors(PartWholeRelationship, ABC):
     """
     A mixin class for semantic annotations that have doors.
     """
 
-    doors: List[Door] = field(default_factory=list, hash=False, kw_only=True)
+    doors: List[Door] = part_whole_relationship_field(
+        default_factory=list, hash=False, kw_only=True
+    )
     """
     The doors of the semantic annotation.
     """
 
-    @synchronized_attribute_modification
-    def add_door(
-        self,
-        door: Door,
-    ):
-        """
-        Add a door to the semantic annotation.
-
-        :param door: The door to add.
-        """
-
-        self._attach_child_entity_in_kinematic_structure(door.root)
-        self.doors.append(door)
-
 
 @dataclass(eq=False)
-class HasHandle(HasRootBody, ABC):
+class HasHandle(HasRootBody, PartWholeRelationship, ABC):
     """
     A mixin class for semantic annotations that have a handle.
     """
 
-    handle: Optional[Handle] = None
+    handle: Optional[Handle] = part_whole_relationship_field(default=None)
     """
     The handle of the semantic annotation.
     """
 
-    @synchronized_attribute_modification
-    def add_handle(
-        self,
-        handle: Handle,
-    ):
-        """
-        Adds a handle to the parent world with a fixed connection.
-
-        :param handle: The handle to add.
-        """
-        self._attach_child_entity_in_kinematic_structure(
-            handle.root,
-        )
-        self.handle = handle
-
 
 @dataclass(eq=False)
-class HasStorageSpace(HasRootBody, ABC):
+class IsStorageSpace(HasRootBody, ABC):
     """
     A mixin class for semantic annotations that represent storage spaces. Used to afterthefact add object for example
     to a table, and have those objects move with the table when it is moved.
@@ -633,12 +517,14 @@ class HasStorageSpace(HasRootBody, ABC):
 
     objects: List[HasRootBody] = field(default_factory=list, hash=False, kw_only=True)
     """
-    The objects stored in the semantic annotation.
+    The occupants currently contained in/on this annotation.
     """
 
     @synchronized_attribute_modification
     def add_object(self, object: HasRootBody):
-        self._attach_child_entity_in_kinematic_structure(object.root)
+        self._world.move_branch(
+            object.root, self.root, enable_unsafe_inside_world_block=True
+        )
         self.objects.append(object)
 
     def get_objects_of_type(
@@ -659,7 +545,7 @@ class HasStorageSpace(HasRootBody, ABC):
 
 
 @dataclass(eq=False)
-class HasSupportingSurface(HasStorageSpace, ABC):
+class HasSupportingSurface(IsStorageSpace, ABC):
     """
     A semantic annotation that represents a supporting surface.
     """
@@ -792,7 +678,9 @@ class HasSupportingSurface(HasStorageSpace, ABC):
 
     @synchronized_attribute_modification
     def add_supporting_surface(self, region: Region):
-        self._attach_child_entity_in_kinematic_structure(region)
+        self._world.move_branch(
+            region, self.root, enable_unsafe_inside_world_block=True
+        )
         self.supporting_surface = region
 
     def sample_points_from_surface(

@@ -596,23 +596,23 @@ class WrappedTable:
 
         # handle one to one relationships
         elif (
-            wrapped_field.is_one_to_one_relationship
+            wrapped_field.is_many_to_one_relationship
             and wrapped_field.type_endpoint in self.ormatic.mapped_classes
         ):
-            logger.info(f"Parsing as one to one relationship.")
+            logger.info(f"Parsing as many to one relationship.")
             self.create_one_to_one_relationship(wrapped_field)
 
         # handle one to many relationships
         elif (
-            wrapped_field.is_one_to_many_relationship
+            wrapped_field.is_many_to_many_relationship
             and wrapped_field.type_endpoint in self.ormatic.mapped_classes
         ):
-            logger.info(f"Parsing as one to many relationship.")
+            logger.info(f"Parsing as many to many relationship.")
             self.create_many_to_many_relationship(wrapped_field)
 
         # handle custom types
         elif (
-            wrapped_field.is_one_to_one_relationship
+            wrapped_field.is_many_to_one_relationship
             and wrapped_field.type_endpoint in self.ormatic.type_mappings
         ):
             logger.info(

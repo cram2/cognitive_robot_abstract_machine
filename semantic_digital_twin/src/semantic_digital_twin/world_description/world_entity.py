@@ -1036,6 +1036,24 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):
             name=PrefixedName(self.name.name, prefix=self.name.prefix),
         )
 
+    def copy_with_new_parent(
+        self,
+        new_parent: KinematicStructureEntity,
+        parent_T_connection_expression: HomogeneousTransformationMatrix,
+    ) -> Self:
+        """
+        Create a copy of this connection re-parented under ``new_parent``, using
+        ``parent_T_connection_expression`` as the new parent offset and keeping the same child and
+        ``connection_T_child_expression``. Subclasses carrying extra state (e.g. an active degree of
+        freedom) override this to preserve it. Used to move a branch without collapsing its connection.
+        """
+        return self.__class__(
+            parent=new_parent,
+            child=self.child,
+            parent_T_connection_expression=parent_T_connection_expression,
+            connection_T_child_expression=self.connection_T_child_expression,
+        )
+
     def update_references_for_world(self, world: World):
         """
         Updates the parent and child references of this connection to the given world as well as the references from the expression.

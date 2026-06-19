@@ -282,31 +282,34 @@ public:
     };
 
     AbstractCompositeSetPtr_t simplify() override {
-        auto result = make_shared_simple_set_set();
-        bool first_iteration = true;
+        if (simple_sets->empty()) {
+            return Interval::make_shared();
+        }
 
-        for (const auto &current_simple_set: *simple_sets) {
-            auto current_simple_interval = std::static_pointer_cast<SimpleInterval>(current_simple_set);
+        // Use a vector so we can safely mutate the last element without
+        // triggering UB from modifying a key inside std::set.
+        std::vector<std::shared_ptr<SimpleInterval>> acc;
+        acc.reserve(simple_sets->size());
 
-            // if this is the first iteration, just copy the interval
-            if (first_iteration) {
-                result->insert(current_simple_interval);
-                first_iteration = false;
+        for (const auto &current_simple_set : *simple_sets) {
+            auto cur = std::static_pointer_cast<SimpleInterval>(current_simple_set);
+            if (acc.empty()) {
+                acc.push_back(std::make_shared<SimpleInterval>(*cur));
                 continue;
             }
-
-            auto last_simple_interval = std::dynamic_pointer_cast<SimpleInterval>(*result->rbegin());
-
-            if (last_simple_interval->upper > current_simple_interval->lower or (
-                last_simple_interval->upper == current_simple_interval->lower and not (
-                  last_simple_interval->right == BorderType::OPEN and
-                  current_simple_interval->left == BorderType::OPEN))) {
-                last_simple_interval->upper = current_simple_interval->upper;
-                last_simple_interval->right = current_simple_interval->right;
-                  } else {
-                      result->insert(current_simple_interval);
-                  }
+            auto &last = acc.back();
+            if (last->upper > cur->lower ||
+                (last->upper == cur->lower &&
+                 !(last->right == BorderType::OPEN && cur->left == BorderType::OPEN))) {
+                last->upper = cur->upper;
+                last->right = cur->right;
+            } else {
+                acc.push_back(std::make_shared<SimpleInterval>(*cur));
+            }
         }
+
+        auto result = make_shared_simple_set_set();
+        result->insert(acc.begin(), acc.end());
         return Interval::make_shared(result);
     };
 

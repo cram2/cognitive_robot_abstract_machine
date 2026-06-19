@@ -119,7 +119,7 @@ class NoServiceFoundError(Exception):
 def fetch_world_from_service(
     node: Node,
     service_suffix: str = "fetch_world",
-    timeout_seconds: float = 5.0,
+    timeout_seconds: float = 10.0,
 ) -> World:
     """
     Fetch a world from any WorldFetcher Service.

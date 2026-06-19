@@ -170,7 +170,7 @@ class Set(AbstractCompositeSet):
             *[SetElement.from_data(elem, all_elements) for elem in all_elements]
         )
 
-    @property
+    @cached_property
     def hash_map(self) -> HashMap:
         """
         :return: A map that maps the hashes of each element in all_elements to the element.

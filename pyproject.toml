@@ -31,8 +31,36 @@ dependencies = [
 dev = [
     "pytest>=7.0.0,<8.0.0",
     "pytest-asyncio>=0.23.0,<0.24.0",
-    "pytest-xdist"
+    "pytest-xdist",
+    "objgraph",
 
+]
+
+# Requirements for building the documentation of all sub-packages.
+# Collected from the doc/requirements.txt files of the workspace members
+# (coraplex, krrood, probabilistic_model, random_events, semantic_digital_twin).
+# Workspace packages (e.g. random-events) are omitted since they are core dependencies.
+doc = [
+    "jupyter-book<2.0.0",
+    "jupyter",
+    "ghp-import",
+    "nbconvert",
+    "jupytext",
+    "jupyterquiz",
+    "sphinx-autoapi",
+    "sphinx-proof",
+    "sphinxcontrib-plantuml",
+    "sphinxcontrib-mermaid",
+    "Pygments>=2.15.0",
+    "pylint",
+    "matplotlib",
+    "numpy",
+    "scipy",
+    "pillow",
+    "graphviz",
+    "polytope",
+    "ortools",
+    "cvxopt"
 ]
 
 [tool.uv.workspace]
@@ -78,3 +106,8 @@ segmind = { path = "segmind", develop = true }
 
 [tool.setuptools]
 packages = []
+
+[tool.docformatter]
+make-summary-multi-line = true
+pre-summary-newline = true
+close-quotes-on-newline = true
