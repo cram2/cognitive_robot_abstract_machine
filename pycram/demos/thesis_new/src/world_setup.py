@@ -209,6 +209,12 @@ def resolve_environment_path(environment_name=None):
     selected = environment_name or os.environ.get(
         THESIS_NEW_ENVIRONMENT_ENV, THESIS_NEW_DEFAULT_ENVIRONMENT
     )
+
+    if isinstance(selected, str) and (
+        selected.startswith("package://") or os.path.isabs(selected)
+    ):
+        return selected
+
     normalized = resolve_environment_name(selected)
 
     if normalized in EXTERNAL_ENVIRONMENT_SPECS:

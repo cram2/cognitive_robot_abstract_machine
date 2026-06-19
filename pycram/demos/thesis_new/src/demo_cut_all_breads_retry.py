@@ -31,6 +31,7 @@ from .spawn_random_breads import build_cutting_reachability_costmaps
 from pycram.robot_plans.actions.composite.thesis_math import body_local_aabb
 from .tool_mounts import get_tool_mount_pose_kwargs
 from .world_setup import resolve_robot_name
+from .utils.jpt_sampler import get_pose_scorer, rerank_by_score
 from .utils.demo_utils import (
     attach_available_tools,
     update_navigation_costmap_debug_publishers,
@@ -195,6 +196,8 @@ def _record_bread_result(
     robot_decision,
     decision_reason,
     final_success,
+    pose_sampler="costmap_fallback",
+    jpt_pose_loglik="",
     total_attempts,
     retry_count,
     collision_failure_count,
@@ -226,6 +229,8 @@ def _record_bread_result(
         robot_decision=robot_decision,
         decision_reason=decision_reason,
         final_success=final_success,
+        pose_sampler=pose_sampler,
+        jpt_pose_loglik=jpt_pose_loglik,
         total_attempts=total_attempts,
         retry_count=retry_count,
         collision_failure_count=collision_failure_count,
@@ -240,7 +245,7 @@ def _record_bread_result(
 
 
 def _results_csv_fieldnames():
-    return ["bread_name", *BASE_RESULT_FIELDNAMES]
+    return ["bread_name", "pose_sampler", "jpt_pose_loglik", *BASE_RESULT_FIELDNAMES]
 
 
 def _empty_motion_progress():
@@ -302,6 +307,34 @@ def _rotate_bread_z(world, bread, angle_rad):
         reference_frame=world.root,
     )
     set_entity_global_pose(world, bread, rotated_pose)
+
+
+def _align_bread_to_approach(world, bread, robot_pose):
+    """Rotate the bread about Z so its cut-normal (object local +x) is parallel to
+    the robot's approach direction (robot base -> bread).
+
+    This is the orientation successful cuts exhibit (cut_normal parallel to the
+    approach). Applying it for the chosen base pose makes object orientation correct
+    by construction, so it is no longer a source of failure and the demo no longer
+    needs rotation-retry attempts.
+
+    :return: the approach yaw the bread was aligned to.
+    """
+    bread_pos = np.asarray(
+        bread.global_pose.to_position().to_np(), dtype=float
+    ).reshape(-1)[:3]
+    bread_quat = np.asarray(
+        bread.global_pose.to_quaternion().to_np(), dtype=float
+    ).reshape(-1)[:4]
+    _, _, current_yaw = euler_from_quaternion(bread_quat)
+    robot_pos = np.asarray(
+        robot_pose.to_position().to_np(), dtype=float
+    ).reshape(-1)[:3]
+    approach_yaw = float(
+        np.arctan2(bread_pos[1] - robot_pos[1], bread_pos[0] - robot_pos[0])
+    )
+    _rotate_bread_z(world, bread, _wrap_angle_rad(approach_yaw - current_yaw))
+    return approach_yaw
     world.update_forward_kinematics()
 
 
@@ -316,6 +349,59 @@ def _fold_abs_angle_rad(angle):
 def _fold_parallel_angle_rad(angle):
     folded = _fold_abs_angle_rad(angle)
     return float(min(folded, abs(np.pi - folded)))
+
+
+def compute_cutting_cause_features(candidate_pose, bread):
+    """Cutting JPT cause-feature vector for a hypothetical robot base pose.
+
+    Mirrors the per-robot feature math in :func:`_build_cut_geometry_binding`
+    (object yaw / cut-normal derivation + the robot-relative angles), but is
+    parameterized by an arbitrary candidate base ``Pose`` so costmap candidates
+    can be scored before the robot is moved. Keys match the manifest ``cause_cols``.
+    """
+    object_pose = bread.global_pose
+    object_pos = np.asarray(
+        object_pose.to_position().to_np(), dtype=float
+    ).reshape(-1)[:3]
+    object_quat = np.asarray(
+        object_pose.to_quaternion().to_np(), dtype=float
+    ).reshape(-1)[:4]
+    _, _, object_yaw = euler_from_quaternion(object_quat)
+    rotation = quaternion_matrix(object_quat)[:3, :3]
+    cut_normal_world = rotation @ np.array([1.0, 0.0, 0.0], dtype=float)
+    cut_normal_world_yaw = float(
+        np.arctan2(cut_normal_world[1], cut_normal_world[0])
+    )
+
+    robot_pos = np.asarray(
+        candidate_pose.to_position().to_np(), dtype=float
+    ).reshape(-1)[:3]
+    robot_quat = np.asarray(
+        candidate_pose.to_quaternion().to_np(), dtype=float
+    ).reshape(-1)[:4]
+    _, _, robot_yaw = euler_from_quaternion(robot_quat)
+
+    robot_to_object_yaw = float(
+        np.arctan2(object_pos[1] - robot_pos[1], object_pos[0] - robot_pos[0])
+    )
+    object_yaw_relative_to_robot = _wrap_angle_rad(object_yaw - robot_yaw)
+    cut_normal_relative_to_approach = _wrap_angle_rad(
+        cut_normal_world_yaw - robot_to_object_yaw
+    )
+    return {
+        "robot_to_target_dist": float(
+            np.hypot(robot_pos[0] - object_pos[0], robot_pos[1] - object_pos[1])
+        ),
+        "robot_yaw_rad": float(robot_yaw),
+        "object_yaw_rad": float(object_yaw),
+        "object_yaw_relative_to_robot_rad": float(object_yaw_relative_to_robot),
+        "cut_normal_approach_parallel_score": float(
+            abs(np.cos(cut_normal_relative_to_approach))
+        ),
+        "cut_normal_approach_abs_angle_rad": float(
+            _fold_parallel_angle_rad(cut_normal_relative_to_approach)
+        ),
+    }
 
 
 @contextmanager
@@ -704,6 +790,18 @@ def main_cutting(
     )
 
     resolved_robot_name = resolve_robot_name(robot_name)
+    pose_scorer = get_pose_scorer("cutting", resolved_robot_name)
+    if pose_scorer is not None:
+        print(
+            f"[setup] using JPT base-pose sampler for cutting/{pose_scorer.robot}",
+            flush=True,
+        )
+    else:
+        print(
+            f"[setup] no cutting JPT for robot '{resolved_robot_name}'; "
+            "using costmap base-pose sampling",
+            flush=True,
+        )
     print("[setup] attaching cutting tools", flush=True)
     arm_tools, _ = _timed(
         "cut/attach_tools",
@@ -752,8 +850,6 @@ def main_cutting(
 
     success_primary = 0
     success_fallback = 0
-    success_rotated_90 = 0
-    success_rotated_180 = 0
     failed = 0
     failed_breads = set()
     successful_breads = set()
@@ -764,12 +860,7 @@ def main_cutting(
     total_breads = len(breads)
     for bread_index, bread in enumerate(breads, start=1):
         bread_name = _body_name(bread)
-        cut_count = (
-            success_primary
-            + success_fallback
-            + success_rotated_90
-            + success_rotated_180
-        )
+        cut_count = success_primary + success_fallback
         print(
             f"[Demo time] {cut_count}/{total_breads} cut breads "
             f"(next {bread_index}/{total_breads}: {bread_name})"
@@ -787,6 +878,22 @@ def main_cutting(
                 node, context.robot, world, bread, debug_costmap_publishers
             ),
         )
+        candidate_scorer = (
+            (lambda pose: pose_scorer.score(compute_cutting_cause_features(pose, bread)))
+            if pose_scorer is not None
+            else None
+        )
+        pose_candidate_reranker = (
+            (
+                lambda candidates: rerank_by_score(
+                    candidates,
+                    lambda pose: compute_cutting_cause_features(pose, bread),
+                    pose_scorer,
+                )
+            )
+            if pose_scorer is not None
+            else None
+        )
         pickup_loc, _ = _timed(
             f"bread/{bread_name}/pickup_loc_build",
             lambda: CostmapLocation(
@@ -802,6 +909,7 @@ def main_cutting(
                 ring_distance=CUTTING_RING_DISTANCE,
                 obstacle_clearance=_cutting_obstacle_clearance(context.robot),
                 context=context,
+                candidate_reranker=pose_candidate_reranker,
             ),
         )
         highlight_elapsed = 0.0
@@ -828,6 +936,8 @@ def main_cutting(
             "seed": effective_seed,
             "world_name": world_name,
             "run_id": run_id,
+            "pose_sampler": "costmap_fallback",
+            "jpt_pose_loglik": "",
         }
         try:
             pickup_pose, pickup_resolve_elapsed = _timed(
@@ -884,39 +994,21 @@ def main_cutting(
                     f"{time.perf_counter() - bread_start_time:.3f}s"
                 )
             continue
-        arm_attempt_groups = [
-            ("primary", arm_tools, None),
-            ("rotated_90", arm_tools, np.pi / 2),
-            ("rotated_180", arm_tools, np.pi / 2),
-        ]
+        if candidate_scorer is not None:
+            chosen_score = candidate_scorer(pickup_pose)
+            if chosen_score is not None and np.isfinite(chosen_score):
+                common_result_kwargs["pose_sampler"] = "jpt"
+                common_result_kwargs["jpt_pose_loglik"] = round(float(chosen_score), 8)
+        # Orient the bread correctly for the chosen base pose (cut-normal parallel to
+        # the approach). Object orientation is therefore correct by construction and
+        # no longer a source of failure, so no rotation-retry attempts are needed.
+        _align_bread_to_approach(world, bread, pickup_pose)
+        arm_attempt_groups = [("primary", arm_tools, None)]
         attempt_succeeded = False
 
         for group_index, (phase_name, current_arm_tools, rotation_delta) in enumerate(
             arm_attempt_groups
         ):
-            if rotation_delta is not None:
-                print(
-                    f"[retry] {bread_name}: rotate bread to "
-                    f"{90 if phase_name == 'rotated_90' else 180}deg around Z"
-                )
-                _rotate_bread_z(world, bread, rotation_delta)
-                perturbation_applied = True
-                perturbation_type = (
-                    "rotate_z_90deg"
-                    if phase_name == "rotated_90"
-                    else "rotate_z_180deg"
-                )
-                debug_costmap_publishers, _ = _timed(
-                    f"bread/{bread_name}/{phase_name}/costmap_preview",
-                    lambda: _update_costmap_debug_publishers(
-                        node,
-                        context.robot,
-                        world,
-                        bread,
-                        debug_costmap_publishers,
-                    ),
-                )
-
             for attempt_index, (arm, tool) in enumerate(current_arm_tools):
                 is_primary_phase = group_index == 0 and attempt_index == 0
                 is_fallback_phase = group_index == 0 and attempt_index > 0
@@ -959,16 +1051,7 @@ def main_cutting(
                         success_primary += 1
                     elif is_fallback_phase:
                         success_fallback += 1
-                    elif phase_name == "rotated_90":
-                        success_rotated_90 += 1
-                    elif phase_name == "rotated_180":
-                        success_rotated_180 += 1
-                    cut_count = (
-                        success_primary
-                        + success_fallback
-                        + success_rotated_90
-                        + success_rotated_180
-                    )
+                    cut_count = success_primary + success_fallback
                     print(f"[Demo time] {cut_count}/{total_breads} cut breads")
                     successful_breads.add(bread)
                     result_row = _record_bread_result(
@@ -1108,8 +1191,6 @@ def main_cutting(
     print(f"  total breads: {len(breads)}")
     print(f"  success primary (RIGHT): {success_primary}")
     print(f"  success fallback (LEFT): {success_fallback}")
-    print(f"  success after 90deg rotation: {success_rotated_90}")
-    print(f"  success after 180deg rotation: {success_rotated_180}")
     print(f"  failed all attempts: {failed}")
     print(f"  results csv: {RESULTS_CSV_PATH}")
 

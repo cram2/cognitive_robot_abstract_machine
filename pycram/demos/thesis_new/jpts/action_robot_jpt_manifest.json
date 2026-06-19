@@ -1,0 +1,2374 @@
+{
+  "cutting": {
+    "armar7": {
+      "action": "cutting",
+      "robot": "armar7",
+      "file_path": "jpts/cutting_armar7_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_yaw_relative_to_robot_rad",
+        "cut_normal_approach_parallel_score",
+        "cut_normal_approach_abs_angle_rad",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_yaw_relative_to_robot_rad",
+        "cut_normal_approach_parallel_score",
+        "cut_normal_approach_abs_angle_rad"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 108,
+      "n_leaves": 5,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.8194,
+          "std": 0.1326,
+          "p5": 0.5837,
+          "p95": 1.0029,
+          "min": 0.4814,
+          "max": 1.0864
+        },
+        "robot_yaw_rad": {
+          "mean": -0.4938,
+          "std": 1.7929,
+          "p5": -2.7973,
+          "p95": 2.3332,
+          "min": -2.9463,
+          "max": 3.0946
+        },
+        "object_yaw_rad": {
+          "mean": 0.1162,
+          "std": 1.8958,
+          "p5": -2.8631,
+          "p95": 2.8801,
+          "min": -3.116,
+          "max": 3.1334
+        },
+        "object_yaw_relative_to_robot_rad": {
+          "mean": -0.9026,
+          "std": 2.0134,
+          "p5": -3.0376,
+          "p95": 2.9557,
+          "min": -3.1268,
+          "max": 3.1213
+        },
+        "cut_normal_approach_parallel_score": {
+          "mean": 0.6512,
+          "std": 0.2918,
+          "p5": 0.1635,
+          "p95": 0.9953,
+          "min": 0.101,
+          "max": 0.9999
+        },
+        "cut_normal_approach_abs_angle_rad": {
+          "mean": 0.7711,
+          "std": 0.4363,
+          "p5": 0.0968,
+          "p95": 1.4066,
+          "min": 0.0163,
+          "max": 1.4696
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.4732,
+          "std": 0.251,
+          "p5": 0.0,
+          "p95": 0.7037,
+          "min": 0.0,
+          "max": 0.7048
+        }
+      }
+    },
+    "garmi": {
+      "action": "cutting",
+      "robot": "garmi",
+      "file_path": "jpts/cutting_garmi_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_yaw_relative_to_robot_rad",
+        "cut_normal_approach_parallel_score",
+        "cut_normal_approach_abs_angle_rad",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_yaw_relative_to_robot_rad",
+        "cut_normal_approach_parallel_score",
+        "cut_normal_approach_abs_angle_rad"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 159,
+      "n_leaves": 8,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 1.0342,
+          "std": 0.1987,
+          "p5": 0.7275,
+          "p95": 1.3665,
+          "min": 0.5661,
+          "max": 1.4958
+        },
+        "robot_yaw_rad": {
+          "mean": 0.161,
+          "std": 1.7846,
+          "p5": -2.7902,
+          "p95": 3.023,
+          "min": -3.0338,
+          "max": 3.1373
+        },
+        "object_yaw_rad": {
+          "mean": -0.0943,
+          "std": 1.732,
+          "p5": -2.7742,
+          "p95": 2.7743,
+          "min": -3.1144,
+          "max": 3.1334
+        },
+        "object_yaw_relative_to_robot_rad": {
+          "mean": -0.4134,
+          "std": 1.6529,
+          "p5": -2.8314,
+          "p95": 2.8046,
+          "min": -3.1343,
+          "max": 3.1333
+        },
+        "cut_normal_approach_parallel_score": {
+          "mean": 0.6034,
+          "std": 0.3091,
+          "p5": 0.0654,
+          "p95": 0.9932,
+          "min": 0.0059,
+          "max": 0.9994
+        },
+        "cut_normal_approach_abs_angle_rad": {
+          "mean": 0.8405,
+          "std": 0.4413,
+          "p5": 0.1171,
+          "p95": 1.5053,
+          "min": 0.0358,
+          "max": 1.5649
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.2625,
+          "std": 0.252,
+          "p5": 0.0,
+          "p95": 0.5048,
+          "min": 0.0,
+          "max": 0.5048
+        }
+      }
+    },
+    "hsrb": {
+      "action": "cutting",
+      "robot": "hsrb",
+      "file_path": "jpts/cutting_hsrb_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_yaw_relative_to_robot_rad",
+        "cut_normal_approach_parallel_score",
+        "cut_normal_approach_abs_angle_rad",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_yaw_relative_to_robot_rad",
+        "cut_normal_approach_parallel_score",
+        "cut_normal_approach_abs_angle_rad"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 39,
+      "n_leaves": 2,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.6452,
+          "std": 0.052,
+          "p5": 0.5083,
+          "p95": 0.6833,
+          "min": 0.4834,
+          "max": 0.6987
+        },
+        "robot_yaw_rad": {
+          "mean": -0.0328,
+          "std": 1.7112,
+          "p5": -3.042,
+          "p95": 3.0077,
+          "min": -3.1011,
+          "max": 3.1148
+        },
+        "object_yaw_rad": {
+          "mean": -0.0041,
+          "std": 1.8135,
+          "p5": -2.2392,
+          "p95": 2.713,
+          "min": -2.858,
+          "max": 2.8841
+        },
+        "object_yaw_relative_to_robot_rad": {
+          "mean": -2.0657,
+          "std": 0.7528,
+          "p5": -2.9079,
+          "p95": -0.393,
+          "min": -3.1093,
+          "max": -0.2307
+        },
+        "cut_normal_approach_parallel_score": {
+          "mean": 0.6581,
+          "std": 0.2399,
+          "p5": 0.1769,
+          "p95": 0.9495,
+          "min": 0.0799,
+          "max": 0.9842
+        },
+        "cut_normal_approach_abs_angle_rad": {
+          "mean": 0.8047,
+          "std": 0.3307,
+          "p5": 0.3188,
+          "p95": 1.3929,
+          "min": 0.1783,
+          "max": 1.4908
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.245,
+          "std": 0.2546,
+          "p5": 0.0,
+          "p95": 0.5029,
+          "min": 0.0,
+          "max": 0.5048
+        }
+      }
+    },
+    "pr2": {
+      "action": "cutting",
+      "robot": "pr2",
+      "file_path": "jpts/cutting_pr2_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_yaw_relative_to_robot_rad",
+        "cut_normal_approach_parallel_score",
+        "cut_normal_approach_abs_angle_rad",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_yaw_relative_to_robot_rad",
+        "cut_normal_approach_parallel_score",
+        "cut_normal_approach_abs_angle_rad"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 155,
+      "n_leaves": 8,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.8611,
+          "std": 0.1564,
+          "p5": 0.6081,
+          "p95": 1.1171,
+          "min": 0.5692,
+          "max": 1.3257
+        },
+        "robot_yaw_rad": {
+          "mean": 0.3035,
+          "std": 1.8556,
+          "p5": -3.1247,
+          "p95": 3.1368,
+          "min": -3.1416,
+          "max": 3.1416
+        },
+        "object_yaw_rad": {
+          "mean": -0.0709,
+          "std": 1.8517,
+          "p5": -2.9095,
+          "p95": 2.9083,
+          "min": -3.1144,
+          "max": 3.1334
+        },
+        "object_yaw_relative_to_robot_rad": {
+          "mean": -0.7798,
+          "std": 1.9319,
+          "p5": -2.9656,
+          "p95": 2.9248,
+          "min": -3.116,
+          "max": 3.1067
+        },
+        "cut_normal_approach_parallel_score": {
+          "mean": 0.6527,
+          "std": 0.322,
+          "p5": 0.0779,
+          "p95": 0.9993,
+          "min": 0.0025,
+          "max": 1.0
+        },
+        "cut_normal_approach_abs_angle_rad": {
+          "mean": 0.7455,
+          "std": 0.4853,
+          "p5": 0.038,
+          "p95": 1.4928,
+          "min": 0.0062,
+          "max": 1.5683
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.4019,
+          "std": 0.2135,
+          "p5": 0.0,
+          "p95": 0.6066,
+          "min": 0.0,
+          "max": 0.7037
+        }
+      }
+    },
+    "rollin_justin": {
+      "action": "cutting",
+      "robot": "rollin_justin",
+      "file_path": "jpts/cutting_rollin_justin_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_yaw_relative_to_robot_rad",
+        "cut_normal_approach_parallel_score",
+        "cut_normal_approach_abs_angle_rad",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_yaw_relative_to_robot_rad",
+        "cut_normal_approach_parallel_score",
+        "cut_normal_approach_abs_angle_rad"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 176,
+      "n_leaves": 9,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 1.0841,
+          "std": 0.2311,
+          "p5": 0.7365,
+          "p95": 1.5173,
+          "min": 0.5402,
+          "max": 1.8624
+        },
+        "robot_yaw_rad": {
+          "mean": -0.0061,
+          "std": 1.9016,
+          "p5": -3.0837,
+          "p95": 3.0122,
+          "min": -3.1337,
+          "max": 3.1237
+        },
+        "object_yaw_rad": {
+          "mean": -0.0631,
+          "std": 1.7237,
+          "p5": -2.8556,
+          "p95": 2.7769,
+          "min": -3.1144,
+          "max": 3.1334
+        },
+        "object_yaw_relative_to_robot_rad": {
+          "mean": -0.0214,
+          "std": 1.9315,
+          "p5": -2.7701,
+          "p95": 2.9502,
+          "min": -3.0747,
+          "max": 3.1258
+        },
+        "cut_normal_approach_parallel_score": {
+          "mean": 0.6293,
+          "std": 0.3179,
+          "p5": 0.0584,
+          "p95": 0.9992,
+          "min": 0.0073,
+          "max": 1.0
+        },
+        "cut_normal_approach_abs_angle_rad": {
+          "mean": 0.7866,
+          "std": 0.474,
+          "p5": 0.039,
+          "p95": 1.5123,
+          "min": 0.0002,
+          "max": 1.5635
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.3209,
+          "std": 0.2514,
+          "p5": 0.0,
+          "p95": 0.6063,
+          "min": 0.0,
+          "max": 0.7037
+        }
+      }
+    },
+    "tiago": {
+      "action": "cutting",
+      "robot": "tiago",
+      "file_path": "jpts/cutting_tiago_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_yaw_relative_to_robot_rad",
+        "cut_normal_approach_parallel_score",
+        "cut_normal_approach_abs_angle_rad",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_yaw_relative_to_robot_rad",
+        "cut_normal_approach_parallel_score",
+        "cut_normal_approach_abs_angle_rad"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 150,
+      "n_leaves": 8,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.7139,
+          "std": 0.1424,
+          "p5": 0.5238,
+          "p95": 0.9363,
+          "min": 0.4078,
+          "max": 1.2019
+        },
+        "robot_yaw_rad": {
+          "mean": 0.2709,
+          "std": 1.7661,
+          "p5": -2.9966,
+          "p95": 3.1308,
+          "min": -3.1393,
+          "max": 3.1415
+        },
+        "object_yaw_rad": {
+          "mean": -0.2429,
+          "std": 1.8414,
+          "p5": -2.96,
+          "p95": 2.879,
+          "min": -3.1089,
+          "max": 3.1334
+        },
+        "object_yaw_relative_to_robot_rad": {
+          "mean": -1.1002,
+          "std": 1.8768,
+          "p5": -2.9595,
+          "p95": 2.9754,
+          "min": -3.1386,
+          "max": 3.1149
+        },
+        "cut_normal_approach_parallel_score": {
+          "mean": 0.668,
+          "std": 0.3114,
+          "p5": 0.0877,
+          "p95": 0.9988,
+          "min": 0.0082,
+          "max": 0.9997
+        },
+        "cut_normal_approach_abs_angle_rad": {
+          "mean": 0.722,
+          "std": 0.4811,
+          "p5": 0.048,
+          "p95": 1.4829,
+          "min": 0.0229,
+          "max": 1.5626
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.3038,
+          "std": 0.2482,
+          "p5": 0.0,
+          "p95": 0.5048,
+          "min": 0.0,
+          "max": 0.7037
+        }
+      }
+    },
+    "unitree_g1": {
+      "action": "cutting",
+      "robot": "unitree_g1",
+      "file_path": "jpts/cutting_unitree_g1_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_yaw_relative_to_robot_rad",
+        "cut_normal_approach_parallel_score",
+        "cut_normal_approach_abs_angle_rad",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_yaw_relative_to_robot_rad",
+        "cut_normal_approach_parallel_score",
+        "cut_normal_approach_abs_angle_rad"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 136,
+      "n_leaves": 7,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.6643,
+          "std": 0.1227,
+          "p5": 0.4373,
+          "p95": 0.8073,
+          "min": 0.3127,
+          "max": 1.0979
+        },
+        "robot_yaw_rad": {
+          "mean": 0.2022,
+          "std": 1.6739,
+          "p5": -2.9255,
+          "p95": 2.9219,
+          "min": -3.1392,
+          "max": 3.1113
+        },
+        "object_yaw_rad": {
+          "mean": -0.2354,
+          "std": 1.7918,
+          "p5": -2.8773,
+          "p95": 2.5908,
+          "min": -3.0697,
+          "max": 3.1334
+        },
+        "object_yaw_relative_to_robot_rad": {
+          "mean": -1.3154,
+          "std": 1.4692,
+          "p5": -3.0055,
+          "p95": 2.5326,
+          "min": -3.1372,
+          "max": 2.9846
+        },
+        "cut_normal_approach_parallel_score": {
+          "mean": 0.6531,
+          "std": 0.2847,
+          "p5": 0.0866,
+          "p95": 0.9918,
+          "min": 0.036,
+          "max": 0.9997
+        },
+        "cut_normal_approach_abs_angle_rad": {
+          "mean": 0.7803,
+          "std": 0.4122,
+          "p5": 0.1284,
+          "p95": 1.4841,
+          "min": 0.0231,
+          "max": 1.5347
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.5223,
+          "std": 0.2854,
+          "p5": 0.0,
+          "p95": 0.8942,
+          "min": 0.0,
+          "max": 0.9312
+        }
+      }
+    }
+  },
+  "mixing": {
+    "armar7": {
+      "action": "mixing",
+      "robot": "armar7",
+      "file_path": "jpts/mixing_armar7_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 108,
+      "n_leaves": 6,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.8568,
+          "std": 0.1296,
+          "p5": 0.5612,
+          "p95": 1.0188,
+          "min": 0.4678,
+          "max": 1.0792
+        },
+        "robot_yaw_rad": {
+          "mean": -0.2473,
+          "std": 1.7516,
+          "p5": -2.7045,
+          "p95": 2.6554,
+          "min": -2.987,
+          "max": 3.0835
+        },
+        "object_yaw_rad": {
+          "mean": 0.241,
+          "std": 1.9111,
+          "p5": -3.0748,
+          "p95": 2.8936,
+          "min": -3.1411,
+          "max": 3.1061
+        },
+        "object_volume_aabb": {
+          "mean": 0.0023,
+          "std": 0.0013,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "mixing_estimated_completed_time_s": {
+          "mean": 1.1749,
+          "std": 0.6636,
+          "p5": 0.0705,
+          "p95": 1.91,
+          "min": 0.0,
+          "max": 1.98
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.5875,
+          "std": 0.3318,
+          "p5": 0.0353,
+          "p95": 0.955,
+          "min": 0.0,
+          "max": 0.99
+        }
+      }
+    },
+    "garmi": {
+      "action": "mixing",
+      "robot": "garmi",
+      "file_path": "jpts/mixing_garmi_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 195,
+      "n_leaves": 9,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 1.1155,
+          "std": 0.0952,
+          "p5": 0.9598,
+          "p95": 1.2577,
+          "min": 0.7489,
+          "max": 1.374
+        },
+        "robot_yaw_rad": {
+          "mean": -0.1399,
+          "std": 1.8623,
+          "p5": -3.0647,
+          "p95": 3.0997,
+          "min": -3.1393,
+          "max": 3.1381
+        },
+        "object_yaw_rad": {
+          "mean": -0.0118,
+          "std": 1.8021,
+          "p5": -2.9788,
+          "p95": 2.8905,
+          "min": -3.1411,
+          "max": 3.1061
+        },
+        "object_volume_aabb": {
+          "mean": 0.0026,
+          "std": 0.0015,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "mixing_estimated_completed_time_s": {
+          "mean": 0.9635,
+          "std": 0.5453,
+          "p5": 0.12,
+          "p95": 1.84,
+          "min": 0.02,
+          "max": 1.98
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.4817,
+          "std": 0.2727,
+          "p5": 0.06,
+          "p95": 0.92,
+          "min": 0.01,
+          "max": 0.99
+        }
+      }
+    },
+    "hsrb": {
+      "action": "mixing",
+      "robot": "hsrb",
+      "file_path": "jpts/mixing_hsrb_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 191,
+      "n_leaves": 10,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.6075,
+          "std": 0.0507,
+          "p5": 0.5319,
+          "p95": 0.6919,
+          "min": 0.4908,
+          "max": 0.7416
+        },
+        "robot_yaw_rad": {
+          "mean": 0.5396,
+          "std": 1.7557,
+          "p5": -2.1177,
+          "p95": 2.9099,
+          "min": -3.1255,
+          "max": 3.0341
+        },
+        "object_yaw_rad": {
+          "mean": 0.0127,
+          "std": 1.8306,
+          "p5": -2.9879,
+          "p95": 2.8923,
+          "min": -3.1411,
+          "max": 3.1298
+        },
+        "object_volume_aabb": {
+          "mean": 0.0025,
+          "std": 0.0014,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "mixing_estimated_completed_time_s": {
+          "mean": 1.0014,
+          "std": 0.5798,
+          "p5": 0.07,
+          "p95": 1.89,
+          "min": 0.0,
+          "max": 1.99
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.5007,
+          "std": 0.2899,
+          "p5": 0.035,
+          "p95": 0.945,
+          "min": 0.0,
+          "max": 0.995
+        }
+      }
+    },
+    "pr2": {
+      "action": "mixing",
+      "robot": "pr2",
+      "file_path": "jpts/mixing_pr2_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 210,
+      "n_leaves": 10,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.9243,
+          "std": 0.1476,
+          "p5": 0.6244,
+          "p95": 1.1219,
+          "min": 0.5715,
+          "max": 1.2192
+        },
+        "robot_yaw_rad": {
+          "mean": -0.1579,
+          "std": 1.7857,
+          "p5": -2.7422,
+          "p95": 2.4987,
+          "min": -3.1247,
+          "max": 3.1381
+        },
+        "object_yaw_rad": {
+          "mean": -0.084,
+          "std": 1.8311,
+          "p5": -3.032,
+          "p95": 2.8648,
+          "min": -3.1411,
+          "max": 3.1061
+        },
+        "object_volume_aabb": {
+          "mean": 0.0027,
+          "std": 0.0015,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "mixing_estimated_completed_time_s": {
+          "mean": 0.9211,
+          "std": 0.5398,
+          "p5": 0.1045,
+          "p95": 1.791,
+          "min": 0.02,
+          "max": 1.99
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.4606,
+          "std": 0.2699,
+          "p5": 0.0523,
+          "p95": 0.8955,
+          "min": 0.01,
+          "max": 0.995
+        }
+      }
+    },
+    "rollin_justin": {
+      "action": "mixing",
+      "robot": "rollin_justin",
+      "file_path": "jpts/mixing_rollin_justin_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 199,
+      "n_leaves": 10,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 1.0528,
+          "std": 0.166,
+          "p5": 0.7693,
+          "p95": 1.3652,
+          "min": 0.5408,
+          "max": 1.5644
+        },
+        "robot_yaw_rad": {
+          "mean": -0.3032,
+          "std": 1.9154,
+          "p5": -3.0318,
+          "p95": 2.8254,
+          "min": -3.1185,
+          "max": 3.1411
+        },
+        "object_yaw_rad": {
+          "mean": -0.0053,
+          "std": 1.8037,
+          "p5": -2.9698,
+          "p95": 2.897,
+          "min": -3.1361,
+          "max": 3.1298
+        },
+        "object_volume_aabb": {
+          "mean": 0.0027,
+          "std": 0.0015,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "mixing_estimated_completed_time_s": {
+          "mean": 0.8982,
+          "std": 0.5698,
+          "p5": 0.108,
+          "p95": 1.911,
+          "min": 0.01,
+          "max": 1.97
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.4491,
+          "std": 0.2849,
+          "p5": 0.054,
+          "p95": 0.9555,
+          "min": 0.005,
+          "max": 0.985
+        }
+      }
+    },
+    "stretch": {
+      "action": "mixing",
+      "robot": "stretch",
+      "file_path": "jpts/mixing_stretch_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 60,
+      "n_leaves": 3,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.551,
+          "std": 0.0913,
+          "p5": 0.4338,
+          "p95": 0.693,
+          "min": 0.3714,
+          "max": 0.7821
+        },
+        "robot_yaw_rad": {
+          "mean": 0.2516,
+          "std": 1.489,
+          "p5": -2.322,
+          "p95": 1.5815,
+          "min": -3.0145,
+          "max": 2.7118
+        },
+        "object_yaw_rad": {
+          "mean": 0.2676,
+          "std": 1.6991,
+          "p5": -2.9405,
+          "p95": 2.9031,
+          "min": -3.1411,
+          "max": 3.0147
+        },
+        "object_volume_aabb": {
+          "mean": 0.0024,
+          "std": 0.0014,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "mixing_estimated_completed_time_s": {
+          "mean": 0.9742,
+          "std": 0.6178,
+          "p5": 0.1,
+          "p95": 1.9125,
+          "min": 0.02,
+          "max": 1.98
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.4871,
+          "std": 0.3089,
+          "p5": 0.05,
+          "p95": 0.9562,
+          "min": 0.01,
+          "max": 0.99
+        }
+      }
+    },
+    "tiago": {
+      "action": "mixing",
+      "robot": "tiago",
+      "file_path": "jpts/mixing_tiago_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 215,
+      "n_leaves": 11,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.7958,
+          "std": 0.1038,
+          "p5": 0.6075,
+          "p95": 0.9411,
+          "min": 0.4561,
+          "max": 1.0973
+        },
+        "robot_yaw_rad": {
+          "mean": -0.2487,
+          "std": 1.796,
+          "p5": -2.8774,
+          "p95": 2.9452,
+          "min": -3.0887,
+          "max": 3.065
+        },
+        "object_yaw_rad": {
+          "mean": 0.0231,
+          "std": 1.8262,
+          "p5": -2.9788,
+          "p95": 2.8979,
+          "min": -3.1411,
+          "max": 3.1298
+        },
+        "object_volume_aabb": {
+          "mean": 0.0027,
+          "std": 0.0015,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "mixing_estimated_completed_time_s": {
+          "mean": 0.9958,
+          "std": 0.5476,
+          "p5": 0.177,
+          "p95": 1.893,
+          "min": 0.02,
+          "max": 1.99
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.4979,
+          "std": 0.2738,
+          "p5": 0.0885,
+          "p95": 0.9465,
+          "min": 0.01,
+          "max": 0.995
+        }
+      }
+    },
+    "unitree_g1": {
+      "action": "mixing",
+      "robot": "unitree_g1",
+      "file_path": "jpts/mixing_unitree_g1_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "mixing_estimated_completed_time_s"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 218,
+      "n_leaves": 11,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.5806,
+          "std": 0.066,
+          "p5": 0.4794,
+          "p95": 0.6846,
+          "min": 0.3651,
+          "max": 0.7403
+        },
+        "robot_yaw_rad": {
+          "mean": 0.2307,
+          "std": 1.7334,
+          "p5": -2.8485,
+          "p95": 3.0631,
+          "min": -3.1343,
+          "max": 3.1339
+        },
+        "object_yaw_rad": {
+          "mean": 0.0389,
+          "std": 1.8281,
+          "p5": -2.9721,
+          "p95": 2.8443,
+          "min": -3.1411,
+          "max": 3.1298
+        },
+        "object_volume_aabb": {
+          "mean": 0.0026,
+          "std": 0.0014,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "mixing_estimated_completed_time_s": {
+          "mean": 1.0143,
+          "std": 0.5728,
+          "p5": 0.097,
+          "p95": 1.86,
+          "min": 0.01,
+          "max": 1.99
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.5072,
+          "std": 0.2864,
+          "p5": 0.0485,
+          "p95": 0.93,
+          "min": 0.005,
+          "max": 0.995
+        }
+      }
+    }
+  },
+  "wiping": {
+    "armar7": {
+      "action": "wiping",
+      "robot": "armar7",
+      "file_path": "jpts/wiping_armar7_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 40,
+      "n_leaves": 2,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.7936,
+          "std": 0.184,
+          "p5": 0.5492,
+          "p95": 1.0491,
+          "min": 0.5291,
+          "max": 1.3082
+        },
+        "robot_yaw_rad": {
+          "mean": 0.1968,
+          "std": 1.2423,
+          "p5": -1.8407,
+          "p95": 2.3888,
+          "min": -3.0394,
+          "max": 2.9242
+        },
+        "object_yaw_rad": {
+          "mean": -0.2179,
+          "std": 1.5764,
+          "p5": -2.8169,
+          "p95": 2.5043,
+          "min": -2.9213,
+          "max": 2.8343
+        },
+        "target_world_x": {
+          "mean": 1.2192,
+          "std": 1.2501,
+          "p5": -1.2196,
+          "p95": 2.959,
+          "min": -1.3056,
+          "max": 2.9727
+        },
+        "target_world_y": {
+          "mean": 0.0133,
+          "std": 1.0094,
+          "p5": -2.0428,
+          "p95": 1.3686,
+          "min": -2.2199,
+          "max": 2.5635
+        },
+        "target_world_z": {
+          "mean": 0.8174,
+          "std": 0.0309,
+          "p5": 0.795,
+          "p95": 0.866,
+          "min": 0.795,
+          "max": 0.866
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.9098,
+          "std": 0.1281,
+          "p5": 0.6659,
+          "p95": 1.0,
+          "min": 0.6515,
+          "max": 1.0
+        }
+      }
+    },
+    "garmi": {
+      "action": "wiping",
+      "robot": "garmi",
+      "file_path": "jpts/wiping_garmi_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 292,
+      "n_leaves": 15,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.9945,
+          "std": 0.1342,
+          "p5": 0.8057,
+          "p95": 1.2453,
+          "min": 0.7141,
+          "max": 1.4342
+        },
+        "robot_yaw_rad": {
+          "mean": 0.1641,
+          "std": 1.6277,
+          "p5": -3.0417,
+          "p95": 2.9969,
+          "min": -3.1396,
+          "max": 3.1227
+        },
+        "object_yaw_rad": {
+          "mean": 0.0405,
+          "std": 1.6885,
+          "p5": -2.6955,
+          "p95": 2.7544,
+          "min": -3.1301,
+          "max": 3.1227
+        },
+        "target_world_x": {
+          "mean": 1.7604,
+          "std": 1.7397,
+          "p5": -1.2165,
+          "p95": 4.9372,
+          "min": -2.7271,
+          "max": 5.2347
+        },
+        "target_world_y": {
+          "mean": 1.134,
+          "std": 1.9158,
+          "p5": -2.3951,
+          "p95": 3.9803,
+          "min": -2.6222,
+          "max": 4.6414
+        },
+        "target_world_z": {
+          "mean": 0.8013,
+          "std": 0.1466,
+          "p5": 0.4341,
+          "p95": 0.9518,
+          "min": 0.1736,
+          "max": 1.3428
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.8506,
+          "std": 0.1008,
+          "p5": 0.6902,
+          "p95": 1.0,
+          "min": 0.6515,
+          "max": 1.0
+        }
+      }
+    },
+    "hsrb": {
+      "action": "wiping",
+      "robot": "hsrb",
+      "file_path": "jpts/wiping_hsrb_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 219,
+      "n_leaves": 11,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.5409,
+          "std": 0.0942,
+          "p5": 0.3845,
+          "p95": 0.6879,
+          "min": 0.3645,
+          "max": 0.8623
+        },
+        "robot_yaw_rad": {
+          "mean": -0.2023,
+          "std": 1.4483,
+          "p5": -3.1062,
+          "p95": 2.3564,
+          "min": -3.1364,
+          "max": 3.1344
+        },
+        "object_yaw_rad": {
+          "mean": -0.1391,
+          "std": 1.4432,
+          "p5": -2.8531,
+          "p95": 2.5792,
+          "min": -3.1351,
+          "max": 3.1264
+        },
+        "target_world_x": {
+          "mean": 1.6661,
+          "std": 1.7627,
+          "p5": -1.2664,
+          "p95": 5.0209,
+          "min": -1.327,
+          "max": 5.2406
+        },
+        "target_world_y": {
+          "mean": 1.6151,
+          "std": 1.7307,
+          "p5": -2.1456,
+          "p95": 4.0136,
+          "min": -2.5267,
+          "max": 4.6397
+        },
+        "target_world_z": {
+          "mean": 0.7182,
+          "std": 0.2061,
+          "p5": 0.2965,
+          "p95": 0.9518,
+          "min": 0.1621,
+          "max": 1.1622
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.8661,
+          "std": 0.0938,
+          "p5": 0.7273,
+          "p95": 1.0,
+          "min": 0.6667,
+          "max": 1.0
+        }
+      }
+    },
+    "pr2": {
+      "action": "wiping",
+      "robot": "pr2",
+      "file_path": "jpts/wiping_pr2_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 326,
+      "n_leaves": 17,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.8317,
+          "std": 0.1541,
+          "p5": 0.5732,
+          "p95": 1.073,
+          "min": 0.4951,
+          "max": 1.1793
+        },
+        "robot_yaw_rad": {
+          "mean": 0.2656,
+          "std": 1.6002,
+          "p5": -2.4697,
+          "p95": 1.8657,
+          "min": -3.1,
+          "max": 2.9704
+        },
+        "object_yaw_rad": {
+          "mean": -0.1351,
+          "std": 1.5818,
+          "p5": -2.7915,
+          "p95": 2.6234,
+          "min": -3.1351,
+          "max": 3.1264
+        },
+        "target_world_x": {
+          "mean": 1.6011,
+          "std": 1.7497,
+          "p5": -1.2132,
+          "p95": 4.9152,
+          "min": -2.7271,
+          "max": 5.2406
+        },
+        "target_world_y": {
+          "mean": 1.7088,
+          "std": 1.6238,
+          "p5": -1.6183,
+          "p95": 3.9946,
+          "min": -2.5908,
+          "max": 4.6397
+        },
+        "target_world_z": {
+          "mean": 0.7922,
+          "std": 0.1758,
+          "p5": 0.3774,
+          "p95": 0.9518,
+          "min": 0.252,
+          "max": 1.3428
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.8222,
+          "std": 0.1029,
+          "p5": 0.6818,
+          "p95": 1.0,
+          "min": 0.6515,
+          "max": 1.0
+        }
+      }
+    },
+    "rollin_justin": {
+      "action": "wiping",
+      "robot": "rollin_justin",
+      "file_path": "jpts/wiping_rollin_justin_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 94,
+      "n_leaves": 4,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.8729,
+          "std": 0.1824,
+          "p5": 0.5991,
+          "p95": 1.1767,
+          "min": 0.539,
+          "max": 1.3111
+        },
+        "robot_yaw_rad": {
+          "mean": 0.3358,
+          "std": 1.4862,
+          "p5": -2.0622,
+          "p95": 3.0276,
+          "min": -3.1349,
+          "max": 3.1085
+        },
+        "object_yaw_rad": {
+          "mean": -0.4302,
+          "std": 1.7858,
+          "p5": -2.883,
+          "p95": 2.582,
+          "min": -3.0818,
+          "max": 3.1264
+        },
+        "target_world_x": {
+          "mean": 0.7989,
+          "std": 1.4876,
+          "p5": -1.3042,
+          "p95": 2.7725,
+          "min": -2.669,
+          "max": 2.9727
+        },
+        "target_world_y": {
+          "mean": -0.037,
+          "std": 1.3762,
+          "p5": -2.3812,
+          "p95": 2.1006,
+          "min": -2.5933,
+          "max": 2.8887
+        },
+        "target_world_z": {
+          "mean": 0.8191,
+          "std": 0.0541,
+          "p5": 0.795,
+          "p95": 0.866,
+          "min": 0.405,
+          "max": 0.866
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.8417,
+          "std": 0.1155,
+          "p5": 0.6667,
+          "p95": 1.0,
+          "min": 0.6515,
+          "max": 1.0
+        }
+      }
+    },
+    "stretch": {
+      "action": "wiping",
+      "robot": "stretch",
+      "file_path": "jpts/wiping_stretch_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 234,
+      "n_leaves": 12,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.4841,
+          "std": 0.1004,
+          "p5": 0.3736,
+          "p95": 0.6971,
+          "min": 0.319,
+          "max": 0.8407
+        },
+        "robot_yaw_rad": {
+          "mean": 0.1259,
+          "std": 1.7145,
+          "p5": -2.7613,
+          "p95": 2.4467,
+          "min": -3.0698,
+          "max": 3.13
+        },
+        "object_yaw_rad": {
+          "mean": -0.1725,
+          "std": 1.6499,
+          "p5": -2.883,
+          "p95": 2.6841,
+          "min": -3.1351,
+          "max": 3.1227
+        },
+        "target_world_x": {
+          "mean": 1.4555,
+          "std": 1.8303,
+          "p5": -1.2859,
+          "p95": 4.8783,
+          "min": -2.9818,
+          "max": 5.2406
+        },
+        "target_world_y": {
+          "mean": 1.3661,
+          "std": 1.8062,
+          "p5": -2.2639,
+          "p95": 4.0206,
+          "min": -2.5992,
+          "max": 4.6397
+        },
+        "target_world_z": {
+          "mean": 0.8005,
+          "std": 0.1715,
+          "p5": 0.405,
+          "p95": 0.9518,
+          "min": 0.1621,
+          "max": 1.3428
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.7931,
+          "std": 0.1833,
+          "p5": 0.3939,
+          "p95": 1.0,
+          "min": 0.0606,
+          "max": 1.0
+        }
+      }
+    },
+    "tiago": {
+      "action": "wiping",
+      "robot": "tiago",
+      "file_path": "jpts/wiping_tiago_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 325,
+      "n_leaves": 16,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.6607,
+          "std": 0.1483,
+          "p5": 0.4049,
+          "p95": 0.8764,
+          "min": 0.2976,
+          "max": 1.0922
+        },
+        "robot_yaw_rad": {
+          "mean": 0.0387,
+          "std": 1.5547,
+          "p5": -2.8733,
+          "p95": 2.6216,
+          "min": -3.1057,
+          "max": 3.1227
+        },
+        "object_yaw_rad": {
+          "mean": -0.0962,
+          "std": 1.563,
+          "p5": -2.7922,
+          "p95": 2.6513,
+          "min": -3.1351,
+          "max": 3.1264
+        },
+        "target_world_x": {
+          "mean": 1.6864,
+          "std": 1.6994,
+          "p5": -1.2031,
+          "p95": 4.9153,
+          "min": -2.7271,
+          "max": 5.2406
+        },
+        "target_world_y": {
+          "mean": 1.5599,
+          "std": 1.7369,
+          "p5": -2.2237,
+          "p95": 3.9978,
+          "min": -2.5908,
+          "max": 4.6397
+        },
+        "target_world_z": {
+          "mean": 0.7707,
+          "std": 0.1915,
+          "p5": 0.3117,
+          "p95": 0.9518,
+          "min": 0.1621,
+          "max": 1.3428
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.8215,
+          "std": 0.1042,
+          "p5": 0.6697,
+          "p95": 1.0,
+          "min": 0.6364,
+          "max": 1.0
+        }
+      }
+    },
+    "unitree_g1": {
+      "action": "wiping",
+      "robot": "unitree_g1",
+      "file_path": "jpts/wiping_unitree_g1_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "target_world_x",
+        "target_world_y",
+        "target_world_z"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 125,
+      "n_leaves": 7,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.5594,
+          "std": 0.1158,
+          "p5": 0.388,
+          "p95": 0.7649,
+          "min": 0.2362,
+          "max": 0.8312
+        },
+        "robot_yaw_rad": {
+          "mean": 0.077,
+          "std": 1.7201,
+          "p5": -2.8994,
+          "p95": 3.0275,
+          "min": -3.1197,
+          "max": 3.1416
+        },
+        "object_yaw_rad": {
+          "mean": -0.2243,
+          "std": 1.7176,
+          "p5": -2.8443,
+          "p95": 2.6821,
+          "min": -3.1351,
+          "max": 3.1264
+        },
+        "target_world_x": {
+          "mean": 0.5831,
+          "std": 1.5725,
+          "p5": -1.2922,
+          "p95": 2.7404,
+          "min": -2.9184,
+          "max": 3.0571
+        },
+        "target_world_y": {
+          "mean": 0.4831,
+          "std": 1.5757,
+          "p5": -2.4048,
+          "p95": 2.6949,
+          "min": -2.5732,
+          "max": 3.3644
+        },
+        "target_world_z": {
+          "mean": 0.831,
+          "std": 0.0516,
+          "p5": 0.795,
+          "p95": 0.866,
+          "min": 0.405,
+          "max": 0.9518
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.819,
+          "std": 0.1546,
+          "p5": 0.6061,
+          "p95": 1.0,
+          "min": 0.2121,
+          "max": 1.0
+        }
+      }
+    }
+  },
+  "pouring": {
+    "armar7": {
+      "action": "pouring",
+      "robot": "armar7",
+      "file_path": "jpts/pouring_armar7_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 108,
+      "n_leaves": 6,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.8568,
+          "std": 0.1296,
+          "p5": 0.5612,
+          "p95": 1.0188,
+          "min": 0.4678,
+          "max": 1.0792
+        },
+        "robot_yaw_rad": {
+          "mean": -0.2473,
+          "std": 1.7516,
+          "p5": -2.7045,
+          "p95": 2.6554,
+          "min": -2.987,
+          "max": 3.0835
+        },
+        "object_yaw_rad": {
+          "mean": 0.241,
+          "std": 1.9111,
+          "p5": -3.0748,
+          "p95": 2.8936,
+          "min": -3.1411,
+          "max": 3.1061
+        },
+        "object_volume_aabb": {
+          "mean": 0.0023,
+          "std": 0.0013,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.5875,
+          "std": 0.3318,
+          "p5": 0.0353,
+          "p95": 0.955,
+          "min": 0.0,
+          "max": 0.99
+        }
+      }
+    },
+    "garmi": {
+      "action": "pouring",
+      "robot": "garmi",
+      "file_path": "jpts/pouring_garmi_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 195,
+      "n_leaves": 9,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 1.1155,
+          "std": 0.0952,
+          "p5": 0.9598,
+          "p95": 1.2577,
+          "min": 0.7489,
+          "max": 1.374
+        },
+        "robot_yaw_rad": {
+          "mean": -0.1399,
+          "std": 1.8623,
+          "p5": -3.0647,
+          "p95": 3.0997,
+          "min": -3.1393,
+          "max": 3.1381
+        },
+        "object_yaw_rad": {
+          "mean": -0.0118,
+          "std": 1.8021,
+          "p5": -2.9788,
+          "p95": 2.8905,
+          "min": -3.1411,
+          "max": 3.1061
+        },
+        "object_volume_aabb": {
+          "mean": 0.0026,
+          "std": 0.0015,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.4817,
+          "std": 0.2727,
+          "p5": 0.06,
+          "p95": 0.92,
+          "min": 0.01,
+          "max": 0.99
+        }
+      }
+    },
+    "hsrb": {
+      "action": "pouring",
+      "robot": "hsrb",
+      "file_path": "jpts/pouring_hsrb_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 191,
+      "n_leaves": 10,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.6075,
+          "std": 0.0507,
+          "p5": 0.5319,
+          "p95": 0.6919,
+          "min": 0.4908,
+          "max": 0.7416
+        },
+        "robot_yaw_rad": {
+          "mean": 0.5396,
+          "std": 1.7557,
+          "p5": -2.1177,
+          "p95": 2.9099,
+          "min": -3.1255,
+          "max": 3.0341
+        },
+        "object_yaw_rad": {
+          "mean": 0.0127,
+          "std": 1.8306,
+          "p5": -2.9879,
+          "p95": 2.8923,
+          "min": -3.1411,
+          "max": 3.1298
+        },
+        "object_volume_aabb": {
+          "mean": 0.0025,
+          "std": 0.0014,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.5007,
+          "std": 0.2899,
+          "p5": 0.035,
+          "p95": 0.945,
+          "min": 0.0,
+          "max": 0.995
+        }
+      }
+    },
+    "pr2": {
+      "action": "pouring",
+      "robot": "pr2",
+      "file_path": "jpts/pouring_pr2_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 210,
+      "n_leaves": 10,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.9243,
+          "std": 0.1476,
+          "p5": 0.6244,
+          "p95": 1.1219,
+          "min": 0.5715,
+          "max": 1.2192
+        },
+        "robot_yaw_rad": {
+          "mean": -0.1579,
+          "std": 1.7857,
+          "p5": -2.7422,
+          "p95": 2.4987,
+          "min": -3.1247,
+          "max": 3.1381
+        },
+        "object_yaw_rad": {
+          "mean": -0.084,
+          "std": 1.8311,
+          "p5": -3.032,
+          "p95": 2.8648,
+          "min": -3.1411,
+          "max": 3.1061
+        },
+        "object_volume_aabb": {
+          "mean": 0.0027,
+          "std": 0.0015,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.4606,
+          "std": 0.2699,
+          "p5": 0.0523,
+          "p95": 0.8955,
+          "min": 0.01,
+          "max": 0.995
+        }
+      }
+    },
+    "rollin_justin": {
+      "action": "pouring",
+      "robot": "rollin_justin",
+      "file_path": "jpts/pouring_rollin_justin_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 199,
+      "n_leaves": 10,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 1.0528,
+          "std": 0.166,
+          "p5": 0.7693,
+          "p95": 1.3652,
+          "min": 0.5408,
+          "max": 1.5644
+        },
+        "robot_yaw_rad": {
+          "mean": -0.3032,
+          "std": 1.9154,
+          "p5": -3.0318,
+          "p95": 2.8254,
+          "min": -3.1185,
+          "max": 3.1411
+        },
+        "object_yaw_rad": {
+          "mean": -0.0053,
+          "std": 1.8037,
+          "p5": -2.9698,
+          "p95": 2.897,
+          "min": -3.1361,
+          "max": 3.1298
+        },
+        "object_volume_aabb": {
+          "mean": 0.0027,
+          "std": 0.0015,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.4491,
+          "std": 0.2849,
+          "p5": 0.054,
+          "p95": 0.9555,
+          "min": 0.005,
+          "max": 0.985
+        }
+      }
+    },
+    "stretch": {
+      "action": "pouring",
+      "robot": "stretch",
+      "file_path": "jpts/pouring_stretch_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 60,
+      "n_leaves": 3,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.551,
+          "std": 0.0913,
+          "p5": 0.4338,
+          "p95": 0.693,
+          "min": 0.3714,
+          "max": 0.7821
+        },
+        "robot_yaw_rad": {
+          "mean": 0.2516,
+          "std": 1.489,
+          "p5": -2.322,
+          "p95": 1.5815,
+          "min": -3.0145,
+          "max": 2.7118
+        },
+        "object_yaw_rad": {
+          "mean": 0.2676,
+          "std": 1.6991,
+          "p5": -2.9405,
+          "p95": 2.9031,
+          "min": -3.1411,
+          "max": 3.0147
+        },
+        "object_volume_aabb": {
+          "mean": 0.0024,
+          "std": 0.0014,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.4871,
+          "std": 0.3089,
+          "p5": 0.05,
+          "p95": 0.9562,
+          "min": 0.01,
+          "max": 0.99
+        }
+      }
+    },
+    "tiago": {
+      "action": "pouring",
+      "robot": "tiago",
+      "file_path": "jpts/pouring_tiago_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 215,
+      "n_leaves": 11,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.7958,
+          "std": 0.1038,
+          "p5": 0.6075,
+          "p95": 0.9411,
+          "min": 0.4561,
+          "max": 1.0973
+        },
+        "robot_yaw_rad": {
+          "mean": -0.2487,
+          "std": 1.796,
+          "p5": -2.8774,
+          "p95": 2.9452,
+          "min": -3.0887,
+          "max": 3.065
+        },
+        "object_yaw_rad": {
+          "mean": 0.0231,
+          "std": 1.8262,
+          "p5": -2.9788,
+          "p95": 2.8979,
+          "min": -3.1411,
+          "max": 3.1298
+        },
+        "object_volume_aabb": {
+          "mean": 0.0027,
+          "std": 0.0015,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.4979,
+          "std": 0.2738,
+          "p5": 0.0885,
+          "p95": 0.9465,
+          "min": 0.01,
+          "max": 0.995
+        }
+      }
+    },
+    "unitree_g1": {
+      "action": "pouring",
+      "robot": "unitree_g1",
+      "file_path": "jpts/pouring_unitree_g1_jpt.json",
+      "file_format": "json",
+      "feature_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb",
+        "motion_stopped_waypoint_fraction"
+      ],
+      "cause_cols": [
+        "robot_to_target_dist",
+        "robot_yaw_rad",
+        "object_yaw_rad",
+        "object_volume_aabb"
+      ],
+      "effect_col": "motion_stopped_waypoint_fraction",
+      "n_success_rows": 218,
+      "n_leaves": 11,
+      "feature_stats": {
+        "robot_to_target_dist": {
+          "mean": 0.5806,
+          "std": 0.066,
+          "p5": 0.4794,
+          "p95": 0.6846,
+          "min": 0.3651,
+          "max": 0.7403
+        },
+        "robot_yaw_rad": {
+          "mean": 0.2307,
+          "std": 1.7334,
+          "p5": -2.8485,
+          "p95": 3.0631,
+          "min": -3.1343,
+          "max": 3.1339
+        },
+        "object_yaw_rad": {
+          "mean": 0.0389,
+          "std": 1.8281,
+          "p5": -2.9721,
+          "p95": 2.8443,
+          "min": -3.1411,
+          "max": 3.1298
+        },
+        "object_volume_aabb": {
+          "mean": 0.0026,
+          "std": 0.0014,
+          "p5": 0.0013,
+          "p95": 0.0053,
+          "min": 0.0013,
+          "max": 0.0053
+        },
+        "motion_stopped_waypoint_fraction": {
+          "mean": 0.5072,
+          "std": 0.2864,
+          "p5": 0.0485,
+          "p95": 0.93,
+          "min": 0.005,
+          "max": 0.995
+        }
+      }
+    }
+  }
+}

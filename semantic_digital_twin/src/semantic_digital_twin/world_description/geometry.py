@@ -425,7 +425,10 @@ class Mesh(Shape):
         """
         mesh = trimesh.load_mesh(self.filename)
         mesh.apply_scale(self.scale.to_np())
-        mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
+        if mesh.visual.kind != trimesh.visual.texture.TextureVisuals().kind:
+            mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(
+                self.color.to_rgba()
+            )
         return mesh
 
     @classmethod

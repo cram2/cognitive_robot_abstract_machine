@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import rclpy
-from typing_extensions import List, Optional, Iterator, Union
+from typing_extensions import Callable, List, Optional, Iterator, Union
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -143,6 +143,16 @@ class CostmapLocation(Location):
     validate_reachability: bool = True
     """
     If False, return collision-free navigation candidates without reachability/visibility IK validation.
+    """
+
+    candidate_reranker: Optional[Callable[[List["Pose"]], List["Pose"]]] = None
+    """
+    Optional hook to reorder the costmap-ranked pose candidates *before* collision
+    validation. Receives the costmap-sorted candidates (best first) and returns them
+    in a new order. This lets a downstream selector (e.g. a JPT likelihood scorer)
+    decide which collision-free pose is preferred without paying the collision cost
+    for every candidate: the existing collision search simply runs in the reranked
+    order and yields the first collision-free pose. Defaults to ``None`` (unchanged).
     """
 
     costmap_width: int = 200
@@ -377,6 +387,8 @@ class CostmapLocation(Location):
 
         candidate_limit = None if self.validate_reachability else self.samples
         pose_candidates = self._iter_sorted_pose_candidates(final_map, candidate_limit)
+        if self.candidate_reranker is not None:
+            pose_candidates = self.candidate_reranker(list(pose_candidates))
 
         candidate_loop_start = time.perf_counter()
         for pose_candidate in pose_candidates:
