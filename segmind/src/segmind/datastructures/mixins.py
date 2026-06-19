@@ -54,10 +54,6 @@ class HasPrimaryTrackedObject:
     The world as a Data Access Object, to be used by ORMatic and the NEEMInterface.
     """
 
-    def __post_init__(self):
-        self.world_frozen_cp = self.tracked_object._world.__deepcopy__(
-            memo={id(self.tracked_object._world): self.tracked_object._world}
-        )
 
     @cached_property
     def object_tracker(self) -> ObjectEventTracker:
@@ -97,6 +93,3 @@ class HasPrimaryAndSecondaryTrackedObjects(HasPrimaryTrackedObject, HasSecondary
     A mixin class that provides the tracked objects for the event.
     """
 
-    def __post_init__(self):
-        HasPrimaryTrackedObject.__post_init__(self)
-        HasSecondaryTrackedObject.__post_init__(self)
