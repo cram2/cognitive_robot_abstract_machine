@@ -19,14 +19,15 @@ from sortedcontainers import SortedSet
 from typing_extensions import TYPE_CHECKING, Any, Optional, Type
 
 from krrood.entity_query_language.query.match import AbstractMatchExpression
-from krrood.ormatic.data_access_objects.dao import DataAccessObject
+from krrood.ormatic.data_access_objects.dao import (
+    DataAccessObject,
+    DataAccessObjectSchema,
+    get_dao_schema,
+)
 from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.feature_extraction.aggregations import get_aggregation_class
-from krrood.parametrization.feature_extraction.feature_extractor import (
-    FeatureExtractor,
-    EntityCompositionDescriptor,
-)
+from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.query.match import Match
@@ -174,11 +175,10 @@ class RelationalProbabilisticCircuit:
     ``ExchangeableDistributionTemplate``.
     """
 
-    specification: Optional[EntityCompositionDescriptor] = field(
-        init=False, default=None
-    )
+    schema_information: Optional[DataAccessObjectSchema] = field(init=False, default=None)
     """
-    The ``EntityCompositionDescriptor`` describing the class's structure
+    The :class:`~krrood.ormatic.data_access_objects.dao.DataAccessObjectSchema` describing
+    the DAO class's columns and relationships.
     """
 
     feature_extractor: Optional[FeatureExtractor] = field(init=False, default=None)
@@ -342,8 +342,9 @@ class RelationalProbabilisticCircuit:
         self.class_probabilistic_circuit = JointProbabilityTree(
             annotated_variables=variables
         ).fit(class_dataframe)
-        self.specification = EntityCompositionDescriptor(type(instances[0]))
-        for exchangeable_part in self.specification.many_to_many_relations:
+        self.schema_information = get_dao_schema(type(instances[0]))
+        for collection_relationship in self.schema_information.collection_relationships:
+            exchangeable_part = collection_relationship.key
             if exchangeable_part not in self.feature_extractor.exchangeable_features:
                 continue
             self.exchangeable_distribution_templates[exchangeable_part] = (

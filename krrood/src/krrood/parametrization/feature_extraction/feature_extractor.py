@@ -7,13 +7,17 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 import sqlalchemy
-from sqlalchemy.orm import MANYTOONE, ONETOMANY
-from typing_extensions import TYPE_CHECKING, Any, Type
+from typing_extensions import TYPE_CHECKING, Any
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import variable
+from krrood.ormatic.data_access_objects.dao import (
+    CollectionRelationship,
+    SingleRelationship,
+    get_dao_schema,
+)
 from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
-from krrood.ormatic.utils import get_python_type_from_sqlalchemy_column, is_data_column
+from krrood.ormatic.utils import get_python_type_from_sqlalchemy_column
 from krrood.parametrization.feature_extraction.aggregations import get_aggregation_class
 from random_events.variable import compatible_types
 
@@ -109,24 +113,24 @@ class FeatureExtractor:
                 continue
             seen.add(id(current_instance))
 
-            instance_composition = EntityCompositionDescriptor(type(current_instance))
+            schema = get_dao_schema(type(current_instance))
 
             result.extend(
                 FeatureExtractor._process_attributes(
-                    current_instance, current_symbolic, instance_composition.attributes
+                    current_instance, current_symbolic, schema.data_column_names
                 )
             )
 
             exchangeable_features.update(
                 FeatureExtractor._process_many_to_many(
-                    current_instance, instance_composition.many_to_many_relations
+                    current_instance, schema.collection_relationships
                 )
             )
             queue.extend(
                 FeatureExtractor._process_many_to_one(
                     current_instance,
                     current_symbolic,
-                    instance_composition.many_to_one_relations,
+                    schema.single_relationships,
                 )
             )
 
@@ -137,7 +141,7 @@ class FeatureExtractor:
     def _process_attributes(
         instance: DataAccessObject,
         symbolic_root: Variable,
-        attributes: list[sqlalchemy.Column],
+        column_names: tuple[str, ...],
     ) -> list[MappedVariable]:
         """
         Collects symbolic variables for all scalar data columns of ``instance``.
@@ -145,20 +149,21 @@ class FeatureExtractor:
         Columns whose value is not a compatible primitive type are skipped.
         :param instance: The DAO instance to inspect.
         :param symbolic_root: The symbolic variable rooted at ``instance``.
-        :param attributes: The scalar data columns of the instance's schema.
+        :param column_names: Names of the scalar data columns of the instance's schema.
         :return: One typed ``MappedVariable`` per compatible scalar attribute.
         """
+        mapper = sqlalchemy.inspection.inspect(type(instance))
+        column_by_name = {column.name: column for column in mapper.columns}
         result = []
-        for attribute in attributes:
-            value = getattr(instance, attribute.key)
+        for name in column_names:
+            column = column_by_name[name]
+            value = getattr(instance, column.key)
 
             if not isinstance(value, compatible_types):
                 continue
 
-            symbolic_attribute = getattr(symbolic_root, attribute.name)
-            symbolic_attribute._type_ = get_python_type_from_sqlalchemy_column(
-                attribute
-            )
+            symbolic_attribute = getattr(symbolic_root, column.name)
+            symbolic_attribute._type_ = get_python_type_from_sqlalchemy_column(column)
             result.append(symbolic_attribute)
         return result
 
@@ -166,37 +171,37 @@ class FeatureExtractor:
     def _process_many_to_one(
         instance: DataAccessObject,
         symbolic_root: Variable,
-        many_to_one_relations: list[str],
+        relationships: tuple[SingleRelationship, ...],
     ) -> deque[Any]:
         """
-        Enqueues non-null many-to-one relations for further BFS traversal.
+        Enqueues non-null single-valued relations for further BFS traversal.
 
         :param instance: The DAO instance to inspect.
         :param symbolic_root: The symbolic variable rooted at ``instance``.
-        :param many_to_one_relations: Field names of the instance's many-to-one relations.
+        :param relationships: Single-valued relationships of the instance's schema.
         :return: ``(child_instance, child_symbolic)`` pairs ready for BFS expansion.
         """
         queue = deque()
-        for part in many_to_one_relations:
-            value = getattr(instance, part)
+        for relationship in relationships:
+            value = getattr(instance, relationship.key)
 
             if value is None:
                 continue
 
-            queue.append((value, getattr(symbolic_root, part)))
+            queue.append((value, getattr(symbolic_root, relationship.key)))
         return queue
 
     @staticmethod
     def _process_many_to_many(
         current_instance: DataAccessObject,
-        many_to_many_relations: list[str],
+        relationships: tuple[CollectionRelationship, ...],
     ) -> dict[str, list[MappedVariable]]:
         """
-        Collects aggregation statistic variables for all one-to-many relations of ``current_instance``.
+        Collects aggregation statistic variables for all collection-valued relations of ``current_instance``.
 
         :param current_instance: The DAO instance to inspect.
-        :param many_to_many_relations: Field names of the instance's one-to-many relations.
-        :return: A mapping from each one-to-many field name to its aggregation variables.
+        :param relationships: Collection-valued relationships of the instance's schema.
+        :return: A mapping from each collection field name to its aggregation variables.
         """
         result = defaultdict(list)
         dao_state = FromDataAccessObjectState()
@@ -207,13 +212,13 @@ class FeatureExtractor:
             return result
 
         aggregation_instance = aggregation_cls(instance=domain_object)
-        for field_name in many_to_many_relations:
-            if not getattr(domain_object, field_name):
+        for relationship in relationships:
+            if not getattr(domain_object, relationship.key):
                 continue
             for feature in aggregation_instance.symbolic_aggregation_features_for(
-                field_name
+                relationship.key
             ):
-                result[field_name].append(feature)
+                result[relationship.key].append(feature)
 
         return result
 
@@ -274,45 +279,3 @@ class FeatureExtractor:
                     f"Unsupported type {feature._type_} for column {column}"
                 )
         return df
-
-
-@dataclass
-class EntityCompositionDescriptor:
-    """
-    Describes the scalar attributes and ORM relationships of a DAO class.
-
-    Constructed from the class's SQLAlchemy mapper; used by :class:`FeatureExtractor`
-    to direct BFS traversal and aggregation discovery.
-    """
-
-    dao_class: Type[DataAccessObject] = field(init=True)
-    """
-    The DAO class whose SQLAlchemy mapper is inspected.
-    """
-
-    attributes: list[sqlalchemy.Column] = field(init=False, default_factory=list)
-    """
-    Scalar data columns of the DAO class.
-    """
-
-    many_to_one_relations: list[str] = field(init=False, default_factory=list)
-    """
-    Field names of many-to-one relations (FK on this table).
-    """
-
-    many_to_many_relations: list[str] = field(init=False, default_factory=list)
-    """
-    Field names of many-to-many relations.
-    """
-
-    def __post_init__(self):
-        mapper = sqlalchemy.inspection.inspect(self.dao_class)
-
-        for relationship in mapper.relationships:
-            if relationship.direction == MANYTOONE:
-                self.many_to_one_relations.append(relationship.key)
-            elif relationship.direction == ONETOMANY:
-                self.many_to_many_relations.append(relationship.key)
-        for column in mapper.columns:
-            if is_data_column(column) and column not in mapper.relationships:
-                self.attributes.append(column)
