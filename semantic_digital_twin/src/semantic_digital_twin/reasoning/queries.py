@@ -1,33 +1,22 @@
-from typing import List, Optional
 
-#from probabilistic_model.scripts.gmm import result
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Fruit, Apple, Food, Carrot, Banana
+from krrood.inheritance_path_length import nearest_common_ancestor, inheritance_path_length
 
-from krrood.entity_query_language.factories import variable_from, entity, contains, variable, \
-    an, and_, exists, not_, set_of, type_
+from krrood.entity_query_language.factories import not_, set_of, type_
 import math
-from typing import List, Union, Optional
+from typing import List, Optional
 from krrood.entity_query_language.factories import (
     variable_from,
     entity,
-    flat_variable,
-    in_,
-    the,
     contains,
     variable,
     an,
-    or_,
-    and_,
-    distinct,
 )
 from krrood.entity_query_language.query.query import Entity
 from krrood.entity_query_language.predicate import symbolic_function, length
 from krrood.utils import recursive_subclasses
-from krrood.utils import recursive_subclasses
 
 from semantic_digital_twin.reasoning.predicates import (
     is_supported_by,
-    is_supporting, compute_euclidean_planar_distance, inheritance_path_length_,
     is_supporting,
     compute_euclidean_planar_distance,
 )
@@ -43,7 +32,6 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     SemanticAnnotation,
 )
-from test.conftest import kitchen_environment_fixture
 
 
 def semantic_annotations_on_surfaces(
@@ -81,8 +69,6 @@ def get_next_object_using_planar_distance(
     :return: A `QueryObjectDescriptor` containing semantic annotations ordered
         by Euclidean distance to the main body.
     """
-    # if supporting_surface is None:
-    #     return []
     supported_semantic_annotations = variable_from(
         semantic_annotations_on_surfaces([supporting_surface], main_body._world)
     )
@@ -118,19 +104,26 @@ def goal_surface_of_object(
     supporting_surface = variable(HasSupportingSurface, supporting_surfaces)
     supporting_body = supporting_surface.bodies[0]
     non_supporting_table = entity(supporting_surface).where(
-        exists(supporting_body, not_(is_supporting(supporting_body))))
+        not_(is_supporting(supporting_body)))
 
     # Query annotations on the surfaces of the tables
     obj = variable(SemanticAnnotation, semantic_annotations_on_surfaces(
         supporting_surfaces, object_of_interest._world
     ))
 
-    inheritance_distance = lambda obj_: inheritance_path_length_(type(object_of_interest), type_(obj_))
+    @symbolic_function
+    def inheritance_distance(obj_: SemanticAnnotation) -> int:
+        """Calculate inheritance distance, returning infinity for unrelated types."""
+        common_ancestor = nearest_common_ancestor(type(object_of_interest), type_(obj_))
+        if common_ancestor is None:
+            return math.inf
+        path_length = inheritance_path_length(type(object_of_interest), common_ancestor)
+        return path_length if path_length is not None else math.inf
 
     query = set_of(obj, supporting_surface).where(
-                                                    (distance:=inheritance_distance(obj)) <= threshold,
-                                             is_supported_by(obj.bodies[0],
-                                                             supporting_body)).ordered_by(distance)
+        (distance := inheritance_distance(obj)) <= threshold,
+        is_supported_by(obj.bodies[0], supporting_body)
+    ).ordered_by(distance)
     return next(query[supporting_surface].evaluate(), next(non_supporting_table.evaluate(), None))
 
 
@@ -155,11 +148,9 @@ def filter_annotations_by_color(
     body = object_var.bodies[0]
 
     matching_body = entity(body).where(
-        and_(
-            body.visual != None,
-            length(body.visual.shapes) > 0,
-            body.visual.shapes[0].color == color,
-        )
+        body.visual != None,
+        length(body.visual.shapes) > 0,
+        body.visual.shapes[0].color == color,
     )
     semantic_annotation = variable(HasRootBody, world.semantic_annotations)
     return entity(semantic_annotation).where(semantic_annotation.root == matching_body)

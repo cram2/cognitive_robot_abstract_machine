@@ -1145,7 +1145,7 @@ class GraphVisualizer:
                 fontweight="medium",
                 color="black",
                 wrap=True,
-                bbox=dict(boxstyle="round,pad=0.28", facecolor="white", edgecolor="none", alpha=0.85),
+                bbox=dict(boxstyle="round,pad=0.28", facecolor="white", alpha=0.85),
                 zorder=3,
             )
         self.ctx["colors"] = colors
