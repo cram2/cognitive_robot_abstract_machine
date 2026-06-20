@@ -25,29 +25,14 @@ from krrood.entity_query_language.verbalization.subquery import (
     selected_aggregator,
     unwrap_result_quantifiers,
 )
-
-#: Prepositions that, as the final token of a snake_case attribute name, mark a *relational* field
-#: (*assigned_to*, *owned_by*, *located_in*). ``of`` is deliberately excluded — ``<noun>_of`` is a
-#: genitive (``number_of``, ``type_of``), never a relational verb.
-_RELATIONAL_PREPOSITIONS = frozenset(
-    {
-        "to",
-        "by",
-        "from",
-        "with",
-        "in",
-        "on",
-        "at",
-        "into",
-        "onto",
-        "for",
-        "through",
-        "over",
-        "under",
-        "against",
-        "about",
-    }
+from krrood.entity_query_language.verbalization.vocabulary.english import (
+    ENGLISH_PREPOSITIONS,
 )
+
+#: The prepositions that, as the final token of a snake_case attribute name, mark a *relational*
+#: field (*assigned_to*, *owned_by*, *located_in*): the English preposition inventory from the
+#: lexicon minus ``of`` — ``<noun>_of`` is a genitive (``number_of``, ``type_of``), never a relation.
+_RELATIONAL_PREPOSITIONS = ENGLISH_PREPOSITIONS - {"of"}
 
 
 def relational_verb_phrase(attribute_name: str) -> Optional[str]:

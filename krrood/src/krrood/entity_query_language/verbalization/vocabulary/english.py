@@ -249,6 +249,61 @@ class Prepositions(VocabEnum):
     WITH = PlainWord("with")
 
 
+#: The closed-class inventory of common English prepositions, as a lexical datum (distinct from the
+#: :class:`Prepositions` enum, which holds the few prepositions the verbalizer *emits*). Prepositions
+#: are a fixed, finite class — no inflection library or POS tagger is needed (or appropriate) to
+#: enumerate them. Recognizers consult this to read a relation off a field name's final token.
+ENGLISH_PREPOSITIONS = frozenset(
+    {
+        "about",
+        "above",
+        "across",
+        "after",
+        "against",
+        "along",
+        "among",
+        "around",
+        "at",
+        "before",
+        "behind",
+        "below",
+        "beneath",
+        "beside",
+        "between",
+        "beyond",
+        "by",
+        "for",
+        "from",
+        "in",
+        "inside",
+        "into",
+        "near",
+        "of",
+        "off",
+        "on",
+        "onto",
+        "out",
+        "outside",
+        "over",
+        "past",
+        "per",
+        "through",
+        "to",
+        "toward",
+        "towards",
+        "under",
+        "underneath",
+        "until",
+        "up",
+        "upon",
+        "via",
+        "with",
+        "within",
+        "without",
+    }
+)
+
+
 class Conjunctions(VocabEnum):
     """Coordinating conjunctions (AND, OR)."""
 
