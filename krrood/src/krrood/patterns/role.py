@@ -108,7 +108,11 @@ class Role(Symbol, SubClassSafeGeneric[T]):
     """Roles are not cached as instances in the :class:`SymbolGraph
     <krrood.symbol_graph.symbol_graph.SymbolGraph>`. Membership queries use :attr:`_role_registry`
     and persistence uses the role's own ORM mapping, so a role need not be a graph node. Role
-    classes still take part in the class diagram and ORM through ``Symbol`` subclassing."""
+    classes still take part in the class diagram and ORM through ``Symbol`` subclassing.
+
+    A subclass that needs its instances enumerable through the SymbolGraph (for example to match an
+    entity-query-language query) may override this to ``True`` for itself; the override applies to
+    that subclass and its descendants and does not affect membership queries."""
 
     _role_registry: ClassVar[RoleRegistry] = RoleRegistry()
     """Inverse index from takers to roles, shared by all role types, that backs the membership
