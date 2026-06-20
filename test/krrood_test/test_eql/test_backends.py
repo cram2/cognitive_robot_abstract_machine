@@ -9,6 +9,7 @@ from ..dataset.semantic_world_like_classes import Apple, Body
 from krrood.entity_query_language.backends import (
     SQLAlchemyBackend,
     EntityQueryLanguageBackend,
+    EntityQueryLanguageGenerativeBackend,
     ProbabilisticBackend,
 )
 from krrood.entity_query_language.core.variable import Literal
@@ -216,7 +217,7 @@ def test_generative_eql_backend():
     )
     q.resolve()
     q.where(q.variable.type > q.variable.charge)
-    results = list(q.evaluate(backend=EntityQueryLanguageBackend()))
+    results = list(q.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
     assert len(results) == 6
     for result in results:
         assert isinstance(result.element, Element)

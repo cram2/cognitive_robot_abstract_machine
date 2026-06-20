@@ -1,5 +1,5 @@
 from krrood.entity_query_language.backends import (
-    EntityQueryLanguageBackend,
+    EntityQueryLanguageGenerativeBackend,
     ProbabilisticBackend,
 )
 from krrood.entity_query_language.factories import an, variable_from
@@ -106,5 +106,5 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
         context=context,
     )
     plan_generator.resolve()
-    plans = list(EntityQueryLanguageBackend().evaluate(plan_generator))
+    plans = list(EntityQueryLanguageGenerativeBackend().evaluate(plan_generator))
     assert len(plans) == len(list(target_locations._domain_)) * len(list(Arms))

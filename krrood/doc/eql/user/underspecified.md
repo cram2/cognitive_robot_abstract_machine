@@ -13,10 +13,13 @@ kernelspec:
 
 # Underspecified Queries and Generative Backends
 
-The {py:func}`~krrood.entity_query_language.factories.an` function (when called with a *type*) is
-the entry point for *generative* queries.  Where `an(Type, domain=...)` **finds** objects that
-already exist in a domain, a domain-less `an(Type)` describes an *underspecified* object whose field
-values are **created** (inferred) by a generative backend.
+A match built with {py:func}`~krrood.entity_query_language.factories.an` is **selective by
+default**: `an(Type, domain=...)` selects from the given domain, and a domain-less `an(Type)`
+selects from the SymbolGraph (for `Symbol` types). To instead **construct new instances** from an
+underspecified match, evaluate it with an explicit *generative backend* — either
+{py:class}`~krrood.entity_query_language.backends.ProbabilisticBackend` (samples a probabilistic
+model) or {py:class}`~krrood.entity_query_language.backends.EntityQueryLanguageGenerativeBackend`
+(deterministically enumerates discrete domains and constructs an instance per combination).
 
 This page explains:
 

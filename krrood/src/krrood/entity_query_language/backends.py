@@ -1,15 +1,24 @@
+import enum
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from typing import Iterable, TypeVar
 
 from sqlalchemy.orm import sessionmaker
+from typing_extensions import Dict
 
+from krrood.entity_query_language.core.base_expressions import (
+    Selectable,
+    SymbolicExpression,
+)
+from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.exceptions import (
     NoSolutionFound,
     GenerativeBackendQueryIsNotUnderspecifiedVariable,
+    UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration,
 )
-from krrood.entity_query_language.query.match import Match
+from krrood.entity_query_language.factories import entity, set_of, variable
+from krrood.entity_query_language.query.match import Match, AttributeMatch
 from krrood.entity_query_language.query.query import Query
 from krrood.ormatic.eql_interface import eql_to_sql
 from krrood.parametrization.model_registries import (
@@ -85,12 +94,104 @@ class SQLAlchemyBackend(SelectiveBackend):
 @dataclass
 class EntityQueryLanguageBackend(SelectiveBackend):
     """
-    A backend that evaluates elements in this python process. This is just ordinary EQL: each
-    expression knows how to evaluate itself natively (queries select, matches generate).
+    A backend that selects elements in this python process. This is just ordinary EQL: each
+    expression evaluates itself natively (queries and matches both select over their domains).
+    Constructing new instances is the job of a :class:`GenerativeBackend`.
     """
 
     def evaluate(self, expression: Evaluable) -> Iterable:
         yield from expression._evaluate_natively_()
+
+
+@dataclass
+class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
+    """
+    A generative backend that constructs new instances deterministically: it treats a match's
+    unspecified leaves as variables, enumerates every combination over their (discrete) domains,
+    constructs an instance per combination via the type's constructor, and keeps those that
+    satisfy the match's ``where`` conditions.
+    """
+
+    def _evaluate(self, expression: Match[T]) -> Iterable[T]:
+        variables: Dict[str, Variable] = {}
+        for attribute_match in expression.matches_with_variables:
+            self._check_attribute_match_is_suitable_for_generation(attribute_match)
+            variables[attribute_match.name_from_variable_access_path] = (
+                self._convert_attribute_match_to_variable(attribute_match)
+            )
+
+        expression.variable._update_domain_(
+            self._generate_raw_results(expression, variables)
+        )
+
+        filtered_results = entity(expression.variable)._quantify_(
+            expression._quantifier_type_
+        )
+        if expression._where_conditions_:
+            filtered_results = filtered_results.where(*expression._where_conditions_)
+        yield from filtered_results._evaluate_natively_()
+
+    @staticmethod
+    def _check_attribute_match_is_suitable_for_generation(
+        attribute_match: AttributeMatch,
+    ) -> None:
+        """
+        Raise if an assignment in the match cannot be used to generate solutions.
+
+        :param attribute_match: The attribute match to check.
+        :raises UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration: If a
+            non-enum leaf is left fully unspecified (``...``), which deterministic generation
+            cannot enumerate (use the :class:`ProbabilisticBackend` instead).
+        """
+        if isinstance(
+            attribute_match.assigned_value, type(Ellipsis)
+        ) and not issubclass(attribute_match.assigned_variable._type_, enum.Enum):
+            raise UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
+                attribute_match
+            )
+
+    @staticmethod
+    def _convert_attribute_match_to_variable(
+        attribute_match: AttributeMatch,
+    ) -> Selectable:
+        """
+        Convert an attribute match into a variable to enumerate, handling ellipsis assignments
+        for enum fields and concrete values.
+
+        :param attribute_match: The attribute match to convert.
+        :return: A variable (or symbolic expression) representing the attribute match.
+        """
+        if isinstance(attribute_match.assigned_value, type(Ellipsis)) and issubclass(
+            attribute_match.assigned_variable._type_, enum.Enum
+        ):
+            return variable(
+                attribute_match.assigned_variable._type_,
+                list(attribute_match.assigned_variable._type_),
+            )
+        if isinstance(attribute_match.assigned_value, SymbolicExpression):
+            return attribute_match.assigned_value
+        return variable(
+            type(attribute_match.assigned_value),
+            [attribute_match.assigned_value],
+        )
+
+    def _generate_raw_results(
+        self, expression: Match[T], variables: Dict[str, Variable]
+    ) -> Iterable[T]:
+        """
+        Construct instances from the given match and enumerable variables.
+
+        :param expression: The match expression to construct instances from.
+        :param variables: The variables to enumerate, keyed by access-path name.
+        :return: A generator yielding an instance per variable combination.
+        """
+        all_combinations = set_of(*variables.values())
+        for combination in all_combinations._evaluate_natively_():
+            for variable_name, value in zip(variables, combination.values()):
+                mapped_variable = expression._get_mapped_variable_by_name(variable_name)
+                mapped_variable._value_ = value
+            expression._update_kwargs_from_literal_values()
+            yield expression.construct_instance()
 
 
 @dataclass
