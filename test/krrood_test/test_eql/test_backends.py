@@ -234,7 +234,7 @@ def test_generative_where_without_explicit_resolve():
         timestamp=datetime.datetime.now(),
     )
     q.where(q.variable.type > q.variable.charge)
-    results = list(q.evaluate(backend=EntityQueryLanguageBackend()))
+    results = list(q.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
     assert len(results) == 6
     for result in results:
         assert isinstance(result.element, Element)

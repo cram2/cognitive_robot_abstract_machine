@@ -140,20 +140,20 @@ def test_empty_conditions_match_var(handles_and_containers_world):
         an(FixedConnection, domain=world.connections)()
 
 
-def test_match_without_domain_generates_a_new_instance():
+def test_match_without_domain_selects_from_symbol_graph():
     """
-    A domain-less match evaluated standalone is *generative*: it constructs a new instance via
-    the type's constructor instead of selecting an existing one (even when an equal instance is
-    registered in the SymbolGraph). This documents the current default behaviour.
+    A domain-less match evaluated standalone (default selective backend) *selects* from the
+    SymbolGraph for ``Symbol`` types: it returns the existing registered instance rather than
+    constructing a new one. Generation requires an explicit generative backend.
     """
     existing = KRROODPosition(1.0, 2.0, 3.0)
     result = an(KRROODPosition)(x=1.0, y=2.0, z=3.0).tolist()
-    assert len(result) == 1
-    assert isinstance(result[0], KRROODPosition)
-    assert result[0] == existing
-    # a brand-new object was constructed (generation), not the existing one (selection)
-    assert result[0] is not existing
+    # the existing object itself is returned (selection), not a freshly-built equal one
+    assert any(r is existing for r in result)
+    assert all(isinstance(r, KRROODPosition) and r == existing for r in result)
 
+
+def test_match_with_list():
     domain = [
         KRROODPositions([KRROODPosition(1, 2, 3), KRROODPosition(1, 2, 3)], ["a", "b"]),
         KRROODPositions([KRROODPosition(1, 2, 3)], ["a"]),
