@@ -1216,6 +1216,37 @@ def test_editing_and_rebuilding_original_after_embedding_leaves_subquery_snapsho
     assert sorted(outer.tolist()) == before
 
 
+def test_editing_distinct_subquery_after_embedding_leaves_snapshot_unchanged():
+    """A subquery that uses distinct is still snapshotted on embedding, so editing and rebuilding the
+    original afterwards does not change the embedded copy."""
+    var1 = variable(int, [1, 2, 3, 4])
+    inner = entity(var1).where(var1 == 2).distinct()
+    outer = an(entity(var1).where(var1 != an(inner)))
+
+    before = sorted(outer.tolist())
+    assert before == [1, 3, 4]
+
+    inner.where(var1 == 3)
+    inner.tolist()
+
+    assert sorted(outer.tolist()) == before
+
+
+def test_embedding_a_count_all_subquery_does_not_corrupt_the_original():
+    """A ``count_all`` query rewires its aggregator child to the grouping at build time, so it falls
+    back to sharing its live expression when embedded. Re-evaluating the original after embedding must
+    still produce correct results."""
+    group_variable = variable(int, [10, 20])
+    counted = set_of(group_variable, eql.count_all()).grouped_by(group_variable)
+
+    before = sorted(tuple(row.values()) for row in counted.tolist())
+
+    embedding = an(entity(counted))
+    embedding.tolist()
+
+    assert sorted(tuple(row.values()) for row in counted.tolist()) == before
+
+
 def test_embedded_subquery_is_a_snapshot_clone_sharing_variable_leaves():
     """The operand embedded for a subquery is an independent clone of the source's compiled
     expression (not the live node), while variable leaves are shared so derived references stay

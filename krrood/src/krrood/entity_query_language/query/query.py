@@ -31,7 +31,6 @@ from krrood.entity_query_language.core.mapped_variable import (
     CanBehaveLikeAVariable,
     MappedVariable,
 )
-from krrood.entity_query_language.query.snapshot import SpineSnapshot
 from krrood.entity_query_language.query.builders import (
     WhereBuilder,
     HavingBuilder,
@@ -604,7 +603,7 @@ class Query(
         which must track the live query so its values resolve against the query's own bindings.
 
         :param parent: The expression about to take this query as a child.
-        :return: A snapshot of the compiled expression, or the live node for self-wrapping and
+        :return: A freshly compiled snapshot of the query, or the live node for self-wrapping and
             derived references.
         """
         if self._building_:
@@ -612,43 +611,64 @@ class Query(
         self.build()
         if isinstance(parent, MappedVariable):
             return self._expression_
-        return self._snapshot_for_embedding_()
-
-    def _snapshot_for_embedding_(self) -> SymbolicExpression:
-        """
-        The snapshot is cached so that several embeddings of this query share one identity (for
-        example a subquery used both as a selected variable and inside a condition), and the cache is
-        discarded on modification (see :meth:`_mark_dirty_`).
-
-        :return: An immutable snapshot of the compiled expression for embedding, or the live compiled
-            expression when it cannot be snapshotted (see :meth:`_is_snapshotable_`).
-        """
         if not self._is_snapshotable_():
             return self._expression_
         if self._embedding_snapshot_ is None:
-            self._embedding_snapshot_ = SpineSnapshot().snapshot(self._expression_)
+            self._embedding_snapshot_ = self._compile_snapshot_()
         return self._embedding_snapshot_
 
     def _is_snapshotable_(self) -> bool:
         """
-        Snapshotting shares variable leaves and clones structural nodes. That is unsound when the
-        compiled expression aggregates or groups (a shared aggregator would reference an
-        un-cloned grouping), applies distinct (its result mapping is bound to this query), or
-        contains a variable derived from this query itself (a shared self-reference would re-evaluate
-        the original). In those cases the live expression is shared as before.
+        A snapshot replays this query's spec onto a fresh query that shares the original's selected
+        variables. That is unsound only for :class:`CountAll
+        <krrood.entity_query_language.operators.aggregators.CountAll>`, whose child is rewired to the
+        grouping at build time: building the snapshot would mutate the shared aggregator and corrupt
+        the original. Such queries share the live expression instead.
+
+        .. note:: This narrow fallback is removed once the compiled node no longer mutates shared
+            aggregators.
 
         :return: Whether the compiled expression can be safely snapshotted.
         """
-        if self._results_mapping:
-            return False
-        for node in (self._expression_, *self._expression_._descendants_):
-            if isinstance(node, (GroupedBy, Aggregator)):
-                return False
-            if isinstance(node, MappedVariable) and any(
-                descendant is self for descendant in node._descendants_
-            ):
-                return False
-        return True
+        return not any(
+            isinstance(node, CountAll) for node in self._expression_._descendants_
+        )
+
+    def _compile_snapshot_(self) -> SymbolicExpression:
+        """
+        Compile an independent snapshot of this query by replaying its modifiers onto a fresh query
+        built from the same spec, rather than cloning the live compiled graph.
+
+        The snapshot is a separate object graph sharing this query's identifier and selected
+        variables, so it evaluates identically and co-references the same variables, while later
+        edits that rebuild the original cannot reach it. Building from the spec sidesteps the
+        cross-reference hazards of graph cloning, so grouping, distinct, and self-referential
+        ordering all compile correctly.
+
+        :return: The compiled expression of the freshly built snapshot query.
+        """
+        snapshot = type(self)(_selected_variables_=self._selected_variables_)
+        snapshot._id_ = self._id_
+        snapshot._expression_id_cache_ = {}
+        if self._where_builder_ is not None:
+            snapshot.where(*self._where_builder_.conditions)
+        if self._grouped_by_builder_ is not None:
+            snapshot.grouped_by(*self._grouped_by_builder_.variables_to_group_by)
+        if self._having_builder_ is not None:
+            snapshot.having(*self._having_builder_.conditions)
+        if self._ordered_by_builder_ is not None:
+            ordering = self._ordered_by_builder_
+            snapshot.ordered_by(
+                ordering.variable, descending=ordering.descending, key=ordering.key
+            )
+        if self._distinct_on:
+            snapshot.distinct(*self._distinct_on)
+        if self._limit_ is not None:
+            snapshot.limit(self._limit_)
+        quantifier = self._quantifier_builder_
+        snapshot._quantify_(quantifier.type, quantifier.quantification_constraint)
+        snapshot.build()
+        return snapshot._expression_
 
     @UnaryExpression._parent_.setter
     def _parent_(self, parent: SymbolicExpression):
