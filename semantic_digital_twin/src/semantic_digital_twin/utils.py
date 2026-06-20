@@ -19,35 +19,6 @@ from xml.etree import ElementTree as ET
 from typing_extensions import Any, Tuple, ClassVar, Type
 
 
-class IDGenerator:
-    """
-    A class that generates incrementing, unique IDs and caches them for every object this is called on.
-    """
-
-    _counter = 0
-    """
-    The counter of the unique IDs.
-    """
-
-    def __init__(self):
-        self._counter = 0
-        self._by_obj = weakref.WeakKeyDictionary()  # type: ignore[var-annotated]
-
-    def __call__(self, obj: Any) -> int:
-        """
-        Creates a unique ID and caches it for every object this is called on.
-
-        :param obj: The object to generate a unique ID for, must be hashable.
-        :return: The unique ID.
-        """
-        try:
-            return self._by_obj[obj]
-        except KeyError:
-            self._counter += 1
-            self._by_obj[obj] = self._counter
-            return self._counter
-
-
 class suppress_stdout_stderr(object):
     """
     A context manager for doing a "deep suppression" of stdout and stderr in
@@ -83,7 +54,7 @@ class suppress_stdout_stderr(object):
 
 
 def hacky_urdf_parser_fix(
-        urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
+    urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
 ) -> str:
     # Parse input string
     root = ET.fromstring(urdf)
@@ -107,24 +78,6 @@ def robot_name_from_urdf_string(urdf_string: str) -> str:
     :return: Extracted name
     """
     return urdf_string.split('robot name="')[1].split('"')[0]
-
-
-def copy_lru_cache(maxsize=None, typed=False):
-    def decorator(func):
-        cached_func = lru_cache(maxsize=maxsize, typed=typed)(func)
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            result = cached_func(*args, **kwargs)
-            return deepcopy(result)
-
-        # Preserve lru_cache methods
-        wrapper.cache_info = cached_func.cache_info
-        wrapper.cache_clear = cached_func.cache_clear
-
-        return wrapper
-
-    return decorator
 
 
 def bpy_installed() -> bool:
@@ -203,6 +156,7 @@ class MockedNodeClass(MockedClass):
     """
     Mocked class for Node in rclpy
     """
+
     ...
 
 
@@ -211,6 +165,7 @@ class MockedNodeModule(MockedModule):
     """
     Mocked module for rclpy.node.
     """
+
     Node: Type[MockedNodeClass] = MockedNodeClass
     """
     A mocked Node class.
@@ -222,6 +177,7 @@ class MockedRCLPY(MockedModule):
     """
     Mocked module for rclpy.
     """
+
     node: ClassVar[MockedNodeModule] = MockedNodeModule()
 
 

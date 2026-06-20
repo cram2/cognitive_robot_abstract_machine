@@ -10,11 +10,11 @@ from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from functools import cached_property
 
-from plyfile import PlyData
 import numpy as np
 import trimesh
 import trimesh.exchange.stl
 from PIL import Image
+from plyfile import PlyData
 from trimesh.visual.texture import TextureVisuals, SimpleMaterial
 from typing_extensions import Optional, List, Dict, Any, Self, Tuple, TYPE_CHECKING
 
@@ -22,14 +22,13 @@ from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, fro
 from random_events.interval import SimpleInterval, Bound, closed
 from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
-from semantic_digital_twin.exceptions import MissingWorldError, MismatchingWorld
+from semantic_digital_twin.exceptions import MismatchingWorld
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,
 )
-from semantic_digital_twin.utils import IDGenerator
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import (
@@ -38,8 +37,6 @@ if TYPE_CHECKING:
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
-
-id_generator = IDGenerator()
 
 logger = logging.getLogger(__name__)
 

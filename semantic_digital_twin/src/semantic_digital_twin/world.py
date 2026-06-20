@@ -70,7 +70,6 @@ from semantic_digital_twin.spatial_types import (
     Point3,
 )
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
-from semantic_digital_twin.utils import IDGenerator
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     ActiveConnection1DOF,
@@ -124,8 +123,6 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger("semantic_digital_twin")
-
-id_generator = IDGenerator()
 
 GenericSemanticAnnotation = TypeVar(
     "GenericSemanticAnnotation", bound=SemanticAnnotation
@@ -601,6 +598,7 @@ class World(HasSimulatorProperties):
     @property
     def robot_bodies_with_collision(self) -> List[Body]:
         from semantic_digital_twin.robots.robot_parts import AbstractRobot
+
         return [
             body
             for robot in self.get_semantic_annotations_by_type(AbstractRobot)
@@ -610,6 +608,7 @@ class World(HasSimulatorProperties):
     @property
     def robot_body_to_robot_mapping(self) -> dict[Body, AbstractRobot]:
         from semantic_digital_twin.robots.robot_parts import AbstractRobot
+
         return {
             body: robot
             for robot in self.get_semantic_annotations_by_type(AbstractRobot)

@@ -38,3 +38,7 @@ class PrefixedName(Symbol):
 
     def __ge__(self, other):
         return str(self) >= str(other)
+
+
+def ensure_prefixed_name(name: str | PrefixedName) -> PrefixedName:
+    return PrefixedName(name) if isinstance(name, str) else name

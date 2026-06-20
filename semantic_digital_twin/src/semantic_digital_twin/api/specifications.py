@@ -9,7 +9,10 @@ from typing_extensions import Self, Type, Any, Generic, TypeVar
 from krrood.patterns.subclass_safe_generic import AbstractSubClassSafeGeneric
 from krrood.utils import get_generic_type_params
 from random_events.product_algebra import Event
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.prefixed_name import (
+    PrefixedName,
+    ensure_prefixed_name,
+)
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
@@ -71,23 +74,6 @@ class WorldEntitySpawnSpecification(ABC):
         :param parent_T_self: Overrides the specification's stored default pose. If None, the stored default is used.
         :param name: Overrides the specification's own name. If None, the spec's name is used.
         """
-
-    @staticmethod
-    def _to_prefixed_name(
-        name: Union[str, PrefixedName, None],
-    ) -> Optional[PrefixedName]:
-        """Normalize a name to a :class:`PrefixedName`, passing ``None`` through."""
-        return PrefixedName(name) if isinstance(name, str) else name
-
-    @staticmethod
-    def _require_axis_for_active_connection(
-        connection_type: Type[Connection], axis: Optional[Vector3]
-    ) -> None:
-        """Raise if an active connection is requested without a movement axis."""
-        if axis is None and issubclass(connection_type, ActiveConnection):
-            raise ValueError(
-                f"{connection_type.__name__} is an active connection, so axis is required."
-            )
 
     @staticmethod
     def _build_connection(
@@ -214,7 +200,7 @@ class KinematicStructureEntitySpecification(
     """
 
     def __post_init__(self):
-        self.name = self._to_prefixed_name(self.name)
+        self.name = ensure_prefixed_name(self.name)
 
     def to_domain_object(
         self, name: Union[str, PrefixedName, None] = None
@@ -224,7 +210,7 @@ class KinematicStructureEntitySpecification(
             self, KinematicStructureEntitySpecification
         )[0]
         return domain_object_type.from_shape_collection(
-            self._to_prefixed_name(name) or self.name,
+            ensure_prefixed_name(name) or self.name,
             self.shapes.copy_without_reference_frame(),
         )
 
@@ -412,7 +398,7 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
             body = super().to_domain_object(name)
         else:
             body = Body(
-                name=self._to_prefixed_name(name) or self.name,
+                name=ensure_prefixed_name(name) or self.name,
                 collision=self.shapes.copy_without_reference_frame(),
                 visual=self.visual_shapes.copy_without_reference_frame(),
             )
@@ -487,10 +473,12 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
     """
 
     def __post_init__(self):
-        self.name = self._to_prefixed_name(self.name)
-        self._require_axis_for_active_connection(
-            self.semantic_annotation_type._parent_connection_type, self.axis
-        )
+        self.name = ensure_prefixed_name(self.name)
+        connection_type = self.semantic_annotation_type._parent_connection_type
+        if self.axis is None and issubclass(connection_type, ActiveConnection):
+            raise ValueError(
+                f"{connection_type.__name__} is an active connection, so axis is required."
+            )
 
     def spawn(
         self,
@@ -503,7 +491,7 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
             _wrapped_part_whole_relationship_fields,
         )
 
-        name = self._to_prefixed_name(name) or self.name
+        name = ensure_prefixed_name(name) or self.name
 
         part_whole_fields_by_name = {
             wrapped_field.name: wrapped_field
@@ -530,7 +518,9 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
             if (
                 wrapped_field is not None
                 and all_nested_annotation_specs
-                and (wrapped_field.is_many_to_many_relationship or not value_is_sequence)
+                and (
+                    wrapped_field.is_many_to_many_relationship or not value_is_sequence
+                )
             ):
                 part_semantic_annotation_specs[key] = items
             elif any(isinstance(item, WorldEntitySpawnSpecification) for item in items):
@@ -617,7 +607,11 @@ class BodyAndConnectionSpecification(WorldEntitySpawnSpecification):
     """
 
     def __post_init__(self):
-        self._require_axis_for_active_connection(self.connection_type, self.axis)
+
+        if self.axis is None and issubclass(self.connection_type, ActiveConnection):
+            raise ValueError(
+                f"{self.connection_type.__name__} is an active connection, so axis is required."
+            )
 
     def spawn(
         self,

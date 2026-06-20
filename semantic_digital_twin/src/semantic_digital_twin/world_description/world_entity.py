@@ -8,8 +8,7 @@ from collections.abc import Iterable
 from copy import deepcopy
 from dataclasses import dataclass, field
 from dataclasses import fields
-from functools import lru_cache, cached_property
-from typing import assert_never
+from functools import cached_property
 from uuid import UUID, uuid4
 
 import numpy as np
@@ -35,16 +34,8 @@ from krrood.adapters.json_serializer import (
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.entity_query_language.predicate import Symbol
 from krrood.symbolic_math.symbolic_math import Matrix
-from krrood.utils import get_full_class_name, memoize
-from semantic_digital_twin.datastructures.joint_state import JointState
-from semantic_digital_twin.world_description.geometry import Mesh
-from semantic_digital_twin.world_description.inertial_properties import Inertial
-from semantic_digital_twin.world_description.shape_collection import (
-    ShapeCollection,
-    BoundingBoxCollection,
-)
-from semantic_digital_twin.mixin import HasSimulatorProperties
 from krrood.utils import get_full_class_name
+from krrood.utils import memoize
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
@@ -52,8 +43,6 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     ReferenceFrameMismatchError,
-    WorldEntityWithIDNotInKwargs,
-    MissingWorldError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -61,7 +50,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Point3,
     Pose,
 )
-from semantic_digital_twin.utils import IDGenerator, camel_case_split
+from semantic_digital_twin.utils import camel_case_split
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import (
@@ -74,8 +63,6 @@ if TYPE_CHECKING:
         DegreeOfFreedom,
     )
     from semantic_digital_twin.world import World, GenericSemanticAnnotation
-
-id_generator = IDGenerator()
 
 
 @dataclass(eq=False)
@@ -465,7 +452,7 @@ class Body(KinematicStructureEntity):
 
     def __post_init__(self):
         if not self.name:
-            self.name = PrefixedName(f"body_{id_generator(self)}")
+            self.name = PrefixedName(f"body_{self.id}")
 
         self.visual.reference_frame = self
         self.collision.reference_frame = self
