@@ -1,7 +1,7 @@
 import numpy as np
 
 from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.factories import an
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.feature_extractor import FeatureExtractor
 from krrood.parametrization.model_registries import DictRegistry
@@ -21,10 +21,10 @@ from ..dataset.semantic_world_like_classes import Body
 
 
 def test_rspn_learning():
-    action = underspecified(NestedAction)(
-        pose=underspecified(KRROODPose)(
-            position=underspecified(KRROODPosition)(x=..., y=..., z=...),
-            orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
+    action = an(NestedAction)(
+        pose=an(KRROODPose)(
+            position=an(KRROODPosition)(x=..., y=..., z=...),
+            orientation=an(KRROODOrientation)(x=..., y=..., z=..., w=...),
         ),
         obj=Body(name="body"),
     )

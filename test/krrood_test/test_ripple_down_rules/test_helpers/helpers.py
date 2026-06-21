@@ -3,7 +3,7 @@ import os
 
 from typing_extensions import List, Any, Tuple, Type, Callable, Optional
 
-from test.krrood_test.test_ripple_down_rules.datasets import (
+from ..datasets import (
     Species,
     Habitat,
     load_zoo_cases,

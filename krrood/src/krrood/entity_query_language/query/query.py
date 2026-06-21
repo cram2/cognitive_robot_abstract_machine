@@ -54,6 +54,7 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     UnificationDict,
 )
+from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.cache_data import (
     SeenSet,
 )
@@ -91,7 +92,10 @@ A function that maps the results of a query to a new set of results.
 @monitored
 @dataclass(eq=False, repr=False)
 class Query(
-    MultiArityExpressionThatPerformsACartesianProduct, CanBehaveLikeAVariable[T], ABC
+    Evaluable,
+    MultiArityExpressionThatPerformsACartesianProduct,
+    CanBehaveLikeAVariable[T],
+    ABC,
 ):
     """
     Describes the queried object(s), could be a query over a single variable or a set of variables,
@@ -177,10 +181,25 @@ class Query(
 
         return wrapper
 
-    def evaluate(self) -> Iterator:
+    def evaluate(self, backend=None) -> Iterator:
         """
-        Wrap the query in a ResultQuantifier expression and evaluate it,
-         returning an iterator over the results.
+        Evaluate the query using the given backend, returning an iterator over the results.
+
+        Finalizes the query structure eagerly so that ``evaluate`` consistently marks the
+        query as built (and forbids further modification) regardless of when the returned
+        iterator is consumed. ``build`` is idempotent.
+
+        :param backend: The query backend to evaluate with. Defaults to the
+            ``EntityQueryLanguageBackend`` (native python evaluation).
+        """
+        self.build()
+        return super().evaluate(backend)
+
+    def _evaluate_natively_(self) -> Iterator:
+        """
+        Wrap the query in a ResultQuantifier expression and evaluate it natively (in this
+        python process), returning an iterator over the results. This is the engine used by
+        the ``EntityQueryLanguageBackend``.
         """
         self.build()
         if self._expression_ is not self:
@@ -507,18 +526,25 @@ class Query(
         """
         aggregated_variables = []
         non_aggregated_variables = []
-        for variable in self._selected_variables_:
-            if isinstance(variable, Aggregator):
-                aggregated_variables.append(variable)
-            elif isinstance(variable, InstantiatedVariable):
-                non_aggregated_variables.extend(variable._operation_children_)
+
+        def _update_aggregated_and_non_aggregated_variables(
+            variable_: SymbolicExpression,
+        ):
+            if isinstance(variable_, Aggregator):
+                aggregated_variables.append(variable_)
+            elif isinstance(variable_, InstantiatedVariable):
+                for child in variable_._operation_children_:
+                    _update_aggregated_and_non_aggregated_variables(child)
             elif (
-                isinstance(variable, ExternallySetVariable)
-                and variable._domain_source_ == DomainSource.DEDUCTION
+                isinstance(variable_, ExternallySetVariable)
+                and variable_._domain_source_ == DomainSource.DEDUCTION
             ):
-                continue
+                pass
             else:
-                non_aggregated_variables.append(variable)
+                non_aggregated_variables.append(variable_)
+
+        for variable in self._selected_variables_:
+            _update_aggregated_and_non_aggregated_variables(variable)
         return aggregated_variables, non_aggregated_variables
 
     def _apply_results_mapping_(

@@ -44,12 +44,14 @@ from krrood.entity_query_language.core.mapped_variable import (
     Index,
 )
 from krrood.entity_query_language.core.variable import Literal, DomainType, Variable
+from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.exceptions import (
     NoKwargsInMatchVar,
     CalledMatchMultipleTimes,
     MatchTypeCannotBeDetermined,
 )
 from krrood.entity_query_language.predicate import HasType
+from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier
 from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from krrood.rustworkx_utils import RWXNode
@@ -197,7 +199,7 @@ class AbstractMatchExpression(Generic[T], ABC):
 
 
 @dataclass(eq=False)
-class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
+class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
     """
     Construct a query that looks for the pattern provided by the type and the keyword arguments.
     Example usage where we look for an object of type Drawer with body of type Body that has the name"drawer_1":
@@ -207,7 +209,7 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         >>> @dataclass
         >>> class Drawer:
         >>>     body: Body
-        >>> drawer = match_variable(Drawer, domain=None)(body=match(Body)(name="drawer_1")))
+        >>> drawer = an(Drawer, domain=world.views)(body=an(Body)(name="drawer_1"))
 
     .. warning::
         Match can take a factory as a mean to construct `T`. If the keyword argument names of the match are not
@@ -231,6 +233,12 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
     _has_been_called: bool = field(init=False, default=False)
     """
     Flag indicating whether the match instance has been called with keyword arguments.
+    """
+
+    _quantifier_type_: Type[ResultQuantifier] = field(init=False, default=An)
+    """
+    The result quantifier applied when this match is materialized into a runnable query.
+    Defaults to ``An`` (zero or more results); set to ``The`` when built via ``the(...)``.
     """
 
     def __post_init__(self):
@@ -257,6 +265,11 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         """
         Update the match with new keyword arguments to constrain the type we are matching with.
 
+        Eagerly creates the match's subject variable so it can be referenced in ``where``
+        conditions immediately (lowering the pattern into conditions stays lazy, tracked by
+        ``resolved``). If this match is later nested under a parent, the parent overwrites
+        the subject with its own attribute during resolution.
+
         :param kwargs: The keyword arguments to match against.
         :return: The current match instance after updating it with the new keyword arguments.
         """
@@ -264,6 +277,8 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
             raise CalledMatchMultipleTimes(self)
         self.kwargs = kwargs
         self._has_been_called = True
+        if self.variable is None:
+            self.create_variable()
         return self
 
     @property
@@ -276,11 +291,12 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         if self._expression is not None:
             return self._expression
 
-        if self.variable is None:
+        if not self.resolved:
             self.resolve()
         entity_ = entity(self.variable)
         if self.conditions:
             entity_ = entity_.where(*self.conditions)
+        entity_._quantify_(self._quantifier_type_)
         self._expression = entity_
         return entity_
 
@@ -385,11 +401,22 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
 
         self.variable = variable(self.type, domain=None)
 
-    def evaluate(self):
+    def _evaluate_natively_(self) -> Iterator:
         """
-        Evaluate the match expression and return the result.
+        Evaluate the match selectively in the current python process: select elements from the
+        match's domain (its variable's domain, or the ``SymbolGraph`` for ``Symbol`` types when
+        no domain was given) that satisfy the structural pattern and ``where`` conditions.
+
+        .. note::
+            Constructing *new* instances from an underspecified match is the job of a
+            :class:`~krrood.entity_query_language.backends.GenerativeBackend` (for example
+            :class:`~krrood.entity_query_language.backends.EntityQueryLanguageGenerativeBackend`
+            or :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`), not of the
+            default selective evaluation.
+
+        :return: An iterator over the matching elements.
         """
-        return self.expression.evaluate()
+        return self.expression._evaluate_natively_()
 
     @property
     def name(self) -> str:
@@ -513,8 +540,9 @@ class AttributeMatch(AbstractMatchExpression[T]):
         Resolve the attribute assignment by creating the conditions and applying the necessary mappings
         to the attribute.
         """
-        if not isinstance(self.assigned_value, AbstractMatchExpression) or (
-            self.assigned_value.variable or self.assigned_value.resolved
+        if (
+            not isinstance(self.assigned_value, AbstractMatchExpression)
+            or self.assigned_value.resolved
         ):
             self.conditions.append(self.attribute == self.assigned_variable)
             return

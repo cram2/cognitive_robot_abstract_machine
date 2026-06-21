@@ -5,7 +5,7 @@ import pytest
 
 import experiments.orm.ormatic_interface  # type: ignore
 from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
-from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.factories import an
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from coraplex.datastructures.dataclasses import Context
@@ -129,8 +129,8 @@ def test_translate_free_space_to_where_condition(wall_door_handle_world):
 
     # Create a variable for the robot
 
-    query = underspecified(MoveToReach)(
-        target_pose_offset_robot=underspecified(Pose2D)(
+    query = an(MoveToReach)(
+        target_pose_offset_robot=an(Pose2D)(
             x=..., y=..., yaw=..., reference_frame=None
         ),
     )

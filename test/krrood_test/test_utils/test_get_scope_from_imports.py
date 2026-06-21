@@ -31,7 +31,7 @@ def test_get_scope_from_imports_wildcard():
 
 def test_get_scope_from_imports_invalid():
     source = "import non_existent_module_xyz"
-    with pytest.raises(ModuleNotFoundError):
+    with pytest.raises(ModuleNotFoundError, match="No module named 'non_existent_module_xyz'"):
         scope = get_scope_from_imports(source=source)
 
 def test_get_scope_from_imports_tree():

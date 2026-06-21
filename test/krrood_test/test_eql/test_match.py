@@ -7,8 +7,7 @@ from krrood.entity_query_language.factories import (
     set_of,
     variable,
     the,
-    match,
-    match_variable,
+    an,
     a,
 )
 from krrood.entity_query_language.exceptions import NoKwargsInMatchVar
@@ -30,16 +29,16 @@ def test_doc_match():
         battery: int
 
     robots = [Robot("R2D2", 100), Robot("C3PO", 0)]
-    query = match_variable(Robot, domain=robots)(name="R2D2", battery=100)
+    query = an(Robot, domain=robots)(name="R2D2", battery=100)
     assert query.tolist()[0].name == "R2D2"
 
 
 def test_match(handles_and_containers_world):
     world = handles_and_containers_world
 
-    fixed_connection = match_variable(FixedConnection, domain=world.connections)(
-        parent=match(Container)(name="Container1"),
-        child=match(Handle)(name="Handle1"),
+    fixed_connection = an(FixedConnection, domain=world.connections)(
+        parent=an(Container)(name="Container1"),
+        child=an(Handle)(name="Handle1"),
     )
     fixed_connection_query = the(fixed_connection)
 
@@ -67,8 +66,8 @@ def test_select(handles_and_containers_world):
     world = handles_and_containers_world
 
     # Method 1
-    fixed_connection = match_variable(FixedConnection, domain=world.connections)(
-        parent=match(Container)(name="Container1"), child=match(Handle)(name="Handle1")
+    fixed_connection = an(FixedConnection, domain=world.connections)(
+        parent=an(Container)(name="Container1"), child=an(Handle)(name="Handle1")
     )
     container_and_handle = the(
         set_of(container := fixed_connection.parent, handle := fixed_connection.child)
@@ -102,16 +101,15 @@ def test_select_where(handles_and_containers_world):
     world = handles_and_containers_world
 
     # Method 1
-    fixed_connection = match_variable(FixedConnection, domain=world.connections)(
-        parent=match(Container),
-        child=match(Handle),
+    fixed_connection = an(FixedConnection, domain=world.connections)(
+        parent=an(Container),
+        child=an(Handle),
     )
     container_and_handle = a(
         set_of(
             container := fixed_connection.parent, handle := fixed_connection.child
         ).where(container.size > 1)
     )
-    # QueryGraph(container_and_handle.build()).visualize()
     # Method 2
     fixed_connection_2 = variable(FixedConnection, domain=world.connections)
     container_and_handle_2 = the(
@@ -139,7 +137,20 @@ def test_select_where(handles_and_containers_world):
 def test_empty_conditions_match_var(handles_and_containers_world):
     world = handles_and_containers_world
     with pytest.raises(NoKwargsInMatchVar):
-        match_variable(FixedConnection, domain=world.connections)()
+        an(FixedConnection, domain=world.connections)()
+
+
+def test_match_without_domain_selects_from_symbol_graph():
+    """
+    A domain-less match evaluated standalone (default selective backend) *selects* from the
+    SymbolGraph for ``Symbol`` types: it returns the existing registered instance rather than
+    constructing a new one. Generation requires an explicit generative backend.
+    """
+    existing = KRROODPosition(1.0, 2.0, 3.0)
+    result = an(KRROODPosition)(x=1.0, y=2.0, z=3.0).tolist()
+    # the existing object itself is returned (selection), not a freshly-built equal one
+    assert any(r is existing for r in result)
+    assert all(isinstance(r, KRROODPosition) and r == existing for r in result)
 
 
 def test_match_with_list():
@@ -148,9 +159,9 @@ def test_match_with_list():
         KRROODPositions([KRROODPosition(1, 2, 3)], ["a"]),
     ]
 
-    q = match_variable(KRROODPositions, domain=domain)(
+    q = an(KRROODPositions, domain=domain)(
         positions=[
-            match(KRROODPosition)(
+            an(KRROODPosition)(
                 x=1,
                 y=2,
             ),

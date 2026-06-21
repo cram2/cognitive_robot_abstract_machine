@@ -32,7 +32,7 @@ from experiments.experiment_definitions import (
     TypstRenderer,
 )
 from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.factories import an
 from krrood.ormatic.data_access_objects.dao import selectin_loading
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine, drop_database
@@ -89,8 +89,8 @@ def _random_underspecified_action(world: World):
     """Return a random underspecified action limited to at most attempts."""
     choice = random.randint(0, 2)
     if choice == 0:
-        action = underspecified(NavigateAction)(
-            target_location=underspecified(Pose.from_xyz_rpy)(
+        action = an(NavigateAction)(
+            target_location=an(Pose.from_xyz_rpy)(
                 x=...,
                 y=...,
                 z=0.0,
@@ -102,9 +102,9 @@ def _random_underspecified_action(world: World):
             keep_joint_states=True,
         )
     elif choice == 1:
-        action = underspecified(MoveTorsoAction)(torso_state=...)
+        action = an(MoveTorsoAction)(torso_state=...)
     else:
-        action = underspecified(ParkArmsAction)(arm=...)
+        action = an(ParkArmsAction)(arm=...)
     action.expression.limit(10)
     return action
 

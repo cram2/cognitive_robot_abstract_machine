@@ -9,11 +9,12 @@ import operator
 from inspect import isclass
 from uuid import UUID
 
-from typing_extensions import Iterable, List
+from typing_extensions import Iterable, List, overload
 
 from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
     TruthValueOperator,
+    OperationResult,
 )
 from krrood.entity_query_language.core.mapped_variable import (
     FlatVariable,
@@ -97,55 +98,12 @@ def set_of(*selected_variables: Union[Selectable[T], Any]) -> SetOf:
     return SetOf(_selected_variables_=selected_variables)
 
 
-# %% Match
-
-
-def match(
-        type_: Optional[Union[Type[T], Selectable[T]]] = None,
-) -> Union[Type[T], CanBehaveLikeAVariable[T], Match[T]]:
-    """
-    Create a symbolic variable matching the type and the provided keyword arguments. This is used for easy variable
-     definitions when there are structural constraints.
-
-    :param type_: The type of the variable (i.e., The class you want to instantiate).
-    :return: The Match instance.
-    """
-    return Match(factory=type_)
-
-
-def match_variable(
-        type_: Union[Type[T], Selectable[T]], domain: DomainType
-) -> Union[T, Entity[T], MatchVariable[T]]:
-    """
-    Same as :py:func:`krrood.entity_query_language.match.match` but with a domain to use for the variable created
-     by the match.
-
-    :param type_: The type of the variable (i.e., The class you want to instantiate).
-    :param domain: The domain used for the variable created by the match.
-    :return: The Match instance.
-    """
-    return MatchVariable(factory=type_, domain=domain)
-
-
-def underspecified(
-        expression: Union[Type[T], Callable[..., T]], target_type: Type[T] | None = None
-) -> Union[Type[T], Match[T]]:
-    """
-    Same as :py:func:`krrood.entity_query_language.factories.match` but instead of searching for solutions in
-    the domain objects, it is used as a query for generative processes to infer solutions that satisfy the constraints
-    in the query.
-    """
-    if target_type is not None:
-        return Match(factory=expression, type_=target_type)
-    return Match(factory=expression)
-
-
 # %% Variable Declaration
 
 
 def variable(
-        type_: Type[T],
-        domain: Optional[DomainType],
+    type_: Type[T],
+    domain: Optional[DomainType],
 ) -> Union[T, Selectable[T], Variable[T]]:
     """
     Declare a symbolic variable that can be used inside queries.
@@ -180,7 +138,7 @@ def variable(
 
 
 def deduced_variable(
-        type_: Optional[Type[T]] = None,
+    type_: Optional[Type[T]] = None,
 ) -> Union[Type[T], ExternallySetVariable[T]]:
     """
     Create a variable that is inferred through deductive reasoning.
@@ -191,7 +149,9 @@ def deduced_variable(
     return ExternallySetVariable(_type_=type_, _domain_source_=DomainSource.DEDUCTION)
 
 
-def variable_from(domain: Union[Iterable[T], Selectable[T]]) -> Union[T, Selectable[T]]:
+def variable_from(
+    domain: Union[Iterable[T], Selectable[T], T],
+) -> Union[T, Variable[T]]:
     """
     Create a variable from a given domain.
 
@@ -205,7 +165,7 @@ def variable_from(domain: Union[Iterable[T], Selectable[T]]) -> Union[T, Selecta
 
 
 def concatenation(
-        *variables: Union[Iterable[T], Selectable[T]],
+    *variables: Union[Iterable[T], Selectable[T]],
 ) -> Union[T, Selectable[T]]:
     """
     Concatenation of two or more variables.
@@ -214,7 +174,7 @@ def concatenation(
 
 
 def contains(
-        container: Union[Iterable, CanBehaveLikeAVariable[T]], item: Any
+    container: Union[Iterable, CanBehaveLikeAVariable[T]], item: Any
 ) -> Comparator:
     """
     Check whether a container contains an item.
@@ -240,7 +200,7 @@ def in_(item: Any, container: Union[Iterable, CanBehaveLikeAVariable[T]]):
 
 
 def flat_variable(
-        var: Union[CanBehaveLikeAVariable[T], Iterable[T]],
+    var: Union[CanBehaveLikeAVariable[T], Iterable[T]],
 ) -> Union[FlatVariable[T], T]:
     """
     Flatten a nested iterable domain into individual items while preserving the parent bindings.
@@ -287,8 +247,8 @@ def not_(operand: ConditionType) -> SymbolicExpression:
 
 
 def for_all(
-        universal_variable: Union[CanBehaveLikeAVariable[T], T],
-        condition: ConditionType,
+    universal_variable: Union[CanBehaveLikeAVariable[T], T],
+    condition: ConditionType,
 ) -> ForAll:
     """
     A universal on variable that finds all sets of variable bindings (values) that satisfy the condition for **every**
@@ -302,8 +262,8 @@ def for_all(
 
 
 def exists(
-        universal_variable: Union[CanBehaveLikeAVariable[T], T],
-        condition: ConditionType,
+    universal_variable: Union[CanBehaveLikeAVariable[T], T],
+    condition: ConditionType,
 ) -> Exists:
     """
     A universal on variable that finds all sets of variable bindings (values) that satisfy the condition for **any**
@@ -319,18 +279,112 @@ def exists(
 # %% Result Quantifiers
 
 
-def an(
-        entity_: Union[T, Query],
-        quantification: Optional[ResultQuantificationConstraint] = None,
-) -> Union[T, Query]:
+def _quantify_or_build_match(
+    arg: Union[T, Query, Type[T], Callable[..., T]],
+    quantifier_type: Type[ResultQuantifier],
+    quantification: Optional[ResultQuantificationConstraint] = None,
+    *,
+    domain: Optional[DomainType] = None,
+    target_type: Optional[Type[T]] = None,
+) -> Union[T, Query, Match[T], MatchVariable[T]]:
     """
-    Select all values satisfying the given entity description.
+    Shared implementation for :py:func:`an` and :py:func:`the`.
 
-    :param entity_: An entity or a set expression to quantify over.
-    :param quantification: Optional quantification constraint.
-    :return: The entity with the applied quantifier.
+    The behaviour is selected by the runtime type of ``arg``:
+
+    * If ``arg`` is a :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression`
+      (an entity, a set expression, a variable or an attribute), it is quantified with
+      ``quantifier_type``. Raw selectables that are not already a
+      :class:`~krrood.entity_query_language.query.query.Query` are first wrapped with
+      :py:func:`entity`.
+    * Otherwise ``arg`` is treated as a type (or a callable factory) and a structural
+      :class:`~krrood.entity_query_language.query.match.Match` is built. If ``domain`` is
+      provided, a :class:`~krrood.entity_query_language.query.match.MatchVariable` bound to
+      that domain is built instead.
+
+    :param arg: An entity/set/variable/attribute to quantify, or a type/callable to match.
+    :param quantifier_type: The result quantifier to apply (``An`` or ``The``).
+    :param quantification: Optional quantification constraint (quantify path only).
+    :param domain: Optional domain that turns the match into a ``MatchVariable``.
+    :param target_type: Optional explicit type for callable factories (match path only).
+    :return: A quantified query, or a ``Match``/``MatchVariable`` builder.
     """
-    return entity_._quantify_(An, quantification_constraint=quantification)
+    if isinstance(arg, SymbolicExpression):
+        if not isinstance(arg, Query):
+            arg = entity(arg)
+        return arg._quantify_(quantifier_type, quantification_constraint=quantification)
+
+    if domain is not None:
+        match_ = MatchVariable(factory=arg, type_=target_type, domain=domain)
+    else:
+        match_ = Match(factory=arg, type_=target_type)
+    match_._quantifier_type_ = quantifier_type
+    return match_
+
+
+@overload
+def an(
+    entity_: Type[T],
+    quantification: None = ...,
+    *,
+    domain: DomainType,
+    target_type: None = ...,
+) -> MatchVariable[T]: ...
+
+
+@overload
+def an(
+    entity_: Type[T],
+    quantification: None = ...,
+    *,
+    domain: None = ...,
+    target_type: None = ...,
+) -> Match[T]: ...
+
+
+@overload
+def an(
+    entity_: Callable[..., T],
+    quantification: None = ...,
+    *,
+    domain: None = ...,
+    target_type: Type[T],
+) -> Match[T]: ...
+
+
+@overload
+def an(
+    entity_: T,
+    quantification: Optional[ResultQuantificationConstraint] = ...,
+    *,
+    domain: None = ...,
+    target_type: None = ...,
+) -> T: ...
+
+
+def an(
+    entity_,
+    quantification=None,
+    *,
+    domain=None,
+    target_type=None,
+):
+    """
+    Select all values satisfying the given description.
+
+    Depending on ``entity_`` this either quantifies an existing symbolic expression with the
+    ``An`` quantifier (zero or more results), or builds a structural ``Match`` when ``entity_``
+    is a type or a callable factory. See :py:func:`_quantify_or_build_match` for details.
+
+    :param entity_: An entity/set/variable/attribute to quantify, or a type/callable to match.
+    :param quantification: Optional quantification constraint (quantify path only).
+    :param domain: Optional domain that turns a type into a ``MatchVariable``.
+    :param target_type: Optional explicit type for callable factories (match path only).
+    :return: The applied quantifier or the constructed match.
+    """
+    return _quantify_or_build_match(
+        entity_, An, quantification, domain=domain, target_type=target_type
+    )
 
 
 a = an
@@ -339,16 +393,62 @@ This is an alias to accommodate for words not starting with vowels.
 """
 
 
+@overload
 def the(
-        entity_: Union[T, Query],
-) -> Union[T, Query]:
-    """
-    Select the unique value satisfying the given entity description.
+    entity_: Type[T],
+    *,
+    domain: DomainType,
+    target_type: None = ...,
+) -> MatchVariable[T]: ...
 
-    :param entity_: An entity or a set expression to quantify over.
-    :return: The entity with the applied quantifier.
+
+@overload
+def the(
+    entity_: Type[T],
+    *,
+    domain: None = ...,
+    target_type: None = ...,
+) -> Match[T]: ...
+
+
+@overload
+def the(
+    entity_: Callable[..., T],
+    *,
+    domain: None = ...,
+    target_type: Type[T],
+) -> Match[T]: ...
+
+
+@overload
+def the(
+    entity_: T,
+    *,
+    domain: None = ...,
+    target_type: None = ...,
+) -> T: ...
+
+
+def the(
+    entity_,
+    *,
+    domain=None,
+    target_type=None,
+):
     """
-    return entity_._quantify_(The)
+    Select the unique value satisfying the given description.
+
+    Behaves like :py:func:`an` but applies the ``The`` quantifier, which expects exactly one
+    result when the expression is materialized (raising otherwise).
+
+    :param entity_: An entity/set/variable/attribute to quantify, or a type/callable to match.
+    :param domain: Optional domain that turns a type into a ``MatchVariable``.
+    :param target_type: Optional explicit type for callable factories (match path only).
+    :return: The applied quantifier or the constructed match.
+    """
+    return _quantify_or_build_match(
+        entity_, The, None, domain=domain, target_type=target_type
+    )
 
 
 # %% Rules
@@ -366,7 +466,7 @@ def add(variable: Any, value: Any) -> None:
 
 
 def inference(
-        type_: Type[T],
+    type_: Type[T],
 ) -> Union[Callable[[], Union[T, InstantiatedVariable[T]]]]:
     """
     This returns a factory function that creates a new variable of the given type and takes keyword arguments for the
@@ -423,10 +523,11 @@ def next_rule(*conditions: ConditionType) -> SymbolicExpression:
 
 # %% Conditionals
 
+
 def case_when(
-        condition: SymbolicExpression,
-        then_value: SymbolicExpression,
-        else_value: Optional[SymbolicExpression] = None,
+    condition: SymbolicExpression,
+    then_value: SymbolicExpression,
+    else_value: Optional[SymbolicExpression] = None,
 ) -> CaseWhen:
     """
     Create a CASE WHEN ... THEN ... ELSE ... END expression.
@@ -450,10 +551,10 @@ def case_when(
 
 
 def max(
-        variable: Selectable[T],
-        key: Optional[Callable] = None,
-        default: Optional[T] = None,
-        distinct: bool = False,
+    variable: Selectable[T],
+    key: Optional[Callable] = None,
+    default: Optional[T] = None,
+    distinct: bool = False,
 ) -> Union[T, Max[T]]:
     """
     Maps the variable values to their maximum value.
@@ -470,8 +571,8 @@ def max(
 
 
 def mode(
-        variable: Selectable[T],
-        default: Optional[T] = None,
+    variable: Selectable[T],
+    default: Optional[T] = None,
 ) -> Union[T, Mode[T]]:
     """
     Calculate and return the first mode from the variable values. The mode is the most common value in the iterable. It is found by
@@ -487,8 +588,8 @@ def mode(
 
 
 def multimode(
-        variable: Selectable[T],
-        default: Optional[T] = None,
+    variable: Selectable[T],
+    default: Optional[T] = None,
 ) -> Union[T, MultiMode[T]]:
     """
     Calculate and return all mode values from the variable values. Similar to :py:func:`krrood.entity_query_language.factories.mode`
@@ -502,10 +603,10 @@ def multimode(
 
 
 def min(
-        variable: Selectable[T],
-        key: Optional[Callable] = None,
-        default: Optional[T] = None,
-        distinct: bool = False,
+    variable: Selectable[T],
+    key: Optional[Callable] = None,
+    default: Optional[T] = None,
+    distinct: bool = False,
 ) -> Union[T, Min[T]]:
     """
     Maps the variable values to their minimum value.
@@ -522,10 +623,10 @@ def min(
 
 
 def sum(
-        variable: Union[T, Selectable[T]],
-        key: Optional[Callable] = None,
-        default: Optional[T] = None,
-        distinct: bool = False,
+    variable: Union[T, Selectable[T]],
+    key: Optional[Callable] = None,
+    default: Optional[T] = None,
+    distinct: bool = False,
 ) -> Union[T, Sum]:
     """
     Computes the sum of values produced by the given variable.
@@ -542,10 +643,10 @@ def sum(
 
 
 def average(
-        variable: Union[Selectable[T], Any],
-        key: Optional[Callable] = None,
-        default: Optional[T] = None,
-        distinct: bool = False,
+    variable: Union[Selectable[T], Any],
+    key: Optional[Callable] = None,
+    default: Optional[T] = None,
+    distinct: bool = False,
 ) -> Union[T, Average]:
     """
     Computes the sum of values produced by the given variable.
@@ -583,8 +684,8 @@ def count_all(distinct: bool = False) -> Union[T, Count[T]]:
 
 
 def distinct(
-        expression: T,
-        *on: Any,
+    expression: T,
+    *on: Any,
 ) -> T:
     """
     Indicate that the result of the expression should be distinct.
@@ -601,7 +702,7 @@ def distinct(
 
 
 def get_conditioned_statements(
-        statement, condition: Callable[OperationResult, bool]
+    statement, condition: Callable[OperationResult, bool]
 ) -> List[SymbolicExpression]:
     """
     Iterates over all sub-statements of the statement and returns all statements that satisfy the condition.
