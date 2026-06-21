@@ -3,9 +3,11 @@
 This module provides annotators for writing and publishing annotations.
 """
 
+from __future__ import annotations
+
+import json
 import os
 import shutil
-import json
 from timeit import default_timer
 
 from py_trees.common import Status
@@ -44,7 +46,7 @@ class AnnotationStorageWriter(BaseAnnotator):
     def __init__(
         self,
         name: str = "AnnotationStorageWriter",
-        descriptor: "AnnotationStorageWriter.Descriptor" = Descriptor(),
+        descriptor: AnnotationStorageWriter.Descriptor = Descriptor(),
     ) -> None:
         """Initialize the annotation storage writer. Minimal one-time init!
 
@@ -114,7 +116,7 @@ class AnnotationPublisherWriter(BaseAnnotator):
     def __init__(
         self,
         name: str = "AnnotationPublisherWriter",
-        descriptor: "AnnotationPublisherWriter.Descriptor" = Descriptor(),
+        descriptor: AnnotationPublisherWriter.Descriptor = Descriptor(),
     ) -> None:
         """Initialize the annotation publisher. Minimal one-time init!
 

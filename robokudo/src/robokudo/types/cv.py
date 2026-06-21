@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-@dataclass(kw_only=True, slots=True)
+@dataclass(kw_only=True)
 class Point2D(Type):
     """2D point representation.
 
@@ -45,7 +45,7 @@ class Point2D(Type):
     """
 
 
-@dataclass(kw_only=True, slots=True)
+@dataclass(kw_only=True)
 class Points3D(Type):
     """3D point cloud container.
 
@@ -58,7 +58,7 @@ class Points3D(Type):
     """
 
 
-@dataclass(kw_only=True, slots=True)
+@dataclass(kw_only=True)
 class Rect(Type):
     """2D rectangle representation.
 
@@ -89,7 +89,7 @@ class Rect(Type):
         return self.pos.x, self.pos.y, self.width, self.height
 
 
-@dataclass(kw_only=True, slots=True)
+@dataclass(kw_only=True)
 class ImageROI(Type):
     """Image region of interest.
 
@@ -109,7 +109,7 @@ class ImageROI(Type):
     """
 
 
-@dataclass(kw_only=True, slots=True)
+@dataclass(kw_only=True)
 class BoundingBox3D(Type):
     """3D oriented bounding box.
 
@@ -139,7 +139,7 @@ class BoundingBox3D(Type):
     """
 
 
-@dataclass(kw_only=True, slots=True)
+@dataclass(kw_only=True)
 class KeyPoint(Point2D):
     """A key point in an image."""
 

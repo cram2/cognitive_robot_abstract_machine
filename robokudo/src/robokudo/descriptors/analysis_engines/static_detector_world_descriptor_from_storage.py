@@ -14,7 +14,7 @@ from robokudo.annotators.static_object_detector import (
 from robokudo.annotators.world_descriptor_bootstrap import (
     WorldDescriptorBootstrapAnnotator,
 )
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
 
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):

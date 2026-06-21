@@ -18,16 +18,18 @@ The module is used for:
 * Experiment logging
 """
 
+from __future__ import annotations
+
 import copy
 import json
-import robokudo.world
 from timeit import default_timer
 
 from py_trees.common import Status
+from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 
+import robokudo.world
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.io.storage import Storage
-from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 
 
 class StorageWriter(BaseAnnotator):
@@ -56,7 +58,7 @@ class StorageWriter(BaseAnnotator):
     def __init__(
         self,
         name: str = "StorageWriter",
-        descriptor: "StorageWriter.Descriptor" = Descriptor(),
+        descriptor: StorageWriter.Descriptor = Descriptor(),
     ) -> None:
         """Initialize the storage writer. Minimal one-time init!
 

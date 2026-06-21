@@ -33,7 +33,7 @@ from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 from robokudo.tree_components.better_parallel import Parallel, ParallelPolicy
 
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
 
 
 class AnalysisEngine(AnalysisEngineInterface):

@@ -11,8 +11,6 @@ from dataclasses import dataclass, field
 
 import cv2
 import open3d as o3d
-from numpy import typing as npt
-
 from semantic_digital_twin.world_description.geometry import (
     Box as SemDTBox,
 )
@@ -339,13 +337,14 @@ class SIFTAnnotation(Annotation):
         return [KeyPoint.to_cv(k) for k in self.keypoints]
 
 
+@dataclass
 class TSDFAnnotation(Annotation):
     """A TSDF Volume annotation."""
 
-    volume: o3d.pipelines.integration.ScalableTSDFVolume
+    volume: Optional[o3d.pipelines.integration.ScalableTSDFVolume] = None
     """The Open3D TSDF Volume object."""
 
-    transform: npt.NDArray[np.float64]
+    transform: Optional[npt.NDArray[np.float64]] = None
     """The transform from the reference frame to the object frame."""
 
     def get_coordinate_frame(self) -> o3d.geometry.TriangleMesh:

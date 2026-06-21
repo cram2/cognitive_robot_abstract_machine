@@ -19,23 +19,25 @@ The module is used for:
 """
 
 from __future__ import annotations
+
 from timeit import default_timer
 
 from py_trees.common import Status
-from typing_extensions import List, TYPE_CHECKING
+from semantic_digital_twin.world_description.world_entity import Region
+from typing_extensions import TYPE_CHECKING, List
 
-from robokudo.annotators.core import ThreadedAnnotator, BaseAnnotator
+import robokudo.world as rk_world
+from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.types.annotation import LocationAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import get_world_to_cam_transform_matrix
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
-import robokudo.world as rk_world
 from robokudo.utils.region import region_obb_in_cam_coordinates
-from semantic_digital_twin.world_description.world_entity import Region
 
 if TYPE_CHECKING:
-    import numpy.typing as npt
     from collections.abc import Iterable
+
+    import numpy.typing as npt
 
 
 class LocationAnnotator(ThreadedAnnotator):
@@ -76,7 +78,7 @@ class LocationAnnotator(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "LocationAnnotator",
-        descriptor: "LocationAnnotator.Descriptor" = Descriptor(),
+        descriptor: LocationAnnotator.Descriptor = Descriptor(),
     ) -> None:
         """Initialize the location annotator.
 

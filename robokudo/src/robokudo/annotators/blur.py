@@ -11,6 +11,8 @@ blur exceeds a threshold.
    * Lower values indicate more blur
 """
 
+from __future__ import annotations
+
 import copy
 from timeit import default_timer
 
@@ -58,7 +60,7 @@ class BlurAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "BlurAnnotator",
-        descriptor: "BlurAnnotator.Descriptor" = Descriptor(),
+        descriptor: BlurAnnotator.Descriptor = Descriptor(),
     ) -> None:
         """Initialize the blur annotator. Minimal one-time init!
 

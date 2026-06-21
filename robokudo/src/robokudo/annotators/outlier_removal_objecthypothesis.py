@@ -17,14 +17,16 @@ Authors:
 * Naser Azizi
 """
 
+from __future__ import annotations
+
 from timeit import default_timer
 
 import numpy as np
 import open3d as o3d
-from rclpy.parameter import Parameter
-from rcl_interfaces.msg import SetParametersResult
 from py_trees.common import Status
-from typing_extensions import List, Dict, Type
+from rcl_interfaces.msg import SetParametersResult
+from rclpy.parameter import Parameter
+from typing_extensions import Dict, List, Type
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CAS, CASViews
@@ -97,7 +99,7 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "OutlierRemovalOnObjectHypothesis",
-        descriptor: "OutlierRemovalOnObjectHypothesisAnnotator.Descriptor" = Descriptor(),
+        descriptor: OutlierRemovalOnObjectHypothesisAnnotator.Descriptor = Descriptor(),
     ):
         """Initialize the outlier removal annotator.
 

@@ -13,10 +13,12 @@ The module supports:
 """
 
 import logging
+
+from py_trees.behaviour import Behaviour
 from py_trees.common import Status
 from py_trees.composites import Sequence
-from py_trees.behaviour import Behaviour
 from typing_extensions import List, Optional
+
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.tree import (
     add_child_to_parent,
@@ -130,7 +132,7 @@ class IterativeTaskScheduler(TaskSchedulerBase):
         self,
         name: str = "IterativeTaskScheduler",
         tree_list: Optional[List[Sequence]] = None,
-    ):
+    ) -> None:
         """Initialize the iterative scheduler.
 
         :param name: Name of the scheduler node

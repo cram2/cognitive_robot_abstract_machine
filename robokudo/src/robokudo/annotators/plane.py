@@ -17,13 +17,15 @@ The plane detection uses:
    Plane visualization includes both inlier points and a mesh model.
 """
 
+from __future__ import annotations
+
 from timeit import default_timer
 
 import numpy as np
 import open3d as o3d
 from py_trees.common import Status
 
-from robokudo.annotators.core import ThreadedAnnotator, BaseAnnotator
+from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.annotation import Plane
 from robokudo.utils.transform import get_transform_from_plane_equation
@@ -65,7 +67,7 @@ class PlaneAnnotator(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "PlaneAnnotator",
-        descriptor: "PlaneAnnotator.Descriptor" = Descriptor(),
+        descriptor: PlaneAnnotator.Descriptor = Descriptor(),
     ) -> None:
         """Initialize the plane detector.
 

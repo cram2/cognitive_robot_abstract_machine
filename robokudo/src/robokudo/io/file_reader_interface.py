@@ -15,22 +15,20 @@ The module is primarily used for:
 * Development and debugging
 """
 
+import json
 import pathlib
 import re
-import json
-
-import cv2
-import ament_index_python.packages
-
-from typing_extensions import Any, Dict, List, Optional, TypeVar
-
 from pathlib import Path
 
-from robokudo.cas import CASViews, CAS
+import ament_index_python.packages
+import cv2
+from typing_extensions import Any, Dict, List, Optional, TypeVar
+
+from robokudo.cas import CAS, CASViews
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.utils.type_conversion import (
-    ros_cam_info_from_dict,
     o3d_cam_intrinsics_from_ros_cam_info,
+    ros_cam_info_from_dict,
 )
 
 T = TypeVar("T")
@@ -65,7 +63,7 @@ class FileReaderInterface(CameraInterface):
             self,
             data: Optional[Dict[str, Dict[str, Any]]] = None,
             data_sequence: Optional[List[str]] = None,
-        ):
+        ) -> None:
             """Initialize the dictionary iterator.
 
             :param data: Dictionary containing the data, defaults to empty dict

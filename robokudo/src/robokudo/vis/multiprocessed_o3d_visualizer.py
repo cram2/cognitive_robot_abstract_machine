@@ -14,10 +14,10 @@ from __future__ import annotations
 
 import atexit
 import logging
-import time
 import multiprocessing as mp
-from multiprocessing import shared_memory
+import time
 from dataclasses import dataclass, field
+from multiprocessing import shared_memory
 from threading import Lock, Thread
 
 import numpy as np
@@ -26,14 +26,15 @@ from typing_extensions import (
     TYPE_CHECKING,
     Any,
     Dict,
+    Generic,
     Iterator,
     List,
     Optional,
+    Self,
     Tuple,
     Type,
-    Union,
-    Generic,
     TypeVar,
+    Union,
     override,
 )
 
@@ -43,8 +44,9 @@ from robokudo.vis.o3d_visualizer import Viewer3D
 from robokudo.vis.visualizer import Visualizer
 
 if TYPE_CHECKING:
-    import numpy.typing as npt
     from multiprocessing.connection import Connection
+
+    import numpy.typing as npt
 
 
 class O3DVisualizer(Visualizer, Visualizer.Observer):
@@ -335,7 +337,7 @@ class ObjectMemoryMap(MemoryMap, Generic[T]):
         return read_idx
 
     @classmethod
-    def from_object(cls, obj: T) -> "ObjectMemoryMap[T]":
+    def from_object(cls, obj: T) -> ObjectMemoryMap[T]:
         """Create a new memory map for the given object.
 
         :param obj: The object to create the memory map from.
@@ -385,7 +387,7 @@ class ArrayMemoryMap(MemoryMap):
     """Datatype of the underlying data as a string."""
 
     @classmethod
-    def from_numpy_array(cls, array: npt.NDArray) -> "ArrayMemoryMap":
+    def from_numpy_array(cls, array: npt.NDArray) -> Self:
         """Create a new memory map for the given numpy array."""
         return cls(
             shape=array.shape,
@@ -428,7 +430,7 @@ class Geometry3DMemoryMap(ObjectMemoryMap[G], Generic[G]):
         group: Optional[str] = None,
         time: Optional[float] = None,
         is_visible: Optional[bool] = None,
-    ) -> "Geometry3DMemoryMap":
+    ) -> Self:
         """Create a new memory memory map for the given geometry.
 
         :param name: The o3d name of the geometry.
@@ -458,7 +460,7 @@ class Geometry3DMemoryMap(ObjectMemoryMap[G], Generic[G]):
         )
 
     @classmethod
-    def from_geometry_dict(cls, geometry: Dict) -> "Geometry3DMemoryMap":
+    def from_geometry_dict(cls, geometry: Dict[str, Any]) -> Geometry3DMemoryMap:
         """Create a new memory map from a geometry dictionary.
 
         :param geometry: The geometry dictionary to create a memory map from.
@@ -779,9 +781,7 @@ class MaterialRecordMemoryMap(
 
     @override
     @classmethod
-    def from_object(
-        cls, obj: o3d.visualization.rendering.MaterialRecord
-    ) -> "MaterialRecordMemoryMap":
+    def from_object(cls, obj: o3d.visualization.rendering.MaterialRecord) -> Self:
         attribute_dict, size = cls.create_mapped_attributes_memory_maps(obj)
         return cls(
             byte_size=size,
@@ -814,9 +814,9 @@ class MaterialRecordMemoryMap(
     ) -> int:
         """Write the given geometry to the shared memory using the memory map.
 
-        :param shm: The shared memory to write to.
+        :param write_buf: The memory buffer to write to.
         :param write_idx: The byte index to start writing at.
-        :param geometry: The geometry to write.
+        :param obj: The geometry to write.
         :return: The byte index after writing.
         """
         return self.write_mapped_attributes(obj, write_buf, write_idx)
@@ -829,7 +829,7 @@ class MaterialRecordMemoryMap(
     ) -> Tuple[o3d.visualization.rendering.MaterialRecord, int]:
         """Read the geometry from the shared memory using the memory map.
 
-        :param shm: The shared memory to read from.
+        :param read_buf: The memory buffer to read from.
         :param read_idx: The byte index to start reading from.
         :return: The geometry read from the shared memory and the byte index after reading.
         """
@@ -866,7 +866,7 @@ class HalfEdgeMemoryMap(ObjectMemoryMap[o3d.geometry.HalfEdge]):
 
     @override
     @classmethod
-    def from_object(cls, obj: o3d.geometry.HalfEdge) -> "HalfEdgeMemoryMap":
+    def from_object(cls, obj: o3d.geometry.HalfEdge) -> Self:
         """Create a HalfEdgeMemoryMap from a HalfEdge object.
 
         :param obj: The HalfEdge object to create a HalfEdgeMemoryMap from.
@@ -1111,7 +1111,7 @@ class SharedMemoryManager(object):
     """The current end byte index of the shared memory (sum of all memory map sizes)."""
 
     @classmethod
-    def with_shm(cls, size: int) -> SharedMemoryManager:
+    def with_shm(cls, size: int) -> Self:
         """Create a SharedMemoryManager with a newly created shared memory of the given size.
 
         :param size: The size of the shared memory to create.
@@ -1120,7 +1120,7 @@ class SharedMemoryManager(object):
         return cls(_shm=shared_memory.SharedMemory(create=True, size=size))
 
     @classmethod
-    def for_shm(cls, name: str) -> SharedMemoryManager:
+    def for_shm(cls, name: str) -> Self:
         """Create a SharedMemoryManager for an existing shared memory with the given name.
 
         :param name: The name of the shared memory to use.
@@ -1167,8 +1167,8 @@ class SharedMemoryManager(object):
     ) -> None:
         """Write a geometry to the shared memory using the given memory map.
 
+        :param geometry_dict: The geometry dictionary to write to the shared memory.
         :param memory_map: The memory map to use for writing the geometry.
-        :param geometry: The geometry to write to the shared memory.
         """
         write_buf = self._shm.buf
         if write_buf is None:

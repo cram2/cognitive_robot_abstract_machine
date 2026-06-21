@@ -17,7 +17,7 @@ The pipeline implements the following functionality:
 """
 
 from robokudo.annotators.outputs import ClearAnnotatorOutputs
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.pipeline import Pipeline
 from py_trees.behaviours import Count, SuccessEveryN

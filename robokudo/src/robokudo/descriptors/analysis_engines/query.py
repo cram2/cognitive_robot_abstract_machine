@@ -25,7 +25,7 @@ from robokudo.pipeline import Pipeline
 
 from robokudo.idioms import pipeline_init
 from robokudo.behaviours.action_server_checks import ActionServerCheck
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
 from robokudo.utils.tree import add_children_to_parent
 
 

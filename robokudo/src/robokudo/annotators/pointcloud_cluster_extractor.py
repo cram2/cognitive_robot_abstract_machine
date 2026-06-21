@@ -13,24 +13,27 @@ The module uses DBSCAN clustering and oriented bounding boxes (OBB) for object d
 """
 
 from __future__ import annotations
+
 import copy
 import logging
 from timeit import default_timer
+
 import cv2
 import numpy as np
 import open3d as o3d
 from matplotlib import pyplot as plt
-from scipy.spatial.transform import Rotation as R
-from typing_extensions import Tuple, List, TYPE_CHECKING
 from py_trees.common import Status
-from robokudo.annotators.core import ThreadedAnnotator, BaseAnnotator
+from scipy.spatial.transform import Rotation as R
+from typing_extensions import TYPE_CHECKING, List, Tuple
+
+from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.annotation import Plane
 from robokudo.types.cv import ImageROI
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import draw_bounding_boxes_from_object_hypotheses
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
-from robokudo.utils.o3d_helper import put_obb_on_target_obb, concatenate_clouds
+from robokudo.utils.o3d_helper import concatenate_clouds, put_obb_on_target_obb
 from robokudo.utils.transform import get_transform_matrix
 
 if TYPE_CHECKING:
@@ -171,7 +174,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "PointCloudClusterExtractor",
-        descriptor: "PointCloudClusterExtractor.Descriptor" = Descriptor(),
+        descriptor: PointCloudClusterExtractor.Descriptor = Descriptor(),
     ) -> None:
         """Initialize the cluster extractor.
 

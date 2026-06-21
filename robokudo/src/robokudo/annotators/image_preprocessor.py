@@ -12,6 +12,7 @@ This module provides an annotator for:
 """
 
 from __future__ import annotations
+
 import copy
 from timeit import default_timer
 
@@ -19,7 +20,7 @@ import cv2
 import numpy
 import open3d as o3d
 from py_trees.common import Status
-from typing_extensions import Optional, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, Optional
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
@@ -69,8 +70,8 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ImagePreprocessor",
-        descriptor: "ImagePreprocessorAnnotator.Descriptor" = Descriptor(),
-    ):
+        descriptor: ImagePreprocessorAnnotator.Descriptor = Descriptor(),
+    ) -> None:
         """Initialize the image preprocessor.
 
         :param name: Name of this annotator instance, defaults to "ImagePreprocessor"

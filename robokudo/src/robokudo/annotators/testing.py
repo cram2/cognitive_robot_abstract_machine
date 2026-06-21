@@ -18,6 +18,8 @@ The module is used for:
 * Debug visualization
 """
 
+from __future__ import annotations
+
 import copy
 import time
 
@@ -27,8 +29,8 @@ from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.composites import Sequence
 
-from robokudo.annotators.core import ThreadedAnnotator, BaseAnnotator
-from robokudo.cas import CASViews, CAS
+from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from robokudo.cas import CAS, CASViews
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
@@ -320,7 +322,7 @@ class ScopedAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ScopedAnnotator",
-        descriptor: "ScopedAnnotator.Descriptor" = Descriptor(),
+        descriptor: ScopedAnnotator.Descriptor = Descriptor(),
     ) -> None:
         """
         Initialize the scoped annotator.

@@ -15,6 +15,8 @@ This module provides base classes for implementing annotators in RoboKudo.
     * Action client integration
 """
 
+from __future__ import annotations
+
 import logging
 import threading
 import time
@@ -122,7 +124,7 @@ class BaseAnnotator(Behaviour):
     def __init__(
         self,
         name: str = "Annotator",
-        descriptor=Descriptor(),
+        descriptor: BaseAnnotator.Descriptor = Descriptor(),
         ros_pkg_name: str = PACKAGE_NAME,
     ) -> None:
         """Initialize the BaseAnnotator.
@@ -209,7 +211,7 @@ class BaseAnnotator(Behaviour):
         """
         return self.get_parent_pipeline().cas
 
-    def get_parent_pipeline(self) -> Optional["robokudo.pipeline.Pipeline"]:
+    def get_parent_pipeline(self) -> Optional[robokudo.pipeline.Pipeline]:
         """Get the pipeline containing this annotator.
 
         :return: The parent pipeline instance or None if not found

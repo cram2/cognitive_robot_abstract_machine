@@ -19,6 +19,7 @@ The module uses:
 """
 
 from __future__ import annotations
+
 from timeit import default_timer as timer
 
 from py_trees.common import Status
@@ -30,8 +31,8 @@ from robokudo.annotators.core import BaseAnnotator
 from robokudo.descriptors.camera_configs.components import TfComponent
 
 if TYPE_CHECKING:
-    from robokudo.io.camera_interface import CameraInterface
     from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
+    from robokudo.io.camera_interface import CameraInterface
 
 
 class CollectionReaderAnnotator(BaseAnnotator):
@@ -77,7 +78,7 @@ class CollectionReaderAnnotator(BaseAnnotator):
 
     def __init__(
         self,
-        descriptor: "CollectionReaderAnnotator.Descriptor",
+        descriptor: CollectionReaderAnnotator.Descriptor,
         name: str = "CollectionReader",
     ) -> None:
         """Initialize the collection reader.
@@ -88,7 +89,7 @@ class CollectionReaderAnnotator(BaseAnnotator):
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
-        self.collection_readers: List["CollectionReaderAnnotator.Descriptor"] = [
+        self.collection_readers: List[CollectionReaderAnnotator.Descriptor] = [
             descriptor
         ]
         self.start_timer: Optional[float] = None
@@ -113,7 +114,7 @@ class CollectionReaderAnnotator(BaseAnnotator):
             child.feedback_message = ""
 
     def add_collection_reader(
-        self, descriptor: "CollectionReaderAnnotator.Descriptor"
+        self, descriptor: CollectionReaderAnnotator.Descriptor
     ) -> None:
         """Add another collection reader descriptor.
 

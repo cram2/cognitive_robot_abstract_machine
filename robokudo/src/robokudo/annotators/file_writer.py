@@ -18,6 +18,8 @@ The module uses:
    Designed to work with robokudo.io.file_reader_interface.
 """
 
+from __future__ import annotations
+
 import json
 from pathlib import Path
 from timeit import default_timer
@@ -64,7 +66,7 @@ class FileWriter(BaseAnnotator):
     def __init__(
         self,
         name: str = "FileWriter",
-        descriptor: "FileWriter.Descriptor" = Descriptor(),
+        descriptor: FileWriter.Descriptor = Descriptor(),
     ) -> None:
         """Initialize the file writer.
 

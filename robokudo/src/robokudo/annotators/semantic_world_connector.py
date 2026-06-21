@@ -1,29 +1,29 @@
-from robokudo.world import world_instance
+from __future__ import annotations
+
+from timeit import default_timer
+
+import numpy as np
+from line_profiler_pycharm import profile
+from py_trees.common import Status
 from scipy.optimize import linear_sum_assignment
-from robokudo.types.cv import ImageROI
+
+from robokudo import world
+from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from robokudo.cas import CAS, CASViews
+from robokudo.types.annotation import (
+    BoundingBox3DAnnotation,
+    PoseAnnotation,
+    StampedPoseAnnotation,
+)
 from robokudo.types.belief_state import ObjectBeliefState
+from robokudo.types.cv import ImageROI
+from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import (
     draw_bounding_boxes_from_object_hypotheses,
     transform_pose_from_cam_to_world,
 )
 from robokudo.utils.hypothesis_comparators import ObjectHypothesisComparator
-from timeit import default_timer
-
-import numpy as np
-from py_trees.common import Status
-
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
-from robokudo.cas import CAS
-from robokudo.cas import CASViews
-from robokudo.types.annotation import (
-    PoseAnnotation,
-    StampedPoseAnnotation,
-    BoundingBox3DAnnotation,
-)
-from robokudo.types.scene import ObjectHypothesis
-from robokudo import world
-
-from line_profiler_pycharm import profile
+from robokudo.world import world_instance
 
 
 class SemanticDigitalTwinConnector(ThreadedAnnotator):
@@ -42,7 +42,7 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "SemanticDigitalTwinSynchronization",
-        descriptor: Descriptor = Descriptor(),
+        descriptor: SemanticDigitalTwinConnector.Descriptor = Descriptor(),
     ) -> None:
         """Default construction. Minimal one-time init!"""
         super().__init__(name, descriptor)

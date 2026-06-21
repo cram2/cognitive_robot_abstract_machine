@@ -14,6 +14,8 @@ Key features:
 * Visualization of detected clusters
 """
 
+from __future__ import annotations
+
 import copy
 from timeit import default_timer
 
@@ -21,7 +23,7 @@ import cv2
 import numpy as np
 import open3d as o3d
 from py_trees.common import Status
-from typing_extensions import Optional, TYPE_CHECKING, Tuple, Dict
+from typing_extensions import TYPE_CHECKING, Dict, Optional, Tuple
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
@@ -120,7 +122,7 @@ class ImageClusterExtractor(BaseAnnotator):
     def __init__(
         self,
         name: str = "ImageClusterExtractor",
-        descriptor: "ImageClusterExtractor.Descriptor" = Descriptor(),
+        descriptor: ImageClusterExtractor.Descriptor = Descriptor(),
     ) -> None:
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

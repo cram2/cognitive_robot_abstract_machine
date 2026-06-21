@@ -12,7 +12,20 @@ from dataclasses import dataclass
 import numpy as np
 import open3d as o3d
 from py_trees.common import Status
-from typing_extensions import List, Optional, Tuple, Dict, Any
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world_description.geometry import (
+    Box as SemDTBox,
+)
+from semantic_digital_twin.world_description.geometry import (
+    Cylinder as SemDTCylinder,
+)
+from semantic_digital_twin.world_description.geometry import (
+    Scale,
+)
+from semantic_digital_twin.world_description.geometry import (
+    Sphere as SemDTSphere,
+)
+from typing_extensions import Any, Dict, List, Optional, Tuple
 
 from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.types.annotation import Cuboid, Cylinder, Shape, Sphere
@@ -30,13 +43,6 @@ from robokudo.utils.shape_fitting import (
     select_best_shape,
 )
 from robokudo.utils.transform import get_quaternion_from_rotation_matrix
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.world_description.geometry import (
-    Box as SemDTBox,
-    Cylinder as SemDTCylinder,
-    Scale,
-    Sphere as SemDTSphere,
-)
 
 
 @dataclass
@@ -225,7 +231,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "ShapeEstimatorAnnotator",
-        descriptor: "ShapeEstimatorAnnotator.Descriptor" = Descriptor(),
+        descriptor: ShapeEstimatorAnnotator.Descriptor = Descriptor(),
     ) -> None:
         """Initialize the shape estimator annotator."""
         super().__init__(name=name, descriptor=descriptor)

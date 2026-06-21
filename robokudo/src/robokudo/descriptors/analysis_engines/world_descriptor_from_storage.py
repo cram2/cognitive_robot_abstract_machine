@@ -33,7 +33,7 @@ from robokudo.annotators.world_visualizer import WorldVisualizer
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 from robokudo.annotators.static_object_detector import StaticObjectDetectorAnnotator
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
 
 
 class AnalysisEngine(AnalysisEngineInterface):

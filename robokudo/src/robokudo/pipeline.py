@@ -20,7 +20,7 @@ import timeit
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.composites import Sequence
-from typing_extensions import TYPE_CHECKING, Optional, List, Any
+from typing_extensions import TYPE_CHECKING, Any, List, Optional
 
 import robokudo.annotators.core
 import robokudo.annotators.outputs
@@ -109,7 +109,7 @@ class Pipeline(Sequence):
         """
         return self.cas
 
-    def get_annotators(self) -> List["robokudo.annotators.core.BaseAnnotator"]:
+    def get_annotators(self) -> List[robokudo.annotators.core.BaseAnnotator]:
         """Get all annotators in this pipeline.
 
         Returns a list of all annotators in this pipeline, including those

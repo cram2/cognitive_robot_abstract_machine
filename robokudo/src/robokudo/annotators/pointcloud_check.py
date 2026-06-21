@@ -18,6 +18,8 @@ The annotator supports:
    Point cloud must be available in CAS under CASViews.CLOUD.
 """
 
+from __future__ import annotations
+
 from timeit import default_timer
 
 import open3d as o3d
@@ -61,8 +63,8 @@ class PointcloudCheckAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "PointcloudcloudCheckAnnotator",
-        descriptor: "PointcloudCheckAnnotator.Descriptor" = Descriptor(),
-    ):
+        descriptor: PointcloudCheckAnnotator.Descriptor = Descriptor(),
+    ) -> None:
         """Initialize the point cloud checker.
 
         :param name: Name of this annotator instance, defaults to "PointcloudcloudCheckAnnotator"

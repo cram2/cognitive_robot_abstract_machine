@@ -27,53 +27,53 @@ import rclpy
 from geometry_msgs.msg import PoseStamped
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
-from rclpy.action import GoalResponse, CancelResponse
-from rclpy.action.server import ServerGoalHandle, ActionServer
+from rclpy.action import CancelResponse, GoalResponse
+from rclpy.action.server import ActionServer, ServerGoalHandle
 from rclpy.node import Node
+from robokudo_msgs.action import Query
 from robokudo_msgs.msg import ObjectDesignator
 from typing_extensions import Any, Optional, Type
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.defs import PACKAGE_NAME, LOGGING_IDENTIFIER_QUERY
+from robokudo.defs import LOGGING_IDENTIFIER_QUERY, PACKAGE_NAME
 from robokudo.identifier import BBIdentifier
 from robokudo.types.annotation import (
-    SemanticColor,
+    BoundingBox3DAnnotation,
     Classification,
-    PoseAnnotation,
-    StampedPoseAnnotation,
-    PositionAnnotation,
-    StampedPositionAnnotation,
-    Shape,
     Cuboid,
     Cylinder,
-    Sphere,
     LocationAnnotation,
-    BoundingBox3DAnnotation,
+    PoseAnnotation,
+    PositionAnnotation,
+    SemanticColor,
+    Shape,
+    Sphere,
+    StampedPoseAnnotation,
+    StampedPositionAnnotation,
 )
 from robokudo.types.cv import BoundingBox3D
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotation_conversion import (
-    SemanticColor2ODConverter,
-    Classification2ODConverter,
-    StampedPose2ODConverter,
     BoundingBox3DForShapeSizeConverter,
-    Pose2ODConverter,
-    Position2ODConverter,
-    StampedPosition2ODConverter,
-    Shape2ODConverter,
+    Classification2ODConverter,
     Cuboid2ODConverter,
     Cylinder2ODConverter,
-    Sphere2ODConverter,
     Location2ODConverter,
+    Pose2ODConverter,
+    Position2ODConverter,
+    SemanticColor2ODConverter,
+    Shape2ODConverter,
+    Sphere2ODConverter,
+    StampedPose2ODConverter,
+    StampedPosition2ODConverter,
 )
 from robokudo.utils.error_handling import (
-    has_blackboard_exception,
-    get_blackboard_exception,
     clear_blackboard_exception,
+    get_blackboard_exception,
+    has_blackboard_exception,
 )
 from robokudo.utils.query import ObjectHypothesisQueryMatcher, QueryHandler
-from robokudo_msgs.action import Query
 
 
 class QueryAnnotator(BaseAnnotator):
@@ -269,7 +269,7 @@ class GenerateQueryResult(BaseAnnotator):
 
     def __init__(
         self, name: str = "GenerateQueryResult", descriptor: Descriptor = Descriptor()
-    ):
+    ) -> None:
         """Initialize query result generator.
 
         :param name: Annotator name, defaults to "GenerateQueryResult"

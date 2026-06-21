@@ -34,7 +34,7 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "WorldDescriptorBootstrap",
-        descriptor: "WorldDescriptorBootstrapAnnotator.Descriptor" = Descriptor(),
+        descriptor: WorldDescriptorBootstrapAnnotator.Descriptor = Descriptor(),
     ) -> None:
         """Initialize the world descriptor bootstrap annotator."""
         super().__init__(name=name, descriptor=descriptor)

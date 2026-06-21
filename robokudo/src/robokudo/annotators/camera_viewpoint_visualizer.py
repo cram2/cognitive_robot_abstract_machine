@@ -5,7 +5,6 @@ in 3D space using Open3D.
 """
 
 import open3d as o3d
-
 from py_trees.common import Status
 
 import robokudo.utils.annotator_helper

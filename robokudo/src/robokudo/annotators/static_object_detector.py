@@ -18,14 +18,16 @@ from timeit import default_timer
 import cv2
 import numpy as np
 from py_trees.common import Status
-from typing_extensions import List, Optional, TYPE_CHECKING, Dict
+from semantic_digital_twin.world_description.world_entity import Body
+from typing_extensions import TYPE_CHECKING, Dict, List, Optional
 
+import robokudo.world as rk_world
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.annotation import (
-    PoseAnnotation,
     BoundingBox3DAnnotation,
     Classification,
+    PoseAnnotation,
 )
 from robokudo.types.cv import ImageROI
 from robokudo.types.scene import ObjectHypothesis
@@ -35,27 +37,25 @@ from robokudo.utils.annotator_helper import (
     scale_cam_intrinsics,
 )
 from robokudo.utils.cv_helper import (
-    rect_outside_image,
     clamp_bounding_rect,
-    get_scaled_color_image_for_depth_image,
     get_scale_coordinates,
+    get_scaled_color_image_for_depth_image,
+    rect_outside_image,
 )
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.o3d_helper import (
     get_2d_bounding_rect_from_3d_bb,
     get_cloud_from_rgb_depth_and_mask,
+    get_obb_from_size_and_transform,
 )
-from robokudo.utils.o3d_helper import get_obb_from_size_and_transform
 from robokudo.utils.transform import (
+    get_quaternion_from_rotation_matrix,
+    get_quaternion_from_transform_matrix,
     get_rotation_matrix_from_euler_angles,
     get_transform_matrix_from_translation,
     get_translation_from_transform_matrix,
-    get_quaternion_from_transform_matrix,
-    get_quaternion_from_rotation_matrix,
 )
-import robokudo.world as rk_world
 from robokudo.world_descriptor import PredefinedObject
-from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -139,8 +139,8 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "StaticObjectDetector",
-        descriptor: "StaticObjectDetectorAnnotator.Descriptor" = Descriptor(),
-    ):
+        descriptor: StaticObjectDetectorAnnotator.Descriptor = Descriptor(),
+    ) -> None:
         """Default construction. Minimal one-time init!
 
         :param name: Name of the annotator instance, defaults to "StaticObjectDetector"

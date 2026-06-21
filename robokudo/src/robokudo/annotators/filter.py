@@ -17,8 +17,10 @@ The module is used for:
 * Conditional processing
 """
 
+from __future__ import annotations
+
 from py_trees.common import Status
-from typing_extensions import Optional, Tuple, Dict, Callable
+from typing_extensions import Callable, Dict, Optional, Tuple
 
 from robokudo.annotators.core import BaseAnnotator
 
@@ -58,7 +60,7 @@ class FilterAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "FilterAnnotator",
-        descriptor: "FilterAnnotator.Descriptor" = Descriptor(),
+        descriptor: FilterAnnotator.Descriptor = Descriptor(),
     ) -> None:
         """Initialize the filter annotator.
 

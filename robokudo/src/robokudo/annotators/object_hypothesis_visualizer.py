@@ -5,6 +5,7 @@ This module provides an annotator for visualizing object hypotheses in both
 """
 
 from __future__ import annotations
+
 import copy
 from pathlib import Path
 from timeit import default_timer
@@ -13,29 +14,29 @@ import cv2
 import open3d as o3d
 import trimesh
 from py_trees.common import Status
-from typing_extensions import TYPE_CHECKING, Tuple, Dict, List
+from semantic_digital_twin.world_description.geometry import Mesh
+from semantic_digital_twin.world_description.world_entity import Body
+from typing_extensions import TYPE_CHECKING, Dict, List, Tuple
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.annotation import (
-    Classification,
     BoundingBox3DAnnotation,
+    Classification,
     PoseAnnotation,
 )
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import draw_bounding_boxes_from_object_hypotheses
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.o3d_helper import (
-    trimesh_to_o3d_mesh,
-    draw_wireframe_of_obb_into_image,
     draw_mesh_wireframe_on_image,
+    draw_wireframe_of_obb_into_image,
+    trimesh_to_o3d_mesh,
 )
 from robokudo.utils.type_conversion import (
     get_o3d_obb_from_bounding_box_annotation,
     get_transform_matrix_from_pose_annotation,
 )
-from semantic_digital_twin.world_description.geometry import Mesh
-from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
     import numpy as np
@@ -71,7 +72,7 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
     def __init__(
         self,
         name: str = "ObjectHypothesisVisualizer",
-        descriptor: "ObjectHypothesisVisualizer.Descriptor" = Descriptor(),
+        descriptor: ObjectHypothesisVisualizer.Descriptor = Descriptor(),
     ) -> None:
         """Initialize the object hypothesis visualizer.
 

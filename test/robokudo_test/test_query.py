@@ -1,4 +1,4 @@
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
 import multiprocessing
 import queue
 import threading

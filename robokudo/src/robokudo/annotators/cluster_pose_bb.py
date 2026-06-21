@@ -19,6 +19,7 @@ The module uses:
 """
 
 from __future__ import annotations
+
 import copy
 import math
 from timeit import default_timer
@@ -27,20 +28,20 @@ import cv2
 import numpy.linalg
 import open3d as o3d
 from py_trees.common import Status
-from typing_extensions import Tuple, List, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, List, Tuple
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.types.annotation import PoseAnnotation, BoundingBox3DAnnotation
+from robokudo.types.annotation import BoundingBox3DAnnotation, PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import (
-    transform_cloud_from_cam_to_world,
     get_world_to_cam_transform_matrix,
+    transform_cloud_from_cam_to_world,
 )
 from robokudo.utils.transform import (
     construct_rotation_matrix,
-    get_transform_matrix,
     get_quaternion_from_rotation_matrix,
+    get_transform_matrix,
 )
 
 if TYPE_CHECKING:
@@ -87,7 +88,7 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ClusterPoseBBAnnotator",
-        descriptor: "ClusterPoseBBAnnotator.Descriptor" = Descriptor(),
+        descriptor: ClusterPoseBBAnnotator.Descriptor = Descriptor(),
     ) -> None:
         """Initialize the pose estimator.
 
@@ -173,7 +174,7 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
                 )
             except Exception as e:
                 self.rk_logger.warning(
-                    f"Couldn't find camera viewpoint in the CAS." f"Fail. Error: {e}"
+                    f"Couldn't find camera viewpoint in the CAS.Fail. Error: {e}"
                 )
                 return Status.FAILURE
 
