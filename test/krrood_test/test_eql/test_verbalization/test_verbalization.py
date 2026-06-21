@@ -479,6 +479,26 @@ def test_relational_navigation_pronominalises_in_nested_query():
     assert "to which it is assigned" in text
 
 
+def test_boolean_predicative_pronominalises_relational_navigation():
+    """A boolean-terminal chain on the subject's relational navigation reads *"the <Type> to which
+    it is <verb> is <attribute>"* — the navigation prefix is recursed through the standard grammar,
+    so it pronominalises to the subject just like a deferred possessive chain."""
+    m = variable(_NavMission, [])
+    text = verbalize_expression(an(entity(m).where(m.assigned_to.operational)))
+    assert "the _NavRobot to which it is assigned is operational" in text
+    assert "_NavMission is assigned" not in text
+
+
+def test_boolean_predicative_standalone_navigation_unchanged():
+    """Outside a subject scope the same predicative keeps the full relative clause (no subject to
+    pronominalise to)."""
+    m = variable(_NavMission, [])
+    assert (
+        verbalize_expression(m.assigned_to.operational)
+        == "the _NavRobot to which a _NavMission is assigned is operational"
+    )
+
+
 def test_pronominal_relative_clause_agrees_with_subject_number():
     """The relative-clause copula agrees with the subject: *it is* (singular) / *they are*
     (plural) — exercised directly on the pronominal path."""
