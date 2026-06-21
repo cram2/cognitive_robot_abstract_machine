@@ -416,28 +416,13 @@ class Pronouns(VocabEnum):
 
 class RangePhrases(VocabEnum):
     """
-    Range (``between``) operator phrases produced when a lower-bound and an upper-bound
-    comparison on the same attribute are folded together.
+    Range (``between``) operator core, produced when a lower-bound and an upper-bound comparison on
+    the same attribute are folded together. The single source for *"between"*, shared by its
+    copula-less (HAVING) surface and its copula-led predicative surface — agreement on the latter is
+    realised by the copula (:func:`copula_with`), not by a duplicated plural member.
     """
 
-    IS_BETWEEN = OperatorWord("is between")
-    """Standard form keeping the copula (*"is between"*)."""
-    ARE_BETWEEN = OperatorWord("are between")
-    """Plural form, for a plural subject (*"whose salaries are between …"*)."""
     BETWEEN = OperatorWord("between")
-    """Copula-less form for HAVING / post-nominal use (*"between"*)."""
-
-
-class CoindexedOperators(VocabEnum):
-    """Plural copular operator phrases for a factored co-indexed comparison — the *"are equal to"*
-    of *"the month and year of A are equal to those of B"*. Plural because the coordinated
-    terminals (*"month and year"*) are the grammatical subject."""
-
-    EQ = OperatorWord("are equal to")
-    GT = OperatorWord("are greater than")
-    LT = OperatorWord("are less than")
-    GE = OperatorWord("are at least")
-    LE = OperatorWord("are at most")
 
 
 class CoindexedPhrases(VocabEnum):
@@ -684,3 +669,48 @@ _OPERATOR_CALLABLE_MAP: Dict[Callable, Operators] = {
     operator.contains: Operators.CONTAINS,
     not_contains: Operators.NOT_CONTAINS,
 }
+
+
+def copula_with(
+    core: str, number: Number = Number.SINGULAR, *, negated: bool = False
+) -> Fragment:
+    """
+    Compose a predicative operator as an agreeing copula followed by an invariant core.
+
+    The copula leaf carries *number*; the morphology pass realises agreement on it alone (*is* →
+    *are*), so the core after it is never duplicated per number.
+
+    :param core: The invariant text after the copula (*"greater than"*, *"between"*, *"equal to"*);
+        empty for a bare equality (the copula alone).
+    :param number: The grammatical number the copula agrees with.
+    :param negated: Use the negative copula (*"is not"* / *"are not"*).
+    :return: The copula leaf alone when *core* is empty, else a phrase of copula then core.
+    """
+    copula = RoleFragment(
+        text=(Copulas.IS_NOT if negated else Copulas.IS).text,
+        role=SemanticRole.OPERATOR,
+        number=number,
+    )
+    if not core:
+        return copula
+    return PhraseFragment(parts=[copula, RoleFragment.for_operator(core)])
+
+
+def predicative_operator(text: str, number: Number = Number.SINGULAR) -> Fragment:
+    """
+    Factor a baked predicative operator surface into an agreeing copula and its invariant core.
+
+    A copular form (*"is greater than"*, *"is not at most"*, *"is no later than"*) splits at its
+    leading copula, so number agreement is realised on the copula alone. A verb operator with no
+    leading copula (*"contains"*, *"does not contain"*) carries no copula and is returned un-agreed.
+
+    :param text: The selected standard-register operator surface.
+    :param number: The grammatical number the copula agrees with.
+    :return: The factored operator fragment.
+    """
+    tokens = text.split()
+    if not tokens or tokens[0] != Copulas.IS.text:
+        return RoleFragment.for_operator(text)
+    negated = len(tokens) > 1 and tokens[1] == Logicals.NOT.text
+    core_tokens = tokens[2:] if negated else tokens[1:]
+    return copula_with(" ".join(core_tokens), number, negated=negated)

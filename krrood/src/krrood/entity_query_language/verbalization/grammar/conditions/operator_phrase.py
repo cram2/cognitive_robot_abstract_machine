@@ -8,11 +8,12 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     RoleFragment,
     Fragment,
 )
+from krrood.entity_query_language.verbalization.fragments.features import Number
 from krrood.entity_query_language.verbalization.subquery import is_calculation_value
 from krrood.entity_query_language.verbalization.vocabulary.english import (
-    CoindexedOperators,
     Logicals,
     Operators,
+    predicative_operator,
 )
 
 if TYPE_CHECKING:
@@ -20,30 +21,20 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.context import MicroplanningServices
 
 
-#: Map a foldable comparison operator to its plural co-indexed phrase (*"are equal to"*, …).
-_COINDEXED_OPERATOR_MAP = {
-    operator.eq: CoindexedOperators.EQ,
-    operator.gt: CoindexedOperators.GT,
-    operator.lt: CoindexedOperators.LT,
-    operator.ge: CoindexedOperators.GE,
-    operator.le: CoindexedOperators.LE,
-}
-
-
 def coindexed_operator(operation) -> Fragment:
     """
-    :param operation: A foldable comparison operator (see ``COINDEXED_OPERATORS``).
+    :param operation: A foldable comparison operator (``eq``/``gt``/``lt``/``ge``/``le``).
     :return: The plural copular operator fragment for the faithful co-indexed form — *"are equal
-        to"* for ``eq``, *"are greater than"* for ``gt``, etc.
+        to"* for ``eq`` (the calculation-equality reading, since two coordinated lists cannot read a
+        bare *"are"*), *"are greater than"* for ``gt``, etc. The plural copula agrees because the
+        coordinated terminals are the grammatical subject.
     """
-    return _COINDEXED_OPERATOR_MAP[operation].as_fragment()
-
-
-def has_coindexed_operator(operation) -> bool:
-    """:return: ``True`` when *operation* has a plural copular phrase (*"are greater than"*) — so a
-    plural subject's predicate can agree without falling back to the singular comparator phrase.
-    """
-    return operation in _COINDEXED_OPERATOR_MAP
+    phrase = (
+        Operators.CALC_EQ
+        if operation is operator.eq
+        else Operators.from_callable(operation)
+    )
+    return predicative_operator(phrase.value.standard, Number.PLURAL)
 
 
 def comparator_operator(
@@ -52,23 +43,28 @@ def comparator_operator(
     *,
     negated: bool = False,
     compact: Optional[bool] = None,
+    number: Number = Number.SINGULAR,
 ) -> Fragment:
     """
     Select the operator fragment for *comparator* (e.g. *"is greater than"*,
     *"is not equal to"*, *"is before"*).
 
-    Handles three orthogonal concerns declaratively:
+    Handles these orthogonal concerns declaratively:
 
     * **Calculation equality** — ``==`` / ``!=`` against an aggregation reads
       *"is equal to"* / *"is not equal to"* rather than the bare *"is"*.
     * **Temporality** — datetime operands select the temporal phrase variant.
     * **Negation / compactness** — flags forwarded to the vocabulary.
+    * **Number agreement** — the predicative (non-compact) surface factors its copula out as an
+      agreeing leaf (:func:`~…vocabulary.english.predicative_operator`), so a plural subject reads
+      *"are greater than"* without a duplicated plural phrase.
 
     :param comparator: The comparator expression.
     :param services: Shared verbalization state.
     :param negated: Outer negation (from a wrapping ``Not``).
     :param compact: Copula-less variant (HAVING clauses).  Defaults to
         ``services.configuration.compact_predicates`` when ``None``.
+    :param number: The grammatical number the predicative copula agrees with.
     :return: The operator fragment.
     """
     if compact is None:
@@ -80,19 +76,17 @@ def comparator_operator(
     )
     if is_calculation:
         calc_negated = (operation is operator.ne) ^ negated
-        return Operators.CALC_EQ.select(
-            negated=calc_negated, compact=compact
-        ).as_fragment()
+        word = Operators.CALC_EQ.select(negated=calc_negated, compact=compact)
+        return word.as_fragment() if compact else predicative_operator(word.text, number)
 
     temporal = is_temporal(comparator.left) or is_temporal(comparator.right)
     try:
-        return (
-            Operators.from_callable(operation)
-            .select(negated=negated, compact=compact, temporal=temporal)
-            .as_fragment()
+        word = Operators.from_callable(operation).select(
+            negated=negated, compact=compact, temporal=temporal
         )
     except KeyError:
         name = comparator._name_
         return RoleFragment.for_operator(
             f"{Logicals.NOT.text} {name}" if negated else name
         )
+    return word.as_fragment() if compact else predicative_operator(word.text, number)

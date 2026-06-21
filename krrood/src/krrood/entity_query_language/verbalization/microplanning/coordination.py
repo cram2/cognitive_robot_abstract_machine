@@ -26,6 +26,7 @@ from krrood.entity_query_language.verbalization.fragments.features import Number
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Conjunctions,
     RangePhrases,
+    copula_with,
 )
 
 if TYPE_CHECKING:
@@ -383,18 +384,16 @@ def build_between(
     :param number: The number the copula agrees with — *"are between"* for a plural subject.
     :return: The range phrase fragment.
     """
-    op = _between_operator(compact, number).as_fragment()
+    op = _between_operator(compact, number)
     bounds = oxford_comma(
         [lower_fragment, upper_fragment], Conjunctions.AND.as_fragment()
     )
     return PhraseFragment(parts=[left_fragment, op, bounds])
 
 
-def _between_operator(compact: bool, number: Number) -> RangePhrases:
-    """:return: the *between* operator phrase — copula-less when *compact*, else agreeing with
-    *number* (*"is between"* / *"are between"*)."""
+def _between_operator(compact: bool, number: Number) -> Fragment:
+    """:return: the *between* operator fragment — the copula-less core when *compact*, else an
+    agreeing copula plus *"between"* (*"is between"* / *"are between"*)."""
     if compact:
-        return RangePhrases.BETWEEN
-    return (
-        RangePhrases.ARE_BETWEEN if number is Number.PLURAL else RangePhrases.IS_BETWEEN
-    )
+        return RangePhrases.BETWEEN.as_fragment()
+    return copula_with(RangePhrases.BETWEEN.text, number)

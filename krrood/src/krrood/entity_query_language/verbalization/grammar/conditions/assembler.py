@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import operator
-
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -16,9 +14,7 @@ from krrood.entity_query_language.verbalization.grammar.framework.assembler impo
     Assembler,
 )
 from krrood.entity_query_language.verbalization.grammar.conditions.operator_phrase import (
-    coindexed_operator,
     comparator_operator,
-    has_coindexed_operator,
 )
 from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
     single_hop_attribute,
@@ -105,7 +101,8 @@ class ConditionAssembler(Assembler[Comparator, None]):
             singular subject; plural for a plural one (a ranking / ordered report, or an aggregated
             inference antecedent — *"whose salaries are greater than 5"*).
         :return: The bare *"<attribute> <operator> <value>"* grouped predicate a *"whose …"* envelope
-            wraps, all agreeing with *number* (see :meth:`_agreeing_operator`).
+            wraps, all agreeing with *number* — the predicative operator factors its copula out so a
+            plural subject reads *"are greater than"* (see :func:`~…operator_phrase.comparator_operator`).
         """
         attribute = single_hop_attribute(comparator.left, subject)
         return PhraseFragment(
@@ -113,23 +110,12 @@ class ConditionAssembler(Assembler[Comparator, None]):
                 RoleFragment.for_attribute(
                     attribute._owner_class_, attribute._attribute_name_, number=number
                 ),
-                self._agreeing_operator(comparator, number),
+                comparator_operator(
+                    comparator, self.context.services, compact=False, number=number
+                ),
                 self.context.child(comparator.right, number=number, as_value=True),
             ]
         )
-
-    def _agreeing_operator(self, comparator: Comparator, number: Number) -> Fragment:
-        """:return: the comparator's operator phrase agreeing with *number* — for a plural subject, a
-        bare equality is the copula *"are"* and an ordering comparator its plural copular phrase
-        (*"are greater than"*); every other case keeps the singular comparator phrase.
-        """
-        if number is not Number.PLURAL:
-            return comparator_operator(comparator, self.context.services, compact=False)
-        if comparator.operation is operator.eq:
-            return Copulas.for_number(number)
-        if has_coindexed_operator(comparator.operation):
-            return coindexed_operator(comparator.operation)
-        return comparator_operator(comparator, self.context.services, compact=False)
 
     def superlative_modifier(
         self, comparator: Comparator, subject: Variable

@@ -144,7 +144,7 @@ def test_build_between_standard_and_compact_forms():
     standard = build_between(left, lo, hi, compact=False)
     assert (
         flatten_fragment_to_plain_text(standard)
-        == f"x {RangePhrases.IS_BETWEEN.text} 1 and 10"
+        == f"x is {RangePhrases.BETWEEN.text} 1 and 10"
     )
 
     compact = build_between(left, lo, hi, compact=True)

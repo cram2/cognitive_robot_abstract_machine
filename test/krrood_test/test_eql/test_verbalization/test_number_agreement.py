@@ -20,6 +20,7 @@ from krrood.entity_query_language.verbalization.rendering.morphology_processor i
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Copulas,
     ExistentialPhrase,
+    predicative_operator,
 )
 from krrood.entity_query_language.verbalization.vocabulary.words import Number
 
@@ -39,6 +40,30 @@ def test_number_of_bridges_boolean_plan_features():
 def test_copula_agreement_is_applied_by_the_pass():
     assert _realised(Copulas.for_number(Number.SINGULAR)) == "is"
     assert _realised(Copulas.for_number(Number.PLURAL)) == "are"
+
+
+def test_predicative_operator_factors_copula_for_agreement():
+    # The copula is factored out as a single agreeing leaf; the invariant core never changes, so a
+    # plural subject agrees without any duplicated plural operator phrase.
+    assert (
+        _realised(predicative_operator("is greater than", Number.SINGULAR))
+        == "is greater than"
+    )
+    assert (
+        _realised(predicative_operator("is greater than", Number.PLURAL))
+        == "are greater than"
+    )
+    # A suppletive temporal core keeps its text; only the copula agrees.
+    assert (
+        _realised(predicative_operator("is no later than", Number.PLURAL))
+        == "are no later than"
+    )
+    assert (
+        _realised(predicative_operator("is not equal to", Number.PLURAL))
+        == "are not equal to"
+    )
+    # A verb operator has no copula and is left un-agreed.
+    assert _realised(predicative_operator("contains", Number.PLURAL)) == "contains"
 
 
 def test_existential_noun_pluralised_by_the_pass():
