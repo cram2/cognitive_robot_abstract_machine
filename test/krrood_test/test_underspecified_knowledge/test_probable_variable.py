@@ -145,7 +145,7 @@ def test_probable_variable_with_concrete_kwarg():
     prob_q = an(KRROODPose)(
         position=an(KRROODPosition)(x=..., y=..., z=...),
         orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
-    ).resolve()
+    )
     prob_q.where(prob_q.variable.position.x > 0.5)
     instance = prob_q.construct_instance()
 
@@ -164,7 +164,7 @@ def test_new_underspecified_with_factory():
             a=..., b=..., c=...
         ),
         orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
-    ).resolve()
+    )
     prob_q.where(prob_q.variable.position.x > 0.5)
     prob_q.expression.build()
     r = prob_q.construct_instance()

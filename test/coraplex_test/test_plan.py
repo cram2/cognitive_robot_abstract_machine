@@ -374,7 +374,6 @@ def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     navigate_action = an(NavigateAction)(
         target_location=target_location,
     )
-    navigate_action.resolve()
 
     context.query_backend = ProbabilisticBackend(
         model_registry=FullyFactorizedRegistry()
@@ -409,7 +408,6 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
             end_effector=variable(EndEffector, world.semantic_annotations),
         ),
     )
-    pick_up_description.resolve()
 
     parameters = UnderspecifiedParameters(pick_up_description)
 

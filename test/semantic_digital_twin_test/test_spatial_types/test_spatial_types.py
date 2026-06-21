@@ -1887,7 +1887,7 @@ class TestQuaternion:
 
 
 def test_underspecification_of_vector():
-    q = an(Vector3)(x=1, y=2, z=3).resolve()
+    q = an(Vector3)(x=1, y=2, z=3)
     q = q.where(q.variable.x > 0)
     v1 = q.construct_instance()
     assert v1.x == 1
@@ -1896,7 +1896,7 @@ def test_underspecification_of_vector():
 
 
 def test_underspecification_of_transformation():
-    q = an(HomogeneousTransformationMatrix.from_xyz_rpy)(x=1).resolve()
+    q = an(HomogeneousTransformationMatrix.from_xyz_rpy)(x=1)
     q = q.where(q.variable.x > 0)
     t1 = q.construct_instance()
     assert t1.x == 1

@@ -105,6 +105,5 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
         ],
         context=context,
     )
-    plan_generator.resolve()
     plans = list(EntityQueryLanguageGenerativeBackend().evaluate(plan_generator))
     assert len(plans) == len(list(target_locations._domain_)) * len(list(Arms))

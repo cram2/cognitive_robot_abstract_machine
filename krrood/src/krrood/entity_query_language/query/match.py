@@ -265,6 +265,11 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         """
         Update the match with new keyword arguments to constrain the type we are matching with.
 
+        Eagerly creates the match's subject variable so it can be referenced in ``where``
+        conditions immediately (lowering the pattern into conditions stays lazy, tracked by
+        ``resolved``). If this match is later nested under a parent, the parent overwrites
+        the subject with its own attribute during resolution.
+
         :param kwargs: The keyword arguments to match against.
         :return: The current match instance after updating it with the new keyword arguments.
         """
@@ -272,6 +277,8 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
             raise CalledMatchMultipleTimes(self)
         self.kwargs = kwargs
         self._has_been_called = True
+        if self.variable is None:
+            self.create_variable()
         return self
 
     @property
@@ -284,7 +291,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         if self._expression is not None:
             return self._expression
 
-        if self.variable is None:
+        if not self.resolved:
             self.resolve()
         entity_ = entity(self.variable)
         if self.conditions:
@@ -533,8 +540,9 @@ class AttributeMatch(AbstractMatchExpression[T]):
         Resolve the attribute assignment by creating the conditions and applying the necessary mappings
         to the attribute.
         """
-        if not isinstance(self.assigned_value, AbstractMatchExpression) or (
-            self.assigned_value.variable or self.assigned_value.resolved
+        if (
+            not isinstance(self.assigned_value, AbstractMatchExpression)
+            or self.assigned_value.resolved
         ):
             self.conditions.append(self.attribute == self.assigned_variable)
             return
