@@ -21,7 +21,7 @@ from krrood.entity_query_language.factories import (
     or_,
     not_,
     variable,
-    match_variable,
+    an,
 )
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.query.query import Query
@@ -769,7 +769,7 @@ def test_explanation_lifecycle_tied_to_instance():
 
         handle = variable(Handle, world.bodies)
         prismatic_connection = variable(PrismaticConnection, world.connections)
-        fixed_connection = match_variable(FixedConnection, world.connections)(
+        fixed_connection = an(FixedConnection, domain=world.connections)(
             parent=prismatic_connection.child, child=handle
         )
         drawers = inference(Drawer)(
@@ -806,7 +806,7 @@ def drawer_rule(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_connection = variable(PrismaticConnection, world.connections)
-    fixed_connection = match_variable(FixedConnection, world.connections)(
+    fixed_connection = an(FixedConnection, domain=world.connections)(
         parent=prismatic_connection.child, child=handle
     )
     return inference(Drawer)(

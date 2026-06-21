@@ -6,7 +6,7 @@ from typing import ClassVar, Optional
 
 from krrood.adapters.json_serializer import from_json
 from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import underspecified, variable
+from krrood.entity_query_language.factories import an, variable
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
@@ -186,13 +186,13 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
             reference_frame=world.root,
         )
 
-        move_to_reach = underspecified(MoveToReach)(
+        move_to_reach = an(MoveToReach)(
             target_pose_end_effector=target_pose,
-            target_pose_offset_robot=underspecified(Pose2D)(
+            target_pose_offset_robot=an(Pose2D)(
                 x=..., y=..., yaw=..., reference_frame=None
             ),
             hip_rotation=...,
-            grasp_description=underspecified(GraspDescription)(
+            grasp_description=an(GraspDescription)(
                 approach_direction=...,
                 vertical_alignment=...,
                 end_effector=variable(EndEffector, world.semantic_annotations),

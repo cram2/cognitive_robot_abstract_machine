@@ -1,8 +1,8 @@
 from krrood.entity_query_language.backends import (
-    EntityQueryLanguageBackend,
+    EntityQueryLanguageGenerativeBackend,
     ProbabilisticBackend,
 )
-from krrood.entity_query_language.factories import underspecified, variable_from
+from krrood.entity_query_language.factories import an, variable_from
 from coraplex.datastructures.enums import (
     Arms,
     ApproachDirection,
@@ -25,7 +25,7 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
     Test that an underspecified action can be executed
     """
     world, robot, context = apartment_world_pr2_copy_with_context
-    action = underspecified(NavigateAction)(
+    action = an(NavigateAction)(
         target_location=variable_from(
             [
                 Pose.from_xyz_quaternion(1, -1, 0, reference_frame=world.root),
@@ -49,8 +49,8 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
     """
     world, robot, context = apartment_world_pr2_copy_with_context
     context.query_backend = ProbabilisticBackend()
-    action = underspecified(NavigateAction)(
-        target_location=underspecified(Pose.from_xyz_rpy)(
+    action = an(NavigateAction)(
+        target_location=an(Pose.from_xyz_rpy)(
             x=...,
             y=...,
             z=0.0,
@@ -80,9 +80,9 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
         VerticalAlignment.NoAlignment,
         robot.left_arm.end_effector,
     )
-    plan_generator = underspecified(sequential, target_type=SequentialNode)(
+    plan_generator = an(sequential, target_type=SequentialNode)(
         children=[
-            underspecified(NavigateAction)(
+            an(NavigateAction)(
                 target_location=(
                     target_locations := variable_from(
                         [
@@ -97,7 +97,7 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
                 ),
                 keep_joint_states=True,
             ),
-            underspecified(PickUpAction)(
+            an(PickUpAction)(
                 arm=...,
                 grasp_description=grasp_description,
                 object_designator=world.get_body_by_name("milk.stl"),
@@ -106,5 +106,5 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
         context=context,
     )
     plan_generator.resolve()
-    plans = list(EntityQueryLanguageBackend().evaluate(plan_generator))
+    plans = list(EntityQueryLanguageGenerativeBackend().evaluate(plan_generator))
     assert len(plans) == len(list(target_locations._domain_)) * len(list(Arms))

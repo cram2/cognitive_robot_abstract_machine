@@ -10,7 +10,6 @@ from krrood.entity_query_language.factories import (
     an,
     entity,
     variable,
-    underspecified,
 )
 from coraplex.config.action_conf import ActionConfig
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
@@ -151,7 +150,7 @@ class TransportAction(ActionDescription):
         :param grasp_description: The grasp description that should be used for placing the object.
         :return: The navigate action that will be used to place the object.
         """
-        return underspecified(NavigateAction)(
+        return an(NavigateAction)(
             target_location=variable(
                 Pose,
                 domain=reachability_location(

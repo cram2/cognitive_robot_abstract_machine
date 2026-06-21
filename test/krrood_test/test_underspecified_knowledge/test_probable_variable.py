@@ -5,7 +5,7 @@ from krrood.entity_query_language.factories import (
     entity,
     and_,
     or_,
-    underspecified,
+    an,
 )
 from krrood.parametrization.random_events_translator import (
     WhereExpressionToRandomEventTranslator,
@@ -24,9 +24,9 @@ from ..dataset.ormatic_interface import *  # type: ignore
 
 
 def test_underspecification_with_where():
-    underspecified_pose = underspecified(KRROODPose)(
-        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
-        orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
+    underspecified_pose = an(KRROODPose)(
+        position=an(KRROODPosition)(x=..., y=..., z=...),
+        orientation=an(KRROODOrientation)(x=..., y=..., z=..., w=...),
     )
     underspecified_pose.expression
     q = underspecified_pose.where(
@@ -73,9 +73,9 @@ def test_dnf_checking():
 
     assert not is_disjunctive_normal_form(q1._conditions_root_)
 
-    underspecified_pose = underspecified(KRROODPose)(
-        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
-        orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
+    underspecified_pose = an(KRROODPose)(
+        position=an(KRROODPosition)(x=..., y=..., z=...),
+        orientation=an(KRROODOrientation)(x=..., y=..., z=..., w=...),
     )
     underspecified_pose.expression
     pose_variable = underspecified_pose.variable
@@ -130,8 +130,8 @@ def test_dnf_checking():
 
 
 def test_query_writing_with_match_and_copy():
-    var = underspecified(KRROODPose)(
-        position=underspecified(KRROODPosition)(x=0.1, y=..., z=...), orientation=None
+    var = an(KRROODPose)(
+        position=an(KRROODPosition)(x=0.1, y=..., z=...), orientation=None
     )
 
     obj = var.construct_instance()
@@ -142,8 +142,8 @@ def test_query_writing_with_match_and_copy():
 
 
 def test_probable_variable_with_concrete_kwarg():
-    prob_q = underspecified(KRROODPose)(
-        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
+    prob_q = an(KRROODPose)(
+        position=an(KRROODPosition)(x=..., y=..., z=...),
         orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     ).resolve()
     prob_q.where(prob_q.variable.position.x > 0.5)
@@ -159,8 +159,8 @@ def test_probable_variable_with_concrete_kwarg():
 
 def test_new_underspecified_with_factory():
 
-    prob_q = underspecified(KRROODPose)(
-        position=underspecified(KRROODPosition.from_abc, target_type=KRROODPosition)(
+    prob_q = an(KRROODPose)(
+        position=an(KRROODPosition.from_abc, target_type=KRROODPosition)(
             a=..., b=..., c=...
         ),
         orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
@@ -174,9 +174,9 @@ def test_new_underspecified_with_factory():
 
 
 def test_underspecified_with_list():
-    q = underspecified(KRROODPositions)(
+    q = an(KRROODPositions)(
         positions=[
-            underspecified(KRROODPosition)(x=1.0, y=..., z=...),
+            an(KRROODPosition)(x=1.0, y=..., z=...),
             KRROODPosition(1, 2, 3),
         ],
         some_strings=["a", "b"],

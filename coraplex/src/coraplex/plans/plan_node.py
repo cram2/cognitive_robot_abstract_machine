@@ -303,7 +303,7 @@ class PlanNode(PlanEntity):
 @dataclass(eq=False, repr=False)
 class UnderspecifiedNode(PlanNode):
     """
-    An action or language expression that is described by an `underspecified(...)` statement.
+    An action or language expression that is described by an underspecified `an(...)` match statement.
     This node is used to generate fully specified actions  or language expressions.
     The semantics are: try until it succeeds or fails if the underspecified action is exhausted.
     If you want to limit the number of attempts, add a limit clause to the underspecified action.

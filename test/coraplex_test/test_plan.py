@@ -6,7 +6,7 @@ import pytest
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import (
     variable_from,
-    underspecified,
+    an,
     variable,
 )
 from krrood.parametrization.model_registries import (
@@ -365,15 +365,13 @@ def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     world, robot_view, context = apartment_world_pr2_copy_with_context
     context.evaluate_conditions = False
 
-    target_location = underspecified(PoseMapping.from_point_mapping_quaternion_mapping)(
-        position=underspecified(Point3Mapping)(
-            x=..., y=..., z=0.0, reference_frame=None
-        ),
+    target_location = an(PoseMapping.from_point_mapping_quaternion_mapping)(
+        position=an(Point3Mapping)(x=..., y=..., z=0.0, reference_frame=None),
         orientation=QuaternionMapping(x=0, y=0, z=0, w=1, reference_frame=None),
         reference_frame=variable_from([robot_view.root]),
     )
 
-    navigate_action = underspecified(NavigateAction)(
+    navigate_action = an(NavigateAction)(
         target_location=target_location,
     )
     navigate_action.resolve()
@@ -400,10 +398,10 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
 
     milk_variable = variable_from([milk])
 
-    pick_up_description = underspecified(PickUpAction)(
+    pick_up_description = an(PickUpAction)(
         object_designator=milk_variable,
         arm=...,
-        grasp_description=underspecified(GraspDescription)(
+        grasp_description=an(GraspDescription)(
             approach_direction=...,
             vertical_alignment=...,
             rotate_gripper=...,

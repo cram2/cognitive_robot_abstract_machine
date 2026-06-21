@@ -9,15 +9,14 @@ from ..dataset.semantic_world_like_classes import Apple, Body
 from krrood.entity_query_language.backends import (
     SQLAlchemyBackend,
     EntityQueryLanguageBackend,
+    EntityQueryLanguageGenerativeBackend,
     ProbabilisticBackend,
-    EntityQueryLanguageBackend,
 )
 from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.factories import (
     variable,
     entity,
     an,
-    underspecified,
     variable_from,
 )
 from krrood.entity_query_language.query_graph import QueryGraph
@@ -45,11 +44,11 @@ def test_nested_action():
 
     apple = Apple("apple", 7)
 
-    prob_q = underspecified(NestedAction)(
+    prob_q = an(NestedAction)(
         obj=variable(Apple, domain=[apple]),
-        pose=underspecified(KRROODPose)(
-            position=underspecified(KRROODPosition)(x=0.02, y=..., z=...),
-            orientation=underspecified(KRROODOrientation)(
+        pose=an(KRROODPose)(
+            position=an(KRROODPosition)(x=0.02, y=..., z=...),
+            orientation=an(KRROODOrientation)(
                 x=..., y=..., z=..., w=variable(float, domain=[0.0, 1.0])
             ),
         ),
@@ -110,19 +109,15 @@ def test_selective_query_multiple_backends(session, database):
         )
     )
 
-    python_backend = EntityQueryLanguageBackend()
-    result = list(python_backend.evaluate(q))
+    result = list(q.evaluate(backend=EntityQueryLanguageBackend()))
     assert len(result) == 1
 
-    database_backend = SQLAlchemyBackend(session_maker)
-    result = list(database_backend.evaluate(q))
+    result = list(q.evaluate(backend=SQLAlchemyBackend(session_maker)))
     assert len(result) == 1
 
 
 def test_probabilistic_backend_with_symbolic_expression():
-    prob_q = underspecified(KRROODPosition)(
-        x=..., y=..., z=variable(int, domain=[1, 2, 3])
-    )
+    prob_q = an(KRROODPosition)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
     parameters = UnderspecifiedParameters(prob_q)
     assert parameters.variables["KRROODPosition.z"] == Symbolic(
         name="KRROODPosition.z", domain=Set.from_iterable([1, 2, 3])
@@ -130,9 +125,7 @@ def test_probabilistic_backend_with_symbolic_expression():
 
 
 def test_underspecified_parameters_with_partly_symbolic_expression():
-    prob_q = underspecified(KRROODPosition)(
-        x=..., y=..., z=variable(int, domain=[1, 2, 3])
-    )
+    prob_q = an(KRROODPosition)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
     parameters = UnderspecifiedParameters(prob_q)
     variables = parameters.variables
     assert len(variables) == 3
@@ -163,9 +156,9 @@ def test_underspecified_parameters_with_full_symbolic_expression():
 
 
 def test_underspecified_parameters_with_only_underspecified():
-    prob_q = underspecified(KRROODPose)(
-        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
-        orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
+    prob_q = an(KRROODPose)(
+        position=an(KRROODPosition)(x=..., y=..., z=...),
+        orientation=an(KRROODOrientation)(x=..., y=..., z=..., w=...),
     )
     parameters = UnderspecifiedParameters(prob_q)
     variables = parameters.variables
@@ -174,7 +167,7 @@ def test_underspecified_parameters_with_only_underspecified():
 
 
 def test_underspecified_parameters_with_only_literals():
-    prob_q = underspecified(KRROODPose)(
+    prob_q = an(KRROODPose)(
         position=KRROODPosition(1, 2, 3),
         orientation=KRROODOrientation(0, 0, 0, 1),
     )
@@ -187,28 +180,28 @@ def test_underspecified_parameters_with_only_literals():
 
 
 def test_enum_value_as_literal():
-    prob_q = underspecified(EnumAction)(
+    prob_q = an(EnumAction)(
         obj=Body(
             "x",
         ),
         enum=TestEnum.OPTION_A,
     )
     pm_backend = ProbabilisticBackend(number_of_samples=10)
-    values = list(pm_backend.evaluate(prob_q))
+    values = list(prob_q.evaluate(backend=pm_backend))
     for value in values:
         assert value.enum == TestEnum.OPTION_A
 
 
 def test_probabilistic_query_backend():
-    prob_q = underspecified(KRROODPose)(
-        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
+    prob_q = an(KRROODPose)(
+        position=an(KRROODPosition)(x=..., y=..., z=...),
         orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     )
     prob_q.resolve()
     prob_q.where(prob_q.variable.position.x > 0.5)
 
     pm_backend = ProbabilisticBackend(number_of_samples=10)
-    values = list(pm_backend.evaluate(prob_q))
+    values = list(prob_q.evaluate(backend=pm_backend))
     for value in values:
         assert value.position.x > 0.5
 
@@ -216,7 +209,7 @@ def test_probabilistic_query_backend():
 
 
 def test_generative_eql_backend():
-    q = underspecified(Atom)(
+    q = an(Atom)(
         element=...,
         type=variable_from([0, 1, 2]),
         charge=variable_from([0.0, 1.0, 2.0]),
@@ -224,8 +217,7 @@ def test_generative_eql_backend():
     )
     q.resolve()
     q.where(q.variable.type > q.variable.charge)
-    backend = EntityQueryLanguageBackend()
-    results = list(backend.evaluate(q))
+    results = list(q.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
     assert len(results) == 6
     for result in results:
         assert isinstance(result.element, Element)

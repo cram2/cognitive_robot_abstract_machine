@@ -68,16 +68,17 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         super().__post_init__()
         self._var_ = self
 
-    def evaluate(self) -> Iterator[T]:
+    def evaluate(self, backend=None) -> Iterator[T]:
         """
         Wrap the aggregator in an entity and evaluate it (i.e., make a query with this aggregator as the selected
         expression and evaluate it.).
 
+        :param backend: The query backend to evaluate with; forwarded to the wrapping entity.
         :return: An iterator over the aggregator results.
         """
         from krrood.entity_query_language.query.query import Entity
 
-        return Entity(_selected_variables_=(self,)).evaluate()
+        return Entity(_selected_variables_=(self,)).evaluate(backend=backend)
 
     def grouped_by(self, *variables: Selectable) -> Entity:
         """

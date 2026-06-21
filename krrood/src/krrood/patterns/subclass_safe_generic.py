@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from copy import copy
-from dataclasses import dataclass, fields, Field
+from dataclasses import dataclass, Field
 from functools import lru_cache
 from inspect import isclass
 from typing import Tuple
@@ -17,12 +17,17 @@ from typing_extensions import (
     Any,
     get_origin,
     get_args,
+    List,
+    get_origin,
+    get_args,
     TypeAlias,
     TypeVarTuple,
     Unpack,
 )
 
+from krrood import logger
 from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
 )
@@ -33,6 +38,17 @@ from krrood.utils import (
     ensure_hashable,
     get_existing_field_by_name,
 )
+
+TRANSIENT_TYPE_RESOLUTION_ERRORS = (
+    ImportError,
+    NameError,
+    TypeError,
+    CouldNotResolveType,
+)
+"""Exceptions raised while importing and resolving a field's type annotation when that type is
+not yet available (typically a circular import during module load). They are transient: the field
+is narrowed later, once a subclass binds the parameter to a concrete type. Any other exception is
+a genuine fault and is left to propagate."""
 
 if TYPE_CHECKING:
     pass
@@ -68,15 +84,48 @@ class AbstractSubClassSafeGeneric(ABC):
         substitutions = cls._get_generic_type_substitutions()
         if not substitutions:
             return
-        resolution_results = (
-            get_and_resolve_generic_type_hints_of_object_using_substitutions(
-                cls, substitutions
+        try:
+            resolution_results = (
+                get_and_resolve_generic_type_hints_of_object_using_substitutions(
+                    cls, substitutions
+                )
             )
-        )
+        except TRANSIENT_TYPE_RESOLUTION_ERRORS as error:
+            # A field's type could not be imported/resolved yet (typically a circular import during
+            # module load). The class must still be definable; such fields are narrowed later, when a
+            # subclass binds the parameter to a concrete type. Only warn when a concrete binding was
+            # actually lost; a failed pure type-variable rename is a no-op, logged at debug to avoid
+            # noise.
+            log = (
+                logger.warning
+                if cls._concrete_binding_was_lost(substitutions)
+                else logger.debug
+            )
+            log(
+                f"SubClassSafeGeneric: could not resolve type hints for {cls} — field "
+                f"types will not be updated. Cause: {error}"
+            )
+            return
         for name, result in resolution_results.items():
             if not result.resolved:
                 continue
             cls._update_field_kwargs(name, {"type": result.resolved_type})
+
+    @staticmethod
+    def _concrete_binding_was_lost(
+        substitutions: Dict[Any, ResolvableType],
+    ) -> bool:
+        """
+        Decide whether a failed substitution dropped information worth surfacing.
+
+        :param substitutions: The substitution map that could not be applied.
+        :return: True if any substitution maps to a concrete type, False when every substitution
+            only renames a type variable (a no-op not worth warning about).
+        """
+        return any(
+            not isinstance(value, (TypeVar, TypeVarTuple))
+            for value in substitutions.values()
+        )
 
     @classmethod
     def _update_field_kwargs(
@@ -385,7 +434,7 @@ class AbstractSubClassSafeGeneric(ABC):
 
 
 @dataclass
-class SubClassSafeGeneric(Generic[T], AbstractSubClassSafeGeneric, ABC):
+class SubClassSafeGeneric(Generic[T], AbstractSubClassSafeGeneric):
     """
     A generic class that can be subclassed safely because it automatically updates the field types that use the generic
      type with the new specified type.
@@ -398,6 +447,10 @@ class SubClassSafeGeneric(Generic[T], AbstractSubClassSafeGeneric, ABC):
          >>> @dataclass
          >>> class MyClass2(SubClassSafeGeneric[int]): ...
          >>> assert next(f for f in fields(MyClass2) if f.name == "my_attribute").type == int)
+
+    The field-type updating is performed by :class:`AbstractSubClassSafeGeneric`, which
+    resolves every generic parameter (multiple ``TypeVar`` s and ``TypeVarTuple`` s) across
+    the whole inheritance chain, rather than only the first generic parameter.
     """
 
     @classmethod

@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from copy import deepcopy
 from dataclasses import dataclass, field
 from dataclasses import fields
+from functools import cached_property
 from functools import lru_cache, cached_property
 from typing import assert_never
 from uuid import UUID, uuid4
@@ -136,7 +137,7 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
         The WorldEntity class is not meant to be instantiated directly.
     """
 
-    id: UUID = field(default_factory=uuid4)
+    id: UUID = field(default_factory=uuid4, kw_only=True)
     """
     A unique identifier for this world entity.
     """

@@ -40,6 +40,7 @@ from krrood.entity_query_language.predicate import (
     symbolic_function,
     Predicate,
 )
+from krrood.patterns.role_predicates import IsSameEntity
 from krrood.entity_query_language.query.quantifiers import (
     ResultQuantificationConstraint,
     Exactly,
@@ -669,6 +670,25 @@ def test_select_predicate(handles_and_containers_world):
     ), "The generated handle should have the expected name."
 
 
+def test_is_same_entity_predicate_in_query(handles_and_containers_world):
+    """
+    ``IsSameEntity`` is a regular EQL predicate: used symbolically in a ``where`` clause it
+    is bound and evaluated by the query engine like any other predicate. Only the literal
+    target itself is the same entity as the target, so exactly one solution is returned.
+    """
+    world = handles_and_containers_world
+    target = world.bodies[0]
+
+    body = variable(type_=Body, domain=world.bodies)
+    same = IsSameEntity(body, target)
+    query = the(entity(same).where(same))
+
+    matches = query.tolist()
+    assert len(matches) == 1
+    assert isinstance(matches[0], IsSameEntity)
+    assert matches[0].entity_1 is target
+
+
 def test_literal_predicate(handles_and_containers_world):
     world = handles_and_containers_world
 
@@ -707,7 +727,7 @@ def test_equivalent_to_contains_type_using_exists():
     fb = variable(FruitBox, domain=None)
     fruit_box_query = an(
         entity(fb).where(
-            exists(var:=flat_variable(fb.fruits), HasType(var, Apple)),
+            exists(var := flat_variable(fb.fruits), HasType(var, Apple)),
         )
     )
 
@@ -1217,9 +1237,9 @@ def test_root_caches_all_descendant_ids_for_nested_queries():
     outer = an(entity(var).where(var != inner))
     root = outer._root_
     for descendant in root._descendants_:
-        assert descendant._id_ in root._expression_id_cache_, (
-            f"{descendant} (id={descendant._id_}) missing from root._expression_id_cache_"
-        )
+        assert (
+            descendant._id_ in root._expression_id_cache_
+        ), f"{descendant} (id={descendant._id_}) missing from root._expression_id_cache_"
 
     # Doubly-nested: the inside the inside an
     var2 = variable(int, [1, 2, 3, 4])
@@ -1228,9 +1248,9 @@ def test_root_caches_all_descendant_ids_for_nested_queries():
     outermost = an(entity(var2).where(var2 != middle))
     root2 = outermost._root_
     for descendant in root2._descendants_:
-        assert descendant._id_ in root2._expression_id_cache_, (
-            f"{descendant} (id={descendant._id_}) missing from root2._expression_id_cache_"
-        )
+        assert (
+            descendant._id_ in root2._expression_id_cache_
+        ), f"{descendant} (id={descendant._id_}) missing from root2._expression_id_cache_"
 
 
 def test_indexing_on_dict_field():
