@@ -228,10 +228,9 @@ class Query(
         by the result pipeline).
         """
         self.build()
-        if self._expression_ is not self:
+        if not self._is_compiled_product_:
             return self._expression_.evaluate()
-        else:
-            return MultiArityExpressionThatPerformsACartesianProduct.evaluate(self)
+        return MultiArityExpressionThatPerformsACartesianProduct.evaluate(self)
 
     def where(self, *conditions: ConditionType) -> Self:
         """
@@ -717,9 +716,9 @@ class Query(
         :return: The conditions root of the compiled product.
         """
         self.build()
-        if self._expression_ is self:
-            return SymbolicExpression._conditions_root_.fget(self)
-        return self._expression_._conditions_root_
+        if not self._is_compiled_product_:
+            return self._expression_._conditions_root_
+        return SymbolicExpression._conditions_root_.fget(self)
 
     @UnaryExpression._parent_.setter
     def _parent_(self, parent: SymbolicExpression):
@@ -730,10 +729,10 @@ class Query(
         """
         if not self._building_:
             self.build()
-        if self._expression_ is not self:
+        if not self._is_compiled_product_:
             self._expression_._parent_ = parent
-        else:
-            UnaryExpression._parent_.__set__(self, parent)
+            return
+        UnaryExpression._parent_.__set__(self, parent)
 
     def _invert_(self):
         raise UnsupportedNegation(self.__class__)
