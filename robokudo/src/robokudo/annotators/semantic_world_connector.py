@@ -54,7 +54,6 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
             .with_comparator_for(BoundingBox3DAnnotation, weight=0.4)
         )
 
-    @profile
     def compute(self) -> Status:
         """Synchronise the current RoboKudo state with the current semdt state."""
         start_timer = default_timer()
