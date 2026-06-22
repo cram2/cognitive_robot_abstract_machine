@@ -169,6 +169,9 @@ class LiteralRule(PhraseRule):
         name 'door'"*). The fields come from the class's ``_identifying_attributes_`` if it declares
         any, else the first present :data:`conventional identity field <_CONVENTIONAL_ID_FIELDS>`.
 
+        This method builds the whole *"a specific Robot with name 'R2D2'"* noun phrase — the
+        identity head plus the qualifying detail :meth:`_identifying_fields` supplies:
+
         >>> robot = variable(Robot, [])
         >>> verbalize_expression(a(entity(robot).where(robot == Robot("R2D2", 80, True))))
         "Find a Robot such that the Robot is a specific Robot with name 'R2D2'"
@@ -203,6 +206,10 @@ class LiteralRule(PhraseRule):
         """:return: The ``(name, value)`` pairs that identify *value* for display — the class's
         declared ``_identifying_attributes_`` (a name or iterable of names) if present, else the first
         present conventional identity field — keeping only scalar values.
+
+        Its contribution is just the identifying detail: it returns ``[("name", "R2D2")]`` here, which
+        is what becomes the *"with name 'R2D2'"* qualifier (drop it and the phrase is the bare *"a
+        specific Robot"*):
 
         >>> robot = variable(Robot, [])
         >>> verbalize_expression(a(entity(robot).where(robot == Robot("R2D2", 80, True))))

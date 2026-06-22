@@ -145,6 +145,10 @@ class SelectionAssembler:
         """:return: the rendered selections, with each maximal run of plain attributes sharing one
         owner folded into a single coordinated genitive, and every other selection rendered alone.
 
+        It performs the fold itself: *department* and *salary* share the Employee owner, so instead of
+        *the department of an Employee and the salary of an Employee* it emits the single coordinated
+        genitive *the department and salary of an Employee*:
+
         >>> employee = variable(Employee, [])
         >>> verbalize_expression(the(set_of(employee.department, employee.salary)))
         'Find the department and salary of an Employee'
@@ -168,6 +172,10 @@ class SelectionAssembler:
         """:return: ``(owner, terminal_step)`` when *selection* is a plain genitive attribute that
         can share an owner with siblings, else ``None`` — a relational terminal (*"the Robot to
         which …"*) does not coordinate cleanly, so it is left alone.
+
+        It is the predicate :meth:`_folded` consults: it accepts *department* and *salary* (returning
+        their shared Employee owner), which is what lets them collapse into *the department and salary
+        of an Employee*; returning ``None`` would keep them as separate genitives.
 
         >>> employee = variable(Employee, [])
         >>> verbalize_expression(the(set_of(employee.department, employee.salary)))

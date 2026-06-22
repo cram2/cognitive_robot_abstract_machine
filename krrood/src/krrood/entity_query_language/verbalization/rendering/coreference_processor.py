@@ -62,6 +62,9 @@ class CoreferenceProcessor(RealizationPass):
     Reference: Reiter & Dale (2000) — referring-expression generation as a microplanning subtask;
     Gatt & Reiter (2009), SimpleNLG — ordered realisation stages.
 
+    Both chains rooted at the Employee subject are downgraded to the pronoun *its* (a first mention
+    would read *the salary of the Employee*):
+
     >>> employee = variable(Employee, [])
     >>> verbalize_expression(an(entity(employee).where(employee.salary > employee.starting_salary)))
     'Find an Employee such that its salary is greater than its starting_salary'
@@ -124,6 +127,10 @@ class CoreferenceProcessor(RealizationPass):
         A fragment built from a query node opens a discourse scope whose focus the
         :class:`DiscourseView` supplies (``None`` suppresses pronominalisation, e.g. a set-of).
 
+        Here it is :meth:`_walk` that opens the Mission's scope, so the relational *the Robot to
+        which* **it** *is assigned* can bind its pronoun to the in-scope subject (with no scope open
+        the root would re-name *a Mission*):
+
         >>> mission = variable(Mission, [])
         >>> verbalize_expression(a(entity(mission).where(mission.assigned_to.battery > 50)))
         'Find a Mission such that the battery of the Robot to which it is assigned is greater than 50'
@@ -140,6 +147,10 @@ class CoreferenceProcessor(RealizationPass):
 
     def _dispatch(self, fragment: Fragment) -> Fragment:
         """Resolve *fragment* by kind (the scope, if any, is already on the stack).
+
+        Its contribution is the routing: each possessive chain (*its salary*, *its starting_salary*)
+        is sent to :meth:`_possessive_chain`; a plain structural node would instead be rebuilt around
+        its recursed children.
 
         >>> employee = variable(Employee, [])
         >>> verbalize_expression(an(entity(employee).where(employee.salary > employee.starting_salary)))
@@ -168,6 +179,10 @@ class CoreferenceProcessor(RealizationPass):
         an *"its …"* continuation of the current centre, which *keeps* it (a centering CONTINUE), so
         a run of attributes on one referent stays uniformly pronominal (*"its battery … its
         power"*) rather than mixing *"its battery … the power of the Robot"*.
+
+        Its contribution here is choosing the chain's form: it renders this one through the relational
+        hop as *the Robot to which it is assigned* (not a pronoun — the Robot is not the subject) and
+        advances the centre to that Robot:
 
         >>> mission = variable(Mission, [])
         >>> verbalize_expression(a(entity(mission).where(mission.assigned_to.battery > 50)))
@@ -225,6 +240,9 @@ class CoreferenceProcessor(RealizationPass):
         entity it introduces and the attributes hanging off it — or ``None`` when the chain has no
         relational hop (or it carries no referent id).
 
+        It is what singles out the *assigned_to* hop whose related Robot the rest of the pass refers
+        back to as *it* / centres on:
+
         >>> mission = variable(Mission, [])
         >>> verbalize_expression(a(entity(mission).where(mission.assigned_to.battery > 50)))
         'Find a Mission such that the battery of the Robot to which it is assigned is greater than 50'
@@ -250,9 +268,13 @@ class CoreferenceProcessor(RealizationPass):
         …"*) clears the centre: the battery heads the phrase, not the Robot. ``None`` when no
         relational referent heads the clause.
 
+        After *the Robot to which it is assigned is operational* (a boolean predicative, so the Robot
+        heads the clause), :meth:`_chain_topic` carries that Robot forward as the centre — which is
+        why the next clause's attribute reads *its battery* rather than *the battery of the Robot*:
+
         >>> mission = variable(Mission, [])
-        >>> verbalize_expression(a(entity(mission).where(mission.assigned_to.battery > 50)))
-        'Find a Mission such that the battery of the Robot to which it is assigned is greater than 50'
+        >>> verbalize_expression(a(entity(mission).where(and_(mission.assigned_to.operational, mission.assigned_to.battery > 50))))
+        'Find a Mission such that the Robot to which it is assigned is operational, and its battery is greater than 50'
         """
         relation = self._outermost_relation(parts)
         if relation is None:
@@ -274,9 +296,13 @@ class CoreferenceProcessor(RealizationPass):
         :return: The pronominalised tail, or ``None`` when the chain's relational referent is not the
             current centre (leaving the subject / possessive forms to apply).
 
+        This is the step that produces the second clause's *its battery*: the Robot was made the
+        centre by the first clause, so its following attribute pronominalises instead of repeating
+        *the battery of the Robot*:
+
         >>> mission = variable(Mission, [])
-        >>> verbalize_expression(a(entity(mission).where(mission.assigned_to.battery > 50)))
-        'Find a Mission such that the battery of the Robot to which it is assigned is greater than 50'
+        >>> verbalize_expression(a(entity(mission).where(and_(mission.assigned_to.operational, mission.assigned_to.battery > 50))))
+        'Find a Mission such that the Robot to which it is assigned is operational, and its battery is greater than 50'
         """
         relation = self._outermost_relation(possessive_chain.parts)
         if relation is None:
@@ -288,6 +314,10 @@ class CoreferenceProcessor(RealizationPass):
 
     def _pronominalises(self, possessive_chain: PossessiveChain) -> bool:
         """:return: ``True`` when the chain root is the current, already-introduced, non-numbered subject.
+
+        It is the gate that decides pronominalisation: returning ``True`` for each chain rooted at the
+        Employee subject is what renders *its salary* / *its starting_salary* instead of *the salary
+        of the Employee*.
 
         >>> employee = variable(Employee, [])
         >>> verbalize_expression(an(entity(employee).where(employee.salary > employee.starting_salary)))
@@ -319,6 +349,10 @@ class CoreferenceProcessor(RealizationPass):
         :return: The resolved referring noun phrase (first / repeat), or the non-referring noun
             phrase rebuilt around its recursed children.
 
+        It is the entry that marks each Robot introduced and applies numbering — here both Robots are
+        first mentions of one colliding type, so it hands them to :meth:`_numbered` and the result is
+        *Robot 1* / *Robot 2* (a lone Robot would stay *a Robot*):
+
         >>> robot_one, robot_two = variable(Robot, []), variable(Robot, [])
         >>> verbalize_expression(a(entity(robot_one).where(robot_one.battery > robot_two.battery)))
         'Find Robot 1 whose battery is greater than the battery of Robot 2'
@@ -340,6 +374,9 @@ class CoreferenceProcessor(RealizationPass):
         left untouched, so this never re-numbers a variable.
 
         :return: The numbered noun phrase, or *noun_phrase* unchanged when it has no number.
+
+        It is the step that supplies the digits: the two same-type Robots collide, so it stamps each
+        with its disambiguation label — the *1* and *2* in *Robot 1* / *Robot 2*:
 
         >>> robot_one, robot_two = variable(Robot, []), variable(Robot, [])
         >>> verbalize_expression(a(entity(robot_one).where(robot_one.battery > robot_two.battery)))
@@ -403,6 +440,10 @@ class CoreferenceProcessor(RealizationPass):
         modifier predicates over the head, so a chain rooted at the head pronominalises (*"a Robot
         whose battery exceeds its threshold"*). This is inferred from structure — the modifiers
         slot — so rules never mark the scope.
+
+        Its contribution is pushing the Employee as the subject *of its own modifiers*, so the chains
+        inside the WHERE pronominalise to *its salary* / *its starting_salary* rather than re-naming
+        the Employee:
 
         >>> employee = variable(Employee, [])
         >>> verbalize_expression(an(entity(employee).where(employee.salary > employee.starting_salary)))

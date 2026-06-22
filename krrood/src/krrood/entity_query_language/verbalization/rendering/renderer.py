@@ -200,6 +200,11 @@ class HierarchicalRenderer(FragmentRenderer):
         """Render one item, prepending the bullet at its indentation level (and a coordinating
         conjunction when this is the last item of a coordinated block).
 
+        Its contribution is the per-item dispatch: a *block* item recurses into :meth:`render` (no
+        bullet of its own), a *leaf* item gets the ``- `` prefix. The output matches :meth:`render`
+        because the top item here is the whole block (recursed), while the bullet it adds is visible
+        on the leaf line *"- battery is between 50 and 90"*:
+
         >>> from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
         >>> robot = variable(Robot, [])
         >>> tree = EQLVerbalizer().build(a(entity(robot).where(and_(robot.battery > 50, robot.battery < 90))))
