@@ -187,6 +187,17 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
             result.append(current)
         return result[:-1][::-1]
 
+    @property
+    def _chain_root_(self) -> Any:
+        """
+        :return: The first non-:class:`MappedVariable` expression at the base of this
+            mapping chain (e.g. the ``robot`` variable behind ``robot.arm.joint``).
+        """
+        current = self
+        while isinstance(current, MappedVariable):
+            current = current._child_
+        return current
+
     def _set_external_root_instance_value_(self, instance: Any, value: Any):
         """
         Set the field of the instance at this access path to the given value.

@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import List, Optional, Type, Iterable
+from typing_extensions import ClassVar, List, Optional, Type, Iterable
 
 from krrood.entity_query_language.predicate import Symbol, Predicate
-from semantic_digital_twin.mixin import HasSimulatorProperties
 
 
 @dataclass(unsafe_hash=True)
@@ -143,6 +142,11 @@ class ContainsType(Predicate):
 
     def __call__(self) -> bool:
         return any(isinstance(obj, self.obj_type) for obj in self.iterable)
+
+    @classmethod
+    def _verbalization_template_(cls) -> str:
+        return "{iterable} contains an instance of {obj_type}"
+
 
 @dataclass(unsafe_hash=True)
 class GraspConfig(WorldEntity):

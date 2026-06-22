@@ -758,3 +758,63 @@ class MatchTypeCannotBeDetermined(DataclassException):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class ModelingError(DataclassException):
+    """
+    Exception raised when there's an error in the model (classes, functions, etc.) definition.
+    """
+
+
+@dataclass
+class WrongPropertyReturnStatementImplementation(ModelingError):
+    """
+    Exception raised when the implementation of a return statement of a property of a class is wrong.
+    """
+
+    property_object: property
+    """
+    The property that is wrongly implemented.
+    """
+    reason: str
+    """
+    The reason for the wrong property.
+    """
+    clazz: Optional[Type] = None
+    """
+    The class that has the property.
+    """
+
+    def error_message(self) -> str:
+        clazz = self.clazz if self.clazz is not None else "UNKNOWN_CLASS"
+        return (
+            f"The implementation of the property {self.property_object} of the class {clazz} is wrong, "
+            f"the reason is: {self.reason}"
+        )
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class NoReturnStatementInProperty(ModelingError):
+    """
+    Exception raised when the implementation of a property has no return statement.
+    """
+
+    property_object: property
+    """
+    The property that is wrongly implemented.
+    """
+    clazz: Optional[Type] = None
+    """
+    The class that has the property.
+    """
+
+    def error_message(self) -> str:
+        clazz = self.clazz if self.clazz is not None else "UNKNOWN_CLASS"
+        return f"The implementation of the property {self.property_object} of the class {clazz} has no return statement"
+
+    def suggest_correction(self) -> str:
+        return ""

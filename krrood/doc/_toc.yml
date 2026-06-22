@@ -22,6 +22,7 @@ parts:
         - file: eql/user/eql_for_sql_experts
         - file: eql/user/writing_rule_trees
         - file: eql/user/inference_explanation
+        - file: eql/user/verbalization
     - file: eql/developer/index
       sections:
         - file: eql/developer/architecture_overview
@@ -30,6 +31,7 @@ parts:
         - file: eql/developer/execution_engine
         - file: eql/developer/graph_and_visualization
         - file: eql/developer/inference_explanation
+        - file: eql/developer/verbalization
 - caption: ORMatic
   chapters:
     - file: ormatic/intro
