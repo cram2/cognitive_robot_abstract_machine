@@ -16,6 +16,12 @@ from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, KinematicChain
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Handle,
+    Drawer,
+    Wardrobe,
+    Door,
+)
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -193,18 +199,24 @@ def test_handle_semantic_annotation_eql(apartment_world_copy):
 
 
 @pytest.mark.parametrize(
-    "semantic_annotation_type, update_existing_semantic_annotations, scenario",
+    "semantic_annotation_type, update_existing_semantic_annotations, scenario, expected_number",
     [
-        (Handle, False, None),
-        (Drawer, False, None),
-        (Wardrobe, False, None),
-        (Door, False, None),
+        (Handle, False, None, 29),
+        (Drawer, False, None, 19),
+        (Wardrobe, False, None, 8),
+        (
+            Door,
+            False,
+            None,
+            8,
+        ),  # Should be 11 as there are prismatically connected doors.
     ],
 )
 def test_infer_apartment_semantic_annotation(
     semantic_annotation_type,
     update_existing_semantic_annotations,
     scenario,
+    expected_number,
     apartment_world_copy,
 ):
     fit_rules_and_assert_semantic_annotations(
@@ -212,6 +224,7 @@ def test_infer_apartment_semantic_annotation(
         semantic_annotation_type,
         update_existing_semantic_annotations,
         scenario,
+        expected_number,
     )
 
 
@@ -264,7 +277,11 @@ def test_explain_inferred_semantic_annotations(apartment_world_copy):
 
 
 def fit_rules_and_assert_semantic_annotations(
-    world, semantic_annotation_type, update_existing_semantic_annotations, scenario
+    world,
+    semantic_annotation_type,
+    update_existing_semantic_annotations,
+    scenario,
+    expected_number: int,
 ):
     world_reasoner = WorldReasoner(world)
     world_reasoner.fit_semantic_annotations(
@@ -275,8 +292,15 @@ def fit_rules_and_assert_semantic_annotations(
     )
 
     found_semantic_annotations = world_reasoner.infer_semantic_annotations()
-    assert any(
-        isinstance(v, semantic_annotation_type) for v in found_semantic_annotations
+    assert (
+        len(
+            [
+                v
+                for v in found_semantic_annotations
+                if isinstance(v, semantic_annotation_type)
+            ]
+        )
+        == expected_number
     )
 
 

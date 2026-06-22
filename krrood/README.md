@@ -24,6 +24,14 @@ The interface side of EQL is inspired by [euROBIN](https://www.eurobin-project.e
 
 ## Ormatic
 
+## PyCharm plugin
+
+**Python Role Lens**, a PyCharm/IntelliJ plugin that teaches the IDE about krrood's `Role`
+delegation pattern (completion, type inference, and Go-to-Declaration on delegated attributes),
+lives at [`plugins/pycharm/pyroles-pycharm/`](plugins/pycharm/pyroles-pycharm/). It is a
+self-contained Gradle project, built and published to the JetBrains Marketplace independently of
+the Python workspace.
+
 ## Documentation
 
 Read the documentation [here](https://code-iai.github.io/krrood/intro.html).

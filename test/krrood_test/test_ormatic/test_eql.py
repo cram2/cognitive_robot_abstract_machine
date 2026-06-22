@@ -1,4 +1,5 @@
 import pytest
+
 from sqlalchemy import select, func, case
 from sqlalchemy.exc import MultipleResultsFound
 from sqlalchemy.orm import aliased
@@ -53,8 +54,6 @@ from krrood.entity_query_language.factories import (
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
-from coraplex.robot_plans.actions.core.pick_up import PickUpAction
-from coraplex.orm.ormatic_interface import PickUpActionDAO, GraspDescriptionDAO
 from krrood.entity_query_language.query.query import UnificationDict
 
 
@@ -294,14 +293,15 @@ def test_complicated_equal(session, database):
 
     expected = (
         select(ContainerDAO)
-        .join(prismatic_alias,
-              onclause=prismatic_alias.parent_id == ContainerDAO.database_id)
-        .join(drawer_alias,
-              onclause=prismatic_alias.child_id == drawer_alias.database_id)
-        .join(fixed_alias,
-              onclause=fixed_alias.parent_id == drawer_alias.database_id )
-        .join(handle_alias,
-              onclause=fixed_alias.child_id == handle_alias.database_id)
+        .join(
+            prismatic_alias,
+            onclause=prismatic_alias.parent_id == ContainerDAO.database_id,
+        )
+        .join(
+            drawer_alias, onclause=prismatic_alias.child_id == drawer_alias.database_id
+        )
+        .join(fixed_alias, onclause=fixed_alias.parent_id == drawer_alias.database_id)
+        .join(handle_alias, onclause=fixed_alias.child_id == handle_alias.database_id)
         .with_only_columns(drawer_alias)
     )
 
@@ -395,7 +395,6 @@ def test_order_by_descending(session, database):
     assert results[1].name == "SmallBody"
 
 
-
 def test_translate_distinct(session, database):
     session.add(BodyDAO(name="UniqueBody", size=10))
     session.add(BodyDAO(name="UniqueBody", size=20))
@@ -411,7 +410,6 @@ def test_translate_distinct(session, database):
 
     results = translator.evaluate()
     assert len(results) == 2
-
 
 
 def test_translate_not(session, database):
@@ -432,7 +430,6 @@ def test_translate_not(session, database):
     assert len(results) == 2
     sizes = sorted([r.size for r in results])
     assert sizes == [20, 30]
-
 
 
 def test_group_by(session, database):
@@ -465,11 +462,7 @@ def test_group_by_with_count(session, database):
     query = an(entity(b).grouped_by(b.size).having(count_all() > 0))
 
     translator = eql_to_sql(query, session)
-    expected = (
-        select(BodyDAO)
-        .group_by(BodyDAO.size)
-        .having(func.count() > 0)
-    )
+    expected = select(BodyDAO).group_by(BodyDAO.size).having(func.count() > 0)
 
     assert str(translator.sql_query) == str(expected)
     results = translator.evaluate()
@@ -486,11 +479,7 @@ def test_having(session, database):
     query = an(entity(b).grouped_by(b.size).having(count_all() > 1))
 
     translator = eql_to_sql(query, session)
-    expected = (
-        select(BodyDAO)
-        .group_by(BodyDAO.size)
-        .having(func.count() > 1)
-    )
+    expected = select(BodyDAO).group_by(BodyDAO.size).having(func.count() > 1)
 
     assert str(translator.sql_query) == str(expected)
 
@@ -508,11 +497,7 @@ def test_having_no_results(session, database):
     query = an(entity(b).grouped_by(b.size).having(count_all() > 1))
 
     translator = eql_to_sql(query, session)
-    expected = (
-        select(BodyDAO)
-        .group_by(BodyDAO.size)
-        .having(func.count() > 1)
-    )
+    expected = select(BodyDAO).group_by(BodyDAO.size).having(func.count() > 1)
     assert str(translator.sql_query) == str(expected)
     results = translator.evaluate()
     assert results == []
@@ -529,9 +514,7 @@ def test_having_with_max(session, database):
 
     translator = eql_to_sql(query, session)
     expected = (
-        select(BodyDAO)
-        .group_by(BodyDAO.name)
-        .having(func.max(BodyDAO.size) > 15)
+        select(BodyDAO).group_by(BodyDAO.name).having(func.max(BodyDAO.size) > 15)
     )
 
     assert str(translator.sql_query) == str(expected)
@@ -553,11 +536,7 @@ def test_having_with_min(session, database):
     query = an(entity(b).grouped_by(b.name).having(min(b.size) < 8))
 
     translator = eql_to_sql(query, session)
-    expected = (
-        select(BodyDAO)
-        .group_by(BodyDAO.name)
-        .having(func.min(BodyDAO.size) < 8)
-    )
+    expected = select(BodyDAO).group_by(BodyDAO.name).having(func.min(BodyDAO.size) < 8)
 
     assert str(translator.sql_query) == str(expected)
 
@@ -578,9 +557,7 @@ def test_having_with_sum(session, database):
 
     translator = eql_to_sql(query, session)
     expected = (
-        select(BodyDAO)
-        .group_by(BodyDAO.name)
-        .having(func.sum(BodyDAO.size) > 15)
+        select(BodyDAO).group_by(BodyDAO.name).having(func.sum(BodyDAO.size) > 15)
     )
 
     assert str(translator.sql_query) == str(expected)
@@ -601,9 +578,7 @@ def test_having_with_average(session, database):
 
     translator = eql_to_sql(query, session)
     expected = (
-        select(BodyDAO)
-        .group_by(BodyDAO.name)
-        .having(func.avg(BodyDAO.size) > 15)
+        select(BodyDAO).group_by(BodyDAO.name).having(func.avg(BodyDAO.size) > 15)
     )
 
     assert str(translator.sql_query) == str(expected)
@@ -682,12 +657,7 @@ def test_where_and_group_by_and_having(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(
-        entity(b)
-        .where(b.size < 25)
-        .grouped_by(b.size)
-        .having(count_all() > 1)
-    )
+    query = an(entity(b).where(b.size < 25).grouped_by(b.size).having(count_all() > 1))
 
     translator = eql_to_sql(query, session)
     expected = (
@@ -802,6 +772,7 @@ def test_set_of(session):
 
     assert str(translator.sql_query) == str(expected)
 
+
 def test_set_of_with_join(session):
     """Verify that set_of with transitive attributes generates correct JOINs."""
     pose = variable(type_=KRROODPose, domain=[])
@@ -811,6 +782,7 @@ def test_set_of_with_join(session):
     expected = select(KRROODPositionDAO.z).join(KRROODPoseDAO.position)
 
     assert str(translator.sql_query) == str(expected)
+
 
 def test_set_of_multi_variable(session, database):
     world = World(1, [Container("Container1"), Handle("Handle1")])
@@ -839,12 +811,15 @@ def test_set_of_multi_variable(session, database):
 
     expected = (
         select(ContainerDAO, HandleDAO, FixedConnectionDAO, PrismaticConnectionDAO)
-        .join(FixedConnectionDAO,
-              onclause=FixedConnectionDAO.parent_id == ContainerDAO.database_id)
-        .join(HandleDAO,
-              onclause=FixedConnectionDAO.child_id == HandleDAO.database_id)
-        .join(PrismaticConnectionDAO,
-              onclause=PrismaticConnectionDAO.child_id == ContainerDAO.database_id)
+        .join(
+            FixedConnectionDAO,
+            onclause=FixedConnectionDAO.parent_id == ContainerDAO.database_id,
+        )
+        .join(HandleDAO, onclause=FixedConnectionDAO.child_id == HandleDAO.database_id)
+        .join(
+            PrismaticConnectionDAO,
+            onclause=PrismaticConnectionDAO.child_id == ContainerDAO.database_id,
+        )
     )
     assert str(translator.sql_query) == str(expected)
 
@@ -852,34 +827,6 @@ def test_set_of_multi_variable(session, database):
     eql_results = list(query.evaluate())
     assert len(sql_results) == len(eql_results)
 
-
-def test_set_of_transitive_attributes(session):
-    """Verify that set_of with transitive attributes generates a JOIN to GraspDescriptionDAO."""
-    pu = variable(type_=PickUpAction, domain=[])
-    query = an(set_of(
-        pu.arm,
-        pu.grasp_description.rotate_gripper,
-        pu.grasp_description.approach_direction,
-        pu.grasp_description.manipulation_offset,
-    ))
-
-    translator = eql_to_sql(query, session)
-
-    grasp_alias = aliased(GraspDescriptionDAO, flat=True)
-
-    expected = (
-        select(PickUpActionDAO)
-        .join(grasp_alias,
-              onclause=grasp_alias.database_id == PickUpActionDAO.grasp_description_id)
-        .with_only_columns(
-            PickUpActionDAO.arm,
-            grasp_alias.rotate_gripper,
-            grasp_alias.approach_direction,
-            grasp_alias.manipulation_offset,
-        )
-    )
-
-    assert str(translator.sql_query) == str(expected)
 
 def test_set_of_move_action_transitive(session):
     """
@@ -890,30 +837,30 @@ def test_set_of_move_action_transitive(session):
     from sqlalchemy.orm import aliased
 
     move = variable(type_=MoveAction, domain=[])
-    query = an(set_of(
-        move.robot_x,
-        move.robot_y,
-        move.hip_rotation,
-        move.grasp_config.rotate_gripper,
-        move.grasp_config.approach_direction,
-        move.grasp_config.manipulation_offset,
-    ))
+    query = an(
+        set_of(
+            move.robot_x,
+            move.robot_y,
+            move.hip_rotation,
+            move.grasp_config.rotate_gripper,
+            move.grasp_config.approach_direction,
+            move.grasp_config.manipulation_offset,
+        )
+    )
 
     translator = eql_to_sql(query, session)
 
     grasp_alias = aliased(GraspConfigDAO, flat=True)
 
-    expected = (
-        select(
-            MoveActionDAO.robot_x,
-            MoveActionDAO.robot_y,
-            MoveActionDAO.hip_rotation,
-            grasp_alias.rotate_gripper,
-            grasp_alias.approach_direction,
-            grasp_alias.manipulation_offset,
-        )
-        .join(grasp_alias,
-              onclause=grasp_alias.database_id == MoveActionDAO.grasp_config_id)
+    expected = select(
+        MoveActionDAO.robot_x,
+        MoveActionDAO.robot_y,
+        MoveActionDAO.hip_rotation,
+        grasp_alias.rotate_gripper,
+        grasp_alias.approach_direction,
+        grasp_alias.manipulation_offset,
+    ).join(
+        grasp_alias, onclause=grasp_alias.database_id == MoveActionDAO.grasp_config_id
     )
 
     assert str(translator.sql_query) == str(expected)
@@ -939,8 +886,10 @@ def test_set_of_with_where(session):
 
     expected = (
         select(KRROODPoseDAO)
-        .join(position_alias,
-              onclause=position_alias.database_id == KRROODPoseDAO.position_id)
+        .join(
+            position_alias,
+            onclause=position_alias.database_id == KRROODPoseDAO.position_id,
+        )
         .with_only_columns(
             position_alias.x,
             position_alias.y,
@@ -958,10 +907,13 @@ def test_set_of_same_table_twice(session):
     Simulates: JOIN NavigateActionDAO np ON ... JOIN NavigateActionDAO np2 ON ...
     This uses two KRROODPose variables to test the same pattern.
     """
-    world = World(1, [
-        Container("Container1"),
-        Container("Container2"),
-    ])
+    world = World(
+        1,
+        [
+            Container("Container1"),
+            Container("Container2"),
+        ],
+    )
     fc1 = FixedConnection(world.bodies[0], world.bodies[1])
     fc2 = FixedConnection(world.bodies[1], world.bodies[0])
     world.connections = [fc1, fc2]
@@ -986,7 +938,6 @@ def test_set_of_same_table_twice(session):
     assert str(ContainerDAO.__tablename__) in sql
 
 
-
 def test_plan_like_query(session):
     """
     Simulate the big plan query pattern:
@@ -996,10 +947,13 @@ def test_plan_like_query(session):
 
     Uses MoveAction/GraspConfig to simulate PickUpAction/NavigateAction pattern.
     """
-    world = World(1, [
-        Container("StartPos"),
-        Container("EndPos"),
-    ])
+    world = World(
+        1,
+        [
+            Container("StartPos"),
+            Container("EndPos"),
+        ],
+    )
     fc1 = FixedConnection(world.bodies[0], world.bodies[1])
     fc2 = FixedConnection(world.bodies[1], world.bodies[0])
     world.connections = [fc1, fc2]
@@ -1030,10 +984,14 @@ def test_plan_like_query(session):
             MoveActionDAO.robot_y,
             GraspConfigDAO.rotate_gripper,
         )
-        .join(GraspConfigDAO,
-              onclause=GraspConfigDAO.database_id == MoveActionDAO.grasp_config_id)
-        .join(FixedConnectionDAO,
-              onclause=FixedConnectionDAO.parent_id == MoveActionDAO.grasp_config_id)
+        .join(
+            GraspConfigDAO,
+            onclause=GraspConfigDAO.database_id == MoveActionDAO.grasp_config_id,
+        )
+        .join(
+            FixedConnectionDAO,
+            onclause=FixedConnectionDAO.parent_id == MoveActionDAO.grasp_config_id,
+        )
         .where(MoveActionDAO.robot_x > 0.0)
     )
     assert str(translator.sql_query) == str(expected)
@@ -1041,10 +999,13 @@ def test_plan_like_query(session):
 
 def test_set_of_multi_variable_evaluate(session, database):
     """Verify that evaluate() for set_of with multiple variables returns dicts."""
-    world = World(1, [
-        Container("Container1"),
-        Handle("Handle1"),
-    ])
+    world = World(
+        1,
+        [
+            Container("Container1"),
+            Handle("Handle1"),
+        ],
+    )
     fc = FixedConnection(world.bodies[0], world.bodies[1])
     world.connections = [fc]
 
@@ -1092,6 +1053,7 @@ def test_set_of_attribute_evaluate(session, database):
     names = sorted([r[keys[0]] for r in results])
     assert names == ["Body1", "Body2"]
 
+
 def test_set_of_transitive_evaluate(session, database):
     """Verify evaluate() for set_of with transitive attributes returns dicts."""
     session.add(
@@ -1103,11 +1065,13 @@ def test_set_of_transitive_evaluate(session, database):
     session.commit()
 
     pose = variable(type_=KRROODPose, domain=[])
-    query = an(set_of(
-        pose.position.x,
-        pose.position.y,
-        pose.position.z,
-    ))
+    query = an(
+        set_of(
+            pose.position.x,
+            pose.position.y,
+            pose.position.z,
+        )
+    )
 
     translator = eql_to_sql(query, session)
     results = translator.evaluate()
@@ -1120,6 +1084,7 @@ def test_set_of_transitive_evaluate(session, database):
     assert 1.0 in values
     assert 2.0 in values
     assert 3.0 in values
+
 
 def test_big_query_select_part(session):
     """
@@ -1139,9 +1104,9 @@ def test_big_query_select_part(session):
             move_place.robot_y,
             move_pick.grasp_config.rotate_gripper,
             move_pick.grasp_config.approach_direction,
-        ).where(
-            move_pick.grasp_config.rotate_gripper < 0.9
-        ).ordered_by(move_pick.robot_x)
+        )
+        .where(move_pick.grasp_config.rotate_gripper < 0.9)
+        .ordered_by(move_pick.robot_x)
     )
 
     translator = eql_to_sql(query, session)
@@ -1157,14 +1122,15 @@ def test_big_query_select_part(session):
             grasp_alias.rotate_gripper,
             grasp_alias.approach_direction,
         )
-        .join(grasp_alias,
-              onclause=grasp_alias.database_id == MoveActionDAO.grasp_config_id)
+        .join(
+            grasp_alias,
+            onclause=grasp_alias.database_id == MoveActionDAO.grasp_config_id,
+        )
         .where(grasp_alias.rotate_gripper < 0.9)
         .order_by(MoveActionDAO.robot_x)
     )
 
     assert str(translator.sql_query) == str(expected)
-
 
 
 def test_cte_from_eql(session, database):
@@ -1182,28 +1148,21 @@ def test_cte_from_eql(session, database):
     b = variable(type_=Body, domain=[])
     inner_query = an(entity(b).where(b.size > 5))
     large_bodies = eql_to_sql(
-        inner_query, session,
-        as_common_table_expression="large_bodies"
+        inner_query, session, as_common_table_expression="large_bodies"
     )
 
     c = variable(type_=Container, domain=[])
     outer_translator = eql_to_sql(an(entity(c)), session)
-    outer_translator.sql_query = (
-        outer_translator.sql_query
-        .join(large_bodies, large_bodies.c.database_id == ContainerDAO.database_id)
+    outer_translator.sql_query = outer_translator.sql_query.join(
+        large_bodies, large_bodies.c.database_id == ContainerDAO.database_id
     )
 
     # Build expected using SQLAlchemy objects — same starting point as the translator
-    inner_expected = (
-        select(BodyDAO)
-        .where(BodyDAO.size > 5)
-        .cte("large_bodies")
-    )
+    inner_expected = select(BodyDAO).where(BodyDAO.size > 5).cte("large_bodies")
 
-    expected = (
-        select(ContainerDAO)
-        .join(inner_expected,
-              onclause=inner_expected.c.database_id == ContainerDAO.database_id)
+    expected = select(ContainerDAO).join(
+        inner_expected,
+        onclause=inner_expected.c.database_id == ContainerDAO.database_id,
     )
 
     assert str(outer_translator.sql_query) == str(expected)
@@ -1221,26 +1180,30 @@ def test_case_when_with_min(session):
     """
     action = variable(MoveAction, domain=None)
 
-    query = an(set_of(
-        min(case_when(action.polymorphic_type == 'PickUpActionDAO', action.database_id))
-    ))
+    query = an(
+        set_of(
+            min(
+                case_when(
+                    action.polymorphic_type == "PickUpActionDAO", action.database_id
+                )
+            )
+        )
+    )
 
     translator = eql_to_sql(query, session)
 
-    expected = (
-        select(MoveActionDAO)
-        .with_only_columns(
-            func.min(
-                case(
-                    (SymbolDAO.polymorphic_type == 'PickUpActionDAO',
-                     MoveActionDAO.database_id)
+    expected = select(MoveActionDAO).with_only_columns(
+        func.min(
+            case(
+                (
+                    SymbolDAO.polymorphic_type == "PickUpActionDAO",
+                    MoveActionDAO.database_id,
                 )
             )
         )
     )
 
     assert str(translator.sql_query) == str(expected)
-
 
 
 def test_case_when_direct_in_set_of(session, database):
@@ -1252,9 +1215,9 @@ def test_case_when_direct_in_set_of(session, database):
     session.commit()
 
     action = variable(MoveAction, domain=None)
-    query = an(set_of(
-        case_when(action.polymorphic_type == 'PickUpActionDAO', action.robot_x)
-    ))
+    query = an(
+        set_of(case_when(action.polymorphic_type == "PickUpActionDAO", action.robot_x))
+    )
     translator = eql_to_sql(query, session)
 
     expected_sql = (
@@ -1276,18 +1239,23 @@ def test_case_when_direct_in_set_of(session, database):
 def test_case_when_with_max(session):
     """Verify max(case_when(...)) translates correctly."""
     action = variable(MoveAction, domain=None)
-    query = an(set_of(
-        max(case_when(action.polymorphic_type == 'PlaceActionDAO', action.database_id))
-    ))
+    query = an(
+        set_of(
+            max(
+                case_when(
+                    action.polymorphic_type == "PlaceActionDAO", action.database_id
+                )
+            )
+        )
+    )
     translator = eql_to_sql(query, session)
 
-    expected = (
-        select(MoveActionDAO)
-        .with_only_columns(
-            func.max(
-                case(
-                    (SymbolDAO.polymorphic_type == 'PlaceActionDAO',
-                     MoveActionDAO.database_id)
+    expected = select(MoveActionDAO).with_only_columns(
+        func.max(
+            case(
+                (
+                    SymbolDAO.polymorphic_type == "PlaceActionDAO",
+                    MoveActionDAO.database_id,
                 )
             )
         )

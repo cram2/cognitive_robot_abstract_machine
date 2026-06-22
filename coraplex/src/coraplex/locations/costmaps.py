@@ -179,7 +179,7 @@ class Costmap(PoseGeneratorBackend):
     If the sampling should randomly pick valid entries
     """
 
-    orientation_generator: Callable[Pose, Pose, [float]] = field(
+    orientation_generator: Optional[Callable[[Point3, Pose], Quaternion]] = field(
         kw_only=True, default=None
     )
     """

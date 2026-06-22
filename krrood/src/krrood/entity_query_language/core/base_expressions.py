@@ -32,6 +32,11 @@ from typing_extensions import (
     Type,
 )
 
+Bindings = Dict[uuid.UUID, Any]
+"""
+A dictionary for expressions' bindings in EQL that maps the expression's unique identifier to its value.
+"""
+
 from krrood.entity_query_language.exceptions import NoExpressionFoundForGivenID
 from krrood.entity_query_language.utils import make_list, T, make_set, is_iterable
 from krrood.symbol_graph.symbol_graph import SymbolGraph
@@ -47,11 +52,6 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.rules.conclusion import Conclusion
     from krrood.entity_query_language.core.variable import Variable
     from krrood.entity_query_language.query.query import Query
-
-Bindings = Dict[uuid.UUID, Any]
-"""
-A dictionary for expressions' bindings in EQL that maps the expression's unique identifier to its value.
-"""
 
 
 @dataclass(eq=False)

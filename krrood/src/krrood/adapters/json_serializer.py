@@ -28,7 +28,6 @@ from krrood.utils import (
     get_full_class_name,
     recursive_subclasses,
 )
-from krrood.inheritance_path_length import inheritance_path_length
 
 list_like_classes = (
     list,
@@ -82,6 +81,10 @@ class JSONSerializableTypeRegistry(metaclass=SingletonMeta):
         :param clazz: The class to get the serializer for.
         :return: The serializer class.
         """
+        # Imported lazily to avoid a circular import: inheritance_path_length pulls in the EQL
+        # predicate/variable modules, which import back from json_serializer during package load.
+        from krrood.inheritance_path_length import inheritance_path_length
+
         if issubclass(clazz, enum.Enum):
             return EnumJSONSerializer
 
