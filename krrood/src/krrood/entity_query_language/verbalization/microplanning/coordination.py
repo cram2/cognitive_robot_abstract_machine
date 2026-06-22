@@ -97,8 +97,9 @@ class CoindexedFold:
     """The shared comparison operator (e.g. ``operator.eq``)."""
 
     terminals: List[Tuple[str, type]]
-    """The co-indexed terminal attributes ``(name, owner)``, in source order — the *"month and
-    year"* the comparators range over."""
+    """The *distinct* co-indexed terminal attributes ``(name, owner)``, in first-occurrence order —
+    the *"month and year"* the comparators range over. A leaf compared more than once is one
+    attribute, so it is listed once (*"have the same name"*, never *"… name and name"*)."""
 
     left_prefix_expression: SymbolicExpression
     """An exemplar of the left chain minus its terminal hop (e.g. ``p.begin``)."""
@@ -412,7 +413,8 @@ def fold_coindexed_groups(
 
     Runs over the already range-folded list (range folds and prior co-indexed folds pass through
     untouched), so the two reductions compose without interfering. A group of fewer than two
-    comparators is never folded.
+    comparators is never folded, and a leaf compared more than once across the same prefixes is one
+    co-indexed attribute (its terminal is listed once).
 
     :param items: A list of conjuncts, possibly already containing :class:`RangeFold` items.
     :return: The list with each co-indexed group reduced to a single fold at the group's first
@@ -425,6 +427,9 @@ def fold_coindexed_groups(
     >>> [term[0] for term in fold_coindexed_groups(
     ...     [pair.left.low == pair.right.low, pair.left.high == pair.right.high])[0].terminals]
     ['low', 'high']
+    >>> [term[0] for term in fold_coindexed_groups(  # a repeated leaf collapses to one terminal
+    ...     [pair.left.low == pair.right.low, pair.left.low == pair.right.low])[0].terminals]
+    ['low']
     """
     signatures = [
         (
@@ -447,7 +452,9 @@ def fold_coindexed_groups(
         exemplar = items[indices[0]]
         slots[indices[0]] = CoindexedFold(
             operation=signature[0],
-            terminals=[signatures[index][1] for index in indices],
+            # Distinct terminals only: a leaf compared more than once across the same prefixes is one
+            # co-indexed attribute, so *"have the same name and name"* collapses to *"… the same name"*.
+            terminals=list(dict.fromkeys(signatures[index][1] for index in indices)),
             left_prefix_expression=exemplar.left._child_,
             right_prefix_expression=exemplar.right._child_,
         )

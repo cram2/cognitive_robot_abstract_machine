@@ -163,15 +163,15 @@ class CoindexedFoldRule(PhraseRule):
     def build(self, node: CoindexedFold, context: RuleContext) -> Fragment:
         """Say the factored clause once — the natural *"have the same"* form over sibling prefixes.
 
-        Detecting sibling prefixes selects the natural branch here, which is why the example reads
-        *the bird_1 and bird_2 of a LoveBirds have the same name and name* rather than the faithful
-        *are equal to those of …* phrasing the other branch would emit.
+        Detecting sibling prefixes selects the natural branch here (the faithful branch would instead
+        read *… are equal to those of …*). The two identical comparisons fold to one clause, and the
+        leaf they both compare — *name* — is listed once, not *"name and name"*:
 
         >>> pair = variable(LoveBirds, [])
         >>> verbalize_expression(
         ...     and_(pair.bird_1.name == pair.bird_2.name, pair.bird_1.name == pair.bird_2.name)
         ... )
-        'the bird_1 and bird_2 of a LoveBirds have the same name and name'
+        'the bird_1 and bird_2 of a LoveBirds have the same name'
         """
         terminals = oxford_comma(
             [self._attribute(pair) for pair in node.terminals],

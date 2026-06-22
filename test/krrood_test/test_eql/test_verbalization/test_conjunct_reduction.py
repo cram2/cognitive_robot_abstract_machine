@@ -6,6 +6,7 @@ its individual folds, on cases the golden end-to-end tests do not isolate.
 
 from __future__ import annotations
 
+import dataclasses
 import datetime
 
 from krrood.entity_query_language.factories import variable
@@ -13,11 +14,27 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
     CoindexedComparisonFold,
     CoindexedFold,
     ConjunctReducer,
+    fold_coindexed_groups,
     RangeBoundFold,
     RangeFold,
     reduce_conjuncts,
 )
-from krrood.entity_query_language.verbalization.example_domain import BankTransaction
+from krrood.entity_query_language.verbalization.example_domain import (
+    BankTransaction,
+    LoveBirds,
+)
+
+
+def _sibling_pair_type() -> type:
+    """A two-attribute sibling structure — ``Pair(left, right)`` where each side has ``low`` and
+    ``high`` — so a co-indexed fold can range over more than one distinct leaf."""
+    side = dataclasses.make_dataclass("Span", [("low", int), ("high", int)])
+    return dataclasses.make_dataclass("Pair", [("left", side), ("right", side)])
+
+
+def _coindexed_leaf_names(fold: CoindexedFold) -> list[str]:
+    """:return: The terminal attribute names of *fold*, in order."""
+    return [name for name, _owner in fold.terminals]
 
 
 def _bounded_transaction():
@@ -95,3 +112,36 @@ def test_a_non_comparator_conjunct_passes_through_untouched():
     boolean_condition = transaction.amount_details.amount > 0
     reduced = reduce_conjuncts([boolean_condition])
     assert reduced == [boolean_condition]
+
+
+def test_repeated_coindexed_leaf_is_listed_once():
+    """Two identical co-indexed comparisons fold to one clause whose shared leaf is listed once —
+    *"have the same name"*, never *"have the same name and name"*."""
+    birds = variable(LoveBirds, domain=None)
+    comparison = birds.bird_1.name == birds.bird_2.name
+    repeated = birds.bird_1.name == birds.bird_2.name
+    [fold] = fold_coindexed_groups([comparison, repeated])
+    assert isinstance(fold, CoindexedFold)
+    assert _coindexed_leaf_names(fold) == ["name"]
+
+
+def test_distinct_coindexed_leaves_are_all_kept():
+    """The repeated-leaf fix must not over-collapse: distinct leaves are each kept."""
+    pair = variable(_sibling_pair_type(), domain=None)
+    [fold] = fold_coindexed_groups(
+        [pair.left.low == pair.right.low, pair.left.high == pair.right.high]
+    )
+    assert _coindexed_leaf_names(fold) == ["low", "high"]
+
+
+def test_repeated_leaf_collapses_while_distinct_ones_remain():
+    """A leaf repeated among distinct ones is deduped in first-occurrence order, not reordered."""
+    pair = variable(_sibling_pair_type(), domain=None)
+    [fold] = fold_coindexed_groups(
+        [
+            pair.left.low == pair.right.low,
+            pair.left.high == pair.right.high,
+            pair.left.low == pair.right.low,
+        ]
+    )
+    assert _coindexed_leaf_names(fold) == ["low", "high"]
