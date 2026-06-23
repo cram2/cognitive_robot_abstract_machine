@@ -31,7 +31,7 @@ A role taker is any dataclass you define.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing_extensions import List
+from typing_extensions import List, Optional
 
 from krrood.entity_query_language.predicate import Symbol
 from krrood.patterns.role_predicates import IsSameEntity
@@ -85,7 +85,7 @@ class CEO(Role[Person]):
     """The role of being the chief executive of a company."""
 
     person: Person = role_taker_field()
-    head_of: Company = None
+    head_of: Optional[Company] = None
 ```
 
 Notice that `CEO` inherits from `Role[Person]` — it does **not** inherit from
@@ -259,7 +259,7 @@ class Representative(Role[CEO]):
     """The role of a CEO acting as a representative of their company."""
 
     ceo: CEO = role_taker_field()
-    represents: Company = None
+    represents: Optional[Company] = None
 
 
 rep = Representative(ceo=ceo, represents=acme)

@@ -201,6 +201,15 @@ class AssociationThroughRoleTaker(Association):
     def get_original_source_instance_given_this_relation_source_instance(
         self, source_instance: Any
     ):
+        """
+        Resolve the instance that actually owns the target, following the role-taker path.
+
+        Walks every field in the path except the last (the association to the target), so the
+        returned instance is the role taker on which the target association is declared.
+
+        :param source_instance: The role instance this association starts from.
+        :return: The instance along the role-taker path that owns the target association.
+        """
         source_instance = (
             super().get_original_source_instance_given_this_relation_source_instance(
                 source_instance

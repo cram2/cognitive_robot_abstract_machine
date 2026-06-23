@@ -11,13 +11,9 @@ from typing_extensions import (
     Generic,
     TypeVar,
     Type,
-    TYPE_CHECKING,
     Optional,
     Dict,
     Any,
-    get_origin,
-    get_args,
-    List,
     get_origin,
     get_args,
     TypeAlias,
@@ -49,9 +45,6 @@ TRANSIENT_TYPE_RESOLUTION_ERRORS = (
 not yet available (typically a circular import during module load). They are transient: the field
 is narrowed later, once a subclass binds the parameter to a concrete type. Any other exception is
 a genuine fault and is left to propagate."""
-
-if TYPE_CHECKING:
-    pass
 
 
 ResolvableType: TypeAlias = (

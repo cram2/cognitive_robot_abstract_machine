@@ -9,9 +9,10 @@ from typing_extensions import List, Iterator, Optional, Iterable
 
 from krrood.entity_query_language.predicate import Predicate
 from coraplex.datastructures.dataclasses import Context
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
+try:
+    from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
+except ImportError:
+    VizMarkerPublisher = None
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AllowSelfCollisions,

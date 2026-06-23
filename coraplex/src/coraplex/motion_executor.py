@@ -10,7 +10,7 @@ from typing_extensions import TYPE_CHECKING
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.templates import Sequence
-from giskardpy.motion_statechart.graph_node import EndMotion
+from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNode
 from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
@@ -30,9 +30,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class MotionExecutor:
-    motions: List[Task]
+    motions: List[MotionStatechartNode]
     """
-    The motions to execute
+    The motions to execute.
     """
 
     world: World
@@ -47,7 +47,9 @@ class MotionExecutor:
 
     ros_node: Any = field(kw_only=True, default=None)
     """
-    ROS node that should be used for communication. Only relevant for real execution.
+    ROS node that should be used for communication.
+
+    Only relevant for real execution.
     """
 
     plan_node: PlanNode = field(kw_only=True)
@@ -83,7 +85,8 @@ class MotionExecutor:
 
     def _execute_for_simulation(self):
         """
-        Creates an executor and executes the motion state chart until it is done.
+        Creates an executor and executes the motion state chart until it is
+        done.
         """
         logger.debug(f"Executing {self.motions} motions in simulation")
         executor = Ros2Executor(
@@ -156,38 +159,39 @@ class MotionExecutor:
 @dataclass
 class ExecutionEnvironment:
     """
-    Base class for managing execution context of all actions within. Instances of this class is to be used with a
-    "with" context block
+    Base class for managing execution context of all actions within.
+
+    Instances of this class is to be used with a "with" context block
 
     Example:
 
         >>> with ExecutionEnvironment(ExecutionType.SIMULATED):
         >>>     SequentialPlan(context, NavigateActionDescription, ...)
-
     """
 
     execution_type: ExecutionType
     """
-    The type of the execution environment 
+    The type of the execution environment.
     """
 
     previous_type: ExecutionType = field(init=False, default=None)
     """
-    Type of the execution environment before setting it, used for nested environments
+    Type of the execution environment before setting it, used for nested
+    environments.
     """
 
     def __enter__(self):
         """
-        Entering function for 'with' scope, saves the previously set :py:attr:`~MotionExecutor.execution_type` and
-        sets it to 'real'
+        Entering function for 'with' scope, saves the previously set
+        :py:attr:`~MotionExecutor.execution_type` and sets it to 'real'.
         """
         self.pre = MotionExecutor.execution_type
         MotionExecutor.execution_type = self.execution_type
 
     def __exit__(self, _type, value, traceback):
         """
-        Exit method for the 'with' scope, sets the :py:attr:`~MotionExecutor.execution_type` to the previously
-        used one.
+        Exit method for the 'with' scope, sets the
+        :py:attr:`~MotionExecutor.execution_type` to the previously used one.
         """
         MotionExecutor.execution_type = self.pre
 

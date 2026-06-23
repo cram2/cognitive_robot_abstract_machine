@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cognitive-robot-abstract-machine"
 version = "0.1.0"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.12,<3.13"
 description = "Meta-package that wires local subprojects together"
 readme = "README.md"
 authors = [{ name = "AICOR Institute", email = "you@example.com" }]

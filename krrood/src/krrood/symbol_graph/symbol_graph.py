@@ -29,7 +29,6 @@ if TYPE_CHECKING:
 
 from krrood import logger
 from krrood.class_diagrams.class_diagram import ClassDiagram
-from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
@@ -265,33 +264,10 @@ class SymbolGraph(metaclass=SingletonMeta):
             )
         ]
 
-    def _build_class_diagram(self, extra_classes: Iterable[Type] = ()) -> ClassDiagram:
-        """Build a class diagram from the currently known ``Symbol`` subclasses.
-
-        :param extra_classes: Classes to include in addition to the collected symbols, even if the
-            package filter would otherwise exclude them.
-        """
+    def _build_class_diagram(self) -> ClassDiagram:
+        """Build a class diagram from the currently known ``Symbol`` subclasses."""
         classes = self._collect_symbol_classes()
-        for clazz in extra_classes:
-            if clazz not in classes:
-                classes.append(clazz)
         return ClassDiagram(classes, introspector=DescriptorAwareIntrospector())
-
-    def ensure_class_in_class_diagram(self, clazz: Type) -> None:
-        """Ensure *clazz* is represented in the class diagram, rebuilding it if necessary.
-
-        The class diagram is built lazily on first use, so ``Symbol`` subclasses (for example role
-        classes) defined afterwards would otherwise never be registered, which silently disables
-        graph-backed features such as the role registry.
-
-        :param clazz: The class that must be present in the class diagram.
-        """
-        try:
-            self._class_diagram.get_wrapped_class(clazz)
-            return
-        except ClassIsUnMappedInClassDiagram:
-            pass
-        self._class_diagram = self._build_class_diagram(extra_classes=(clazz,))
 
     @property
     def class_diagram(self) -> ClassDiagram:

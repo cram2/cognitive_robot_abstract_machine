@@ -6,7 +6,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.dialects import postgresql
 
 from krrood.entity_query_language.exceptions import MultipleSolutionFound
-from ..dataset.example_classes import KRROODPosition, KRROODPose
+from ..dataset.example_classes import KRROODPosition, KRROODPose, NestedAction
 from ..dataset.semantic_world_like_classes import (
     World,
     Body,
@@ -28,6 +28,7 @@ from ..dataset.ormatic_interface import (
     GraspConfigDAO,
     ContainerDAO,
     HandleDAO,
+    NestedActionDAO,
     SymbolDAO,
     WorldEntityDAO,
 )
@@ -40,6 +41,7 @@ from krrood.entity_query_language.factories import (
     in_,
     an,
     the,
+    count,
     count_all,
     not_,
     max,
@@ -48,6 +50,7 @@ from krrood.entity_query_language.factories import (
     average,
     set_of,
     case_when,
+    exists,
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
@@ -1259,3 +1262,169 @@ def test_case_when_with_max(session):
     )
 
     assert str(translator.sql_query) == str(expected)
+
+
+def test_entity_from_multi_hop_attribute(session, database):
+    """
+    Prove bug: entity(a.pose.position) where the chain is two hops deep
+    (NestedAction → pose → KRROODPose → position → KRROODPosition) raises
+    AttributeResolutionError because _translate_entity_from_attribute looks up the
+    outermost attribute name ('position') directly on the leaf DAO (NestedActionDAO)
+    instead of walking the full chain.
+
+    After the fix the translator must join through KRROODPoseDAO and return
+    KRROODPositionDAO instances for all linked actions.
+    """
+    orientation = KRROODOrientationDAO(x=0.0, y=0.0, z=0.0, w=1.0)
+    position_low = KRROODPositionDAO(x=0.0, y=0.0, z=3.0)
+    position_high = KRROODPositionDAO(x=0.0, y=0.0, z=30.0)
+    pose_low = KRROODPoseDAO(position=position_low, orientation=orientation)
+    pose_high = KRROODPoseDAO(position=position_high, orientation=orientation)
+    body = BodyDAO(name="TestBody", size=1)
+    session.add_all([
+        NestedActionDAO(obj=body, pose=pose_low),
+        NestedActionDAO(obj=body, pose=pose_high),
+    ])
+    session.commit()
+
+    a = variable(NestedAction, domain=[])
+    query = an(entity(a.pose.position))
+
+    translator = eql_to_sql(query, session)
+    results = translator.evaluate()
+
+    assert len(results) == 2
+    assert all(isinstance(r, KRROODPositionDAO) for r in results)
+    z_values = sorted(r.z for r in results)
+    assert z_values == pytest.approx([3.0, 30.0])
+
+
+def test_entity_with_relationship_selected_variable(session, database):
+    """
+    Prove bug: entity(m.grasp_config).where(m.robot_x > 0.5) produces a cross-join
+    instead of an INNER JOIN, returning too many results.
+
+    After the fix, GraspConfigDAO must be joined with MoveActionDAO via the FK so
+    only the grasp_config linked to a high-robot_x move is returned.
+    """
+    grasp_matching = GraspConfigDAO(rotate_gripper=0.3, approach_direction=0.0, manipulation_offset=0.0)
+    grasp_not_matching = GraspConfigDAO(rotate_gripper=0.9, approach_direction=0.0, manipulation_offset=0.0)
+    session.add(grasp_matching)
+    session.add(grasp_not_matching)
+
+    move_high = MoveActionDAO(robot_x=1.0, robot_y=0.0, hip_rotation=0.0)
+    move_high.grasp_config = grasp_matching
+    session.add(move_high)
+
+    move_low = MoveActionDAO(robot_x=0.1, robot_y=0.0, hip_rotation=0.0)
+    move_low.grasp_config = grasp_not_matching
+    session.add(move_low)
+
+    session.commit()
+
+    m = variable(MoveAction, domain=[])
+    query = an(entity(m.grasp_config).where(m.robot_x > 0.5))
+
+    translator = eql_to_sql(query, session)
+    results = translator.evaluate()
+
+    assert len(results) == 1
+    assert isinstance(results[0], GraspConfigDAO)
+    assert results[0].rotate_gripper == pytest.approx(0.3)
+
+
+def test_count_all_derives_dao_from_where_clause(session, database):
+    """
+    Prove bug: set_of(count_all()).where(m.robot_x > 0.5) raises NoDAOFoundError
+    because CountAll carries no DAO information.
+
+    After the fix, the translator must fall back to the WHERE clause to find the
+    base DAO (MoveActionDAO via m.robot_x) and emit SELECT count(*) FROM MoveActionDAO.
+    """
+    session.add(MoveActionDAO(robot_x=1.0, robot_y=0.0, hip_rotation=0.0))
+    session.add(MoveActionDAO(robot_x=2.0, robot_y=0.0, hip_rotation=0.0))
+    session.add(MoveActionDAO(robot_x=0.1, robot_y=0.0, hip_rotation=0.0))
+    session.commit()
+
+    m = variable(MoveAction, domain=[])
+    c = count_all()
+    query = an(set_of(c).where(m.robot_x > 0.5))
+
+    translator = eql_to_sql(query, session)
+    results = translator.evaluate()
+
+    assert len(results) == 1
+    assert results[0][c] == 2
+
+
+def test_order_by_aggregate(session, database):
+    """
+    Prove bug: set_of(b.size, c).grouped_by(b.size).ordered_by(c, descending=True)
+    raises an error because _apply_clauses calls translate_attribute() on a Count
+    aggregator instead of _translate_comparator_operand().
+
+    After the fix, the translator must emit:
+    SELECT size, COUNT(*) FROM BodyDAO GROUP BY size ORDER BY COUNT(*) DESC
+    and return rows ordered with the most-frequent size first.
+    """
+    session.add_all([
+        BodyDAO(name="Body1", size=10),
+        BodyDAO(name="Body2", size=10),
+        BodyDAO(name="Body3", size=10),
+        BodyDAO(name="Body4", size=20),
+        BodyDAO(name="Body5", size=20),
+    ])
+    session.commit()
+
+    b = variable(type_=Body, domain=[])
+    c = count(b)
+    query = an(set_of(b.size, c).grouped_by(b.size).ordered_by(c, descending=True))
+
+    translator = eql_to_sql(query, session)
+    results = translator.evaluate()
+
+    assert len(results) == 2
+    sizes = [list(row.values())[0] for row in results]
+    assert sizes[0] == 10  # appears 3 times → largest count, comes first
+    assert sizes[1] == 20  # appears 2 times
+
+
+def test_exists_in_where_clause(session, database):
+    """
+    Prove bug: exists(g, m.grasp_config == g) in a WHERE clause raises
+    UnsupportedQueryTypeError because Exists is not handled in translate_query.
+
+    After the fix, the translator must emit a correlated EXISTS subquery:
+
+    SELECT MoveActionDAO.*
+    FROM MoveActionDAO
+    WHERE EXISTS (
+        SELECT 1 FROM GraspConfigDAO
+        WHERE MoveActionDAO.grasp_config_id = GraspConfigDAO.database_id
+    )
+
+    so only MoveActions that have an associated GraspConfig are returned.
+    """
+    grasp_a = GraspConfigDAO(rotate_gripper=0.1, approach_direction=0.0, manipulation_offset=0.0)
+    grasp_b = GraspConfigDAO(rotate_gripper=0.5, approach_direction=0.0, manipulation_offset=0.0)
+    session.add_all([grasp_a, grasp_b])
+
+    move_with_grasp_a = MoveActionDAO(robot_x=1.0, robot_y=0.0, hip_rotation=0.0)
+    move_with_grasp_a.grasp_config = grasp_a
+    move_with_grasp_b = MoveActionDAO(robot_x=2.0, robot_y=0.0, hip_rotation=0.0)
+    move_with_grasp_b.grasp_config = grasp_b
+    move_without_grasp = MoveActionDAO(robot_x=3.0, robot_y=0.0, hip_rotation=0.0)
+
+    session.add_all([move_with_grasp_a, move_with_grasp_b, move_without_grasp])
+    session.commit()
+
+    m = variable(MoveAction, domain=[])
+    g = variable(GraspConfig, domain=[])
+    query = an(entity(m).where(exists(g, m.grasp_config == g)))
+
+    translator = eql_to_sql(query, session)
+    results = translator.evaluate()
+
+    assert len(results) == 2
+    result_robot_xs = {r.robot_x for r in results}
+    assert result_robot_xs == {1.0, 2.0}

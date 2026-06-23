@@ -9,6 +9,7 @@ from typing_extensions import (
     ClassVar,
     Iterator,
     List,
+    Optional,
     Tuple,
     Type,
     TypeVar,
@@ -156,19 +157,21 @@ class Role(Symbol, SubClassSafeGeneric[T]):
         """
         :return: The concrete type of this role's role taker.
         """
-        try:
-            type_ = next(
+        type_ = next(
+            (
                 declared_field.type
                 for declared_field in fields(cls)
-                if declared_field.name == cls.role_taker_field_name()
-            )
-        except (StopIteration, RoleTakerFieldNotFound):
+                if isinstance(declared_field, RoleTakerField)
+            ),
+            None,
+        )
+        if type_ is None:
             type_ = get_generic_type_params(cls, Role)[0]
         if isinstance(type_, str):
             module_namespace = sys.modules[cls.__module__].__dict__
-            try:
+            if type_ in module_namespace:
                 type_ = module_namespace[type_]
-            except KeyError:
+            else:
                 type_ = eval(type_, module_namespace)
         if isinstance(type_, TypeVar):
             if type_.__bound__ is None:
@@ -198,9 +201,10 @@ class Role(Symbol, SubClassSafeGeneric[T]):
         return current
 
     def __post_init__(self):
-        super_post_init = getattr(super(), "__post_init__", None)
-        if super_post_init is not None:
-            super_post_init()
+        # ``object`` has no ``__post_init__``; a generic base (SubClassSafeGeneric) may. Guard the
+        # call with ``hasattr`` so the chain runs only when a base actually defines it.
+        if hasattr(super(), "__post_init__"):
+            super().__post_init__()
         type(self)._role_registry.register(self)
 
     def __getattr__(self, item: str) -> Any:
@@ -293,7 +297,9 @@ class Role(Symbol, SubClassSafeGeneric[T]):
         return any(cls.yield_taker_roles_of_type(role_taker, role_types))
 
     @classmethod
-    def roles_for(cls, role_taker: T, role_type: Type[Role] = None) -> List[Role]:
+    def roles_for(
+        cls, role_taker: T, role_type: Optional[Type[Role]] = None
+    ) -> List[Role]:
         """
         :param role_taker: The role taker instance to query.
         :param role_type: The type of roles to check for.

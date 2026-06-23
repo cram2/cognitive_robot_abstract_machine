@@ -14,6 +14,7 @@ from semantic_digital_twin.adapters.ros.world_fetcher import (
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
+from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import RevoluteConnection
@@ -223,6 +224,39 @@ def test_part_whole_relationship_field_survives_deepcopy():
         # The field values themselves survived the round trip.
         assert isinstance(copied_drawer.handle, Handle)
         assert isinstance(copied_drawer.mechanical_joint, Slider)
+
+
+@pytest.fixture
+def hsr_world_state_reset(_hsr_world_setup):
+    """
+    Single-HSRB world fixture that mirrors ``pr2_world_state_reset``.
+
+    ``_hsr_world_setup`` already has HSRB annotations (added by
+    ``world_with_urdf_factory``), so we only deepcopy — no second
+    ``from_world`` call — and restore the joint-state vector afterwards.
+    """
+    world = deepcopy(_hsr_world_setup)
+    state = world.state._data.copy()
+    yield world
+    world.state._data[:] = state
+
+
+def test_hsrb_world(hsr_world_state_reset, session):
+    """
+    Verify that an HSRB world can be serialised, inserted into a database,
+    queried back, and fully reconstructed — including the robot's mobile base.
+    """
+    dao: WorldMappingDAO = to_dao(hsr_world_state_reset)
+    session.add(dao)
+    session.commit()
+
+    queried_world = session.scalar(select(WorldMappingDAO))
+    reconstructed: World = queried_world.from_dao()
+
+    [hsrb] = reconstructed.get_semantic_annotations_by_type(HSRB)
+    assert hsrb.mobile_base is not None
+    assert hsrb.mobile_base.torso is not None
+    assert hsrb.mobile_base.torso.arm is not None
 
 
 def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session):

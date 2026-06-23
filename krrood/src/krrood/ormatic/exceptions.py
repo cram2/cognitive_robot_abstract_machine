@@ -49,7 +49,35 @@ class NoDAOFoundError(DataclassException, TypeError):
         return f"Class {type(self.obj)} does not have a DAO."
 
     def suggest_correction(self) -> str:
-        return "did you forget to import your ORM Interface? Otherwise the class may not be in the ORM Interface."
+        return (
+            "Check that the correct ormatic interface is imported, that the ormatic interfaces are "
+            "up to date by running the script that generates the ormatic interface, and that the target class is "
+            "actually mapped."
+        )
+
+
+@dataclass
+class NoDAOFoundForTypeError(NoDAOFoundError):
+    """
+    Raised when no DAO class is found for a domain *type* rather than for a concrete instance.
+
+    Type-driven lookups (such as EQL translation, which resolves DAOs from variable types)
+    store the offending type itself in :attr:`obj`, so the message reports it directly instead
+    of its metaclass.
+    """
+
+    def error_message(self) -> str:
+        return f"No DAO found for type {self.obj}."
+
+
+@dataclass
+class NoDAOFoundForSelectionError(NoDAOFoundError):
+    """
+    Raised when none of the selected expressions of a query resolve to a DAO-bearing type.
+    """
+
+    def error_message(self) -> str:
+        return f"No DAO could be derived from the selected expressions: {self.obj}."
 
 
 @dataclass
