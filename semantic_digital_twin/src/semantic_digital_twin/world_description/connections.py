@@ -71,6 +71,7 @@ class FixedConnection(Connection):
             HomogeneousTransformationMatrix
         ] = None,
         connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
+        **kwargs,
     ) -> Self:
         return cls(
             parent=parent,
@@ -189,6 +190,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         offset: float = 0.0,
         dof_limits: Optional[DegreeOfFreedomLimits] = None,
         axis: Vector3 | None = None,
+        **kwargs,
     ) -> Self:
         """
         Creates and returns an instance of the class with its single degree of freedom, initializing a
@@ -463,13 +465,13 @@ class Connection6DoF(Connection):
             HomogeneousTransformationMatrix
         ] = None,
         connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
+        **kwargs,
     ) -> Self:
         """
         Creates an instance of the class with automatically generated degrees of freedom (DoFs)
         for the provided parent and child kinematic entities within the specified world.
 
-        The ``axis``/``multiplier``/``offset``/``dof_limits`` parameters are accepted for
-        interface consistency with active connections and ignored here.
+        The additional kwargs parameters are accepted for interface consistency with other connections and ignored here.
 
         This method initializes and adds the required degrees of freedom to the world,
         and sets their properties accordingly. It generates a name for the connection if
@@ -686,14 +688,14 @@ class OmniDrive(WheeledDrive):
         connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
         translation_velocity_limits: float = 0.6,
         rotation_velocity_limits: float = 0.5,
+        **kwargs,
     ) -> Self:
         """
         Creates an instance of the class with automatically generated degrees of freedom
         (DOFs) for translation on the x and y axes, rotation along roll, pitch, and yaw
         axes, and velocity limits for translation and rotation.
 
-        The ``axis``/``multiplier``/``offset``/``dof_limits`` parameters are accepted for
-        interface consistency with active connections and ignored here.
+        The additional kwargs parameters are accepted for interface consistency with other connections and ignored here.
 
         This method modifies the provided world to add all required degrees of freedom
         and their limits, based on the provided settings. Names for the degrees of
@@ -952,13 +954,13 @@ class DifferentialDrive(WheeledDrive):
         connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
         translation_velocity_limits: float = 0.6,
         rotation_velocity_limits: float = 0.5,
+        **kwargs,
     ) -> Self:
         """
         Creates an instance of the class with automatically generated DoFs for translation on the x-axis,
         rotation along roll, pitch, and yaw axes, and velocity limits for translation and rotation.
 
-        The ``axis``/``multiplier``/``offset``/``dof_limits`` parameters are accepted for
-        interface consistency with active connections and ignored here.
+        The additional kwargs parameters are accepted for interface consistency with other connections and ignored here.
 
         :param world: The world where the configuration is being applied, and degrees of freedom are added.
         :param parent: The parent kinematic structure entity.
