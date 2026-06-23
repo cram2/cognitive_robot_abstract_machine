@@ -41,8 +41,6 @@ except ModuleNotFoundError:
     ParallelGripperCommand = None
 
 logger = logging.getLogger(__name__)
-logger = logging.getLogger(__name__)
-
 
 Action = TypeVar("Action")
 ActionGoal = TypeVar("ActionGoal")
