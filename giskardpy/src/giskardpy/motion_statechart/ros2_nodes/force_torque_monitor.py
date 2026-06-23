@@ -66,10 +66,10 @@ class ForceDirectionMonitor(ForceTorqueNode):
     """Returns TRUE when the force projected onto direction crosses a threshold."""
 
     direction: Vector3 = field(kw_only=True)
-    """Direction in the sensor frame along which the force is measured. Normalized internally."""
+    """Direction in the sensor frame along which the force is measured. Normalized internally"""
 
     threshold: float = field(kw_only=True)
-    """Trigger threshold in N for the force projected onto ``direction``."""
+    """Trigger threshold in N for the force projected onto direction"""
 
     def on_tick(
         self, context: MotionStatechartContext
@@ -80,6 +80,8 @@ class ForceDirectionMonitor(ForceTorqueNode):
         force = Vector3.from_iterable(self.force_as_np())
         unit_direction = self.direction / self.direction.norm()
         force_along_direction = float(force.dot(unit_direction))
+        print(f"[FT Monitor] Force magnitude: {force_along_direction}")
         if force_along_direction < self.threshold:
+            print(f"[FT Monitor] force threshold crossed")
             return ObservationStateValues.TRUE
         return ObservationStateValues.FALSE
