@@ -153,9 +153,15 @@ class LiteralRule(PhraseRule):
     name = "literal"
 
     def build(self, node: Literal, context: RuleContext) -> Fragment:
-        """:return: The literal value, or *"a specific <Type>"* for a concrete object literal."""
+        """:return: The literal value, or *"a specific <Type>"* for a concrete object literal.
+
+        A bare class used as a value (e.g. the type argument of a predicate) renders as a linked type
+        reference rather than an un-linkable literal, so it hyperlinks like any other type name.
+        """
         if is_concrete_object_literal(node):
             return self._concrete_object(node, context)
+        if isinstance(node._value_, type):
+            return RoleFragment.for_type(node._value_)
         return RoleFragment.for_literal(node._value_)
 
     def _concrete_object(self, node: Literal, context: RuleContext) -> Fragment:

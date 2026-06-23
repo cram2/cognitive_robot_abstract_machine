@@ -466,6 +466,19 @@ def test_pipeline_html_without_resolver_no_anchor_tags():
     assert "<a " not in text
 
 
+def test_type_valued_literal_is_hyperlinked():
+    """A bare class used as a value (e.g. the type argument of a predicate) links to its source like
+    a type reference, rather than rendering as an un-linkable literal."""
+    from krrood.entity_query_language.core.variable import Literal
+
+    resolver = _ConstantResolver("http://example.com/sensor")
+    text = VerbalizationPipeline.html(link_resolver=resolver).verbalize(
+        Literal(_value_=_Sensor)
+    )
+    assert 'href="http://example.com/sensor"' in text
+    assert "_Sensor" in text
+
+
 def test_pipeline_ansi_with_resolver_and_osc8_emits_escape():
     r = variable(_Sensor, [])
     resolver = _ConstantResolver("http://example.com/sensor")
