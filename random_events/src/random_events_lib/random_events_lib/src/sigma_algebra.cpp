@@ -85,28 +85,15 @@ bool AbstractSimpleSet::operator!=(const AbstractSimpleSet &other) {
 //
 
 bool AbstractCompositeSet::is_disjoint() {
-    // Early‐exit if fewer than 2 atomic pieces
-    if (simple_sets->size() < 2) {
-        return true;
-    }
+    if (simple_sets->size() < 2) return true;
 
-    // Copy all pointers into a vector (O(n))
-    std::vector<AbstractSimpleSetPtr_t> vec;
-    vec.reserve(simple_sets->size());
-    for (auto const &p : *simple_sets) {
-        vec.push_back(p);
-    }
-
-    // For each unique pair (i<j), test intersection.  Early‐exit on first non‐empty
-    // (If n is small, this is fine; if n is large, this is the inherent O(n^2) check.)
-    for (size_t i = 0; i + 1 < vec.size(); ++i) {
-        for (size_t j = i + 1; j < vec.size(); ++j) {
-            auto &A = vec[i];
-            auto &B = vec[j];
-            auto I = A->intersection_with(B);  // cost = T_cap
-            if (!I->is_empty()) {
-                return false;  // found overlap
-            }
+    // Iterate directly over the std::set using two nested iterators — no vector copy,
+    // no shared_ptr reference-count churn.
+    for (auto it1 = simple_sets->cbegin(); it1 != simple_sets->cend(); ++it1) {
+        auto it2 = it1;
+        ++it2;
+        for (; it2 != simple_sets->cend(); ++it2) {
+            if (!(*it1)->intersection_with(*it2)->is_empty()) return false;
         }
     }
     return true;
@@ -408,30 +395,77 @@ AbstractCompositeSetPtr_t AbstractCompositeSet::intersection_with(
 }
 
 AbstractCompositeSetPtr_t AbstractCompositeSet::complement() const {
-    // Early exit for empty sets - complement of empty set is the universal set
-    if (simple_sets->empty()) {
-        return make_new_empty();
+    if (simple_sets->empty()) return make_new_empty();
+
+    // ---------------------------------------------------------------------------
+    // Optimised complement via successive difference (inlined for speed).
+    //
+    // De Morgan: (A₀ ∪ A₁ ∪ … ∪ Aₙ)^c = A₀^c ∩ A₁^c ∩ … ∩ Aₙ^c
+    // Rewritten as: start with A₀^c, then subtract each Aᵢ in turn:
+    //   result = A₀^c \ A₁ \ A₂ \ …
+    // because X ∩ Y^c = X \ Y.
+    //
+    // Key optimisation: for each piece P of result and each obstacle Aᵢ,
+    // test overlap with a single intersection call.
+    //   - No overlap (common case): P survives unchanged — O(1) per piece.
+    //   - Overlap:  compute I = P ∩ Aᵢ, then I^c, then P ∩ each piece of I^c.
+    //     Same work as the old intersection_with(Aᵢ^c) approach but the
+    //     complement is taken on the smaller set I rather than all of Aᵢ.
+    //
+    // We inline the "piece \ Aᵢ" logic to avoid the intermediate
+    // SimpleSetSetPtr_t allocation that AbstractSimpleSet::difference_with
+    // would create for every piece, and collect results in a single scratch
+    // vector for one bulk insert per step.
+    //
+    // Because result is a disjoint union at every step and the subtraction of
+    // a single simple set preserves disjointness of its subsets, no
+    // make_disjoint() is needed during the loop.
+    // ---------------------------------------------------------------------------
+
+    auto it = simple_sets->cbegin();
+
+    // Initialise result = A₀^c  (already disjoint)
+    auto result = make_new_empty();
+    {
+        auto comp0 = (*it)->complement();
+        result->simple_sets->insert(comp0->begin(), comp0->end());
+        ++it;
     }
 
-    // We know "(∪ A_i)^c = ∩ (A_i^c)."
-    // So we iterate over each atomic piece, compute A_i^c (a set of pieces), then intersect them in turn.
+    while (it != simple_sets->cend()) {
+        if (result->simple_sets->empty()) break;
 
-    AbstractCompositeSetPtr_t result = nullptr;
-    bool first = true;
+        std::vector<AbstractSimpleSetPtr_t> scratch;
+        scratch.reserve(result->simple_sets->size());  // at least as many survivors
 
-    for (auto const &A : *simple_sets) {
-        auto compA = A->complement();  // cost ≈ O(k_i log k_i)
-        if (first) {
-            // Initialize result to "all pieces from A^c"
-            result = make_new_empty();
-            result->simple_sets->insert(compA->begin(), compA->end());
-            first = false;
-        } else {
-            // Intersect the running result with compA
-            result = result->intersection_with(compA);  // each intersection is expensive
+        for (auto const &piece : *result->simple_sets) {
+            // Test if "piece" overlaps the current obstacle Aᵢ
+            auto I = piece->intersection_with(*it);  // one intersection
+
+            if (I->is_empty()) {
+                // Fast path: no overlap — piece survives unchanged.
+                scratch.push_back(piece);
+            } else {
+                // Slow path: compute piece \ Aᵢ = piece ∩ Iᶜ
+                // (using I instead of Aᵢ for the complement keeps the
+                // complement smaller: I ⊆ Aᵢ, so I^c ⊇ Aᵢ^c, but
+                // piece ∩ I^c = piece ∩ Aᵢ^c, which is what we want)
+                auto I_comp = I->complement();
+                for (auto const &comp_piece : *I_comp) {
+                    auto sub = piece->intersection_with(comp_piece);
+                    if (!sub->is_empty()) scratch.push_back(sub);
+                }
+            }
         }
+
+        auto next = make_new_empty();
+        if (!scratch.empty()) {
+            next->simple_sets->insert(scratch.begin(), scratch.end());
+        }
+        result = next;
+        ++it;
     }
-    return (result == nullptr) ? make_new_empty() : result;
+    return result;
 }
 
 AbstractCompositeSetPtr_t AbstractCompositeSet::union_with(
@@ -474,67 +508,21 @@ AbstractCompositeSetPtr_t AbstractCompositeSet::union_with(
 
 AbstractCompositeSetPtr_t AbstractCompositeSet::union_with(
     const AbstractCompositeSetPtr_t &other) {
-    // Early exit for empty sets
-    if (simple_sets->empty()) {
-        // If other is empty or contains only empty sets, return empty
-        if (other->is_empty()) {
-            return make_new_empty();
-        }
-
-        // Filter out empty sets from other
-        auto result = make_new_empty();
-        for (auto const &p : *other->simple_sets) {
-            if (!p->is_empty()) {
-                result->simple_sets->insert(p);
-            }
-        }
-
-        // If result is empty after filtering, return empty set
-        if (result->simple_sets->empty()) {
-            return result;
-        }
-
-        return result;
-    }
-
-    if (other->is_empty()) {
-        // Filter out empty sets from this
-        auto result = make_new_empty();
-        for (auto const &p : *simple_sets) {
-            if (!p->is_empty()) {
-                result->simple_sets->insert(p);
-            }
-        }
-
-        // If result is empty after filtering, return empty set
-        if (result->simple_sets->empty()) {
-            return result;
-        }
-
-        return result;
-    }
-
+    // Single pass over each source, counting non-empty contributions.
+    // If only one source contributes, it was already disjoint → skip make_disjoint().
     auto result = make_new_empty();
-    // 1) Insert all non-empty sets from "this"
+    size_t from_this = 0, from_other = 0;
+
     for (auto const &p : *simple_sets) {
-        if (!p->is_empty()) {
-            result->simple_sets->insert(p);
-        }
+        if (!p->is_empty()) { result->simple_sets->insert(p); ++from_this; }
     }
-
-    // 2) Insert all non-empty sets from "other"
     for (auto const &p : *other->simple_sets) {
-        if (!p->is_empty()) {
-            result->simple_sets->insert(p);
-        }
+        if (!p->is_empty()) { result->simple_sets->insert(p); ++from_other; }
     }
 
-    // If result is empty after filtering, return empty set
-    if (result->simple_sets->empty()) {
-        return result;
-    }
+    if (result->simple_sets->empty()) return result;
+    if (from_this == 0 || from_other == 0) return result;
 
-    // 3) Re‐coalesce any overlaps
     return result->make_disjoint();
 }
 
@@ -611,6 +599,53 @@ AbstractCompositeSetPtr_t AbstractCompositeSet::difference_with(
     return result->make_disjoint();
 }
 
+AbstractCompositeSetPtr_t AbstractCompositeSet::subtract_simple_set_disjoint(
+    const AbstractSimpleSetPtr_t &obstacle) {
+    // Precondition: this is a disjoint union.
+    // Correctness: (piece_i - obstacle) ∩ (piece_j - obstacle) ⊆ piece_i ∩ piece_j = ∅
+    // when the pieces are disjoint, so the result is disjoint without calling make_disjoint().
+    if (simple_sets->empty() || obstacle->is_empty()) return shared_from_this();
+
+    // Each 3-D box can split into at most 6 sub-pieces when one box is subtracted from it.
+    std::vector<AbstractSimpleSetPtr_t> result_pieces;
+    result_pieces.reserve(simple_sets->size() * 6);
+
+    for (auto const &current_piece : *simple_sets) {
+        auto overlap = current_piece->intersection_with(obstacle);
+        if (overlap->is_empty()) {
+            // No overlap with the obstacle: keep the current piece unchanged.
+            result_pieces.push_back(current_piece);
+        } else {
+            // Split the current piece around the obstacle and keep all non-overlapping sub-pieces.
+            auto difference_pieces = current_piece->difference_with(obstacle);
+            for (auto const &difference_piece : *difference_pieces) {
+                result_pieces.push_back(difference_piece);
+            }
+        }
+    }
+
+    auto result = make_new_empty();
+    if (!result_pieces.empty()) {
+        result->simple_sets->insert(result_pieces.begin(), result_pieces.end());
+    }
+    return result;
+}
+
+AbstractCompositeSetPtr_t AbstractCompositeSet::subtract_disjoint(
+    const AbstractCompositeSetPtr_t &obstacle_set) {
+    // Equivalent to (this & ~obstacle_set) but stays bounded in the same space as this
+    // composite set.  Never calls make_disjoint() — disjointness is maintained at each step.
+    if (simple_sets->empty()) return make_new_empty();
+    if (obstacle_set->is_empty()) return shared_from_this();
+
+    auto remaining = shared_from_this();
+    for (auto const &obstacle_piece : *obstacle_set->simple_sets) {
+        remaining = remaining->subtract_simple_set_disjoint(obstacle_piece);
+        if (remaining->is_empty()) break;
+    }
+    return remaining;
+}
+
 bool AbstractCompositeSet::contains(const AbstractCompositeSetPtr_t &other) {
     // Early exit for empty sets
     if (other->is_empty()) {
@@ -622,7 +657,7 @@ bool AbstractCompositeSet::contains(const AbstractCompositeSetPtr_t &other) {
 
     // A ⊇ B  iff  A ∩ B == B
     auto I = intersection_with(other);  // expensive
-    return (I == other) || (*I == *other);
+    return *I == *other;
 }
 
 void AbstractCompositeSet::add_new_simple_set(

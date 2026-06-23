@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cognitive-robot-abstract-machine"
 version = "0.1.0"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.12,<3.13"
 description = "Meta-package that wires local subprojects together"
 readme = "README.md"
 authors = [{ name = "AICOR Institute", email = "you@example.com" }]
@@ -13,7 +13,7 @@ authors = [{ name = "AICOR Institute", email = "you@example.com" }]
 # Add dependencies on all workspace members by their distribution names
 # uv will resolve these to editable installs via [tool.uv.sources]
 dependencies = [
-  "pycram-robotics",
+  "coraplex",
   "giskardpy",
   "semantic_digital_twin",
   "krrood",
@@ -21,24 +21,62 @@ dependencies = [
   "probabilistic_model",
   "robokudo",
   "physics_simulators",
+  "experiments",
   "ipykernel>=7.2.0",
-  "lark-parser>=0.12.0",
+  "lark-parser>=0.12.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0,<8.0.0",
+    "pytest-asyncio>=0.23.0,<0.24.0",
+    "pytest-xdist",
+    "objgraph",
+
+]
+
+# Requirements for building the documentation of all sub-packages.
+# Collected from the doc/requirements.txt files of the workspace members
+# (coraplex, krrood, probabilistic_model, random_events, semantic_digital_twin).
+# Workspace packages (e.g. random-events) are omitted since they are core dependencies.
+doc = [
+    "jupyter-book<2.0.0",
+    "jupyter",
+    "ghp-import",
+    "nbconvert",
+    "jupytext",
+    "jupyterquiz",
+    "sphinx-autoapi",
+    "sphinx-proof",
+    "sphinxcontrib-plantuml",
+    "sphinxcontrib-mermaid",
+    "Pygments>=2.15.0",
+    "pylint",
+    "matplotlib",
+    "numpy",
+    "scipy",
+    "pillow",
+    "graphviz",
+    "polytope",
+    "ortools",
+    "cvxopt"
 ]
 
 [tool.uv.workspace]
 members = [
-  "pycram",
+  "coraplex",
   "giskardpy",
   "semantic_digital_twin",
   "krrood",
   "random_events",
   "probabilistic_model",
   "physics_simulators",
-  "robokudo"
+  "robokudo",
+  "experiments"
 ]
 
 [tool.uv.sources]
-pycram-robotics       = { workspace = true }
+coraplex       = { workspace = true }
 giskardpy             = { workspace = true }
 semantic_digital_twin = { workspace = true }
 krrood                = { workspace = true }
@@ -46,12 +84,13 @@ probabilistic_model   = { workspace = true }
 random_events         = { workspace = true }
 robokudo              = { workspace = true }
 physics_simulators    = { workspace = true }
+experiments           = { workspace = true }
 
 [tool.poetry]
 package-mode = false
 
 [tool.poetry.dependencies]
-pycram-robotics = { path = "pycram", develop = true }
+coraplex = { path = "coraplex", develop = true }
 giskardpy = { path = "giskardpy", develop = true }
 semantic_digital_twin = { path = "semantic_digital_twin", develop = true }
 krrood = { path = "krrood", develop = true }
@@ -59,6 +98,12 @@ random_events = { path = "random_events", develop = true }
 probabilistic_model = { path = "probabilistic_model", develop = true }
 robokudo = { path = "robokudo", develop = true }
 physics_simulators = { path = "physics_simulators", develop = true }
+experiments = { path = "experiments", develop = true }
 
 [tool.setuptools]
 packages = []
+
+[tool.docformatter]
+make-summary-multi-line = true
+pre-summary-newline = true
+close-quotes-on-newline = true

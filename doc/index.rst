@@ -26,7 +26,7 @@ Architecture Overview
 
 CRAM consists of the following sub-packages:
 
--  `PyCRAM <https://cram2.github.io/cognitive_robot_abstract_machine/pycram>`__:
+-  `CoraPlex <https://cram2.github.io/cognitive_robot_abstract_machine/coraplex>`__:
    is the central control unit of the CRAM architecture. It
    interprets and executes high-level action plans using the
    CRAM plan language (CPL).
@@ -170,8 +170,8 @@ Research & Publications
   generalized action plans,” Cognitive Systems Research, vol. 92, p.
   101375, Sep. 2025, doi: 10.1016/j.cogsys.2025.101375.
 | [4] J. Dech, A. Bassiouny, T. Schierenbeck, V. Hassouna, L. Krohm, and
-  D. Prüsser, PyCRAM: A Python framework for cognition-enbabled robtics.
-  (2025). [Online]. Available: https://github.com/cram2/pycram
+  D. Prüsser, CoraPlex: A Python framework for cognition-enbabled robtics.
+  (2025). [Online]. Available: https://github.com/cram2/coraplex
 | [5] T. Schierenbeck, probabilistic_model: A Python package for
   probabilistic models. (Jul. 01, ). [Online]. Available:
   https://github.com/tomsch420/probabilistic_model

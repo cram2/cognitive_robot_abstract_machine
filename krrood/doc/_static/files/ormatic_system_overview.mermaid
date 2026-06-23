@@ -1,0 +1,31 @@
+flowchart TB
+    %% Title and Description
+    accTitle: ORMatic High-Level System Overview
+    accDescr: High-level architecture showing Domain Layer, Persistence Layer, and RDBMS
+
+    %% Subgraphs (Clusters)
+    subgraph Domain ["Domain Layer"]
+        direction LR
+        definitions["Domain Definitions (Python Dataclasses)"]
+        data["Domain Objects (Python Objects)"]
+    end
+
+    subgraph Persistence ["Persistence Layer (Generated)"]
+        direction LR
+        interface["Data Access Object Definitions"]
+        instances["Data Access Objects"]
+    end
+
+    %% Database Node
+    db[("RDBMS (Supported by SQLAlchemy)")]
+
+    %% Relationships & Layout Constraints
+    definitions -->|"generate_orm()"| interface
+    data -- "to_dao()" -->instances
+    instances <-->|"SQLAlchemy Session"| db
+
+
+    %% Internal Structure Hints
+    definitions -.->|"Defines structure"| data
+    interface -.->|"Defines structure"| instances
+    instances -- "from_dao()" --> data

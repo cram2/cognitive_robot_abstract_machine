@@ -1,0 +1,41 @@
+import os
+import time
+
+from sqlalchemy.orm import sessionmaker
+
+from experiments.sage_10k.demos import Sage10kSouthwesternStoreDemo
+from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.ormatic.utils import create_engine, drop_database
+from semantic_digital_twin.orm.ormatic_interface import *
+
+
+def main():
+    """
+    Drop the entire Sage10k database and recreate it with one loaded scene in it.
+    Loading this scene from the database is ~ 5 times faster than loading it from the files.
+    """
+    current_time = time.time()
+    print("creating database")
+    engine = create_engine(os.getenv("SAGE10k_DATABASE_URI"))
+    drop_database(engine)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(engine)()
+    print(f"creating the database took {time.time() - current_time:.2f} seconds")
+
+    current_time = time.time()
+    print("loading scene")
+    demo = Sage10kSouthwesternStoreDemo()
+    demo.create_world()
+    print(f"Loading the scene took {time.time() - current_time:.2f} seconds")
+
+    current_time = time.time()
+    print("saving to database")
+    dao = to_dao(demo.world)
+    session.add(dao)
+    session.commit()
+    print(f"Saving to database took {time.time() - current_time:.2f} seconds")
+    print(f"Added world to database with database_id: {dao.database_id}")
+
+
+if __name__ == "__main__":
+    main()

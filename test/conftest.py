@@ -1,3 +1,4 @@
+import gc
 import os
 import threading
 import time
@@ -13,7 +14,7 @@ except ImportError:
     Garmi = None
 
 try:
-    from pycram.datastructures.dataclasses import Context
+    from coraplex.datastructures.dataclasses import Context
 except ModuleNotFoundError:
     # ROS dependencies.
     Context = None
@@ -33,13 +34,19 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.robots.tracy import Tracy
+from semantic_digital_twin.robots.armar7 import Armar7
+from semantic_digital_twin.robots.icub3 import ICub3
+from semantic_digital_twin.robots.justin import Justin
+from semantic_digital_twin.robots.mmp_dresden import MMPDresden
+from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
+
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Table,
@@ -84,10 +91,10 @@ Some basic facts about fixtures:
     * This only works the requesting fixture is scoped less or equal the the requested fixture (function requesting session works)
  * The return/yield value of fixtures is being cached. 
     * In case of worlds this is important since always the same world is returned by a session scoped fixture
-    
+
 General Remarks:
     * Apparently generating the robot semantic view takes some time so it should be done in the session scoped setup
-    
+
 The structure of fixtures in this conftest: 
     * World setup fixtures: 
         These setup a world and return it, they are scoped for a whole session
@@ -107,6 +114,14 @@ The structure of fixtures in this conftest:
         after the test since there is no good method to reset the model after a test has changed it. 
 
 """
+
+
+def pytest_configure(config):
+    worker = os.environ.get("PYTEST_XDIST_WORKER")
+
+    if worker:
+        worker_num = int(worker.removeprefix("gw"))
+        os.environ["ROS_DOMAIN_ID"] = str(100 + worker_num)
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -129,6 +144,7 @@ def cleanup_after_test():
 @pytest.fixture(autouse=True, scope="module")
 def count_worlds():
     yield
+    gc.collect()
     world_in_mem = objgraph.count("World")
     if world_in_mem > 30:
         raise MemoryError(
@@ -139,6 +155,15 @@ def count_worlds():
 #############################################
 ############### Worlds ######################
 #############################################
+
+
+@pytest.fixture()
+def world_with_two_bodies() -> tuple[World, Body, Body]:
+    """A fresh world with an unconnected parent and child body, ready to receive a connection."""
+    world = World()
+    parent = Body(name=PrefixedName("parent"))
+    child = Body(name=PrefixedName("child"))
+    return world, parent, child
 
 
 @pytest.fixture()
@@ -305,6 +330,23 @@ def self_collision_bot_world():
 
 
 @pytest.fixture()
+def supported_abstract_robots():
+    return [
+        PR2,
+        Tiago,
+        Justin,
+        HSRB,
+        Tracy,
+        Stretch,
+        Armar7,
+        ICub3,
+        UnitreeG1,
+        MMPDresden,
+        # Garmi, We dont have the ROS Package yet
+    ]
+
+
+@pytest.fixture()
 def cylinder_bot_diff_world():
     robot_world = World()
     with robot_world.modify_world():
@@ -342,19 +384,19 @@ def cylinder_bot_diff_world():
 
 
 def world_with_urdf_factory(
-    urdf_path: str,
-    robot_semantic_annotation: Type[AbstractRobot] | None,
-    drive_connection_type: Type[OmniDrive | DifferentialDrive],
-    robot_starting_pose: HomogeneousTransformationMatrix | None = None,
-    urdf_path_resolver: PathResolver | None = None,
-    robot_localization_pose: HomogeneousTransformationMatrix | None = None,
+        robot_semantic_annotation: Type[AbstractRobot],
+        drive_connection_type: Type[OmniDrive | DifferentialDrive],
+        robot_starting_pose: HomogeneousTransformationMatrix | None = None,
+        urdf_path_resolver: PathResolver | None = None,
+        robot_localization_pose: HomogeneousTransformationMatrix | None = None,
 ):
     """
     Builds this tree:
     map -> odom_combined -> "urdf tree"
     """
     urdf_parser = URDFParser.from_file(
-        file_path=urdf_path, path_resolver=urdf_path_resolver
+        file_path=robot_semantic_annotation.get_ros_file_path(),
+        path_resolver=urdf_path_resolver,
     )
     world_with_urdf = urdf_parser.parse()
     if robot_semantic_annotation is not None:
@@ -387,33 +429,30 @@ def world_with_urdf_factory(
 
 
 @pytest.fixture(scope="session")
-def pr2_world_setup():
-    urdf_dir = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    return world_with_urdf_factory(urdf_dir, PR2, OmniDrive)
+def _pr2_world_setup():
+    return world_with_urdf_factory(PR2, OmniDrive)
 
 
 @pytest.fixture(scope="function")
-def pr2_world_copy(pr2_world_setup):
-    result = deepcopy(pr2_world_setup)
-    PR2.from_world(result)
+def pr2_world_copy(_pr2_world_setup):
+    result = deepcopy(_pr2_world_setup)
     return result
 
 
 @pytest.fixture(scope="session")
-def hsr_world_setup():
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "pycram",
-        "resources",
-        "robots",
-    )
-    hsr = os.path.join(urdf_dir, "hsrb.urdf")
-    return world_with_urdf_factory(hsr, HSRB, OmniDrive)
+def _hsr_world_setup():
+    return world_with_urdf_factory(HSRB, OmniDrive)
+
+
+@pytest.fixture(scope="function")
+def hsr_world_copy(_hsr_world_setup):
+    result = deepcopy(_hsr_world_setup)
+    HSRB.from_world(result)
+    return result
 
 
 @pytest.fixture(scope="session")
-def garmi_world_setup():
+def _garmi_world_setup():
     if Garmi is None:
         pytest.skip("GARMI semantic annotation not installed")
     urdf_dir = "package://garmi_description/urdf/garmi.urdf"
@@ -427,46 +466,29 @@ def garmi_world_setup():
 def tracy_world():
     if not tracy_installed():
         pytest.skip("Tracy not installed")
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "urdf",
-    )
-    tracy = os.path.join(urdf_dir, "tracy.urdf")
-    tracy_parser = URDFParser.from_file(file_path=tracy)
+    tracy_parser = URDFParser.from_file(file_path=Tracy.get_ros_file_path())
     world_with_tracy = tracy_parser.parse()
     Tracy.from_world(world_with_tracy)
     return world_with_tracy
 
 
 @pytest.fixture(scope="session")
-def stretch_world():
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "pycram",
-        "resources",
-        "robots",
-    )
-    stretch = os.path.join(urdf_dir, "stretch_description.urdf")
-    return world_with_urdf_factory(stretch, Stretch, DifferentialDrive)
+def _stretch_world_setup():
+    return world_with_urdf_factory(Stretch, DifferentialDrive)
 
 
 @pytest.fixture(scope="session")
-def tiago_world():
-    tiago = "package://iai_tiago_description/urdf/tiago_from_our_robot.urdf"
-    return world_with_urdf_factory(tiago, Tiago, DifferentialDrive)
+def _tiago_world_setup():
+    return world_with_urdf_factory(Tiago, DifferentialDrive)
 
 
 @pytest.fixture(scope="session")
-def apartment_world_setup():
+def _apartment_world_setup():
     apartment_world = URDFParser.from_file(
         os.path.join(
             os.path.dirname(__file__),
             "..",
-            "pycram",
+            "coraplex",
             "resources",
             "worlds",
             "apartment.urdf",
@@ -476,7 +498,7 @@ def apartment_world_setup():
         os.path.join(
             os.path.dirname(__file__),
             "..",
-            "pycram",
+            "coraplex",
             "resources",
             "objects",
             "milk.stl",
@@ -486,7 +508,7 @@ def apartment_world_setup():
         os.path.join(
             os.path.dirname(__file__),
             "..",
-            "pycram",
+            "coraplex",
             "resources",
             "objects",
             "breakfast_cereal.stl",
@@ -513,8 +535,29 @@ def apartment_world_setup():
     return apartment_world
 
 
+@pytest.fixture(scope="function")
+def apartment_world_copy(_apartment_world_setup):
+    result = deepcopy(_apartment_world_setup)
+    return result
+
+
+@pytest.fixture(scope="function")
+def apartment_world_pr2_copy_with_context(_apartment_world_setup, _pr2_world_setup):
+    result = deepcopy(_apartment_world_setup)
+    pr2_copy = deepcopy(_pr2_world_setup)
+    result.merge_world(pr2_copy)
+    return (
+        result,
+        result.get_semantic_annotations_by_type(AbstractRobot)[0],
+        Context(
+            result,
+            result.get_semantic_annotations_by_type(AbstractRobot)[0],
+        ),
+    )
+
+
 @pytest.fixture(scope="session")
-def simple_apartment_setup():
+def _simple_apartment_setup():
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName("root"))
@@ -522,28 +565,28 @@ def simple_apartment_setup():
 
         box = Body(
             name=PrefixedName("box"),
-            collision=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
-            visual=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
+            collision=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
+            visual=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
         )
 
         box_2 = Body(
             name=PrefixedName("box_2"),
-            collision=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
-            visual=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
+            collision=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
+            visual=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
         )
 
         box_1_connection = FixedConnection(
             parent=world.root,
             child=box,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                2, 0, 0.5, reference_frame=world.root
+                2, 0, 0.375, reference_frame=world.root
             ),
         )
         box_2_connection = FixedConnection(
             parent=root,
             child=box_2,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                -2, 0, 0.5
+                -2, 0, 0.375
             ),
         )
 
@@ -608,7 +651,7 @@ def simple_apartment_setup():
         os.path.join(
             os.path.dirname(__file__),
             "..",
-            "pycram",
+            "coraplex",
             "resources",
             "objects",
             "milk.stl",
@@ -616,7 +659,7 @@ def simple_apartment_setup():
     ).parse()
     world.merge_world_at_pose(
         milk_world,
-        HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi),
+        HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.02, yaw=np.pi),
     )
     return world
 
@@ -638,15 +681,14 @@ def kitchen_world():
 
 
 @pytest.fixture(scope="session")
-def pr2_apartment_world(pr2_world_setup, apartment_world_setup):
+def pr2_apartment_world(_pr2_world_setup, _apartment_world_setup):
     """
     Builds this tree:
     map -> odom_combined -> pr2 urdf tree
         -> apartment urdf
     """
-    pr2_copy = deepcopy(pr2_world_setup)
-    PR2.from_world(pr2_copy)  # semantic annotations are lost on copy
-    apartment_copy = deepcopy(apartment_world_setup)
+    pr2_copy = deepcopy(_pr2_world_setup)
+    apartment_copy = deepcopy(_apartment_world_setup)
 
     pr2_copy.merge_world(apartment_copy)
     pr2_copy.get_body_by_name("base_footprint").parent_connection.origin = (
@@ -656,19 +698,19 @@ def pr2_apartment_world(pr2_world_setup, apartment_world_setup):
 
 
 @pytest.fixture(scope="session")
-def simple_pr2_world_setup(pr2_world_setup, simple_apartment_setup):
-    apartment_world = deepcopy(simple_apartment_setup)
-    pr2_copy = deepcopy(pr2_world_setup)
+def simple_pr2_world_setup(_pr2_world_setup, _simple_apartment_setup):
+    apartment_world = deepcopy(_simple_apartment_setup)
+    pr2_copy = deepcopy(_pr2_world_setup)
     pr2_copy.merge_world(apartment_world)
-    robot_view = PR2.from_world(pr2_copy)  # semantic annotations are lost on copy
+    robot_view = pr2_copy.get_semantic_annotations_by_type(PR2)[0]
     return pr2_copy, robot_view, Context(pr2_copy, robot_view)
 
 
 @pytest.fixture(scope="session")
-def hsr_apartment_world(hsr_world_setup, apartment_world_setup):
-    apartment_copy = deepcopy(apartment_world_setup)
-    hsr_copy = deepcopy(hsr_world_setup)
-    robot_view = HSRB.from_world(hsr_copy)
+def hsr_apartment_world(_hsr_world_setup, _apartment_world_setup):
+    apartment_copy = deepcopy(_apartment_world_setup)
+    hsr_copy = deepcopy(_hsr_world_setup)
+    robot_view = hsr_copy.get_semantic_annotations_by_type(HSRB)[0]
 
     apartment_copy.merge_world_at_pose(
         hsr_copy, HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
@@ -678,9 +720,9 @@ def hsr_apartment_world(hsr_world_setup, apartment_world_setup):
 
 
 @pytest.fixture(scope="session")
-def stretch_apartment_world(stretch_world_setup, apartment_world_setup):
-    apartment_copy = deepcopy(apartment_world_setup)
-    stretch_copy = deepcopy(stretch_world_setup)
+def stretch_apartment_world(_stretch_world_setup, _apartment_world_setup):
+    apartment_copy = deepcopy(_apartment_world_setup)
+    stretch_copy = deepcopy(_stretch_world_setup)
 
     apartment_copy.merge_world_at_pose(
         stretch_copy, HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
@@ -690,9 +732,9 @@ def stretch_apartment_world(stretch_world_setup, apartment_world_setup):
 
 
 @pytest.fixture(scope="session")
-def tiago_apartment_world(tiago_world, apartment_world_setup):
-    apartment_copy = deepcopy(apartment_world_setup)
-    tiago_copy = deepcopy(tiago_world)
+def tiago_apartment_world(_tiago_world_setup, _apartment_world_setup):
+    apartment_copy = deepcopy(_apartment_world_setup)
+    tiago_copy = deepcopy(_tiago_world_setup)
     apartment_copy.merge_world(tiago_copy)
 
     return apartment_copy, Tiago.from_world(apartment_copy)
@@ -704,9 +746,8 @@ def tiago_apartment_world(tiago_world, apartment_world_setup):
 
 
 @pytest.fixture
-def pr2_world_state_reset(pr2_world_setup):
-    world = deepcopy(pr2_world_setup)
-    PR2.from_world(world)  # semantic annotations are lost on copy
+def pr2_world_state_reset(_pr2_world_setup):
+    world = deepcopy(_pr2_world_setup)
     state = world.state._data.copy()
     yield world
     world.state._data[:] = state
@@ -716,7 +757,6 @@ def pr2_world_state_reset(pr2_world_setup):
 def pr2_apartment_state_reset(pr2_apartment_world):
     world = deepcopy(pr2_apartment_world)
     state = deepcopy(world.state._data)
-    PR2.from_world(world)
     yield world
     world.state._data = state
 

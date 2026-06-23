@@ -45,7 +45,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     SelfCollisionMatrixRule,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -104,9 +104,6 @@ class SelfCollisionMatrixInterface:
         self.world = World()
         with self.world.modify_world():
             self.world.add_body(Body(name=PrefixedName("map")))
-        VizMarkerPublisher(
-            _world=self.world, node=rospy.node, shape_source=ShapeSource.COLLISION_ONLY
-        ).with_tf_publisher()
 
     def load_urdf(self, urdf_path: str):
         robot_world = URDFParser.from_file(urdf_path).parse()
@@ -118,6 +115,9 @@ class SelfCollisionMatrixInterface:
                 robot_world, FixedConnection(parent=map, child=robot_world.root)
             )
         self.robot = MinimalRobot.from_world(self.world)
+        VizMarkerPublisher(
+            _world=self.world, node=rospy.node, shape_source=ShapeSource.COLLISION_ONLY
+        ).with_tf_publisher()
 
     def dye_all_bodies_white_transparent(self):
         with self.world.modify_world():

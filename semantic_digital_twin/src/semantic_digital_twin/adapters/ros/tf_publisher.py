@@ -21,7 +21,7 @@ from semantic_digital_twin.callbacks.callback import (
     StateChangeCallback,
     ModelChangeCallback,
 )
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -60,7 +60,7 @@ class TfPublisherModelCallback(ModelChangeCallback):
     compiled_tf: CompiledFunction = field(init=False)
     """Compiled function for evaluating the tf expressions."""
 
-    def _notify(self, **kwargs):
+    def on_model_change(self, **kwargs):
         self.update_connections_to_expression()
         self.compile_tf_expression()
         self.init_tf_message()
@@ -158,8 +158,8 @@ class TFPublisher(StateChangeCallback):
             _world=self._world,
             ignored_kinematic_structure_entities=self.ignored_kinematic_structure_entities,
         )
-        self.tf_model_cb.notify()
-        self._notify()
+        self.tf_model_cb.notify_model_change()
+        self.on_state_change()
 
     @classmethod
     def create_with_ignore_robot(cls, robot: AbstractRobot, node: Node) -> Self:
@@ -203,7 +203,7 @@ class TFPublisher(StateChangeCallback):
             ignored_kinematic_structure_entities=ignored_bodies,
         )
 
-    def _notify(self, **kwargs):
+    def on_state_change(self, **kwargs):
         if self._world.state.version % self.throttle_state_updates != 0:
             return
         self.tf_model_cb.update_tf_message()

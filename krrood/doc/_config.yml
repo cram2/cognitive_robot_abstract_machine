@@ -26,6 +26,7 @@ sphinx:
     - autoapi.extension  # Add the AutoAPI extension
     - 'sphinx.ext.autodoc'
     - sphinxcontrib.plantuml
+    - sphinxcontrib.mermaid
   config:
     bibtex_bibfiles:
       - references.bib

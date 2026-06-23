@@ -429,7 +429,11 @@ class MJCFParser:
                 joint_dynamics = JointDynamics(
                     armature=mujoco_joint.armature,
                     dry_friction=mujoco_joint.frictionloss,
-                    damping=mujoco_joint.damping,
+                    damping=(
+                        mujoco_joint.damping
+                        if mujoco.mj_version() < 3007000
+                        else mujoco_joint.damping[0]
+                    ),
                 )
                 if mujoco_joint.type == mujoco.mjtJoint.mjJNT_HINGE:
                     connection = RevoluteConnection(
@@ -439,7 +443,7 @@ class MJCFParser:
                         parent_T_connection_expression=parent_body_to_joint_transform,
                         connection_T_child_expression=joint_to_child_body_transform,
                         axis=joint_axis,
-                        dof_id=dof.id,
+                        raw_dof=dof,
                         dynamics=joint_dynamics,
                     )
                 elif mujoco_joint.type == mujoco.mjtJoint.mjJNT_SLIDE:
@@ -450,7 +454,7 @@ class MJCFParser:
                         parent_T_connection_expression=parent_body_to_joint_transform,
                         connection_T_child_expression=joint_to_child_body_transform,
                         axis=joint_axis,
-                        dof_id=dof.id,
+                        raw_dof=dof,
                         dynamics=joint_dynamics,
                     )
                 else:
@@ -459,7 +463,11 @@ class MJCFParser:
                     )
                 connection.simulator_additional_properties.append(
                     MujocoJoint(
-                        stiffness=mujoco_joint.stiffness,
+                        stiffness=(
+                            [mujoco_joint.stiffness]
+                            if mujoco.mj_version() < 3007000
+                            else mujoco_joint.stiffness.tolist()
+                        ),
                         actuator_force_range=mujoco_joint.actfrcrange.tolist(),
                     )
                 )
@@ -668,7 +676,11 @@ class MJCFParser:
                     actuator_force_limited=tendon.actfrclimited,
                     actuator_force_range=tendon.actfrcrange.tolist(),
                     armature=tendon.armature,
-                    damping=tendon.damping,
+                    damping=(
+                        [tendon.damping]
+                        if mujoco.mj_version() < 3007000
+                        else tendon.damping.tolist()
+                    ),
                     frictionloss=tendon.frictionloss,
                     group=tendon.group,
                     limited=tendon.limited,
@@ -681,7 +693,11 @@ class MJCFParser:
                     solver_reference_friction=tendon.solref_friction.tolist(),
                     solver_reference_limit=tendon.solref_limit.tolist(),
                     spring_length=tendon.springlength.tolist(),
-                    stiffness=tendon.stiffness,
+                    stiffness=(
+                        [tendon.stiffness]
+                        if mujoco.mj_version() < 3007000
+                        else tendon.stiffness.tolist()
+                    ),
                     width=tendon.width,
                     joints=joints,
                 )

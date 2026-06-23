@@ -13,10 +13,13 @@ parts:
         - file: examples/loading_worlds
         - file: examples/visualizing_worlds
         - file: examples/world_structure_manipulation
-        - file: examples/semantic_annotations
+        - file: examples/semantic_annotations_overview
+          sections:
+            - file: examples/semantic_annotations
+            - file: examples/semantic_annotation_part_whole
+            - file: examples/semantic_annotation_factories
         - file: examples/world_state_manipulation
         - file: examples/regions
-        - file: examples/semantic_annotation_factories
         - file: examples/persistence_of_annotated_worlds
         - file: examples/graph_of_convex_sets
         - file: examples/physics_simulators

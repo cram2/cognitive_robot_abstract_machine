@@ -1,4 +1,5 @@
 rustworkx
+nltk
 numpy
 trimesh>=4.11.1
 typing_extensions
@@ -6,7 +7,6 @@ urdf-parser-py
 matplotlib
 casadi~=3.7.0
 hypothesis
-pytest
 scipy
 sqlacodegen
 pytest-order

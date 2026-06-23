@@ -4,7 +4,10 @@ import random_events.interval
 from random_events.interval import closed, singleton
 
 from probabilistic_model.distributions.gaussian import GaussianDistribution
-from probabilistic_model.distributions.distributions import DiracDeltaDistribution
+from probabilistic_model.distributions.distributions import (
+    DiracDeltaDistribution,
+    IntegerDistribution,
+)
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
 from probabilistic_model.utils import MissingDict
@@ -321,6 +324,60 @@ def test_subset_of_integer_variables_expectation():
     y_dist = make_dirac(y_var, 0)
     subcircuit_root.add_subcircuit(leaf(y_dist, circuit))
     assert circuit.expectation([x_var])[x_var] == 0
+
+
+class MixedLeafTruncationTestCase(unittest.TestCase):
+    """
+    Truncation over a composite event must work for circuits with mixed
+    (continuous + discrete) leaves.
+    """
+
+    x = Continuous("x")
+    n = Integer("n")
+
+    def build_mixed_circuit(self) -> ProbabilisticCircuit:
+        circuit = ProbabilisticCircuit()
+        root = SumUnit(probabilistic_circuit=circuit)
+
+        first_component = ProductUnit(probabilistic_circuit=circuit)
+        first_component.add_subcircuit(
+            leaf(UniformDistribution(closed(0.0, 1.0).simple_sets[0], variable=self.x), circuit)
+        )
+        first_component.add_subcircuit(
+            leaf(IntegerDistribution(variable=self.n,
+                                     probabilities=MissingDict(float, {0: 0.5, 1: 0.3, 2: 0.2})), circuit)
+        )
+        root.add_subcircuit(first_component, np.log(0.6))
+
+        second_component = ProductUnit(probabilistic_circuit=circuit)
+        second_component.add_subcircuit(
+            leaf(UniformDistribution(closed(0.5, 2.0).simple_sets[0], variable=self.x), circuit)
+        )
+        second_component.add_subcircuit(
+            leaf(IntegerDistribution(variable=self.n,
+                                     probabilities=MissingDict(float, {1: 0.4, 2: 0.4, 3: 0.2})), circuit)
+        )
+        root.add_subcircuit(second_component, np.log(0.4))
+        return circuit
+
+    def composite_event(self) -> Event:
+        return (
+            SimpleEvent.from_data({self.x: closed(0.0, 0.7), self.n: closed(0, 1)}).as_composite_set()
+            | SimpleEvent.from_data({self.x: closed(1.0, 1.8), self.n: closed(2, 3)}).as_composite_set()
+        )
+
+    def test_truncation_log_probability_matches_event_probability(self):
+        circuit = self.build_mixed_circuit()
+        event = self.composite_event()
+        expected_probability = circuit.probability(event)
+        _, log_probability = circuit.log_truncated(event)
+        self.assertAlmostEqual(np.exp(log_probability), expected_probability, places=9)
+
+    def test_truncated_circuit_places_all_mass_inside_event(self):
+        circuit = self.build_mixed_circuit()
+        event = self.composite_event()
+        truncated, _ = circuit.log_truncated(event)
+        self.assertAlmostEqual(truncated.probability(event), 1.0, places=9)
 
 
 if __name__ == "__main__":

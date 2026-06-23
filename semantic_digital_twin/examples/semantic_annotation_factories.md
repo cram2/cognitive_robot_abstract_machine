@@ -58,7 +58,7 @@ with world.modify_world():
         world=world,
         scale=Scale(0.05, 0.1, 0.02)
     )
-    drawer.add_handle(handle)
+    drawer.add(handle)
 
 print(*world.semantic_annotations, sep="\n")
 rt = RayTracer(world)

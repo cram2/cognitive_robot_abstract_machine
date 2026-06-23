@@ -1,0 +1,12 @@
+import os
+import sys
+if "coraplex" in os.path.abspath(os.getcwd()):
+    from coraplex.designators.action_designator import *
+    from coraplex.designators.motion_designator import *
+    from coraplex.designators.location_designator import *
+    from coraplex.designators.object_designator import *
+    from coraplex.datastructures.pose import Pose
+    from coraplex.worlds.bullet_world import BulletWorld
+    from coraplex.process_module import simulated_robot, real_robot
+    from coraplex.world_concepts.world_object import Object
+    from pycrap.ontologies import Robot, Apartment, Milk

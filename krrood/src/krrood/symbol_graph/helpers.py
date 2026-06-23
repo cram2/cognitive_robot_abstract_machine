@@ -2,8 +2,10 @@ from dataclasses import is_dataclass, fields
 
 from typing_extensions import Optional, Any, Type
 
+from krrood.symbolic_math.symbolic_math import Scalar as SymbolicScalar
 from krrood.class_diagrams.class_diagram import WrappedClass, ParseError
-from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
+from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram, CouldNotResolveType
+from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 
@@ -14,9 +16,25 @@ def get_field_type_endpoint(owner_class: Type, field_name: str) -> Optional[Type
     :param field_name: The name of the field.
     :return: The type of the field from the class diagram.
     """
+    if owner_class is None:
+        return None
     wrapped_field = get_wrapped_field(owner_class, field_name)
     if wrapped_field is None:
-        return None
+        prop = owner_class.__dict__.get(field_name)
+        if not isinstance(prop, property) or prop.fget is None:
+            return None
+        try:
+            return_type = get_type_hints_of_object(prop.fget).get("return")
+        except CouldNotResolveType:
+            return None
+        if return_type is None:
+            return None
+
+        if return_type is SymbolicScalar or (
+            isinstance(return_type, type) and issubclass(return_type, SymbolicScalar)
+        ):
+            return float
+        return return_type
     try:
         return wrapped_field.type_endpoint
     except (AttributeError, RuntimeError):

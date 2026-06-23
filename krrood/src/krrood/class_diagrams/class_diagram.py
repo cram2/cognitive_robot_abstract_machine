@@ -12,7 +12,7 @@ from typing import _GenericAlias
 import rustworkx as rx
 from typing_extensions import get_args, get_origin
 
-from krrood.utils import module_and_class_name, memoize
+from krrood.utils import module_and_class_name, memoize, get_generic_type_params
 
 try:
     from krrood.rustworkx_utils import RWXNode
@@ -37,13 +37,19 @@ from krrood.class_diagrams.attribute_introspector import (
     AttributeIntrospector,
     DataclassOnlyIntrospector,
 )
-from krrood.class_diagrams.utils import Role, get_generic_type_param, resolve_type
+from krrood.class_diagrams.utils import Role, resolve_type
 from krrood.class_diagrams.wrapped_field import WrappedField
 
-from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
+from krrood.class_diagrams.exceptions import (
+    ClassIsUnMappedInClassDiagram,
+    CouldNotResolveType,
+)
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.predicate import PropertyDescriptor
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -94,9 +100,9 @@ class Association(ClassRelation):
     """The field in the source class that creates this association with the target class."""
 
     @cached_property
-    def one_to_many(self) -> bool:
+    def many_to_many(self) -> bool:
         """Whether the association is one-to-many (True) or many-to-one (False)."""
-        return self.field.is_one_to_many_relationship and not self.field.is_type_type
+        return self.field.is_many_to_many_relationship and not self.field.is_type_type
 
     def get_key(self, include_field_name: bool = False) -> tuple:
         """
@@ -640,7 +646,7 @@ class ClassDiagram:
                     is_role_subclass = False
 
                 if wrapped_field.is_role_taker and is_role_subclass:
-                    role_taker_type = get_generic_type_param(actual_cls, Role)[0]
+                    role_taker_type = get_generic_type_params(actual_cls, Role)[0]
                     if role_taker_type is target_type:
                         association_type = HasRoleTaker
 
@@ -762,11 +768,14 @@ class ClassDiagram:
         """
         # Phase 1: Collect all unique specialized generic types referenced in fields
         to_process = set()
-        [
-            to_process.add(wrapped_field.type_endpoint)
-            for wrapped_class in self.wrapped_classes
-            for wrapped_field in wrapped_class.fields
-        ]
+
+        for wrapped_class in self.wrapped_classes:
+            for wrapped_field in wrapped_class.fields:
+                try:
+                    to_process.add(wrapped_field.type_endpoint)
+                except CouldNotResolveType as e:
+                    logger.warning(e)
+                    continue
 
         # Phase 2: Add nodes for discovered types that do not already exists
         while to_process:
