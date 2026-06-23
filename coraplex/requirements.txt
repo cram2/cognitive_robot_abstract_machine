@@ -16,3 +16,5 @@ rustworkx
 pillow
 polytope # needed for random events
 semantic_digital_twin
+trimesh
+cgal

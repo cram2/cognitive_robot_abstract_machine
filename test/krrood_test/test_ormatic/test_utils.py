@@ -1,7 +1,7 @@
 import pytest
 from krrood.ormatic.exceptions import UnsupportedColumnType
 from krrood.ormatic.utils import get_python_type_from_sqlalchemy_column
-from krrood.utils import inheritance_path_length
+from krrood.inheritance_path_length import inheritance_path_length
 from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.world_description.world_entity import Body
 

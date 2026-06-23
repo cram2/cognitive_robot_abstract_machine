@@ -46,7 +46,7 @@
 - Reduce nesting and reduce complexity:
   - The main branch of a function should hold the main output with the biggest compute; alternative outputs should be realized via guard clauses beforehand
   - When dealing with nested if statements and branching methods, use guard clauses to reduce nesting by inverting conditions and returning early
-- Avoid being too careful and overusing try-except blocks
+- Dont use try except blocks, programs in illegal states should raise appropriate exceptions.
 - Instead of passing around strings, use enums instead
 
 ## Type Hints
@@ -54,10 +54,11 @@
 
 ## Documentation
 - Classes and methods should always have meaningful, non-trivial documentation
+- Every field/attribute must be documented with its own docstring placed directly below the field, not described in the class docstring
 - Write docstrings in ReStructuredText format
 - Write docstrings that explain what the function does and not how it does it
 - Keep docstrings short and concise
-- Use Sphinx tags (for example `..note::`, `..warning::`, and `:func:`) where appropriate
+- Use Sphinx directives (for example `..note::`, `..warning::`, and `:func:`) where appropriate
 - Do not create type information for docstrings (type hints already convey this)
 
 ## Domain-Specific Conventions

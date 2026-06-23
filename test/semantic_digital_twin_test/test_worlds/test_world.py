@@ -1042,7 +1042,7 @@ def test_overwrite_dof_limits_mimic(world_setup):
             offset=23,
             multiplier=-2,
             axis=Vector3(0, 0, 1),
-            dof_id=connection.dof_id,
+            raw_dof=connection.raw_dof,
         )
         world.add_body(body)
         world.add_connection(mimic_connection)
@@ -1212,7 +1212,7 @@ def test_world_state_trajectory(world_setup, tmp_path):
     time = 1337.0
 
     connection: PrismaticConnection = world.get_connection(r1, r2)
-    dof_uuid = connection.dof_id
+    dof_uuid = connection.dof.id
 
     traj = WorldStateTrajectory.from_world_state(world.state, time)
     cmd = np.array([100.0, 0, 0, 0, 0, 0, 0, 0])
@@ -1441,7 +1441,7 @@ def test_move_branch_preserves_active_connection(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     old_connection = r2.parent_connection
     assert isinstance(old_connection, RevoluteConnection)
-    old_dof_id = old_connection.dof_id
+    old_dof_id = old_connection.dof.id
     old_pose = r2.global_transform
 
     with world.modify_world():
@@ -1449,7 +1449,7 @@ def test_move_branch_preserves_active_connection(world_setup):
 
     assert r2.parent_kinematic_structure_entity == bf
     assert isinstance(r2.parent_connection, RevoluteConnection)
-    assert r2.parent_connection.dof_id == old_dof_id
+    assert r2.parent_connection.dof.id == old_dof_id
     assert np.allclose(r2.global_transform, old_pose)
 
 

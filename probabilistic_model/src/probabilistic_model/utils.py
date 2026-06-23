@@ -16,6 +16,33 @@ from random_events.product_algebra import Event
 from random_events.variable import Variable, Continuous
 
 
+def logsumexp(values, axis=None):
+    """
+    Numerically stable logarithm of a sum of exponentials.
+
+    This is a lightweight drop-in for :func:`scipy.special.logsumexp` covering the
+    cases used in the probabilistic circuit inference loops (a list or array reduced
+    over ``axis``, or a one-dimensional array reduced over everything). scipy's
+    implementation carries large per-call dispatch overhead that dominates those
+    loops, where this function is called once per sum unit per query.
+
+    :param values: The values to reduce. May be a list of scalars or arrays.
+    :param axis: The axis to reduce over, or ``None`` to reduce over all entries.
+    :return: ``log(sum(exp(values)))`` reduced over ``axis``.
+    """
+    values = np.asarray(values, dtype=float)
+    maximum = np.amax(values, axis=axis, keepdims=True)
+    # avoid NaN when a whole reduction is -inf (or +inf): subtract 0.0 instead
+    maximum = np.where(np.isfinite(maximum), maximum, 0.0)
+    with np.errstate(divide="ignore"):
+        result = (
+            np.log(np.sum(np.exp(values - maximum), axis=axis, keepdims=True)) + maximum
+        )
+    if axis is None:
+        return result.reshape(())[()]
+    return np.squeeze(result, axis=axis)
+
+
 def simple_interval_as_array(interval: SimpleInterval) -> np.ndarray:
     """
     Convert a simple interval to a numpy array.

@@ -765,7 +765,7 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
 
 
 @dataclass(eq=False)
-class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):
+class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer, ABC):
     """
     Represents a connection between two entities in the world.
     """
@@ -938,41 +938,37 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):
         return Matrix.vstack([position, orientation]).T
 
     @property
-    def dofs(self) -> Set[DegreeOfFreedom]:
+    def dofs(self) -> list[DegreeOfFreedom]:
         """
-        Returns the degrees of freedom associated with this connection.
+        Returns the degrees of freedom associated with this connection, active ones first.
         """
-        dofs = set()
-
-        if hasattr(self, "active_dofs"):
-            dofs.update(set(self.active_dofs))
-        if hasattr(self, "passive_dofs"):
-            dofs.update(set(self.passive_dofs))
-
-        return dofs
+        return self.active_dofs + self.passive_dofs
 
     @classmethod
+    @abstractmethod
     def create_with_dofs(
         cls,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
+        *,
         name: Optional[PrefixedName] = None,
-        *args,
-        **kwargs,
+        parent_T_connection_expression: Optional[
+            HomogeneousTransformationMatrix
+        ] = None,
+        connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
     ) -> Self:
         """
-        This method will automatically generate the degrees of freedom for this connection into the given world
-        and initialize the connection with the generated dofs.
+        Generates the degrees of freedom for this connection into the given world and initializes the
+        connection with them.
+
         :param world: Reference to the world where the dofs should be added.
-        :param parent: parent of the connection.
-        :param child: child of the connection.
-        :param name: name of the connection.
-        :param args: additional arguments the subclass might need
-        :param kwargs: additional keyword arguments the subclass might need
-        :return:
+        :param parent: Parent of the connection.
+        :param child: Child of the connection.
+        :param name: Name of the connection. If ``None``, a default is generated from parent and child.
+        :param parent_T_connection_expression: Constant pose of the connection relative to its parent.
+        :param connection_T_child_expression: Constant pose of the child relative to the connection.
         """
-        raise NotImplementedError(f"{cls}.create_with_dofs is not implemented.")
 
     def _find_references_in_world(self, world: World) -> Tuple[
         KinematicStructureEntity,

@@ -4,7 +4,7 @@ from typing import Type, Any, Iterator, Tuple
 
 from typing_extensions import Dict
 
-from krrood.utils import inheritance_path_length
+from krrood.inheritance_path_length import inheritance_path_length
 
 
 @dataclass

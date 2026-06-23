@@ -61,19 +61,23 @@ def tracy_block_world(tracy_world):
 
     with tracy_world.modify_world():
         box1_connection = Connection6DoF.create_with_dofs(
-            tracy_world,
-            tracy_world.root,
-            box1,
-            PrefixedName("box1_connection"),
-            HomogeneousTransformationMatrix.from_xyz_rpy(0.8, 0.5, 0.93),
+            world=tracy_world,
+            parent=tracy_world.root,
+            child=box1,
+            name=PrefixedName("box1_connection"),
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                0.8, 0.5, 0.93
+            ),
         )
 
         box2_connection = Connection6DoF.create_with_dofs(
-            tracy_world,
-            tracy_world.root,
-            box2,
-            PrefixedName("box2_connection"),
-            HomogeneousTransformationMatrix.from_xyz_rpy(0.8, -0.5, 0.93),
+            world=tracy_world,
+            parent=tracy_world.root,
+            child=box2,
+            name=PrefixedName("box2_connection"),
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                0.8, -0.5, 0.93
+            ),
         )
         tracy_world.add_connection(box1_connection)
         tracy_world.add_connection(box2_connection)

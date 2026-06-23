@@ -7,6 +7,9 @@ from typing_extensions import Dict, Any
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from semantic_digital_twin.world_description.world_entity import WorldEntityWithID
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
@@ -187,15 +190,18 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> DegreeOfFreedom:
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
         uuid = from_json(data["id"])
         lower_limits = from_json(data["lower_limits"], **kwargs)
         upper_limits = from_json(data["upper_limits"], **kwargs)
-        return cls(
+        self = cls(
             name=from_json(data["name"]),
             limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
             id=uuid,
             has_hardware_interface=data["has_hardware_interface"],
         )
+        tracker.add_world_entity_with_id(self)
+        return self
 
     def __deepcopy__(self, memo):
         result = DegreeOfFreedom(

@@ -158,6 +158,15 @@ def count_worlds():
 
 
 @pytest.fixture()
+def world_with_two_bodies() -> tuple[World, Body, Body]:
+    """A fresh world with an unconnected parent and child body, ready to receive a connection."""
+    world = World()
+    parent = Body(name=PrefixedName("parent"))
+    child = Body(name=PrefixedName("child"))
+    return world, parent, child
+
+
+@pytest.fixture()
 def cylinder_bot_world():
     robot_world = World()
     with robot_world.modify_world():

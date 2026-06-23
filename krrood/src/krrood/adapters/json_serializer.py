@@ -27,8 +27,8 @@ from krrood.singleton import SingletonMeta
 from krrood.utils import (
     get_full_class_name,
     recursive_subclasses,
-    inheritance_path_length,
 )
+from krrood.inheritance_path_length import inheritance_path_length
 
 list_like_classes = (
     list,
