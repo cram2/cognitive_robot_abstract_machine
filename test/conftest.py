@@ -474,10 +474,7 @@ def tracy_world():
 
 @pytest.fixture(scope="session")
 def _stretch_world_setup():
-    try:
-        return world_with_urdf_factory(Stretch, DifferentialDrive)
-    except (ParsingError, FileNotFoundError) as error:
-        pytest.skip(f"Stretch URDF not available: {error}")
+    return world_with_urdf_factory(Stretch, DifferentialDrive)
 
 
 @pytest.fixture(scope="session")
