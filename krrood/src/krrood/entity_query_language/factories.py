@@ -696,5 +696,11 @@ def is_class(obj: Any) -> bool:
 
 
 @symbolic_function
-def type_(obj: Any) -> Type:
-    return obj.__class__
+def type_(obj: Any):
+    """
+    Determines the type of the given object.
+
+    :param obj: The object whose type is to be determined.
+    :return: The type of the given object.
+    """
+    return type(obj)
