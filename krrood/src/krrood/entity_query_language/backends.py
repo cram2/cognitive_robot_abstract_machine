@@ -149,7 +149,9 @@ class EntityQueryLanguageBackend(SelectiveBackend):
         if isinstance(
             attribute_match.assigned_value, type(Ellipsis)
         ) and not issubclass(attribute_match.assigned_variable._type_, enum.Enum):
-            raise UnderspecifiedStatementInfeasibleForEQLGeneration(attribute_match)
+            raise UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
+                attribute_match
+            )
 
     def _convert_attribute_match_to_variable(self, attribute_match: AttributeMatch):
         """
@@ -211,6 +213,7 @@ class ProbabilisticBackend(GenerativeBackend):
     number_of_samples: int = field(kw_only=True, default=50)
     """
     The number of samples to generate.
+    This is only used if the query does not specify a limit.
     """
 
     def _evaluate(self, expression: Match[T]) -> Iterable[T]:
@@ -220,26 +223,43 @@ class ProbabilisticBackend(GenerativeBackend):
 
         model = self.model_registry.get_model(parameters)
 
-        # apply conditions from the parameters
-        conditioned, _ = model.conditional(parameters.assignments_for_conditioning)
+        # apply conditions from literal assignments to underspecified variables
+        conditioned, _ = model.conditional(
+            parameters.conditioning_assignments_from_literal_values
+        )
 
         if conditioned is None:
             raise NoSolutionFound(expression.expression)
 
         # apply conditions from the where statements
-        if parameters.truncation_event:
-            truncated, _ = conditioned.truncated(parameters.truncation_event)
-
-            if truncated is None:
-                raise NoSolutionFound(expression.expression)
+        if parameters.truncation_assignments_from_where_conditions:
+            truncated, _ = conditioned.truncated(
+                parameters.truncation_assignments_from_where_conditions
+            )
         else:
             truncated = conditioned
 
-        samples = truncated.sample(self.number_of_samples)
+        # apply conditions from variable assignments to underspecified variables
+        if parameters.truncation_assignments_from_krrood_variables:
+            complete_event = parameters.truncation_assignments_from_krrood_variables[0]
+            complete_event.fill_missing_variables(parameters.variables.values())
+            for event in parameters.truncation_assignments_from_krrood_variables[1:]:
+                complete_event = complete_event.intersection_with(event)
+            truncated, _ = conditioned.truncated(complete_event, singleton_allowed=True)
+
+            if truncated is None:
+                raise NoSolutionFound(expression.expression)
+
+        number_of_samples = expression.expression._limit_ or self.number_of_samples
+
+        # sample and sort by log likelihood
+        samples = truncated.sample(number_of_samples)
+        log_likelihoods = truncated.log_likelihood(samples)
+        samples = samples[log_likelihoods.argsort()[::-1]]
 
         # create new objects with the values from the samples
         for sample in samples:
-            instance = parameters.create_instance_from_variables_and_sample(
+            instance = parameters.construct_instance_from_model_sample(
                 truncated.variables, sample
             )
             yield instance

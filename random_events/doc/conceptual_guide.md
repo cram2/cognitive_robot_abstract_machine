@@ -442,7 +442,7 @@ Now this already sounds somewhat useful.
 However, just the events are of limited use. 
 The real power of the product algebra comes when you start to calculate probabilities of events.
 For this, 
-you can check out this tutorial on [probability theory](https://probabilistic-model.readthedocs.io/en/latest/examples/probability_theory.html).
+you can check out this tutorial on [probability theory](https://cram2.github.io/cognitive_robot_abstract_machine/probabilistic_model/probability_theory.html).
 
 ```{bibliography}
 ```

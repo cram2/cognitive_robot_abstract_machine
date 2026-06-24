@@ -12,10 +12,12 @@ from krrood.adapters.json_serializer import (
     shallow_diff_json,
     JSONAttributeDiff,
     list_like_classes,
+    JSONData,
 )
 from semantic_digital_twin.exceptions import (
     MissingWorldModificationContextError,
     MismatchingIDsInWorldModification,
+    WorldEntityWithIDNotFoundError,
 )
 from semantic_digital_twin.world_description.world_entity import (
     WorldEntityWithID,
@@ -74,7 +76,27 @@ class WorldModification(ABC):
 
 
 @dataclass
-class AddKinematicStructureEntityModification(WorldModification):
+class WorldModificationWithWorldEntityReference(WorldModification, ABC):
+    """
+    An abstract base class representing a modification to the world which may be synchronized, and which contains a
+     reference to an entity in the world, as those cases may sometimes be treated differently (see World.__deepcopy__).
+    """
+
+    @abstractmethod
+    def update_reference_for_world(self, world: World) -> Self:
+        """
+        Update the reference to the entity in the world to point to the corresponding entity in the given world. This is used
+        when applying modifications to a copied world, to ensure that the references in the modifications point to the entities
+        in the copied world rather than the original world.
+
+        :param world: The world to update the reference for.
+        """
+
+
+@dataclass
+class AddKinematicStructureEntityModification(
+    WorldModificationWithWorldEntityReference
+):
     """
     Addition of a body to the world.
     """
@@ -110,6 +132,9 @@ class AddKinematicStructureEntityModification(WorldModification):
             )
         world.add_kinematic_structure_entity(self.kinematic_structure_entity)
 
+    def update_reference_for_world(self, world: World) -> Self:
+        return self.__class__(self.kinematic_structure_entity.copy_for_world(world))
+
 
 @dataclass
 class RemoveKinematicStructureEntityModification(WorldModification):
@@ -133,7 +158,7 @@ class RemoveKinematicStructureEntityModification(WorldModification):
 
 
 @dataclass
-class AddConnectionModification(WorldModification):
+class AddConnectionModification(WorldModificationWithWorldEntityReference):
     """
     Addition of a connection to the world.
     """
@@ -166,6 +191,9 @@ class AddConnectionModification(WorldModification):
             )
         world.add_connection(self.connection.copy_for_world(world))
 
+    def update_reference_for_world(self, world: World) -> Self:
+        return self.__class__(self.connection.copy_for_world(world))
+
 
 @dataclass
 class RemoveConnectionModification(WorldModification):
@@ -194,7 +222,7 @@ class RemoveConnectionModification(WorldModification):
 
 
 @dataclass
-class AddDegreeOfFreedomModification(WorldModification):
+class AddDegreeOfFreedomModification(WorldModificationWithWorldEntityReference):
     """
     Addition of a degree of freedom to the world.
     """
@@ -222,6 +250,9 @@ class AddDegreeOfFreedomModification(WorldModification):
             )
         world.add_degree_of_freedom(self.degree_of_freedom)
 
+    def update_reference_for_world(self, world: World) -> Self:
+        return self.__class__(self.degree_of_freedom.copy_for_world(world))
+
 
 @dataclass
 class RemoveDegreeOfFreedomModification(WorldModification):
@@ -238,7 +269,7 @@ class RemoveDegreeOfFreedomModification(WorldModification):
 
 @dataclass
 class AddSemanticAnnotationModification(WorldModification, SubclassJSONSerializer):
-    semantic_annotation_json: Dict[str, Any]
+    semantic_annotation_json: JSONData
 
     @classmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]):
@@ -282,7 +313,7 @@ class RemoveSemanticAnnotationModification(WorldModification):
 
 
 @dataclass
-class AddActuatorModification(WorldModification):
+class AddActuatorModification(WorldModificationWithWorldEntityReference):
     actuator: Actuator
 
     original_actuator_id: Optional[UUID] = field(default=None)
@@ -303,6 +334,9 @@ class AddActuatorModification(WorldModification):
             )
 
         world.add_actuator(self.actuator)
+
+    def update_reference_for_world(self, world: World) -> Self:
+        return self.__class__(self.actuator.copy_for_world(world))
 
 
 @dataclass
@@ -330,6 +364,20 @@ class WorldModelModificationBlock:
 
     def apply(self, world: World):
         for modification in self.modifications:
+            modification.apply(world)
+
+    def update_references_for_world_and_apply(self, world: World):
+        """
+        Update the references in the modifications to point to the corresponding entities in the given world, and
+        then apply the modifications to the world. This is used when applying modifications to a copied world, to
+        ensure that the references in the modifications point to the entities in the copied world rather than the original world.
+
+        :param world: The world to update the references for.
+        """
+        for modification in self.modifications:
+            if isinstance(modification, WorldModificationWithWorldEntityReference):
+                modification = modification.update_reference_for_world(world)
+
             modification.apply(world)
 
     @classmethod
@@ -392,7 +440,7 @@ class SetDofHasHardwareInterface(WorldModification):
 
 
 @dataclass
-class AttributeUpdateModification(WorldModification):
+class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
     """
     An update to one or more attributes of an entity in the world.
     This is used when decorating a method with  @synchronized_attribute_modification
@@ -403,7 +451,7 @@ class AttributeUpdateModification(WorldModification):
     The UUID of the entity that was updated.
     """
 
-    updated_kwargs: List[JSONAttributeDiff]
+    updated_kwargs_json_list: List[JSONAttributeDiff]
     """
     The list of attribute names and their new values.
     """
@@ -416,29 +464,32 @@ class AttributeUpdateModification(WorldModification):
         )
 
     def apply(self, world: World):
-        entity = world.get_world_entity_with_id_by_id(self.entity_id)
-        for diff in self.update_world_references_in_updated_kwargs(world):
-            current_value = getattr(entity, diff.attribute_name)
-            if isinstance(current_value, list_like_classes):
-                self._apply_to_list(world, current_value, diff)
-            else:
-                obj = self._resolve_item(world, diff.added_values[0])
-                setattr(entity, diff.attribute_name, obj)
-
-    def update_world_references_in_updated_kwargs(self, world: World):
         tracker = WorldEntityWithIDKwargsTracker.from_world(world)
         kwargs = tracker.create_kwargs()
-        return from_json(to_json(self.updated_kwargs), **kwargs)
+        entity = world.get_world_entity_with_id_by_id(self.entity_id)
+        for diff in self.updated_kwargs_json_list:
+            current_value = getattr(entity, diff.attribute_name)
+            if isinstance(current_value, list_like_classes):
+                self._apply_to_list(current_value, diff, **kwargs)
+            else:
+                obj = self._resolve_item(
+                    world, from_json(diff.added_values[0], **kwargs)
+                )
+                setattr(entity, diff.attribute_name, obj)
+        world._model_manager.current_model_modification_block.append(self)
 
     def _apply_to_list(
-        self, world: World, current_value: List[Any], diff: JSONAttributeDiff
+        self, current_value: List[Any], diff: JSONAttributeDiff, **kwargs
     ):
-        for raw in diff.removed_values:
+        world = kwargs["__world_entity_tracker"]._world
+        for raw_json in diff.removed_values:
+            raw = from_json(raw_json, **kwargs)
             obj = self._resolve_item(world, raw)
             if obj in current_value:
                 current_value.remove(obj)
 
-        for raw in diff.added_values:
+        for raw_json in diff.added_values:
+            raw = from_json(raw_json, **kwargs)
             obj = self._resolve_item(world, raw)
             if obj not in current_value:
                 current_value.append(obj)
@@ -447,6 +498,22 @@ class AttributeUpdateModification(WorldModification):
         if isinstance(item, UUID):
             return world.get_world_entity_with_id_by_id(item)
         return item
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "entity_id": to_json(self.entity_id),
+            "updated_kwargs_json_list": to_json(self.updated_kwargs_json_list),
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(
+            entity_id=from_json(data["entity_id"], **kwargs),
+            updated_kwargs_json_list=from_json(
+                data["updated_kwargs_json_list"], **kwargs
+            ),
+        )
 
 
 def synchronized_attribute_modification(func):

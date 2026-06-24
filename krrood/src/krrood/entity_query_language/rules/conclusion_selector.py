@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing_extensions import Optional, Iterable, TYPE_CHECKING, Self
+from typing_extensions import Iterable, TYPE_CHECKING, Self, Optional
 
 from krrood.entity_query_language.rules.conclusion import Conclusion
 from krrood.entity_query_language.operators.set_operations import Union as EQLUnion
@@ -108,30 +108,30 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
 
     def _evaluate__(
         self,
-        sources: Optional[Bindings] = None,
+        sources: Optional[OperationResult] = None,
     ) -> Iterable[OperationResult]:
         """
         Evaluate the ExceptIf condition and yield the results.
         """
-        for left_value in self.left._evaluate_(sources, self):
+        for left_value in self._evaluate_child_as_condition_(self.left, sources):
             if left_value.is_false:
                 yield from self.get_operation_result_and_clear_conclusion(left_value)
                 continue
-            yield from self.evaluate_right(left_value.bindings)
+            yield from self.evaluate_right(left_value)
             if not self.right_yielded:
                 # If the right branch didn't yield any True values, propagate the left branch's conclusions.
                 yield from self.get_operation_result_and_clear_conclusion(left_value)
 
-    def evaluate_right(self, bindings: Bindings) -> Iterable[OperationResult]:
+    def evaluate_right(self, left_value: OperationResult) -> Iterable[OperationResult]:
         """
         Evaluate the right branch of the ExceptIf condition and yield the results. In addition, update the right_yielded
          flag and the conclusion if the right branch is True.
 
-        :param bindings: The current bindings from the left evaluation to evaluate the right branch with.
+        :param left_value: The OperationResult from the left evaluation to evaluate the right branch with.
         :return: The results of evaluating the right branch.
         """
         self.right_yielded = False
-        for right_value in self.right._evaluate_(bindings, parent=self):
+        for right_value in self._evaluate_child_as_condition_(self.right, left_value):
             if right_value.is_true:
                 self.right_yielded = True
             yield from self.get_operation_result_and_clear_conclusion(right_value)
@@ -139,10 +139,10 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
     def get_operation_result_and_clear_conclusion(
         self, result: OperationResult
     ) -> Iterable[OperationResult]:
-        self._is_false_ = result.operand is self.left and result.is_false
+        is_false = result.operand is self.left and result.is_false
         if result.is_true:
             self._conclusions_.update(result.operand._conclusions_)
-        yield OperationResult(result.bindings, self._is_false_, self, result)
+        yield OperationResult(result.bindings, is_false, self, result)
         self._conclusions_.clear()
 
     @classmethod
@@ -176,7 +176,7 @@ class Alternative(OR, ConclusionSelector):
 
     def _evaluate__(
         self,
-        sources: Bindings,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         for output in OR._evaluate__(self, sources):
             if output.is_true:
@@ -216,15 +216,17 @@ class Next(EQLUnion, ConclusionSelector):
 
     def _evaluate__(
         self,
-        sources: Bindings,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
-        for output in EQLUnion._evaluate__(self, sources):
-            if output.is_true:
-                self._conclusions_.update(
-                    output.previous_operation_result.operand._conclusions_
+        for child in self._operation_children_:
+            for child_result in self._evaluate_child_as_condition_(child, sources):
+                output = OperationResult(
+                    child_result.bindings, child_result.is_false, self, child_result
                 )
-            yield output
-            self._conclusions_.clear()
+                if output.is_true:
+                    self._conclusions_.update(child_result.operand._conclusions_)
+                yield output
+                self._conclusions_.clear()
 
     @classmethod
     def _get_current_context_condition(

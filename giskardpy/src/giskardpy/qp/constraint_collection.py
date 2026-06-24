@@ -11,7 +11,7 @@ from giskardpy.data_types.exceptions import (
 )
 from giskardpy.motion_statechart.data_types import LifeCycleValues, DefaultWeights
 from giskardpy.motion_statechart.exceptions import (
-    MotionStatechartError,
+    InvalidConstraintExpressionShapeError,
 )
 from giskardpy.qp.constraint import (
     EqualityConstraint,
@@ -144,9 +144,7 @@ class ConstraintCollection:
         :param upper_slack_limit: how much the upper error can be violated, don't use unless you know what you are doing
         """
         if task_expression.shape != (1, 1):
-            raise MotionStatechartError(
-                f"expression must have shape (1, 1), has {task_expression.shape}"
-            )
+            raise InvalidConstraintExpressionShapeError(list(task_expression.shape))
 
         lower_slack_limit = (
             lower_slack_limit if lower_slack_limit is not None else -float("inf")
@@ -193,9 +191,7 @@ class ConstraintCollection:
         :param upper_slack_limit: how much the upper error can be violated, don't use unless you know what you are doing
         """
         if task_expression.shape != (1, 1):
-            raise MotionStatechartError(
-                f"expression must have shape (1,1), has {task_expression.shape}"
-            )
+            raise InvalidConstraintExpressionShapeError(list(task_expression.shape))
         name = name or ""
         lower_slack_limit = (
             lower_slack_limit if lower_slack_limit is not None else -float("inf")

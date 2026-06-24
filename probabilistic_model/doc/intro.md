@@ -43,7 +43,7 @@ If you use this software for publications, please cite it as below.
 @software{schierenbeck2024pm,
 author = {Schierenbeck, Tom},
 title = {probabilistic_model: A Python package for probabilistic models},
-url = {https://github.com/tomsch420/probabilistic_model},
+url = {https://cram2.github.io/cognitive_robot_abstract_machine/probabilistic_model/intro.html},
 version = {7.1.0},
 }
 ```

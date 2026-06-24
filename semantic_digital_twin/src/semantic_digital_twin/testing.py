@@ -66,10 +66,10 @@ def world_setup() -> Tuple[
         world.add_degree_of_freedom(dof)
 
         c_l1_l2 = PrismaticConnection(
-            parent=l1, child=l2, dof_id=dof.id, axis=Vector3.X(reference_frame=l1)
+            parent=l1, child=l2, raw_dof=dof, axis=Vector3.X(reference_frame=l1)
         )
         c_r1_r2 = RevoluteConnection(
-            parent=r1, child=r2, dof_id=dof.id, axis=Vector3.Z(reference_frame=r1)
+            parent=r1, child=r2, raw_dof=dof, axis=Vector3.Z(reference_frame=r1)
         )
         bf_root_l1 = FixedConnection(parent=bf, child=l1)
         bf_root_r1 = FixedConnection(parent=bf, child=r1)

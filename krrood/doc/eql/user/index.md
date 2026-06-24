@@ -22,6 +22,7 @@ For most users, we recommend following the documentation in this order:
 7.  **[Pattern Matching](match.md)**: Simpler pattern matching against structured data.
 8.  **[EQL for SQL Experts](eql_for_sql_experts.md)**: A comparative guide for those with a relational database background, mapping EQL concepts to SQL equivalents.
 9.  **[Writing Rule Trees](writing_rule_trees.md)**: An advanced topic for building complex reasoning systems with EQL.
+10. **[Inference Explanation](inference_explanation.md)**: Understand how EQL records why an object was inferred, and query that metadata with EQL itself.
 
 
 ## Developer Guide

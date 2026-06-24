@@ -37,12 +37,21 @@ deactivate
 To run the tests or use CRAM with a real robot you need to setup a ROS workspace with the dependencies. 
 The monorepo provides a shell script to setup the workspace for you. 
 ```bash
-export OVERLAY_WS=$HOME
+export OVERLAY_WS=$HOME/ros_ws
 ./scripts/setup_ros_workspace.sh
 ```
 This will create a ROS workspace in the folder specified in OVERLAY_WS
 
-### Install using UV 
+### Install additional dependencies
+
+You need to install the following system dependencies:
+
+```bash
+sudo apt install -y graphviz graphviz-dev
+```
+
+
+### Install using UV
 
 To install the whole repo we use uv (https://github.com/astral-sh/uv), first to install uv:
 
@@ -57,6 +66,12 @@ then install packages:
 uv sync --active
 ```
 
+If you also want the development dependencies, run:
+
+```bash
+uv sync --extra dev --active 
+```
+
 
 ### Alternative: Poetry
 
@@ -66,11 +81,11 @@ Install poetry if you haven't already:
 
 ```bash
 pip install poetry
-``` 
+```
 
 Install the CRAM package along with its dependencies:
 
-```bash 
+```bash
 poetry install
 ```
 
@@ -88,7 +103,7 @@ sudo bash .github/docker/setup_ros_workspace.sh && source ~/.bashrc
 pytest test/<package>_test
 ```
 
-e.g. `pytest test/pycram_test`
+e.g. `pytest test/coraplex_test`
 
 ## Contribution
 

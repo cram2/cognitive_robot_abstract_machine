@@ -102,7 +102,7 @@ class WhereExpressionToRandomEventTranslator:
             else:
                 assert_never(expression)
             simple_events.append(simple_event)
-        return Event.from_simple_sets(*simple_events)
+        return Event.from_simple_sets(*simple_events).simplify()
 
     def _translate_conjunction(self, expression: AND) -> SimpleEvent:
         """

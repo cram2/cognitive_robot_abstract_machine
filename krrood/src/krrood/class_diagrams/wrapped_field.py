@@ -25,12 +25,18 @@ from typing_extensions import (
 )
 
 from krrood.class_diagrams.exceptions import MissingContainedTypeOfContainer
-from krrood.class_diagrams.utils import behaves_like_a_built_in_class, get_type_hints_of_object
+from krrood.class_diagrams.utils import (
+    behaves_like_a_built_in_class,
+    common_base_class,
+    get_type_hints_of_object,
+)
 from krrood.utils import module_and_class_name, is_builtin_type
 
 if TYPE_CHECKING:
     from krrood.class_diagrams.class_diagram import WrappedClass
-    from krrood.ontomatic.property_descriptor.property_descriptor import PropertyDescriptor
+    from krrood.ontomatic.property_descriptor.property_descriptor import (
+        PropertyDescriptor,
+    )
 
 
 @dataclass
@@ -144,7 +150,7 @@ class WrappedField:
     @cached_property
     def is_builtin_type(self) -> bool:
         return is_builtin_type(self.type_endpoint) or (
-                self.type_endpoint in [datetime, NoneType]
+            self.type_endpoint in [datetime, NoneType]
         )
 
     @cached_property
@@ -182,7 +188,20 @@ class WrappedField:
             return get_args(self.resolved_type)[0]
         else:
             try:
-                return get_args(self.resolved_type)[0]
+                args = get_args(self.resolved_type)
+                if len(args) > 1:
+                    # TypeVarTuple expansion produces list[A, B, ...] — use the LCA
+                    lowest_common_base_class = common_base_class(list(args))
+                    if lowest_common_base_class is not None:
+                        return lowest_common_base_class
+                arg = args[0]
+                # Explicit Union contained type e.g. list[Union[A, B]] — resolve to LCA
+                if get_origin(arg) is Union:
+                    non_none = [t for t in get_args(arg) if t is not NoneType]
+                    lowest_common_base_class = common_base_class(non_none)
+                    if lowest_common_base_class is not None:
+                        return lowest_common_base_class
+                return arg
             except IndexError:
                 if self.resolved_type is Type:
                     return self.resolved_type
@@ -200,16 +219,23 @@ class WrappedField:
         return issubclass(self.type_endpoint, enum.Enum)
 
     @cached_property
-    def is_one_to_one_relationship(self) -> bool:
+    def is_many_to_one_relationship(self) -> bool:
+        """
+        ..note:: One-to-one relationships are not possible as its not enforceable that nobody references to the other side.
+        See `one-to-one relationships <https://docs.sqlalchemy.org/en/21/orm/basic_relationships.html#one-to-one>`_
+        """
         return not self.is_container and not self.is_builtin_type
 
     @cached_property
-    def is_one_to_many_relationship(self) -> bool:
+    def is_many_to_many_relationship(self) -> bool:
+        """
+        ..note:: One-to-many relationships are not possible as its not enforceable that nobody references to the other side.
+        """
         return self.is_container and not self.is_builtin_type and not self.is_optional
 
     @cached_property
     def is_iterable(self):
-        return self.is_one_to_many_relationship and hasattr(
+        return self.is_many_to_many_relationship and hasattr(
             self.container_type, "__iter__"
         )
 
@@ -217,13 +243,18 @@ class WrappedField:
     def type_endpoint(self) -> Type:
         if self.is_container or self.is_optional:
             return self.contained_type
-        else:
-            return self.resolved_type
+        resolved = self.resolved_type
+        if get_origin(resolved) is Union:
+            non_none = [arg for arg in get_args(resolved) if arg is not NoneType]
+            lowest_common_ancestor = common_base_class(non_none)
+            if lowest_common_ancestor is not None:
+                return lowest_common_ancestor
+        return resolved
 
     @cached_property
     def is_role_taker(self) -> bool:
         return (
-            self.is_one_to_one_relationship
+            self.is_many_to_one_relationship
             and not self.is_optional
             and self.field.default == MISSING
             and self.field.default_factory == MISSING
@@ -252,11 +283,13 @@ class WrappedField:
 
         :return: True if the type hint is an underspecified generic class.
         """
-        # If it's a class and it inherits from Generic but has no arguments
+        # A class is underspecified only if it still has free TypeVar parameters.
+        # Concrete subclasses of generic parents (e.g. HSRBMobileBase(MobileBase, HasTorso[HSRBTorso]))
+        # are subclasses of Generic but have __parameters__ == (), so they must not be skipped.
         if inspect.isclass(self.type_endpoint) and issubclass(
             self.type_endpoint, Generic
         ):
-            return True
+            return len(getattr(self.type_endpoint, "__parameters__", ())) > 0
 
         # Also check if it's a GenericAlias with empty args (though usually origin is used then)
         origin = get_origin(self.type_endpoint)

@@ -25,7 +25,10 @@ from typing_extensions import (
 
 from krrood.entity_query_language.utils import T, merge_args_and_kwargs
 from krrood.entity_query_language.core.variable import Variable, InstantiatedVariable
-from krrood.entity_query_language.core.base_expressions import Selectable
+from krrood.entity_query_language.core.base_expressions import (
+    Selectable,
+    SymbolicExpression,
+)
 from krrood.symbol_graph.symbol_graph import Symbol
 
 
@@ -77,6 +80,27 @@ class Predicate(Symbol, ABC):
                 _kwargs_=all_kwargs,
             )
         return super().__new__(cls)
+
+    @classmethod
+    def _construct_normally_(cls, **kwargs) -> "Predicate":
+        """
+        Construct a concrete predicate instance directly, bypassing the symbolic ``__new__`` check.
+
+        Normally, calling ``cls(**kwargs)`` when any kwarg is a :class:`Selectable` redirects
+        construction to an :class:`~krrood.entity_query_language.core.variable.InstantiatedVariable`
+        so the call can be represented as a symbolic expression in a query graph.  During evaluation,
+        however, the bound values themselves may be :class:`Selectable` objects (e.g. in a
+        meta-query that reasons about EQL nodes).  In that case the redirect is wrong — we want the
+        real predicate instance so its :meth:`__call__` can be evaluated immediately.
+
+        :meth:`_construct_normally_` is the escape hatch for that situation.  It calls
+        ``object.__new__`` directly (skipping ``__new__`` entirely) and then ``__init__``, so the
+        caller always receives a fully initialised concrete predicate regardless of what the kwargs
+        contain.
+        """
+        instance = object.__new__(cls)
+        instance.__init__(**kwargs)
+        return instance
 
     @abstractmethod
     def __call__(self) -> bool:
@@ -144,6 +168,6 @@ def length(iterable: Sized) -> int:
 def _any_of_the_kwargs_is_a_variable(bindings: Dict[str, Any]) -> bool:
     """
     :param bindings: A kwarg like dict mapping strings to objects
-    :return: Rather any of the objects is a variable or not.
+    :return: ``True`` if any value in ``bindings`` is a :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression`, ``False`` otherwise.
     """
-    return any(isinstance(binding, Selectable) for binding in bindings.values())
+    return any(isinstance(binding, SymbolicExpression) for binding in bindings.values())

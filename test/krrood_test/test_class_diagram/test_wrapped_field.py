@@ -1,17 +1,25 @@
 from __future__ import annotations
 
 from dataclasses import fields, Field
+from types import NoneType
 
 from typing_extensions import Type
 
 from krrood.class_diagrams.class_diagram import WrappedClass
+from krrood.class_diagrams.utils import common_base_class
 from krrood.class_diagrams.wrapped_field import WrappedField
 from ..dataset.example_classes import (
     KRROODPosition,
     KRROODOrientation,
     KRROODPose,
     KRROODPositions,
-    KRROODPositionTypeWrapper, GenericClassAssociation,
+    KRROODPositionTypeWrapper,
+    GenericClassAssociation,
+    KRROODCup,
+    KRROODBowl,
+    KRROODPhysicalObject,
+    KRROODPosition4D,
+    KRROODPosition5D,
 )
 
 
@@ -77,17 +85,46 @@ def test_is_type_type():
     )
     assert wrapped_field.is_type_type
 
+
 def test_is_specialized_generic():
     wrapped_class = WrappedClass(clazz=GenericClassAssociation)
-    associated_value = WrappedField(wrapped_class, get_field_by_name(GenericClassAssociation, "associated_value"))
+    associated_value = WrappedField(
+        wrapped_class, get_field_by_name(GenericClassAssociation, "associated_value")
+    )
     assert associated_value.is_instantiation_of_generic_class
-    associated_value_not_parametrized = WrappedField(wrapped_class, get_field_by_name(GenericClassAssociation, "associated_value_not_parametrized"))
+    associated_value_not_parametrized = WrappedField(
+        wrapped_class,
+        get_field_by_name(GenericClassAssociation, "associated_value_not_parametrized"),
+    )
     assert not associated_value_not_parametrized.is_instantiation_of_generic_class
 
-    associated_value_list = WrappedField(wrapped_class, get_field_by_name(GenericClassAssociation, "associated_value_list"))
+    associated_value_list = WrappedField(
+        wrapped_class,
+        get_field_by_name(GenericClassAssociation, "associated_value_list"),
+    )
     assert associated_value_list.is_container
     assert associated_value_list.is_instantiation_of_generic_class
 
-    associated_value_not_parametrized_list = WrappedField(wrapped_class, get_field_by_name(GenericClassAssociation, "associated_value_not_parametrized_list"))
+    associated_value_not_parametrized_list = WrappedField(
+        wrapped_class,
+        get_field_by_name(
+            GenericClassAssociation, "associated_value_not_parametrized_list"
+        ),
+    )
     assert associated_value_not_parametrized_list.is_container
     assert not associated_value_not_parametrized_list.is_instantiation_of_generic_class
+
+
+def test_common_base_class():
+    assert common_base_class([KRROODCup, KRROODBowl]) is KRROODPhysicalObject
+    assert common_base_class([KRROODPosition4D, KRROODPosition5D]) is KRROODPosition4D
+    assert common_base_class([KRROODPosition, KRROODPhysicalObject]) is None
+    assert common_base_class([KRROODPosition]) is KRROODPosition
+
+    assert common_base_class([]) is None
+    assert (
+        common_base_class(["UnresolvedRef", KRROODCup, KRROODBowl])
+        is KRROODPhysicalObject
+    )
+
+    assert common_base_class([KRROODCup, KRROODBowl, NoneType]) is None

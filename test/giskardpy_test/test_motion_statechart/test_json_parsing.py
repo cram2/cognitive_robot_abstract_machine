@@ -152,7 +152,7 @@ def test_executing_json_parsed_statechart(tmp_path):
         )
         world.add_degree_of_freedom(dof)
         root_C_tip = RevoluteConnection(
-            parent=root, child=tip, axis=Vector3.Z(), dof_id=dof.id
+            parent=root, child=tip, axis=Vector3.Z(), raw_dof=dof
         )
         world.add_connection(root_C_tip)
 
@@ -162,7 +162,7 @@ def test_executing_json_parsed_statechart(tmp_path):
         )
         world.add_degree_of_freedom(dof)
         root_C_tip2 = RevoluteConnection(
-            parent=root, child=tip2, axis=Vector3.Z(), dof_id=dof.id
+            parent=root, child=tip2, axis=Vector3.Z(), raw_dof=dof
         )
         world.add_connection(root_C_tip2)
 

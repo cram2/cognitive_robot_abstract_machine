@@ -12,7 +12,7 @@ If you use this software, please cite it as below.
 @software{schierenbeck2024re,
 author = {Schierenbeck, Tom},
 title = {Random-Events},
-url = {https://github.com/tomsch420/random-events},
+url = {https://cram2.github.io/cognitive_robot_abstract_machine/random_events/intro.html},
 version = {4.1.2},
 }
 ```

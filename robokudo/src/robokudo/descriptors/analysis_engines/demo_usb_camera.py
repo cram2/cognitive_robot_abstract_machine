@@ -69,7 +69,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         device = 0
         # device = "/home/user_name/Videos/my_video.webm"
         # device = "/home/user_name/Pictures/my_image.jpg"
-        # device = "https://raw.githubusercontent.com/cram2/pycram/refs/heads/dev/doc/images/boxy.gif"
+        # device = "https://raw.githubusercontent.com/cram2/coraplex/refs/heads/dev/doc/images/boxy.gif"
 
         cv_config = CrDescriptorFactory.create_descriptor(
             "opencv",

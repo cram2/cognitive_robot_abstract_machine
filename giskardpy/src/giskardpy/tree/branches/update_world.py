@@ -13,7 +13,7 @@ class HasWorldUpdate(GiskardBehavior):
         super().__init__("has world update?")
 
     def update(self) -> Status:
-        if len(GiskardBlackboard().giskard.model_synchronizer.missed_messages) > 0:
+        if len(GiskardBlackboard().giskard.world_synchronizer.missed_messages) > 0:
             return Status.SUCCESS
         return Status.FAILURE
 
