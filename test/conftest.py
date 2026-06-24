@@ -384,11 +384,11 @@ def cylinder_bot_diff_world():
 
 
 def world_with_urdf_factory(
-        robot_semantic_annotation: Type[AbstractRobot],
-        drive_connection_type: Type[OmniDrive | DifferentialDrive],
-        robot_starting_pose: HomogeneousTransformationMatrix | None = None,
-        urdf_path_resolver: PathResolver | None = None,
-        robot_localization_pose: HomogeneousTransformationMatrix | None = None,
+    robot_semantic_annotation: Type[AbstractRobot],
+    drive_connection_type: Type[OmniDrive | DifferentialDrive],
+    robot_starting_pose: HomogeneousTransformationMatrix | None = None,
+    urdf_path_resolver: PathResolver | None = None,
+    robot_localization_pose: HomogeneousTransformationMatrix | None = None,
 ):
     """
     Builds this tree:
@@ -474,7 +474,10 @@ def tracy_world():
 
 @pytest.fixture(scope="session")
 def _stretch_world_setup():
-    return world_with_urdf_factory(Stretch, DifferentialDrive)
+    try:
+        return world_with_urdf_factory(Stretch, DifferentialDrive)
+    except (ParsingError, FileNotFoundError) as error:
+        pytest.skip(f"Stretch URDF not available: {error}")
 
 
 @pytest.fixture(scope="session")

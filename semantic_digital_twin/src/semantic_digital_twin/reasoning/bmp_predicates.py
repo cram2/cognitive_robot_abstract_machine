@@ -21,7 +21,7 @@ from typing import Optional
 
 from krrood.entity_query_language.predicate import Predicate
 
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.effects import Effect, TaskRequest
 from semantic_digital_twin.world_description.motion import Motion

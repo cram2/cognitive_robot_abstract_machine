@@ -76,6 +76,12 @@ class PourableContainer(HasFillLevel):
 
 
 @pytest.fixture
+def pr2_world_setup(pr2_world_copy):
+    """Function-scoped PR2 world, suitable for tests that modify the world."""
+    return pr2_world_copy
+
+
+@pytest.fixture
 def world_with_cup():
     """World containing a single pourable container with a tilt joint, filled to 100%."""
     world = World()
@@ -119,7 +125,7 @@ def tracy_pouring_world(tracy_world):
     Tracy world with both arms in park position and a Jeroen cup on the table.
     """
     world = deepcopy(tracy_world)
-    tracy = Tracy.from_world(world)
+    [tracy] = world.get_semantic_annotations_by_type(Tracy)
 
     left_park = tracy.left_arm.get_joint_state_by_type(StaticJointState.PARK)
     right_park = tracy.right_arm.get_joint_state_by_type(StaticJointState.PARK)
@@ -133,8 +139,8 @@ def tracy_pouring_world(tracy_world):
                 world,
                 world.root,
                 table_cup_body,
-                PrefixedName("table_T_table_cup"),
-                HomogeneousTransformationMatrix.from_xyz_rpy(
+                name=PrefixedName("table_T_table_cup"),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     0.5, 0.0, _TABLE_SURFACE_Z
                 ),
             )

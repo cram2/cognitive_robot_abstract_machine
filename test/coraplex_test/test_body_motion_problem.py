@@ -18,7 +18,7 @@ from krrood.ormatic.utils import classproperty
 
 from giskardpy.body_motion_problem.container_physics import RunMSCModel
 from giskardpy.body_motion_problem.pouring_physics import PouringMSCModel
-from pycram.body_motion_problem.predicates import MotionStatechartCanPerform
+from coraplex.body_motion_problem.predicates import MotionStatechartCanPerform
 from semantic_digital_twin.reasoning.bmp_predicates import Causes, SatisfiesRequest
 from semantic_digital_twin.semantic_annotations.effects import (
     ClosedEffect,
@@ -79,9 +79,9 @@ def mutable_model_world(pr2_apartment_world):
 
 
 @pytest.fixture
-def stretch_apartment_world(stretch_world, apartment_world_setup):
-    world = deepcopy(stretch_world)
-    world.merge_world(deepcopy(apartment_world_setup))
+def stretch_apartment_world(_stretch_world_setup, _apartment_world_setup):
+    world = deepcopy(_stretch_world_setup)
+    world.merge_world(deepcopy(_apartment_world_setup))
     world.get_body_by_name("base_link").parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(1.2, 2, 0)
     )
@@ -89,13 +89,19 @@ def stretch_apartment_world(stretch_world, apartment_world_setup):
 
 
 @pytest.fixture
-def tiago_apartment_world(tiago_world, apartment_world_setup):
-    world = deepcopy(tiago_world)
-    world.merge_world(deepcopy(apartment_world_setup))
+def tiago_apartment_world(_tiago_world_setup, _apartment_world_setup):
+    world = deepcopy(_tiago_world_setup)
+    world.merge_world(deepcopy(_apartment_world_setup))
     world.get_body_by_name("base_footprint").parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(1.2, 2, 0)
     )
     return world
+
+
+@pytest.fixture
+def pr2_world_setup(_pr2_world_setup):
+    """Function-scoped PR2 world for fixtures that need an isolated copy."""
+    return deepcopy(_pr2_world_setup)
 
 
 @pytest.fixture
@@ -128,7 +134,7 @@ def world_with_cup():
 def pr2_world_with_cup(pr2_world_setup):
     """PR2 world with a pourable cup placed within arm reach at (0.7, 0.0, 0.85)."""
     world = deepcopy(pr2_world_setup)
-    robot = PR2.from_world(world)
+    [robot] = world.get_semantic_annotations_by_type(PR2)
     with world.modify_world():
         cup = PourableContainer.create_with_new_body_in_world(
             name=PrefixedName("cup"),
@@ -304,7 +310,7 @@ class TestContainerManipulationPredicates:
         )
 
         _, motions, _, _, drawers = _extend_world(world, only_drawers=True)
-        robot = PR2.from_world(world)
+        [robot] = world.get_semantic_annotations_by_type(PR2)
         motion = motions[0]
 
         assert not MotionStatechartCanPerform(motion=motion, robot=robot)()
@@ -675,7 +681,7 @@ class TestRobotIntegration:
         effect_sym = variable(Effect, domain=effects[:10])
         motion_sym = variable(Motion, domain=motions[:10])
 
-        robot = Stretch.from_world(world)
+        [robot] = world.get_semantic_annotations_by_type(Stretch)
         query = an(
             set_of(task_sym, motion_sym, effect_sym).where(
                 SatisfiesRequest(task=task_sym, effect=effect_sym),
@@ -702,9 +708,13 @@ class TestRobotIntegration:
         effect_sym = variable(Effect, domain=effects[:5])
         motion_sym = variable(Motion, domain=motions[:5])
 
-        robot = Tiago.from_world(world)
-        left_arm_park = robot.left_arm.get_joint_state_by_type(StaticJointState.PARK)
-        right_arm_park = robot.right_arm.get_joint_state_by_type(StaticJointState.PARK)
+        [robot] = world.get_semantic_annotations_by_type(Tiago)
+        left_arm_park = robot.get_left_arm_if_specified().get_joint_state_by_type(
+            StaticJointState.PARK
+        )
+        right_arm_park = robot.get_right_arm_if_specified().get_joint_state_by_type(
+            StaticJointState.PARK
+        )
         world.set_positions_1DOF_connection(dict(left_arm_park.items()))
         world.set_positions_1DOF_connection(dict(right_arm_park.items()))
 
@@ -740,7 +750,7 @@ class TestRobotIntegration:
         effect_sym = variable(Effect, domain=effects)
         motion_sym = variable(Motion, domain=[motion])
 
-        robot = PR2.from_world(world)
+        [robot] = world.get_semantic_annotations_by_type(PR2)
         left_arm_park = robot.left_arm.get_joint_state_by_type(StaticJointState.PARK)
         right_arm_park = robot.right_arm.get_joint_state_by_type(StaticJointState.PARK)
         world.set_positions_1DOF_connection(dict(left_arm_park.items()))
