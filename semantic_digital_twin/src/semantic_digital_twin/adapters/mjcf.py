@@ -500,6 +500,11 @@ class MJCFParser:
                 lower_limits.position = float(mujoco_joint.range[0])
                 upper_limits = DerivativeMap()
                 upper_limits.position = float(mujoco_joint.range[1])
+
+                # Mujocos MJCF does not support velocity limits on joints. Set default values here.
+                lower_limits.velocity = 0.0
+                upper_limits.velocity = 1.0
+
                 dof = DegreeOfFreedom(
                     name=PrefixedName(dof_name),
                     limits=DegreeOfFreedomLimits(

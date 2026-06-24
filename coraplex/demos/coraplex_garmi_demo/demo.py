@@ -7,14 +7,14 @@ import rclpy
 from ament_index_python.packages import get_package_share_directory
 from rclpy.executors import SingleThreadedExecutor
 
-from pycram.datastructures.dataclasses import Context
-from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from pycram.datastructures.grasp import GraspDescription
-from pycram.motion_executor import simulated_robot
-from pycram.plans.factories import sequential
-from pycram.robot_plans.actions.composite.transporting import TransportAction
-from pycram.robot_plans.actions.core.pick_up import PickUpAction
-from pycram.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
+from coraplex.datastructures.dataclasses import Context
+from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+from coraplex.datastructures.grasp import GraspDescription
+from coraplex.motion_executor import simulated_robot
+from coraplex.plans.factories import sequential
+from coraplex.robot_plans.actions.composite.transporting import TransportAction
+from coraplex.robot_plans.actions.core.pick_up import PickUpAction
+from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Table,
@@ -42,6 +42,8 @@ from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from spatial_types import Point3
 from world import World
+
+print("imports done")
 
 SAMPLE_PLACE_POSES = False  # False → use hardcoded fallback poses instead
 
@@ -187,7 +189,7 @@ with simulated_robot:
                 grasp_description=GraspDescription(
                     ApproachDirection.RIGHT,
                     VerticalAlignment.TOP,
-                    garmi_robot.right_arm.manipulator,
+                    garmi_robot.get_right_arm_if_specified().end_effector,
                 ),
                 target_location=bowl_target_pose,
             ),
@@ -198,7 +200,7 @@ with simulated_robot:
                 grasp_description=GraspDescription(
                     ApproachDirection.RIGHT,
                     VerticalAlignment.TOP,
-                    garmi_robot.right_arm.manipulator,
+                    garmi_robot.get_right_arm_if_specified().end_effector,
                 ),
                 target_location=spoon_target_pose,
             ),
