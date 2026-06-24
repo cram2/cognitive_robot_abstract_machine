@@ -21,7 +21,7 @@ class ReachTopTask(Task):
     """Moves the body's bottom to the pre-grasp point above the hole."""
 
     root_link: KinematicStructureEntity = field(kw_only=True)
-    """Root link of the kin chain."""
+    """Root link of the kinematic chain."""
 
     tip_link: KinematicStructureEntity = field(kw_only=True)
     """Body that is controlled."""
@@ -63,7 +63,7 @@ class SlightlyTiltedTask(Task):
     """Tilts the body by a fixed angle relative to the up axis."""
 
     root_link: KinematicStructureEntity = field(kw_only=True)
-    """Root link of the kin chain."""
+    """Root link of the kinematic chain."""
 
     tip_link: KinematicStructureEntity = field(kw_only=True)
     """Body that is controlled."""
@@ -79,16 +79,17 @@ class SlightlyTiltedTask(Task):
             self.root_link, self.tip_link
         )
         root_V_cylinder_z = root_T_tip @ Vector3.Z()
-        tilt_error = root_V_cylinder_z.angle_between(self.root_V_up)
+        cos_tilt = root_V_cylinder_z.dot(self.root_V_up)
+        cos_goal = float(np.cos(self.tilt))
 
         artifacts = NodeArtifacts()
         artifacts.constraints.add_position_constraint(
-            expr_current=tilt_error,
-            expr_goal=self.tilt,
+            expr_current=cos_tilt,
+            expr_goal=cos_goal,
             reference_velocity=0.1,
             quadratic_weight=self.weight,
         )
-        artifacts.observation = sm.abs(tilt_error - self.tilt) <= 0.01
+        artifacts.observation = sm.abs(cos_tilt - cos_goal) <= 0.01
         return artifacts
 
 
@@ -97,7 +98,7 @@ class StayOnLineTask(Task):
     """Keeps the body's bottom on the line between the hole and the pre-grasp point."""
 
     root_link: KinematicStructureEntity = field(kw_only=True)
-    """Root link of the kin chain."""
+    """Root link of the kinematic chain."""
 
     tip_link: KinematicStructureEntity = field(kw_only=True)
     """Body that is controlled."""
@@ -142,7 +143,7 @@ class InsertTask(Task):
     """Moves the body's bottom down into the hole."""
 
     root_link: KinematicStructureEntity = field(kw_only=True)
-    """Root link of the kin chain."""
+    """Root link of the kinematic chain."""
 
     tip_link: KinematicStructureEntity = field(kw_only=True)
     """Body that is controlled."""
@@ -178,7 +179,7 @@ class TiltStraightTask(Task):
     """Aligns the body's axis with the hole axis."""
 
     root_link: KinematicStructureEntity = field(kw_only=True)
-    """Root link of the kin chain."""
+    """Root link of the kinematic chain."""
 
     tip_link: KinematicStructureEntity = field(kw_only=True)
     """Body that is controlled."""
@@ -214,7 +215,7 @@ class InsertCylinder(Goal):
     """
 
     cylinder_name: Body = field(kw_only=True)
-    """Cylinder body to insert. Used as the tip link of the kin chain."""
+    """Cylinder body to insert. Used as the tip link of the kinematic chain."""
 
     hole_point: Point3 = field(kw_only=True)
     """Position of the hole to insert the cylinder into."""
