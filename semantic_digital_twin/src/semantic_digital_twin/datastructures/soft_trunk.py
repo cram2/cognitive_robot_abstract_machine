@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.world_entity import (
@@ -26,7 +26,6 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.geometry import Cylinder, Color
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
-    Vector3,
     Quaternion,
 )
 
@@ -38,18 +37,16 @@ if TYPE_CHECKING:
 class SoftTrunkSection:
     """
     Encapsulates the physical and visual properties of a single soft section.
-
-    :length: The rest length of the section in meters.
-
-    :radius: The radius of the cylinder representing the section's volume.
-
-    :resolution: The number of discrete rigid segments used to approximate the
-                continuous curve for visualization and collision checking.
     """
 
     length: float
+    """The rest length of the section in meters."""
+
     radius: float
+    """The radius of the cylinder representing the section's volume."""
+
     resolution: int
+    """The number of discrete rigid segments used to approximate the continuous curve."""
 
 
 @dataclass(eq=False, kw_only=True)
@@ -63,7 +60,7 @@ class SoftEndEffector(EndEffector):
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List:
+    def setup_joint_states(self) -> list:
         return []
 
 
@@ -78,7 +75,7 @@ class SoftArm(Arm):
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List:
+    def setup_joint_states(self) -> list:
         return []
 
 
@@ -99,19 +96,34 @@ class SoftTrunk(SemanticAnnotation):
     """
 
     name: PrefixedName
+    """The unique prefixed name assigned to this soft trunk instance."""
+
     root: Body
+    """The base body representing the physical root of the trunk."""
+
     _world: World
+    """Reference to the parent world containing this robot."""
 
-    # Base to Tip ordering in lists
-    kappa_dofs: List[DegreeOfFreedom] = field(default_factory=list)
-    phi_dofs: List[DegreeOfFreedom] = field(default_factory=list)
-    bending_x_dofs: List[DegreeOfFreedom] = field(default_factory=list)
-    bending_y_dofs: List[DegreeOfFreedom] = field(default_factory=list)
-    torsion_dofs: List[DegreeOfFreedom] = field(default_factory=list)
-    extension_dofs: List[DegreeOfFreedom] = field(default_factory=list)
+    kappa_dofs: list[DegreeOfFreedom] = field(default_factory=list)
+    """List of curvature DOFs (1/radius) ordered from base to tip."""
 
-    # Semantic components
-    arms: List[Arm] = field(default_factory=list)
+    phi_dofs: list[DegreeOfFreedom] = field(default_factory=list)
+    """List of bending plane DOFs ordered from base to tip."""
+
+    bending_x_dofs: list[DegreeOfFreedom] = field(default_factory=list)
+    """List of bending DOFs around the local X-axis ordered from base to tip."""
+
+    bending_y_dofs: list[DegreeOfFreedom] = field(default_factory=list)
+    """List of bending DOFs around the local Y-axis ordered from base to tip."""
+
+    torsion_dofs: list[DegreeOfFreedom] = field(default_factory=list)
+    """List of axial torsion (twisting) DOFs ordered from base to tip."""
+
+    extension_dofs: list[DegreeOfFreedom] = field(default_factory=list)
+    """List of longitudinal extension (stretching) DOFs ordered from base to tip."""
+
+    arms: list[Arm] = field(default_factory=list)
+    """List of semantic Arm structures associated with this trunk."""
 
     def __post_init__(self):
         super().__post_init__()
@@ -119,12 +131,12 @@ class SoftTrunk(SemanticAnnotation):
     @property
     def piecewise_constant_curvature_sections(
         self,
-    ) -> List[Tuple[DegreeOfFreedom, DegreeOfFreedom]]:
+    ) -> list[tuple[DegreeOfFreedom, DegreeOfFreedom]]:
         """Returns a list of (kappa_dof, phi_dof) pairs, ordered from base to tip."""
         return list(zip(self.kappa_dofs, self.phi_dofs))
 
     @property
-    def cosserat_sections(self) -> List[Tuple[DegreeOfFreedom, ...]]:
+    def cosserat_sections(self) -> list[tuple[DegreeOfFreedom, ...]]:
         """Returns a list of (bx, by, torsion, extension) tuples, ordered from base to tip."""
         return list(
             zip(
@@ -139,7 +151,7 @@ class SoftTrunk(SemanticAnnotation):
     def build_piecewise_constant_curvature(
         cls,
         world: World,
-        sections: List[SoftTrunkSection],
+        sections: list[SoftTrunkSection],
     ) -> SoftTrunk:
         """
         Builds a soft robot using the Piecewise Constant Curvature (PCC) model.
@@ -243,7 +255,7 @@ class SoftTrunk(SemanticAnnotation):
     def build_cosserat(
         cls,
         world: World,
-        sections: List[SoftTrunkSection],
+        sections: list[SoftTrunkSection],
     ) -> SoftTrunk:
         """
         Builds a soft robot using the differential Cosserat Rod Theory.
@@ -285,29 +297,29 @@ class SoftTrunk(SemanticAnnotation):
             )
 
             for s, section in enumerate(sections):
-                bx = DegreeOfFreedom(
+                bending_x = DegreeOfFreedom(
                     name=PrefixedName(f"bending_x_{s}", prefix), limits=strain_limits
                 )
-                by = DegreeOfFreedom(
+                bending_y = DegreeOfFreedom(
                     name=PrefixedName(f"bending_y_{s}", prefix), limits=strain_limits
                 )
-                tor = DegreeOfFreedom(
+                torsion = DegreeOfFreedom(
                     name=PrefixedName(f"torsion_{s}", prefix), limits=strain_limits
                 )
-                ext = DegreeOfFreedom(
+                extension = DegreeOfFreedom(
                     name=PrefixedName(f"extension_{s}", prefix), limits=extension_limits
                 )
 
-                for dof in [bx, by, tor, ext]:
+                for dof in [bending_x, bending_y, torsion, extension]:
                     world.add_degree_of_freedom(dof)
 
-                world.state[ext.id].position = 1.0
+                world.state[extension.id].position = 1.0
 
                 # Store references to preserve order
-                trunk.bending_x_dofs.append(bx)
-                trunk.bending_y_dofs.append(by)
-                trunk.torsion_dofs.append(tor)
-                trunk.extension_dofs.append(ext)
+                trunk.bending_x_dofs.append(bending_x)
+                trunk.bending_y_dofs.append(bending_y)
+                trunk.torsion_dofs.append(torsion)
+                trunk.extension_dofs.append(extension)
 
                 segment_length = section.length / section.resolution
                 for i in range(section.resolution):
@@ -331,10 +343,10 @@ class SoftTrunk(SemanticAnnotation):
                     connection = CosseratRodConnection(
                         parent=prev_body,
                         child=curr_body,
-                        bending_x_dof_id=bx.id,
-                        bending_y_dof_id=by.id,
-                        torsion_dof_id=tor.id,
-                        extension_dof_id=ext.id,
+                        bending_x_dof_id=bending_x.id,
+                        bending_y_dof_id=bending_y.id,
+                        torsion_dof_id=torsion.id,
+                        extension_dof_id=extension.id,
                         segment_length=segment_length,
                     )
                     world.add_connection(connection)
