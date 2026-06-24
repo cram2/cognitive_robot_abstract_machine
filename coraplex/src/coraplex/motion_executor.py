@@ -56,7 +56,6 @@ class MotionExecutor:
     """
 
     execution_type: ClassVar[ExecutionType] = None
-    _giskard_wrapper: ClassVar[Any] = None
 
     def construct_msc(self):
         self.motion_state_chart = MotionStatechart()
@@ -140,9 +139,7 @@ class MotionExecutor:
     def _execute_for_real(self):
         from giskardpy.middleware.ros2.python_interface import GiskardWrapper
 
-        if MotionExecutor._giskard_wrapper is None:
-            MotionExecutor._giskard_wrapper = GiskardWrapper(self.ros_node, world=self.world)
-        giskard = MotionExecutor._giskard_wrapper
+        giskard = self.plan_node.plan.context.giskard_wrapper
 
         kill_event = threading.Event()
         interrupt_thread = threading.Thread(
