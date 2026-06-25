@@ -8,8 +8,12 @@ import pytest
 from semantic_digital_twin.api.specifications import (
     BodySpecification,
     RegionSpecification,
-    BodyAndConnectionSpecification,
+    ConnectedBodySpecification,
     ConnectionSpecification,
+    FixedConnectionSpecification,
+    Connection6DoFSpecification,
+    PrismaticConnectionSpecification,
+    RevoluteConnectionSpecification,
     SemanticAnnotationWithRootSpecification,
     WorldSpecification,
     WorldEntitySpawnSpecification,
@@ -84,7 +88,7 @@ def test_body_and_connection_pose_and_name_override(empty_world):
     body_spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1, y=2, z=3
     )
-    spec = BodyAndConnectionSpecification(body_specification=body_spec)
+    spec = ConnectedBodySpecification(body_specification=body_spec)
     body = spec.spawn(empty_world, name="renamed")
     assert body.name == PrefixedName("renamed")
     root_T_body = empty_world.compute_forward_kinematics(empty_world.root, body)
@@ -94,7 +98,7 @@ def test_body_and_connection_pose_and_name_override(empty_world):
 def test_body_and_connection_spawn_arg_overrides_stored_pose(empty_world):
     body_spec = BodySpecification.box("box", Scale(1, 1, 1))
     body_spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
-    spec = BodyAndConnectionSpecification(body_specification=body_spec)
+    spec = ConnectedBodySpecification(body_specification=body_spec)
     body = spec.spawn(
         empty_world,
         parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=5),
@@ -104,10 +108,9 @@ def test_body_and_connection_spawn_arg_overrides_stored_pose(empty_world):
 
 
 def test_body_and_connection_active(empty_world):
-    spec = BodyAndConnectionSpecification(
+    spec = ConnectedBodySpecification(
         body_specification=BodySpecification.box("drawer", Scale(1, 1, 1)),
-        connection_type=PrismaticConnection,
-        axis=Vector3.Z(),
+        connection_specification=PrismaticConnectionSpecification(axis=Vector3.Z()),
     )
     body = spec.spawn(empty_world)
     assert isinstance(body.parent_connection, PrismaticConnection)
@@ -147,21 +150,25 @@ def test_active_annotation_spawns(empty_world):
     assert isinstance(annotation.root.parent_connection, PrismaticConnection)
 
 
-def test_active_connection_requires_parameters_body():
+def test_active_connection_requires_parameters_body(empty_world):
+    # An active connection without an axis is rejected at spawn time by create_with_dofs.
+    spec = ConnectedBodySpecification(
+        body_specification=BodySpecification.box("b", Scale(1, 1, 1)),
+        connection_specification=PrismaticConnectionSpecification(),
+    )
     with pytest.raises(ValueError):
-        BodyAndConnectionSpecification(
-            body_specification=BodySpecification.box("b", Scale(1, 1, 1)),
-            connection_type=PrismaticConnection,
-        )
+        spec.spawn(empty_world)
 
 
-def test_active_annotation_requires_parameters():
+def test_active_annotation_requires_parameters(empty_world):
+    # Slider's parent connection is active, so spawning without an axis must raise.
+    spec = SemanticAnnotationWithRootSpecification(
+        name="slider",
+        semantic_annotation_type=Slider,
+        root_specification=None,
+    )
     with pytest.raises(ValueError):
-        SemanticAnnotationWithRootSpecification(
-            name="slider",
-            semantic_annotation_type=Slider,
-            root_specification=None,
-        )
+        spec.spawn(empty_world)
 
 
 def test_nested_annotation_on_non_part_whole_field_raises(empty_world):
@@ -257,12 +264,19 @@ def test_to_domain_object_generic_resolution():
 
 
 def test_body_and_connection_6dof(empty_world):
-    spec = BodyAndConnectionSpecification(
+    spec = ConnectedBodySpecification(
         body_specification=BodySpecification.box("free", Scale(1, 1, 1)),
-        connection_type=Connection6DoF,
+        connection_specification=Connection6DoFSpecification(),
     )
     body = spec.spawn(empty_world)
     assert isinstance(body.parent_connection, Connection6DoF)
+
+
+def test_connected_body_specification_name_defaults_to_body_name():
+    spec = ConnectedBodySpecification(
+        body_specification=BodySpecification.box("box", Scale(1, 1, 1))
+    )
+    assert spec.name == PrefixedName("box")
 
 
 def test_spawn_positional_name(empty_world):
@@ -314,79 +328,73 @@ def test_world_specification_annotation_starting_object():
 #####################################################################
 
 
-def test_for_fixed_connection_captures_type_without_kwargs():
-    spec = ConnectionSpecification.for_fixed_connection()
+def test_fixed_connection_spec_binds_type_without_params():
+    spec = FixedConnectionSpecification()
     assert spec.connection_type is FixedConnection
-    assert spec.connection_kwargs == {}
+    assert spec._create_with_dofs_kwargs() == {}
 
 
-def test_for_connection_6dof_captures_type_without_kwargs():
-    spec = ConnectionSpecification.for_connection_6dof()
+def test_connection_6dof_spec_binds_type_without_params():
+    spec = Connection6DoFSpecification()
     assert spec.connection_type is Connection6DoF
-    assert spec.connection_kwargs == {}
+    assert spec._create_with_dofs_kwargs() == {}
 
 
-def test_for_active_connection_1dof_captures_parameters():
+def test_active_1dof_spec_captures_parameters():
     limits = DegreeOfFreedomLimits(
         lower=DerivativeMap(velocity=-1.0), upper=DerivativeMap(velocity=1.0)
     )
     axis = Vector3.Z()
-    spec = ConnectionSpecification.for_active_connection_1dof(
-        PrismaticConnection,
-        multiplier=2.0,
-        offset=0.5,
-        dof_limits=limits,
-        axis=axis,
+    spec = PrismaticConnectionSpecification(
+        axis=axis, multiplier=2.0, offset=0.5, dof_limits=limits
     )
     assert spec.connection_type is PrismaticConnection
-    # connection_type is forwarded explicitly, so it must not leak into the kwargs.
-    assert set(spec.connection_kwargs) == {"multiplier", "offset", "dof_limits", "axis"}
-    assert spec.connection_kwargs["multiplier"] == 2.0
-    assert spec.connection_kwargs["offset"] == 0.5
-    assert spec.connection_kwargs["dof_limits"] is limits
-    assert spec.connection_kwargs["axis"] is axis
+    assert spec.axis is axis
+    assert spec.multiplier == 2.0
+    assert spec.offset == 0.5
+    assert spec.dof_limits is limits
 
 
-def test_for_active_connection_1dof_defaults():
-    spec = ConnectionSpecification.for_active_connection_1dof(RevoluteConnection)
-    assert spec.connection_kwargs == {
+def test_active_1dof_spec_defaults():
+    spec = RevoluteConnectionSpecification()
+    assert spec.connection_type is RevoluteConnection
+    assert spec._create_with_dofs_kwargs() == {
+        "axis": None,
         "multiplier": 1.0,
         "offset": 0.0,
         "dof_limits": None,
-        "axis": None,
     }
 
 
-def test_fixed_connection_spec_materializes(empty_world):
-    spec = ConnectionSpecification.for_fixed_connection()
-    child = Body(name=PrefixedName("child"))
-    with empty_world.modify_world():
-        connection = spec.connection_type.create_with_dofs(
-            world=empty_world,
-            parent=empty_world.root,
-            child=child,
-            **spec.connection_kwargs,
-        )
-        empty_world.add_connection(connection)
-    assert isinstance(connection, FixedConnection)
-    assert child in empty_world.bodies
+def test_parameterized_active_consumes_parameters():
+    axis = Vector3.Z()
+    spec = PrismaticConnectionSpecification.parameterized(axis=axis, multiplier=2.0)
+    assert isinstance(spec, PrismaticConnectionSpecification)
+    assert spec.axis is axis
+    assert spec.multiplier == 2.0
 
 
-def test_active_1dof_connection_spec_kwargs_match_create_with_dofs_signature():
-    # The captured kwargs must be keyword arguments that create_with_dofs accepts,
+def test_parameterized_fixed_ignores_active_parameters():
+    # A fixed spec must accept and ignore active parameters, so a caller holding a bare
+    # specification type can parameterize any family uniformly.
+    spec = FixedConnectionSpecification.parameterized(axis=Vector3.Z(), multiplier=2.0)
+    assert isinstance(spec, FixedConnectionSpecification)
+    assert spec._create_with_dofs_kwargs() == {}
+
+
+def test_active_1dof_spec_kwargs_match_create_with_dofs_signature():
+    # The forwarded kwargs must be keyword arguments that create_with_dofs accepts,
     # otherwise the specification cannot materialize its connection.
-    spec = ConnectionSpecification.for_active_connection_1dof(
-        PrismaticConnection, multiplier=2.0, offset=0.5, axis=Vector3.Z()
-    )
+    spec = PrismaticConnectionSpecification(axis=Vector3.Z(), multiplier=2.0, offset=0.5)
     accepted_parameters = inspect.signature(
         PrismaticConnection.create_with_dofs
     ).parameters
-    assert set(spec.connection_kwargs).issubset(accepted_parameters)
+    assert set(spec._create_with_dofs_kwargs()).issubset(accepted_parameters)
 
 
 def test_connection_spec_spawn_fixed(empty_world):
     child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
-    connection = ConnectionSpecification.for_fixed_connection().spawn(
+    connection = FixedConnectionSpecification().spawn(
         empty_world, parent=empty_world.root, child=child
     )
     assert isinstance(connection, FixedConnection)
@@ -397,9 +405,7 @@ def test_connection_spec_spawn_fixed(empty_world):
 
 def test_connection_spec_spawn_defaults_parent_to_root(empty_world):
     child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
-    connection = ConnectionSpecification.for_connection_6dof().spawn(
-        empty_world, child=child
-    )
+    connection = Connection6DoFSpecification().spawn(empty_world, child=child)
     assert isinstance(connection, Connection6DoF)
     assert connection.parent is empty_world.root
 
@@ -409,8 +415,8 @@ def test_connection_spec_spawn_active_forwards_kwargs(empty_world):
         lower=DerivativeMap(velocity=-1.5), upper=DerivativeMap(velocity=1.5)
     )
     child = BodySpecification.box("slider", Scale(1, 1, 1)).to_domain_object()
-    connection = ConnectionSpecification.for_active_connection_1dof(
-        PrismaticConnection, dof_limits=limits, axis=Vector3.Z()
+    connection = PrismaticConnectionSpecification(
+        axis=Vector3.Z(), dof_limits=limits
     ).spawn(empty_world, child=child)
     assert isinstance(connection, PrismaticConnection)
     assert connection.dof.limits.upper.velocity == 1.5
@@ -419,7 +425,7 @@ def test_connection_spec_spawn_active_forwards_kwargs(empty_world):
 
 def test_connection_spec_spawn_applies_pose(empty_world):
     child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
-    ConnectionSpecification.for_fixed_connection().spawn(
+    FixedConnectionSpecification().spawn(
         empty_world,
         parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3),
         child=child,
@@ -430,14 +436,14 @@ def test_connection_spec_spawn_applies_pose(empty_world):
 
 def test_connection_spec_spawn_without_child_raises(empty_world):
     with pytest.raises(MissingConnectionChildError):
-        ConnectionSpecification.for_fixed_connection().spawn(empty_world)
+        FixedConnectionSpecification().spawn(empty_world)
 
 
 def test_connection_spec_spawn_without_name_matches_direct_creation(empty_world):
     # A nameless spec must auto-generate the same connection name as creating the
     # connection directly between an identically-named parent and child.
     spec_child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
-    spec_connection = ConnectionSpecification.for_fixed_connection().spawn(
+    spec_connection = FixedConnectionSpecification().spawn(
         empty_world, parent=empty_world.root, child=spec_child
     )
 
@@ -450,6 +456,23 @@ def test_connection_spec_spawn_without_name_matches_direct_creation(empty_world)
         direct_world.add_connection(direct_connection)
 
     assert spec_connection.name == direct_connection.name
+
+
+@pytest.mark.parametrize(
+    "annotation_type, expected_specification_type",
+    [
+        (Milk, FixedConnectionSpecification),
+        (Slider, PrismaticConnectionSpecification),
+        (Hinge, RevoluteConnectionSpecification),
+    ],
+)
+def test_annotation_declares_parent_connection_specification_type(
+    annotation_type, expected_specification_type
+):
+    assert (
+        annotation_type._parent_connection_specification_type
+        is expected_specification_type
+    )
 
 
 #####################################################################
@@ -619,10 +642,11 @@ def test_annotation_spec_active_slider(empty_world):
     assert isinstance(annotation.root.parent_connection, PrismaticConnection)
 
 
-def test_annotation_spec_active_requires_axis():
-    # Slider's parent connection is active, so the spec construction must demand an axis.
+def test_annotation_spec_active_requires_axis(empty_world):
+    # Slider's parent connection is active, so spawning without an axis must raise.
+    spec = Slider.get_default_annotation_specification("slider", Scale(0.1, 0.1, 0.1))
     with pytest.raises(ValueError):
-        Slider.get_default_annotation_specification("slider", Scale(0.1, 0.1, 0.1))
+        spec.spawn(empty_world)
 
 
 def test_annotation_spec_case_forwards_wall_thickness(empty_world):

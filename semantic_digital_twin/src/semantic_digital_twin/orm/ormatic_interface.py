@@ -5039,23 +5039,6 @@ class WorldEntityWithIDKwargsTrackerDAO(
     )
 
 
-class ConnectionWithoutReferenceFramesSpecificationDAO(
-    Base,
-    DataAccessObject[
-        semantic_digital_twin.api.specifications.ConnectionWithoutReferenceFramesSpecification
-    ],
-):
-    __tablename__ = "ConnectionWithoutReferenceFramesSpecificationDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    connection_type: Mapped[TypeType] = mapped_column(
-        TypeType, nullable=False, use_existing_column=True
-    )
-
-
 class WorldEntitySpawnSpecificationDAO(
     Base,
     DataAccessObject[
@@ -5078,13 +5061,13 @@ class WorldEntitySpawnSpecificationDAO(
     }
 
 
-class BodyAndConnectionSpecificationDAO(
+class ConnectedBodySpecificationDAO(
     WorldEntitySpawnSpecificationDAO,
     DataAccessObject[
-        semantic_digital_twin.api.specifications.BodyAndConnectionSpecification
+        semantic_digital_twin.api.specifications.ConnectedBodySpecification
     ],
 ):
-    __tablename__ = "BodyAndConnectionSpecificationDAO"
+    __tablename__ = "ConnectedBodySpecificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(WorldEntitySpawnSpecificationDAO.database_id),
@@ -5092,20 +5075,13 @@ class BodyAndConnectionSpecificationDAO(
         use_existing_column=True,
     )
 
-    multiplier: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    offset: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-    connection_type: Mapped[TypeType] = mapped_column(
-        TypeType, nullable=False, use_existing_column=True
-    )
-
     body_specification_id: Mapped[int] = mapped_column(
         ForeignKey("BodySpecificationDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
-    axis_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+    connection_specification_id: Mapped[int] = mapped_column(
+        ForeignKey("ConnectionSpecificationDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
@@ -5116,12 +5092,15 @@ class BodyAndConnectionSpecificationDAO(
         foreign_keys=[body_specification_id],
         post_update=True,
     )
-    axis: Mapped[Vector3MappingDAO] = relationship(
-        "Vector3MappingDAO", uselist=False, foreign_keys=[axis_id], post_update=True
+    connection_specification: Mapped[ConnectionSpecificationDAO] = relationship(
+        "ConnectionSpecificationDAO",
+        uselist=False,
+        foreign_keys=[connection_specification_id],
+        post_update=True,
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "BodyAndConnectionSpecificationDAO",
+        "polymorphic_identity": "ConnectedBodySpecificationDAO",
         "inherit_condition": database_id
         == WorldEntitySpawnSpecificationDAO.database_id,
         "polymorphic_load": "selectin",
@@ -5144,6 +5123,82 @@ class ConnectionSpecificationDAO(
         "polymorphic_identity": "ConnectionSpecificationDAO",
         "inherit_condition": database_id
         == WorldEntitySpawnSpecificationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class ActiveConnection1DOFSpecificationDAO(
+    ConnectionSpecificationDAO,
+    DataAccessObject[
+        semantic_digital_twin.api.specifications.ActiveConnection1DOFSpecification
+    ],
+):
+    __tablename__ = "ActiveConnection1DOFSpecificationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ConnectionSpecificationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    multiplier: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    offset: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    axis_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    axis: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO", uselist=False, foreign_keys=[axis_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ActiveConnection1DOFSpecificationDAO",
+        "inherit_condition": database_id == ConnectionSpecificationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class Connection6DoFSpecificationDAO(
+    ConnectionSpecificationDAO,
+    DataAccessObject[
+        semantic_digital_twin.api.specifications.Connection6DoFSpecification
+    ],
+):
+    __tablename__ = "Connection6DoFSpecificationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ConnectionSpecificationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Connection6DoFSpecificationDAO",
+        "inherit_condition": database_id == ConnectionSpecificationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class FixedConnectionSpecificationDAO(
+    ConnectionSpecificationDAO,
+    DataAccessObject[
+        semantic_digital_twin.api.specifications.FixedConnectionSpecification
+    ],
+):
+    __tablename__ = "FixedConnectionSpecificationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ConnectionSpecificationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "FixedConnectionSpecificationDAO",
+        "inherit_condition": database_id == ConnectionSpecificationDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -5245,6 +5300,28 @@ class BodySpecificationDAO(
     }
 
 
+class PrismaticConnectionSpecificationDAO(
+    ActiveConnection1DOFSpecificationDAO,
+    DataAccessObject[
+        semantic_digital_twin.api.specifications.PrismaticConnectionSpecification
+    ],
+):
+    __tablename__ = "PrismaticConnectionSpecificationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ActiveConnection1DOFSpecificationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PrismaticConnectionSpecificationDAO",
+        "inherit_condition": database_id
+        == ActiveConnection1DOFSpecificationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class RegionSpecificationDAO(
     KinematicStructureEntitySpecificationDAO,
     DataAccessObject[semantic_digital_twin.api.specifications.RegionSpecification],
@@ -5261,6 +5338,28 @@ class RegionSpecificationDAO(
         "polymorphic_identity": "RegionSpecificationDAO",
         "inherit_condition": database_id
         == KinematicStructureEntitySpecificationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class RevoluteConnectionSpecificationDAO(
+    ActiveConnection1DOFSpecificationDAO,
+    DataAccessObject[
+        semantic_digital_twin.api.specifications.RevoluteConnectionSpecification
+    ],
+):
+    __tablename__ = "RevoluteConnectionSpecificationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ActiveConnection1DOFSpecificationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "RevoluteConnectionSpecificationDAO",
+        "inherit_condition": database_id
+        == ActiveConnection1DOFSpecificationDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -10453,8 +10552,11 @@ class ActiveConnection1DOFDAO(
         use_existing_column=True,
     )
 
-    parameters_id: Mapped[int] = mapped_column(
-        ForeignKey("ActiveConnection1DOFParametersDAO.database_id", use_alter=True),
+    multiplier: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    offset: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    axis_id: Mapped[int] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
@@ -10463,15 +10565,20 @@ class ActiveConnection1DOFDAO(
         nullable=True,
         use_existing_column=True,
     )
+    dynamics_id: Mapped[int] = mapped_column(
+        ForeignKey("JointDynamicsDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
 
-    parameters: Mapped[ActiveConnection1DOFParametersDAO] = relationship(
-        "ActiveConnection1DOFParametersDAO",
-        uselist=False,
-        foreign_keys=[parameters_id],
-        post_update=True,
+    axis: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO", uselist=False, foreign_keys=[axis_id], post_update=True
     )
     raw_dof: Mapped[DegreeOfFreedomDAO] = relationship(
         "DegreeOfFreedomDAO", uselist=False, foreign_keys=[raw_dof_id], post_update=True
+    )
+    dynamics: Mapped[JointDynamicsDAO] = relationship(
+        "JointDynamicsDAO", uselist=False, foreign_keys=[dynamics_id], post_update=True
     )
 
     __mapper_args__ = {

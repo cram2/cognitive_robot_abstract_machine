@@ -73,6 +73,8 @@ from semantic_digital_twin.world_description.world_modification import (
 
 from semantic_digital_twin.api.specifications import (
     BodySpecification,
+    ConnectionSpecification,
+    FixedConnectionSpecification,
     SemanticAnnotationWithRootSpecification,
     KinematicStructureEntitySpecification,
 )
@@ -128,12 +130,12 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         return hash((self.__class__, self.root))
 
     @classproperty
-    def _parent_connection_type(self) -> Type[Connection]:
+    def _parent_connection_specification_type(self) -> Type[ConnectionSpecification]:
         """
-        The type of connection used to connect the root kinematic structure entity to the world.
-        .. note:: Currently its always, except with sliders and hinges, but in the future this may change. So override if needed.
+        The connection specification type that attaches the root kinematic structure entity to the world.
+        .. note:: Currently its always fixed, except with sliders and hinges, but in the future this may change. So override if needed.
         """
-        return FixedConnection
+        return FixedConnectionSpecification
 
     @classmethod
     def _create_with_connection_in_world(
@@ -162,31 +164,20 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         """
 
         self_instance = cls(name=name, root=kinematic_structure_entity)
-        world_root_T_self = world_root_T_self or HomogeneousTransformationMatrix()
-
         root = world.root
-        world_root_T_self.reference_frame = root
-        world_root_T_self.child_frame = kinematic_structure_entity
 
-        if cls._parent_connection_type == FixedConnection:
-            world_root_C_self = FixedConnection(
-                parent=root,
-                child=kinematic_structure_entity,
-                parent_T_connection_expression=world_root_T_self,
-            )
-        else:
-            world_root_C_self = cls._parent_connection_type.create_with_dofs(
-                world=world,
-                parent=root,
-                child=kinematic_structure_entity,
-                parent_T_connection_expression=world_root_T_self,
-                multiplier=connection_multiplier,
-                offset=connection_offset,
-                axis=active_axis,
-                dof_limits=connection_limits,
-            )
-
-        world.add_connection(world_root_C_self)
+        connection_specification = cls._parent_connection_specification_type.parameterized(
+            axis=active_axis,
+            multiplier=connection_multiplier,
+            offset=connection_offset,
+            dof_limits=connection_limits,
+        )
+        connection_specification.spawn(
+            world,
+            parent=root,
+            parent_T_self=world_root_T_self,
+            child=kinematic_structure_entity,
+        )
         world.add_semantic_annotation(self_instance)
 
         return self_instance

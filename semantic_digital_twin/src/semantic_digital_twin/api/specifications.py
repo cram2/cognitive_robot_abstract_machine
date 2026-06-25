@@ -4,7 +4,7 @@ import difflib
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
-from typing import Union, Optional, TYPE_CHECKING
+from typing import ClassVar, Iterable, Union, Optional, TYPE_CHECKING
 
 from typing_extensions import Self, Type, Any, Generic, TypeVar
 
@@ -23,8 +23,9 @@ from semantic_digital_twin.world_description.connections import (
     WheeledDrive,
     FixedConnection,
     ActiveConnection,
-    ActiveConnection1DOF,
     Connection6DoF,
+    PrismaticConnection,
+    RevoluteConnection,
 )
 from semantic_digital_twin.world_description.geometry import (
     Scale,
@@ -86,49 +87,15 @@ class WorldEntitySpawnSpecification(ABC):
         :param name: Overrides the specification's own name. If None, the spec's name is used.
         """
 
-    def _attach(
+    def _spawn_children(
         self,
         world: World,
-        entity: KinematicStructureEntity,
-        parent: Optional[KinematicStructureEntity],
-        connection_type: Type[Connection],
-        parent_T_self: Optional[HomogeneousTransformationMatrix],
-        *,
-        axis: Optional[Vector3] = None,
-        multiplier: float = 1.0,
-        offset: float = 0.0,
-        dof_limits: Optional[DegreeOfFreedomLimits] = None,
-        annotation: Optional[HasRootKinematicStructureEntity] = None,
-        children: list[WorldEntitySpawnSpecification] = None,
+        parent: KinematicStructureEntity,
+        children: Iterable[WorldEntitySpawnSpecification],
     ) -> None:
-        """
-        Attach ``entity`` to ``parent`` (default ``world.root``) with a connection, optionally
-        register ``annotation``, then spawn ``children`` beneath ``entity`` — all in one
-        ``modify_world`` block.
-        """
-
-        parent = parent or world.root
-
-        parent_T_self = parent_T_self or HomogeneousTransformationMatrix()
-        parent_T_self.reference_frame = parent
-        parent_T_self.child_frame = entity
-
-        with world.modify_world():
-            connection = connection_type.create_with_dofs(
-                world=world,
-                parent=parent,
-                child=entity,
-                axis=axis,
-                multiplier=multiplier,
-                offset=offset,
-                dof_limits=dof_limits,
-                parent_T_connection_expression=parent_T_self,
-            )
-            world.add_connection(connection)
-            if annotation is not None:
-                world.add_semantic_annotation(annotation)
-            for child in children or []:
-                child.spawn(world, parent=entity)
+        """Spawn each child specification as a kinematic child of ``parent``."""
+        for child in children:
+            child.spawn(world, parent=parent)
 
 
 @dataclass
@@ -186,14 +153,14 @@ class KinematicStructureEntitySpecification(
         parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> DomainObjectType:
         entity = self.to_domain_object(name)
-        self._attach(
-            world,
-            entity,
-            parent,
-            FixedConnection,
-            parent_T_self or self.parent_T_self,
-            children=self.child_specification,
-        )
+        with world.modify_world():
+            FixedConnectionSpecification().spawn(
+                world,
+                parent=parent,
+                parent_T_self=parent_T_self or self.parent_T_self,
+                child=entity,
+            )
+            self._spawn_children(world, entity, self.child_specification)
         return entity
 
     @classmethod
@@ -380,8 +347,8 @@ class RegionSpecification(KinematicStructureEntitySpecification[Region]):
 class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
     """
     Declarative description of a semantic annotation rooted in a single kinematic
-    structure entity. The annotation type owns the parent connection type (via its
-    ``_parent_connection_type``); this specification only supplies the connection
+    structure entity. The annotation type owns the parent connection specification type (via its
+    ``_parent_connection_specification_type``); this specification only supplies the connection
     parameters for active connections.
     """
 
@@ -398,7 +365,7 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
     axis: Optional[Vector3] = None
     """
     Movement axis for the parent connection. Required when the annotation's
-    ``_parent_connection_type`` is an active connection (``ActiveConnection``); ignored otherwise.
+    ``_parent_connection_specification_type`` is an active connection; ignored otherwise.
     """
 
     multiplier: float = 1.0
@@ -507,20 +474,19 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
             else ()
         )
 
+        connection_specification = self.semantic_annotation_type._parent_connection_specification_type.parameterized(
+            axis=self.axis,
+            multiplier=self.multiplier,
+            offset=self.offset,
+            dof_limits=self.connection_limits,
+        )
+
         with world.modify_world():
-            self._attach(
-                world,
-                root_entity,
-                parent,
-                self.semantic_annotation_type._parent_connection_type,
-                effective_pose,
-                axis=self.axis,
-                multiplier=self.multiplier,
-                offset=self.offset,
-                dof_limits=self.connection_limits,
-                annotation=instance,
-                children=children,
+            connection_specification.spawn(
+                world, parent=parent, parent_T_self=effective_pose, child=root_entity
             )
+            world.add_semantic_annotation(instance)
+            self._spawn_children(world, root_entity, children)
             for field_name, part_specs in part_semantic_annotation_specs.items():
                 for part_spec in part_specs:
                     part = part_spec.spawn(world, parent=root_entity)
@@ -530,81 +496,41 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
 
 
 @dataclass
-class BodyAndConnectionSpecification(WorldEntitySpawnSpecification):
-
-    body_specification: BodySpecification
-
-    connection_type: Type[Connection] = field(default=FixedConnection)
-
-    axis: Optional[Vector3] = None
+class ConnectionSpecification(WorldEntitySpawnSpecification, ABC):
     """
-    Movement axis for the parent connection. Required when ``connection_type`` is an active
-    connection (``ActiveConnection``); ignored otherwise.
+    Declarative, world- and kinematic-structure-entity-independent description of a connection.
+
+    Each connection family is a concrete subclass that binds its :attr:`connection_type` and
+    carries exactly the parameters that family uses. Materializing a specification forwards those
+    parameters to the connection type's
+    :meth:`~semantic_digital_twin.world_description.world_entity.Connection.create_with_dofs`.
     """
 
-    multiplier: float = 1.0
+    name: Union[str, PrefixedName, None] = field(default=None, kw_only=True)
     """
-    DoF multiplier for the parent connection (active connections only).
-    """
-
-    offset: float = 0.0
-    """
-    DoF offset for the parent connection (active connections only).
+    Optional connection name. If None, ``create_with_dofs`` auto-generates one from parent and child.
     """
 
-    connection_limits: Optional[DegreeOfFreedomLimits] = None
-    """
-    Degree-of-freedom limits for the parent connection (active connections only).
-    """
+    @property
+    @abstractmethod
+    def connection_type(self) -> Type[Connection]:
+        """The connection type this specification materializes."""
 
-    def spawn(
-        self,
-        world: World,
-        name: Union[str, PrefixedName, None] = None,
-        parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
-    ) -> Body:
-        body = self.body_specification.to_domain_object(name)
-        pose = parent_T_self or self.body_specification.parent_T_self
-        self._attach(
-            world,
-            body,
-            parent,
-            self.connection_type,
-            pose,
-            axis=self.axis,
-            multiplier=self.multiplier,
-            offset=self.offset,
-            dof_limits=self.connection_limits,
-            children=self.body_specification.child_specification,
-        )
-        return body
+    def _create_with_dofs_kwargs(self) -> dict[str, Any]:
+        """Family-specific keyword arguments forwarded to ``create_with_dofs``. Empty by default."""
+        return {}
 
+    @classmethod
+    def parameterized(
+        cls, *, name: PrefixedName | None = None, **connection_parameters
+    ) -> Self:
+        """
+        Instantiate this specification, applying the parameters its connection family uses.
 
-@dataclass
-class ConnectionSpecification(WorldEntitySpawnSpecification):
-    """
-    Declarative, world- and kinematic structure entity independent description of a connection.
-
-    A specification only captures *which* connection type to create and *how* to
-    parameterize it.. The captured parameters are forwarded verbatim as keyword arguments to the connection type's
-    :meth:`~semantic_digital_twin.world_description.world_entity.Connection.create_with_dofs`
-    when the connection is finally materialized.
-
-    Instances are built through the ``for_*`` factory methods rather than the
-    constructor, so that each connection family can validate and name its own parameters.
-    """
-
-    connection_type: Type[Connection] = field(kw_only=True, init=False)
-    """
-    The connection type to instantiate. Set by the ``for_*`` factory methods.
-    """
-
-    connection_kwargs: dict[str, Any] = field(default_factory=dict, init=False)
-    """
-    Keyword arguments forwarded to :meth:`connection_type.create_with_dofs`. Empty for
-    parameterless connection families such as fixed and 6-DoF connections.
-    """
+        Parameters that the family does not use are ignored, so a caller holding a bare
+        specification type can parameterize any family uniformly.
+        """
+        return cls(name=name)
 
     def spawn(
         self,
@@ -641,63 +567,134 @@ class ConnectionSpecification(WorldEntitySpawnSpecification):
                 child=child,
                 name=connection_name,
                 parent_T_connection_expression=parent_T_connection,
-                **self.connection_kwargs,
+                **self._create_with_dofs_kwargs(),
             )
             world.add_connection(connection)
         return connection
 
-    @classmethod
-    def for_fixed_connection(cls, name: PrefixedName | None = None) -> Self:
-        """
-        Specification for a rigid :class:`~semantic_digital_twin.world_description.connections.FixedConnection`,
-        which has no degrees of freedom and therefore no parameters.
 
-        :param name: The name of the connection. If None, ``create_with_dofs`` generates one.
-        """
-        self = cls(name=name)
-        self.connection_type = FixedConnection
-        return self
+@dataclass
+class FixedConnectionSpecification(ConnectionSpecification):
+    """Specification for a rigid :class:`~semantic_digital_twin.world_description.connections.FixedConnection`."""
+
+    connection_type: ClassVar[Type[Connection]] = FixedConnection
+    """The connection type this specification materializes."""
+
+
+@dataclass
+class Connection6DoFSpecification(ConnectionSpecification):
+    """Specification for a free-floating :class:`~semantic_digital_twin.world_description.connections.Connection6DoF`."""
+
+    connection_type: ClassVar[Type[Connection]] = Connection6DoF
+    """The connection type this specification materializes."""
+
+
+@dataclass
+class ActiveConnection1DOFSpecification(ConnectionSpecification, ABC):
+    """
+    Specification for a single-DoF active connection. Concrete leaf subclasses bind the
+    :attr:`connection_type` (e.g. prismatic or revolute).
+    """
+
+    axis: Optional[Vector3] = None
+    """Movement axis of the connection. Required by ``create_with_dofs`` at spawn time."""
+
+    multiplier: float = 1.0
+    """Scaling factor applied to the degree of freedom's motion."""
+
+    offset: float = 0.0
+    """Constant offset applied to the degree of freedom's motion."""
+
+    dof_limits: Optional[DegreeOfFreedomLimits] = None
+    """Limits for the generated degree of freedom."""
+
+    def _create_with_dofs_kwargs(self) -> dict[str, Any]:
+        return {
+            "axis": self.axis,
+            "multiplier": self.multiplier,
+            "offset": self.offset,
+            "dof_limits": self.dof_limits,
+        }
 
     @classmethod
-    def for_active_connection_1dof(
+    def parameterized(
         cls,
-        connection_type: Type[ActiveConnection1DOF],
+        *,
         name: PrefixedName | None = None,
+        axis: Vector3 | None = None,
         multiplier: float = 1.0,
         offset: float = 0.0,
         dof_limits: Optional[DegreeOfFreedomLimits] = None,
-        axis: Vector3 | None = None,
+        **_,
     ) -> Self:
-        """
-        Specification for a single-DoF active connection (e.g. prismatic or revolute).
+        return cls(
+            name=name,
+            axis=axis,
+            multiplier=multiplier,
+            offset=offset,
+            dof_limits=dof_limits,
+        )
 
-        :param connection_type: The concrete :class:`~semantic_digital_twin.world_description.connections.ActiveConnection1DOF` subclass to create.
-        :param name: The name of the connection. If None, ``create_with_dofs`` generates one.
 
-        .. note:: The remaining parameters mirror
-            :meth:`~semantic_digital_twin.world_description.connections.ActiveConnection1DOF.create_with_dofs`
-            and are forwarded to it unchanged.
-        """
-        call_args = dict(locals())
-        call_args.pop("cls")
-        call_args.pop("connection_type")
-        call_args.pop("name")
-        self = cls(name=name)
-        self.connection_type = connection_type
-        self.connection_kwargs = call_args
-        return self
+@dataclass
+class PrismaticConnectionSpecification(ActiveConnection1DOFSpecification):
+    """Specification for a :class:`~semantic_digital_twin.world_description.connections.PrismaticConnection`."""
 
-    @classmethod
-    def for_connection_6dof(cls, name: PrefixedName | None = None) -> Self:
-        """
-        Specification for a free-floating :class:`~semantic_digital_twin.world_description.connections.Connection6DoF`,
-        whose six degrees of freedom are generated without further parameters.
+    connection_type: ClassVar[Type[Connection]] = PrismaticConnection
+    """The connection type this specification materializes."""
 
-        :param name: The name of the connection. If None, ``create_with_dofs`` generates one.
-        """
-        self = cls(name=name)
-        self.connection_type = Connection6DoF
-        return self
+
+@dataclass
+class RevoluteConnectionSpecification(ActiveConnection1DOFSpecification):
+    """Specification for a :class:`~semantic_digital_twin.world_description.connections.RevoluteConnection`."""
+
+    connection_type: ClassVar[Type[Connection]] = RevoluteConnection
+    """The connection type this specification materializes."""
+
+
+@dataclass
+class ConnectedBodySpecification(WorldEntitySpawnSpecification):
+    """A body specification together with the connection that attaches it to its parent."""
+
+    name: Union[str, PrefixedName, None] = field(default=None, kw_only=True)
+    """
+    Optional name override for the spawned body. Defaults to the wrapped body specification's name.
+    """
+
+    body_specification: BodySpecification
+    """
+    The geometry and pose specification of the body to spawn.
+    """
+
+    connection_specification: ConnectionSpecification = field(
+        default_factory=FixedConnectionSpecification
+    )
+    """
+    How the spawned body is connected to its parent. A fixed connection by default.
+    """
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = self.body_specification.name
+        super().__post_init__()
+
+    def spawn(
+        self,
+        world: World,
+        name: Union[str, PrefixedName, None] = None,
+        parent: KinematicStructureEntity | None = None,
+        parent_T_self: HomogeneousTransformationMatrix | None = None,
+    ) -> Body:
+        body = self.body_specification.to_domain_object(name)
+        pose = parent_T_self or self.body_specification.parent_T_self
+        with world.modify_world():
+            self.connection_specification.spawn(
+                world, parent=parent, parent_T_self=pose, child=body
+            )
+            self._spawn_children(
+                world, body, self.body_specification.child_specification
+            )
+        return body
 
 
 @dataclass

@@ -38,8 +38,6 @@ from semantic_digital_twin.spatial_types import (
     Vector3,
 )
 from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-    PrismaticConnection,
     FixedConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -54,11 +52,13 @@ from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     Body,
     Region,
-    Connection,
 )
 from semantic_digital_twin.api.specifications import (
     BodySpecification,
+    ConnectionSpecification,
+    PrismaticConnectionSpecification,
     RegionSpecification,
+    RevoluteConnectionSpecification,
 )
 
 if TYPE_CHECKING:
@@ -323,8 +323,8 @@ class Hinge(MechanicalJoint):
     """
 
     @classproperty
-    def _parent_connection_type(self) -> Type[Connection]:
-        return RevoluteConnection
+    def _parent_connection_specification_type(self) -> Type[ConnectionSpecification]:
+        return RevoluteConnectionSpecification
 
 
 @dataclass(eq=False)
@@ -334,8 +334,8 @@ class Slider(MechanicalJoint):
     """
 
     @classproperty
-    def _parent_connection_type(self) -> Type[Connection]:
-        return PrismaticConnection
+    def _parent_connection_specification_type(self) -> Type[ConnectionSpecification]:
+        return PrismaticConnectionSpecification
 
 
 @dataclass(eq=False)
