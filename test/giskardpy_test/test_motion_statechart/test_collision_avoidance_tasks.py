@@ -553,9 +553,9 @@ def test_self_collision_avoidance(self_collision_bot_world: World):
 
 
 def test_avoid_collision_go_around_corner(pr2_with_box, rclpy_node):
-    viz = VizMarkerPublisher(_world=pr2_with_box, node=rclpy_node)
-    viz.with_tf_publisher()
-    viz.with_collision_visualization()
+    viz = VizMarkerPublisher(
+        _world=pr2_with_box, node=rclpy_node
+    ).with_tf_and_collision_visualization()
     r_tip = pr2_with_box.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
     robot = pr2_with_box.get_semantic_annotations_by_type(AbstractRobot)[0]
 

@@ -89,6 +89,16 @@ class VizMarkerPublisher(ModelChangeCallback):
     """QoS profile for the publisher."""
 
     _tf_publisher: Optional[TFPublisher] = field(init=False, default=None)
+    """
+    Reference to a tf publisher created by this class.
+    """
+
+    _collision_publisher: Optional[CollisionVizMarkerPublisher] = field(
+        init=False, default=None
+    )
+    """
+    Reference to a collision marker publisher created by this class.
+    """
 
     def __post_init__(self):
         super().__post_init__()
@@ -106,17 +116,20 @@ class VizMarkerPublisher(ModelChangeCallback):
         """
         self._tf_publisher = TFPublisher(_world=self._world, node=self.node)
 
-    def with_collision_visualization(self, **kwargs) -> CollisionVizMarkerPublisher:
+    def with_collision_visualization(self, **kwargs):
         """
         Launches a publisher for closest-points collision results alongside the
         VizMarkerPublisher and registers it with the world's collision manager.
 
         :param kwargs: Forwarded to :class:`CollisionVizMarkerPublisher`.
-        :return: The registered collision visualization publisher.
         """
-        publisher = CollisionVizMarkerPublisher(node=self.node, **kwargs)
-        self._world.collision_manager.add_collision_consumer(publisher)
-        return publisher
+        self._collision_publisher = CollisionVizMarkerPublisher(
+            node=self.node, world=self._world, **kwargs
+        )
+
+    def with_tf_and_collision_visualization(self):
+        self.with_tf_publisher()
+        self.with_collision_visualization()
 
     def _select_shapes(self, body):
         if self.shape_source is ShapeSource.VISUAL_ONLY:
