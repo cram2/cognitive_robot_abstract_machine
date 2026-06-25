@@ -59,6 +59,11 @@ class TopicSubscriberNode(TopicNode[MsgType]):
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         node_artifacts = super().build(context)
+
+        existing = getattr(self, "_subscriber", None)
+        if existing is not None:
+            return node_artifacts
+
         self._subscriber = self.ros2_node.create_subscription(
             msg_type=self.msg_type,
             topic=self.topic_name,
@@ -87,6 +92,13 @@ class TopicSubscriberNode(TopicNode[MsgType]):
     def on_reset(self, context: MotionStatechartContext):
         self.clear_msg()
 
+    def cleanup(self, context: MotionStatechartContext):
+        super().cleanup(context)
+        subscriber = getattr(self, "_subscriber", None)
+        if subscriber is not None:
+            self.ros2_node.destroy_subscription(subscriber)
+            self._subscriber = None
+
 
 @dataclass(eq=False, repr=False)
 class TopicPublisherNode(TopicNode[MsgType]):
@@ -100,12 +112,24 @@ class TopicPublisherNode(TopicNode[MsgType]):
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         node_artifacts = super().build(context)
+
+        existing = getattr(self, "_publisher", None)
+        if existing is not None:
+            return node_artifacts
+
         self._publisher = self.ros2_node.create_publisher(
             msg_type=self.msg_type,
             topic=self.topic_name,
             qos_profile=self.qos_profile,
         )
         return node_artifacts
+
+    def cleanup(self, context: MotionStatechartContext):
+        super().cleanup(context)
+        publisher = getattr(self, "_publisher", None)
+        if publisher is not None:
+            self.ros2_node.destroy_publisher(publisher)
+            self._publisher = None
 
 
 @dataclass(eq=False, repr=False)

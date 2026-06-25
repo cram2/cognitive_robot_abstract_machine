@@ -109,6 +109,14 @@ class TracyRightGripperLeftFinger(Finger):
             ),
         )
 
+    def _setup_velocity_limits(self):
+        """
+        The UR10e default velocity limits are either 2.09 or 3.14 depending on the joint. Wrist joints are 3.14.
+        Clipping the limits below 3.14 causes weird movements in end effector orientation space,
+        as the wrist stops moving with the correct speed relative to the other arm joints.
+        """
+        vel_limits = defaultdict(lambda: 4.0)
+        self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
 @dataclass(eq=False)
 class TracyRightGripperRightFinger(Finger):
@@ -264,7 +272,7 @@ class TracyRightArm(Arm[TracyRightGripper]):
         connections = self.active_connections
         arm_park = JointState.from_mapping(
             name=PrefixedName("right_arm_park", prefix=self.name.name),
-            mapping=dict(zip(connections, [3.72, -2.07, -1.17, 4.0, 0.82, 0.75])),
+            mapping=dict(zip(connections, [3.77, -2.05, -0.9, 3.8, 0.76, -2.28])),
             state_type=StaticJointState.PARK,
         )
         return [arm_park]

@@ -140,9 +140,7 @@ class MotionExecutor:
             time.sleep(0.01)
 
     def _execute_for_real(self):
-        from giskardpy.middleware.ros2.python_interface import GiskardWrapper
-
-        giskard = GiskardWrapper(self.ros_node)
+        giskard = self.plan_node.plan.context.giskard_wrapper
 
         kill_event = threading.Event()
         interrupt_thread = threading.Thread(

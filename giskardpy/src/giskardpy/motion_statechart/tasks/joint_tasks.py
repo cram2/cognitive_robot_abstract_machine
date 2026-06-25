@@ -39,7 +39,7 @@ class JointPositionList(Task):
     """
     max_velocity: float = field(default=1.0, kw_only=True)
     """
-    The maximum velocity of the joints.
+    The maximum velocity of the joints in m/s.
     """
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
