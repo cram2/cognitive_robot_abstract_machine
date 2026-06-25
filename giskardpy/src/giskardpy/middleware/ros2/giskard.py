@@ -9,7 +9,7 @@ from typing import List
 import rclpy
 from sqlalchemy.orm import sessionmaker
 
-from giskardpy.data_types.exceptions import SetupException
+from giskardpy.data_types.exceptions import NoControlledJointsError
 from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.model.world_config import WorldConfig
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -154,7 +154,7 @@ class Giskard:
         controlled_joints = self.robot.controlled_connections
         non_controlled_joints = set(movable_joints).difference(set(controlled_joints))
         if len(controlled_joints) == 0 and len(world.connections) > 0:
-            raise SetupException("No joints are flagged as controlled.")
+            raise NoControlledJointsError()
         if len(non_controlled_joints) > 0:
             rospy.node.get_logger().info(
                 f"The following joints are non-fixed according to the urdf, "

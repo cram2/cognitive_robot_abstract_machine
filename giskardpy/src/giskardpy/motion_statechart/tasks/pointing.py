@@ -1,19 +1,14 @@
 from __future__ import division
 
 from dataclasses import dataclass, field
-from functools import cached_property
 
+from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.graph_node import NodeArtifacts
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
-from krrood.symbolic_math.float_variable_data import FloatVariableData
 from semantic_digital_twin.spatial_types import Point3, Vector3
-from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.graph_node import NodeArtifacts, DebugExpression
-from giskardpy.motion_statechart.graph_node import Task
 
 
 @dataclass(eq=False, repr=False)
@@ -61,7 +56,7 @@ class Pointing(CartesianTask):
         root_V_pointing_axis.vis_frame = self.tip_link
         root_V_goal_axis.vis_frame = self.tip_link
 
-        artifacts.constraints.add_vector_goal_constraints(
+        artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_pointing_axis,
             frame_V_goal=root_V_goal_axis,
             reference_velocity=self.max_velocity,
@@ -122,7 +117,7 @@ class PointingCone(CartesianTask):
         )
         root_V_goal_axis_proj.vis_frame = self.tip_link
 
-        artifacts.constraints.add_vector_goal_constraints(
+        artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_pointing_axis,
             frame_V_goal=root_V_goal_axis_proj,
             reference_velocity=self.max_velocity,

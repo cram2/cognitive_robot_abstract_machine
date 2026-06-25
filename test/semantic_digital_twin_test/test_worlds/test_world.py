@@ -513,6 +513,40 @@ def test_merge_with_connection(world_setup, pr2_world_copy):
     assert np.allclose(actual_fk, expected_fk)
 
 
+def test_merge_world_with_connection_worldless_parent():
+    world1 = World()
+    b1 = Body(name=PrefixedName("b1"))
+
+    world2 = World()
+    b2 = Body(name=PrefixedName("b2"))
+
+    with world2.modify_world():
+        world2.add_body(b2)
+
+    b1_C_b2 = FixedConnection(parent=b1, child=b2)
+    world1.merge_world(world2, b1_C_b2)
+
+    assert b1_C_b2 in world1.connections
+    assert b2 in world1.bodies
+
+
+def test_merge_world_with_connection_worldless_child():
+    world1 = World()
+    b1 = Body(name=PrefixedName("b1"))
+
+    world2 = World()
+    b2 = Body(name=PrefixedName("b2"))
+
+    with world2.modify_world():
+        world2.add_body(b2)
+
+    b2_C_b1 = FixedConnection(parent=b2, child=b1)
+    world1.merge_world(world2, b2_C_b1)
+
+    assert b2_C_b1 in world1.connections
+    assert b2 in world1.bodies
+
+
 def test_merge_with_pose(world_setup, pr2_world_copy):
     world, l1, l2, bf, r1, r2 = world_setup
 

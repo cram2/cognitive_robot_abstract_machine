@@ -2,8 +2,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing_extensions import Type, Dict
 
-from krrood.entity_query_language.query.match import Match, MatchVariable
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
+from krrood.utils import get_class_and_attribute_name
+from probabilistic_model.probabilistic_circuit.relational.rspn import (
+    RelationalProbabilisticCircuit,
+)
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
 from probabilistic_model.probabilistic_model import ProbabilisticModel
 
@@ -45,3 +48,29 @@ class DictRegistry(ModelRegistry):
 
     def get_model(self, parameters: UnderspecifiedParameters) -> ProbabilisticModel:
         return self.models[parameters.statement._expression.selected_variable._type_]
+
+
+@dataclass
+class RelationalCircuitRegistry(ModelRegistry):
+    """
+    A registry that grounds a RelationalProbabilisticCircuit for the queried statement and
+    aligns its variable names to the UnderspecifiedParameters convention before returning.
+    """
+
+    relational_probabilistic_circuit: RelationalProbabilisticCircuit
+    """
+    The trained relational probabilistic circuit to ground.
+    """
+
+    def get_model(self, parameters: UnderspecifiedParameters) -> ProbabilisticModel:
+        grounded = self.relational_probabilistic_circuit.ground(parameters.statement)
+        class_prefix = self.relational_probabilistic_circuit.class_.__name__
+        rename_map = {}
+        for circuit_var in grounded.variables:
+            qualified_name = get_class_and_attribute_name(
+                class_prefix, circuit_var.name
+            )
+            if qualified_name in parameters.variables:
+                rename_map[circuit_var] = parameters.variables[qualified_name]
+        grounded.update_variables(rename_map)
+        return grounded

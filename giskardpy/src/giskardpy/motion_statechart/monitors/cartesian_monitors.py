@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import List
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
@@ -9,38 +8,7 @@ from semantic_digital_twin.spatial_types import (
     RotationMatrix,
     HomogeneousTransformationMatrix,
 )
-from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.world_description.world_entity import Body
-
-
-@dataclass
-class InWorldSpace(MotionStatechartNode):
-    tip_link: Body
-    xyz: List[float]
-
-    def __post_init__(self):
-        self.joint: OmniDrive = context.world.get_connections_by_type(OmniDrive)[0]
-        self.drive_link = self.joint.child
-        self.tip_link = self.tip_link
-        self.map = self.joint.parent
-
-        map_T_tip = context.world._forward_kinematic_manager.compose_expression(
-            self.map, self.tip_link
-        )
-        map_T_drive = context.world._forward_kinematic_manager.compose_expression(
-            self.map, self.drive_link
-        )
-
-        # project to floor
-        map_T_tip.z = 0
-
-        error = map_T_tip.to_position() - map_T_drive.to_position()
-        error.vis_frame = self.drive_link
-        context.context.add_debug_expression(f"{self.name}/error", error)
-        self.observation_expression = sm.logic_and(
-            sm.abs(error.x) <= self.xyz[0],
-            sm.abs(error.y) <= self.xyz[1],
-        )
 
 
 @dataclass

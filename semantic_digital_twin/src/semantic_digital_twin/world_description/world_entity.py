@@ -1054,13 +1054,15 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer, AB
         """
         Updates the parent and child references of this connection to the given world as well as the references from the expression.
         """
-        child_id = self.child.id
-        child = world.get_kinematic_structure_entity_by_id(child_id)
-        parent_id = self.parent.id
-        parent = world.get_kinematic_structure_entity_by_id(parent_id)
-        self.parent = parent
-        self.child = child
-        self.parent_T_connection_expression.reference_frame = parent
+        if world.is_kinematic_structure_entity_in_world(self.parent):
+            parent = world.get_kinematic_structure_entity_by_id(self.parent.id)
+            self.parent = parent
+
+        if world.is_kinematic_structure_entity_in_world(self.child):
+            child = world.get_kinematic_structure_entity_by_id(self.child.id)
+            self.child = child
+        self.parent_T_connection_expression.reference_frame = self.parent
+        self.parent_T_connection_expression.child_frame = self.child
 
 
 GenericConnection = TypeVar("GenericConnection", bound=Connection)

@@ -681,18 +681,22 @@ class OperationResult:
     """
     The bindings resulting from the operation, mapping variable IDs to their values.
     """
+
     is_false: bool = False
     """
     Whether the operation resulted in a false value (i.e., The operation condition was not satisfied)
     """
+
     operand: Optional[SymbolicExpression] = None
     """
     The operand that produced the result.
     """
+
     previous_operation_result: Optional[OperationResult] = None
     """
     The result of the operation that was evaluated before this one.
     """
+
     satisfied_condition_ids: Optional[OrderedSet[UUID]] = None
     """
     A set of UUIDs of condition expressions in the condition tree that were satisfied (truth value = True)

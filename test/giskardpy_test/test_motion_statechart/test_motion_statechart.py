@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 import numpy as np
 import pytest
-
 from giskardpy.data_types.exceptions import DuplicateNameException
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -42,6 +41,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability
 from giskardpy.motion_statechart.test_nodes.test_nodes import (
     ChangeStateOnEvents,
     ConstTrueNode,
@@ -53,7 +53,9 @@ from giskardpy.motion_statechart.test_nodes.test_nodes import (
     TestEndBeforeStart,
     TestUnpauseUnknownFromParentPause,
 )
-from giskardpy.qp.constraint import EqualityConstraint
+from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
+from giskardpy.qp.constraint import GiskardEqualityConstraint
+from giskardpy.qp.enforcement_strategy import IntegralStrategy
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from krrood.symbolic_math.symbolic_math import (
     trinary_logic_and,
@@ -66,6 +68,7 @@ from semantic_digital_twin.spatial_types import (
     Vector3,
     Point3,
 )
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 
 
@@ -1218,7 +1221,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
 
     expr = Vector3.X(tip).angle_between(Vector3.Y(root))
 
-    col.add_point_goal_constraints(
+    GeometricConstraintBuilder(col).add_point_goal_constraints(
         frame_P_current=Point3(0, 0, 0, reference_frame=tip),
         frame_P_goal=Point3(0, 0, 0, reference_frame=tip),
         reference_velocity=0.1,
@@ -1275,15 +1278,16 @@ def test_constraint_collection(pr2_world_state_reset: World):
         quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         task_expression=expr,
     )
-    constraint = EqualityConstraint(
+    constraint = GiskardEqualityConstraint(
         name="same_name",
         expression=expr,
-        bound=0.0,
         normalization_factor=0.1,
         quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         lower_slack_limit=-float("inf"),
         upper_slack_limit=float("inf"),
         linear_weight=0,
+        enforcement_strategy=IntegralStrategy,
+        bound=0.0,
     )
     col3._constraints.append(constraint)
 
@@ -1692,3 +1696,30 @@ class TestLifeCycleTransitions:
         msc.plot_gantt_chart()
 
         assert len(msc.history) == 5
+
+
+class TestMaxManipulability:
+    def test_MaxManipulability(self, pr2_world_state_reset: World):
+        root = pr2_world_state_reset.get_body_by_name("base_footprint")
+        tip = pr2_world_state_reset.get_body_by_name("r_gripper_tool_frame")
+
+        goal_pose = Pose.from_xyz_rpy(
+            x=0.8, y=-0.3, z=1.0, reference_frame=pr2_world_state_reset.root
+        )
+        msc = MotionStatechart()
+        cart_goal = CartesianPose(
+            root_link=pr2_world_state_reset.root,
+            tip_link=tip,
+            goal_pose=goal_pose,
+        )
+        msc.add_nodes([cart_goal, MaxManipulability(root_link=root, tip_link=tip)])
+        msc.add_node(EndMotion.when_true(cart_goal))
+
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        fk = pr2_world_state_reset.compute_forward_kinematics_np(
+            pr2_world_state_reset.root, tip
+        )
+        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.threshold)

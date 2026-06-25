@@ -1,31 +1,27 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum, EnumType
+from enum import EnumType
 from functools import cached_property
 from types import UnionType, EllipsisType
-from typing import Dict, Optional, Tuple, List, Iterable, Union
 
 import numpy as np
-from typing_extensions import Any, get_args
+from typing_extensions import Any, Iterable, Optional, Union, get_args
 from krrood.parametrization.exceptions import EmptyVariableDomain, InvalidEllipsis
 import random_events.variable
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Literal, Variable
-from krrood.entity_query_language.factories import and_, variable
-from krrood.entity_query_language.core.mapped_variable import (
-    Attribute,
-)
+from krrood.entity_query_language.factories import and_
 from krrood.entity_query_language.query.match import MatchVariable, AttributeMatch
-from krrood.ormatic.data_access_objects.helper import to_dao, get_dao_class
+from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 from krrood.parametrization.random_events_translator import (
     WhereExpressionToRandomEventTranslator,
 )
-from krrood.parametrization.feature_extractor import FeatureExtractor
+from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
 from random_events.interval import singleton
 from random_events.product_algebra import Event, SimpleEvent
-from random_events.set import Set, SetElement
+from random_events.set import Set
 from random_events.variable import (
     compatible_types,
     variable_from_name_and_type,
@@ -62,22 +58,22 @@ class UnderspecifiedParameters:
     Only exists if the statement has a where condition.
     """
 
-    conditioning_assignments_from_literal_values: Dict[
+    conditioning_assignments_from_literal_values: dict[
         random_events.variable.Variable, Any
     ] = field(init=False, default_factory=dict)
     """
     Dictionary of events that are created from literal values, e.g. actual values. These are the assignments, that the probabilistic model is *conditioned* on.
     """
 
-    truncation_assignments_from_krrood_variables: List[Event] = field(
+    truncation_assignments_from_krrood_variables: list[Event] = field(
         init=False, default_factory=list
     )
     """
     List of events that are created from symbolic expressions, e.g. variable assignments. These are the assignments, that the probabilistic model is *truncated* on. They may contain literals in their domains, however, the difference to `_events_from_literal_values` is, that these events are not directly used for conditioning, but rather for truncation. This means, that the events of this list do not change the weights of sum nodes in probabilistic circuits.
     """
 
-    _symbolic_expression_event_cache: Dict[
-        SymbolicExpression, Tuple[Event, Dict[str, random_events.variable.Variable]]
+    _symbolic_expression_event_cache: dict[
+        SymbolicExpression, tuple[Event, dict[str, random_events.variable.Variable]]
     ] = field(init=False, default_factory=dict)
     """
     A cache for events that are created from symbolic expressions.
@@ -95,7 +91,7 @@ class UnderspecifiedParameters:
         _ = self.variables  # make variables available
 
     @cached_property
-    def variables(self) -> Dict[str, random_events.variable.Variable]:
+    def variables(self) -> dict[str, random_events.variable.Variable]:
         """
         :return: A dictionary that maps variable names to random events variables that appear in
         the `where` or `Match` statement.
@@ -112,7 +108,7 @@ class UnderspecifiedParameters:
 
     def _extract_variables_from_attribute_match(
         self, attribute_match: AttributeMatch
-    ) -> Dict[str, random_events.variable.Variable]:
+    ) -> dict[str, random_events.variable.Variable]:
         """
         Extract variables from an attribute match by dispatching to specific handlers.
 
@@ -131,7 +127,7 @@ class UnderspecifiedParameters:
 
     def _handle_literal_attribute_match(
         self, attribute_match: AttributeMatch
-    ) -> Dict[str, random_events.variable.Variable]:
+    ) -> dict[str, random_events.variable.Variable]:
         """
         Handle attribute matches where the assigned value is a literal.
 
@@ -143,57 +139,133 @@ class UnderspecifiedParameters:
         krrood_variable = attribute_match.assigned_variable
         type_ = self._process_attribute_match_type(krrood_variable._type_)
 
-        # value incompatible
         if (
             issubclass(type_, compatible_types)
             and not isinstance(value, compatible_types)
+            and not isinstance(value, (list, tuple, set))
             and not isinstance(value, EllipsisType)
         ):
             raise TypeError(
                 f"The attribute type is {type_}, but the assigned value is of type {type(value)}."
                 f"Please enter a value of a valid type. Valid types are {type_} or Ellipsis"
             )
-        #  value compatible
-        elif isinstance(value, compatible_types):
+
+        if isinstance(value, EllipsisType) and not issubclass(type_, compatible_types):
+            raise InvalidEllipsis(type_)
+
+        if isinstance(value, EllipsisType):
+            return {name: variable_from_name_and_type(name=name, type_=type_)}
+
+        if isinstance(value, compatible_types):
             result = {name: variable_from_name_and_type(name=name, type_=type(value))}
             self.conditioning_assignments_from_literal_values[result[name]] = value
             return result
-        # value compatible but type is not leaf type, so Ellipsis was not allowed
-        elif isinstance(value, EllipsisType) and not issubclass(
-            type_, compatible_types
-        ):
-            raise InvalidEllipsis(type_)
-        # value compatible
-        elif isinstance(value, EllipsisType):
-            return {name: variable_from_name_and_type(name=name, type_=type_)}
 
-        return self._extract_variables_from_non_primitive_literal(attribute_match)
+        if isinstance(value, (list, tuple, set)):
+            return self._extract_variables_from_iterable_literal(name, value)
 
-    def _extract_variables_from_non_primitive_literal(
-        self, attribute_match: AttributeMatch
-    ) -> Dict[str, random_events.variable.Variable]:
+        if isinstance(value, compatible_types) or isinstance(type_, compatible_types):
+            return self._handle_compatible_type_literal(name, value, type_)
+
+        return self._extract_variables_from_non_primitive_literal(value, name)
+
+    def _handle_compatible_type_literal(
+        self,
+        name: str,
+        value: Any,
+        type_: type,
+    ) -> dict[str, random_events.variable.Variable]:
         """
-        Extract variables from a literal value that is not a primitive type.
+        Handle a literal whose value or declared type is a primitive compatible type.
 
-        :param attribute_match: The attribute match with a non-primitive literal value.
+        Picks ``type_`` when it is a concrete compatible type; falls back to
+        ``type(value)`` otherwise.
+
+        :param name: The variable name derived from the attribute access path.
+        :param value: The literal value being matched.
+        :param type_: The processed declared type of the attribute.
+        :return: A dictionary containing the extracted variable.
+        """
+        effective_type = (
+            type_
+            if (
+                type_ is not None
+                and isinstance(type_, type)
+                and issubclass(type_, compatible_types)
+            )
+            else type(value)
+        )
+        result = {name: variable_from_name_and_type(name=name, type_=effective_type)}
+        self.conditioning_assignments_from_literal_values[result[name]] = value
+        return result
+
+    def _extract_variables_from_iterable_literal(
+        self, name: str, value: Union[list, tuple]
+    ) -> dict[str, random_events.variable.Variable]:
+        """
+        Extract variables from an iterable literal by processing each element with an
+        indexed name prefix (e.g. ``walls[0].height``, ``walls[1].start_point.x``).
+
+        Primitive elements become a single conditioning variable; non-primitive elements
+        are decomposed via
+        :py:class:`~krrood.parametrization.feature_extraction.feature_extractor.FeatureExtractor`.
+
+        :param name: Base variable name derived from the attribute access path.
+        :param value: The iterable assigned value.
         :return: A dictionary of extracted variables.
         """
         result = {}
-        dao_state = ToDataAccessObjectState()
+        for index, element in enumerate(value):
+            if element is None:
+                continue
 
-        extractor = FeatureExtractor.from_instances(
-            [to_dao(attribute_match.assigned_value, dao_state)]
-        )
+            type_ = self._process_attribute_match_type(type(element))
+            if isinstance(element, EllipsisType) and not issubclass(
+                type_, compatible_types
+            ):
+                raise InvalidEllipsis(type_)
+
+            indexed_name = f"{name}[{index}]"
+            if isinstance(element, compatible_types):
+                result.update(self._handle_compatible_type_literal(indexed_name, element, type_))
+            else:
+                result.update(
+                    self._extract_variables_from_non_primitive_literal(element, indexed_name)
+                )
+        return result
+
+    def _extract_variables_from_non_primitive_literal(
+        self, value: Any, name_prefix: str
+    ) -> dict[str, random_events.variable.Variable]:
+        """
+        Extract variables from a single non-primitive literal value.
+
+        Converts ``value`` to a DAO, runs feature extraction, and registers a
+        conditioning assignment for every discovered feature.
+
+        :param value: The non-primitive literal to decompose.
+        :param name_prefix: Attribute access path used to namespace the feature names
+            (e.g. ``"obj"`` yields ``"obj.position.x"``).
+        :return: A dictionary mapping prefixed feature names to their variables.
+        """
+        result = {}
+        dao_state = ToDataAccessObjectState()
+        extractor = FeatureExtractor.from_instances([to_dao(value, dao_state)])
         for feature in extractor.features:
-            result[feature._name_] = random_events.variable.Continuous(
-                name=feature._name_
+            feature_name = f"{name_prefix}.{feature.get_clean_name_from_mapped_variable()}"
+            random_events_variable = variable_from_name_and_type(
+                name=feature_name, type_=feature._type_
             )
-            self._register_literal_conditioning_event(attribute_match, feature, result)
+            result[feature_name] = random_events_variable
+            mapping = feature.apply_mapping_on_external_root(value)
+            if not isinstance(mapping, feature._type_):
+                mapping = feature._type_(mapping)
+            self.conditioning_assignments_from_literal_values[random_events_variable] = mapping
         return result
 
     def _handle_variable_attribute_match(
         self, attribute_match: AttributeMatch
-    ) -> Dict[str, random_events.variable.Variable]:
+    ) -> dict[str, random_events.variable.Variable]:
         """
         Handle attribute matches where the assigned value is a KRROOD variable.
 
@@ -223,8 +295,8 @@ class UnderspecifiedParameters:
         )
 
     def _extract_variables_from_primitive_krrood_variable(
-        self, attribute_match: AttributeMatch, domain_objects: List[Any]
-    ) -> Dict[str, random_events.variable.Variable]:
+        self, attribute_match: AttributeMatch, domain_objects: list[Any]
+    ) -> dict[str, random_events.variable.Variable]:
         """
         Extract variables from a KRROOD variable with a primitive type.
 
@@ -254,8 +326,8 @@ class UnderspecifiedParameters:
         return result
 
     def _extract_variables_from_non_primitive_krrood_variable(
-        self, attribute_match: AttributeMatch, domain_objects: List[Any]
-    ) -> Dict[str, random_events.variable.Variable]:
+        self, attribute_match: AttributeMatch, domain_objects: list[Any]
+    ) -> dict[str, random_events.variable.Variable]:
         """
         Extract variables from a KRROOD variable with a non-primitive type.
 
@@ -312,7 +384,7 @@ class UnderspecifiedParameters:
         self,
         variables: Iterable[random_events.variable.Variable],
         sample: np.ndarray,
-    ) -> Dict[random_events.variable.Variable, Any]:
+    ) -> dict[random_events.variable.Variable, Any]:
         """
         Construct an instance from a sample of a probabilistic model.
 
@@ -363,33 +435,8 @@ class UnderspecifiedParameters:
         result = self.statement.construct_instance()
         return result
 
-    def _register_literal_conditioning_event(
-        self,
-        attribute_match: AttributeMatch,
-        attribute: Attribute,
-        result: Dict[str, random_events.variable.Variable],
-    ):
-        """
-        Register a conditioning event for a literal attribute match.
-
-        :param attribute_match: The attribute match.
-        :param attribute: The attribute being matched.
-        :param result: The dictionary of variables to update.
-        """
-        if not isinstance(attribute_match.assigned_value, compatible_types):
-            mapping = attribute.apply_mapping_on_external_root(
-                attribute_match.assigned_value
-            )
-            if not isinstance(mapping, attribute._type_):
-                # this cast is necessary because of the way the mapping is applied to the attribute. For instance, mapping might be Scalar(), but the attribute type is float.
-                mapping = attribute._type_(mapping)
-        else:
-            mapping = attribute_match.assigned_value
-        self.conditioning_assignments_from_literal_values[result[attribute._name_]] = (
-            mapping
-        )
-
-    def _process_attribute_match_type(self, type_):
+    @staticmethod
+    def _process_attribute_match_type(type_):
         """
         Process the type of an attribute matches assigned variable such that there are no unions.
         :param type_: The type to process

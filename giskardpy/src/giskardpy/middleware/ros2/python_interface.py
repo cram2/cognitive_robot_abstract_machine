@@ -10,7 +10,7 @@ import rclpy
 from json_msgs.action import JsonAction
 from json_msgs.action._json_action import JsonAction_Result
 from giskardpy.middleware.ros2 import rospy
-from giskardpy.middleware.ros2.exceptions import ExecutionException
+from giskardpy.middleware.ros2.exceptions import NoActiveGoalToCancelError
 from giskardpy.middleware.ros2.ros2_interface import MyActionClient
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
@@ -107,9 +107,7 @@ class GiskardWrapper:
         try:
             future = self._client._goal_handle.cancel_goal_async()
         except AttributeError as e:
-            raise ExecutionException(
-                "Can't cancel goals, because there is no active one"
-            )
+            raise NoActiveGoalToCancelError()
         return future
 
     async def get_result(self):

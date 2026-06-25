@@ -579,16 +579,28 @@ class World(HasSimulatorProperties):
         return possible_roots[0]
 
     @property
-    def active_degrees_of_freedom(self) -> Set[DegreeOfFreedom]:
-        return {
-            dof for connection in self.connections for dof in connection.active_dofs
-        }
+    def active_degrees_of_freedom(self) -> List[DegreeOfFreedom]:
+        """
+        The deduplicated, order-preserving list of active degrees of freedom across all connections.
+        """
+        return list(
+            dict.fromkeys(
+                dof for connection in self.connections for dof in connection.active_dofs
+            )
+        )
 
     @property
-    def passive_degrees_of_freedom(self) -> Set[DegreeOfFreedom]:
-        return {
-            dof for connection in self.connections for dof in connection.passive_dofs
-        }
+    def passive_degrees_of_freedom(self) -> List[DegreeOfFreedom]:
+        """
+        The deduplicated, order-preserving list of passive degrees of freedom across all connections.
+        """
+        return list(
+            dict.fromkeys(
+                dof
+                for connection in self.connections
+                for dof in connection.passive_dofs
+            )
+        )
 
     @property
     def regions(self) -> List[Region]:
