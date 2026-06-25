@@ -2,44 +2,41 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Iterable, Optional, Self, Tuple
+from typing import Iterable, Optional, Self, Tuple, TYPE_CHECKING
 
-from random_events.interval import closed
-from random_events.product_algebra import SimpleEvent
 from typing_extensions import List, Type
 
 from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math import symbolic_math
-from semantic_digital_twin.semantic_annotations.mixins import (
-    HasSupportingSurface,
-    HasRootRegion,
-    HasDrawers,
-    HasDoors,
-    HasHandle,
-    HasLegs,
-    HasShelfLayers,
-    HasCaseAsRootBody,
-    HasHinge,
-    HasSlider,
-    HasApertures,
-    IsPerceivable,
-    HasRootBody,
-    HasStorageSpace,
-)
+from random_events.interval import closed
+from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
     InvalidPlaneDimensions,
     InvalidHingeActiveAxis,
     MissingSemanticAnnotationError,
+    MechanicalJointAlreadyMounted,
 )
 from semantic_digital_twin.reasoning.predicates import InsideOf
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasSupportingSurface,
+    HasRootRegion,
+    HasDrawers,
+    HasDoors,
+    HasHandle,
+    HasCaseAsRootBody,
+    HasMechanicalJoint,
+    HasApertures,
+    IsPerceivable,
+    HasRootBody,
+    IsStorageSpace,
+)
 from semantic_digital_twin.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
@@ -48,7 +45,7 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.world_description.geometry import Scale, Mesh
+from semantic_digital_twin.world_description.geometry import Scale, Mesh, Color
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
     ShapeCollection,
@@ -59,6 +56,9 @@ from semantic_digital_twin.world_description.world_entity import (
     Region,
     Connection,
 )
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.world import World
 
 
 @dataclass(eq=False)
@@ -117,13 +117,12 @@ class Handle(HasRootBody):
         :param thickness: The thickness of the handle walls.
         """
 
-        x_interval = closed(0, scale.x - thickness)
-        y_interval = closed(
-            -scale.y / 2 + thickness,
-            scale.y / 2 - thickness,
+        x_interval = closed(-scale.x + thickness, 0)
+        y_interval = closed(-scale.y / 2, scale.y / 2)
+        z_interval = closed(
+            -scale.z / 2 + thickness,
+            scale.z / 2 - thickness,
         )
-
-        z_interval = closed(-scale.z / 2, scale.z / 2)
 
         return SimpleEvent.from_data(
             {
@@ -133,11 +132,16 @@ class Handle(HasRootBody):
             }
         )
 
+
 @dataclass(eq=False)
 class Dishwasher(HasCaseAsRootBody, HasDoors, HasDrawers):
     """
     A dishwasher is a kitchen appliance used for cleaning dishes, utensils, and cookware. It typically has a front door that opens to reveal racks for loading dirty items and a control panel for selecting wash cycles.
     """
+
+    @classproperty
+    def hole_direction(self) -> Vector3:
+        return Vector3.NEGATIVE_X()
 
 
 @dataclass(eq=False)
@@ -193,9 +197,72 @@ class Aperture(HasRootRegion):
             name, world, parent_T_self, scale=body_scale
         )
 
+    def _mount_strategy(self, main_has_root_body_annotation: HasRootBody) -> None:
+        # An aperture cuts its shape out of the whole's geometry, then mounts as a child.
+        self._remove_aperture_geometry_from_parent(main_has_root_body_annotation)
+        super()._mount_strategy(main_has_root_body_annotation)
+
+    def _remove_aperture_geometry_from_parent(self, parent: HasRootBody):
+        """
+        Remove the geometry of the aperture from the parent body's collision and visual geometry.
+
+        :param parent: The parent from which the aperture geometry is removed.
+        """
+
+        world = parent._world
+        world.update_forward_kinematics()
+        hole_event = self.root.area.as_bounding_box_collection_in_frame(
+            parent.root
+        ).event
+        wall_event = parent.root.collision.as_bounding_box_collection_in_frame(
+            parent.root
+        ).event
+        new_wall_event = wall_event - hole_event
+        new_bounding_box_collection = BoundingBoxCollection.from_event(
+            parent.root, new_wall_event
+        ).as_shapes()
+
+        parent.root.collision = new_bounding_box_collection
+        parent.root.visual = new_bounding_box_collection
+
 
 @dataclass(eq=False)
-class Hinge(HasRootBody):
+class MechanicalJoint(HasRootBody):
+    """
+    A mechanical joint is a physical entity that connects two bodies and allows one to move along or around a fixed axis
+    """
+
+    def _mount_strategy(self, main_has_root_body_annotation: HasRootBody) -> None:
+        """
+        Inserts the joint between the whole (``main_has_root_body_annotation``) and the whole's
+        current parent, preserving the whole's ancestry.
+        So
+        whole_parent -(fixed)-> whole
+        becomes
+        whole_parent -(active)-> joint -(fixed)-> whole. The joint keeps its active connection
+        (now anchored at the whole's parent); the whole hangs rigidly off the joint.
+        """
+        if (
+            main_has_root_body_annotation.root.parent_kinematic_structure_entity
+            == self.root
+        ):
+            return
+        # used instead of World.compute_child_kinematic_structure_entities because its memoized
+        if list(self._world.kinematic_structure.successors(self.root.index)):
+            raise MechanicalJointAlreadyMounted(self, main_has_root_body_annotation)
+
+        self._world.move_branch(
+            self.root,
+            main_has_root_body_annotation.root.parent_kinematic_structure_entity,
+            enable_unsafe_inside_world_block=True,
+        )
+        main_has_root_body_annotation._world.move_branch(
+            main_has_root_body_annotation.root, self.root, True
+        )
+
+
+@dataclass(eq=False)
+class Hinge(MechanicalJoint):
     """
     A hinge is a physical entity that connects two bodies and allows one to rotate around a fixed axis.
     """
@@ -206,7 +273,7 @@ class Hinge(HasRootBody):
 
 
 @dataclass(eq=False)
-class Slider(HasRootBody):
+class Slider(MechanicalJoint):
     """
     A Slider is a physical entity that connects two bodies and allows one to linearly translate along a fixed axis.
     """
@@ -221,7 +288,7 @@ class EntryWay(Aperture): ...
 
 
 @dataclass(eq=False)
-class Door(HasHandle, HasHinge):
+class Door(HasHandle, HasMechanicalJoint):
     """
     A door is a physical entity that has covers an opening, has a movable body and a handle.
     """
@@ -261,10 +328,12 @@ class Door(HasHandle, HasHinge):
         entry_way_region_name = PrefixedName(
             name.name + "entry_way_region", name.prefix
         )
+
         entry_way_region = Region(
             name=entry_way_region_name,
             area=ShapeCollection([Mesh.from_trimesh(mesh=door_body.combined_mesh)]),
         )
+        entry_way_region.area.dye_shapes(Color(R=1.0, G=1.0, B=1.0, A=0.2))
         entry_way = EntryWay(name=entry_way_name, root=entry_way_region)
         world.add_region(entry_way.root)
         world.add_connection(FixedConnection(door_body, entry_way.root))
@@ -357,7 +426,7 @@ class DoubleDoor(SemanticAnnotation):
 
 
 @dataclass(eq=False)
-class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasSlider, HasStorageSpace):
+class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMechanicalJoint):
 
     @classproperty
     def hole_direction(self) -> Vector3:
@@ -375,7 +444,7 @@ class ShelfLayer(HasSupportingSurface):
 
 
 @dataclass(eq=False)
-class Table(Furniture, HasSupportingSurface, HasLegs):
+class Table(Furniture, HasSupportingSurface):
     """
     A semantic annotation that represents a table.
     """
@@ -389,7 +458,7 @@ class CounterTop(Furniture, HasSupportingSurface):
 
 
 @dataclass(eq=False)
-class Cabinet(Furniture, HasCaseAsRootBody):
+class Cabinet(Furniture, HasCaseAsRootBody, HasHandle):
     @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.NEGATIVE_X()
@@ -398,24 +467,17 @@ class Cabinet(Furniture, HasCaseAsRootBody):
 @dataclass(eq=False)
 class Fridge(Cabinet, HasDoors, HasDrawers): ...
 
-@dataclass(eq=False)
-class Cooktop(HasRootBody):
-    """
-    A cooktop.
-    """
 
 @dataclass(eq=False)
-class Oven(HasCaseAsRootBody):
-    @classproperty
-    def hole_direction(self) -> Vector3:
-        return Vector3.NEGATIVE_X()
+class Oven(HasRootBody): ...
+
 
 @dataclass(eq=False)
 class Dresser(Cabinet, HasDrawers, HasDoors): ...
 
 
 @dataclass(eq=False)
-class Cupboard(Cabinet, HasDoors, HasShelfLayers): ...
+class Cupboard(Cabinet, HasDoors, HasDrawers): ...
 
 
 @dataclass(eq=False)
@@ -755,16 +817,12 @@ class Milk(Food, IsPerceivable):
     A container of milk.
     """
 
-    ...
-
 
 @dataclass(eq=False)
 class SaltContainer(HasRootBody, IsPerceivable):
     """
     A container of salt.
     """
-
-    ...
 
 
 @dataclass(eq=False)
@@ -838,6 +896,7 @@ class Salt(Food):
     A pack or container of salt (e.g., salt shaker or salt can).
     """
 
+
 @dataclass(eq=False)
 class CoffeeTable(Table):
     """
@@ -849,13 +908,6 @@ class CoffeeTable(Table):
 class DiningTable(Table):
     """
     A dining table.
-    """
-
-
-@dataclass(eq=False)
-class Leg(HasRootBody):
-    """
-    A semantic annotation representing a leg of a furniture item.
     """
 
 
@@ -1069,4 +1121,80 @@ class Baseball(HasRootBody):
 class LiquidCap(HasRootBody):
     """
     A liquid cap.
+    """
+
+
+@dataclass(eq=False)
+class Agent(HasRootBody):
+    """
+    Represents an entity in the world that can act, move, or be controlled.
+
+    Agents are dynamic bodies with semantic meaning — they may have intent,
+    behavior, or be controlled by external or internal logic. Examples include
+    robots, humans, or other autonomous actors.
+
+    """
+
+
+@dataclass(eq=False)
+class Human(Agent):
+    """
+    Represents a human agent in the environment.
+
+    A Person is an Agent that is not robotically actuated and does not provide
+    kinematic chains, end_effectors, or robot-specific components.
+
+    This class exists primarily for semantic distinction, so that algorithms
+    can treat human agents differently from robots if needed.
+    """
+
+
+@dataclass(eq=False)
+class SemanticEnvironmentAnnotation(HasRootBody):
+    """
+    Represents a semantic annotation of the environment.
+    """
+
+
+@dataclass(eq=False)
+class RoomWithWallsAndDoors(Room):
+    """
+    A room with a type description (e.g., Ktichen) and walls and doors.
+    """
+
+    room_type: Optional[str] = field(kw_only=True, default=None)
+    """
+    Description of the type of the room in natural language.
+    """
+
+    walls: List[Wall] = field(kw_only=True, default_factory=list)
+    """
+    The walls enclosing this room.
+    """
+
+    doors: List[Door] = field(kw_only=True, default_factory=list)
+    """
+    The doors of the room.
+    """
+
+
+@dataclass(eq=False)
+class DoorWithType(Door):
+    """
+    A Door that has a type description, e.g. "main entrance"
+    """
+
+    type_description: Optional[str] = field(kw_only=True, default=None)
+
+@dataclass(eq=False)
+class Leg(HasRootBody):
+    """
+    A leg that supports a piece of furniture.
+    """
+
+
+@dataclass(eq=False)
+class Cooktop(HasRootBody):
+    """
+    A cooktop surface for cooking.
     """
