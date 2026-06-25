@@ -13,7 +13,7 @@ from typing_extensions import List, TYPE_CHECKING, Union, Set as teSet
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
 from random_events.interval import Interval, SimpleInterval
 from random_events.sigma_algebra import AbstractSimpleSet, AbstractCompositeSet
-from random_events.variable import Variable, Continuous
+from random_events.variable import Variable, Continuous, Symbolic
 import random_events_lib as rl
 
 # Type definitions
@@ -233,7 +233,7 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
         Plot the event.
         """
         assert all(
-            isinstance(variable, Continuous) for variable in self.keys()
+            not isinstance(variable, Symbolic) for variable in self.keys()
         ), "Plotting is only supported for events that consist of only continuous variables."
         if len(self.keys()) == 1:
             return self.plot_1d()

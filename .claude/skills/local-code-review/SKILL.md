@@ -7,6 +7,7 @@ allowed-tools: Bash, Read, Grep, Glob, Edit, Write, Agent, EnterPlanMode, ExitPl
 # Local Code Review
 
 Review everything the current branch adds on top of the cram2 upstream `main`, then hand the developer an approval-gated plan to fix what you found, apply it, and verify. The coding standards you review and fix against are in `@AGENTS.md` — that file is the source of truth; do not restate its rules here. **Every change you propose or make must itself adhere to `@AGENTS.md`.**
+When presenting the developer with a plan, and the developer clarifies the plan or wants it changed, incorporate the feedback into the plan and present it to the developer again for approval.
 
 Stay **read-only through steps 1–5**. Do not edit, fix, or push anything until the plan is approved in step 6.
 

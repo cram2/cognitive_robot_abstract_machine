@@ -8,7 +8,7 @@ from random_events.interval import *
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.set import SetElement, Set
 from random_events.sigma_algebra import AbstractSimpleSet
-from random_events.variable import Continuous, Symbolic
+from random_events.variable import Continuous, Integer, Symbolic
 
 str_set = {"a", "c", "b"}
 str_set_domain = Set.from_iterable(str_set)
@@ -313,6 +313,19 @@ class EventTestCase(unittest.TestCase):
         y2 = Continuous("y2")
         e2 = e.update_variables({self.y: y2})
         self.assertEqual(e2.variables, SortedSet([self.x, y2]))
+
+
+class IntegerVariablePlotTestCase(unittest.TestCase):
+    count = Integer(name="count")
+
+    def test_plot_1d_with_integer_variable(self):
+        event = SimpleEvent.from_data(
+            {self.count: SimpleInterval.from_data(0, 5)}
+        )
+        traces = event.plot()
+        self.assertIsNotNone(traces)
+        fig = go.Figure(traces, event.plotly_layout())
+        self.assertIsNotNone(fig)
 
 
 class OperationsWithEmptySetsTestCase(unittest.TestCase):

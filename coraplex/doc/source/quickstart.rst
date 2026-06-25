@@ -12,9 +12,9 @@ If you haven't done so, please refer to the installation instructions in the doc
 Intro to Semantic Digital Twin
 -----------------------------
 
-CoraPlex uses the `semantic_digital_twin <https://github.com/cram2/semantic_digital_twin>`__ package to manage the belief
+CoraPlex uses the `semantic_digital_twin <https://github.com/cram2/cognitive_robot_abstract_machine/tree/main/semantic_digital_twin>`__ package to manage the belief
 state and the semantic information of it. To learn more about what the semantic digital twin is capable of refer to
-its `documentation <https://cram2.github.io/semantic_digital_twin/intro.html>`__.
+its `documentation <https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/intro.html>`__.
 
 The semantic digital twin is a belief state representation, that means it represents the robot's knowledge about itself and its environment according
 to knowledge present before and sensor inputs that are taken during execution.

@@ -71,7 +71,7 @@ class LocalMinimumReached(MotionStatechartNode):
 
         dt = (
             context.qp_controller_config.control_dt
-            or context.qp_controller_config.mpc_dt
+            or context.qp_controller_config.model_predictive_control_time_step
         )
         traj_longer_than_1_sec = context.control_cycle_variable * dt > 1
         artifacts.observation = sm.trinary_logic_and(

@@ -30,7 +30,7 @@ How to use these exercises
 2. In your command line, navigate to scripts and run the command `bash scripts/convert_exercises_for_self_assessment.sh`
 3. You will find the converted exercises inside the `self_assessment/exercises/converted_exercises` directory
 4. Open the exercise notebook you want to work on and read the task description before touching any code.
-5. Implement your solution in the dedicated cells. Keep your code small and readable. If your goal is to contribute to the project, consider also reading our [developer guide](https://cram2.github.io/semantic_world/developer_guide.html) first
+5. Implement your solution in the dedicated cells. Keep your code small and readable. If your goal is to contribute to the project, consider also reading our [developer guide](https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/developer_guide.html) first
 6. Run the checks in the exercise to validate your work. If they pass, you may assume that your solution is correct.
 7. If you are stuck or want to compare your solution to an example solution, you can find a working solution by coming back to this section, open the corresponding solution page on this documentation.
 
