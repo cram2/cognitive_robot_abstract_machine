@@ -1,61 +1,57 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
-from giskardpy.executor import Executor, SimulationPacer
-from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.body_motion_problem.giskard_physics_model import GiskardPhysicsModel
+from giskardpy.motion_statechart.goals.open_close import Open
+from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from semantic_digital_twin.physics.physics_model import PhysicsModel
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.effects import Effect
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
-class RunMSCModel(PhysicsModel):
+class ContainerManipulationPhysicsModel(GiskardPhysicsModel):
     """
-    Physics model that executes a pre-built MotionStatechart to generate an actuator trajectory.
+    Physics model for opening or closing articulated containers (drawers, doors).
 
-    Runs the statechart in simulation without real-time pacing, records the actuator
-    position after each control step, and restores the world state via
-    ``world.reset_state_context()`` afterwards.
+    Builds and runs a Giskard :class:`~giskardpy.motion_statechart.goals.open_close.Open`
+    goal MSC internally, driving the container joint to :attr:`goal_joint_state`.
     """
 
-    motion_statechart: MotionStatechart
-    """The statechart to execute during simulation."""
+    handle: Body
+    """The handle body used as both the gripper tip and the environment link in the Open goal."""
 
     actuator: ActiveConnection1DOF
-    """The connection whose position is sampled after each control tick."""
+    """The revolute or prismatic joint being driven."""
 
-    timeout: int = field(default=500)
-    """Maximum number of control ticks before stopping the simulation."""
+    goal_joint_state: float
+    """Target joint position to drive the container to."""
 
-    def run(self, effect: Effect, world: World) -> tuple[Optional[list[float]], bool]:
+    @property
+    def primary_connection(self) -> ActiveConnection1DOF:
+        return self.actuator
+
+    def build_motion_statechart(self, effect: Effect, world: World) -> MotionStatechart:
         """
-        Execute the statechart and record the actuator-position trajectory.
-
-        The world state is restored to its pre-simulation values after this call.
-
-        :param effect: Desired effect; passed for interface consistency but not directly used.
-        :param world: World in which to simulate.
-        :return: (trajectory, achieved) where trajectory is the list of recorded actuator positions.
+        Build an MSC with a single :class:`~giskardpy.motion_statechart.goals.open_close.Open`
+        goal targeting :attr:`goal_joint_state`.
         """
-        with world.reset_state_context():
-            trajectory: list[float] = []
-            executor = Executor(
-                context=MotionStatechartContext(world=world),
-                pacer=SimulationPacer(real_time_factor=None),
-            )
-            executor.compile(motion_statechart=self.motion_statechart)
-            try:
-                for _ in range(self.timeout):
-                    executor.tick()
-                    trajectory.append(float(self.actuator.position))
-                    if self.motion_statechart.is_end_motion():
-                        break
-            finally:
-                executor._set_velocity_acceleration_jerk_to_zero()
-                self.motion_statechart.cleanup_nodes(context=executor.context)
-                executor.context.cleanup()
-        return trajectory, bool(trajectory)
+        msc = MotionStatechart()
+        goal = Open(
+            tip_link=self.handle,
+            environment_link=self.handle,
+            goal_joint_state=self.goal_joint_state,
+        )
+        msc.add_node(goal)
+        msc.add_node(EndMotion.when_true(goal))
+        return msc
+
+    def interaction_body(self):
+        """
+        :return: The handle body, so :class:`MotionStatechartCanPerform` tracks
+                 the correct interaction point.
+        """
+        return self.handle

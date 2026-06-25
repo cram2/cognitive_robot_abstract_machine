@@ -9,7 +9,9 @@ from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.symbolic_math.symbolic_math import Scalar
 from typing_extensions import Self
 
-from semantic_digital_twin.physics.differential_equation import DifferentialEquation
+from semantic_digital_twin.physics.equations.differential_equation import (
+    DifferentialEquation,
+)
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 
 

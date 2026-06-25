@@ -11,7 +11,7 @@ from giskardpy.motion_statechart.data_types import (
     ObservationStateValues,
 )
 from giskardpy.motion_statechart.graph_node import NodeArtifacts, Task
-from semantic_digital_twin.physics.pouring_equations import (
+from semantic_digital_twin.physics.equations.pouring_equations import (
     PouringEquation,
     tilt_expression_from_fk,
 )

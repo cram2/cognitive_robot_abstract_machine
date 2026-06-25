@@ -10,7 +10,9 @@ from typing_extensions import TYPE_CHECKING, Union, Optional, Dict, Any, Self
 
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.symbolic_math import Scalar
-from semantic_digital_twin.physics.pouring_equations import tilt_expression_from_fk
+from semantic_digital_twin.physics.equations.pouring_equations import (
+    tilt_expression_from_fk,
+)
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -35,7 +37,7 @@ from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
-    from semantic_digital_twin.physics.pouring_equations import (
+    from semantic_digital_twin.physics.equations.pouring_equations import (
         InflowEquation,
         PouringEquation,
     )

@@ -71,7 +71,7 @@ from semantic_digital_twin.world_description.world_entity import (
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
 )
-from semantic_digital_twin.physics.pouring_equations import (
+from semantic_digital_twin.physics.equations.pouring_equations import (
     ArticulatedPouringEquation,
     PouringEquation,
     InflowEquation,

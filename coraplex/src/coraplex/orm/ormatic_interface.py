@@ -60,6 +60,7 @@ import coraplex.view_manager
 import datetime
 import enum
 import giskardpy.body_motion_problem.container_physics
+import giskardpy.body_motion_problem.giskard_physics_model
 import giskardpy.body_motion_problem.pouring_physics
 import giskardpy.executor
 import giskardpy.middleware.ros2.behavior_tree_config
@@ -5685,10 +5686,13 @@ class FunctionMappingDAO(
     )
 
 
-class RunMSCModelDAO(
-    Base, DataAccessObject[giskardpy.body_motion_problem.container_physics.RunMSCModel]
+class GiskardPhysicsModelDAO(
+    Base,
+    DataAccessObject[
+        giskardpy.body_motion_problem.giskard_physics_model.GiskardPhysicsModel
+    ],
 ):
-    __tablename__ = "RunMSCModelDAO"
+    __tablename__ = "GiskardPhysicsModelDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
@@ -5696,8 +5700,34 @@ class RunMSCModelDAO(
 
     timeout: Mapped[builtins.int] = mapped_column(use_existing_column=True)
 
-    motion_statechart_id: Mapped[int] = mapped_column(
-        ForeignKey("MotionStatechartDAO.database_id", use_alter=True),
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "GiskardPhysicsModelDAO",
+    }
+
+
+class ContainerManipulationPhysicsModelDAO(
+    GiskardPhysicsModelDAO,
+    DataAccessObject[
+        giskardpy.body_motion_problem.container_physics.ContainerManipulationPhysicsModel
+    ],
+):
+    __tablename__ = "ContainerManipulationPhysicsModelDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GiskardPhysicsModelDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    goal_joint_state: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    handle_id: Mapped[int] = mapped_column(
+        ForeignKey("BodyDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
@@ -5707,11 +5737,8 @@ class RunMSCModelDAO(
         use_existing_column=True,
     )
 
-    motion_statechart: Mapped[MotionStatechartDAO] = relationship(
-        "MotionStatechartDAO",
-        uselist=False,
-        foreign_keys=[motion_statechart_id],
-        post_update=True,
+    handle: Mapped[BodyDAO] = relationship(
+        "BodyDAO", uselist=False, foreign_keys=[handle_id], post_update=True
     )
     actuator: Mapped[ActiveConnection1DOFDAO] = relationship(
         "ActiveConnection1DOFDAO",
@@ -5720,15 +5747,23 @@ class RunMSCModelDAO(
         post_update=True,
     )
 
+    __mapper_args__ = {
+        "polymorphic_identity": "ContainerManipulationPhysicsModelDAO",
+        "inherit_condition": database_id == GiskardPhysicsModelDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
 
 class PouringMSCModelDAO(
-    Base,
+    GiskardPhysicsModelDAO,
     DataAccessObject[giskardpy.body_motion_problem.pouring_physics.PouringMSCModel],
 ):
     __tablename__ = "PouringMSCModelDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
+        ForeignKey(GiskardPhysicsModelDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
     )
 
     initial_tilt: Mapped[typing.Optional[builtins.float]] = mapped_column(
@@ -5736,7 +5771,7 @@ class PouringMSCModelDAO(
     )
 
     fill_equation: Mapped[
-        semantic_digital_twin.physics.pouring_equations.PouringEquation
+        semantic_digital_twin.physics.equations.pouring_equations.PouringEquation
     ] = mapped_column(
         sqlalchemy.sql.sqltypes.JSON, nullable=False, use_existing_column=True
     )
@@ -5774,6 +5809,12 @@ class PouringMSCModelDAO(
     tip_link: Mapped[BodyDAO] = relationship(
         "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
     )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PouringMSCModelDAO",
+        "inherit_condition": database_id == GiskardPhysicsModelDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
 
 
 class ExecutorDAO(Base, DataAccessObject[giskardpy.executor.Executor]):
@@ -10680,7 +10721,7 @@ class PouringTaskDAO(
     reference_velocity: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
     fill_equation: Mapped[
-        semantic_digital_twin.physics.pouring_equations.PouringEquation
+        semantic_digital_twin.physics.equations.pouring_equations.PouringEquation
     ] = mapped_column(
         sqlalchemy.sql.sqltypes.JSON, nullable=False, use_existing_column=True
     )

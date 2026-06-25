@@ -10,13 +10,12 @@ import pytest
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
-from giskardpy.motion_statechart.goals.open_close import Open
-from giskardpy.motion_statechart.graph_node import EndMotion
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from krrood.entity_query_language.factories import an, set_of, variable
 from krrood.ormatic.utils import classproperty
 
-from giskardpy.body_motion_problem.container_physics import RunMSCModel
+from giskardpy.body_motion_problem.container_physics import (
+    ContainerManipulationPhysicsModel,
+)
 from giskardpy.body_motion_problem.pouring_physics import PouringMSCModel
 from coraplex.body_motion_problem.predicates import MotionStatechartCanPerform
 from semantic_digital_twin.reasoning.bmp_predicates import Causes, SatisfiesRequest
@@ -26,7 +25,7 @@ from semantic_digital_twin.semantic_annotations.effects import (
     PouringEffect,
 )
 from semantic_digital_twin.world_description.effects import Effect, TaskRequest
-from semantic_digital_twin.world_description.motion import Motion
+from semantic_digital_twin.world_description.motion import Motion, MotionTrajectory
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.pr2 import PR2
@@ -165,17 +164,16 @@ def pr2_world_with_cup(pr2_world_setup):
 # ---------------------------------------------------------------------------
 
 
-def _get_msc_model_for_open_goal(handle_body, actuator, goal_value) -> RunMSCModel:
-    """Create a motion statechart model that drives a joint to goal_value."""
-    msc = MotionStatechart()
-    goal = Open(
-        tip_link=handle_body,
-        environment_link=handle_body,
+def _get_msc_model_for_open_goal(
+    handle_body, actuator, goal_value
+) -> ContainerManipulationPhysicsModel:
+    """Create a physics model that drives a container joint to goal_value."""
+    return ContainerManipulationPhysicsModel(
+        handle=handle_body,
+        actuator=actuator,
         goal_joint_state=goal_value,
+        timeout=500,
     )
-    msc.add_node(goal)
-    msc.add_node(EndMotion.when_true(goal))
-    return RunMSCModel(motion_statechart=msc, actuator=actuator, timeout=500)
 
 
 def _extend_world(
@@ -225,7 +223,6 @@ def _extend_world(
         )
         motions.append(
             Motion(
-                trajectory=[],
                 actuator=act,
                 motion_model=_get_msc_model_for_open_goal(
                     annotation.handle.root, act, upper
@@ -244,7 +241,6 @@ def _extend_world(
             )
             motions.append(
                 Motion(
-                    trajectory=[],
                     actuator=act,
                     motion_model=_get_msc_model_for_open_goal(
                         annotation.handle.root, act, lower
@@ -317,7 +313,9 @@ class TestContainerManipulationPredicates:
 
         act = drawers[0].root.parent_connection
         upper = act.active_dofs[0].limits.upper.position
-        motion.trajectory = [i * upper / 8 for i in range(9)]
+        motion.motion_trajectory = MotionTrajectory(
+            {act: [i * upper / 8 for i in range(9)]}
+        )
         result = MotionStatechartCanPerform(motion=motion, robot=robot)()
         assert isinstance(result, bool)
 
@@ -381,7 +379,6 @@ class TestPouringPredicates:
             target_object=cup, property_getter=lambda c: c.fill_level, goal_value=0.6
         )
         motion = Motion(
-            trajectory=[],
             actuator=cup.root.parent_connection,
             motion_model=PouringMSCModel(
                 fill_equation=cup.fill_equation,
@@ -404,7 +401,6 @@ class TestPouringPredicates:
             goal_value=goal_fill,
         )
         motion = Motion(
-            trajectory=[],
             actuator=cup.root.parent_connection,
             motion_model=PouringMSCModel(
                 fill_equation=cup.fill_equation,
@@ -479,9 +475,10 @@ class TestContainerManipulationQueries:
         world = mutable_model_world
         effects, _, open_task, close_task, drawers = _extend_world(world)
 
+        actuator = drawers[0].root.parent_connection
         motion = Motion(
-            trajectory=[0.0, 0.1, 0.2, 0.3, 0.4],
-            actuator=drawers[0].root.parent_connection,
+            actuator=actuator,
+            motion_trajectory=MotionTrajectory({actuator: [0.0, 0.1, 0.2, 0.3, 0.4]}),
         )
         task_sym = variable(TaskRequest, domain=[open_task, close_task])
         effect_sym = variable(Effect, domain=effects)
@@ -545,7 +542,6 @@ class TestPouringQueries:
             goal_value=goal_fill,
         )
         motion = Motion(
-            trajectory=[],
             actuator=cup.root.parent_connection,
             motion_model=PouringMSCModel(
                 fill_equation=cup.fill_equation,
@@ -585,7 +581,6 @@ class TestPouringQueries:
             goal_value=goal_fill,
         )
         motion = Motion(
-            trajectory=[],
             actuator=cup.root.parent_connection,
             motion_model=PouringMSCModel(
                 fill_equation=cup.fill_equation,
@@ -613,17 +608,17 @@ class TestPouringQueries:
         result = results[0]
         assert result.data[task_sym].task_type == "pour"
         assert result.data[effect_sym].goal_value == goal_fill
-        assert len(result.data[motion_sym].trajectory) > 0
+        assert not result.data[motion_sym].motion_trajectory.is_empty()
 
     def test_infer_effects_and_tasks_from_given_motion(self, world_with_cup):
         """Given a fixed tilt trajectory, the query identifies which effects and task requests it satisfies."""
         world, cup = world_with_cup
 
-        trajectory = [0.1, 1.0, 1.3] + ([1.3] * 30) + [1.3, 1.0, 0.7, 0.4, 0.1, 0.0]
-
+        tilt_positions = [0.1, 1.0, 1.3] + ([1.3] * 30) + [1.3, 1.0, 0.7, 0.4, 0.1, 0.0]
+        actuator = cup.root.parent_connection
         motion = Motion(
-            trajectory=trajectory,
-            actuator=cup.root.parent_connection,
+            actuator=actuator,
+            motion_trajectory=MotionTrajectory({actuator: tilt_positions}),
             time_step=0.1,
         )
 
@@ -738,13 +733,14 @@ class TestRobotIntegration:
         VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         effects, _, open_task, close_task, drawers = _extend_world(world)
 
+        actuator = [
+            drawer
+            for drawer in drawers
+            if "cabinet11_drawer_top" in str(drawer.bodies[0].name)
+        ][0].root.parent_connection
         motion = Motion(
-            trajectory=[0.0, 0.1, 0.2, 0.3],
-            actuator=[
-                drawer
-                for drawer in drawers
-                if "cabinet11_drawer_top" in str(drawer.bodies[0].name)
-            ][0].root.parent_connection,
+            actuator=actuator,
+            motion_trajectory=MotionTrajectory({actuator: [0.0, 0.1, 0.2, 0.3]}),
         )
         task_sym = variable(TaskRequest, domain=[open_task, close_task])
         effect_sym = variable(Effect, domain=effects)

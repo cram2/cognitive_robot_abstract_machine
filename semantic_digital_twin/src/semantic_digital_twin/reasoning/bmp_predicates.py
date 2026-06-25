@@ -51,14 +51,13 @@ class Causes(Predicate):
         if (
             self.motion
             and self.motion.motion_model
-            and len(self.motion.trajectory) == 0
+            and self.motion.motion_trajectory is None
         ):
-            trajectory, _ = self.motion.motion_model.run(self.effect, self.environment)
-            if trajectory and len(trajectory) > 0:
-                self.motion.trajectory = trajectory
-                self.motion.secondary_trajectories = (
-                    self.motion.motion_model.build_secondary_trajectories(self.effect)
-                )
+            motion_trajectory = self.motion.motion_model.run(
+                self.effect, self.environment
+            )
+            if not motion_trajectory.is_empty():
+                self.motion.motion_trajectory = motion_trajectory
 
         return self._map_motion_to_effect()
 
@@ -68,28 +67,30 @@ class Causes(Predicate):
 
         :param step_delay: Seconds to sleep between steps (default 50 ms ≈ 20 fps).
         """
-        for i, position in enumerate(self.motion.trajectory):
-            updates = {self.motion.actuator: float(position)}
-            for conn, traj in self.motion.secondary_trajectories:
-                updates[conn] = float(traj[i])
-            self.environment.set_positions_1DOF_connection(updates)
+        length = len(self.motion.motion_trajectory.positions_for(self.motion.actuator))
+        for i in range(length):
+            self.environment.set_positions_1DOF_connection(
+                self.motion.motion_trajectory.position_updates_at(i)
+            )
             time.sleep(step_delay)
 
     def _map_motion_to_effect(self) -> bool:
         """
         Replay the trajectory in a sandboxed world and check whether the effect is achieved.
         """
-        trajectory = self.motion.trajectory
-        actuator = self.motion.actuator
+        if self.motion.motion_trajectory is None:
+            return False
 
+        actuator_positions = self.motion.motion_trajectory.positions_for(
+            self.motion.actuator
+        )
         is_achieved_pre = self.effect.is_achieved()
 
         with self.environment.reset_state_context():
-            for i, position in enumerate(trajectory):
-                updates = {actuator: float(position)}
-                for conn, traj in self.motion.secondary_trajectories:
-                    updates[conn] = float(traj[i])
-                self.environment.set_positions_1DOF_connection(updates)
+            for i in range(len(actuator_positions)):
+                self.environment.set_positions_1DOF_connection(
+                    self.motion.motion_trajectory.position_updates_at(i)
+                )
                 if self.motion.time_step is not None:
                     self.environment.step_physics(self.motion.time_step)
 
@@ -121,7 +122,7 @@ class CanPerform(Predicate):
 
     Checks whether a robot can physically execute the motion trajectory,
     independently of task success. Concrete implementations live in the layer
-    that owns the execution machinery (e.g., pycram with giskardpy).
+    that owns the execution machinery (e.g., coraplex with giskardpy).
     """
 
     motion: Motion

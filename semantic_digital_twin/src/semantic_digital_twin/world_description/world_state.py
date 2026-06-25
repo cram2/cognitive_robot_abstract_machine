@@ -582,3 +582,17 @@ class WorldStateTrajectory:
     def items(self) -> Iterator[tuple[float, WorldStateView]]:
         with self.world_lock():
             yield from zip(self.keys(), self.values())
+
+    def get_dof_positions(self, dof_id: UUID) -> Optional[np.ndarray]:
+        """
+        Return all recorded position values for a specific degree of freedom.
+
+        :param dof_id: UUID of the degree of freedom to extract.
+        :return: 1-D array of raw DOF positions across all timesteps, or ``None``
+                 if the DOF is not present in this trajectory.
+        """
+        with self.world_lock():
+            if dof_id not in self._index:
+                return None
+            col = self._index[dof_id]
+            return self.data[:, 0, col].copy()

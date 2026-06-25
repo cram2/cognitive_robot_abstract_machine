@@ -66,7 +66,10 @@ class MotionStatechartCanPerform(CanPerform):
 
     def __call__(self) -> bool:
         gc.collect()
-        if not self.motion.trajectory:
+        if (
+            self.motion.motion_trajectory is None
+            or self.motion.motion_trajectory.is_empty()
+        ):
             return False
         world = self.robot._world
         with world.reset_state_context():
@@ -103,7 +106,9 @@ class MotionStatechartCanPerform(CanPerform):
         world = target._world
         dof_id = self.motion.actuator.raw_dof.id
         trajectory = []
-        for position in self.motion.trajectory:
+        for position in self.motion.motion_trajectory.positions_for(
+            self.motion.actuator
+        ):
             world.state[dof_id].position = position
             world.notify_state_change()
             trajectory.append(target.global_pose)
