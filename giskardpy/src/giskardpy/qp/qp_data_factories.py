@@ -4,17 +4,14 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
-import scipy.sparse as sp
-from scipy.sparse import issparse
 from typing_extensions import (
-    Self,
     TYPE_CHECKING,
     Generic,
     TypeVar,
     get_args,
-    assert_never,
 )
 
+from giskardpy.qp.exceptions import NoFactoryForQPDataTypeError
 from giskardpy.qp.qp_data import QPData, QPDataExplicit, QPDataTwoSidedInequality
 from krrood.symbolic_math.symbolic_math import (
     CompiledFunctionWithViews,
@@ -27,7 +24,7 @@ from krrood.symbolic_math.symbolic_math import (
 )
 
 if TYPE_CHECKING:
-    from giskardpy.qp.adapters.qp_adapter import QPDataSymbolic
+    from giskardpy.qp.qp_data_symbolic import QPDataSymbolic
 
 
 T = TypeVar("T", bound=QPData)
@@ -45,10 +42,9 @@ class QPDataFactory(Generic[T], ABC):
     """
 
     @classmethod
-    @property
     def qp_data_type(cls) -> type[T]:
         """
-        The semDT type for which this converter handles conversion.
+        The :class:`QPData` subtype this factory produces.
         """
         return get_args(cls.__orig_bases__[0])[0]
 
@@ -60,9 +56,9 @@ class QPDataFactory(Generic[T], ABC):
         Returns the factory that handles conversion for the given QPData type.
         """
         for subclass in cls.__subclasses__():
-            if subclass.qp_data_type == qp_data_type:
+            if subclass.qp_data_type() == qp_data_type:
                 return subclass
-        assert_never(qp_data_type)
+        raise NoFactoryForQPDataTypeError(qp_data_type=qp_data_type)
 
     @abstractmethod
     def compile(
@@ -125,22 +121,22 @@ class QPDataExplicitFactory(QPDataFactory[QPDataExplicit]):
     ):
         eq_matrix = hstack(
             [
-                self.qp_data.eq_matrix_dofs,
-                self.qp_data.eq_matrix_slack,
+                self.qp_data.equality_matrix_degrees_of_freedom,
+                self.qp_data.equality_matrix_slack,
                 Matrix.zeros(
-                    self.qp_data.eq_matrix_slack.shape[0],
-                    self.qp_data.num_neq_slack_variables,
+                    self.qp_data.equality_matrix_slack.shape[0],
+                    self.qp_data.number_inequality_slack_variables,
                 ),
             ]
         )
         neq_matrix = hstack(
             [
-                self.qp_data.neq_matrix_dofs,
+                self.qp_data.inequality_matrix_degrees_of_freedom,
                 Matrix.zeros(
-                    self.qp_data.neq_matrix_slack.shape[0],
-                    self.qp_data.num_eq_slack_variables,
+                    self.qp_data.inequality_matrix_slack.shape[0],
+                    self.qp_data.number_equality_slack_variables,
                 ),
-                self.qp_data.neq_matrix_slack,
+                self.qp_data.inequality_matrix_slack,
             ]
         )
         free_symbols = [
@@ -164,9 +160,9 @@ class QPDataExplicitFactory(QPDataFactory[QPDataExplicit]):
                 self.qp_data.linear_weights,
                 self.qp_data.box_lower_constraints,
                 self.qp_data.box_upper_constraints,
-                self.qp_data.eq_bounds,
-                self.qp_data.neq_lower_bounds,
-                self.qp_data.neq_upper_bounds,
+                self.qp_data.equality_bounds,
+                self.qp_data.inequality_lower_bounds,
+                self.qp_data.inequality_upper_bounds,
             ],
             parameters=VariableParameters.from_lists(*free_symbols),
         )
@@ -204,17 +200,26 @@ class QPDataExplicitFactory(QPDataFactory[QPDataExplicit]):
             inequality_matrix=neq_matrix_np_raw,
             inequality_lower_bounds=neq_lower_bounds_np_raw,
             inequality_upper_bounds=neq_upper_bounds_np_raw,
-            num_equality_slack_variables=self.qp_data.num_eq_slack_variables,
-            num_inequality_slack_variables=self.qp_data.num_neq_slack_variables,
+            num_equality_slack_variables=self.qp_data.number_equality_slack_variables,
+            num_inequality_slack_variables=self.qp_data.number_inequality_slack_variables,
         )
 
 
 @dataclass
 class QPDataTwoSidedInequalityFactory(QPDataFactory[QPDataTwoSidedInequality]):
+    """
+    Builds a :class:`QPDataTwoSidedInequality` by combining the equality and inequality blocks into a
+    single two-sided constraint matrix.
+    """
 
-    equality_matrix_compiled: CompiledFunction = field(init=False)
     inequality_matrix_compiled: CompiledFunction = field(init=False)
+    """
+    The compiled combined constraint matrix over all free variables.
+    """
     combined_vector_f: CompiledFunctionWithViews = field(init=False)
+    """
+    The compiled weights and bounds, with views for the lower and upper bound vectors.
+    """
 
     def compile(
         self,
@@ -222,29 +227,32 @@ class QPDataTwoSidedInequalityFactory(QPDataFactory[QPDataTwoSidedInequality]):
         life_cycle_symbols: list[FloatVariable],
         float_variables: list[FloatVariable],
     ):
-        if len(self.qp_data.neq_matrix_dofs) == 0:
+        if len(self.qp_data.inequality_matrix_degrees_of_freedom) == 0:
             constraint_matrix = hstack(
-                [self.qp_data.eq_matrix_dofs, self.qp_data.eq_matrix_slack]
+                [
+                    self.qp_data.equality_matrix_degrees_of_freedom,
+                    self.qp_data.equality_matrix_slack,
+                ]
             )
         else:
             eq_matrix = hstack(
                 [
-                    self.qp_data.eq_matrix_dofs,
-                    self.qp_data.eq_matrix_slack,
+                    self.qp_data.equality_matrix_degrees_of_freedom,
+                    self.qp_data.equality_matrix_slack,
                     Matrix.zeros(
-                        self.qp_data.eq_matrix_dofs.shape[0],
-                        self.qp_data.neq_matrix_slack.shape[1],
+                        self.qp_data.equality_matrix_degrees_of_freedom.shape[0],
+                        self.qp_data.inequality_matrix_slack.shape[1],
                     ),
                 ]
             )
             neq_matrix = hstack(
                 [
-                    self.qp_data.neq_matrix_dofs,
+                    self.qp_data.inequality_matrix_degrees_of_freedom,
                     Matrix.zeros(
-                        self.qp_data.neq_matrix_dofs.shape[0],
-                        self.qp_data.eq_matrix_slack.shape[1],
+                        self.qp_data.inequality_matrix_degrees_of_freedom.shape[0],
+                        self.qp_data.equality_matrix_slack.shape[1],
                     ),
-                    self.qp_data.neq_matrix_slack,
+                    self.qp_data.inequality_matrix_slack,
                 ]
             )
             constraint_matrix = vstack([eq_matrix, neq_matrix])
@@ -258,25 +266,25 @@ class QPDataTwoSidedInequalityFactory(QPDataFactory[QPDataTwoSidedInequality]):
         len_lb_be_lba_end = (
             self.qp_data.quadratic_weights.shape[0]
             + self.qp_data.box_lower_constraints.shape[0]
-            + self.qp_data.eq_bounds.shape[0]
-            + self.qp_data.neq_lower_bounds.shape[0]
+            + self.qp_data.equality_bounds.shape[0]
+            + self.qp_data.inequality_lower_bounds.shape[0]
         )
         len_ub_be_uba_end = (
             len_lb_be_lba_end
             + self.qp_data.box_upper_constraints.shape[0]
-            + self.qp_data.eq_bounds.shape[0]
-            + self.qp_data.neq_upper_bounds.shape[0]
+            + self.qp_data.equality_bounds.shape[0]
+            + self.qp_data.inequality_upper_bounds.shape[0]
         )
 
         self.combined_vector_f = CompiledFunctionWithViews(
             expressions=[
                 self.qp_data.quadratic_weights,
                 self.qp_data.box_lower_constraints,
-                self.qp_data.eq_bounds,
-                self.qp_data.neq_lower_bounds,
+                self.qp_data.equality_bounds,
+                self.qp_data.inequality_lower_bounds,
                 self.qp_data.box_upper_constraints,
-                self.qp_data.eq_bounds,
-                self.qp_data.neq_upper_bounds,
+                self.qp_data.equality_bounds,
+                self.qp_data.inequality_upper_bounds,
                 self.qp_data.linear_weights,
             ],
             parameters=VariableParameters.from_lists(*free_symbols),
@@ -315,14 +323,12 @@ class QPDataTwoSidedInequalityFactory(QPDataFactory[QPDataTwoSidedInequality]):
             box_eq_neq_lower_bounds_np_raw,
             box_eq_neq_upper_bounds_np_raw,
         ) = self.combined_vector_f(*args)
-        self.qp_data_raw = QPDataTwoSidedInequality(
+        return QPDataTwoSidedInequality(
             quadratic_weights=quadratic_weights_np_raw,
             linear_weights=linear_weights_np_raw,
             inequality_matrix=neq_matrix,
             inequality_lower_bounds=box_eq_neq_lower_bounds_np_raw,
             inequality_upper_bounds=box_eq_neq_upper_bounds_np_raw,
-            num_equality_slack_variables=self.qp_data.num_eq_slack_variables,
-            num_inequality_slack_variables=self.qp_data.num_neq_slack_variables,
+            num_equality_slack_variables=self.qp_data.number_equality_slack_variables,
+            num_inequality_slack_variables=self.qp_data.number_inequality_slack_variables,
         )
-
-        return self.qp_data_raw

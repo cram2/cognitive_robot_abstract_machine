@@ -22,6 +22,7 @@ from krrood.entity_query_language.factories import (
     flat_variable,
 )
 from krrood.inheritance_path_length import inheritance_path_length
+from random_events.interval import SimpleInterval, Bound
 from ..dataset.example_classes import KRROODVectorsWithProperty
 from krrood.entity_query_language.predicate import length, symbolic_function
 from krrood.entity_query_language.query.operations import GroupedBy
@@ -736,3 +737,34 @@ def test_nearest_object_type():
     ).first()
     assert best_object_and_distance[object_var] == objects[1]
     assert best_object_and_distance[min_distance] == 1
+
+
+def test_count_range():
+    domain = ["chair", "chair", ..., ..., ..., "table"]
+    type_var = variable(object, domain=domain)
+    result = an(entity(eql.count_range(type_var)).where(type_var == "chair")).tolist()
+    assert len(result) == 1
+    interval: SimpleInterval = result[0]
+    assert isinstance(interval, SimpleInterval)
+    assert interval.lower == 2
+    assert interval.upper == 5
+    assert interval.left == Bound.CLOSED
+    assert interval.right == Bound.CLOSED
+
+
+def test_count_range_no_unknowns():
+    domain = ["chair", "chair", "table"]
+    type_var = variable(object, domain=domain)
+    result = an(entity(eql.count_range(type_var)).where(type_var == "chair")).tolist()
+    assert len(result) == 1
+    assert result[0] == 2
+
+
+def test_count_range_all_unknowns():
+    domain = [..., ..., ...]
+    type_var = variable(object, domain=domain)
+    result = an(entity(eql.count_range(type_var)).where(type_var == ...)).tolist()
+    assert len(result) == 1
+    interval: SimpleInterval = result[0]
+    assert interval.lower == 0
+    assert interval.upper == 3

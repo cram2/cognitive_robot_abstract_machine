@@ -179,3 +179,50 @@ def test_dao_lookup_recovers_after_late_dao_definition():
         pass
 
     assert get_dao_class(_LateDomainClass) is _LateDomainClassDAO
+
+
+def test_bare_generic_resolves_to_unique_concrete_subclass():
+    """
+    A bare generic domain class maps to an empty polymorphic base DAO while its
+    single parametrization carries the data columns. A runtime instance of the bare
+    generic must therefore resolve to that unique concrete subclass, not the empty
+    base which would silently drop all data.
+    """
+
+    class _SingleParameterGeneric(Generic[T]):
+        pass
+
+    class _SingleParameterGenericDAO(DataAccessObject[_SingleParameterGeneric]):
+        pass
+
+    class _SingleParameterGenericFloatDAO(
+        _SingleParameterGenericDAO, DataAccessObject[_SingleParameterGeneric[float]]
+    ):
+        pass
+
+    assert get_dao_class(_SingleParameterGeneric) is _SingleParameterGenericFloatDAO
+
+
+def test_bare_generic_with_multiple_parametrizations_stays_on_base():
+    """
+    When several parametrizations exist the concrete subclass is ambiguous, so the
+    bare generic must resolve to the polymorphic base rather than guessing.
+    """
+
+    class _MultiParameterGeneric(Generic[T]):
+        pass
+
+    class _MultiParameterGenericDAO(DataAccessObject[_MultiParameterGeneric]):
+        pass
+
+    class _MultiParameterGenericFloatDAO(
+        _MultiParameterGenericDAO, DataAccessObject[_MultiParameterGeneric[float]]
+    ):
+        pass
+
+    class _MultiParameterGenericIntDAO(
+        _MultiParameterGenericDAO, DataAccessObject[_MultiParameterGeneric[int]]
+    ):
+        pass
+
+    assert get_dao_class(_MultiParameterGeneric) is _MultiParameterGenericDAO

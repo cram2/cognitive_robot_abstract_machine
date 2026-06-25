@@ -125,8 +125,8 @@ def fully_factorized(
     root = ProductUnit(probabilistic_circuit=pc)
     for variable in variables:
 
-        # create a normal distribution for every continuous variable
-        if isinstance(variable, Continuous):
+        # create a normal distribution for every continuous or integer variable
+        if isinstance(variable, (Continuous, Integer)):
             distribution = GaussianDistribution(
                 variable=variable,
                 location=means.get(variable, 0.0),

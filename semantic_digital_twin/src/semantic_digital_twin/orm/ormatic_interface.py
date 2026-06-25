@@ -5039,6 +5039,23 @@ class WorldEntityWithIDKwargsTrackerDAO(
     )
 
 
+class ConnectionWithoutReferenceFramesSpecificationDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.api.specifications.ConnectionWithoutReferenceFramesSpecification
+    ],
+):
+    __tablename__ = "ConnectionWithoutReferenceFramesSpecificationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    connection_type: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+
 class WorldEntitySpawnSpecificationDAO(
     Base,
     DataAccessObject[
@@ -5092,11 +5109,6 @@ class BodyAndConnectionSpecificationDAO(
         nullable=True,
         use_existing_column=True,
     )
-    connection_limits_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("DegreeOfFreedomLimitsDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
 
     body_specification: Mapped[BodySpecificationDAO] = relationship(
         "BodySpecificationDAO",
@@ -5106,12 +5118,6 @@ class BodyAndConnectionSpecificationDAO(
     )
     axis: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO", uselist=False, foreign_keys=[axis_id], post_update=True
-    )
-    connection_limits: Mapped[DegreeOfFreedomLimitsDAO] = relationship(
-        "DegreeOfFreedomLimitsDAO",
-        uselist=False,
-        foreign_keys=[connection_limits_id],
-        post_update=True,
     )
 
     __mapper_args__ = {
@@ -5265,20 +5271,9 @@ class SemanticAnnotationWithRootSpecificationDAO(
         nullable=True,
         use_existing_column=True,
     )
-    connection_limits_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("DegreeOfFreedomLimitsDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
 
     axis: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO", uselist=False, foreign_keys=[axis_id], post_update=True
-    )
-    connection_limits: Mapped[DegreeOfFreedomLimitsDAO] = relationship(
-        "DegreeOfFreedomLimitsDAO",
-        uselist=False,
-        foreign_keys=[connection_limits_id],
-        post_update=True,
     )
 
     __mapper_args__ = {
@@ -7021,20 +7016,9 @@ class InvalidConnectionLimitsDAO(
         nullable=True,
         use_existing_column=True,
     )
-    limits_id: Mapped[int] = mapped_column(
-        ForeignKey("DegreeOfFreedomLimitsDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
 
     name: Mapped[PrefixedNameDAO] = relationship(
         "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
-    )
-    limits: Mapped[DegreeOfFreedomLimitsDAO] = relationship(
-        "DegreeOfFreedomLimitsDAO",
-        uselist=False,
-        foreign_keys=[limits_id],
-        post_update=True,
     )
 
     __mapper_args__ = {
@@ -9705,6 +9689,40 @@ class JointDynamicsDAO(
     damping: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
 
+class ActiveConnection1DOFParametersDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.connections.ActiveConnection1DOFParameters
+    ],
+):
+    __tablename__ = "ActiveConnection1DOFParametersDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    multiplier: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    offset: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    axis_id: Mapped[int] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    dynamics_id: Mapped[int] = mapped_column(
+        ForeignKey("JointDynamicsDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    axis: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO", uselist=False, foreign_keys=[axis_id], post_update=True
+    )
+    dynamics: Mapped[JointDynamicsDAO] = relationship(
+        "JointDynamicsDAO", uselist=False, foreign_keys=[dynamics_id], post_update=True
+    )
+
+
 class AccelerationVariableDAO(
     Base,
     DataAccessObject[
@@ -9744,29 +9762,14 @@ class DegreeOfFreedomLimitsDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    lower_id: Mapped[int] = mapped_column(
-        ForeignKey("DerivativeMap_floatDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    upper_id: Mapped[int] = mapped_column(
-        ForeignKey("DerivativeMap_floatDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
     )
 
-    lower: Mapped[DerivativeMap_floatDAO] = relationship(
-        "DerivativeMap_floatDAO",
-        uselist=False,
-        foreign_keys=[lower_id],
-        post_update=True,
-    )
-    upper: Mapped[DerivativeMap_floatDAO] = relationship(
-        "DerivativeMap_floatDAO",
-        uselist=False,
-        foreign_keys=[upper_id],
-        post_update=True,
-    )
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "DegreeOfFreedomLimitsDAO",
+    }
 
 
 class JerkVariableDAO(
@@ -10398,11 +10401,8 @@ class ActiveConnection1DOFDAO(
         use_existing_column=True,
     )
 
-    multiplier: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    offset: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-    axis_id: Mapped[int] = mapped_column(
-        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+    parameters_id: Mapped[int] = mapped_column(
+        ForeignKey("ActiveConnection1DOFParametersDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
@@ -10411,20 +10411,15 @@ class ActiveConnection1DOFDAO(
         nullable=True,
         use_existing_column=True,
     )
-    dynamics_id: Mapped[int] = mapped_column(
-        ForeignKey("JointDynamicsDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
 
-    axis: Mapped[Vector3MappingDAO] = relationship(
-        "Vector3MappingDAO", uselist=False, foreign_keys=[axis_id], post_update=True
+    parameters: Mapped[ActiveConnection1DOFParametersDAO] = relationship(
+        "ActiveConnection1DOFParametersDAO",
+        uselist=False,
+        foreign_keys=[parameters_id],
+        post_update=True,
     )
     raw_dof: Mapped[DegreeOfFreedomDAO] = relationship(
         "DegreeOfFreedomDAO", uselist=False, foreign_keys=[raw_dof_id], post_update=True
-    )
-    dynamics: Mapped[JointDynamicsDAO] = relationship(
-        "JointDynamicsDAO", uselist=False, foreign_keys=[dynamics_id], post_update=True
     )
 
     __mapper_args__ = {
@@ -10796,13 +10791,13 @@ class DegreeOfFreedomDAO(
     )
 
     limits_id: Mapped[int] = mapped_column(
-        ForeignKey("DegreeOfFreedomLimitsDAO.database_id", use_alter=True),
+        ForeignKey("DegreeOfFreedomLimits_floatDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    limits: Mapped[DegreeOfFreedomLimitsDAO] = relationship(
-        "DegreeOfFreedomLimitsDAO",
+    limits: Mapped[DegreeOfFreedomLimits_floatDAO] = relationship(
+        "DegreeOfFreedomLimits_floatDAO",
         uselist=False,
         foreign_keys=[limits_id],
         post_update=True,
@@ -21305,5 +21300,52 @@ class DerivativeMap_floatDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DerivativeMap_floatDAO",
         "inherit_condition": database_id == DerivativeMapDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class DegreeOfFreedomLimits_floatDAO(
+    DegreeOfFreedomLimitsDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.degree_of_freedom.DegreeOfFreedomLimits[
+            float
+        ]
+    ],
+):
+    __tablename__ = "DegreeOfFreedomLimits_floatDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(DegreeOfFreedomLimitsDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    lower_id: Mapped[int] = mapped_column(
+        ForeignKey("DerivativeMap_floatDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    upper_id: Mapped[int] = mapped_column(
+        ForeignKey("DerivativeMap_floatDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    lower: Mapped[DerivativeMap_floatDAO] = relationship(
+        "DerivativeMap_floatDAO",
+        uselist=False,
+        foreign_keys=[lower_id],
+        post_update=True,
+    )
+    upper: Mapped[DerivativeMap_floatDAO] = relationship(
+        "DerivativeMap_floatDAO",
+        uselist=False,
+        foreign_keys=[upper_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "DegreeOfFreedomLimits_floatDAO",
+        "inherit_condition": database_id == DegreeOfFreedomLimitsDAO.database_id,
         "polymorphic_load": "selectin",
     }

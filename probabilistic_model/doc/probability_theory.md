@@ -30,7 +30,7 @@ At the end of this book, you will understand ...
 
 The first section walks through the essential concepts of probability that lay the foundation to understand modern
 probabilistic modelling.
-You should get familiar with the sigma-algebra first. For that, I recommend [this book](https://random-events.readthedocs.io/en/latest/conceptual_guide.html).
+You should get familiar with the sigma-algebra first. For that, I recommend [this book](https://cram2.github.io/cognitive_robot_abstract_machine/random_events/conceptual_guide.html).
 
 The reason why the sigma-algebra is the set of interest for probability theory is, bluntly speaking, knowing the
 probability of every atomic event is knowing the probability of every possible event.
@@ -39,7 +39,7 @@ it would be possible to construct a sigma-algebra that is not the powerset of it
 everything I have seen so far, no purpose to the real world.
 
 The sigma algebra of interest for practical probabilistic reasoning is
-the [product sigma-algebra](https://random-events.readthedocs.io/en/latest/conceptual_guide.html#product-sigma-algebra).
+the [product sigma-algebra](https://cram2.github.io/cognitive_robot_abstract_machine/random_events/conceptual_guide.html#product-sigma-algebra).
 Next, we define the probabilities of events in {prf:ref}`def-probability-measure`.
 
 ### Probability Measure
@@ -64,7 +64,7 @@ The triple $(E, \Im, P)$ is called a probability space.
 
 The probability measure just tells that for non-intersecting sets, you can determine the probability of the union by
 adding the atomic probabilities. Furthermore, for intersecting sets you have to subtract the intersection because it is
-added in there twice otherwise. You may realise that in the [random events package](https://random-events.readthedocs.io/en/latest/) 
+added in there twice otherwise. You may realise that in the [random events package](https://cram2.github.io/cognitive_robot_abstract_machine/random_events/) 
 the composite random event always contains a disjoint union of events. 
 The sigma-additivity is the sole reason for that.
 

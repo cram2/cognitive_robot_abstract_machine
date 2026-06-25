@@ -199,7 +199,7 @@ The image below show a semantic costmap created for a table.
 Algebraic Semantic Costmap
 --------------------------
 
-A algebraic semantic costmap is a special for of a semantic costmap. It is created using `Random Event <https://random-events.readthedocs.io/en/latest/intro.html>`_.
+A algebraic semantic costmap is a special for of a semantic costmap. It is created using `Random Event <https://cram2.github.io/cognitive_robot_abstract_machine/random_events/intro.html>`_.
 This allows to slice the created costmap to specify the area of interest. For example, the costmap is created above the
 whole table but we only want to place an object on the lower right area or the outer perimeter of the table. This can be
 done as follows:

@@ -39,7 +39,7 @@ world = setup_world()
 
 # Using the Entity Query Language
 To query the belief state for certain objects we use the Entity Query Language (EQL) which is part of the KRROOD project. 
-For a more detailed documentation check out their website (https://github.com/code-iai/krrood/tree/main).
+For a more detailed documentation check out their website (https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html).
 
 To query for a body for example the milk bottle we need to create a query.
 

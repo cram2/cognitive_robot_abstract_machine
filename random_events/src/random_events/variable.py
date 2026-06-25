@@ -1,17 +1,15 @@
 import enum
-import types
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import assert_never
 
-import random_events_lib as rl
-from typing_extensions import Self, Dict, Any, Optional, Iterable, Type, Union, List
+from typing_extensions import Self, Any, Optional, Iterable, Type, Union
 
+import random_events_lib as rl
 from random_events.interval import reals, Interval, closed, singleton, SimpleInterval
 from random_events.set import Set, SetElement
 from random_events.sigma_algebra import AbstractCompositeSet
 from random_events.utils import CPPWrapper
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 
 compatible_types = (
     int,

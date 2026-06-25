@@ -1082,8 +1082,8 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
 
         [
             self.graph.add_edge(
-                new_nodes[parent].index,
-                new_nodes[child].index,
+                new_nodes[subgraph.get_node_data(parent).index].index,
+                new_nodes[subgraph.get_node_data(child).index].index,
                 subgraph.get_edge_data(parent, child),
             )
             for parent, child in subgraph.edge_list()
@@ -1380,7 +1380,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         new_root = ProductUnit(probabilistic_circuit=self)
 
         if len(remaining_variables) > 0:
-            new_root.add_subcircuit(root, False)
+            new_root.add_subcircuit(root)
 
         for variable, value in point.items():
             new_root.add_subcircuit(leaf(make_dirac(variable, value), self))

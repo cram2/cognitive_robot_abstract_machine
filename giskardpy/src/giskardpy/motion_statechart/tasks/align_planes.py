@@ -63,7 +63,7 @@ class AlignPlanes(Task):
         artifacts.debug_expressions.append(current_dbg)
         artifacts.debug_expressions.append(goal_dbg)
 
-        artifacts.constraints.add_vector_goal_constraints(
+        artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_tip_normal,
             frame_V_goal=root_V_root_normal,
             reference_velocity=self.reference_velocity,

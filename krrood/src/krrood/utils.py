@@ -383,6 +383,17 @@ def get_method_name(method: Callable) -> str:
     return method.__name__ if hasattr(method, "__name__") else str(method)
 
 
+def get_class_and_attribute_name(class_name: str, attribute_name: str) -> str:
+    """
+    Return the dot-qualified name ``"{class_name}.{attribute_name}"``.
+
+    :param class_name: The owner class name, typically ``SomeClass.__name__``.
+    :param attribute_name: The attribute or variable name to qualify.
+    :return: The qualified name string.
+    """
+    return f"{class_name}.{attribute_name}"
+
+
 def get_method_class_name_if_exists(method: Callable) -> Optional[str]:
     """
     Get the class name of a method if it has one.

@@ -6,7 +6,7 @@ from enum import IntEnum
 import numpy as np
 import qpSWIFT_sparse_bindings as qpSWIFT
 
-from giskardpy.qp.exceptions import QPSolverException
+from giskardpy.qp.exceptions import SolverReturnedFailureError
 from giskardpy.qp.qp_data import QPDataExplicit
 from giskardpy.qp.solvers.qp_solver import QPSolver
 
@@ -24,8 +24,9 @@ class QPSolverQPSwift(QPSolver[QPDataExplicit]):
     big_ball_mode: bool = False
     """
     qpSWIFT does not have infeasible detection and cannot differentiate suboptimal from infeasible.
-    If you know you QP is actually feasible, you can just ignore the failures and use the suboptimal solution.
-    .. warning:: This might lead to instability if the qp was actually infeasible.
+    If you know your QP is actually feasible, you can just ignore the failures and use the suboptimal solution.
+    .. warning:: This is unsafe because it might lead to instability if the QP was actually infeasible. Only enable it
+        when you are certain the problem is feasible.
     """
 
     opts = {
@@ -54,7 +55,7 @@ class QPSolverQPSwift(QPSolver[QPDataExplicit]):
         if not self.big_ball_mode:
             if exit_flag != QPSWIFTExitFlags.Optimal:
                 error_code = QPSWIFTExitFlags(exit_flag)
-                raise QPSolverException(f"Failed to solve qp: {str(error_code)}")
+                raise SolverReturnedFailureError(solver_status=str(error_code))
         return result.x
 
     solver_call = solver_call_explicit_interface

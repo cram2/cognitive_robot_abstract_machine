@@ -40,7 +40,7 @@ If a variable represents a list or a dictionary, you can use standard indexing o
 first_part = robot.parts[0] # -> returns IndexedVariable(robot.parts, 0)
 
 # Accessing a value by key in a dictionary
-config_val = robot.config["battery_limit"] # -> returns IndexedVariable(robot.config, "battery_limit")
+config_val = robot.qp_controller_config["battery_limit"] # -> returns IndexedVariable(robot.config, "battery_limit")
 ```
 
 ## Flattening Collections
