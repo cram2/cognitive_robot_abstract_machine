@@ -165,9 +165,20 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
     Superclass for active connections with 1 degree of freedom.
     """
 
-    parameters: ActiveConnection1DOFParameters = field(kw_only=True)
+    axis: Vector3 = field(kw_only=True)
     """
-    Parameters definiting the behavior of the active connection.
+    Connection moves along this axis, should be a unit vector.
+    The axis is defined relative to the local reference frame of the parent KinematicStructureEntity.
+    """
+
+    multiplier: float = 1.0
+    """
+    Movement along the axis is multiplied by this value. Useful if Connections share DoFs.
+    """
+
+    offset: float = 0.0
+    """
+    Movement along the axis is offset by this value. Useful if Connections share DoFs.
     """
 
     raw_dof: DegreeOfFreedom = field(kw_only=True)
@@ -176,9 +187,16 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
     Use the :attr:`dof` property to obtain it with ``multiplier`` and ``offset`` applied.
     """
 
+    dynamics: JointDynamics = field(default_factory=JointDynamics)
+    """
+    Dynamic properties of the joint.
+    """
+
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
-        result["parameters"] = to_json(self.parameters)
+        result["axis"] = self.axis.to_np().tolist()
+        result["multiplier"] = self.multiplier
+        result["offset"] = self.offset
         result["dof_id"] = to_json(self.raw_dof.id)
         return result
 
@@ -198,7 +216,9 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
             connection_T_child_expression=from_json(
                 data["connection_T_child_expression"], **kwargs
             ),
-            parameters=from_json(data["parameters"], **kwargs),
+            axis=Vector3.from_iterable(data["axis"]),
+            multiplier=data["multiplier"],
+            offset=data["offset"],
             raw_dof=raw_dof,
         )
 
@@ -238,6 +258,10 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         :return: An instance of the class representing the defined relationship with
                  its DOF added to the world.
         """
+        if axis is None:
+            raise ValueError(
+                f"{cls.__name__} is an active connection and requires an axis."
+            )
         name = name or cls._generate_default_name(parent=parent, child=child)
         dof = DegreeOfFreedom(name=PrefixedName("dof", str(name)), limits=dof_limits)
         world.add_degree_of_freedom(dof)
@@ -247,7 +271,9 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
             child=child,
             parent_T_connection_expression=parent_T_connection_expression,
             connection_T_child_expression=connection_T_child_expression,
-            parameters=parameters,
+            axis=axis,
+            multiplier=multiplier,
+            offset=offset,
             raw_dof=dof,
         )
         return connection
@@ -279,38 +305,6 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
     @property
     def active_dofs(self) -> list[DegreeOfFreedom]:
         return [self.raw_dof]
-
-    @property
-    def multiplier(self) -> float:
-        return self.parameters.multiplier
-
-    @multiplier.setter
-    def multiplier(self, value: float):
-        self.parameters.multiplier = value
-
-    @property
-    def offset(self) -> float:
-        return self.parameters.offset
-
-    @offset.setter
-    def offset(self, value: float):
-        self.parameters.offset = value
-
-    @property
-    def axis(self) -> Vector3:
-        return self.parameters.axis
-
-    @axis.setter
-    def axis(self, value: Vector3):
-        self.parameters.axis = value
-
-    @property
-    def dynamics(self):
-        return self.parameters.dynamics
-
-    @dynamics.setter
-    def dynamics(self, value: JointDynamics):
-        self.parameters.dynamics = value
 
     @property
     def position(self) -> float:

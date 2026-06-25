@@ -1,4 +1,5 @@
 import copy
+import inspect
 from pathlib import Path
 
 import numpy as np
@@ -8,12 +9,17 @@ from semantic_digital_twin.api.specifications import (
     BodySpecification,
     RegionSpecification,
     BodyAndConnectionSpecification,
+    ConnectionSpecification,
     SemanticAnnotationWithRootSpecification,
     WorldSpecification,
     WorldEntitySpawnSpecification,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import ParsingError, UselessConceptError
+from semantic_digital_twin.exceptions import (
+    MissingConnectionChildError,
+    ParsingError,
+    UselessConceptError,
+)
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobotPart
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -75,7 +81,9 @@ def test_region_specification_spawns(empty_world):
 
 def test_body_and_connection_pose_and_name_override(empty_world):
     body_spec = BodySpecification.box("box", Scale(1, 1, 1))
-    body_spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3)
+    body_spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=1, y=2, z=3
+    )
     spec = BodyAndConnectionSpecification(body_specification=body_spec)
     body = spec.spawn(empty_world, name="renamed")
     assert body.name == PrefixedName("renamed")
@@ -301,6 +309,150 @@ def test_world_specification_annotation_starting_object():
 
 
 #####################################################################
+# ConnectionSpecification captures a connection type and the keyword
+# arguments forwarded to its create_with_dofs.
+#####################################################################
+
+
+def test_for_fixed_connection_captures_type_without_kwargs():
+    spec = ConnectionSpecification.for_fixed_connection()
+    assert spec.connection_type is FixedConnection
+    assert spec.connection_kwargs == {}
+
+
+def test_for_connection_6dof_captures_type_without_kwargs():
+    spec = ConnectionSpecification.for_connection_6dof()
+    assert spec.connection_type is Connection6DoF
+    assert spec.connection_kwargs == {}
+
+
+def test_for_active_connection_1dof_captures_parameters():
+    limits = DegreeOfFreedomLimits(
+        lower=DerivativeMap(velocity=-1.0), upper=DerivativeMap(velocity=1.0)
+    )
+    axis = Vector3.Z()
+    spec = ConnectionSpecification.for_active_connection_1dof(
+        PrismaticConnection,
+        multiplier=2.0,
+        offset=0.5,
+        dof_limits=limits,
+        axis=axis,
+    )
+    assert spec.connection_type is PrismaticConnection
+    # connection_type is forwarded explicitly, so it must not leak into the kwargs.
+    assert set(spec.connection_kwargs) == {"multiplier", "offset", "dof_limits", "axis"}
+    assert spec.connection_kwargs["multiplier"] == 2.0
+    assert spec.connection_kwargs["offset"] == 0.5
+    assert spec.connection_kwargs["dof_limits"] is limits
+    assert spec.connection_kwargs["axis"] is axis
+
+
+def test_for_active_connection_1dof_defaults():
+    spec = ConnectionSpecification.for_active_connection_1dof(RevoluteConnection)
+    assert spec.connection_kwargs == {
+        "multiplier": 1.0,
+        "offset": 0.0,
+        "dof_limits": None,
+        "axis": None,
+    }
+
+
+def test_fixed_connection_spec_materializes(empty_world):
+    spec = ConnectionSpecification.for_fixed_connection()
+    child = Body(name=PrefixedName("child"))
+    with empty_world.modify_world():
+        connection = spec.connection_type.create_with_dofs(
+            world=empty_world,
+            parent=empty_world.root,
+            child=child,
+            **spec.connection_kwargs,
+        )
+        empty_world.add_connection(connection)
+    assert isinstance(connection, FixedConnection)
+    assert child in empty_world.bodies
+
+
+def test_active_1dof_connection_spec_kwargs_match_create_with_dofs_signature():
+    # The captured kwargs must be keyword arguments that create_with_dofs accepts,
+    # otherwise the specification cannot materialize its connection.
+    spec = ConnectionSpecification.for_active_connection_1dof(
+        PrismaticConnection, multiplier=2.0, offset=0.5, axis=Vector3.Z()
+    )
+    accepted_parameters = inspect.signature(
+        PrismaticConnection.create_with_dofs
+    ).parameters
+    assert set(spec.connection_kwargs).issubset(accepted_parameters)
+
+
+def test_connection_spec_spawn_fixed(empty_world):
+    child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    connection = ConnectionSpecification.for_fixed_connection().spawn(
+        empty_world, parent=empty_world.root, child=child
+    )
+    assert isinstance(connection, FixedConnection)
+    assert connection.parent is empty_world.root
+    assert connection.child is child
+    assert child in empty_world.bodies
+
+
+def test_connection_spec_spawn_defaults_parent_to_root(empty_world):
+    child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    connection = ConnectionSpecification.for_connection_6dof().spawn(
+        empty_world, child=child
+    )
+    assert isinstance(connection, Connection6DoF)
+    assert connection.parent is empty_world.root
+
+
+def test_connection_spec_spawn_active_forwards_kwargs(empty_world):
+    limits = DegreeOfFreedomLimits(
+        lower=DerivativeMap(velocity=-1.5), upper=DerivativeMap(velocity=1.5)
+    )
+    child = BodySpecification.box("slider", Scale(1, 1, 1)).to_domain_object()
+    connection = ConnectionSpecification.for_active_connection_1dof(
+        PrismaticConnection, dof_limits=limits, axis=Vector3.Z()
+    ).spawn(empty_world, child=child)
+    assert isinstance(connection, PrismaticConnection)
+    assert connection.dof.limits.upper.velocity == 1.5
+    assert connection.dof.limits.lower.velocity == -1.5
+
+
+def test_connection_spec_spawn_applies_pose(empty_world):
+    child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    ConnectionSpecification.for_fixed_connection().spawn(
+        empty_world,
+        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3),
+        child=child,
+    )
+    root_T_child = empty_world.compute_forward_kinematics(empty_world.root, child)
+    np.testing.assert_allclose(root_T_child.to_position().to_np()[:3], [1, 2, 3])
+
+
+def test_connection_spec_spawn_without_child_raises(empty_world):
+    with pytest.raises(MissingConnectionChildError):
+        ConnectionSpecification.for_fixed_connection().spawn(empty_world)
+
+
+def test_connection_spec_spawn_without_name_matches_direct_creation(empty_world):
+    # A nameless spec must auto-generate the same connection name as creating the
+    # connection directly between an identically-named parent and child.
+    spec_child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    spec_connection = ConnectionSpecification.for_fixed_connection().spawn(
+        empty_world, parent=empty_world.root, child=spec_child
+    )
+
+    direct_world = _fresh_world()
+    direct_child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    with direct_world.modify_world():
+        direct_connection = FixedConnection.create_with_dofs(
+            world=direct_world, parent=direct_world.root, child=direct_child
+        )
+        direct_world.add_connection(direct_connection)
+
+    assert spec_connection.name == direct_connection.name
+
+
+#####################################################################
 # get_default_body_specification / get_default_region_specification
 # reproduce the geometry that create_with_new_body_in_world(scale=...)
 # (and Aperture's region factory) generate, for every class that
@@ -324,9 +476,7 @@ def test_default_spec_matches_base_body(empty_world):
         factory = Milk.create_with_new_body_in_world(
             name=PrefixedName("milk"), world=empty_world, scale=scale
         )
-    spec_body = Milk.get_default_body_specification(
-        "milk", scale
-    ).to_domain_object()
+    spec_body = Milk.get_default_body_specification("milk", scale).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
     assert spec_body.collision is spec_body.visual
 
@@ -377,9 +527,7 @@ def test_default_spec_matches_door(empty_world):
         factory = Door.create_with_new_body_in_world(
             name=PrefixedName("door"), world=empty_world, scale=scale
         )
-    spec_body = Door.get_default_body_specification(
-        "door", scale
-    ).to_domain_object()
+    spec_body = Door.get_default_body_specification("door", scale).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
 
 
@@ -394,9 +542,7 @@ def test_default_spec_matches_floor(empty_world):
         factory = Floor.create_with_new_body_in_world(
             name=PrefixedName("floor"), world=empty_world, scale=scale
         )
-    spec_body = Floor.get_default_body_specification(
-        "floor", scale
-    ).to_domain_object()
+    spec_body = Floor.get_default_body_specification("floor", scale).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
 
 
@@ -406,9 +552,7 @@ def test_default_spec_matches_wall(empty_world):
         factory = Wall.create_with_new_body_in_world(
             name=PrefixedName("wall"), world=empty_world, scale=scale
         )
-    spec_body = Wall.get_default_body_specification(
-        "wall", scale
-    ).to_domain_object()
+    spec_body = Wall.get_default_body_specification("wall", scale).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
 
 
@@ -606,7 +750,9 @@ def test_nested_list_valued_parts_on_to_many_field(empty_world):
         HomogeneousTransformationMatrix.from_xyz_rpy(y=0.8)
     )
     wall = Wall.get_default_annotation_specification(
-        "wall", Scale(0.1, 3, 3), annotation_kwargs={"apertures": [aperture_a, aperture_b]}
+        "wall",
+        Scale(0.1, 3, 3),
+        annotation_kwargs={"apertures": [aperture_a, aperture_b]},
     ).spawn(empty_world)
     assert len(wall.apertures) == 2
     assert all(isinstance(aperture, Aperture) for aperture in wall.apertures)
@@ -618,8 +764,12 @@ def test_list_value_on_singular_part_field_raises(empty_world):
         Scale(0.4, 0.5, 0.6),
         annotation_kwargs={
             "handle": [
-                Handle.get_default_annotation_specification("h1", Scale(0.1, 0.05, 0.05)),
-                Handle.get_default_annotation_specification("h2", Scale(0.1, 0.05, 0.05)),
+                Handle.get_default_annotation_specification(
+                    "h1", Scale(0.1, 0.05, 0.05)
+                ),
+                Handle.get_default_annotation_specification(
+                    "h2", Scale(0.1, 0.05, 0.05)
+                ),
             ]
         },
     )
@@ -650,7 +800,10 @@ def test_annotation_connection_limits_threaded(empty_world):
         lower=DerivativeMap(velocity=-1.5), upper=DerivativeMap(velocity=1.5)
     )
     spec = Slider.get_default_annotation_specification(
-        "slider", Scale(0.1, 0.1, 0.1), active_axis=Vector3.Z(), connection_limits=limits
+        "slider",
+        Scale(0.1, 0.1, 0.1),
+        active_axis=Vector3.Z(),
+        connection_limits=limits,
     )
     slider = spec.spawn(empty_world)
     dof_limits = slider.root.parent_connection.dof.limits
@@ -776,9 +929,7 @@ def test_nested_composite_matches_imperative(empty_world):
         imperative_drawer.add(imperative_handle)
         imperative_drawer.add(imperative_hinge)
 
-    _assert_same_geometry(
-        drawer.root.collision, imperative_drawer.root.collision
-    )
+    _assert_same_geometry(drawer.root.collision, imperative_drawer.root.collision)
     _assert_same_geometry(
         drawer.handle.root.collision, imperative_handle.root.collision
     )

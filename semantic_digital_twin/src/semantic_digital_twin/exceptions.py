@@ -336,6 +336,24 @@ class InvalidConnectionLimits(UsageError):
 
 
 @dataclass
+class MissingConnectionChildError(UsageError):
+    """
+    Raised when a connection is spawned without a child kinematic structure entity.
+    """
+
+    connection_name: Optional[PrefixedName]
+    """
+    The name of the connection specification that was spawned without a child.
+    """
+
+    def error_message(self) -> str:
+        return f"Spawning the connection '{self.connection_name}' requires a child kinematic structure entity."
+
+    def suggest_correction(self) -> str:
+        return "pass the child entity via the 'child' keyword argument of spawn."
+
+
+@dataclass
 class MimicDofLimitOverwriteError(UsageError):
     """
     Raised when trying to overwrite the limits of a mimic degree of freedom.

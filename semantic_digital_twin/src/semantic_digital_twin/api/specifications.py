@@ -1,7 +1,9 @@
 from __future__ import annotations
+
+import difflib
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Union, Optional, TYPE_CHECKING
 
 from typing_extensions import Self, Type, Any, Generic, TypeVar
@@ -14,6 +16,7 @@ from semantic_digital_twin.datastructures.prefixed_name import (
     ensure_prefixed_name,
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.exceptions import MissingConnectionChildError
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -579,23 +582,122 @@ class BodyAndConnectionSpecification(WorldEntitySpawnSpecification):
 
 
 @dataclass
-class ConnectionWithoutReferenceFramesSpecification:
+class ConnectionSpecification(WorldEntitySpawnSpecification):
+    """
+    Declarative, world- and kinematic structure entity independent description of a connection.
 
-    connection_type: Type[Connection] = field(kw_only=True)
+    A specification only captures *which* connection type to create and *how* to
+    parameterize it.. The captured parameters are forwarded verbatim as keyword arguments to the connection type's
+    :meth:`~semantic_digital_twin.world_description.world_entity.Connection.create_with_dofs`
+    when the connection is finally materialized.
 
-    connection_kwargs: dict[str, Any] = field(default_factory=dict)
+    Instances are built through the ``for_*`` factory methods rather than the
+    constructor, so that each connection family can validate and name its own parameters.
+    """
+
+    connection_type: Type[Connection] = field(kw_only=True, init=False)
+    """
+    The connection type to instantiate. Set by the ``for_*`` factory methods.
+    """
+
+    connection_kwargs: dict[str, Any] = field(default_factory=dict, init=False)
+    """
+    Keyword arguments forwarded to :meth:`connection_type.create_with_dofs`. Empty for
+    parameterless connection families such as fixed and 6-DoF connections.
+    """
+
+    def spawn(
+        self,
+        world: World,
+        name: Union[str, PrefixedName, None] = None,
+        parent: KinematicStructureEntity | None = None,
+        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        *,
+        child: KinematicStructureEntity | None = None,
+    ) -> Connection:
+        """
+        Materialize the connection between ``parent`` and ``child`` and add it to the world.
+
+        Unlike the entity specifications, a connection joins two pre-existing entities, so the
+        child it connects must be supplied explicitly via ``child``.
+
+        :param child: The kinematic structure entity that becomes the connection's child.
+        :raises MissingConnectionChildError: If ``child`` is not provided.
+        """
+        if child is None:
+            raise MissingConnectionChildError(connection_name=self.name)
+
+        parent = parent or world.root
+        connection_name = ensure_prefixed_name(name) or self.name
+
+        parent_T_connection = parent_T_self or HomogeneousTransformationMatrix()
+        parent_T_connection.reference_frame = parent
+        parent_T_connection.child_frame = child
+
+        with world.modify_world():
+            connection = self.connection_type.create_with_dofs(
+                world=world,
+                parent=parent,
+                child=child,
+                name=connection_name,
+                parent_T_connection_expression=parent_T_connection,
+                **self.connection_kwargs,
+            )
+            world.add_connection(connection)
+        return connection
 
     @classmethod
-    def for_fixed_connection(cls):
-        return cls(connection_type=FixedConnection)
+    def for_fixed_connection(cls, name: PrefixedName | None = None) -> Self:
+        """
+        Specification for a rigid :class:`~semantic_digital_twin.world_description.connections.FixedConnection`,
+        which has no degrees of freedom and therefore no parameters.
+
+        :param name: The name of the connection. If None, ``create_with_dofs`` generates one.
+        """
+        self = cls(name=name)
+        self.connection_type = FixedConnection
+        return self
 
     @classmethod
-    def for_active_connection_1dof(cls, connection_type: Type[ActiveConnection1DOF], kwargs):
-        return cls(connection_type=connection_type, connection_kwargs=kwargs)
+    def for_active_connection_1dof(
+        cls,
+        connection_type: Type[ActiveConnection1DOF],
+        name: PrefixedName | None = None,
+        multiplier: float = 1.0,
+        offset: float = 0.0,
+        dof_limits: Optional[DegreeOfFreedomLimits] = None,
+        axis: Vector3 | None = None,
+    ) -> Self:
+        """
+        Specification for a single-DoF active connection (e.g. prismatic or revolute).
+
+        :param connection_type: The concrete :class:`~semantic_digital_twin.world_description.connections.ActiveConnection1DOF` subclass to create.
+        :param name: The name of the connection. If None, ``create_with_dofs`` generates one.
+
+        .. note:: The remaining parameters mirror
+            :meth:`~semantic_digital_twin.world_description.connections.ActiveConnection1DOF.create_with_dofs`
+            and are forwarded to it unchanged.
+        """
+        call_args = dict(locals())
+        call_args.pop("cls")
+        call_args.pop("connection_type")
+        call_args.pop("name")
+        self = cls(name=name)
+        self.connection_type = connection_type
+        self.connection_kwargs = call_args
+        return self
 
     @classmethod
-    def for_connection_6dof(cls):
-        return cls(connection_type=Connection6DoF)
+    def for_connection_6dof(cls, name: PrefixedName | None = None) -> Self:
+        """
+        Specification for a free-floating :class:`~semantic_digital_twin.world_description.connections.Connection6DoF`,
+        whose six degrees of freedom are generated without further parameters.
+
+        :param name: The name of the connection. If None, ``create_with_dofs`` generates one.
+        """
+        self = cls(name=name)
+        self.connection_type = Connection6DoF
+        return self
 
 
 @dataclass
