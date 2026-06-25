@@ -69,18 +69,27 @@ class MujocoSimulator(BaseSimulator):
     finish, so this lock provides the actual mutual exclusion.
     """
 
-
     def __post_init__(self, file_path: str = ""):
         super().__post_init__()
         self._file_path = file_path
         root = ET.parse(file_path).getroot()
         self._name = root.attrib.get("model", self.name)
         self._mj_spec: mujoco.MjSpec = mujoco.MjSpec.from_file(filename=self._file_path)
-        self._mj_spec.compiler.inertiafromgeom = self.config.get("inertiafromgeom", mujoco.mjtInertiaFromGeom.mjINERTIAFROMGEOM_TRUE)
-        self._mj_spec.option.integrator = self.config.get("integrator", mujoco.mjtIntegrator.mjINT_RK4)
-        self._mj_spec.option.noslip_iterations = int(self.config.get("noslip_iterations", 0))
-        self._mj_spec.option.noslip_tolerance = float(self.config.get("noslip_tolerance", 1e-6))
-        self._mj_spec.option.cone = self.config.get('cone', mujoco.mjtCone.mjCONE_PYRAMIDAL)
+        self._mj_spec.compiler.inertiafromgeom = self.config.get(
+            "inertiafromgeom", mujoco.mjtInertiaFromGeom.mjINERTIAFROMGEOM_TRUE
+        )
+        self._mj_spec.option.integrator = self.config.get(
+            "integrator", mujoco.mjtIntegrator.mjINT_RK4
+        )
+        self._mj_spec.option.noslip_iterations = int(
+            self.config.get("noslip_iterations", 0)
+        )
+        self._mj_spec.option.noslip_tolerance = float(
+            self.config.get("noslip_tolerance", 1e-6)
+        )
+        self._mj_spec.option.cone = self.config.get(
+            "cone", mujoco.mjtCone.mjCONE_PYRAMIDAL
+        )
         self._mj_spec.option.impratio = float(self.config.get("impratio", 1))
         self._mj_spec.option.timestep = self.step_size
         if self.config.get("multiccd", False):
@@ -143,7 +152,10 @@ class MujocoSimulator(BaseSimulator):
             body_spec.name = body_name
             try:
                 for body_child in (
-                    body_spec.bodies + body_spec.joints + body_spec.geoms + body_spec.sites
+                    body_spec.bodies
+                    + body_spec.joints
+                    + body_spec.geoms
+                    + body_spec.sites
                 ):
                     body_child.name = body_child.name.replace(dummy_prefix, "")
             except ValueError:
@@ -154,7 +166,10 @@ class MujocoSimulator(BaseSimulator):
                     self._mj_model, self._mj_data
                 )
                 for body_child in (
-                    body_spec.bodies + body_spec.joints + body_spec.geoms + body_spec.sites
+                    body_spec.bodies
+                    + body_spec.joints
+                    + body_spec.geoms
+                    + body_spec.sites
                 ):
                     body_child.name = body_child.name.replace(dummy_prefix, "")
             self._mj_model, self._mj_data = self._mj_spec.recompile(
@@ -630,7 +645,7 @@ class MujocoSimulator(BaseSimulator):
         :return: A SimulatorCallbackResult with a list of actuator names as the result
         """
         result = [
-            self._mj_model.actuator(actuator_id).name
+            self._mj_model.connection(actuator_id).name
             for actuator_id in range(self._mj_model.nu)
         ]
         return SimulatorCallbackResult(
@@ -1620,6 +1635,7 @@ class MujocoSimulator(BaseSimulator):
                     self._renderer._sim().load(self._mj_model, self._mj_data, "")
                     if self.simulation_thread is None:
                         mujoco.mj_step1(self._mj_model, self._mj_data)
+
         if self.state == SimulatorState.RUNNING:
             self.pause()
             do_spawn()

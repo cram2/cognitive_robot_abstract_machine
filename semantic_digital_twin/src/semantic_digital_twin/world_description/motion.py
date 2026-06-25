@@ -51,13 +51,13 @@ class MotionTrajectory:
 @dataclass(eq=True)
 class Motion:
     """
-    Represents a candidate motion as a sequence of actuator positions.
+    Represents a candidate motion as a sequence of connection positions.
 
     When a physics model is provided and the trajectory is ``None``, the model
     is used to generate the trajectory on demand during the causal sufficiency check.
     """
 
-    actuator: Connection
+    connection: Connection
     """The connection (joint) that is manipulated by this motion."""
 
     motion_model: Optional[PhysicsModel] = field(default=None)

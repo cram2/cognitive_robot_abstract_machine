@@ -67,7 +67,9 @@ class Causes(Predicate):
 
         :param step_delay: Seconds to sleep between steps (default 50 ms ≈ 20 fps).
         """
-        length = len(self.motion.motion_trajectory.positions_for(self.motion.actuator))
+        length = len(
+            self.motion.motion_trajectory.positions_for(self.motion.connection)
+        )
         for i in range(length):
             self.environment.set_positions_1DOF_connection(
                 self.motion.motion_trajectory.position_updates_at(i)
@@ -82,7 +84,7 @@ class Causes(Predicate):
             return False
 
         actuator_positions = self.motion.motion_trajectory.positions_for(
-            self.motion.actuator
+            self.motion.connection
         )
         is_achieved_pre = self.effect.is_achieved()
 

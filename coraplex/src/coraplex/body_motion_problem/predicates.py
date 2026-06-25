@@ -90,11 +90,11 @@ class MotionStatechartCanPerform(CanPerform):
                 return body
         for annotation in self.robot._world.get_semantic_annotations_by_type(HasHandle):
             if (
-                annotation.root.parent_connection == self.motion.actuator
+                annotation.root.parent_connection == self.motion.connection
                 and annotation.handle is not None
             ):
                 return annotation.handle.root
-        return self.motion.actuator.child
+        return self.motion.connection.child
 
     def _compute_body_trajectory(self, target: Body) -> list[Pose]:
         """
@@ -104,10 +104,10 @@ class MotionStatechartCanPerform(CanPerform):
         restored after this method returns.
         """
         world = target._world
-        dof_id = self.motion.actuator.raw_dof.id
+        dof_id = self.motion.connection.raw_dof.id
         trajectory = []
         for position in self.motion.motion_trajectory.positions_for(
-            self.motion.actuator
+            self.motion.connection
         ):
             world.state[dof_id].position = position
             world.notify_state_change()

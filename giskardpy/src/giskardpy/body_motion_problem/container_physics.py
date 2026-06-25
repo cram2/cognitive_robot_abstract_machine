@@ -9,6 +9,7 @@ from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.effects import Effect
+from semantic_digital_twin.world_description.motion import MotionTrajectory
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -30,10 +31,6 @@ class ContainerManipulationPhysicsModel(GiskardPhysicsModel):
     goal_joint_state: float
     """Target joint position to drive the container to."""
 
-    @property
-    def primary_connection(self) -> ActiveConnection1DOF:
-        return self.actuator
-
     def build_motion_statechart(self, effect: Effect, world: World) -> MotionStatechart:
         """
         Build an MSC with a single :class:`~giskardpy.motion_statechart.goals.open_close.Open`
@@ -48,6 +45,18 @@ class ContainerManipulationPhysicsModel(GiskardPhysicsModel):
         msc.add_node(goal)
         msc.add_node(EndMotion.when_true(goal))
         return msc
+
+    def _build_motion_trajectory(self, effect: Effect) -> MotionTrajectory:
+        """
+        :return: Trajectory for the container joint driven by this model.
+        """
+        return MotionTrajectory(
+            {
+                self.actuator: self._extract_dof_positions(
+                    self._recorded_trajectory, self.actuator
+                )
+            }
+        )
 
     def interaction_body(self):
         """

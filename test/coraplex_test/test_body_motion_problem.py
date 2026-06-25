@@ -223,7 +223,7 @@ def _extend_world(
         )
         motions.append(
             Motion(
-                actuator=act,
+                connection=act,
                 motion_model=_get_msc_model_for_open_goal(
                     annotation.handle.root, act, upper
                 ),
@@ -241,7 +241,7 @@ def _extend_world(
             )
             motions.append(
                 Motion(
-                    actuator=act,
+                    connection=act,
                     motion_model=_get_msc_model_for_open_goal(
                         annotation.handle.root, act, lower
                     ),
@@ -379,7 +379,7 @@ class TestPouringPredicates:
             target_object=cup, property_getter=lambda c: c.fill_level, goal_value=0.6
         )
         motion = Motion(
-            actuator=cup.root.parent_connection,
+            connection=cup.root.parent_connection,
             motion_model=PouringMSCModel(
                 fill_equation=cup.fill_equation,
                 fill_connection=cup.fill_connection,
@@ -401,7 +401,7 @@ class TestPouringPredicates:
             goal_value=goal_fill,
         )
         motion = Motion(
-            actuator=cup.root.parent_connection,
+            connection=cup.root.parent_connection,
             motion_model=PouringMSCModel(
                 fill_equation=cup.fill_equation,
                 fill_connection=cup.fill_connection,
@@ -477,7 +477,7 @@ class TestContainerManipulationQueries:
 
         actuator = drawers[0].root.parent_connection
         motion = Motion(
-            actuator=actuator,
+            connection=actuator,
             motion_trajectory=MotionTrajectory({actuator: [0.0, 0.1, 0.2, 0.3, 0.4]}),
         )
         task_sym = variable(TaskRequest, domain=[open_task, close_task])
@@ -542,7 +542,7 @@ class TestPouringQueries:
             goal_value=goal_fill,
         )
         motion = Motion(
-            actuator=cup.root.parent_connection,
+            connection=cup.root.parent_connection,
             motion_model=PouringMSCModel(
                 fill_equation=cup.fill_equation,
                 fill_connection=cup.fill_connection,
@@ -581,7 +581,7 @@ class TestPouringQueries:
             goal_value=goal_fill,
         )
         motion = Motion(
-            actuator=cup.root.parent_connection,
+            connection=cup.root.parent_connection,
             motion_model=PouringMSCModel(
                 fill_equation=cup.fill_equation,
                 fill_connection=cup.fill_connection,
@@ -617,7 +617,7 @@ class TestPouringQueries:
         tilt_positions = [0.1, 1.0, 1.3] + ([1.3] * 30) + [1.3, 1.0, 0.7, 0.4, 0.1, 0.0]
         actuator = cup.root.parent_connection
         motion = Motion(
-            actuator=actuator,
+            connection=actuator,
             motion_trajectory=MotionTrajectory({actuator: tilt_positions}),
             time_step=0.1,
         )
@@ -739,7 +739,7 @@ class TestRobotIntegration:
             if "cabinet11_drawer_top" in str(drawer.bodies[0].name)
         ][0].root.parent_connection
         motion = Motion(
-            actuator=actuator,
+            connection=actuator,
             motion_trajectory=MotionTrajectory({actuator: [0.0, 0.1, 0.2, 0.3]}),
         )
         task_sym = variable(TaskRequest, domain=[open_task, close_task])

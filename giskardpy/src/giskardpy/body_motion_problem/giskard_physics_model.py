@@ -24,7 +24,7 @@ class GiskardPhysicsModel(PhysicsModel):
     Abstract base for physics models that simulate a MotionStatechart via Giskard's Executor.
 
     Subclasses define the MSC to run (:meth:`build_motion_statechart`) and which
-    connection's positions form the primary trajectory (:attr:`primary_connection`).
+    connections to record (:meth:`_build_motion_trajectory`).
 
     The executor runs at maximum speed (no real-time pacing) inside a
     ``world.reset_state_context()``, recording the full ``WorldStateTrajectory`` for
@@ -37,11 +37,6 @@ class GiskardPhysicsModel(PhysicsModel):
     _recorded_trajectory: Optional[WorldStateTrajectory] = field(
         init=False, repr=False, default=None
     )
-
-    @property
-    @abstractmethod
-    def primary_connection(self) -> ActiveConnection1DOF:
-        """The connection whose position values form the returned primary trajectory."""
 
     @abstractmethod
     def build_motion_statechart(self, effect: Effect, world: World) -> MotionStatechart:
@@ -82,21 +77,15 @@ class GiskardPhysicsModel(PhysicsModel):
 
         return self._build_motion_trajectory(effect)
 
+    @abstractmethod
     def _build_motion_trajectory(self, effect: Effect) -> MotionTrajectory:
         """
         Construct the :class:`~semantic_digital_twin.world_description.motion.MotionTrajectory`
         from the most recently recorded world-state trajectory.
 
-        The default implementation extracts only the primary connection.
-        Subclasses may override to include additional coupled connections.
-
         :param effect: The effect that was passed to the most recent :meth:`run` call.
         :return: Trajectory covering all connections relevant to this model.
         """
-        positions = self._extract_dof_positions(
-            self._recorded_trajectory, self.primary_connection
-        )
-        return MotionTrajectory({self.primary_connection: positions})
 
     def _extract_dof_positions(
         self, trajectory: WorldStateTrajectory, connection: ActiveConnection1DOF

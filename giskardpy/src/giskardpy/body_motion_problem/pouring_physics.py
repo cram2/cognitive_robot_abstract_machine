@@ -49,10 +49,6 @@ class PouringMSCModel(GiskardPhysicsModel):
     initial_tilt: Optional[float] = field(default=None)
     """If set, the tilt connection is moved to this angle before the simulation begins."""
 
-    @property
-    def primary_connection(self) -> ActiveConnection1DOF:
-        return self.tilt_connection
-
     def build_motion_statechart(self, effect: Effect, world: World) -> MotionStatechart:
         """
         Build an MSC with a :class:`~giskardpy.motion_statechart.tasks.pouring.PouringTask`
