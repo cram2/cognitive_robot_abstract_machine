@@ -11,4 +11,12 @@ systems using behavior trees. It includes:
 * Common data structures for perception data
 """
 
-__version__: str = "1.0.0"
+import sys
+from pathlib import Path
+
+def _get_version():
+    version_file = Path(__file__).resolve().parent.parent.parent.parent / "VERSION"
+    with open(version_file) as f:
+        return f.read().strip()
+
+__version__: str = _get_version()
