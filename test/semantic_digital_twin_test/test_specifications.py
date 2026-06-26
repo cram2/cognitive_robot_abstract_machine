@@ -385,7 +385,9 @@ def test_parameterized_fixed_ignores_active_parameters():
 def test_active_1dof_spec_kwargs_match_create_with_dofs_signature():
     # The forwarded kwargs must be keyword arguments that create_with_dofs accepts,
     # otherwise the specification cannot materialize its connection.
-    spec = PrismaticConnectionSpecification(axis=Vector3.Z(), multiplier=2.0, offset=0.5)
+    spec = PrismaticConnectionSpecification(
+        axis=Vector3.Z(), multiplier=2.0, offset=0.5
+    )
     accepted_parameters = inspect.signature(
         PrismaticConnection.create_with_dofs
     ).parameters
