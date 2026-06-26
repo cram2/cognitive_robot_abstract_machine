@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 
@@ -40,10 +40,15 @@ class DifferentialDriveBaseGoal(Sequence):
     goal_pose: Pose = field(kw_only=True)
     """Pose to reach."""
 
-    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
+    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
     """Task priority relative to other tasks."""
 
     nodes: list[MotionStatechartNode] = field(default_factory=list, init=False)
+
+    threshold: float = field(default=0.01, kw_only=True)
+    """
+    Threshold when the drive goals for the base are considered achieved.
+    """
 
     def expand(self, context: MotionStatechartContext) -> None:
         if self.diff_drive_connection is None:
@@ -82,6 +87,7 @@ class DifferentialDriveBaseGoal(Sequence):
                 tip_link=tip,
                 goal_orientation=root_R_first_orientation,
                 weight=self.weight,
+                threshold=self.threshold,
             ),
             CartesianPose(
                 name=f"{self.name}/step2",
@@ -89,6 +95,7 @@ class DifferentialDriveBaseGoal(Sequence):
                 tip_link=tip,
                 goal_pose=root_T_goal2,
                 weight=self.weight,
+                threshold=self.threshold,
             ),
             CartesianPose(
                 name=f"{self.name}/step3",
@@ -96,6 +103,7 @@ class DifferentialDriveBaseGoal(Sequence):
                 tip_link=tip,
                 goal_pose=root_T_goal,
                 weight=self.weight,
+                threshold=self.threshold,
             ),
         ]
         super().expand(context)

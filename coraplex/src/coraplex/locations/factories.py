@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from copy import deepcopy
 
 from typing_extensions import List, Union, Optional
@@ -31,7 +33,7 @@ def _get_object_in_hand(
     Util method that finds the object a robot is holding in the given arm.
 
     :param test_robot: The robot that is holding something
-    :parm test_world: The world in which the robot is located
+    :param test_world: The world in which the robot is located
     :param arm: The arm that is holding something
     :returns: The body that the robot is holding in the given arm or None
     """
@@ -54,7 +56,7 @@ def occupancy_location(target_pose: Pose, context: Context) -> Location:
     Factory that creates a Location for robot base poses, does not have any validators
 
     :param target_pose: Target pose around which robot base poses should be sampled
-    :praam context: Context of the plan in which the location should be created
+    :param context: Context of the plan in which the location should be created
     :returns: The Location for robot base poses
     """
     return Location(
@@ -110,8 +112,11 @@ def reachability_location(
                     or target_body,
                 ),
                 tip_link=man.tool_frame,
-                world=context.world,
-                robot=context.robot,
+                context=Context(
+                    world=context.world,
+                    robot=context.robot,
+                    alternative_motion_mappings=context.alternative_motion_mappings,
+                ),
             )
         ],
     )
@@ -168,8 +173,11 @@ def visibility_location(target: Union[Pose, Body], context: Context) -> Location
         costmap,
         [
             IsVisibleBy(
-                world=context.world,
-                robot=context.robot,
+                context=Context(
+                    world=context.world,
+                    robot=context.robot,
+                    alternative_motion_mappings=context.alternative_motion_mappings,
+                ),
                 target_pose=target_pose,
                 target_body=target_body,
             )
@@ -220,8 +228,11 @@ def giskard_reachability_location(
                     _get_object_in_hand(context.robot, context.world, arm)
                     or target_body,
                 ),
-                robot=context.robot,
-                world=context.world,
+                context=Context(
+                    robot=context.robot,
+                    world=context.world,
+                    alternative_motion_mappings=context.alternative_motion_mappings,
+                ),
                 tip_link=man.tool_frame,
             )
         ],
