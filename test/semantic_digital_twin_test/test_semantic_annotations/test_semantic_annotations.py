@@ -280,6 +280,26 @@ def fit_rules_and_assert_semantic_annotations(
     )
 
 
+@pytest.mark.skipif(world_rdr is None, reason="requires world_rdr")
+def test_inferred_handle_bearing_annotations_have_handle_instance(
+    apartment_world_setup,
+):
+    world_reasoner = WorldReasoner(apartment_world_setup)
+    found_semantic_annotations = world_reasoner.infer_semantic_annotations()
+    drawers = [v for v in found_semantic_annotations if isinstance(v, Drawer)]
+    doors = [v for v in found_semantic_annotations if isinstance(v, Door)]
+    assert drawers, "Expected at least one inferred Drawer"
+    assert doors, "Expected at least one inferred Door"
+    for drawer in drawers:
+        assert isinstance(
+            drawer.handle, Handle
+        ), f"drawer.handle should be a Handle, got {type(drawer.handle)}"
+    for door in doors:
+        assert isinstance(
+            door.handle, Handle
+        ), f"door.handle should be a Handle, got {type(door.handle)}"
+
+
 def test_semantic_annotation_serialization_deserialization_once(apartment_world_copy):
     handle_body = apartment_world_copy.bodies[0]
     door_body = apartment_world_copy.bodies[1]

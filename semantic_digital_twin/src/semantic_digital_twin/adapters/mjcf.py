@@ -81,6 +81,14 @@ class MJCFParser:
     The prefix for every name used in this world.
     """
 
+    use_visual_as_collision: bool = False
+    """
+    When True, geoms with ``contype=0`` and ``conaffinity=0`` (visual-only in MuJoCo)
+    are also registered as collision shapes in the SDT world. Use this when the MJCF
+    scene separates visual meshes from collision geometry into different files and you
+    need the visual meshes to participate in SDT collision checking.
+    """
+
     def __post_init__(self):
         if self.prefix is None:
             self.prefix = os.path.basename(self.file_path).split(".")[0]
@@ -109,6 +117,7 @@ class MJCFParser:
 
             root = Body(name=PrefixedName(worldbody.name))
             self.world.add_body(root)
+            self._apply_geoms_to_body(mujoco_body=worldbody, body=root)
 
             for mujoco_body in worldbody.bodies:
                 self.parse_body(mujoco_body=mujoco_body)
@@ -124,13 +133,13 @@ class MJCFParser:
 
         return self.world
 
-    def parse_body(self, mujoco_body: mujoco.MjsBody):
+    def _apply_geoms_to_body(self, mujoco_body: mujoco.MjsBody, body: Body) -> None:
         """
-        Parse a Mujoco body and add it to the world.
+        Parse geoms of a Mujoco body and attach them as visual/collision shapes to a Body.
 
-        :param mujoco_body: The Mujoco body to parse.
+        :param mujoco_body: The Mujoco body whose geoms to parse.
+        :param body: The semdt Body to attach the shapes to.
         """
-        body = Body(name=PrefixedName(mujoco_body.name))
         visuals = []
         collisions = []
         for mujoco_geom in mujoco_body.geoms:
@@ -142,7 +151,8 @@ class MJCFParser:
                     solver_reference=mujoco_geom.solref.tolist(),
                 )
             )
-            if mujoco_geom.contype != 0 or mujoco_geom.conaffinity != 0:
+            is_collision_geom = mujoco_geom.contype != 0 or mujoco_geom.conaffinity != 0
+            if is_collision_geom or self.use_visual_as_collision:
                 collisions.append(shape)
             if mujoco_geom.group in [
                 GeomVisibilityAndCollisionType.VISIBLE_AND_COLLIDABLE_1,
@@ -150,9 +160,18 @@ class MJCFParser:
                 GeomVisibilityAndCollisionType.ONLY_VISIBLE,
             ]:
                 visuals.append(shape)
-        body.inertial = self.parse_inertial(mujoco_body=mujoco_body)
         body.visual = ShapeCollection(shapes=visuals, reference_frame=body)
         body.collision = ShapeCollection(shapes=collisions, reference_frame=body)
+
+    def parse_body(self, mujoco_body: mujoco.MjsBody):
+        """
+        Parse a Mujoco body and add it to the world.
+
+        :param mujoco_body: The Mujoco body to parse.
+        """
+        body = Body(name=PrefixedName(mujoco_body.name))
+        self._apply_geoms_to_body(mujoco_body=mujoco_body, body=body)
+        body.inertial = self.parse_inertial(mujoco_body=mujoco_body)
         body.simulator_additional_properties.append(
             MujocoBody(
                 gravitation_compensation_factor=mujoco_body.gravcomp,
@@ -477,9 +496,15 @@ class MJCFParser:
                 )
             else:
                 lower_limits = DerivativeMap()
-                lower_limits.position = mujoco_joint.range[0]
+                # Note: Parse joint limits as float instead of numpy float, otherwise it will trigger .to_np() on symbolic expressions with free variables in giskardpy -> raises Exception
+                lower_limits.position = float(mujoco_joint.range[0])
                 upper_limits = DerivativeMap()
-                upper_limits.position = mujoco_joint.range[1]
+                upper_limits.position = float(mujoco_joint.range[1])
+
+                # Mujocos MJCF does not support velocity limits on joints. Set default values here.
+                lower_limits.velocity = 0.0
+                upper_limits.velocity = 1.0
+
                 dof = DegreeOfFreedom(
                     name=PrefixedName(dof_name),
                     limits=DegreeOfFreedomLimits(

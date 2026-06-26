@@ -90,6 +90,8 @@ class TransportAction(ActionDescription):
                         True,
                     ),
                     OpenAction(handle, self.arm),
+                    # Note: without the CostmapLocation fails
+                    MoveTorsoAction(TorsoState.HIGH),
                 ]
             )
         ).perform()
