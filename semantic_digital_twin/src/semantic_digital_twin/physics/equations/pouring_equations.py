@@ -1,0 +1,178 @@
+from __future__ import annotations
+
+from abc import abstractmethod
+from dataclasses import dataclass, field
+from typing import Any, Dict
+
+import krrood.symbolic_math.symbolic_math as sm
+from krrood.adapters.json_serializer import SubclassJSONSerializer
+from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar
+from typing_extensions import Self, Tuple
+
+from semantic_digital_twin.physics.equations.differential_equation import (
+    DifferentialEquation,
+)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+
+
+@dataclass
+class PouringEquation(SubclassJSONSerializer, DifferentialEquation):
+    """
+    Abstract ODE for pouring-domain fill-level dynamics.
+
+    Owns the outflow rate constant.
+    Concrete subclasses implement :meth:`symbolic_velocity`.
+
+    :param outflow_rate_constant: Outflow rate constant.
+    """
+
+    outflow_rate_constant: float = field(default=1.0, kw_only=True)
+
+    @abstractmethod
+    def symbolic_velocity(
+        self, tilt_expression: Scalar, fill_expression: Scalar
+    ) -> Scalar:
+        """
+        Symbolic d(fill_normalized)/dt as a CasADi expression.
+
+        :param tilt_expression: Symbolic tilt angle θ in radians.
+        :param fill_expression: Symbolic fill level in [0, 1].
+        :return: Symbolic desired fill velocity.
+        """
+
+    def symbolic_tilt_floor(self, fill_expression: Scalar) -> Scalar:
+        """
+        Symbolic minimum tilt angle at which flow begins for the given fill level.
+
+        :param fill_expression: Symbolic fill-level position DOF variable.
+        :return: Symbolic tilt floor angle in radians.
+        """
+        return sm.Scalar(0.0)
+
+    def symbolic_ode_jacobians(
+        self, tilt_expression: Scalar, fill_expression: Scalar
+    ) -> Tuple[Scalar, Scalar]:
+        """
+        Partial derivatives of the fill velocity ODE w.r.t. tilt and fill level.
+
+        Uses CasADi autodiff on fresh symbolic variables, then substitutes the actual
+        expressions. Both derivatives are computed in a single call to avoid evaluating
+        :meth:`symbolic_velocity` twice.
+
+        :param tilt_expression: Symbolic tilt angle α at the current operating point.
+        :param fill_expression: Symbolic fill level h at the current operating point.
+        :return: ``(∂f/∂α, ∂f/∂h)`` evaluated at ``(tilt_expression, fill_expression)``.
+        """
+        alpha_var = FloatVariable("_ode_alpha")
+        h_var = FloatVariable("_ode_h")
+        f = self.symbolic_velocity(alpha_var, h_var)
+        df_dalpha = f.jacobian([alpha_var])[0, 0].substitute(
+            [alpha_var, h_var], [tilt_expression, fill_expression]
+        )
+        df_dh = f.jacobian([h_var])[0, 0].substitute(
+            [alpha_var, h_var], [tilt_expression, fill_expression]
+        )
+        return df_dalpha, df_dh
+
+
+@dataclass
+class ArticulatedPouringEquation(PouringEquation):
+    """
+    Pouring ODE derived from the 2-D rectangular-cup model.
+
+    Computes the effective discharge gap from actual cup dimensions (height ``A``,
+    half-width ``r``) and the current tilt angle::
+
+        L(h)    = √((A − h)² + r²)
+        φ(h)    = atan2(A − h, r)
+        d(α, h) = max(0, L(h) · sin(α − φ(h)))
+        ḣ       = −k · d(α, h)
+
+    :param container_geometry: Physical dimensions of the container.
+    """
+
+    container_height: float
+    container_width: float
+
+    def to_json(self) -> Dict[str, Any]:
+        result = super().to_json()
+        result["container_height"] = self.container_height
+        result["container_width"] = self.container_width
+        result["outflow_rate_constant"] = self.outflow_rate_constant
+        return result
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(
+            container_height=data["container_height"],
+            container_width=data["container_width"],
+            outflow_rate_constant=data["outflow_rate_constant"],
+        )
+
+    def symbolic_tilt_floor(self, fill_expression: Scalar) -> Scalar:
+        """
+        Returns the geometric tilt offset φ(fill) — the minimum tilt for flow.
+
+        :param fill_expression: Symbolic fill-level position DOF variable.
+        :return: Symbolic φ(fill) in radians.
+        """
+        A = self.container_height
+        r = self.container_width / 2
+        return sm.atan2(A - fill_expression * A, r)
+
+    def symbolic_velocity(
+        self, tilt_expression: Scalar, fill_expression: Scalar
+    ) -> Scalar:
+        """
+        :param tilt_expression: Symbolic tilt angle θ in radians.
+        :param fill_expression: Symbolic fill level in [0, 1].
+        :return: Symbolic d(fill_normalized)/dt as a CasADi expression.
+        """
+        A = self.container_height
+        r = self.container_width / 2
+        h_sym = fill_expression * A
+        L_sym = sm.sqrt((A - h_sym) ** 2 + r**2)
+        phi_sym = sm.atan2(A - h_sym, r)
+        gap_sym = sm.max(
+            sm.Scalar(0.0),
+            L_sym * sm.sin(tilt_expression - phi_sym),
+        )
+        return -self.outflow_rate_constant * gap_sym / A
+
+
+def tilt_expression_from_fk(root_T_cup: HomogeneousTransformationMatrix) -> Scalar:
+    """
+    Symbolic tilt angle of a cup about the vertical axis given its FK transform.
+
+    Uses the z-component of the cup's local up axis in the root frame:
+    θ = acos(R_zz).
+
+    :param root_T_cup: Symbolic FK expression from root to cup frame.
+    :return: Symbolic tilt angle in radians.
+    """
+    root_V_cup_z = root_T_cup.to_rotation_matrix() @ Vector3.Z()
+    return sm.safe_acos(root_V_cup_z.z)
+
+
+@dataclass
+class InflowEquation(DifferentialEquation):
+    """
+    Fill-level ODE for a container receiving liquid.
+
+    Converts an inflow volume rate to a normalised fill velocity
+    for this container using its own cross-sectional geometry.
+
+    :param container_geometry: Physical dimensions of the receiving container.
+    :param inflow: The symbolic inflow volume rate.
+    """
+
+    container_height: float
+    container_width: float
+    inflow: Scalar = field(default_factory=lambda: sm.Scalar(0.0))
+
+    def symbolic_velocity(self) -> Scalar:
+        """
+        :return: Normalised fill velocity from inflow.
+        """
+        receiver_volume = self.container_width / 2 * self.container_height
+        return self.inflow / receiver_volume

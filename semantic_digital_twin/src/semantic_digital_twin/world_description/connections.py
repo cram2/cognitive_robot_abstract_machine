@@ -9,6 +9,10 @@ import numpy as np
 from typing_extensions import TYPE_CHECKING, Union, Optional, Dict, Any, Self
 
 from krrood.adapters.json_serializer import from_json, to_json
+from krrood.symbolic_math.symbolic_math import Scalar
+from semantic_digital_twin.physics.equations.pouring_equations import (
+    tilt_expression_from_fk,
+)
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -33,6 +37,10 @@ from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
+    from semantic_digital_twin.physics.equations.pouring_equations import (
+        InflowEquation,
+        PouringEquation,
+    )
 
 
 class HasUpdateState(ABC):
@@ -1083,3 +1091,125 @@ class DifferentialDrive(WheeledDrive):
             yaw=world.get_degree_of_freedom_by_id(self.yaw.id),
             x_velocity=world.get_degree_of_freedom_by_id(self.x_velocity.id),
         )
+
+
+@dataclass(eq=False)
+class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
+    """
+    Translating DOF representing the fill level of a container.
+
+    Integrates :attr:`outflow_equation` and :attr:`inflow_equation` each tick.
+    Either may be ``None``; the net velocity is their sum.
+
+    **Why the fill DOF is passive (not QP-active)**
+
+    The fill level must be driven exclusively by physics: liquid flows out only when the container is
+    physically tilted beyond the spill threshold. If the fill DOF were listed in :meth:`active_dofs`,
+    the QP solver would include it as a free variable and could satisfy pouring constraints by directly
+    commanding fill velocity — bypassing the tilt mechanics entirely. In practice this caused the QP to
+    drain the container without the cup ever tilting, because using the fill DOF directly was a cheaper
+    path to minimising the constraint error than moving all the arm joints.
+
+    Declaring the DOF as passive (via :meth:`passive_dofs`) keeps it in the world state and forward-
+    kinematics parameter set — so the FK phantom-link transform and constraint expressions that read
+    ``fill_sym`` remain valid — while excluding it from the QP's optimisation variables.
+    """
+
+    outflow_equation: Optional[PouringEquation] = field(
+        default=None, kw_only=True, init=False
+    )
+    """ODE governing how liquid leaves this container (e.g. tilting to pour)."""
+
+    inflow_equation: Optional[InflowEquation] = field(
+        default=None, kw_only=True, init=False
+    )
+    """ODE governing how liquid enters this container from an external source."""
+
+    @property
+    def active_dofs(self) -> List[DegreeOfFreedom]:
+        """
+        Returns an empty list so the QP solver cannot command fill velocity directly.
+
+        :return: Empty list.
+        """
+        return []
+
+    @property
+    def passive_dofs(self) -> List[DegreeOfFreedom]:
+        """
+        Registers the fill DOF as passive so it remains in the world state and FK parameter set
+        without being a QP optimisation variable.
+
+        :return: List containing the single fill-level DOF.
+        """
+        return [self.raw_dof]
+
+    def to_json(self) -> Dict[str, Any]:
+        result = super().to_json()
+        result["outflow_equation"] = (
+            to_json(self.outflow_equation)
+            if self.outflow_equation is not None
+            else None
+        )
+        result["inflow_equation"] = (
+            to_json(self.inflow_equation) if self.inflow_equation is not None else None
+        )
+        return result
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> LiquidConnection:
+        instance = super()._from_json(data, **kwargs)
+        raw_outflow = data.get("outflow_equation")
+        if raw_outflow is not None:
+            instance.outflow_equation = from_json(raw_outflow)
+        raw_inflow = data.get("inflow_equation")
+        if raw_inflow is not None:
+            instance.inflow_equation = from_json(raw_inflow)
+        return instance
+
+    def copy_for_world(self, world: World) -> LiquidConnection:
+        """
+        Copy this connection into world, preserving the physics equations.
+
+        :param world: The target world.
+        :return: The copied connection registered in world.
+        """
+        copy = super().copy_for_world(world)
+        copy.outflow_equation = self.outflow_equation
+        copy.inflow_equation = self.inflow_equation
+        return copy
+
+    def add_to_world(self, world: World):
+        super().add_to_world(world)
+        translation_axis = self.axis * self.dof.variables.position
+        self._kinematics = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=translation_axis[0],
+            y=translation_axis[1],
+            z=translation_axis[2],
+            child_frame=self.child,
+        )
+
+    @property
+    def tilt_expression(self) -> Optional[Scalar]:
+        """Symbolic tilt angle used by :attr:`outflow_equation` during physics integration."""
+        root_T_child = self._world.compose_forward_kinematics_expression(
+            self._world.root, self.child
+        )
+        return tilt_expression_from_fk(root_T_child)
+
+    def update_state(self, dt: float):
+        """
+        Advances the fill level by one physics step.
+
+        :param dt: Time elapsed since the previous step, in seconds.
+        """
+        state = self._world.state
+        velocity = 0.0
+        if self.outflow_equation is not None:
+            velocity += self.outflow_equation.symbolic_velocity(
+                self.tilt_expression,
+                self.dof.variables.position,
+            ).evaluate()[0]
+        if self.inflow_equation is not None:
+            velocity += self.inflow_equation.symbolic_velocity().evaluate()[0]
+        state[self.dof.id].position = state[self.dof.id].position + velocity * dt

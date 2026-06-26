@@ -384,11 +384,11 @@ def cylinder_bot_diff_world():
 
 
 def world_with_urdf_factory(
-        robot_semantic_annotation: Type[AbstractRobot],
-        drive_connection_type: Type[OmniDrive | DifferentialDrive],
-        robot_starting_pose: HomogeneousTransformationMatrix | None = None,
-        urdf_path_resolver: PathResolver | None = None,
-        robot_localization_pose: HomogeneousTransformationMatrix | None = None,
+    robot_semantic_annotation: Type[AbstractRobot],
+    drive_connection_type: Type[OmniDrive | DifferentialDrive],
+    robot_starting_pose: HomogeneousTransformationMatrix | None = None,
+    urdf_path_resolver: PathResolver | None = None,
+    robot_localization_pose: HomogeneousTransformationMatrix | None = None,
 ):
     """
     Builds this tree:
