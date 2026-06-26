@@ -106,9 +106,13 @@ class Handle(HasRootBody):
         ).as_shapes()
         handle_body.collision = collision
         handle_body.visual = collision
-        return cls._create_with_connection_in_world(
-            name, world, handle_body, world_root_T_self
+
+        instance = cls(name=name, root=handle_body)
+        cls._parent_connection_specification_type().spawn(
+            world, parent_T_self=world_root_T_self, child=handle_body
         )
+        world.add_semantic_annotation(instance)
+        return instance
 
     @classmethod
     def _create_handle_geometry(
@@ -204,9 +208,12 @@ class Aperture(HasRootRegion):
         ).as_shapes()
         aperture_region.area = aperture_geometry
 
-        return cls._create_with_connection_in_world(
-            name, world, aperture_region, world_root_T_self
+        instance = cls(name=name, root=aperture_region)
+        cls._parent_connection_specification_type().spawn(
+            world, parent_T_self=world_root_T_self, child=aperture_region
         )
+        world.add_semantic_annotation(instance)
+        return instance
 
     @classmethod
     def create_with_new_region_in_world_from_body(
@@ -394,10 +401,12 @@ class Door(HasHandle, HasMechanicalJoint):
         world.add_connection(FixedConnection(door_body, entry_way.root))
         world.add_semantic_annotation(entry_way)
 
-        door = cls._create_with_connection_in_world(
-            name, world, door_body, world_root_T_self
+        door = cls(name=name, root=door_body)
+        cls._parent_connection_specification_type().spawn(
+            world, parent_T_self=world_root_T_self, child=door_body
         )
         door.entry_way = entry_way
+        world.add_semantic_annotation(door)
         return door
 
     @classmethod
@@ -603,9 +612,13 @@ class Floor(HasSupportingSurface):
         :param floor_polytope: A list of 3D points defining the floor poly
         """
         room_body = Body.from_3d_points(name=name, points_3d=floor_polytope)
-        return cls._create_with_connection_in_world(
-            name, world, room_body, world_root_T_self
+
+        instance = cls(name=name, root=room_body)
+        cls._parent_connection_specification_type().spawn(
+            world, parent_T_self=world_root_T_self, child=room_body
         )
+        world.add_semantic_annotation(instance)
+        return instance
 
     @classmethod
     def get_default_body_specification(
@@ -691,9 +704,12 @@ class Wall(HasApertures):
         wall_body.collision = wall_collision
         wall_body.visual = wall_collision
 
-        return cls._create_with_connection_in_world(
-            name, world, wall_body, world_root_T_self
+        instance = cls(name=name, root=wall_body)
+        cls._parent_connection_specification_type().spawn(
+            world, parent_T_self=world_root_T_self, child=wall_body
         )
+        world.add_semantic_annotation(instance)
+        return instance
 
     @property
     def doors(self) -> Iterable[Door]:

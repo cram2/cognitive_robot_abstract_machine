@@ -409,6 +409,7 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
     ) -> HasRootKinematicStructureEntity:
         from semantic_digital_twin.semantic_annotations.mixins import (
             _wrapped_part_whole_relationship_fields,
+            PartWholeRelationship,
         )
 
         name = ensure_prefixed_name(name) or self.name
@@ -476,7 +477,7 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
             else ()
         )
 
-        connection_specification = self.semantic_annotation_type._parent_connection_specification_type.parameterized(
+        connection_specification = self.semantic_annotation_type._parent_connection_specification_type.from_kwargs(
             axis=self.axis,
             multiplier=self.multiplier,
             offset=self.offset,
@@ -532,7 +533,7 @@ class ConnectionSpecification(WorldEntitySpawnSpecification, ABC):
         }
 
     @classmethod
-    def parameterized(
+    def from_kwargs(
         cls, *, name: PrefixedName | None = None, **connection_parameters
     ) -> Self:
         """
@@ -620,7 +621,7 @@ class ActiveConnection1DOFSpecification(ConnectionSpecification, ABC):
     """Limits for the generated degree of freedom."""
 
     @classmethod
-    def parameterized(
+    def from_kwargs(
         cls,
         *,
         name: PrefixedName | None = None,

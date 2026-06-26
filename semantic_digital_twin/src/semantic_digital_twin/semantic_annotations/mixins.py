@@ -138,53 +138,6 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         return FixedConnectionSpecification
 
     @classmethod
-    def _create_with_connection_in_world(
-        cls,
-        name: PrefixedName,
-        world: World,
-        kinematic_structure_entity: KinematicStructureEntity,
-        world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
-        connection_limits: Optional[DegreeOfFreedomLimits] = None,
-        active_axis: Optional[Vector3] = None,
-        connection_multiplier: float = 1.0,
-        connection_offset: float = 0.0,
-    ):
-        """
-        Create a new instance and connect its root entity to the world's root.
-
-        :param name: The name of the semantic annotation.
-        :param world: The world to add the annotation and entity to.
-        :param kinematic_structure_entity: The root entity of the semantic annotation.
-        :param world_root_T_self: The initial pose of the entity in the world root frame.
-        :param connection_limits: The limits for the connection's degrees of freedom.
-        :param active_axis: The active axis for the connection.
-        :param connection_multiplier: The multiplier for the connection.
-        :param connection_offset: The offset for the connection.
-        :return: The created semantic annotation instance.
-        """
-
-        self_instance = cls(name=name, root=kinematic_structure_entity)
-        root = world.root
-
-        connection_specification = (
-            cls._parent_connection_specification_type.parameterized(
-                axis=active_axis,
-                multiplier=connection_multiplier,
-                offset=connection_offset,
-                dof_limits=connection_limits,
-            )
-        )
-        connection_specification.spawn(
-            world,
-            parent=root,
-            parent_T_self=world_root_T_self,
-            child=kinematic_structure_entity,
-        )
-        world.add_semantic_annotation(self_instance)
-
-        return self_instance
-
-    @classmethod
     @abstractmethod
     def _default_root_specification(
         cls, name: Union[str, PrefixedName], *args, **kwargs
@@ -318,16 +271,15 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
             body.collision = collision_shapes
             body.visual = collision_shapes
 
-        return cls._create_with_connection_in_world(
-            name=name,
-            world=world,
-            kinematic_structure_entity=body,
-            world_root_T_self=world_root_T_self,
-            connection_multiplier=connection_multiplier,
-            connection_offset=connection_offset,
-            active_axis=active_axis,
-            connection_limits=connection_limits,
-        )
+        instance = cls(name=name, root=body)
+        cls._parent_connection_specification_type.from_kwargs(
+            axis=active_axis,
+            multiplier=connection_multiplier,
+            offset=connection_offset,
+            dof_limits=connection_limits,
+        ).spawn(world, parent_T_self=world_root_T_self, child=body)
+        world.add_semantic_annotation(instance)
+        return instance
 
     @classmethod
     def get_default_body_specification(
@@ -394,16 +346,15 @@ class HasRootRegion(HasRootKinematicStructureEntity, ABC):
         """
         region = Region(name=name)
 
-        return cls._create_with_connection_in_world(
-            name=name,
-            world=world,
-            kinematic_structure_entity=region,
-            world_root_T_self=world_root_T_self,
-            connection_multiplier=connection_multiplier,
-            connection_offset=connection_offset,
-            active_axis=active_axis,
-            connection_limits=connection_limits,
-        )
+        instance = cls(name=name, root=region)
+        cls._parent_connection_specification_type.from_kwargs(
+            axis=active_axis,
+            multiplier=connection_multiplier,
+            offset=connection_offset,
+            dof_limits=connection_limits,
+        ).spawn(world, parent_T_self=world_root_T_self, child=region)
+        world.add_semantic_annotation(instance)
+        return instance
 
 
 class PartWholeRelationshipField(dataclasses.Field):
@@ -1001,16 +952,16 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
         ).as_shapes()
         body.collision = collision_shapes
         body.visual = collision_shapes
-        return cls._create_with_connection_in_world(
-            name=name,
-            world=world,
-            kinematic_structure_entity=body,
-            world_root_T_self=world_root_T_self,
-            connection_multiplier=connection_multiplier,
-            connection_offset=connection_offset,
-            active_axis=active_axis,
-            connection_limits=connection_limits,
-        )
+
+        instance = cls(name=name, root=body)
+        cls._parent_connection_specification_type.from_kwargs(
+            axis=active_axis,
+            multiplier=connection_multiplier,
+            offset=connection_offset,
+            dof_limits=connection_limits,
+        ).spawn(world, parent_T_self=world_root_T_self, child=body)
+        world.add_semantic_annotation(instance)
+        return instance
 
     @classmethod
     def _create_container_event(cls, scale: Scale, wall_thickness: float) -> Event:

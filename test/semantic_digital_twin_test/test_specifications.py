@@ -368,7 +368,7 @@ def test_active_1dof_spec_defaults():
 
 def test_parameterized_active_consumes_parameters():
     axis = Vector3.Z()
-    spec = PrismaticConnectionSpecification.parameterized(axis=axis, multiplier=2.0)
+    spec = PrismaticConnectionSpecification.from_kwargs(axis=axis, multiplier=2.0)
     assert isinstance(spec, PrismaticConnectionSpecification)
     assert spec.axis is axis
     assert spec.multiplier == 2.0
@@ -377,7 +377,7 @@ def test_parameterized_active_consumes_parameters():
 def test_parameterized_fixed_ignores_active_parameters():
     # A fixed spec must accept and ignore active parameters, so a caller holding a bare
     # specification type can parameterize any family uniformly.
-    spec = FixedConnectionSpecification.parameterized(axis=Vector3.Z(), multiplier=2.0)
+    spec = FixedConnectionSpecification.from_kwargs(axis=Vector3.Z(), multiplier=2.0)
     assert isinstance(spec, FixedConnectionSpecification)
     assert spec._create_with_dofs_kwargs() == {}
 

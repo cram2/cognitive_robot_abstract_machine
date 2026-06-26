@@ -28,22 +28,27 @@ from typing_extensions import (
     Iterable,
     Union,
     Any,
+    Callable,
+    Generic,
+    Optional,
     get_type_hints,
 )
 
 from krrood.adapters.json_serializer import to_json, from_json
 from krrood.ormatic.exceptions import UnsupportedColumnType
+from krrood.utils import T
 
 
-class classproperty:
+class classproperty(Generic[T]):
     """
     A decorator that allows a class method to be accessed as a property.
     """
 
-    def __init__(self, fget):
+    def __init__(self, fget: Callable[[Type[Any]], T]) -> None:
         self.fget = fget
+        """The underlying accessor; receives the owning class and returns the property value."""
 
-    def __get__(self, instance, owner):
+    def __get__(self, instance: Any, owner: Optional[Type[Any]] = None) -> T:
         return self.fget(owner)
 
 
@@ -248,9 +253,7 @@ def get_python_type_from_sqlalchemy_column(column: Column):
 
     if type(column.type) in type_mappings.values():
         python_type = [
-            key
-            for key, value in type_mappings.items()
-            if value == type(column.type)
+            key for key, value in type_mappings.items() if value == type(column.type)
         ]
     else:
         try:
