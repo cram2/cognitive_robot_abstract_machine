@@ -8,6 +8,7 @@ from typing import ClassVar, Iterable, Union, Optional, TYPE_CHECKING
 
 from typing_extensions import Self, Type, Any, Generic, TypeVar
 
+from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.patterns.subclass_safe_generic import AbstractSubClassSafeGeneric
 from krrood.utils import get_generic_type_params
 from random_events.product_algebra import Event
@@ -53,6 +54,7 @@ from semantic_digital_twin.world_description.world_entity import (
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.mixins import (
         HasRootKinematicStructureEntity,
+        PartWholeRelationship,
     )
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
@@ -487,6 +489,10 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
             )
             world.add_semantic_annotation(instance)
             self._spawn_children(world, root_entity, children)
+
+            if not isinstance(instance, PartWholeRelationship):
+                return instance
+
             for field_name, part_specs in part_semantic_annotation_specs.items():
                 for part_spec in part_specs:
                     part = part_spec.spawn(world, parent=root_entity)
@@ -517,8 +523,13 @@ class ConnectionSpecification(WorldEntitySpawnSpecification, ABC):
         """The connection type this specification materializes."""
 
     def _create_with_dofs_kwargs(self) -> dict[str, Any]:
-        """Family-specific keyword arguments forwarded to ``create_with_dofs``. Empty by default."""
-        return {}
+        """Forward every public dataclass field except the connection ``name`` to ``create_with_dofs``."""
+        discovered_attributes = DataclassOnlyIntrospector().discover(type(self))
+        return {
+            attribute.public_name: getattr(self, attribute.public_name)
+            for attribute in discovered_attributes
+            if attribute.public_name != "name"
+        }
 
     @classmethod
     def parameterized(
@@ -607,14 +618,6 @@ class ActiveConnection1DOFSpecification(ConnectionSpecification, ABC):
 
     dof_limits: Optional[DegreeOfFreedomLimits] = None
     """Limits for the generated degree of freedom."""
-
-    def _create_with_dofs_kwargs(self) -> dict[str, Any]:
-        return {
-            "axis": self.axis,
-            "multiplier": self.multiplier,
-            "offset": self.offset,
-            "dof_limits": self.dof_limits,
-        }
 
     @classmethod
     def parameterized(

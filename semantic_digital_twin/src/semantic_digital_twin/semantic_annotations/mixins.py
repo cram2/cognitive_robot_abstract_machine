@@ -166,11 +166,13 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         self_instance = cls(name=name, root=kinematic_structure_entity)
         root = world.root
 
-        connection_specification = cls._parent_connection_specification_type.parameterized(
-            axis=active_axis,
-            multiplier=connection_multiplier,
-            offset=connection_offset,
-            dof_limits=connection_limits,
+        connection_specification = (
+            cls._parent_connection_specification_type.parameterized(
+                axis=active_axis,
+                multiplier=connection_multiplier,
+                offset=connection_offset,
+                dof_limits=connection_limits,
+            )
         )
         connection_specification.spawn(
             world,
