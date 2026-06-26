@@ -104,7 +104,7 @@ def reachability_location(
         costmap,
         [
             AreReachableBy(
-                pose_sequence=grasp_description._pose_sequence(
+                pose_sequence=grasp_description.pose_sequence(
                     target_pose,
                     _get_object_in_hand(context.robot, context.world, arm)
                     or target_body,
@@ -215,7 +215,7 @@ def giskard_reachability_location(
         backend,
         [
             AreReachableBy(
-                pose_sequence=grasp_description._pose_sequence(
+                pose_sequence=grasp_description.pose_sequence(
                     target_pose,
                     _get_object_in_hand(context.robot, context.world, arm)
                     or target_body,

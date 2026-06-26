@@ -55,6 +55,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Carrot,
     Lettuce,
     Banana,
+    Bowl,
+    Spoon,
+    Drawer,
+    Handle,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.utils import rclpy_installed, tracy_installed
@@ -384,11 +388,11 @@ def cylinder_bot_diff_world():
 
 
 def world_with_urdf_factory(
-        robot_semantic_annotation: Type[AbstractRobot],
-        drive_connection_type: Type[OmniDrive | DifferentialDrive],
-        robot_starting_pose: HomogeneousTransformationMatrix | None = None,
-        urdf_path_resolver: PathResolver | None = None,
-        robot_localization_pose: HomogeneousTransformationMatrix | None = None,
+    robot_semantic_annotation: Type[AbstractRobot],
+    drive_connection_type: Type[OmniDrive | DifferentialDrive],
+    robot_starting_pose: HomogeneousTransformationMatrix | None = None,
+    urdf_path_resolver: PathResolver | None = None,
+    robot_localization_pose: HomogeneousTransformationMatrix | None = None,
 ):
     """
     Builds this tree:
@@ -514,6 +518,17 @@ def _apartment_world_setup():
             "breakfast_cereal.stl",
         )
     ).parse()
+    spoon_world = STLParser(
+        os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "coraplex",
+            "resources",
+            "objects",
+            "spoon.stl",
+        )
+    ).parse()
+
     apartment_world.merge_world_at_pose(
         milk_world,
         HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -526,11 +541,31 @@ def _apartment_world_setup():
             2.37, 2.5, 1.05, reference_frame=apartment_world.root
         ),
     )
-    milk_view = Milk(
-        root=apartment_world.get_body_by_name("milk.stl"), _world=apartment_world
+    apartment_world.merge_world(
+        spoon_world,
+        FixedConnection(
+            parent=apartment_world.get_body_by_name("cabinet10_drawer_top"),
+            child=spoon_world.root,
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                -0.05, -0.05, -0.02
+            ),
+        ),
     )
+
     with apartment_world.modify_world():
-        apartment_world.add_semantic_annotation(milk_view)
+
+        apartment_world.add_semantic_annotations(
+            [
+                Milk(root=apartment_world.get_body_by_name("milk.stl")),
+                Spoon(root=apartment_world.get_body_by_name("spoon.stl")),
+            ]
+        )
+        apartment_world.add_semantic_annotation_recursively(
+            Drawer(
+                root=apartment_world.get_body_by_name("cabinet10_drawer_top"),
+                handle=Handle(root=apartment_world.get_body_by_name("handle_cab10_t")),
+            )
+        )
 
     return apartment_world
 

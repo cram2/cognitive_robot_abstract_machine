@@ -9,7 +9,7 @@ from krrood.entity_query_language.factories import underspecified
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from coraplex.datastructures.dataclasses import Context
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.misc import MoveToReach
 from random_events.variable import Continuous
@@ -103,8 +103,8 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
         HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
     )
 
-    viz_marker_publisher = VizMarkerPublisher(node=rclpy_node, _world=world)
-    viz_marker_publisher.with_tf_publisher()
+    # viz_marker_publisher = VizMarkerPublisher(node=rclpy_node, _world=world)
+    # viz_marker_publisher.with_tf_publisher()
 
     context = Context.from_world(world, query_backend=ProbabilisticBackend())
 

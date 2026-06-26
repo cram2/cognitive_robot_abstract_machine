@@ -25,7 +25,7 @@ from rclpy.executors import SingleThreadedExecutor
 
 from experiments.sage_10k.demos import Sage10kAbstractDemoHSRB
 from krrood.utils import recursive_subclasses
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
