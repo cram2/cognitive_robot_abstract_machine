@@ -13,6 +13,7 @@ from typing_extensions import Dict, Any, Self, Optional, List, Iterator
 from typing_extensions import TYPE_CHECKING
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
+from semantic_digital_twin.exceptions import MismatchingWorld
 from semantic_digital_twin.world_description.geometry import Shape, BoundingBox, Color
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
@@ -66,7 +67,40 @@ class ShapeCollection(SubclassJSONSerializer):
         if self.reference_frame is None:
             return
         for shape in self.shapes:
-            shape._transform_to_frame(self.reference_frame)
+            self._transform_shape_to_reference_frame(shape)
+
+    def _transform_shape_to_reference_frame(self, shape: Shape) -> None:
+        """
+        Transform ``shape``'s origin into this collection's reference frame in-place.
+
+        A shape without a reference frame adopts the collection's frame. Cross-frame transforms are
+        logged; transforming across worlds raises :class:`MismatchingWorld`.
+        """
+        origin_reference_frame = shape.origin.reference_frame
+        if origin_reference_frame is None:
+            shape.origin.reference_frame = self.reference_frame
+            return
+
+        if origin_reference_frame == self.reference_frame:
+            return
+
+        if self.reference_frame is None or self.reference_frame._world is None:
+            return
+
+        if origin_reference_frame._world != self.reference_frame._world:
+            raise MismatchingWorld(
+                expected_world=origin_reference_frame._world,
+                given_world=self.reference_frame._world,
+            )
+
+        logger.warning(
+            f"Transformed shape {shape} to {self.reference_frame} since it was in a different "
+            f"reference frame than the collection."
+        )
+        shape.origin = self.reference_frame._world.transform(
+            shape.origin,
+            self.reference_frame,
+        )
 
     def __getitem__(self, index: int) -> Shape:
         return self.shapes[index]
@@ -82,7 +116,7 @@ class ShapeCollection(SubclassJSONSerializer):
 
     def append(self, shape: Shape):
         if self.world is not None:
-            shape._transform_to_frame(self.reference_frame)
+            self._transform_shape_to_reference_frame(shape)
         self.shapes.append(shape)
 
     def copy_without_reference_frame(self):
@@ -371,34 +405,3 @@ class BoundingBoxCollection(ShapeCollection):
             max(all_z),
             HomogeneousTransformationMatrix(reference_frame=self.reference_frame),
         )
-
-    def transform_all_shapes_to_own_frame(self):
-        """
-        Transform all shapes into this collections' frame in-place.
-        """
-        if self.reference_frame is None:
-            return
-        for shape in self.shapes:
-            self._transform_to_own_frame(shape)
-
-    def _transform_to_own_frame(self, shape: Shape):
-        """
-        Transform the shape to this collections' frame in-place.
-        :param shape: The shape to transform.
-        """
-        if shape.origin.reference_frame is None:
-            # If we don’t have a world, fall back to the owning body/frame
-            shape.origin.reference_frame = self.reference_frame
-        elif (
-            self.reference_frame is not None
-            and shape.origin.reference_frame != self.reference_frame
-            and self.reference_frame._world is not None
-        ):
-            logger.warning(
-                f"Transformed shape {shape} to {self.reference_frame} since it was in a different "
-                f"reference frame than the collection."
-            )
-            shape.origin = self.reference_frame._world.transform(
-                shape.origin,
-                self.reference_frame,
-            )

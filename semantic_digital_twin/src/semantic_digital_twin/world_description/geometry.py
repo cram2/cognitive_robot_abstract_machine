@@ -22,7 +22,6 @@ from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, fro
 from random_events.interval import SimpleInterval, Bound, closed
 from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
-from semantic_digital_twin.exceptions import MismatchingWorld
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -376,32 +375,6 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
             if f.name not in ["origin"]
         }
         return self.__class__(origin=new_origin, **new_props)
-
-    def _transform_to_frame(self, new_reference_frame: KinematicStructureEntity):
-        """
-        Transforms the shape to the given reference frame in-place.
-        """
-        origin_reference_frame = self.origin.reference_frame
-        if origin_reference_frame is None:
-            self.origin.reference_frame = new_reference_frame
-            return
-
-        if origin_reference_frame == new_reference_frame:
-            return
-
-        if new_reference_frame._world is None:
-            return
-
-        if origin_reference_frame._world != new_reference_frame._world:
-            raise MismatchingWorld(
-                expected_world=origin_reference_frame._world,
-                given_world=new_reference_frame._world,
-            )
-
-        self.origin = new_reference_frame._world.transform(
-            self.origin,
-            new_reference_frame,
-        )
 
     def as_shape_collection(self):
         from semantic_digital_twin.world_description.shape_collection import (
