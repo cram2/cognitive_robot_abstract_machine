@@ -192,6 +192,69 @@ class TestPouringTask:
             cup.fill_connection.dof.variables.position,
         ).evaluate()[0] == pytest.approx(0.0, abs=1e-2)
 
+    def test_proactive_tilt_back(self, world_with_cup, rclpy_node):
+        """
+        Verify that the linearized MPC starts reducing tilt before the fill level reaches
+        the goal, demonstrating proactive rather than purely reactive control.
+
+        The cup tilt must begin decreasing while the fill level is still strictly above
+        ``goal_value + fill_level_tolerance``.
+        """
+        world, cup = world_with_cup
+        goal_fill = 0.6
+        tolerance = 0.05
+
+        msc = MotionStatechart()
+        pouring_task = PouringTask(
+            fill_equation=cup.fill_equation,
+            fill_connection=cup.fill_connection,
+            root_link=world.root,
+            tip_link=cup.root,
+            goal_value=goal_fill,
+            fill_level_tolerance=tolerance,
+            reference_velocity=0.05,
+        )
+        msc.add_node(pouring_task)
+        msc.add_node(EndMotion.when_true(pouring_task))
+
+        tilt_history: list[float] = []
+        fill_history: list[float] = []
+
+        original_on_tick = pouring_task.on_tick
+
+        def recording_on_tick(context):
+            tilt_history.append(float(cup.root.parent_connection.position))
+            fill_history.append(float(cup.fill_level))
+            return original_on_tick(context)
+
+        pouring_task.on_tick = recording_on_tick
+
+        executor = Executor(
+            MotionStatechartContext(world=world),
+            pacer=SimulationPacer(real_time_factor=1),
+        )
+        executor.compile(motion_statechart=msc)
+        executor.tick_until_end(timeout=1000)
+
+        assert pouring_task.observation_state == ObservationStateValues.TRUE
+
+        tilt_near_goal_start: float | None = None
+        max_tilt_before_threshold = 0.0
+        threshold = goal_fill + 2 * tolerance
+        for tilt, fill in zip(tilt_history, fill_history):
+            if fill > threshold:
+                max_tilt_before_threshold = max(max_tilt_before_threshold, tilt)
+            elif tilt_near_goal_start is None:
+                tilt_near_goal_start = tilt
+                break
+
+        assert tilt_near_goal_start is not None, "fill level never approached goal"
+        assert tilt_near_goal_start < max_tilt_before_threshold, (
+            f"Expected tilt to be decreasing when fill first reached goal region "
+            f"(tilt={tilt_near_goal_start:.4f} should be < "
+            f"max tilt before threshold={max_tilt_before_threshold:.4f})"
+        )
+
     def test_pr2_pouring_from_gripper(self, pr2_world_setup, rclpy_node):
         """
         Test that PouringTask works when the cup is held by the PR2 robot.

@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
-import numpy as np
-import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     DefaultWeights,
@@ -54,23 +52,17 @@ class PouringTask(Task):
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
-        Creates the equality constraint that drives the arm to tilt the cup until the goal fill level is reached.
+        Creates the terminal fill-level prediction constraint for linearized MPC pouring.
 
-        The fill-level DOF is physics-driven (passive in the QP), so the constraint cannot command fill velocity
-        directly. Instead it drives arm joint velocities via the gradient of :attr:`fill_vel_ode` with respect to
-        the tilt angle.
+        The pouring ODE ``ḣ = f(α, h)`` is linearized at the current operating point and
+        the discrete-time recursion is unrolled analytically over the control horizon.  The
+        resulting single QP row drives the MPC-predicted fill level at the end of the horizon
+        toward :attr:`goal_value`.
 
-        The constraint is formulated as::
-
-            d(fill_vel_ode)/dt = (goal - fill) - fill_vel_ode
-
-        whose steady state is ``fill_vel_ode = goal - fill``, meaning outflow is proportional to the remaining
-        error and reaches zero exactly when fill equals the goal. The ``-fill_vel_ode`` term on the right-hand side
-        acts as proportional damping: when the cup is already pouring fast enough (or has overshot the goal), the
-        QP immediately drives the arm to reduce tilt rather than waiting for the fill error to accumulate.
-
-        Without this damping term the equality bound would be ``goal - fill``, which evaluates to zero at the goal
-        and therefore commands the QP to hold outflow *constant* rather than stop it, causing sustained overshoot.
+        Because the terminal constraint couples earlier velocity decisions to a larger share of
+        the predicted fill change (via geometric-series weights), the optimizer sees that
+        continued high tilt will overshoot and proactively starts tilting back before the fill
+        level reaches the goal — the key advantage over a purely reactive formulation.
 
         :param context: The build context.
         :return: The generated task artifacts.
@@ -90,11 +82,14 @@ class PouringTask(Task):
             self.tilt_expr, fill_sym
         )
 
-        artifacts.constraints.add_equality_constraint(
+        artifacts.constraints.add_fill_prediction_constraint(
             name=f"{self.fill_connection.name}",
-            equality_bound=(sm.Scalar(self.goal_value) - fill_sym) - self.fill_vel_ode,
+            tilt_expression=self.tilt_expr,
+            fill_sym=fill_sym,
+            fill_vel_ode=self.fill_vel_ode,
+            fill_equation=self.fill_equation,
+            goal_value=self.goal_value,
             quadratic_weight=self.weight,
-            task_expression=self.fill_vel_ode,
             reference_velocity=self.reference_velocity,
         )
         return artifacts

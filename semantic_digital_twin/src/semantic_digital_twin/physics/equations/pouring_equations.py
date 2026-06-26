@@ -6,8 +6,8 @@ from typing import Any, Dict
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer
-from krrood.symbolic_math.symbolic_math import Scalar
-from typing_extensions import Self
+from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar
+from typing_extensions import Self, Tuple
 
 from semantic_digital_twin.physics.equations.differential_equation import (
     DifferentialEquation,
@@ -48,6 +48,31 @@ class PouringEquation(SubclassJSONSerializer, DifferentialEquation):
         :return: Symbolic tilt floor angle in radians.
         """
         return sm.Scalar(0.0)
+
+    def symbolic_ode_jacobians(
+        self, tilt_expression: Scalar, fill_expression: Scalar
+    ) -> Tuple[Scalar, Scalar]:
+        """
+        Partial derivatives of the fill velocity ODE w.r.t. tilt and fill level.
+
+        Uses CasADi autodiff on fresh symbolic variables, then substitutes the actual
+        expressions. Both derivatives are computed in a single call to avoid evaluating
+        :meth:`symbolic_velocity` twice.
+
+        :param tilt_expression: Symbolic tilt angle α at the current operating point.
+        :param fill_expression: Symbolic fill level h at the current operating point.
+        :return: ``(∂f/∂α, ∂f/∂h)`` evaluated at ``(tilt_expression, fill_expression)``.
+        """
+        alpha_var = FloatVariable("_ode_alpha")
+        h_var = FloatVariable("_ode_h")
+        f = self.symbolic_velocity(alpha_var, h_var)
+        df_dalpha = f.jacobian([alpha_var])[0, 0].substitute(
+            [alpha_var, h_var], [tilt_expression, fill_expression]
+        )
+        df_dh = f.jacobian([h_var])[0, 0].substitute(
+            [alpha_var, h_var], [tilt_expression, fill_expression]
+        )
+        return df_dalpha, df_dh
 
 
 @dataclass
