@@ -49,6 +49,7 @@ from semantic_digital_twin.world_description.world_entity import (
     Region,
     KinematicStructureEntity,
     Connection,
+    WorldEntity,
 )
 
 if TYPE_CHECKING:
@@ -80,7 +81,7 @@ class WorldEntitySpawnSpecification(ABC):
         name: Union[str, PrefixedName, None] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
-    ):
+    ) -> WorldEntity:
         """
         Instantiate the World Entity and add it to the given world.
 
@@ -568,7 +569,11 @@ class ConnectionSpecification(WorldEntitySpawnSpecification, ABC):
         parent = parent or world.root
         connection_name = ensure_prefixed_name(name) or self.name
 
-        parent_T_connection = parent_T_self or HomogeneousTransformationMatrix()
+        parent_T_connection = (
+            deepcopy(parent_T_self)
+            if parent_T_self is not None
+            else HomogeneousTransformationMatrix()
+        )
         parent_T_connection.reference_frame = parent
         parent_T_connection.child_frame = child
 
@@ -703,11 +708,37 @@ class ConnectedBodySpecification(WorldEntitySpawnSpecification):
 
 @dataclass
 class WorldSpecification:
+    """
+    Declarative description of a whole world: an optional robot and the objects spawned around it.
+
+    Materializing it (:meth:`to_world`) builds either an empty world with a single root body or a
+    robot world wired as ``map -> odom_combined -> drive -> robot``, then spawns all starting objects.
+    """
+
     robot_semantic_annotation: Optional[Type[AbstractRobot]] = None
+    """
+    The robot to populate the world with. If None, an empty world with a single root body is created.
+    """
+
     drive_connection_type: Type[WheeledDrive] | None = None
+    """
+    The connection type attaching the robot to ``odom_combined``. Defaults to a free-floating connection.
+    """
+
     world_T_odom: HomogeneousTransformationMatrix | None = None
+    """
+    The localization pose of ``odom_combined`` in the ``map`` frame. If None, identity is used.
+    """
+
     odom_T_robot_start: HomogeneousTransformationMatrix | None = None
+    """
+    The start pose of the robot in the ``odom_combined`` frame. If None, identity is used.
+    """
+
     starting_objects: list[WorldEntitySpawnSpecification] = field(default_factory=list)
+    """
+    Specifications spawned relative to the world root once the robot (if any) is in place.
+    """
 
     def to_world(self) -> World:
         """

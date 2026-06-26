@@ -17738,6 +17738,29 @@ class MismatchingWorldDAO(
     }
 
 
+class MissingConnectionAxisErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.MissingConnectionAxisError],
+):
+    __tablename__ = "MissingConnectionAxisErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    connection_type_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MissingConnectionAxisErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class MissingConnectionChildErrorDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.MissingConnectionChildError],
@@ -20278,40 +20301,6 @@ class JointDynamicsDAO(
     armature: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     dry_friction: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     damping: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-
-class ActiveConnection1DOFParametersDAO(
-    Base,
-    DataAccessObject[
-        semantic_digital_twin.world_description.connections.ActiveConnection1DOFParameters
-    ],
-):
-    __tablename__ = "ActiveConnection1DOFParametersDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    multiplier: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    offset: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-    axis_id: Mapped[int] = mapped_column(
-        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    dynamics_id: Mapped[int] = mapped_column(
-        ForeignKey("JointDynamicsDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    axis: Mapped[Vector3MappingDAO] = relationship(
-        "Vector3MappingDAO", uselist=False, foreign_keys=[axis_id], post_update=True
-    )
-    dynamics: Mapped[JointDynamicsDAO] = relationship(
-        "JointDynamicsDAO", uselist=False, foreign_keys=[dynamics_id], post_update=True
-    )
 
 
 class AccelerationVariableDAO(

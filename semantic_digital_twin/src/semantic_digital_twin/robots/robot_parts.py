@@ -276,8 +276,14 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
     def get_default_body_specification(
         cls,
         name: Union[str, PrefixedName],
-        scale: Scale = None,
+        scale: Optional[Scale] = None,
     ) -> BodySpecification:
+        """
+        Robot-part geometry comes from the parsed URDF, not from a scale, so a default
+        body specification cannot be derived.
+
+        :raises UselessConceptError: Always, since robot-part bodies must already exist in the world.
+        """
         raise UselessConceptError(
             reason="The bodies needed for RobotParts should already exist in the world after parsing a URDF"
         )

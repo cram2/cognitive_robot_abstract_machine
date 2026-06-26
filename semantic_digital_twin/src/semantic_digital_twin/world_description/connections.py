@@ -8,7 +8,7 @@ from uuid import UUID
 import numpy as np
 from typing_extensions import TYPE_CHECKING, Union, Optional, Dict, Any, Self
 
-from krrood.adapters.json_serializer import from_json, to_json, SubclassJSONSerializer
+from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -23,6 +23,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
+from semantic_digital_twin.exceptions import MissingConnectionAxisError
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
@@ -109,54 +110,6 @@ class ActiveConnection(Connection, ABC):
     @property
     def is_controlled(self):
         return self.has_hardware_interface
-
-
-@dataclass
-class ActiveConnection1DOFParameters(SubclassJSONSerializer):
-    """
-    Represents parameters for an active connection with one degree of freedom (1DOF) in a kinematic structure.
-
-    This class is designed to encapsulate the configuration and dynamic characteristics of a
-    1DOF connection in a parent kinematic structure entity.
-    """
-
-    axis: Vector3 = field(kw_only=True)
-    """
-    Connection moves along this axis, should be a unit vector.
-    The axis is defined relative to the local reference frame of the parent KinematicStructureEntity.
-    """
-
-    multiplier: float = 1.0
-    """
-    Movement along the axis is multiplied by this value. Useful if Connections share DoFs.
-    """
-
-    offset: float = 0.0
-    """
-    Movement along the axis is offset by this value. Useful if Connections share DoFs.
-    """
-
-    dynamics: JointDynamics = field(default_factory=JointDynamics)
-    """
-    Dynamic properties of the joint.
-    """
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(
-            axis=Vector3.from_iterable(data["axis"]),
-            multiplier=data["multiplier"],
-            offset=data["offset"],
-            dynamics=from_json(data["dynamics"], **kwargs),
-        )
-
-    def to_json(self) -> Dict[str, Any]:
-        result = super().to_json()
-        result["axis"] = self.axis.to_np().tolist()
-        result["multiplier"] = self.multiplier
-        result["offset"] = self.offset
-        result["dynamics"] = to_json(self.dynamics)
-        return result
 
 
 @dataclass(eq=False)
@@ -259,9 +212,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
                  its DOF added to the world.
         """
         if axis is None:
-            raise ValueError(
-                f"{cls.__name__} is an active connection and requires an axis."
-            )
+            raise MissingConnectionAxisError(connection_type_name=cls.__name__)
         name = name or cls._generate_default_name(parent=parent, child=child)
         dof = DegreeOfFreedom(name=PrefixedName("dof", str(name)), limits=dof_limits)
         world.add_degree_of_freedom(dof)

@@ -20,6 +20,8 @@ from semantic_digital_twin.api.specifications import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
+    InvalidPlaneDimensions,
+    MissingConnectionAxisError,
     MissingConnectionChildError,
     ParsingError,
     UselessConceptError,
@@ -156,7 +158,7 @@ def test_active_connection_requires_parameters_body(empty_world):
         body_specification=BodySpecification.box("b", Scale(1, 1, 1)),
         connection_specification=PrismaticConnectionSpecification(),
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(MissingConnectionAxisError):
         spec.spawn(empty_world)
 
 
@@ -167,7 +169,7 @@ def test_active_annotation_requires_parameters(empty_world):
         semantic_annotation_type=Slider,
         root_specification=None,
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(MissingConnectionAxisError):
         spec.spawn(empty_world)
 
 
@@ -252,6 +254,26 @@ def test_to_domain_object_is_reusable():
     # Shapes are copied, not shared with the spec or between materializations.
     assert first.collision is not second.collision
     assert first.collision is not spec.shapes
+
+
+def test_spawn_does_not_alias_or_mutate_stored_pose(empty_world):
+    """
+    A specification is reusable: spawning it must neither bind nor mutate its stored
+    pose, and each materialized connection must own a distinct pose bound to its own child.
+    """
+    spec = BodySpecification.box("box", Scale(1, 1, 1))
+    first = spec.spawn(empty_world, name="first")
+
+    assert spec.parent_T_self.reference_frame is None
+    assert spec.parent_T_self.child_frame is None
+
+    second = spec.spawn(empty_world, name="second")
+    first_expression = first.parent_connection.parent_T_connection_expression
+    second_expression = second.parent_connection.parent_T_connection_expression
+
+    assert first_expression is not second_expression
+    assert first_expression.child_frame is first
+    assert second_expression.child_frame is second
 
 
 def test_to_domain_object_generic_resolution():
@@ -557,7 +579,7 @@ def test_default_spec_matches_door(empty_world):
 
 
 def test_default_spec_door_validates_plane():
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidPlaneDimensions):
         Door.get_default_body_specification("door", Scale(2, 1, 1))
 
 
@@ -647,7 +669,7 @@ def test_annotation_spec_active_slider(empty_world):
 def test_annotation_spec_active_requires_axis(empty_world):
     # Slider's parent connection is active, so spawning without an axis must raise.
     spec = Slider.get_default_annotation_specification("slider", Scale(0.1, 0.1, 0.1))
-    with pytest.raises(ValueError):
+    with pytest.raises(MissingConnectionAxisError):
         spec.spawn(empty_world)
 
 

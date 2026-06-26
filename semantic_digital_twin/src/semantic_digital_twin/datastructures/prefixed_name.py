@@ -40,5 +40,10 @@ class PrefixedName(Symbol):
         return str(self) >= str(other)
 
 
-def ensure_prefixed_name(name: str | PrefixedName) -> PrefixedName:
+def ensure_prefixed_name(
+    name: Optional[str | PrefixedName],
+) -> Optional[PrefixedName]:
+    """
+    Normalize a name into a :class:`PrefixedName`, wrapping a bare string and passing ``None`` through.
+    """
     return PrefixedName(name) if isinstance(name, str) else name

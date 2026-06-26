@@ -355,13 +355,12 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
 
     def copy_for_world(self, world: World) -> Self:
         """
-        Copies this shape with references to the given world.
-        :param world: The world to copy to.
-        :return: A copy of this shape with references to the given world.
-        """
+        Creates a reference-frame-free copy of this shape for use in another world.
 
-        clean_copy = self.copy_without_reference_frame()
-        return clean_copy
+        :param world: Accepted for interface consistency with other ``copy_for_world`` methods; ignored here.
+        :return: A copy of this shape without a reference frame.
+        """
+        return self.copy_without_reference_frame()
 
     def copy_without_reference_frame(self):
         """
@@ -413,11 +412,17 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
             shapes=[self], reference_frame=self.origin.reference_frame
         )
 
-    def recenter_origin(self):
-        bb = self.local_frame_bounding_box
-        center_x = (bb.min_x + bb.max_x) / 2
-        center_y = (bb.min_y + bb.max_y) / 2
-        center_z = (bb.min_z + bb.max_z) / 2
+    def recenter_origin(self) -> None:
+        """
+        Moves the origin so the shape's local-frame bounding box is centered on it.
+
+        The translation is set to the negated bounding-box center, leaving the shape's
+        geometry symmetric about its origin.
+        """
+        bounding_box = self.local_frame_bounding_box
+        center_x = (bounding_box.min_x + bounding_box.max_x) / 2
+        center_y = (bounding_box.min_y + bounding_box.max_y) / 2
+        center_z = (bounding_box.min_z + bounding_box.max_z) / 2
         self.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             -center_x, -center_y, -center_z, 0, 0, 0
         )

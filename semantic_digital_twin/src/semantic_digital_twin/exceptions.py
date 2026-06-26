@@ -354,6 +354,24 @@ class MissingConnectionChildError(UsageError):
 
 
 @dataclass
+class MissingConnectionAxisError(UsageError):
+    """
+    Raised when an active connection is created without a movement axis.
+    """
+
+    connection_type_name: str
+    """
+    The name of the active connection type that was created without an axis.
+    """
+
+    def error_message(self) -> str:
+        return f"'{self.connection_type_name}' is an active connection and requires an axis."
+
+    def suggest_correction(self) -> str:
+        return "pass a movement axis via the 'axis' keyword argument."
+
+
+@dataclass
 class MimicDofLimitOverwriteError(UsageError):
     """
     Raised when trying to overwrite the limits of a mimic degree of freedom.

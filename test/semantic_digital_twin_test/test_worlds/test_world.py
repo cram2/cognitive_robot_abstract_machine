@@ -618,6 +618,24 @@ def test_remove_connection(world_setup):
             world.remove_connection(world.get_connection(r1, r2))
 
 
+def test_remove_branch_from_world(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    parent_connection = world.get_connection(bf, r1)
+    inner_connection = world.get_connection(r1, r2)
+
+    world.remove_branch_from_world(r1)
+
+    # The whole r-branch and the connection attaching it to its parent are gone.
+    assert r1 not in world.kinematic_structure_entities
+    assert r2 not in world.kinematic_structure_entities
+    assert parent_connection not in world.connections
+    assert inner_connection not in world.connections
+
+    # The rest of the world is untouched.
+    for remaining in (world.root, bf, l1, l2):
+        assert remaining in world.kinematic_structure_entities
+
+
 def test_kinematic_structure_entity_hash(world_setup):
     _, l1, _, _, _, _ = world_setup
     assert hash(l1) == hash(l1.id)
