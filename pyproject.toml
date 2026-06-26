@@ -33,9 +33,7 @@ dev = [
     "pytest-xdist",
     "objgraph",
     "treon",
-    "jupytext",
     "bokeh",
-    "jupyterquiz",
 
 ]
 
