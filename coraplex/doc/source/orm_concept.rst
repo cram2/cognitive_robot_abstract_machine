@@ -30,6 +30,9 @@ and then emits a coherent relational schema with mapped Python classes. Custom t
 used scientific data types such as numerical arrays, ensuring that rich data can be stored efficiently. This approach
 reduces manual maintenance and keeps the schema consistent with the rest of the framework.
 
+The generated mapping lives in ``src/coraplex/orm/ormatic_interface.py`` and must never be edited by hand. Whenever a
+mapped datastructure changes, regenerate the interface by running ``scripts/regenerate_all_orm.py``.
+
 What the Model Contains
 -----------------------
 The generated model captures several categories of information:
@@ -43,7 +46,7 @@ The generated model captures several categories of information:
 How It Fits into the Workflow
 -----------------------------
 During execution, CoraPlex creates instances of actions, plan nodes, and spatial constructs as part of normal planning and
-ontrol. The ORM layer provides a uniform pathway for persisting these instances and their relationships to a database.
+control. The ORM layer provides a uniform pathway for persisting these instances and their relationships to a database.
 Using this ORM layer a user can simply insert the whole plan into a database, the ORM will take care of recursively
 discovering all the relevant information from the plan and translating them into a format that can be inserted into the
 database.

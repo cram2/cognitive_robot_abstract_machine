@@ -42,9 +42,10 @@ designator.
 
 ```python
 from coraplex.robot_plans.motions import MoveMotion
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import *
 from semantic_digital_twin.spatial_types.spatial_types import Pose
+
 motion_description = MoveMotion(target=Pose.from_xyz_quaternion(pos_x=1., reference_frame=world.root))
 
 with simulated_robot:
@@ -58,9 +59,11 @@ Like any designator we start by creating a description and then resolving and pe
 
 ```python
 from coraplex.robot_plans.motions.gripper import MoveToolCenterPointMotion
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.datastructures.enums import Arms
-motion_description = MoveToolCenterPointMotion(target=Pose.from_xyz_quaternion(0.5, 0.6, 0.6, 0, 0, 0, 1, reference_frame=world.root), arm=Arms.LEFT)
+
+motion_description = MoveToolCenterPointMotion(
+    target=Pose.from_xyz_quaternion(1.5, 0.6, 0.6, 0, 0, 0, 1, reference_frame=world.root), arm=Arms.LEFT)
 
 with simulated_robot:
     execute_single(motion_description, context=context).perform()
@@ -73,9 +76,10 @@ motion designator takes the target as position and orientation, in reality only 
 
 ```python
 from coraplex.robot_plans.motions import LookingMotion
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 
-motion_description = LookingMotion(target=Pose.from_xyz_quaternion(1, 1, 1, 0, 0, 0, 1, reference_frame=world.root), camera=pr2_view.get_default_camera())
+motion_description = LookingMotion(target=Pose.from_xyz_quaternion(1, 1, 1, 0, 0, 0, 1, reference_frame=world.root),
+                                   camera=pr2_view.get_default_camera())
 
 with simulated_robot:
     execute_single(motion_description, context=context).perform()
@@ -88,7 +92,7 @@ and close the gripper respectively.
 
 ```python
 from coraplex.robot_plans.motions import MoveGripperMotion
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.datastructures.enums import Arms
 from semantic_digital_twin.datastructures.definitions import GripperState
 
@@ -135,7 +139,7 @@ the names of all joints that should be moved and the second list are the positio
 
 ```python
 from coraplex.robot_plans.motions import MoveJointsMotion
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 
 with simulated_robot:
     motion_description = MoveJointsMotion(names=["torso_lift_joint", "r_shoulder_pan_joint"], positions=[0.2, -1.2])

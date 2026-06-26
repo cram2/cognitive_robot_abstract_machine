@@ -89,7 +89,7 @@ to the PYTHON_PATH by default. To solve this problem start PyCharm from a termin
 
 .. code-block:: shell
 
-    source /opt/ros/jayyz/setup.bash
+    source /opt/ros/jazzy/setup.bash
     pycharm
 
 Instead of "pycharm" the command could also be "pycharm-professional" that depends on your installation. Just use <TAB>
@@ -137,7 +137,7 @@ Building the documentation
 ==========================
 
 The documentation uses jupyter-book as engine.
-Building the documentation requires Python 3.9 or higher to avoid dependency conflicts.
+Building the documentation requires Python 3.10 or higher to avoid dependency conflicts.
 
 Source the venv that contains CoraPlex
 

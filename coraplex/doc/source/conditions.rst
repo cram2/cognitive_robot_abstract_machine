@@ -29,29 +29,31 @@ Partial Designator to find parameter for under-specified actions.
 Example
 -------
 
-As an example we will look at the pre condition for the PickUpAction. In general the pre -and postcondition can be anything
-that is a EQL predicate, a symbolic function or something that evaluates to bool.
+As an example we will look at the pre condition for the :class:`~coraplex.robot_plans.actions.core.pick_up.PickUpAction`.
+In general the pre -and postcondition can be anything that is an EQL predicate, a symbolic function or something that
+evaluates to bool. Conditions are defined as static methods that receive the EQL ``variables``, the execution
+``context`` and the action ``kwargs``.
 
 .. code-block:: python
 
-    manipulator = variable(Manipulator, domain)
-
-    and_(
-        GripperIsFree(manipulator),
-                reachability_validator(
-                    PoseStamped.from_spatial_type(self.object_designator.global_pose),
-                    manipulator.tool_frame,
-                    self.robot_view,
-                    self.world,
-                    self.robot_view.full_body_controlled,
-                ),
-            )
-    )
+    @staticmethod
+    def pre_condition(variables, context, kwargs):
+        end_effector = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        return and_(
+            GripperIsFree(end_effector),
+            IsObjectReachableBy(
+                robot=context.robot,
+                world=context.world,
+                arm=variables["arm"],
+                object_designator=kwargs["object_designator"],
+                grasp_description=kwargs["grasp_description"],
+            ),
+        )
 
 This condition is comprised of two conditions, the first is that the gripper that should pick up the object is free and
-not holding anything and the second is that the object is reachable. In this case the only used variable is the one for
-the manipulator since querying over other parameter (like the object to be picked up) would result in very unexpected
-behaviour of the plan.
+not holding anything (:class:`~coraplex.querying.predicates.GripperIsFree`) and the second is that the object is
+reachable (:class:`~coraplex.locations.pose_validator.IsObjectReachableBy`). The arm is the queried variable here, since
+querying over other parameter (like the object to be picked up) would result in very unexpected behaviour of the plan.
 
 Now imagine the following scenario, the robot is standing near the object it should pick up but the object cannot be
 picked up with the specified arm, however using the other arm would enable the robot to execute the PickUp Action.

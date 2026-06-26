@@ -3,7 +3,7 @@ Setup Development Environment
 =============================
 
 Setting up CoraPlex with PyCharm
-==============================
+================================
 
 .. _setup_env:
 
@@ -157,26 +157,24 @@ Run scripts
 -----------
 
 IPython allows to run Python files and enables the access to created variables. This can be helpful
-if you want to create a setup script which initializes things like the BulletWorld, Objects and imports
+if you want to create a setup script which initializes the world, the robot and imports
 relevant modules.
 
 To execute a Python script simply run ``run filename.py`` in the IPython shell.
 
-Here is an example how a setup script can look like.
+Here is an example how a setup script can look like. It uses :func:`~coraplex.testing.setup_world`, which loads the
+apartment, a milk bottle and the PR2 robot into a single semantic digital twin world.
 
 .. code-block:: python
 
-    from coraplex.bullet_world import BulletWorld, Object
-    from coraplex.designators.action_designator import *
-    from coraplex.designators.motion_designator import *
-    from coraplex.designators.location_designator import *
-    from coraplex.designators.object_designator import *
-    from coraplex.process_module import simulated_robot
-    from coraplex.pose import Pose
-    from coraplex.enums import ObjectType
+    from semantic_digital_twin.robots.pr2 import PR2
+    from coraplex.testing import setup_world
+    from coraplex.datastructures.dataclasses import Context
+    from coraplex.execution_environment import simulated_robot
 
-    world = BulletWorld()
+    world = setup_world()
+    robot = PR2.from_world(world)
+    context = Context(world, robot)
 
-    robot = Object("pr2", ObjectType.ROBOT, "pr2.urdf")
-    kitchen = Object("kitchen", ObjectType.ENVIRONMENT, "kitchen.urdf")
-    cereal = Object("cereal", ObjectType.BREAKFAST_CEREAL, "breakfast_cereal.stl", pose=Pose([1.4, 1, 0.95]))
+    milk_body = world.get_body_by_name("milk.stl")
+    cereal_body = world.get_body_by_name("breakfast_cereal.stl")

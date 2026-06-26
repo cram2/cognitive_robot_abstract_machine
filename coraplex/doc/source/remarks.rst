@@ -26,10 +26,3 @@ in your terminal. --name is the name of your virtual environment and --display-n
 that will display in the drop down menu of jupyter. After that, select the correct Python interpreter kernel (``coraplex``) and
 everything should work now.
 Refer `here <https://www.jetbrains.com/help/pycharm/configuring-jupyter-notebook.html#resolving-kernel-mismatch-error-of-configured-server>`_ for details.
-
-
-Dirty Terminals
-===============
-
-If your terminal gets polluted by PyBullet complaining about incomplete URDF descriptions, you need to first fix your
-URDF files by inserting the missing tags and second delete the `resources/cached` folder.

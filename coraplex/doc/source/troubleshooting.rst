@@ -34,20 +34,17 @@ The best solution is to double check the input arguments of the DesignatorDescri
 Error when performing Actions or Motions
 ----------------------------------------
 
-.. code-block:: python
-
-        30 def perform(self):
-        31     pm_manager = ProcessModuleManager.get_manager()
-   ---> 32     return pm_manager.navigate().execute(self)
-
-   AttributeError: 'NoneType' object has no attribute 'navigate'
-
-If you get an error like this when trying to perform an action or motion designator, then you did not specify how the
-designator should be executed. You can specify how the designator should be performed by using the simulated_robot or
-real_robot environments. This is also explained in the `Action Designator Example <https://cram2.github.io/cognitive_robot_abstract_machine/coraplex/notebooks/action_designator.html#Navigate-Action>`_.
+If you get an error when trying to perform an action or motion designator that complains about a missing execution
+environment, then you did not specify how the designator should be executed. You can specify how the designator should
+be performed by wrapping the call in the ``simulated_robot`` or ``real_robot`` environment. This is also explained in
+the `Action Designator Example <https://cram2.github.io/cognitive_robot_abstract_machine/coraplex/notebooks/action_designator.html#Navigate-Action>`_.
 
 .. code-block:: python
+
+   from coraplex.execution_environment import simulated_robot
+   from coraplex.plans.factories import execute_single
+   from coraplex.robot_plans.actions.core.navigation import NavigateAction
 
    with simulated_robot:
-      NavigateAction([Pose()]).resolve().perform()
+      execute_single(NavigateAction(target_location=pose), context=context).perform()
 

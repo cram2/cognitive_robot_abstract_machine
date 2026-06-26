@@ -8,9 +8,9 @@ This guide assumes you have already installed CoraPlex either via pip or from so
 If you haven't done so, please refer to the installation instructions in the documentation.
 
 
------------------------------
+------------------------------
 Intro to Semantic Digital Twin
------------------------------
+------------------------------
 
 CoraPlex uses the `semantic_digital_twin <https://github.com/cram2/cognitive_robot_abstract_machine/tree/main/semantic_digital_twin>`__ package to manage the belief
 state and the semantic information of it. To learn more about what the semantic digital twin is capable of refer to
@@ -50,7 +50,11 @@ Now to set up the environment, we will use URDF files for the robot and the envi
 
     apartment_world = URDFParser.from_file("<path-to-coraplex>/resources/worlds/apartment.urdf").parse()
     milk_world = STLParser("<path-to-coraplex>/resources/objects/milk.stl").parse()
-    pr2_world = URDFParser.from_file("<path-to-coraplex>/resources/robots/pr2_calibrated_with_ft.urdf").parse()
+    pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").parse()
+
+.. note::
+    The PR2 description is resolved from the ``iai_pr2_description`` ROS package rather than a file shipped with
+    CoraPlex. CoraPlex itself only bundles ``resources/worlds`` and ``resources/objects``.
 
 As you might have noticed each of the parsers returns an independent world which is not really useful. Therefore we need to
 merge them into a single world.
@@ -70,10 +74,10 @@ need to use the modify_world context manager.
 
 .. code-block:: python
 
-    from semantic_digital_twin.drives.omni_drive import OmniDrive
+    from semantic_digital_twin.world_description.connections import OmniDrive
 
     with world.modify_world():
-        pr2_root = pr2_world.root
+        pr2_root = pr2_world.get_body_by_name("base_footprint")
         world_root = world.root
         drive_connection = OmniDrive.create_with_dofs(parent=world_root, child=pr2_root, world=world)
         world.merge_world(pr2_world, drive_connection)
@@ -84,12 +88,12 @@ and sourced.
 
 .. code-block:: python
 
-    from semantic_digital_twin.adapters.viz_marker_publisher import VizMarkerPublisher
+    from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
     import rclpy
 
     rclpy.init()
     node = rclpy.create_node("simple_viz_node")
-    viz_publisher = VizMarkerPublisher(world, node)
+    viz_publisher = VizMarkerPublisher(_world=world, node=node)
 
 You can now open RViz2 and add a Marker display subscribing to the topic "/semworld/viz_marker" to see the world.
 
@@ -99,7 +103,7 @@ Writing your First Plan
 
 Now that we have set up the environment, we can write our first plan. A plan in CoraPlex is a structured sequence of actions
 which the robot will execute to achieve a specific goal. For more details on how plans work in CoraPlex, refer to the
-:ref:`_plan_header`.
+:ref:`plan_header`.
 
 The plan will consist of the following steps:
 
@@ -110,37 +114,60 @@ The plan will consist of the following steps:
 5. Move the robot to a position near the table.
 6. Place the milk bottle on the table.
 
-.. code-block::python
-    from coraplex.language import SequentialPlan
-    from coraplex.robot_plans.actions import ParkArmsActionDescription, MoveTorsoActionDescription, NavigateActionDescription, PickUpActionDescription, PlaceActionDescription
-    from coraplex.datastructures.dataclasses import Context
-    from coraplex.datastructures.enums import Arms, TorsoState
-    from coraplex.datastructures.pose import PoseStamped
+.. code-block:: python
+
     from semantic_digital_twin.robots.pr2 import PR2
+    from semantic_digital_twin.spatial_types.spatial_types import Pose
+    from semantic_digital_twin.datastructures.definitions import TorsoState
+    from coraplex.datastructures.dataclasses import Context
+    from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+    from coraplex.datastructures.grasp import GraspDescription
+    from coraplex.plans.factories import sequential
+    from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
+    from coraplex.robot_plans.actions.core.navigation import NavigateAction
+    from coraplex.robot_plans.actions.core.pick_up import PickUpAction
+    from coraplex.robot_plans.actions.core.placing import PlaceAction
 
     context = Context(world, PR2.from_world(world))
     milk_body = world.get_body_by_name("milk.stl")
 
-    SequentialPlan(context,
-        ParkArmsActionDescription(Arms.BOTH),
-        MoveTorsoActionDescription(TorsoState.HIGH),
-        NavigateActionDescription(PoseStamped.from_list([2.0, 2.0, 0.0], [0, 0, 0, 1])),
-        PickUpActionDescription(milk, Arms.RIGHT),
-        NavigateActionDescription(PoseStamped.from_list([4.0, 4.0, 0.0], [0, 0, 0, 1])),
-        PlaceActionDescription(milk, PoseStamped.from_list([4.2, 4.0, 1.0], [0, 0, 0, 1]))
-    )
+    plan = sequential(
+        [
+            ParkArmsAction(Arms.BOTH),
+            MoveTorsoAction(TorsoState.HIGH),
+            NavigateAction(Pose.from_xyz_rpy(2.0, 2.0, 0.0, reference_frame=world.root)),
+            PickUpAction(
+                object_designator=milk_body,
+                arm=Arms.RIGHT,
+                grasp_description=GraspDescription(
+                    ApproachDirection.FRONT,
+                    VerticalAlignment.NoAlignment,
+                    context.robot.right_arm.end_effector,
+                ),
+            ),
+            NavigateAction(Pose.from_xyz_rpy(4.0, 4.0, 0.0, reference_frame=world.root)),
+            PlaceAction(
+                object_designator=milk_body,
+                target_location=Pose.from_xyz_rpy(4.2, 4.0, 1.0, reference_frame=world.root),
+                arm=Arms.RIGHT,
+            ),
+        ],
+        context=context,
+    ).plan
 
 What did we just do here?
 We first created a context which holds the world as well as the semantic description of the PR2 robot in that world.
 This context is used by the plan to determine in which world and by which robot the plan should be executed.
 Next, we retrieved the milk bottle body from the world to use it in the pick-up and place actions.
-Finally, we created a SequentialPlan, meaning all actions will be executed one after another in the order they are defined.
+Finally, we built a plan from the :func:`~coraplex.plans.factories.sequential` factory, meaning all actions will be
+executed one after another in the order they are defined. The factory returns a node whose ``.plan`` attribute is the
+runnable plan.
 
-To execute the plan, we need to determine if it should be run in simulation or on a real robot and the call perform.
+To execute the plan, we need to determine if it should be run in simulation or on a real robot and then call perform.
 
 .. code-block:: python
 
-    from coraplex.process_modules import simulated_robot
+    from coraplex.execution_environment import simulated_robot
 
     with simulated_robot:
         plan.perform()

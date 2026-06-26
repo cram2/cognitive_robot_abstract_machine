@@ -29,7 +29,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
 )
 
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 
 from coraplex.plans.factories import execute_single, sequential
 

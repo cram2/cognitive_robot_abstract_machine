@@ -32,7 +32,7 @@ jobs:
           source /opt/ros/cram-env/bin/activate
           sudo apt-get update
           sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libegl1
-          poetry install
+          uv sync --extra dev,doc --active 
 
       - name: Restore cache
         uses: actions/cache/restore@v4

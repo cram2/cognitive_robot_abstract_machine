@@ -23,7 +23,7 @@ sys.path.append(os.path.abspath("./_ext"))
 # -- Project information -----------------------------------------------------
 
 project = "coraplex"
-copyright = "2025, Jonas Dech"
+copyright = "2026, Jonas Dech"
 author = "Jonas Dech"
 
 # The short X.Y version

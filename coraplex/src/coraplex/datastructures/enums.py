@@ -89,6 +89,21 @@ class TaskStatus(int, Enum):
     INTERRUPTED = 4
     PAUSE = 5
 
+    @property
+    def color(self) -> str:
+        """
+        :return: The color used to render this status in visualizations.
+        """
+        return {
+            TaskStatus.CREATED: "blue",
+            TaskStatus.RUNNING: "light-green",
+            TaskStatus.SUCCEEDED: "green",
+            TaskStatus.FAILED: "red",
+            TaskStatus.INTERRUPTED: "orange",
+            TaskStatus.PAUSE: "yellow",
+        }[self]
+
+
 class JointType(Enum):
     """
     Enum for readable joint types.

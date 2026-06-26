@@ -951,14 +951,8 @@ def test_copy_two_times(pr2_world_state_reset):
 
 
 def test_copy_drawer(apartment_world_copy):
-    handle = Handle(root=apartment_world_copy.get_body_by_name("handle_cab10_t"))
-    drawer = Drawer(
-        root=apartment_world_copy.get_body_by_name("cabinet10_drawer_top"),
-        handle=handle,
-    )
-    with apartment_world_copy.modify_world():
-        apartment_world_copy.add_semantic_annotation(handle)
-        apartment_world_copy.add_semantic_annotation(drawer)
+    [handle] = apartment_world_copy.get_semantic_annotations_by_type(Handle)
+    [drawer] = apartment_world_copy.get_semantic_annotations_by_type(Drawer)
 
     apartment_copy = deepcopy(apartment_world_copy)
     copied_handle = apartment_copy.get_semantic_annotation_by_name(handle.name)

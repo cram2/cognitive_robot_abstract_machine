@@ -51,7 +51,7 @@ example, to link to the source code of the class `PickUpAction` you can use:
 
 .. code-block:: markdown
 
-    {class}`~coraplex.designators.action_designator.PickUpAction`
+    {class}`~coraplex.robot_plans.actions.core.pick_up.PickUpAction`
 
 
 Alternatively, you can use `{meth}`, `{func}`, `{attr}`, `{class}`, `{mod}` and `{obj}` to link to methods, functions,

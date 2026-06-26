@@ -32,6 +32,8 @@ dev = [
     "pytest-asyncio>=0.23.0,<0.24.0",
     "pytest-xdist",
     "objgraph",
+    "treon",
+    "bokeh",
 
 ]
 

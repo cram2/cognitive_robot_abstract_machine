@@ -12,7 +12,7 @@ from coraplex.datastructures.enums import (
 from coraplex.datastructures.grasp import GraspDescription
 
 from coraplex.language import SequentialNode
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
@@ -22,7 +22,9 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 def test_underspecified_action(apartment_world_pr2_copy_with_context):
     """
-    Test that an underspecified action can be executed
+    Test that an underspecified action resolves to a concrete candidate and parses
+    into an executable. Execution is deferred to parse().execute(), so performing the
+    node only expands it; the resolved candidate is not performed here.
     """
     world, robot, context = apartment_world_pr2_copy_with_context
     action = underspecified(NavigateAction)(
@@ -38,14 +40,18 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
     plan = execute_single(action_like=action, context=context).plan
     with simulated_robot:
         plan.perform()
-    assert len(plan.nodes) == 3
+
     assert plan.root.status == TaskStatus.SUCCEEDED
-    assert plan.root.children[0].status == TaskStatus.SUCCEEDED
+    candidate = plan.root.children[0]
+    assert isinstance(candidate.designator, NavigateAction)
+    assert plan.root.parse() is not None
 
 
 def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_context):
     """
-    Test that an underspecified action can be executed when a factory for a spatial type is used with ellipsis
+    Test that an underspecified action resolves and parses when a factory for a spatial
+    type is used with ellipsis. Execution is deferred to parse().execute(), so performing
+    the node only expands it; the resolved candidate is not performed here.
     """
     world, robot, context = apartment_world_pr2_copy_with_context
     context.query_backend = ProbabilisticBackend()
@@ -65,9 +71,11 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
     plan = execute_single(action_like=action, context=context).plan
     with simulated_robot:
         plan.perform()
-    assert len(plan.nodes) >= 3
+
     assert plan.root.status == TaskStatus.SUCCEEDED
-    assert plan.root.children[-1].status == TaskStatus.SUCCEEDED
+    candidate = plan.root.children[-1]
+    assert isinstance(candidate.designator, NavigateAction)
+    assert plan.root.parse() is not None
 
 
 def test_underspecified_language(apartment_world_pr2_copy_with_context):

@@ -7,7 +7,8 @@ parts:
   - caption: Getting Started
     chapters:
     - file: installation.rst
-    - file:  quickstart.rst
+    - file: quickstart.rst
+    - file: setup_env.rst
 
   - caption: Concepts
     chapters:
@@ -34,6 +35,7 @@ parts:
       - file: notebooks/language
       - file: designator_example.rst
         sections:
+        - file: notebooks/plan
         - file: notebooks/action_designator
         - file: notebooks/object_designator
         - file: notebooks/location_designator
