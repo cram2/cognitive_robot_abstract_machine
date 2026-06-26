@@ -9,7 +9,7 @@ from typing import List
 import rclpy
 from sqlalchemy.orm import sessionmaker
 
-from giskardpy.data_types.exceptions import SetupException
+from giskardpy.data_types.exceptions import NoControlledJointsError
 from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.model.world_config import WorldConfig
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -30,11 +30,10 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.adapters.ros.world_fetcher import FetchWorldServer
 from semantic_digital_twin.adapters.ros.world_synchronizer import (
-    ModelSynchronizer,
-    StateSynchronizer,
+    WorldSynchronizer,
     ModelReloadSynchronizer,
 )
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world_description.connections import ActiveConnection
 
 logger = logging.getLogger(__name__)
@@ -63,8 +62,7 @@ class Giskard:
     robot_interface_config: RobotInterfaceConfig
     qp_controller_config: QPControllerConfig = field(default_factory=QPControllerConfig)
     executor: Executor = field(init=False)
-    model_synchronizer: ModelSynchronizer = field(init=False)
-    state_synchronizer: StateSynchronizer = field(init=False)
+    world_synchronizer: WorldSynchronizer = field(init=False)
     tf_publisher: TFPublisher = field(init=False)
     viz_marker_publisher: VizMarkerPublisher = field(init=False)
     model_reload_synchronizer: ModelReloadSynchronizer = field(init=False)
@@ -124,14 +122,10 @@ class Giskard:
             )
             self.model_reload_synchronizer = None
 
-        self.model_synchronizer = ModelSynchronizer(
+        self.world_synchronizer = WorldSynchronizer(
             _world=self.world_config.world, node=rospy.node
         )
-        self.model_synchronizer.pause()
-        self.state_synchronizer = StateSynchronizer(
-            _world=self.world_config.world, node=rospy.node
-        )
-        self.state_synchronizer.pause()
+        self.world_synchronizer.pause()
         self.world_fetcher = FetchWorldServer(
             node=rospy.node, world=self.world_config.world
         )
@@ -160,7 +154,7 @@ class Giskard:
         controlled_joints = self.robot.controlled_connections
         non_controlled_joints = set(movable_joints).difference(set(controlled_joints))
         if len(controlled_joints) == 0 and len(world.connections) > 0:
-            raise SetupException("No joints are flagged as controlled.")
+            raise NoControlledJointsError()
         if len(non_controlled_joints) > 0:
             rospy.node.get_logger().info(
                 f"The following joints are non-fixed according to the urdf, "

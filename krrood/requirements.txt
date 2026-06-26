@@ -5,6 +5,7 @@ typing-extensions>=4.12.2
 rustworkx>=0.14.0
 sqlalchemy
 black
+ruff
 sortedcontainers
 
 # rdr requirements

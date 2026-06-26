@@ -16,19 +16,25 @@ if TYPE_CHECKING:
 
 @dataclass
 class CollisionViolatedError(DataclassException):
-    message: str = field(init=False)
     violated_collisions: list[ClosestPoints]
     thresholds: list[float]
 
-    def __post_init__(self):
-        self.message = f"Violated collision constraints: \n"
-        for collision, threshold in zip(self.violated_collisions, self.thresholds):
-            self.message += f"{str(collision.body_a.name), str(collision.body_b.name)}: {collision.distance} < {threshold}\n"
+    def error_message(self) -> str:
+        violations = "".join(
+            f"{str(collision.body_a.name), str(collision.body_b.name)}: {collision.distance} < {threshold}\n"
+            for collision, threshold in zip(self.violated_collisions, self.thresholds)
+        )
+        return f"Violated collision constraints: \n{violations}"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
 class MotionStatechartError(DataclassException):
-    message: str = field(init=False)
+    """
+    Base class for errors in the motion statechart.
+    """
 
 
 @dataclass
@@ -36,13 +42,20 @@ class NodeInitializationError(MotionStatechartError):
     node: MotionStatechartNode
     reason: str
 
-    def __post_init__(self):
-        self.message = f'Failed to initialize Goal "{self.node.unique_name}". Reason: {self.reason}'
+    def error_message(self) -> str:
+        return f'Failed to initialize Goal "{self.node.unique_name}". Reason: {self.reason}'
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
 class EmptyMotionStatechartError(MotionStatechartError):
-    reason: str = field(default="MotionStatechart is empty.", init=False)
+    def error_message(self) -> str:
+        return "MotionStatechart is empty."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -58,6 +71,7 @@ class NodeAlreadyBelongsToDifferentNodeError(NodeInitializationError):
         self.reason = (
             f'Node "{self.new_node.unique_name}" already belongs to "{parent_name}".'
         )
+        super().__post_init__()
 
 
 @dataclass
@@ -68,19 +82,37 @@ class EndMotionInGoalError(NodeInitializationError):
 
 
 @dataclass
+class InvalidConstraintExpressionShapeError(MotionStatechartError):
+    actual_shape: list[int]
+
+    def error_message(self) -> str:
+        shape_str = " ".join(map(str, self.actual_shape))
+        return f"Constraint expression must have shape (1, 1), has ({shape_str})."
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
 class NodeNotFoundError(MotionStatechartError):
     name: str
 
-    def __post_init__(self):
-        self.message = f"Node '{self.name}' not found in MotionStatechart."
+    def error_message(self) -> str:
+        return f"Node '{self.name}' not found in MotionStatechart."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
 class NotInMotionStatechartError(MotionStatechartError):
     name: str
 
-    def __post_init__(self):
-        self.message = f"Operation can't be performed because node '{self.name}' does not belong to a MotionStatechart."
+    def error_message(self) -> str:
+        return f"Operation can't be performed because node '{self.name}' does not belong to a MotionStatechart."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -88,46 +120,56 @@ class InvalidConditionError(MotionStatechartError):
     condition: TrinaryCondition
     new_expression: Scalar
 
-    def __post_init__(self):
-        self.message = f'Invalid {self.condition.kind.name} condition of node "{self.condition.owner.unique_name}": "{self.new_expression}". Reason: "{self.message}"'
+    def reason(self) -> str:
+        raise NotImplementedError
+
+    def error_message(self) -> str:
+        return f'Invalid {self.condition.kind.name} condition of node "{self.condition.owner.unique_name}": "{self.new_expression}". Reason: "{self.reason()}"'
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
 class InputNotExpressionError(InvalidConditionError):
-    message: str = field(
-        default="Input is not an expression. Did you forget '.observation_variable'?",
-        init=False,
-    )
+    def reason(self) -> str:
+        return "Input is not an expression."
+
+    def suggest_correction(self) -> str:
+        return "did you forget '.observation_variable'?"
 
 
 @dataclass
 class SelfInStartConditionError(InvalidConditionError):
-    message: str = field(
-        default=f"Start condition cannot contain the node itself.", init=False
-    )
+    def reason(self) -> str:
+        return "Start condition cannot contain the node itself."
 
 
 @dataclass
 class NonObservationVariableError(InvalidConditionError):
     non_observation_variable: FloatVariable
 
-    def __post_init__(self):
-        self.message = f'Contains "{self.non_observation_variable}", which is not an observation variable.'
+    def reason(self) -> str:
+        return f'Contains "{self.non_observation_variable}", which is not an observation variable.'
 
 
 @dataclass
 class MissingContextExtensionError(MotionStatechartError):
     expected_extension: Type
 
-    def __post_init__(self):
-        self.message = (
-            f'Missing context extension "{self.expected_extension.__name__}".'
-        )
+    def error_message(self) -> str:
+        return f'Missing context extension "{self.expected_extension.__name__}".'
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
 class DuplicateContextExtensionError(MotionStatechartError):
     extension_type: Type
 
-    def __post_init__(self):
-        self.message = f"Extension of type {self.extension_type.__name__} already exists. You cannot add it twice."
+    def error_message(self) -> str:
+        return f"Extension of type {self.extension_type.__name__} already exists. You cannot add it twice."
+
+    def suggest_correction(self) -> str:
+        return ""

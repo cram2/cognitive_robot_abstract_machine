@@ -10,7 +10,7 @@ import rclpy
 from json_msgs.action import JsonAction
 from json_msgs.action._json_action import JsonAction_Result
 from giskardpy.middleware.ros2 import rospy
-from giskardpy.middleware.ros2.exceptions import ExecutionException
+from giskardpy.middleware.ros2.exceptions import NoActiveGoalToCancelError
 from giskardpy.middleware.ros2.ros2_interface import MyActionClient
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
@@ -22,12 +22,9 @@ from rclpy.action.client import ClientGoalHandle
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
-from semantic_digital_twin.adapters.ros.world_synchronizer import (
-    ModelSynchronizer,
-    StateSynchronizer,
-)
+from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 
 
@@ -54,11 +51,8 @@ class GiskardWrapper:
             )
             self.world = fetch_world_from_service(self.node_handle, timeout_seconds=300)
             self.node_handle.get_logger().info("world synced")
-            self.model_synchronizer = ModelSynchronizer(
+            self.world_synchronizer = WorldSynchronizer(
                 _world=self.world, node=self.node_handle, synchronous=True
-            )
-            self.state_synchronizer = StateSynchronizer(
-                _world=self.world, node=self.node_handle
             )
         giskard_topic = f"{self.giskard_node_name}/command"
         self._client = MyActionClient(self.node_handle, JsonAction, giskard_topic)
@@ -113,9 +107,7 @@ class GiskardWrapper:
         try:
             future = self._client._goal_handle.cancel_goal_async()
         except AttributeError as e:
-            raise ExecutionException(
-                "Can't cancel goals, because there is no active one"
-            )
+            raise NoActiveGoalToCancelError()
         return future
 
     async def get_result(self):

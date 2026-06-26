@@ -16,7 +16,7 @@ pip install random-events
 
 ### For Developers:
 
-Create your own fork of the [original repository](https://github.com/tomsch420/random-events) and clone the fork.
+Create your own fork of the [original repository](https://github.com/cram2/cognitive_robot_abstract_machine) and clone the fork.
 ```
 git clone *ADDRESS_OF_YOUR_FORK*
 ```
@@ -33,4 +33,4 @@ pip install -r requirements-dev.txt
 ```
 
 ## Usage and Guides:
-Check out the [documentation.](https://random-events.readthedocs.io/en/latest/)
+Check out the [documentation.](https://cram2.github.io/cognitive_robot_abstract_machine/random_events/)

@@ -5,12 +5,13 @@ from typing import Type, Optional, Any, TYPE_CHECKING
 from typing_extensions import get_origin
 
 
-from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
-
 from krrood.ormatic.exceptions import NoGenericError, NoDAOFoundError
 from krrood.utils import recursive_subclasses
 
 if TYPE_CHECKING:
+    from krrood.ormatic.data_access_objects.alternative_mappings import (
+        AlternativeMapping,
+    )
     from krrood.ormatic.data_access_objects.dao import DataAccessObject
     from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 
@@ -32,6 +33,61 @@ def _get_clazz_by_original_clazz(
                 return subclass
         except (AttributeError, TypeError, NoGenericError):
             continue
+    return None
+
+
+def _maps_parametrization_of(dao_clazz: Type, generic_clazz: Type) -> bool:
+    """
+    Check whether a DAO class maps a parametrization of a bare generic class.
+
+    :param dao_clazz: The candidate DAO class.
+    :param generic_clazz: The bare generic domain class.
+    :return: True if the DAO maps a parametrization (e.g. ``C[float]``) of ``generic_clazz``.
+    """
+    try:
+        mapped_class = dao_clazz.original_class()
+    except (AttributeError, TypeError, NoGenericError):
+        return False
+    return get_origin(mapped_class) is generic_clazz
+
+
+@lru_cache(maxsize=None)
+def _get_concrete_generic_subclass(
+    base_dao: Type[DataAccessObject], original_clazz: Type
+) -> Optional[Type[DataAccessObject]]:
+    """
+    Find the unique concrete DAO subclass for a bare generic domain class.
+
+    A bare generic domain class (for example ``DerivativeMap``) maps to an empty
+    polymorphic base DAO, while its parametrizations (for example ``DerivativeMap[float]``)
+    map to concrete data-bearing leaf DAOs. A runtime instance of the bare generic carries
+    no type argument, so it must be persisted through such a concrete leaf.
+
+    :param base_dao: The DAO resolved for the bare generic class.
+    :param original_clazz: The bare generic domain class.
+    :return: The unique concrete leaf subclass DAO, or None when ``original_clazz`` is not a
+        bare generic, ``base_dao`` already maps a parametrization, or the leaf is ambiguous.
+    """
+    if not getattr(original_clazz, "__parameters__", ()):
+        return None
+    if get_origin(base_dao.original_class()) is not None:
+        return None
+
+    parametrized_subclasses = [
+        subclass
+        for subclass in recursive_subclasses(base_dao)
+        if _maps_parametrization_of(subclass, original_clazz)
+    ]
+    leaf_subclasses = [
+        subclass
+        for subclass in parametrized_subclasses
+        if not any(
+            other is not subclass and issubclass(other, subclass)
+            for other in parametrized_subclasses
+        )
+    ]
+    if len(leaf_subclasses) == 1:
+        return leaf_subclasses[0]
     return None
 
 
@@ -67,7 +123,8 @@ def get_dao_class(
     # This is important for polymorphic inheritance to get the most specific DAO.
     dao = _get_clazz_by_original_clazz(DataAccessObject, original_clazz)
     if dao is not None:
-        return dao
+        concrete_dao = _get_concrete_generic_subclass(dao, original_clazz)
+        return concrete_dao if concrete_dao is not None else dao
 
     # Fallback to the expected type if provided.
     if expected_type is not None:
@@ -76,6 +133,20 @@ def get_dao_class(
             return dao
 
     return None
+
+
+def clear_dao_lookup_caches() -> None:
+    """
+    Clear all caches that map domain classes to DAO classes.
+
+    This has to be called whenever a new DataAccessObject or AlternativeMapping
+    subclass is created, since previously failed lookups (cached as None) would
+    otherwise stay stale forever.
+    """
+    _get_clazz_by_original_clazz.cache_clear()
+    _get_concrete_generic_subclass.cache_clear()
+    get_dao_class.cache_clear()
+    get_alternative_mapping.cache_clear()
 
 
 @lru_cache(maxsize=None)
@@ -88,6 +159,10 @@ def get_alternative_mapping(
     :param original_clazz: The domain class.
     :return: The corresponding alternative mapping or None.
     """
+    from krrood.ormatic.data_access_objects.alternative_mappings import (
+        AlternativeMapping,
+    )
+
     return _get_clazz_by_original_clazz(AlternativeMapping, original_clazz)
 
 

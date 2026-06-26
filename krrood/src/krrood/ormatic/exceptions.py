@@ -10,6 +10,7 @@ from krrood.exceptions import DataclassException
 if TYPE_CHECKING:
     from krrood.ormatic.data_access_objects.alternative_mappings import FunctionMapping
 
+
 @dataclass
 class NoGenericError(DataclassException, TypeError):
     """
@@ -23,11 +24,11 @@ class NoGenericError(DataclassException, TypeError):
 
     clazz: Type
 
-    def __post_init__(self):
-        self.message = (
-            f"Cannot determine original class for {self.clazz}. "
-            "Did you forget to parameterise the DataAccessObject subclass?"
-        )
+    def error_message(self) -> str:
+        return f"Cannot determine original class for {self.clazz}."
+
+    def suggest_correction(self) -> str:
+        return "did you forget to parameterise the DataAccessObject subclass?"
 
 
 @dataclass
@@ -44,11 +45,39 @@ class NoDAOFoundError(DataclassException, TypeError):
     The class that no dao was found for
     """
 
-    def __post_init__(self):
-        self.message = (
-            f"Class {type(self.obj)} does not have a DAO. Did you forget to import your ORM Interface? "
-            f"Otherwise the class may not be in the ORM Interface"
+    def error_message(self) -> str:
+        return f"Class {type(self.obj)} does not have a DAO."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check that the correct ormatic interface is imported, that the ormatic interfaces are "
+            "up to date by running the script that generates the ormatic interface, and that the target class is "
+            "actually mapped."
         )
+
+
+@dataclass
+class NoDAOFoundForTypeError(NoDAOFoundError):
+    """
+    Raised when no DAO class is found for a domain *type* rather than for a concrete instance.
+
+    Type-driven lookups (such as EQL translation, which resolves DAOs from variable types)
+    store the offending type itself in :attr:`obj`, so the message reports it directly instead
+    of its metaclass.
+    """
+
+    def error_message(self) -> str:
+        return f"No DAO found for type {self.obj}."
+
+
+@dataclass
+class NoDAOFoundForSelectionError(NoDAOFoundError):
+    """
+    Raised when none of the selected expressions of a query resolve to a DAO-bearing type.
+    """
+
+    def error_message(self) -> str:
+        return f"No DAO could be derived from the selected expressions: {self.obj}."
 
 
 @dataclass
@@ -64,12 +93,12 @@ class NoDAOFoundDuringParsingError(NoDAOFoundError):
     The relationship that tried to create the DAO.
     """
 
-    def __init__(self, obj: Any, dao: Type, relationship: RelationshipProperty = None):
-        self.message = (
-            f"Class {type(obj)} does not have a DAO. This happened when trying "
-            f"to create a dao for {dao}) on the relationship {relationship} with the "
-            f"relationship value {obj}. "
-            f"Expected a relationship value of type {relationship.target if relationship else "Unknown"}."
+    def error_message(self) -> str:
+        return (
+            f"Class {type(self.obj)} does not have a DAO. This happened when trying "
+            f"to create a dao for {self.dao}) on the relationship {self.relationship} with the "
+            f"relationship value {self.obj}. "
+            f"Expected a relationship value of type {self.relationship.target if self.relationship else 'Unknown'}."
         )
 
 
@@ -84,8 +113,11 @@ class UnsupportedRelationshipError(DataclassException, ValueError):
 
     relationship: RelationshipProperty
 
-    def __post_init__(self):
-        self.message = f"Unsupported relationship direction for {self.relationship}."
+    def error_message(self) -> str:
+        return f"Unsupported relationship direction for {self.relationship}."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -104,3 +136,18 @@ class UncallableFunction(NotImplementedError):
             f"The reconstructed function was a lambda function and hence cannot be called again. "
             f"The function tried to be reconstructed from {self.function_mapping}"
         )
+
+
+@dataclass
+class UnsupportedColumnType(DataclassException, TypeError):
+    """
+    Exception raised when a column type is neither a type_mapping nor a builtin sqlalchemy type.
+    """
+
+    column_type: Type
+
+    def error_message(self) -> str:
+        return f"Column type: {self.column_type} is neither a builtin sqlalchemy type nor does it exist in the dict of type_mappings."
+
+    def suggest_correction(self) -> str:
+        return ""

@@ -99,7 +99,7 @@ class QPControllerConfig:
     """
 
     # %% init false
-    mpc_dt: float = field(init=False)
+    model_predictive_control_time_step: float = field(init=False)
     """
     The time step of the MPC in seconds.
     control_dt == mpc_dt:
@@ -124,7 +124,7 @@ class QPControllerConfig:
             logging.warning(
                 f"Hertz ({self.target_frequency}) is below 20Hz. This might cause instability."
             )
-        self.mpc_dt = self.control_dt
+        self.model_predictive_control_time_step = self.control_dt
 
         if self.prediction_horizon < 4:
             raise ValueError("prediction horizon must be >= 4.")
@@ -136,8 +136,19 @@ class QPControllerConfig:
         """
         return 1 / self.target_frequency
 
+    @property
+    def control_horizon(self) -> int:
+        """
+        Number of time steps over which commands are applied, two fewer than the prediction
+        horizon because the final two steps only bring the system to rest.
+        """
+        return self.prediction_horizon - 2
+
     @classmethod
     def create_with_simulation_defaults(cls):
+        """
+        Creates a configuration with the default values used for kinematic simulation.
+        """
         return cls(
             target_frequency=20,
             prediction_horizon=7,
@@ -146,13 +157,21 @@ class QPControllerConfig:
     def set_dof_weight(
         self, dof_name: PrefixedName, derivative: Derivatives, weight: float
     ):
-        """Set weight for a specific DOF derivative."""
+        """
+        Sets the objective weight of a single degree-of-freedom derivative.
+        """
         self.dof_weights[dof_name][derivative] = weight
 
     def set_dof_weights(self, dof_name: PrefixedName, weight_map: DerivativeMap[float]):
-        """Set multiple weights for a DOF."""
+        """
+        Sets the objective weights of all derivatives of a degree of freedom.
+        """
         self.dof_weights[dof_name] = weight_map
 
-    def get_dof_weight(self, dof_name: PrefixedName, derivative: Derivatives) -> float:
-        """Get weight for a specific DOF derivative."""
+    def get_degree_of_freedom_weight(
+        self, dof_name: PrefixedName, derivative: Derivatives
+    ) -> float:
+        """
+        Returns the objective weight of a single degree-of-freedom derivative.
+        """
         return self.dof_weights[dof_name][derivative]

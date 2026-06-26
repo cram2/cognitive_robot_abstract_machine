@@ -123,8 +123,8 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
         the state version.
         """
         self.version += 1
-        for callback in self.state_change_callbacks:
-            callback.notify(**kwargs)
+        for callback in list(self.state_change_callbacks):
+            callback.notify_state_change(**kwargs)
 
     def clear(self):
         with self.world_lock:
@@ -199,9 +199,13 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
             if set(self._ids) != set(other._ids):
                 return False
 
+            # align the columns of `other` to this state's column order, so that
+            # states with the same per-DOF values compare equal regardless of
+            # the order in which the DOFs were added
+            other_column_order = [other._index[dof_id] for dof_id in self._ids]
             return np.allclose(
                 self._data,
-                other._data,
+                other._data[:, other_column_order],
                 rtol=1e-8,
                 atol=1e-12,
                 equal_nan=True,
@@ -209,7 +213,8 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
 
     def keys(self) -> List[UUID]:
         with self.world_lock:
-            return self._ids
+            # return a copy so that callers cannot corrupt the internal bookkeeping
+            return list(self._ids)
 
     def items(self) -> List[tuple[UUID, np.ndarray]]:
         with self.world_lock:
@@ -381,8 +386,12 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
     def merge_state(self, other: WorldState):
         """
         Merges another WorldState into this one, overwriting values for any DOFs that are present in both states.
+        If a DOF only exists in the other state, a DofNotInWorldStateError is raised.
         """
+
         for dof_id in other:
+            if dof_id not in self:
+                raise DofNotInWorldStateError(dof_id)
             self_state_dof = self[dof_id]
             other_state_dof = other[dof_id]
             self_state_dof.position = other_state_dof.position

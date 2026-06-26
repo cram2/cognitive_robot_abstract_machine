@@ -8,8 +8,13 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
 
-from giskardpy.data_types.exceptions import SetupException
+from giskardpy.data_types.exceptions import (
+    JointRegistrationRequiresStandaloneModeError,
+)
 from giskardpy.middleware.ros2 import rospy
+from giskardpy.middleware.ros2.exceptions import (
+    FollowJointTrajectoryServerRequiresPlanningModeError,
+)
 from giskardpy.middleware.ros2.ros2_interface import (
     search_for_subscriber_of_node_with_type,
     get_parameters,
@@ -20,7 +25,7 @@ from giskardpy.middleware.ros2.ros2_interface import (
 from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.tree.branches.giskard_bt import GiskardBT
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -130,9 +135,7 @@ class RobotInterfaceConfig(ABC):
         self, joint_names: List[Union[str, PrefixedName]]
     ) -> None:
         if not GiskardBlackboard().tree_config.is_standalone():
-            raise SetupException(
-                f"Joints only need to be registered in StandAlone mode."
-            )
+            raise JointRegistrationRequiresStandaloneModeError()
         for joint_name in joint_names:
             connection: ActiveConnection = self.world.get_connection_by_name(joint_name)
             if not isinstance(connection, ActiveConnection):
@@ -158,9 +161,7 @@ class RobotInterfaceConfig(ABC):
         if group_name is None:
             group_name = self.world.robot_name
         if not GiskardBlackboard().tree_config.is_open_loop():
-            raise SetupException(
-                "add_follow_joint_trajectory_server only works in planning mode"
-            )
+            raise FollowJointTrajectoryServerRequiresPlanningModeError()
         self.tree.execute_traj.add_follow_joint_traj_action_server(
             namespace=namespace,
             group_name=group_name,

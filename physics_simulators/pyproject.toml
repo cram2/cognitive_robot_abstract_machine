@@ -11,10 +11,10 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
-license = "MIT"
+license = {text = "MIT"}
 
 dependencies = [
-    "mujoco",
+    "mujoco==3.9.0",
 ]
 
 [tool.setuptools]

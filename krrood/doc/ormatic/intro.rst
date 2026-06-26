@@ -10,12 +10,62 @@ domain objects (dataclasses) and database representations (rows).
 This approach promotes a separation between the domain model and the persistence mechanism, allowing developers
 to concentrate on business logic while abstracting underlying database implementation and SQLAlchemy specifics.
 
+System Overview
+---------------
+
+The following diagram illustrates the interaction between the domain layer, the persistence layer, and the database:
+
+
+.. mermaid:: ../_static/files/ormatic_system_overview.mermaid
+    :caption: ORMatic High-Level System Overview
+
+- **Domain Layer**: This is where business logic and data structures are defined using standard Python dataclasses (**Domain Definitions**). Instances of these dataclasses are referred to as **Domain Objects**.
+- **Persistence Layer**: ORMatic automatically generates a corresponding set of **Data Access Objects (DAOs)** based on the domain definitions. These DAOs are SQLAlchemy declarative models that handle the mapping to the database.
+- **Mapping & Conversion**:
+  - ``generate_orm()``: Analyzes domain definitions to automatically create the DAO structure.
+  - ``to_dao()``: Converts domain objects into their DAO counterparts for persistence.
+  - ``from_dao()``: Reconstructs domain objects from retrieved DAO instances.
+- **Database Interaction**: The persistence layer communicates with the **RDBMS** via SQLAlchemy sessions, providing a clean abstraction over the physical storage.
+
+I recommend to structure your Python package to work cleanly with ORMatic as follows:
+
+::
+
+    domain_model/
+    ├── scripts/
+    │   └── generate_orm.py               # Script to configure ORMatic
+    ├── src/
+    │   └── domain_model/
+    │       └── orm/
+    │           ├── __init__.py           # Package initializer
+    │           ├── model.py              # Custom types and alternative mappings
+    │           └── ormatic_interface.py  # Generated target file for ORMatic
+    └── tests/
+        └── conftest.py                   # Pytest config; automatically runs generate_orm.py
+
+
+You can make your conftest automatically refresh the ormatic_interface.py by including something like this in your
+conftest.py:
+
+.. code-block:: python
+
+    def pytest_configure(config):
+        # Ensure ORM classes are generated before tests run
+        repository_root = Path(__file__).resolve().parents[1]
+        generate_orm_path = (
+            repository_root / "scripts" / "generate_orm.py"
+        )
+        # Execute the ORM generation script as a standalone module
+        runpy.run_path(str(generate_orm_path), run_name="__main__")
+
+    import domain_model.orm.ormatic_interface
+
 Core Assumptions and Modeling Rules
 -----------------------------------
 To ensure unambiguous translation and an ergonomic generated ORM, ORMatic adheres to the following rules for dataclass modeling:
 
 - **Protected Fields:** Any dataclass field name beginning with ``_`` is ignored for persistence. These protected fields are suitable for transient or derived runtime data.
-- **Optional Types:** The only supported union is :py:class:`Optional[T] <typing.Optional>`. Other unions should be modeled using a shared superclass.
+- **Optional Types:** The only guaranteed supported union is :py:class:`Optional[T] <typing.Optional>`. Other unions are modeled using a shared superclass if there exists a common base that is not `object`.
 - **Collections:** Iterables must be non-optional and non-nested. For an "optional list," use a default factory that returns an empty collection.
 - **Inheritance and Polymorphism:** Inheritance is supported and generates `joined-table <https://docs.sqlalchemy.org/en/20/orm/inheritance.html>`_ inheritance. Note that only the *first* base class in a multiple inheritance structure is considered for queries using abstract classes.
 - **Type Discipline:** Dataclass fields require concrete, non-ambiguous type annotations. Prefer small dataclasses or value objects over primitive types when modeling relationships.

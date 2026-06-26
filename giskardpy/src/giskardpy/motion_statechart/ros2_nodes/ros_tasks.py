@@ -4,28 +4,42 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+from control_msgs.action import ParallelGripperCommand
+from geometry_msgs.msg import (
+    Point as ROSPoint,
+)
+from geometry_msgs.msg import (
+    Pose as ROSPose,
+)
 from geometry_msgs.msg import (
     PoseStamped as ROSPoseStamped,
-    Pose as ROSPose,
-    Point as ROSPoint,
+)
+from geometry_msgs.msg import (
     Quaternion as ROSQuaternion,
 )
+from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.robots.robot_parts import EndEffector
 
 try:
     from nav2_msgs.action import NavigateToPose
 except ModuleNotFoundError:
     NavigateToPose = None
-from rclpy.action import ActionClient
-from std_msgs.msg import Header
-from typing_extensions import Type, TypeVar, Generic
-
 import krrood.symbolic_math.symbolic_math as sm
+from rclpy.action import ActionClient
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world_description.world_entity import Body
+from std_msgs.msg import Header
+from typing_extensions import Generic, Type, TypeVar
+
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
 from giskardpy.motion_statechart.ros_context import RosContextExtension
-from semantic_digital_twin.spatial_types.spatial_types import Pose
-from semantic_digital_twin.world_description.world_entity import Body
+from control_msgs.action import ParallelGripperCommand
+try:
+    from control_msgs.action import ParallelGripperCommand
+except ModuleNotFoundError:
+    ParallelGripperCommand = None
 
 logger = logging.getLogger(__name__)
 
@@ -189,4 +203,70 @@ class NavigateActionServerTask(
                 if self._result.error_code == NavigateToPose.Result.NONE
                 else ObservationStateValues.FALSE
             )
+        return ObservationStateValues.UNKNOWN
+
+
+@dataclass(eq=False, repr=False)
+class RobotiqGripperActionServerTask(
+    ActionServerTask[
+        ParallelGripperCommand, ParallelGripperCommand.Goal, ParallelGripperCommand.Result, ParallelGripperCommand.Feedback]
+):
+    """
+    Node for calling a Robotiq ROS2 action server to control the gripper using
+    control_msgs/ParallelGripperCommand interface.
+    """
+
+    target_position: float = 0.0
+    """
+    Target position/opening width of the gripper in meters. (e.g., 0.0 for fully closed, 0.085 for fully open)
+    """
+
+    target_velocity: float = 10.0
+    """
+    Velocity at which the gripper should move to the target position in meters per second.
+    """
+
+    target_effort: float = 5.0
+    """
+    Effort (force) that the gripper should apply in Newtons.
+    """
+
+    def build_msg(self, context: MotionStatechartContext):
+        """
+        Creates and returns a message based on the provided MotionStatechartContext.
+
+        The method processes the given context to construct a specific message
+        that can be utilized for further communication or logging purposes. The
+        context determines the message's content and structure.
+
+        Parameters:
+            context: MotionStatechartContext
+                The context from which the message is built. It contains information
+                necessary to construct the message.
+
+        Returns:
+            str: The constructed message based on the provided context.
+        """
+        super().build_msg(context)
+
+        self._msg = ParallelGripperCommand.Goal()
+        self._msg.command.position = [self.target_position]
+        self._msg.command.velocity = [self.target_velocity]
+        self._msg.command.effort = [self.target_effort]
+
+    def on_tick(self, context: MotionStatechartContext) -> ObservationStateValues:
+        """
+        Evaluates the action result to track completion.
+        """
+        if self._result:
+            # ParallelGripperCommand.Result contains a boolean 'stalled' flag and a 'reached_goal' flag.
+            # Usually, reaching the goal or stalling out (gripping an object) counts as a successful execution.
+            if hasattr(self._result, "reached_goal") and self._result.reached_goal:
+                return ObservationStateValues.TRUE
+            elif hasattr(self._result, "stalled") and self._result.stalled:
+                # Stalled means it met resistance (successfully grasped something)
+                return ObservationStateValues.TRUE
+            else:
+                return ObservationStateValues.FALSE
+
         return ObservationStateValues.UNKNOWN

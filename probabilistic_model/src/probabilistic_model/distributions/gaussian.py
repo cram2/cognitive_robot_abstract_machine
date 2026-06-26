@@ -124,6 +124,11 @@ class GaussianDistribution(ContinuousDistribution):
         if probability <= 0.0:
             return None, -np.inf
 
+        if interval.as_composite_set() == reals():
+            return GaussianDistribution(
+                variable=self.variable, location=self.location, scale=self.scale
+            ), np.log(probability)
+
         return TruncatedGaussianDistribution(
             variable=self.variable,
             interval=interval,

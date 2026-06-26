@@ -16,13 +16,13 @@ from typing_extensions import (
     Any,
     ClassVar,
     Dict,
+    Optional,
     Tuple,
     Iterable,
     TYPE_CHECKING,
 )
 
 from krrood.entity_query_language.core.base_expressions import (
-    Bindings,
     OperationResult,
     SymbolicExpression,
     BinaryExpression,
@@ -64,7 +64,7 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
 
     def _evaluate__(
         self,
-        sources: Bindings,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
         Compares the left and right symbolic variables using the "operation".
@@ -94,13 +94,13 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
             left_value = make_set(left_value)
             right_value = make_set(right_value)
         res = self.operation(left_value, right_value)
-        self._is_false_ = not res
+        is_false = not res
         bindings = copy(child_result.bindings)
         bindings[self._id_] = res
-        return OperationResult(bindings, self._is_false_, self, child_result)
+        return OperationResult(bindings, is_false, self, child_result)
 
     def _optimize_operands_order_(
-        self, sources: Bindings
+        self, sources: Optional[OperationResult]
     ) -> Tuple[SymbolicExpression, SymbolicExpression]:
         from krrood.entity_query_language.query.quantifiers import The
 
@@ -110,7 +110,9 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
             return self.left, self.right
         elif not left_has_the and right_has_the:
             return self.right, self.left
-        if sources and any(v._id_ in sources for v in self.right._unique_variables_):
+        if sources is not None and any(
+            v._id_ in sources.bindings for v in self.right._unique_variables_
+        ):
             return self.right, self.left
         else:
             return self.left, self.right

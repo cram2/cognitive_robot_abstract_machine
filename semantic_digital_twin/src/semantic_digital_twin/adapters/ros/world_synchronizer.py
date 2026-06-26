@@ -1,7 +1,7 @@
 import json
 import os
 import threading
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import ClassVar, Optional, Set, Type, List, Dict
@@ -10,11 +10,14 @@ from uuid import UUID
 import numpy as np
 import rclpy  # type: ignore
 import std_msgs.msg
-from krrood.adapters.json_serializer import from_json, to_json
-from krrood.ormatic.data_access_objects.helper import to_dao
 from rclpy.node import Node as RosNode
 from rclpy.publisher import Publisher
 from rclpy.subscription import Subscription
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from krrood.adapters.json_serializer import from_json, to_json
+from krrood.ormatic.data_access_objects.helper import to_dao
 from semantic_digital_twin.adapters.ros.messages import (
     MetaData,
     WorldStateUpdate,
@@ -22,26 +25,28 @@ from semantic_digital_twin.adapters.ros.messages import (
     ModificationBlock,
     LoadModel,
     Acknowledgment,
+    WorldUpdate,
 )
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.callbacks.callback import (
-    Callback,
     StateChangeCallback,
     ModelChangeCallback,
 )
-from semantic_digital_twin.exceptions import MissingPublishChangesKWARG
+from semantic_digital_twin.exceptions import (
+    MissingPublishChangesKWARG,
+    ApplyMissedMessagesWhileWorldIsBeingModifiedError,
+    StateUpdateContainsUnknownDegreesOfFreedomError,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
-    WorldEntityWithID,
+    WorldEntityWithClassBasedID,
 )
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 
 @dataclass
-class Synchronizer(WorldEntityWithID):
+class Synchronizer(WorldEntityWithClassBasedID):
     """
     Abstract synchronizer to manage world synchronizations between processes running semantic digital twin.
 
@@ -50,9 +55,8 @@ class Synchronizer(WorldEntityWithID):
 
     .. warning::
 
-        When ``synchronous=True`` is used on a :class:`SynchronizerOnCallback`, publication
-        blocks until **all** current subscribers acknowledge receipt or a 5-second timeout
-        elapses. If a subscriber process crashes or exits without unsubscribing, the publisher
+        When ``synchronous=True``, publication blocks until **all** current subscribers acknowledge receipt or
+        a 5-second timeout elapses. If a subscriber process crashes or exits without unsubscribing, the publisher
         will wait for the full timeout on every synchronous publish because the dead process
         never acknowledges.
 
@@ -75,6 +79,11 @@ class Synchronizer(WorldEntityWithID):
     topic_name: Optional[str] = None
     """
     The topic name of the publisher and subscriber.
+    """
+
+    synchronous: bool = False
+    """
+    If ``True``, publish blocks until all subscribers acknowledge receipt.
     """
 
     acknowledge_topic_name: Optional[str] = "/acknowledge"
@@ -124,6 +133,12 @@ class Synchronizer(WorldEntityWithID):
     Condition variable used to block synchronous publication until all expected acknowledgments have been received.
     """
 
+    _publish_lock: threading.Lock = field(default_factory=threading.Lock)
+    """
+    Serializes :meth:`publish` so concurrent publications cannot unintentionally override the shared
+    acknowledgment-tracking state (``_current_publication_event_id`` / ``_received_acknowledgments``).
+    """
+
     def __post_init__(self):
         self.subscriber = self.node.create_subscription(
             std_msgs.msg.String,
@@ -131,14 +146,14 @@ class Synchronizer(WorldEntityWithID):
             callback=self.subscription_callback,
             qos_profile=10,
         )
+        self.publisher = self.node.create_publisher(
+            std_msgs.msg.String, topic=self.topic_name, qos_profile=10
+        )
         self.acknowledge_subscriber = self.node.create_subscription(
             std_msgs.msg.String,
             topic=self.acknowledge_topic_name,
             callback=self.acknowledge_callback,
             qos_profile=10,
-        )
-        self.publisher = self.node.create_publisher(
-            std_msgs.msg.String, topic=self.topic_name, qos_profile=10
         )
         self.acknowledge_publisher = self.node.create_publisher(
             std_msgs.msg.String, topic=self.acknowledge_topic_name, qos_profile=10
@@ -155,24 +170,30 @@ class Synchronizer(WorldEntityWithID):
             process_id=os.getpid(),
         )
 
-    def subscription_callback(self, msg: std_msgs.msg.String):
+    def subscription_callback(self, message: std_msgs.msg.String):
         """
         Wrap the origin subscription callback by self-skipping and disabling the next world callback.
+        Holds the world lock while deserializing to ensure no changes happen while building the tracker and
+        running from_json.
 
-        :param msg: The incoming ROS string message containing a serialized synchronization message.
+        :param message: The incoming ROS string message containing a serialized synchronization message.
         """
-        tracker = WorldEntityWithIDKwargsTracker.from_world(self._world)
+        with self._world._world_lock:
+            tracker = WorldEntityWithIDKwargsTracker.from_world(self._world)
+            deserialized_message = from_json(
+                json.loads(message.data), **tracker.create_kwargs()
+            )
 
-        msg = from_json(json.loads(msg.data), **tracker.create_kwargs())
+            if deserialized_message.meta_data == self.meta_data:
+                return
 
-        if msg.meta_data == self.meta_data:
+            self._subscription_callback(deserialized_message)
+
+    def acknowledge_message(self, message: message_type):
+        if self.acknowledge_publisher is None:
             return
-
-        self._subscription_callback(msg)
-
-    def acknowledge_message(self, msg: message_type):
         acknowledgment = Acknowledgment(
-            publication_event_id=msg.publication_event_id,
+            publication_event_id=message.publication_event_id,
             node_meta_data=self.meta_data,
         )
         self.acknowledge_publisher.publish(
@@ -232,238 +253,54 @@ class Synchronizer(WorldEntityWithID):
         """
         raise NotImplementedError
 
-    def publish(self, msg: Message, synchronous: bool = False):
+    def publish(self, msg: Message):
         """
         Publish a message to the synchronization topic.
 
         :param msg: The message to publish.
-        :param synchronous: If True, block until all subscribers acknowledge receipt.
         """
-        self._current_publication_event_id = msg.publication_event_id
 
-        if synchronous:
-            with self._acknowledge_condition_variable:
-                self._expected_acknowledgment_count = self._snapshot_subscribers()
-                self._received_acknowledgments = set()
-                self.publisher.publish(
-                    std_msgs.msg.String(data=json.dumps(to_json(msg)))
-                )
-
-                success = self._acknowledge_condition_variable.wait_for(
-                    lambda: len(self._received_acknowledgments)
-                    >= self._expected_acknowledgment_count,
-                    timeout=self.wait_for_synchronization_timeout,
-                )
-                if not success:
-                    self.node.get_logger().warning(
-                        "Message was not acknowledged, timeout"
-                    )
-
-                self._current_publication_event_id = None
-                self._expected_acknowledgment_count = 0
-                self._received_acknowledgments = set()
-        else:
+        if not self.synchronous:
             self.publisher.publish(std_msgs.msg.String(data=json.dumps(to_json(msg))))
+            return
+
+        with self._publish_lock, self._acknowledge_condition_variable:
+            self._current_publication_event_id = msg.publication_event_id
+            self._expected_acknowledgment_count = self._snapshot_subscribers()
+            self._received_acknowledgments = set()
+            self.publisher.publish(std_msgs.msg.String(data=json.dumps(to_json(msg))))
+
+            success = self._acknowledge_condition_variable.wait_for(
+                lambda: len(self._received_acknowledgments)
+                >= self._expected_acknowledgment_count,
+                timeout=self.wait_for_synchronization_timeout,
+            )
+            if not success:
+                self.node.get_logger().warning("Message was not acknowledged, timeout")
+
+            self._current_publication_event_id = None
+            self._expected_acknowledgment_count = 0
+            self._received_acknowledgments = set()
 
     def close(self):
         """
         Clean up publishers and subscribers.
         """
-
-        # Destroy subscribers
         if self.subscriber is not None:
             self.node.destroy_subscription(self.subscriber)
             self.subscriber = None
 
-        # Destroy publishers
+        if self.acknowledge_subscriber is not None:
+            self.node.destroy_subscription(self.acknowledge_subscriber)
+            self.acknowledge_subscriber = None
+
         if self.publisher is not None:
             self.node.destroy_publisher(self.publisher)
             self.publisher = None
 
-
-@dataclass
-class SynchronizerOnCallback(Synchronizer, Callback, ABC):
-    """
-    Synchronizer that does something on callbacks by the world.
-    Additionally, ensures that the callback is cleaned up on close.
-    """
-
-    synchronous: bool = False
-    """
-    If True, world_callback will block until all subscribers acknowledge receipt of the published message.
-    """
-
-    missed_messages: List[Message] = field(default_factory=list, init=False, repr=False)
-    """
-    The messages that the callback did not trigger due to being paused.
-    """
-
-    def _notify(self, **kwargs):
-        """
-        Wrapper method around world_callback that checks if this time the callback should be triggered.
-        """
-        publish_changes = kwargs.get("publish_changes", None)
-        if publish_changes is None:
-            raise MissingPublishChangesKWARG(kwargs)
-
-        if not publish_changes:
-            return
-
-        self.world_callback(
-            publish_changes=publish_changes, synchronous=self.synchronous
-        )
-
-    def _subscription_callback(self, msg: Message):
-        if self._is_paused:
-            self.missed_messages.append(msg)
-        else:
-            self.apply_message(msg)
-            self.acknowledge_message(msg)
-
-    @abstractmethod
-    def apply_message(self, msg):
-        """
-        Apply the received message to the world.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def world_callback(self, publish_changes: bool = True, synchronous: bool = False):
-        """
-        Called when the world notifies and update that is not caused by this synchronizer.
-        """
-        raise NotImplementedError
-
-    def apply_missed_messages(self):
-        """
-        Applies the missed messages to the world.
-        """
-        if not self.missed_messages:
-            return
-        with self._world.modify_world(publish_changes=False):
-            missed_message_to_be_acknowledged = self.missed_messages
-            self.missed_messages = []
-            for msg in missed_message_to_be_acknowledged:
-                self.apply_message(msg)
-            for msg in missed_message_to_be_acknowledged:
-                self.acknowledge_message(msg)
-
-
-@dataclass
-class StateSynchronizer(StateChangeCallback, SynchronizerOnCallback):
-    """
-    Synchronizes the state (values of free variables) of the semantic digital twin with the associated ROS topic.
-    """
-
-    message_type: ClassVar[Optional[Type[Message]]] = WorldStateUpdate
-
-    topic_name: str = "/semantic_digital_twin/world_state"
-
-    def __post_init__(self):
-        StateChangeCallback.__post_init__(self)
-        Synchronizer.__post_init__(self)
-
-    def apply_message(self, msg: WorldStateUpdate):
-        """
-        Update the world state with the provided message.
-
-        :param msg: The message containing the new state information.
-        """
-        # Parse incoming states: WorldState has 'states' only
-        indices = [self._world.state._index[_id] for _id in msg.ids]
-
-        if indices:
-            with self._world._world_lock:
-                self._world.state._data[0, indices] = np.asarray(
-                    msg.states, dtype=float
-                )
-                self.update_previous_world_state()
-                self._world.notify_state_change(publish_changes=False)
-
-    def world_callback(self, publish_changes: bool = True, synchronous: bool = False):
-        """
-        Publish the current world state to the ROS topic.
-        """
-        if not publish_changes:
-            return
-
-        changes = self.compute_state_changes()
-
-        if not changes:
-            return
-
-        self.update_previous_world_state()
-
-        msg = WorldStateUpdate(
-            ids=list(changes.keys()),
-            states=list(changes.values()),
-            meta_data=self.meta_data,
-        )
-        self.publish(msg, synchronous=synchronous)
-
-    def compute_state_changes(self) -> Dict[UUID, float]:
-        """
-        Compute and return only the position changes since the last published snapshot.
-
-        Returns a mapping of DOF name to current position for entries whose position
-        differs from the previous snapshot, using a vectorized tolerance-based diff.
-        """
-        ids = self._world.state.keys()  # List[PrefixedName] in column order
-        curr = self._world.state.positions  # np.ndarray shape (N,)
-        prev = self.previous_world_state_data  # np.ndarray shape (N,)
-
-        # If the number of DOFs changed (model update), send everything once
-        # so the other side can resynchronize, then the snapshot will be updated afterward.
-        if prev.shape != curr.shape:
-            return {n: float(v) for n, v in zip(ids, curr)}
-
-        # Vectorized comparison: O(N) with minimal Python overhead
-        changed_mask = ~np.isclose(curr, prev, rtol=1e-8, atol=1e-12, equal_nan=True)
-        if not np.any(changed_mask):
-            return {}
-
-        idx = np.nonzero(changed_mask)[0]
-        return {ids[i]: float(curr[i]) for i in idx}
-
-
-@dataclass
-class ModelSynchronizer(
-    ModelChangeCallback,
-    SynchronizerOnCallback,
-):
-    """
-    Synchronizes the model (addition/removal of bodies/DOFs/connections) with the associated ROS topic.
-    """
-
-    message_type: ClassVar[Type[Message]] = ModificationBlock
-    topic_name: str = "/semantic_digital_twin/world_model"
-
-    def apply_message(self, msg: ModificationBlock):
-        running_callbacks = [
-            callback
-            for callback in self._world.state.state_change_callbacks
-            if not callback._is_paused
-        ]
-        for callback in running_callbacks:
-            callback.pause()
-
-        with self._world.modify_world(publish_changes=False):
-            msg.modifications.apply(self._world)
-        for callback in running_callbacks:
-            callback.resume()
-
-    def world_callback(self, publish_changes: bool = True, synchronous: bool = False):
-
-        if not publish_changes:
-            return
-
-        msg = ModificationBlock(
-            meta_data=self.meta_data,
-            modifications=self._world.get_world_model_manager().model_modification_blocks[
-                -1
-            ],
-        )
-        self.publish(msg, synchronous=synchronous)
+        if self.acknowledge_publisher is not None:
+            self.node.destroy_publisher(self.acknowledge_publisher)
+            self.acknowledge_publisher = None
 
 
 @dataclass
@@ -493,7 +330,9 @@ class ModelReloadSynchronizer(Synchronizer):
         Save the current world model to the database and publish the primary key to the ROS topic such that other
         processes can subscribe to the model changes and update their worlds.
         """
-        dao: WorldMappingDAO = to_dao(self._world)
+        from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO  # type: ignore
+
+        dao = to_dao(self._world)
         self.session.add(dao)
         self.session.commit()
         message = LoadModel(primary_key=dao.database_id, meta_data=self.meta_data)
@@ -527,3 +366,233 @@ class ModelReloadSynchronizer(Synchronizer):
         """
         self._world.clear()
         self._world.merge_world(new_world)
+
+
+@dataclass(eq=False)
+class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
+    """
+    Single ``/world_sync`` topic synchronizer for ordered model + state delivery.
+
+    Publishing both model and state updates on the **same** ROS topic provides DDS FIFO
+    ordering guarantees — a model update published before a state update will always be
+    received first, eliminating the cross-topic race that causes ``KeyError`` when state
+    messages arrive before the model update that introduced the referenced DOF UUIDs.
+
+    The ``synchronize_model`` and ``synchronize_state`` flags control whether outgoing
+    changes are published.  Incoming messages from other nodes are always received and
+    applied regardless of these flags.
+    """
+
+    message_type: ClassVar[Optional[Type[Message]]] = WorldUpdate
+
+    topic_name: str = "/semantic_digital_twin/world_sync"
+
+    synchronize_model: bool = True
+    """
+    If ``True``, model changes on this world are published to the synchronization topic.
+    If ``False``, this synchronizer acts as a receive-only participant for model changes.
+    """
+
+    synchronize_state: bool = True
+    """
+    If ``True``, state changes on this world are published to the synchronization topic.
+    If ``False``, this synchronizer acts as a receive-only participant for state changes.
+    """
+
+    missed_messages: List[WorldUpdate] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """
+    Buffer for messages received while the synchronizer is paused.
+    These messages can be applied later by calling ``apply_missed_messages()``.
+    """
+
+    def __post_init__(self):
+        Synchronizer.__post_init__(self)
+        if self.synchronize_model:
+            self._world.get_world_model_manager().model_change_callbacks.append(self)
+        if self.synchronize_state:
+            self._world.state.state_change_callbacks.append(self)
+        self.update_previous_world_state()
+
+    def on_model_change(self, **kwargs):
+        publish_changes = kwargs.get("publish_changes")
+        if publish_changes is None:
+            raise MissingPublishChangesKWARG(kwargs)
+        if not publish_changes:
+            return
+
+        model_block = ModificationBlock(
+            meta_data=self.meta_data,
+            modifications=self._world.get_world_model_manager().model_modification_blocks[
+                -1
+            ],
+        )
+        update = WorldUpdate(meta_data=self.meta_data, modification_block=model_block)
+        self._publish_or_defer(update)
+
+    def on_state_change(self, **kwargs):
+        publish_changes = kwargs.get("publish_changes")
+        if publish_changes is None:
+            raise MissingPublishChangesKWARG(kwargs)
+        if not publish_changes:
+            return
+
+        changes = self.compute_state_changes()
+        if not changes:
+            return
+
+        state_message = WorldStateUpdate(
+            meta_data=self.meta_data,
+            ids=list(changes.keys()),
+            states=list(changes.values()),
+        )
+        update = WorldUpdate(meta_data=self.meta_data, state_update=state_message)
+        self._publish_or_defer(update)
+        self.update_previous_world_state()
+
+    def _publish_or_defer(self, update: WorldUpdate) -> None:
+        """
+        Publishes ``update`` now, or defers it until the world lock is released.
+
+        When this callback fires from within a ``modify_world`` context, ``_world_lock`` is held by
+        the modifying thread. Publishing (and, in synchronous mode, waiting for acknowledgments)
+        while holding the lock would block the receiving executor that must acquire the lock to
+        apply and acknowledge, resulting in a cross-process deadlock. We therefore defer the publish to
+        the world's ``pending_publications``, which are flushed after the lock is released. Outside a
+        modification (usually just during state changes) no lock is held, so we publish directly.
+        """
+        if self._world.world_is_being_modified:
+            self._world.get_world_model_manager().pending_publications.append(
+                lambda: self.publish(update)
+            )
+        else:
+            self.publish(update)
+
+    def compute_state_changes(self) -> Dict[UUID, float]:
+        """Return only DOF positions that changed since the last snapshot."""
+        degree_of_freedom_identifiers = self._world.state.keys()
+        current_positions = self._world.state.positions
+        previous_positions = self.previous_world_state_data
+
+        if previous_positions.shape != current_positions.shape:
+            return {
+                identifier: float(value)
+                for identifier, value in zip(
+                    degree_of_freedom_identifiers, current_positions
+                )
+            }
+
+        changed_mask = ~np.isclose(
+            current_positions, previous_positions, rtol=1e-8, atol=1e-12, equal_nan=True
+        )
+        if not np.any(changed_mask):
+            return {}
+
+        changed_indices = np.nonzero(changed_mask)[0]
+        return {
+            degree_of_freedom_identifiers[index]: float(current_positions[index])
+            for index in changed_indices
+        }
+
+    def _subscription_callback(self, message: WorldUpdate):
+        if self._is_paused:
+            self.missed_messages.append(message)
+        else:
+            self.apply_message(message)
+            self.acknowledge_message(message)
+
+    def apply_message(self, message: WorldUpdate):
+        """Apply model first, then state — preserves the ordering invariant.
+
+        Both are applied under a single hold of ``_world_lock`` so a combined update is
+        atomic: no other thread can observe the new model structure without its accompanying state.
+        """
+        with self._world._world_lock:
+            if message.modification_block is not None:
+                self._apply_model(message.modification_block)
+            if message.state_update is not None:
+                self._apply_state(message.state_update)
+
+    def _apply_model(self, modification_block_message: ModificationBlock):
+        """
+        Applies the model and recompiles the world structure before applying the new state
+        """
+        with self._world.modify_world(publish_changes=False):
+            modification_block_message.modifications.apply(self._world)
+
+    def _apply_state(self, state_update_message: WorldStateUpdate):
+        """
+        Applies the state, and raises a StateUpdateContainsUnknownDegreesOfFreedomError if we receive unknown degree of freedom
+        """
+        identifier_index_state_triples = [
+            (identifier, self._world.state._index.get(identifier), state_value)
+            for identifier, state_value in zip(
+                state_update_message.ids, state_update_message.states
+            )
+        ]
+        unknown_identifiers = [
+            identifier
+            for identifier, index, _ in identifier_index_state_triples
+            if index is None
+        ]
+        if unknown_identifiers:
+            raise StateUpdateContainsUnknownDegreesOfFreedomError(
+                unknown_identifiers=unknown_identifiers
+            )
+        indices = [index for _, index, _ in identifier_index_state_triples]
+        state_values = [
+            state_value for _, _, state_value in identifier_index_state_triples
+        ]
+        with self._world._world_lock:
+            self._world.state._data[0, indices] = np.asarray(state_values, dtype=float)
+            self.update_previous_world_state()
+        self._world.notify_state_change(publish_changes=False)
+
+    def apply_missed_messages(self):
+        """Apply buffered messages accumulated while the synchronizer was paused.
+
+        Each message is applied independently so that model-change notifications
+        fire between messages, which is required for state messages that follow
+        model messages (``compiled_all_fks`` must exist before
+        ``notify_state_change`` is called).
+
+        :raises ApplyMissedMessagesWhileWorldIsBeingModifiedError: If called while a
+            ``modify_world`` context is active on this synchronizer's world.
+        """
+        if self._world.world_is_being_modified:
+            raise ApplyMissedMessagesWhileWorldIsBeingModifiedError()
+        if not self.missed_messages:
+            return
+        pending_messages = self.missed_messages
+        self.missed_messages = []
+        # Hold the world lock across the whole batch so the buffered messages apply atomically: a
+        # concurrent modify_world on another thread serializes behind it instead of interleaving.
+        with self._world._world_lock:
+            for message in pending_messages:
+                self.apply_message(message)
+        for message in pending_messages:
+            self.acknowledge_message(message)
+
+    def resume(self):
+        """Resume publishing and subscribing. Missed messages are NOT applied automatically."""
+        super().resume()
+
+    def stop(self):
+        if self.synchronize_model:
+            try:
+                self._world.get_world_model_manager().model_change_callbacks.remove(
+                    self
+                )
+            except ValueError:
+                pass
+        if self.synchronize_state:
+            try:
+                self._world.state.state_change_callbacks.remove(self)
+            except ValueError:
+                pass
+        super().stop()
+
+    def close(self):
+        self.stop()
+        super().close()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import os
 import sys
 from dataclasses import dataclass
 from enum import Enum
@@ -11,11 +12,15 @@ import builtins
 
 import typing_extensions
 from typing_extensions import Callable, get_args, get_origin
-from typing_extensions import List, Type, Any, Dict, Tuple, Generic
-from typing_extensions import TypeVar
+from typing_extensions import List, Optional, Type, Any, Dict, Tuple, Generic
+from typing_extensions import TypeVar, TypeVarTuple
 
+from krrood import logger
 from krrood.class_diagrams.exceptions import CouldNotResolveType
-from krrood.utils import get_scope_from_imports
+from krrood.utils import (
+    ensure_hashable,
+    get_scope_from_imports,
+)
 
 
 def classes_of_module(module) -> List[Type]:
@@ -33,13 +38,35 @@ def classes_of_module(module) -> List[Type]:
     return result
 
 
+def common_base_class(types: List[Type]) -> Optional[Type]:
+    """
+    Return the lowest common ancestor of *types*, or ``None`` if the only
+    common ancestor is :class:`object`.
+
+    Non-class entries (e.g. unresolved forward references) are silently
+    skipped.  If no classes remain after filtering, ``None`` is returned.
+    """
+    classes = [t for t in types if inspect.isclass(t)]
+    if not classes:
+        return None
+    if len(classes) == 1:
+        return classes[0]
+    common = set(classes[0].__mro__)
+    for t in classes[1:]:
+        common &= set(t.__mro__)
+    for cls in classes[0].__mro__:
+        if cls in common and cls is not object:
+            return cls
+    return None
+
+
 def behaves_like_a_built_in_class(
-        clazz: Type,
+    clazz: Type,
 ) -> bool:
     return (
-            is_builtin_class(clazz)
-            or clazz == UUID
-            or (inspect.isclass(clazz) and issubclass(clazz, Enum))
+        is_builtin_class(clazz)
+        or clazz == UUID
+        or (inspect.isclass(clazz) and issubclass(clazz, Enum))
     )
 
 
@@ -121,23 +148,6 @@ class Role(Generic[T]):
     """
 
 
-def get_generic_type_param(cls, generic_base):
-    """
-    Given a subclass and its generic base, return the concrete type parameter(s).
-
-    Example:
-        get_generic_type_param(Employee, Role) -> (<class '__main__.Person'>,)
-    """
-    orig_bases = cls.__orig_bases__ if hasattr(cls, "__orig_bases__") else []
-    for base in orig_bases:
-        base_origin = get_origin(base)
-        if base_origin is None:
-            continue
-        if issubclass(get_origin(base), generic_base):
-            return get_args(base)
-    return None
-
-
 def get_type_hint_of_keyword_argument(callable_: Callable, name: str):
     """
     :param callable_: A callable to inspect
@@ -177,7 +187,7 @@ class TypeHintResolutionResult:
 
 
 def get_and_resolve_generic_type_hints_of_object_using_substitutions(
-        object_: Any, substitution: Dict[TypeVar, Type]
+    object_: Any, substitution: Dict[TypeVar, Type]
 ) -> Dict[str, TypeHintResolutionResult]:
     """
     Resolve generic type hints of an object using a substitution dictionary.
@@ -191,8 +201,8 @@ def get_and_resolve_generic_type_hints_of_object_using_substitutions(
 
 
 def resolve_type(
-        type_to_resolve: Any,
-        substitution: Dict[TypeVar, Any],
+    type_to_resolve: Any,
+    substitution: Dict[TypeVar, Any],
 ) -> TypeHintResolutionResult:
     """
     Resolve type variables in a type.
@@ -202,34 +212,44 @@ def resolve_type(
     :return: A TypeHintResolutionResult object containing the resolved type and a boolean indicating whether any
     substitutions were made.
     """
-    if isinstance(type_to_resolve, TypeVar):
-        if type_to_resolve not in substitution:
+    if isinstance(type_to_resolve, (TypeVar, TypeVarTuple)):
+        type_to_resolve_key = ensure_hashable(type_to_resolve)
+        if type_to_resolve_key not in substitution:
             return TypeHintResolutionResult(type_to_resolve, False, type_to_resolve)
         return TypeHintResolutionResult(
-            substitution[type_to_resolve], True, type_to_resolve
+            substitution[type_to_resolve_key], True, type_to_resolve
         )
 
     # If the type itself can be indexed (like List[T] or Optional[T])
-    params = getattr(type_to_resolve, "__parameters__", None)
-    if hasattr(type_to_resolve, "__getitem__") and params:
-        new_params = []
-        resolved: bool = False  # whether any substitutions were made
-        for param in params:
-            if param in substitution:
-                new_params.append(substitution[param])
-                resolved = True
-            else:
-                new_params.append(param)
-        subscript_param = new_params[0] if len(new_params) == 1 else tuple(new_params)
-        return TypeHintResolutionResult(
-            type_to_resolve[subscript_param], resolved, type_to_resolve)
+    parameters = getattr(type_to_resolve, "__parameters__", None)
+    if not (hasattr(type_to_resolve, "__getitem__") and parameters):
+        return TypeHintResolutionResult(type_to_resolve, False, type_to_resolve)
 
-    return TypeHintResolutionResult(type_to_resolve, False, type_to_resolve)
+    new_parameters = []
+    resolved: bool = False
+    for parameter in parameters:
+        if parameter not in substitution:
+            new_parameters.append(parameter)
+            continue
+
+        value = substitution[parameter]
+        if isinstance(parameter, TypeVarTuple) and isinstance(value, tuple):
+            new_parameters.extend(value)
+        else:
+            new_parameters.append(value)
+        resolved = True
+
+    subscript_parameter = (
+        new_parameters[0] if len(new_parameters) == 1 else tuple(new_parameters)
+    )
+    return TypeHintResolutionResult(
+        type_to_resolve[subscript_parameter], resolved, type_to_resolve
+    )
 
 
 @lru_cache
 def get_type_hints_of_object(
-        object_: Any, namespace: Tuple[Tuple[str, Any], ...] = ()
+    object_: Any, namespace: Tuple[Tuple[str, Any], ...] = ()
 ) -> Dict[str, Any]:
     """
     Get the type hints of an object. This is a workaround for the fact that get_type_hints() does not work with objects
@@ -262,8 +282,48 @@ def get_type_hints_of_object(
     return type_hints
 
 
+@lru_cache(maxsize=None)
+def _scope_from_imports_by_mtime(source_path: str, mtime: float) -> Dict[str, Any]:
+    """
+    Import scope for *source_path*, cached per ``(source_path, mtime)``.
+
+    See :func:`_cached_scope_from_imports`; the *mtime* component of the key is what makes the
+    cache self-invalidate when the file changes on disk.
+
+    :param source_path: Path to the source file whose import scope is built.
+    :param mtime: Last-modification time of *source_path*, used only as part of the cache key.
+    :return: The import scope dictionary for *source_path*.
+    """
+    return get_scope_from_imports(file_path=source_path)
+
+
+def _cached_scope_from_imports(source_path: str) -> Dict[str, Any]:
+    """
+    Return the import scope of *source_path*, reusing a per-file cache.
+
+    The class-diagram type-hint fallback re-parses the same handful of library source files
+    thousands of times; caching by ``(path, mtime)`` collapses that to one parse per file while
+    self-invalidating if the file changes on disk. The returned dictionary is shared between callers
+    and must be treated as read-only, consistent with the :func:`lru_cache`-d
+    :func:`get_type_hints_of_object`.
+
+    This cache is intentionally local to the class-diagram resolution path and not applied to
+    :func:`~krrood.utils.get_scope_from_imports` itself, because other callers (ripple-down-rules
+    code generation) re-read regenerated files within a single process and rely on the uncached
+    behaviour.
+
+    :param source_path: Path to the source file whose import scope is needed.
+    :return: The import scope dictionary for *source_path*.
+    """
+    try:
+        mtime = os.path.getmtime(source_path)
+    except OSError:
+        return get_scope_from_imports(file_path=source_path)
+    return _scope_from_imports_by_mtime(source_path, mtime)
+
+
 def get_object_by_name_from_another_object_in_same_module(
-        name: str, object_: Any
+    name: str, object_: Any
 ) -> Any:
     """
     Get the object with the given name from another object in the same module.
@@ -281,7 +341,7 @@ def get_object_by_name_from_another_object_in_same_module(
         raise CouldNotResolveType(
             name, extra_information=f"Could not find source file for {object_}"
         )
-    scope = get_scope_from_imports(file_path=source_path)
+    scope = _cached_scope_from_imports(source_path)
     if name in scope:
         return scope[name]
     elif name in builtins.__dict__:
@@ -290,5 +350,5 @@ def get_object_by_name_from_another_object_in_same_module(
         raise CouldNotResolveType(
             name,
             extra_information=f"Could not find {name} in {source_path}, could be a deprecated import statement or "
-                              f"a type defined in a module that is not imported in the source file.",
+            f"a type defined in a module that is not imported in the source file.",
         )

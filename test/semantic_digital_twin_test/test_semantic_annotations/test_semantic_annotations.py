@@ -1,15 +1,19 @@
 import logging
 
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.variable import InstantiatedVariable
+from krrood.entity_query_language.explanation.explanation import explain_inference
+from krrood.entity_query_language.factories import entity, variable, in_, inference, an
+from krrood.entity_query_language.query.quantifiers import An
 from numpy.ma.testutils import (
     assert_equal,
 )  # You could replace this with numpy's regular assert for better compatibility
-
-from krrood.entity_query_language.factories import entity, variable, in_, inference, an
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, KinematicChain
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.testing import *
@@ -37,49 +41,139 @@ class TestSemanticAnnotation(SemanticAnnotation):
     A Generic semantic annotation for multiple bodies.
     """
 
-    _private_entity: KinematicStructureEntity = field(default=None)
-    entity_list: List[KinematicStructureEntity] = field(
-        default_factory=list, hash=False
+    _private_entity: Optional[KinematicStructureEntity] = None
+    public_entity: Optional[KinematicStructureEntity] = None
+    _private_entity_list: List[KinematicStructureEntity] = field(default_factory=list)
+    public_entity_list: List[KinematicStructureEntity] = field(default_factory=list)
+    _private_annotation: Optional[SemanticAnnotation] = None
+    public_annotation: Optional[SemanticAnnotation] = None
+    _private_annotation_list: List[SemanticAnnotation] = field(default_factory=list)
+    public_annotation_list: List[SemanticAnnotation] = field(default_factory=list)
+
+
+def test_aggregate_bodies(kitchen_world):
+    """
+    Tests that SemanticAnnotation.kinematic_structure_entities aggregates:
+    -  public direct kinematic structure entity fields
+    - public list fields containing kinematic structure entities
+    - public nested semantic annotations' kinematic structure entities
+    but nothing from private fields
+    The exact order is not specified by the contract, so we check set membership.
+    """
+
+    # Arrange: pick some existing bodies from the world fixture
+    b0, b1, b2, b3 = kitchen_world.bodies[:4]
+
+    # Private values (should NOT appear)
+    private_entity = b0
+    private_entity_list = [b0]
+    private_annotation = TestSemanticAnnotation(public_entity=b0)
+    private_annotation_list = [TestSemanticAnnotation(public_entity=b0)]
+
+    # Public values (should appear)
+    public_entity = b1
+    public_entity_list = [b2]
+    public_annotation = TestSemanticAnnotation(public_entity=b3)
+    public_annotation_list = [TestSemanticAnnotation(public_entity=b1)]
+
+    ann = TestSemanticAnnotation(
+        _private_entity=private_entity,
+        public_entity=public_entity,
+        _private_entity_list=private_entity_list,
+        public_entity_list=public_entity_list,
+        _private_annotation=private_annotation,
+        public_annotation=public_annotation,
+        _private_annotation_list=private_annotation_list,
+        public_annotation_list=public_annotation_list,
     )
-    semantic_annotations: List[SemanticAnnotation] = field(
-        default_factory=list, hash=False
+
+    # Act
+    aggregated_list = ann.kinematic_structure_entities
+
+    # Expected to include public direct entities and entities from public lists
+    expected_present = [public_entity, *public_entity_list]
+
+    # Nested public annotations contribute their own public_entity
+    if isinstance(public_annotation, SemanticAnnotation):
+        expected_present.extend(public_annotation.kinematic_structure_entities)
+    for x in public_annotation_list:
+        expected_present.extend(x.kinematic_structure_entities)
+
+    # Expected to exclude any private contributions
+    unexpected = [private_entity, *private_entity_list]
+    if isinstance(private_annotation, SemanticAnnotation):
+        unexpected.extend(private_annotation.kinematic_structure_entities)
+    for x in private_annotation_list:
+        unexpected.extend(x.kinematic_structure_entities)
+
+    sorting_key = lambda kse: kse.id
+    # Check all expected are present
+    assert sorted(aggregated_list, key=sorting_key) == sorted(
+        expected_present, key=sorting_key
     )
-    root_entity_1: KinematicStructureEntity = field(default=None)
-    root_entity_2: KinematicStructureEntity = field(default=None)
-    tip_entity_1: KinematicStructureEntity = field(default=None)
-    tip_entity_2: KinematicStructureEntity = field(default=None)
-
-    def add_entity(self, body: KinematicStructureEntity):
-        self.entity_list.append(body)
-
-    def add_semantic_annotation(self, semantic_annotation: SemanticAnnotation):
-        self.semantic_annotations.append(semantic_annotation)
-
-    @property
-    def chain(self) -> list[KinematicStructureEntity]:
-        """
-        Returns itself as a kinematic chain.
-        """
-        return self._world.compute_chain_of_kinematic_structure_entities(
-            self.root_entity_1, self.tip_entity_1
-        )
-
-    @property
-    def _private_chain(self) -> list[KinematicStructureEntity]:
-        """
-        Private chain computation.
-        """
-        return self._world.compute_chain_of_kinematic_structure_entities(
-            self.root_entity_2, self.tip_entity_2
-        )
+    # no unexpected item
+    assert set(aggregated_list) == set(expected_present) - set(unexpected)
 
 
-def test_semantic_annotation_hash(apartment_world_setup):
-    semantic_annotation1 = Handle(root=apartment_world_setup.bodies[0])
-    semantic_annotation2 = Handle(root=apartment_world_setup.bodies[0])
-    with apartment_world_setup.modify_world():
-        apartment_world_setup.add_semantic_annotation(semantic_annotation1)
-        apartment_world_setup.add_semantic_annotation(semantic_annotation2)
+def test_has_root_kinematic_structure_entity_aggregate_bodies(kitchen_world):
+    annotation = SemanticEnvironmentAnnotation(root=kitchen_world.root)
+    with kitchen_world.modify_world():
+        kitchen_world.add_semantic_annotation(annotation)
+
+    assert (
+        annotation.kinematic_structure_entities
+        == kitchen_world.kinematic_structure_entities
+    )
+
+
+def test_has_hinge_has_slider_aggregate_bodies():
+    world = World()
+    root = Body(name=PrefixedName("root"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+
+    door_body = Body(name=PrefixedName("door_body"))
+    drawer_body = Body(name=PrefixedName("drawer_body"))
+    handle1_body = Body(name=PrefixedName("handle1_body"))
+    handle2_body = Body(name=PrefixedName("handle2_body"))
+    hinge_body = Body(name=PrefixedName("hinge_body"))
+    slider_body = Body(name=PrefixedName("slider_body"))
+    handle1 = Handle(root=handle1_body)
+    handle2 = Handle(root=handle2_body)
+    hinge = Hinge(root=hinge_body)
+    slider = Slider(root=slider_body)
+    drawer = Drawer(root=drawer_body)
+    door = Door(root=door_body)
+    with world.modify_world():
+        world.add_connection(FixedConnection(parent=root, child=door_body))
+        world.add_connection(FixedConnection(parent=root, child=drawer_body))
+        world.add_connection(FixedConnection(parent=root, child=handle2_body))
+        world.add_connection(FixedConnection(parent=root, child=handle1_body))
+        world.add_connection(FixedConnection(parent=root, child=hinge_body))
+        world.add_connection(FixedConnection(parent=root, child=slider_body))
+        world.add_semantic_annotation(handle1)
+        world.add_semantic_annotation(handle2)
+        world.add_semantic_annotation(hinge)
+        world.add_semantic_annotation(slider)
+        world.add_semantic_annotation(drawer)
+        world.add_semantic_annotation(door)
+        door.add(handle2)
+        door.add(hinge)
+        drawer.add(handle1)
+        drawer.add(slider)
+
+    expected_door_bodies = {door_body, handle2_body, hinge_body}
+    expected_drawer_bodies = {drawer_body, handle1_body, slider_body}
+    assert set(door.kinematic_structure_entities) == expected_door_bodies
+    assert set(drawer.kinematic_structure_entities) == expected_drawer_bodies
+
+
+def test_semantic_annotation_hash(apartment_world_copy):
+    semantic_annotation1 = Handle(root=apartment_world_copy.bodies[0])
+    semantic_annotation2 = Handle(root=apartment_world_copy.bodies[0])
+    with apartment_world_copy.modify_world():
+        apartment_world_copy.add_semantic_annotation(semantic_annotation1)
+        apartment_world_copy.add_semantic_annotation(semantic_annotation2)
 
     # hash of semantic annotations should be based on their properties, not ids
     assert id(semantic_annotation1) != id(semantic_annotation2)
@@ -87,57 +181,8 @@ def test_semantic_annotation_hash(apartment_world_setup):
     assert semantic_annotation1 == semantic_annotation2
 
 
-def test_aggregate_bodies(kitchen_world):
-    world_semantic_annotation = TestSemanticAnnotation(_world=kitchen_world)
-
-    # Test bodies added to a private dataclass field are not aggregated
-    world_semantic_annotation._private_entity = (
-        kitchen_world.kinematic_structure_entities[0]
-    )
-
-    # Test aggregation of bodies added in custom properties
-    world_semantic_annotation.root_entity_1 = (
-        kitchen_world.kinematic_structure_entities[1]
-    )
-    world_semantic_annotation.tip_entity_1 = kitchen_world.kinematic_structure_entities[
-        4
-    ]
-
-    # Test aggregation of normal dataclass field
-    body_subset = kitchen_world.kinematic_structure_entities[5:10]
-    [world_semantic_annotation.add_entity(body) for body in body_subset]
-
-    # Test aggregation of bodies in a new as well as a nested semantic annotation
-    semantic_annotation1 = TestSemanticAnnotation()
-    semantic_annotation1_subset = kitchen_world.kinematic_structure_entities[10:18]
-    [semantic_annotation1.add_entity(body) for body in semantic_annotation1_subset]
-
-    semantic_annotation2 = TestSemanticAnnotation()
-    semantic_annotation2_subset = kitchen_world.kinematic_structure_entities[20:]
-    [semantic_annotation2.add_entity(body) for body in semantic_annotation2_subset]
-
-    semantic_annotation1.add_semantic_annotation(semantic_annotation2)
-    world_semantic_annotation.add_semantic_annotation(semantic_annotation1)
-
-    # Test that bodies added in a custom private property are not aggregated
-    world_semantic_annotation.root_entity_2 = (
-        kitchen_world.kinematic_structure_entities[18]
-    )
-    world_semantic_annotation.tip_entity_2 = kitchen_world.kinematic_structure_entities[
-        20
-    ]
-
-    assert_equal(
-        set(world_semantic_annotation.kinematic_structure_entities),
-        set(kitchen_world.kinematic_structure_entities)
-        - {
-            kitchen_world.kinematic_structure_entities[0],
-        },
-    )
-
-
-def test_handle_semantic_annotation_eql(apartment_world_setup):
-    body = variable(type_=Body, domain=apartment_world_setup.bodies)
+def test_handle_semantic_annotation_eql(apartment_world_copy):
+    body = variable(type_=Body, domain=apartment_world_copy.bodies)
     query = an(
         entity(inference(Handle)(root=body)).where(
             in_("handle", body.name.name.lower())
@@ -160,10 +205,10 @@ def test_infer_apartment_semantic_annotation(
     semantic_annotation_type,
     update_existing_semantic_annotations,
     scenario,
-    apartment_world_setup,
+    apartment_world_copy,
 ):
     fit_rules_and_assert_semantic_annotations(
-        apartment_world_setup,
+        apartment_world_copy,
         semantic_annotation_type,
         update_existing_semantic_annotations,
         scenario,
@@ -183,12 +228,12 @@ def test_generated_semantic_annotations(kitchen_world):
     assert len(drawer_container_names) == 19
 
 
-@pytest.mark.order("second_to_last")
-def test_apartment_semantic_annotations(apartment_world_setup):
-    world_reasoner = WorldReasoner(apartment_world_setup)
+@pytest.mark.order("third_to_last")
+def test_apartment_semantic_annotations(apartment_world_copy):
+    world_reasoner = WorldReasoner(apartment_world_copy)
     world_reasoner.fit_semantic_annotations(
         [Handle, Drawer, Wardrobe],
-        world_factory=lambda: apartment_world_setup,
+        world_factory=lambda: apartment_world_copy,
         scenario=None,
     )
 
@@ -199,6 +244,23 @@ def test_apartment_semantic_annotations(apartment_world_setup):
         if isinstance(v, HasCaseAsRootBody)
     ]
     assert len(drawer_container_names) == 27
+
+
+@pytest.mark.order("second_to_last")
+def test_explain_inferred_semantic_annotations(apartment_world_copy):
+    world_reasoner = WorldReasoner(apartment_world_copy)
+    found_semantic_annotations = list(world_reasoner.infer_semantic_annotations())
+    drawer = next(ann for ann in found_semantic_annotations if isinstance(ann, Drawer))
+    explanation = explain_inference(drawer)
+    assert explanation is not None
+    assert isinstance(explanation.query_root, SymbolicExpression)
+    assert explanation.get_satisfied_conditions_as_string() == (
+        "(Handle.root == FixedConnection.child)"
+        "\nAND (FixedConnection.parent == PrismaticConnection.child)"
+    )
+    visualize = False
+    if visualize:
+        explanation.condition_graph().visualize(filename="drawer_explanation.pdf")
 
 
 def fit_rules_and_assert_semantic_annotations(
@@ -218,22 +280,22 @@ def fit_rules_and_assert_semantic_annotations(
     )
 
 
-def test_semantic_annotation_serialization_deserialization_once(apartment_world_setup):
-    handle_body = apartment_world_setup.bodies[0]
-    door_body = apartment_world_setup.bodies[1]
+def test_semantic_annotation_serialization_deserialization_once(apartment_world_copy):
+    handle_body = apartment_world_copy.bodies[0]
+    door_body = apartment_world_copy.bodies[1]
 
     handle = Handle(root=handle_body)
     door = Door(root=door_body, handle=handle)
-    with apartment_world_setup.modify_world():
-        apartment_world_setup.add_semantic_annotation(handle)
-        apartment_world_setup.add_semantic_annotation(door)
+    with apartment_world_copy.modify_world():
+        apartment_world_copy.add_semantic_annotation(handle)
+        apartment_world_copy.add_semantic_annotation(door)
 
     door_se = door.to_json()
 
-    with apartment_world_setup.modify_world():
-        apartment_world_setup.remove_semantic_annotation(door)
+    with apartment_world_copy.modify_world():
+        apartment_world_copy.remove_semantic_annotation(door)
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(apartment_world_setup)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(apartment_world_copy)
     kwargs = tracker.create_kwargs()
 
     door_de = Door.from_json(door_se, **kwargs)
@@ -259,3 +321,44 @@ def test_minimal_robot_annotation(pr2_world_state_reset):
     pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(AbstractRobot)[0]
     assert len(robot.bodies) == len(pr2.bodies)
     assert len(robot.connections) == len(pr2.connections)
+
+
+def test_kinematic_chain_with_root_equal_tip_has_no_connections():
+
+    @dataclass(eq=False)
+    class ReviewKinematicChain(KinematicChain):
+        """Minimal concrete KinematicChain for chain tests."""
+
+        def setup_hardware_interfaces(self):
+            pass
+
+        def setup_joint_states(self) -> List[JointState]:
+            return []
+
+        @classmethod
+        def setup_default_configuration_in_world_below_robot_root(
+            cls, robot_root: KinematicStructureEntity
+        ):
+            raise NotImplementedError
+
+    world = World()
+    root = Body(name=PrefixedName("root", prefix="review"))
+    link = Body(name=PrefixedName("link", prefix="review"))
+    collision = Box(
+        scale=Scale(),
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=link),
+    )
+    link.collision = ShapeCollection([collision], reference_frame=link)
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(link)
+        joint = RevoluteConnection.create_with_dofs(
+            world=world, parent=root, child=link, axis=Vector3.Z(reference_frame=root)
+        )
+        world.add_connection(joint)
+        chain = ReviewKinematicChain(
+            name=PrefixedName("chain", prefix="review"), root=link, tip=link
+        )
+        world.add_semantic_annotation(chain)
+
+    assert chain.connections == []

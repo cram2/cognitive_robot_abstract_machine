@@ -21,7 +21,7 @@ The resulting SQL databases are perfect entry points for machine learning.
 
 Concepts used:
 - [](loading-worlds)
-- [ORMatic](https://github.com/tomsch420/ormatic)
+- [ORMatic](https://cram2.github.io/cognitive_robot_abstract_machine/krrood/ormatic/intro.html)
 
 Let's go into an example where we create a world, store it, retrieve and reconstruct it.
 
@@ -84,7 +84,7 @@ print(table.sample_points_from_surface(amount=2))
 
 ## Maintaining the ORM 🧰
 
-You can maintain the ORM by maintaining the [generate_orm.py](https://github.com/cram2/semantic_digital_twin/blob/main/scripts/generate_orm.py).
+You can maintain the ORM by maintaining the [generate_orm.py](https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/semantic_digital_twin/scripts/generate_orm.py).
 In there you have to list all the classes you want to generate mappings for and perhaps some type decorators for advanced use cases.
 Whenever you write a new dataclass that should appear or has semantic meaningful content make sure it appears in the set of classes.
 Pay attention to the logger during generation and see if it understands your datastructures correctly.

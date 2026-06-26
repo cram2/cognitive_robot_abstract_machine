@@ -26,4 +26,4 @@ The interface side of EQL is inspired by [euROBIN](https://www.eurobin-project.e
 
 ## Documentation
 
-Read the documentation [here](https://code-iai.github.io/krrood/intro.html).
+Read the documentation [here](https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html).
