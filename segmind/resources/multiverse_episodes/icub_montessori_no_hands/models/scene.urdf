@@ -1,0 +1,652 @@
+<?xml version="1.0" ?>
+<robot name="iCub_with_montessori_toys_2" version="1.0">
+  <link name="world"/>
+  <joint name="table_joint" type="fixed">
+    <origin xyz="0.0 0.0 1.0" rpy="0.0 0.0 0.0"/>
+    <parent link="world"/>
+    <child link="table"/>
+  </joint>
+  <link name="table">
+    <inertial>
+      <origin xyz="0.0 0.0 -0.20000000298023224" rpy="0.0 0.0 0.0"/>
+      <mass value="10.0"/>
+      <inertia ixx="2.251666784286499" ixy="0.0" ixz="0.0" iyy="6.551666736602783" iyz="0.0" izz="6.926666736602783"/>
+    </inertial>
+    <collision name="Geom_1">
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="2.0 1.0 0.10000000149011612"/>
+      </geometry>
+    </collision>
+    <collision name="Geom_2">
+      <origin xyz="0.949999988079071 0.44999998807907104 -0.5" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.10000000149011612 0.10000000149011612 1.0"/>
+      </geometry>
+    </collision>
+    <collision name="Geom_3">
+      <origin xyz="-0.949999988079071 0.44999998807907104 -0.5" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.10000000149011612 0.10000000149011612 1.0"/>
+      </geometry>
+    </collision>
+    <collision name="Geom_4">
+      <origin xyz="0.949999988079071 -0.44999998807907104 -0.5" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.10000000149011612 0.10000000149011612 1.0"/>
+      </geometry>
+    </collision>
+    <collision name="Geom_5">
+      <origin xyz="-0.949999988079071 -0.44999998807907104 -0.5" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.10000000149011612 0.10000000149011612 1.0"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="small_table_joint" type="fixed">
+    <origin xyz="-0.35 0.0 1.05" rpy="0.0 0.0 0.0"/>
+    <parent link="world"/>
+    <child link="small_table"/>
+  </joint>
+  <link name="small_table">
+    <inertial>
+      <origin xyz="0.0 0.0 0.23000000417232513" rpy="0.0 0.0 0.0"/>
+      <mass value="10.0"/>
+      <inertia ixx="1.502666711807251" ixy="0.0" ixz="0.0" iyy="0.42766666412353516" iyz="0.0" izz="1.7316666841506958"/>
+    </inertial>
+    <collision name="small_table_geom_1">
+      <origin xyz="0.0 0.0 0.25" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.5 1.0 0.025"/>
+      </geometry>
+    </collision>
+    <collision name="small_table_geom_2">
+      <origin xyz="0.22499999403953552 0.4749999940395355 0.125" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.05000000074505806 0.05000000074505806 0.25"/>
+      </geometry>
+    </collision>
+    <collision name="small_table_geom_3">
+      <origin xyz="0.22499999403953552 -0.4749999940395355 0.125" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.05000000074505806 0.05000000074505806 0.25"/>
+      </geometry>
+    </collision>
+    <collision name="small_table_geom_4">
+      <origin xyz="-0.22499999403953552 0.4749999940395355 0.125" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.05000000074505806 0.05000000074505806 0.25"/>
+      </geometry>
+    </collision>
+    <collision name="small_table_geom_5">
+      <origin xyz="-0.22499999403953552 -0.4749999940395355 0.125" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.05000000074505806 0.05000000074505806 0.25"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="montessori_box_joint" type="fixed">
+    <origin xyz="-0.4 0.0 1.353" rpy="0.0 0.0 0.0"/>
+    <parent link="world"/>
+    <child link="montessori_box"/>
+  </joint>
+  <link name="montessori_box">
+    <inertial>
+      <origin xyz="0.026771999895572662 0.00018124999769497663 -0.003932740073651075" rpy="0.0 0.0 0.0"/>
+      <mass value="1.0220400094985962"/>
+      <inertia ixx="0.006246746983379126" ixy="-1.3294325071910862e-05" ixz="-3.980706424044911e-06" iyy="0.0019284707959741354" iyz="-6.739499440300278e-06" izz="0.006575432140380144"/>
+    </inertial>
+    <collision name="UCX_MontessoriBox_001">
+      <origin xyz="-0.007499999832361937 0.0 0.035999998450279236" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.01600000075995922 0.041999999433755875 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_002">
+      <origin xyz="-0.04625000059604645 0.0 0.035999998450279236" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.017500000074505806 0.28200000524520874 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_003">
+      <origin xyz="0.0 0.13300000131130219 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.09799999743700027 0.00800000037997961 0.06400000303983688"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_004">
+      <origin xyz="0.0 -0.13300000131130219 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.09799999743700027 0.00800000037997961 0.06400000303983688"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_005">
+      <origin xyz="0.04500000178813934 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.0020000000949949026 0.257999986410141 0.06400000303983688"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_006">
+      <origin xyz="-0.0024999999441206455 0.04349999874830246 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.09300000220537186 0.003000000026077032 0.06400000303983688"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_007">
+      <origin xyz="-0.0024999999441206455 -0.04349999874830246 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.09300000220537186 0.003000000026077032 0.06400000303983688"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_008">
+      <origin xyz="0.0 0.0 -0.035999998450279236" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.10999999940395355 0.28200000524520874 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_009">
+      <origin xyz="0.04574999958276749 0.0 0.035999998450279236" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.01850000023841858 0.28200000524520874 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_010">
+      <origin xyz="-0.0005000000237487257 -0.12200000137090683 0.035999998450279236" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.07400000095367432 0.03799999877810478 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_011">
+      <origin xyz="-0.0005000000237487257 -0.04600000008940697 0.035999998450279236" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.07400000095367432 0.05000000074505806 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_012">
+      <origin xyz="-0.017500000074505806 0.04600000008940697 0.035999998450279236" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.03999999910593033 0.05000000074505806 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_013">
+      <origin xyz="-0.017500000074505806 0.12600000202655792 0.035999998450279236" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.03999999910593033 0.029999999329447746 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_014">
+      <origin xyz="0.023936999961733818 0.019593000411987305 0.035999998450279236" rpy="0.0 0.0 -0.5235986113548279"/>
+      <geometry>
+        <box size="0.041999999433755875 0.020999999716877937 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_015">
+      <origin xyz="-0.0005000000237487257 -0.08699999749660492 0.035999998450279236" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.009999999776482582 0.03200000151991844 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_016">
+      <origin xyz="0.03200000151991844 0.08100000023841858 0.035999998450279236" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.008999999612569809 0.11999999731779099 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_017">
+      <origin xyz="0.02500000037252903 0.04399999976158142 0.035999998450279236" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.004999999888241291 0.04600000008940697 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_018">
+      <origin xyz="0.02500000037252903 0.12800000607967377 0.035999998450279236" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.004999999888241291 0.026000000536441803 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_019">
+      <origin xyz="0.0024999999441206455 0.07100000232458115 0.035999998450279236" rpy="0.0 0.0 0.7853969931602478"/>
+      <geometry>
+        <box size="0.016568999737501144 0.016568999737501144 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_020">
+      <origin xyz="0.012500000186264515 0.08100000023841858 0.035999998450279236" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.019999999552965164 0.11999999731779099 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_021">
+      <origin xyz="-0.03750000149011612 0.07100000232458115 0.035999998450279236" rpy="0.0 0.0 0.7853969931602478"/>
+      <geometry>
+        <box size="0.016568999737501144 0.016568999737501144 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_022">
+      <origin xyz="-0.03750000149011612 0.11100000143051147 0.035999998450279236" rpy="0.0 0.0 0.7853969931602478"/>
+      <geometry>
+        <box size="0.016568999737501144 0.016568999737501144 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_023">
+      <origin xyz="0.0024999999441206455 0.11100000143051147 0.035999998450279236" rpy="0.0 0.0 0.7853969931602478"/>
+      <geometry>
+        <box size="0.016568999737501144 0.016568999737501144 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_024">
+      <origin xyz="0.023936999961733818 -0.019593000411987305 0.035999998450279236" rpy="0.0 0.0 0.5235986113548279"/>
+      <geometry>
+        <box size="0.041999999433755875 0.020999999716877937 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_025">
+      <origin xyz="-0.03750000149011612 -0.07100000232458115 0.035999998450279236" rpy="0.0 0.0 0.7853969931602478"/>
+      <geometry>
+        <box size="0.013255000114440918 0.013255000114440918 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_026">
+      <origin xyz="-0.005499999970197678 -0.07100000232458115 0.035999998450279236" rpy="0.0 0.0 0.7853969931602478"/>
+      <geometry>
+        <box size="0.013255000114440918 0.013255000114440918 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_027">
+      <origin xyz="-0.005499999970197678 -0.10300000011920929 0.035999998450279236" rpy="0.0 0.0 0.7853969931602478"/>
+      <geometry>
+        <box size="0.013255000114440918 0.013255000114440918 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriBox_028">
+      <origin xyz="-0.03750000149011612 -0.10300000011920929 0.035999998450279236" rpy="0.0 0.0 0.7853969931602478"/>
+      <geometry>
+        <box size="0.013255000114440918 0.013255000114440918 0.00800000037997961"/>
+      </geometry>
+    </collision>
+    <visual name="MontessoriBox">
+      <origin xyz="0.00525750732049346 1.4678077604912687e-05 -0.0003088224621023983" rpy="-1.586214303970337 -1.5560582876205444 -3.1267335414886475"/>
+      <geometry>
+        <mesh filename="file://scene/meshes/stl/montessori_box_MontessoriBox.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+      <material name="MontessoriBox_material">
+        <color rgba="0.89 0.67 0.57 1.0"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="montessori_square_hole_joint" type="fixed">
+    <origin xyz="0.02 -0.087 0.04" rpy="0.0 0.0 0.0"/>
+    <parent link="montessori_box"/>
+    <child link="square_hole"/>
+  </joint>
+  <link name="square_hole">
+    <inertial>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <mass value="0.007762390188872814"/>
+      <inertia ixx="5.07195011323347e-07" ixy="0.0" ixz="0.0" iyy="5.07195011323347e-07" iyz="0.0" izz="5.07195011323347e-07"/>
+    </inertial>
+    <collision name="square_hole_shape">
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.03 0.03 0.001"/>
+      </geometry>
+      <material name="MontessoriDrawer2_material">
+        <color rgba="0.99 0.0 0.0 1.0"/>
+      </material>
+    </collision>
+  </link>
+  <joint name="montessori_circular_hole_1_joint" type="fixed">
+    <origin xyz="-0.0215 -0.087 0.04" rpy="0.0 0.0 0.0"/>
+    <parent link="montessori_box"/>
+    <child link="circular_hole_1"/>
+  </joint>
+  <link name="circular_hole_1">
+    <inertial>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <mass value="0.007762390188872814"/>
+      <inertia ixx="5.07195011323347e-07" ixy="0.0" ixz="0.0" iyy="5.07195011323347e-07" iyz="0.0" izz="5.07195011323347e-07"/>
+    </inertial>
+    <collision name="circular_hole_1_shape">
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <cylinder radius="0.015" length="0.001"/>
+      </geometry>
+      <material name="MontessoriDrawer2_material">
+        <color rgba="0.99 0.0 0.0 1.0"/>
+      </material>
+    </collision>
+  </link>
+  <joint name="montessori_triangle_hole_joint" type="fixed">
+    <origin xyz="0.019 0.0 0.04" rpy="0.0 0.0 0.0"/>
+    <parent link="montessori_box"/>
+    <child link="triangle_hole"/>
+  </joint>
+  <link name="triangle_hole">
+    <inertial>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <mass value="0.01134410034865141"/>
+      <inertia ixx="1.2508099871411105e-06" ixy="0.0" ixz="0.0" iyy="1.2508099871411105e-06" iyz="0.0" izz="8.338760153492331e-07"/>
+    </inertial>
+    <collision name="MontessoriObject2">
+      <origin xyz="-0.005819993559271097 1.2720914664890083e-19 3.725290298461914e-09" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <mesh filename="file://scene/meshes/stl/montessori_object_2_MontessoriObject_002.stl" scale="0.8 0.8 0.02"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="montessori_rectangular_hole_joint" type="fixed">
+    <origin xyz="-0.027 0.0 0.04" rpy="0.0 0.0 0.0"/>
+    <parent link="montessori_box"/>
+    <child link="rectangular_hole"/>
+  </joint>
+  <link name="rectangular_hole">
+    <inertial>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <mass value="0.008732689544558525"/>
+      <inertia ixx="1.2838399925385602e-06" ixy="0.0" ixz="0.0" iyy="7.13243025529664e-07" iyz="0.0" izz="7.13243025529664e-07"/>
+    </inertial>
+    <collision name="rectangular_hole_shape">
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.015 0.03 0.001"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="montessori_circular_hole_2_joint" type="fixed">
+    <origin xyz="-0.018 0.091 0.04" rpy="0.0 0.0 0.0"/>
+    <parent link="montessori_box"/>
+    <child link="circular_hole_2"/>
+  </joint>
+  <link name="circular_hole_2">
+    <inertial>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <mass value="0.007762390188872814"/>
+      <inertia ixx="5.07195011323347e-07" ixy="0.0" ixz="0.0" iyy="5.07195011323347e-07" iyz="0.0" izz="5.07195011323347e-07"/>
+    </inertial>
+    <collision name="circular_hole_2_shape">
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <cylinder radius="0.015" length="0.001"/>
+      </geometry>
+      <material name="MontessoriDrawer2_material">
+        <color rgba="0.99 0.0 0.0 1.0"/>
+      </material>
+    </collision>
+  </link>
+  <joint name="montessori_disk_hole_joint" type="fixed">
+    <origin xyz="0.025 0.091 0.04" rpy="0.0 0.0 0.0"/>
+    <parent link="montessori_box"/>
+    <child link="disk_hole"/>
+  </joint>
+  <link name="disk_hole">
+    <inertial>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <mass value="0.007762390188872814"/>
+      <inertia ixx="5.07195011323347e-07" ixy="0.0" ixz="0.0" iyy="5.07195011323347e-07" iyz="0.0" izz="5.07195011323347e-07"/>
+    </inertial>
+    <collision name="disk_hole_shape">
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.005 0.04 0.001"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="montessori_drawer_1_joint" type="prismatic">
+    <origin xyz="-0.003000000026077032 0.08699999749660492 0.0" rpy="0.0 0.0 0.0"/>
+    <axis xyz="-1.0 0.0 0.0"/>
+    <parent link="montessori_box"/>
+    <child link="montessori_drawer_1"/>
+    <limit effort="1000.0" lower="0.0" upper="0.10000000149011612" velocity="1000.0"/>
+  </joint>
+  <link name="montessori_drawer_1">
+    <inertial>
+      <origin xyz="0.0257485993206501 5.7039901690814077e-08 -0.0025818198919296265" rpy="0.0 0.0 0.0"/>
+      <mass value="0.13218800723552704"/>
+      <inertia ixx="0.0001644437579670921" ixy="1.272882515536422e-12" ixz="3.2807527077238774e-06" iyy="0.0002020050014834851" iyz="9.96200517910939e-13" izz="0.00026708925724960864"/>
+    </inertial>
+    <collision name="UCX_MontessoriDrawer1_001">
+      <origin xyz="0.0 0.0 -0.029999999329447746" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.09200000017881393 0.0820000022649765 0.0020000000949949026"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer1_002">
+      <origin xyz="-0.041999999433755875 0.0 0.0010000000474974513" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.00800000037997961 0.0820000022649765 0.05999999865889549"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer1_003">
+      <origin xyz="0.004000000189989805 0.03849999979138374 0.0010000000474974513" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.08399999886751175 0.004999999888241291 0.05999999865889549"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer1_004">
+      <origin xyz="0.004000000189989805 -0.03849999979138374 0.0010000000474974513" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.08399999886751175 0.004999999888241291 0.05999999865889549"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer1_005">
+      <origin xyz="0.04349999874830246 0.0 0.0010000000474974513" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.004999999888241291 0.07199999690055847 0.05999999865889549"/>
+      </geometry>
+    </collision>
+    <visual name="MontessoriDrawer1">
+      <origin xyz="0.00039275470771826804 -9.528518252199802e-11 -0.004749107174575329" rpy="0.0 -1.5696903467178345 3.1415927410125732"/>
+      <geometry>
+        <mesh filename="file://scene/meshes/stl/montessori_box_MontessoriDrawer.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+      <material name="MontessoriDrawer1_material">
+        <color rgba="1.0 0.83 0.67 1.0"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="montessori_drawer_1_handle_joint" type="fixed">
+    <origin xyz="-0.061 0.0 0.001" rpy="0.0 0.0 0.0"/>
+    <parent link="montessori_drawer_1"/>
+    <child link="montessori_drawer_1_handle"/>
+  </joint>
+  <link name="montessori_drawer_1_handle">
+    <inertial>
+      <origin xyz="0.003915579989552498 7.503020427179763e-09 -7.799900308969043e-11" rpy="0.0 0.0 0.0"/>
+      <mass value="0.005739749874919653"/>
+      <inertia ixx="2.2677200206544512e-07" ixy="-1.7225866458074612e-13" ixz="4.098988519890849e-15" iyy="3.5472399417812994e-07" iyz="5.498105549545885e-21" izz="3.5430400657787686e-07"/>
+    </inertial>
+    <collision name="UCX_MontessoriDrawer1Handle_001">
+      <origin xyz="0.007499999832361937 0.0 0.0" rpy="-0.0 1.5707963705062866 0.0"/>
+      <geometry>
+        <cylinder radius="0.00800000037997961" length="0.014999999664723873"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer1Handle_002">
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <sphere radius="0.004999999888241291"/>
+      </geometry>
+    </collision>
+    <visual name="MontessoriDrawer1Handle">
+      <origin xyz="0.0039155809208750725 7.543388136355134e-09 -2.279017252693194e-11" rpy="1.5707963705062866 -1.3322676295501878e-15 1.5707963705062866"/>
+      <geometry>
+        <mesh filename="file://scene/meshes/stl/montessori_box_MontessoriDrawerHandle.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+      <material name="MontessoriDrawer1Handle_material">
+        <color rgba="0.89 0.67 0.57 1.0"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="montessori_drawer_2_joint" type="prismatic">
+    <origin xyz="-0.003000000026077032 0.0 0.0" rpy="0.0 0.0 0.0"/>
+    <axis xyz="-1.0 0.0 0.0"/>
+    <parent link="montessori_box"/>
+    <child link="montessori_drawer_2"/>
+    <limit effort="1000.0" lower="0.0" upper="0.10000000149011612" velocity="1000.0"/>
+  </joint>
+  <link name="montessori_drawer_2">
+    <inertial>
+      <origin xyz="0.0257485993206501 5.7039901690814077e-08 -0.0025818198919296265" rpy="0.0 0.0 0.0"/>
+      <mass value="0.13218800723552704"/>
+      <inertia ixx="0.0001644437579670921" ixy="1.272882515536422e-12" ixz="3.2807527077238774e-06" iyy="0.0002020050014834851" iyz="9.96200517910939e-13" izz="0.00026708925724960864"/>
+    </inertial>
+    <collision name="UCX_MontessoriDrawer2_001">
+      <origin xyz="0.0 0.0 -0.029999999329447746" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.09200000017881393 0.0820000022649765 0.0020000000949949026"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer2_002">
+      <origin xyz="-0.041999999433755875 0.0 0.0010000000474974513" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.00800000037997961 0.0820000022649765 0.05999999865889549"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer2_003">
+      <origin xyz="0.004000000189989805 0.03849999979138374 0.0010000000474974513" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.08399999886751175 0.004999999888241291 0.05999999865889549"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer2_004">
+      <origin xyz="0.004000000189989805 -0.03849999979138374 0.0010000000474974513" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.08399999886751175 0.004999999888241291 0.05999999865889549"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer2_005">
+      <origin xyz="0.04349999874830246 0.0 0.0010000000474974513" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.004999999888241291 0.07199999690055847 0.05999999865889549"/>
+      </geometry>
+    </collision>
+    <visual name="MontessoriDrawer2">
+      <origin xyz="0.00039275470771826804 -9.528518252199802e-11 -0.004749107174575329" rpy="0.0 -1.5696903467178345 3.1415927410125732"/>
+      <geometry>
+        <mesh filename="file://scene/meshes/stl/montessori_box_MontessoriDrawer.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+      <material name="MontessoriDrawer2_material">
+        <color rgba="0.99 0.73 0.55 1.0"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="montessori_drawer_2_handle_joint" type="fixed">
+    <origin xyz="-0.061 0.0 0.001" rpy="0.0 0.0 0.0"/>
+    <parent link="montessori_drawer_2"/>
+    <child link="montessori_drawer_2_handle"/>
+  </joint>
+  <link name="montessori_drawer_2_handle">
+    <inertial>
+      <origin xyz="0.003915579989552498 7.503020427179763e-09 -7.799900308969043e-11" rpy="0.0 0.0 0.0"/>
+      <mass value="0.005739749874919653"/>
+      <inertia ixx="2.2677200206544512e-07" ixy="-1.7225866458074612e-13" ixz="4.098988519890849e-15" iyy="3.5472399417812994e-07" iyz="5.498105549545885e-21" izz="3.5430400657787686e-07"/>
+    </inertial>
+    <collision name="UCX_MontessoriDrawer2Handle_001">
+      <origin xyz="0.007499999832361937 0.0 0.0" rpy="-0.0 1.5707963705062866 0.0"/>
+      <geometry>
+        <cylinder radius="0.00800000037997961" length="0.014999999664723873"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer2Handle_002">
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <sphere radius="0.004999999888241291"/>
+      </geometry>
+    </collision>
+    <visual name="MontessoriDrawer2Handle">
+      <origin xyz="0.0039155809208750725 7.543388136355134e-09 -2.279017252693194e-11" rpy="1.5707963705062866 -1.3322676295501878e-15 1.5707963705062866"/>
+      <geometry>
+        <mesh filename="file://scene/meshes/stl/montessori_box_MontessoriDrawerHandle.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+      <material name="MontessoriDrawer2Handle_material">
+        <color rgba="0.89 0.67 0.57 1.0"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="montessori_drawer_3_joint" type="prismatic">
+    <origin xyz="-0.003000000026077032 -0.08699999749660492 0.0" rpy="0.0 0.0 0.0"/>
+    <axis xyz="-1.0 0.0 0.0"/>
+    <parent link="montessori_box"/>
+    <child link="montessori_drawer_3"/>
+    <limit effort="1000.0" lower="0.0" upper="0.10000000149011612" velocity="1000.0"/>
+  </joint>
+  <link name="montessori_drawer_3">
+    <inertial>
+      <origin xyz="0.0257485993206501 5.7039901690814077e-08 -0.0025818198919296265" rpy="0.0 0.0 0.0"/>
+      <mass value="0.13218800723552704"/>
+      <inertia ixx="0.0001644437579670921" ixy="1.272882515536422e-12" ixz="3.2807527077238774e-06" iyy="0.0002020050014834851" iyz="9.96200517910939e-13" izz="0.00026708925724960864"/>
+    </inertial>
+    <collision name="UCX_MontessoriDrawer3_001">
+      <origin xyz="0.0 0.0 -0.029999999329447746" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.09200000017881393 0.0820000022649765 0.0020000000949949026"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer3_002">
+      <origin xyz="-0.041999999433755875 0.0 0.0010000000474974513" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.00800000037997961 0.0820000022649765 0.05999999865889549"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer3_003">
+      <origin xyz="0.004000000189989805 0.03849999979138374 0.0010000000474974513" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.08399999886751175 0.004999999888241291 0.05999999865889549"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer3_004">
+      <origin xyz="0.004000000189989805 -0.03849999979138374 0.0010000000474974513" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.08399999886751175 0.004999999888241291 0.05999999865889549"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer3_005">
+      <origin xyz="0.04349999874830246 0.0 0.0010000000474974513" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.004999999888241291 0.07199999690055847 0.05999999865889549"/>
+      </geometry>
+    </collision>
+    <visual name="MontessoriDrawer3">
+      <origin xyz="0.00039275470771826804 -9.528518252199802e-11 -0.004749107174575329" rpy="0.0 -1.5696903467178345 3.1415927410125732"/>
+      <geometry>
+        <mesh filename="file://scene/meshes/stl/montessori_box_MontessoriDrawer.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+      <material name="MontessoriDrawer3_material">
+        <color rgba="0.87 0.94 0.98 1.0"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="montessori_drawer_3_handle_joint" type="fixed">
+    <origin xyz="-0.061 0.0 0.001" rpy="0.0 0.0 0.0"/>
+    <parent link="montessori_drawer_3"/>
+    <child link="montessori_drawer_3_handle"/>
+  </joint>
+  <link name="montessori_drawer_3_handle">
+    <inertial>
+      <origin xyz="0.003915579989552498 7.503020427179763e-09 -7.799900308969043e-11" rpy="0.0 0.0 0.0"/>
+      <mass value="0.005739749874919653"/>
+      <inertia ixx="2.2677200206544512e-07" ixy="-1.7225866458074612e-13" ixz="4.098988519890849e-15" iyy="3.5472399417812994e-07" iyz="5.498105549545885e-21" izz="3.5430400657787686e-07"/>
+    </inertial>
+    <collision name="UCX_MontessoriDrawer3Handle_001">
+      <origin xyz="0.007499999832361937 0.0 0.0" rpy="-0.0 1.5707963705062866 0.0"/>
+      <geometry>
+        <cylinder radius="0.00800000037997961" length="0.014999999664723873"/>
+      </geometry>
+    </collision>
+    <collision name="UCX_MontessoriDrawer3Handle_002">
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <sphere radius="0.004999999888241291"/>
+      </geometry>
+    </collision>
+    <visual name="MontessoriDrawer3Handle">
+      <origin xyz="0.0039155809208750725 7.543388136355134e-09 -2.279017252693194e-11" rpy="1.5707963705062866 -1.3322676295501878e-15 1.5707963705062866"/>
+      <geometry>
+        <mesh filename="file://scene/meshes/stl/montessori_box_MontessoriDrawerHandle.stl" scale="1.0 1.0 1.0"/>
+      </geometry>
+      <material name="MontessoriDrawer3Handle_material">
+        <color rgba="0.89 0.67 0.57 1.0"/>
+      </material>
+    </visual>
+  </link>
+</robot>
