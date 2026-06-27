@@ -13,9 +13,6 @@ from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
     GrammaticalNumber,
 )
-from krrood.entity_query_language.verbalization.grammar.aggregation.kinds import (
-    AGGREGATION_KIND,
-)
 from krrood.entity_query_language.verbalization.grammar.framework.assembler import (
     Assembler,
 )
@@ -27,6 +24,7 @@ from krrood.entity_query_language.verbalization.grammar.query.planner import (
     QueryPlanner,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
+    Aggregations,
     FallbackNouns,
     Keywords,
     Prepositions,
@@ -61,7 +59,9 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
         if aggregation_data.leaf is None:
             return self.context.child(aggregation_data.aggregator)
 
-        aggregation_kind = AGGREGATION_KIND[type(aggregation_data.aggregator)]
+        aggregation_kind = Aggregations.for_aggregator(
+            type(aggregation_data.aggregator)
+        )
         leaf_fragment = RoleFragment.for_attribute(
             aggregation_data.leaf._owner_class_,
             aggregation_data.leaf._attribute_name_,

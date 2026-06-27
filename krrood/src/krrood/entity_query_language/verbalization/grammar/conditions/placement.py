@@ -12,7 +12,7 @@ from krrood.entity_query_language.core.base_expressions import SymbolicExpressio
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.verbalization.exceptions import (
-    UndeclaredFormSlotError,
+    UndeclaredFormPositionError,
 )
 from krrood.entity_query_language.verbalization.fragments.base import (
     BlockFragment,
@@ -51,8 +51,8 @@ from krrood.entity_query_language.verbalization.vocabulary.words import (
 )
 
 
-class Slot(Enum):
-    """Where a condition's rendered form attaches in a sentence — the surface-slot taxonomy a
+class SurfacePosition(Enum):
+    """Where a condition's rendered form attaches in a sentence — the surface-position taxonomy a
     caller maps to an actual position (a noun modifier vs. a standalone clause)."""
 
     SELECTION_MODIFIER = auto()
@@ -80,10 +80,10 @@ class Placement:
 
 @dataclass(frozen=True)
 class Placed:
-    """A rendered condition together with the slot it occupies, for the caller to position."""
+    """A rendered condition together with the position it occupies, for the caller to position."""
 
-    slot: Slot
-    """The surface slot the fragment occupies."""
+    position: SurfacePosition
+    """The surface position the fragment occupies."""
 
     fragment: Fragment
     """The rendered condition."""
@@ -92,7 +92,7 @@ class Placed:
 class ConditionForm(SpecificityRule):
     """
     One surface form a condition can take next to a subject noun — recognise it, render it, and
-    declare its :class:`Slot`. The single, *total* registry of these forms is the one authority on
+    declare its :class:`SurfacePosition`. The single, *total* registry of these forms is the one authority on
     *how a condition is said relative to a subject*: every position-aware caller (a query's subject
     restriction) asks it via :func:`place` and never picks a form itself.
 
@@ -109,16 +109,16 @@ class ConditionForm(SpecificityRule):
     production-rule selection (the most-specific guarded alternative wins).
     """
 
-    slot: ClassVar[Slot]
-    """The surface slot this form's output occupies."""
+    position: ClassVar[SurfacePosition]
+    """The surface position this form's output occupies."""
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         """Fail fast at class-definition time when a concrete form forgets to declare its
-        :attr:`slot` (otherwise the omission is a silent ``AttributeError`` deep in :func:`place`).
+        :attr:`position` (otherwise the omission is a silent ``AttributeError`` deep in :func:`place`).
         """
         super().__init_subclass__(**kwargs)
-        if not inspect.isabstract(cls) and not hasattr(cls, "slot"):
-            raise UndeclaredFormSlotError(form=cls)
+        if not inspect.isabstract(cls) and not hasattr(cls, "position"):
+            raise UndeclaredFormPositionError(form=cls)
 
     @classmethod
     @abstractmethod
@@ -128,7 +128,7 @@ class ConditionForm(SpecificityRule):
         :return: ``True`` when this form renders *request*.
 
         It is the gate each concrete form overrides to claim a situation; here the winning override
-        (:class:`WhosePredicateForm`) is what routes ``robot.battery > 50`` into the *whose* slot, so
+        (:class:`WhosePredicateForm`) is what routes ``robot.battery > 50`` into the *whose* position, so
         the class example renders *whose battery is greater than 50* rather than a standalone clause.
         """
 
@@ -155,7 +155,7 @@ class StandaloneForm(ConditionForm):
     'Find an Employee such that its salary is greater than its starting_salary'
     """
 
-    slot = Slot.STANDALONE
+    position = SurfacePosition.STANDALONE
 
     @classmethod
     def applies(cls, request: Placement) -> bool:
@@ -163,7 +163,7 @@ class StandaloneForm(ConditionForm):
 
         Returning ``True`` unconditionally, it is the catch-all gate that claims the comparator no
         specific form accepts — which is why the class example lands in a *such that …* clause instead
-        of the *whose* slot a one-sided attribute comparison would take.
+        of the *whose* position a one-sided attribute comparison would take.
         """
         return True
 
@@ -173,7 +173,7 @@ class StandaloneForm(ConditionForm):
 
         Deferring to the recursion is what supplies the whole *its salary is greater than its
         starting_salary* clause; this form contributes only the decision to render it standalone (its
-        :attr:`slot` is :attr:`Slot.STANDALONE`), so the caller frames it with *such that*.
+        :attr:`position` is :attr:`SurfacePosition.STANDALONE`), so the caller frames it with *such that*.
         """
         return context.child(request.item)
 
@@ -192,7 +192,7 @@ class SuperlativeForm(StandaloneForm):
     'Find the unique BankTransaction with the maximum amount'
     """
 
-    slot = Slot.SELECTION_MODIFIER
+    position = SurfacePosition.SELECTION_MODIFIER
 
     @classmethod
     def applies(cls, request: Placement) -> bool:
@@ -226,7 +226,7 @@ class WhoseRangeForm(StandaloneForm):
     'Find an Employee whose salary is between 100 and 200'
     """
 
-    slot = Slot.WHOSE
+    position = SurfacePosition.WHOSE
 
     @classmethod
     def applies(cls, request: Placement) -> bool:
@@ -263,7 +263,7 @@ class WhosePredicateForm(StandaloneForm):
     'Find a Robot whose battery is greater than 50'
     """
 
-    slot = Slot.WHOSE
+    position = SurfacePosition.WHOSE
 
     @classmethod
     def applies(cls, request: Placement) -> bool:
@@ -310,7 +310,7 @@ class AbsenceForm(StandaloneForm):
     'Find a Mission such that the Mission has no priority'
     """
 
-    slot = Slot.STANDALONE
+    position = SurfacePosition.STANDALONE
 
     @classmethod
     def applies(cls, request: Placement) -> bool:
@@ -332,7 +332,7 @@ class AbsenceForm(StandaloneForm):
         """Render the standalone absence predicate *"<owner> has no <attribute>"*.
 
         It owns the *the Mission has no priority* span, flipping owner and attribute into the *has
-        no* frame; tagged :attr:`Slot.STANDALONE`, it is why the caller frames the result with *such
+        no* frame; tagged :attr:`SurfacePosition.STANDALONE`, it is why the caller frames the result with *such
         that* rather than *whose*.
         """
         return render_absence(request.item, context, number=request.number)
@@ -340,15 +340,15 @@ class AbsenceForm(StandaloneForm):
 
 def place(request: Placement, context: RuleContext) -> Placed:
     """
-    Render a condition relative to its subject and report the slot it occupies — the single entry a
+    Render a condition relative to its subject and report the position it occupies — the single entry a
     position-aware caller uses. The form is chosen by the registry (most-specific applicable; the
     standalone fallback guarantees a match), so the caller never inspects the condition's shape.
 
     :param request: The condition and the subject it may attach to.
     :param context: The per-node context (recursion and services).
-    :return: The rendered condition tagged with its surface slot.
+    :return: The rendered condition tagged with its surface position.
 
-    Pairing the rendered fragment with the winning form's :attr:`slot` is what lets the caller route
+    Pairing the rendered fragment with the winning form's :attr:`position` is what lets the caller route
     ``robot.battery > 50`` to the *whose* position, producing the *whose battery is greater than 50*
     placement in the example.
 
@@ -357,7 +357,7 @@ def place(request: Placement, context: RuleContext) -> Placed:
     'Find a Robot whose battery is greater than 50'
     """
     form = ConditionForm.most_applicable(request)
-    return Placed(slot=form.slot, fragment=form.render(request, context))
+    return Placed(position=form.position, fragment=form.render(request, context))
 
 
 # ── placing a whole subject restriction ─────────────────────────────────────
@@ -366,7 +366,7 @@ def place(request: Placement, context: RuleContext) -> Placed:
 @dataclass(frozen=True)
 class RestrictionFragments:
     """The placed pieces of a subject's WHERE, for the caller to position — each goes to a different
-    sentence slot, so they are kept apart rather than pre-joined."""
+    sentence position, so they are kept apart rather than pre-joined."""
 
     inline_modifiers: List[Fragment] = field(default_factory=list)
     """Superlative selection phrases (*"with the maximum amount"*) that attach inline, right after
@@ -391,7 +391,7 @@ def as_subject_restrictions(
     """
     Say a subject's WHERE conjuncts as restrictions on its noun — the counterpart to
     :meth:`ConditionAssembler.as_statements` for when conditions attach to a subject rather than
-    standing alone. Each conjunct is placed and the results bucketed by slot into the pieces a
+    standing alone. Each conjunct is placed and the results bucketed by position into the pieces a
     caller positions: superlative noun modifiers, the shared *"whose"* group, and the standalone
     residual. This is the list form of :func:`place`.
 
@@ -407,7 +407,7 @@ def as_subject_restrictions(
         an aggregated inference antecedent.
     :return: The placed restriction pieces.
 
-    Bucketing each placed conjunct by slot is what splits the two conditions in the example: the
+    Bucketing each placed conjunct by position is what splits the two conditions in the example: the
     battery comparison fills the *whose* group while the ``== None`` conjunct becomes the standalone
     residual, so the sentence joins *whose battery is greater than 50* with *such that the Robot has
     no name*.
@@ -420,7 +420,9 @@ def as_subject_restrictions(
         place(Placement(item=item, subject=subject, number=number), context)
         for item in reduce_conjuncts(list(conditions))
     ]
-    grouped = [item.fragment for item in placed if item.slot is Slot.WHOSE]
+    grouped = [
+        item.fragment for item in placed if item.position is SurfacePosition.WHOSE
+    ]
     whose = (
         BlockFragment(
             header=Keywords.WHOSE.as_fragment(),
@@ -432,11 +434,17 @@ def as_subject_restrictions(
     )
     return RestrictionFragments(
         inline_modifiers=[
-            item.fragment for item in placed if item.slot is Slot.SELECTION_MODIFIER
+            item.fragment
+            for item in placed
+            if item.position is SurfacePosition.SELECTION_MODIFIER
         ],
         whose=whose,
         residual=_join_residual(
-            [item.fragment for item in placed if item.slot is Slot.STANDALONE]
+            [
+                item.fragment
+                for item in placed
+                if item.position is SurfacePosition.STANDALONE
+            ]
         ),
     )
 

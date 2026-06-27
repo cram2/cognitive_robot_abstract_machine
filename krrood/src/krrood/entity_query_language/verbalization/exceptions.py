@@ -17,6 +17,7 @@ from krrood.exceptions import DataclassException
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import SymbolicExpression
     from krrood.entity_query_language.core.variable import InstantiatedVariable
+    from krrood.entity_query_language.operators.aggregators import Aggregator
     from krrood.entity_query_language.verbalization.fragments.base import Fragment
     from krrood.entity_query_language.verbalization.grammar.conditions.placement import (
         ConditionForm,
@@ -118,21 +119,44 @@ class UnloweredFragmentError(DataclassException):
 
 
 @dataclass
-class UndeclaredFormSlotError(DataclassException):
+class UndeclaredFormPositionError(DataclassException):
     """
     A concrete :class:`~krrood.entity_query_language.verbalization.grammar.conditions.placement.ConditionForm`
-    subclass did not declare its ``slot`` class variable — caught at class-definition time rather
+    subclass did not declare its ``position`` class variable — caught at class-definition time rather
     than as a silent ``AttributeError`` deep in ``place``.
     """
 
     form: "type[ConditionForm]"
-    """The condition-form subclass missing its ``slot``."""
+    """The condition-form subclass missing its ``position``."""
 
     def error_message(self) -> str:
         return (
-            f"{self.form.__name__!r} must declare the `slot` class variable — "
+            f"{self.form.__name__!r} must declare the `position` class variable — "
             "it sets where the form's output attaches."
         )
 
     def suggest_correction(self) -> str:
-        return "Add e.g. `slot = Slot.WHOSE` to the class body."
+        return "Add e.g. `position = SurfacePosition.WHOSE` to the class body."
+
+
+@dataclass
+class UnknownAggregatorError(DataclassException):
+    """
+    An aggregator type has no verbalization phrase — a coverage gap surfaced when a new
+    :class:`~krrood.entity_query_language.operators.aggregators.Aggregator` subtype is added
+    without a matching entry in :class:`~krrood.entity_query_language.verbalization.vocabulary.english.Aggregations`.
+    """
+
+    aggregator_type: "type[Aggregator]"
+    """The aggregator type that maps to no aggregation phrase."""
+
+    def error_message(self) -> str:
+        return (
+            f"No aggregation phrase for aggregator {self.aggregator_type.__name__!r}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Add the aggregator to `_AGGREGATOR_PHRASES` in "
+            "verbalization/vocabulary/english.py."
+        )

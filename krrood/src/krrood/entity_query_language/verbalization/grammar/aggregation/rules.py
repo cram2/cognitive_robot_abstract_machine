@@ -6,13 +6,11 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     NounPhrase,
 )
 from krrood.entity_query_language.verbalization.fragments.features import Definiteness
-from krrood.entity_query_language.verbalization.grammar.aggregation.kinds import (
-    AGGREGATION_KIND,
-)
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
     PhraseRule,
     RuleContext,
 )
+from krrood.entity_query_language.verbalization.vocabulary.english import Aggregations
 
 
 class AggregatorRule(PhraseRule):
@@ -35,7 +33,7 @@ class AggregatorRule(PhraseRule):
         # The aggregation word owns its complement realisation (the "of" and the child's number);
         # the rule only chooses the structure — a childless aggregate is the bare word, otherwise a
         # definite noun phrase around the lexicon-built complement.
-        kind = AGGREGATION_KIND[type(node)]
+        kind = Aggregations.for_aggregator(type(node))
         if not kind.has_child:
             return kind.as_fragment()  # childless aggregate, e.g. "count of all"
         child_fragment = context.child(node._child_, number=kind.child_number)

@@ -444,17 +444,14 @@ def _operator_fragment(
     return predicative_operator(word.text, number)
 
 
-#: Copula surfaces a clause is negatable through (the leaf the ``negated`` feature attaches to).
-_COPULA_SURFACES = frozenset({Copulas.IS.text, Copulas.ARE.text})
-
-
 def _is_negatable_head(fragment: Fragment) -> bool:
-    """:return: whether *fragment* is a clause's negatable head — a ``VERB`` lemma (do-support) or a
-    copula (*"is"* / *"are"*)."""
+    """:return: whether *fragment* is a clause's negatable head — a ``VERB`` lemma (do-support) or an
+    affirmative copula (*"is"* / *"are"*) the ``negated`` feature attaches to."""
     return isinstance(fragment, RoleFragment) and (
         fragment.role is SemanticRole.VERB
         or (
-            fragment.role is SemanticRole.OPERATOR and fragment.text in _COPULA_SURFACES
+            fragment.role is SemanticRole.OPERATOR
+            and fragment.text in (Copulas.IS.text, Copulas.ARE.text)
         )
     )
 

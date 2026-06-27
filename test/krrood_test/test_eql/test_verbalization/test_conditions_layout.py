@@ -31,7 +31,7 @@ def test_placement_owns_subject_slot_placement():
     )
     for name in (
         "ConditionForm",
-        "Slot",
+        "SurfacePosition",
         "Placement",
         "place",
         "as_subject_restrictions",

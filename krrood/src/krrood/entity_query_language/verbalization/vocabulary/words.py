@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum, StrEnum
-from typing_extensions import ClassVar
+from enum import Enum
+from typing_extensions import ClassVar, Optional
 
 from krrood.entity_query_language.verbalization.fragments.base import (
     RoleFragment,
@@ -91,19 +91,6 @@ class LogicalWord(RoleWord):
     _role_ = SemanticRole.LOGICAL
 
 
-class ChildForm(StrEnum):
-    """How an aggregation word verbalizes its child expression."""
-
-    PLURAL = "plural"
-    """The child is rendered in plural form, joined by *"of"*: *"sum of amounts of
-    BankTransactions"*. The bare aggregation noun (*"sum"*) is the phrase head, so a repeat mention
-    reduces cleanly to *"the sum"*."""
-    SINGULAR = "singular"
-    """The child is rendered singular, joined by *"of"*: *"maximum of the amount of …"*."""
-    NONE = "none"
-    """The aggregation word takes no child (e.g. ``"count of all"``); it renders bare."""
-
-
 @dataclass(frozen=True)
 class AggregationWord(RoleWord):
     """
@@ -111,8 +98,9 @@ class AggregationWord(RoleWord):
     """
 
     _role_ = SemanticRole.AGGREGATION
-    child_form: ChildForm = ChildForm.PLURAL
-    """Controls how the child expression is verbalized."""
+    child_form: Optional[GrammaticalNumber] = GrammaticalNumber.PLURAL
+    """The grammatical number the child expression is rendered in (*"sum of amounts"* → plural,
+    *"maximum of the amount"* → singular), or ``None`` for a childless aggregate (*"count of all"*)."""
 
 
 class OperatorWord(RoleWord):
@@ -184,17 +172,23 @@ class OperatorPhrase:
         >>> phrase.select(compact=True).text
         'greater than'
         """
-        by_flags = {
-            (False, False, False): self.standard,
-            (False, False, True): self.compact,
-            (False, True, False): self.negated,
-            (False, True, True): self.negated_compact,
-            (True, False, False): self.temporal,
-            (True, False, True): self.temporal_compact,
-            (True, True, False): self.temporal_negated,
-            (True, True, True): self.temporal_negated_compact,
-        }
-        text = by_flags[(temporal, negated, compact)]
+        match (temporal, negated, compact):
+            case (False, False, False):
+                text = self.standard
+            case (False, False, True):
+                text = self.compact
+            case (False, True, False):
+                text = self.negated
+            case (False, True, True):
+                text = self.negated_compact
+            case (True, False, False):
+                text = self.temporal
+            case (True, False, True):
+                text = self.temporal_compact
+            case (True, True, False):
+                text = self.temporal_negated
+            case _:
+                text = self.temporal_negated_compact
         return OperatorWord(text=text or self.standard)
 
 

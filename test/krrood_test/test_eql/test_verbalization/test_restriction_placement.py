@@ -1,6 +1,6 @@
 """
 Unit tests for the condition-form registry — the open-closed seam that maps a folded WHERE
-conjunct to its surface form and :class:`Slot`. The registry is *total*: a standalone fallback
+conjunct to its surface form and :class:`SurfacePosition`. The registry is *total*: a standalone fallback
 catches anything no specific form fits, so selection never returns ``None`` and there is no
 residual special case.
 """
@@ -13,7 +13,7 @@ from krrood.entity_query_language.factories import variable
 from krrood.entity_query_language.verbalization.grammar.conditions.placement import (
     ConditionForm,
     Placement,
-    Slot,
+    SurfacePosition,
     StandaloneForm,
     SuperlativeForm,
     WhosePredicateForm,
@@ -33,10 +33,10 @@ class _Thing:
 
 def test_each_form_declares_its_slot():
     """Every form fixes where its output lands — the assembler buckets by this slot."""
-    assert SuperlativeForm.slot is Slot.SELECTION_MODIFIER
-    assert WhoseRangeForm.slot is Slot.WHOSE
-    assert WhosePredicateForm.slot is Slot.WHOSE
-    assert StandaloneForm.slot is Slot.STANDALONE
+    assert SuperlativeForm.position is SurfacePosition.SELECTION_MODIFIER
+    assert WhoseRangeForm.position is SurfacePosition.WHOSE
+    assert WhosePredicateForm.position is SurfacePosition.WHOSE
+    assert StandaloneForm.position is SurfacePosition.STANDALONE
 
 
 def test_attribute_predicate_selects_the_whose_form():
@@ -46,7 +46,7 @@ def test_attribute_predicate_selects_the_whose_form():
         Placement(item=thing.battery > 50, subject=thing)
     )
     assert form is WhosePredicateForm
-    assert form.slot is Slot.WHOSE
+    assert form.position is SurfacePosition.WHOSE
 
 
 def test_range_fold_selects_the_whose_range_form():
@@ -55,7 +55,7 @@ def test_range_fold_selects_the_whose_range_form():
     (folded,) = fold_range_pairs([thing.salary > 100, thing.salary < 200])
     form = ConditionForm.most_applicable(Placement(item=folded, subject=thing))
     assert form is WhoseRangeForm
-    assert form.slot is Slot.WHOSE
+    assert form.position is SurfacePosition.WHOSE
 
 
 def test_non_foldable_conjunct_falls_back_to_standalone():
@@ -67,7 +67,7 @@ def test_non_foldable_conjunct_falls_back_to_standalone():
         Placement(item=thing.battery > thing.salary, subject=thing)
     )
     assert form is StandaloneForm
-    assert form.slot is Slot.STANDALONE
+    assert form.position is SurfacePosition.STANDALONE
 
 
 def test_selection_is_total():

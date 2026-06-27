@@ -7,9 +7,6 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     RoleFragment,
     Fragment,
 )
-from krrood.entity_query_language.verbalization.grammar.aggregation.kinds import (
-    AGGREGATION_KIND,
-)
 from krrood.entity_query_language.verbalization.grammar.framework.assembler import (
     Assembler,
 )
@@ -29,6 +26,7 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
 from typing_extensions import List
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.verbalization.vocabulary.english import (
+    Aggregations,
     Articles,
     Copulas,
     Prepositions,
@@ -172,7 +170,7 @@ class ConditionAssembler(Assembler[Comparator, None]):
             parts=[
                 Prepositions.WITH.as_fragment(),
                 Articles.THE.as_fragment(),
-                AGGREGATION_KIND[type(fold.aggregator)].as_fragment(),
+                Aggregations.for_aggregator(type(fold.aggregator)).as_fragment(),
                 RoleFragment.for_attribute(leaf._owner_class_, leaf._attribute_name_),
             ]
         )

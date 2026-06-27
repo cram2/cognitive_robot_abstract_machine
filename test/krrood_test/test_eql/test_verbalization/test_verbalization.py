@@ -2052,7 +2052,7 @@ def test_inference_planner_decomposes_rule_without_rendering(
     from krrood.entity_query_language.verbalization.grammar.conditions.placement import (
         ConditionForm,
         Placement,
-        Slot,
+        SurfacePosition,
     )
 
     conditions = [
@@ -2065,7 +2065,7 @@ def test_inference_planner_decomposes_rule_without_rendering(
     form = ConditionForm.most_applicable(
         Placement(item=antecedent.conditions[0], subject=antecedent.variable)
     )
-    assert form.slot is Slot.WHOSE
+    assert form.position is SurfacePosition.WHOSE
 
 
 def test_query_planner_collects_subject_restriction_without_placing():
@@ -2079,7 +2079,7 @@ def test_query_planner_collects_subject_restriction_without_placing():
     from krrood.entity_query_language.verbalization.grammar.conditions.placement import (
         ConditionForm,
         Placement,
-        Slot,
+        SurfacePosition,
         WhosePredicateForm,
     )
 
@@ -2102,7 +2102,7 @@ def test_query_planner_collects_subject_restriction_without_placing():
     # whose-predicate form (slot WHOSE: "whose battery is greater than 50").
     form = ConditionForm.most_applicable(Placement(item=conjunct, subject=plan.subject))
     assert form is WhosePredicateForm
-    assert form.slot is Slot.WHOSE
+    assert form.position is SurfacePosition.WHOSE
 
 
 def test_instantiated_planner_decomposes_bindings_without_rendering(
