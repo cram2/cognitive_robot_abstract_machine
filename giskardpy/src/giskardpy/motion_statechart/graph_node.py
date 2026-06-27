@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import logging
 import re
 import threading
 from abc import ABC
@@ -61,6 +62,8 @@ if TYPE_CHECKING:
         MotionStatechart,
     )
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(eq=False, repr=False)
 class TrinaryCondition(SubclassJSONSerializer):
@@ -77,7 +80,7 @@ class TrinaryCondition(SubclassJSONSerializer):
     """
     The type of transition associated with this condition.
     """
-    expression: Scalar = field(default=lambda: Scalar.const_trinary_unknown())
+    expression: Scalar = field(default_factory=Scalar.const_trinary_unknown)
     """
     The logical trinary condition to be evaluated.
     """
@@ -827,9 +830,19 @@ class MotionStatechartNode(SubclassJSONSerializer):
             raise NotInMotionStatechartError(self.name)
         self._reset_condition.update_expression(expression, self)
 
+    def _json_excluded_fields(self) -> set[str]:
+        """
+        Names of init fields that the generic serializer must not write, so subclasses can
+        serialize them in a custom way.
+        """
+        return set()
+
     def to_json(self) -> Dict[str, Any]:
         json_data = super().to_json()
+        excluded_fields = self._json_excluded_fields()
         for field_ in fields(self):
+            if field_.name in excluded_fields:
+                continue
             if not field_.name.startswith("_") and field_.init:
                 value = getattr(self, field_.name)
                 json_data[field_.name] = to_json(value)
@@ -990,6 +1003,13 @@ class ThreadPayloadMonitor(MotionStatechartNode, ABC):
         # Return the last known result (initialized to Unknown until first success)
         return self._last_result
 
+    def cleanup(self, context: MotionStatechartContext):
+        """
+        Stops the background worker thread.
+        """
+        self._stop_event.set()
+        self._thread.join(timeout=1.0)
+
     def _worker_loop(self):
         while not self._stop_event.is_set():
             # Wait until a request is made (wake periodically to check for stop)
@@ -1000,12 +1020,13 @@ class ThreadPayloadMonitor(MotionStatechartNode, ABC):
             self._request_event.clear()
             try:
                 result = self._compute_observation()
-                # Accept only valid trinary values (floats expected)
                 self._last_result = result
                 self._has_result = True
             except Exception:
-                # On failure, keep previous result and mark as having no new value
-                pass
+                # Keep the previous result, but surface the failure instead of hiding it.
+                logger.exception(
+                    "%s failed to compute its observation.", self.__class__.__name__
+                )
 
 
 @dataclass(eq=False, repr=False)
@@ -1076,10 +1097,10 @@ class CancelMotion(MotionStatechartNode):
     def on_tick(self, context: MotionStatechartContext) -> Optional[float]:
         raise self.exception
 
+    def _json_excluded_fields(self) -> set[str]:
+        return {"exception"}
+
     def to_json(self) -> Dict[str, Any]:
-        exception_field = next(f for f in fields(self) if f.name == "exception")
-        # set init to False to prevent superclass from calling to_json on it
-        exception_field.init = False
         json_data = super().to_json()
         # cast to general exception, because it can be json serialized
         json_data["exception"] = to_json(Exception(str(self.exception)))

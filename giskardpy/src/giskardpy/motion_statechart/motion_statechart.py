@@ -60,7 +60,7 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
         self.data = np.delete(self.data, node.index)
 
     def __iter__(self):
-        return iter(self.data)
+        return iter(self.motion_statechart.nodes)
 
     def __len__(self) -> int:
         return self.data.shape[0]
@@ -104,7 +104,9 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
         return str(self)
 
     def __eq__(self, other: Self) -> bool:
-        return str(self) == str(other)
+        if not isinstance(other, State):
+            return NotImplemented
+        return np.array_equal(self.data, other.data)
 
 
 @dataclass(repr=False, eq=False)
@@ -419,6 +421,7 @@ class MotionStatechart(SubclassJSONSerializer):
         return self.rx_graph.get_node_data(index)
 
     def _add_transitions(self):
+        self.rx_graph.clear_edges()
         for node in self.nodes:
             self._create_edge_for_condition(node, node._start_condition)
             self._create_edge_for_condition(node, node._pause_condition)
@@ -432,16 +435,22 @@ class MotionStatechart(SubclassJSONSerializer):
             self.rx_graph.add_edge(owner.index, parent_node.index, condition)
 
     def _build_nodes(self, context: MotionStatechartContext):
+        built_node_indices: set[int] = set()
         for node in self.nodes:
-            self._build_and_apply_artifacts(node, context=context)
+            self._build_and_apply_artifacts(node, context, built_node_indices)
 
     def _build_and_apply_artifacts(
-        self, node: MotionStatechartNode, context: MotionStatechartContext
+        self,
+        node: MotionStatechartNode,
+        context: MotionStatechartContext,
+        built_node_indices: set[int],
     ):
+        if node.index in built_node_indices:
+            return
         if isinstance(node, Goal):
             for child_node in node.nodes:
-                self._build_and_apply_artifacts(child_node, context=context)
-            node.build(context=context)
+                self._build_and_apply_artifacts(child_node, context, built_node_indices)
+        built_node_indices.add(node.index)
         artifacts = node.build(context=context)
         node._constraint_collection = artifacts.constraints
         node._constraint_collection.link_to_motion_statechart_node(node)

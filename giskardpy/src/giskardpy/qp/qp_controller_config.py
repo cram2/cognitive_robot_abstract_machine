@@ -87,12 +87,6 @@ class QPControllerConfig:
     ..warning:: Only change if you really know what you are doing.
     """
 
-    retries_with_relaxed_constraints: int = field(default=5)
-    """
-    If the QP insolvable, the constraints will be relaxed with high weight slack variables 
-    up to 'retries_with_relaxed_constraints' many times.
-    """
-
     verbose: bool = field(default=True)
     """
     If True, prints config.
