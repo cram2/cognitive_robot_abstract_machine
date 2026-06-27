@@ -174,6 +174,7 @@ class Keywords(VocabEnum):
     WHERE = KeyWord("where")
     WHOSE = KeyWord("whose")
     WHICH = KeyWord("which")
+    THAT = KeyWord("that")
     GROUPED_BY = KeyWord("grouped by")
     GROUPED = KeyWord("grouped")
     HAVING = KeyWord("having")

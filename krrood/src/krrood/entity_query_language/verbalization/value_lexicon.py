@@ -5,7 +5,33 @@ import enum
 
 from typing_extensions import Any
 
-__all__ = ["value_phrase"]
+__all__ = ["value_phrase", "type_noun"]
+
+
+#: Human-readable nouns for the primitive types, whose bare ``__name__`` reads as programmer jargon
+#: (*"int"*, *"str"*). Every other type keeps its ``__name__``.
+_PRIMITIVE_TYPE_NOUNS = {
+    int: "Integer",
+    str: "Text",
+    float: "floating-point number",
+    bool: "Boolean",
+}
+
+
+def type_noun(type_: type) -> str:
+    """
+    Render a type as the noun it reads as in prose — the single type-name-as-noun point.
+
+    :param type_: The class to name.
+    :return: A friendly noun for a primitive (``int`` → *"Integer"*, ``float`` →
+        *"floating-point number"*), else the class ``__name__``.
+
+    >>> type_noun(int)
+    'Integer'
+    >>> type_noun(float)
+    'floating-point number'
+    """
+    return _PRIMITIVE_TYPE_NOUNS.get(type_, type_.__name__)
 
 
 def value_phrase(value: Any) -> str:
@@ -26,9 +52,9 @@ def value_phrase(value: Any) -> str:
     >>> value_phrase(None)
     'nothing'
     >>> value_phrase(int)
-    'int'
+    'Integer'
     >>> value_phrase((int, str))
-    'int or str'
+    'Integer or Text'
     >>> value_phrase(datetime.datetime(2026, 5, 23))
     'May 23, 2026'
     >>> value_phrase(42)
@@ -37,11 +63,11 @@ def value_phrase(value: Any) -> str:
     if value is None:
         return "nothing"
     if isinstance(value, type):
-        return value.__name__
+        return type_noun(value)
     if isinstance(value, tuple) and all(
         isinstance(variable, type) for variable in value
     ):
-        return " or ".join(variable.__name__ for variable in value)
+        return " or ".join(type_noun(variable) for variable in value)
     if isinstance(value, enum.Enum):
         return value.name
     if isinstance(value, datetime.datetime):

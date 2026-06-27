@@ -3,13 +3,13 @@ from __future__ import annotations
 import ast
 import inspect
 import textwrap
-from functools import lru_cache
 
 from typing_extensions import Dict, Optional
 
 from krrood.entity_query_language.verbalization.fragments.source_reference import (
     SourceReference,
 )
+from krrood.patterns.caching import weak_key_cache
 
 
 def first_docstring_line(documented_object: object) -> Optional[str]:
@@ -48,7 +48,7 @@ def _string_expression_first_line(node: ast.AST) -> Optional[str]:
     return None
 
 
-@lru_cache(maxsize=None)
+@weak_key_cache
 def _attribute_docstrings(cls: type) -> Dict[str, str]:
     """
     :param cls: The class whose own body to scan.

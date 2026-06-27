@@ -8,6 +8,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     Clause,
     map_structural_children,
     NounPhrase,
+    OwnedAttributes,
     PhraseFragment,
     PossessiveChain,
     Fragment,
@@ -22,6 +23,7 @@ from krrood.entity_query_language.verbalization.fragments.roles import SemanticR
 from krrood.entity_query_language.verbalization.microplanning.possessive import (
     attribute_fragment,
     chain_head_number,
+    coordinated_genitive,
     possessive_path,
     pronominal_path,
 )
@@ -166,6 +168,8 @@ class CoreferenceProcessor(RealizationPass):
                 return self._noun_phrase(fragment)
             case PossessiveChain():
                 return self._possessive_chain(fragment)
+            case OwnedAttributes():
+                return self._owned_attributes(fragment)
             case Clause():
                 return self._subject_clause(fragment)
             case PhraseFragment(parts=[PossessiveChain(), *_]):
@@ -297,6 +301,40 @@ class CoreferenceProcessor(RealizationPass):
                 parts=[replace(part.parts[0], number=number), *part.parts[1:]],
             )
         return part
+
+    def _owned_attributes(self, owned: OwnedAttributes) -> Fragment:
+        """:return: the owner's attributes as the possessive *"its/their <attrs>"* when the owner is
+        the current subject, else the genitive *"the <attrs> of <owner>"* — the same pronominalise vs.
+        spell-out choice :meth:`_possessive_chain` makes for a navigation chain, but for a coordinated
+        attribute list whose owner has no further hops (e.g. a *"predict"* point on the selection).
+
+        >>> verbalize_expression(underspecified(Robot)(name="R2", battery=...))
+        "Generate a Robot and predict its battery value given that its name is 'R2'"
+        """
+        if self._owner_is_subject(owned):
+            possessive = Pronouns.possessive(
+                self._subject_stack[-1].number
+            ).as_fragment()
+            return PhraseFragment(parts=[possessive, self._walk(owned.attributes)])
+        return coordinated_genitive(
+            [self._walk(owned.attributes)], self._walk(owned.owner_fragment)
+        )
+
+    def _owner_is_subject(self, owned: OwnedAttributes) -> bool:
+        """:return: whether *owned*'s owner is the current, already-introduced, non-numbered subject —
+        the gate selecting the possessive *"its <attrs>"* over the genitive (the
+        :class:`OwnedAttributes` analogue of :meth:`_pronominalises`)."""
+        if owned.owner_referent_id is None or owned.owner_referent_id not in self._seen:
+            return False
+        if (
+            not self._subject_stack
+            or self._subject_stack[-1].subject_id != owned.owner_referent_id
+        ):
+            return False
+        return not (
+            isinstance(owned.owner_fragment, NounPhrase)
+            and owned.owner_fragment.definiteness is Definiteness.BARE
+        )
 
     def _possessive_chain(self, possessive_chain: PossessiveChain) -> Fragment:
         """:return: The chain as *"its/their …"* when its root is the current subject (the

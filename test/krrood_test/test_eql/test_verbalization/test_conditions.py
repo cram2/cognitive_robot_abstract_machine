@@ -251,7 +251,7 @@ def test_primitive_domain_variable_lists_in_value_position():
     text = verbalize_expression(r.battery == variable(int, [1, 2, 3]))
     assert "one of 1, 2, or 3" in text
     # The same variable as a bare subject keeps its type-name noun.
-    assert verbalize_expression(variable(int, [1, 2])) == "an int"
+    assert verbalize_expression(variable(int, [1, 2])) == "an Integer"
 
 
 def test_entity_domain_variable_not_listed():
@@ -481,9 +481,7 @@ def test_coindexed_lone_equality_folds_inside_each_or_arm():
     arm of an OR folds independently to its own natural 'have the same' clause."""
     p = variable(_Period, domain=None)
     query = an(
-        entity(p).where(
-            or_(p.begin.month == p.end.month, p.begin.year == p.end.year)
-        )
+        entity(p).where(or_(p.begin.month == p.end.month, p.begin.year == p.end.year))
     )
     text = verbalize_expression(query)
     assert "the begin and end of the _Period have the same month" in text
@@ -495,7 +493,8 @@ def test_coindexed_lone_equality_folds_inside_each_or_arm():
 
 def test_coindexed_negated_lone_equality_keeps_the_faithful_form():
     """An outer negation disables the fold — 'NOT (begin.month == end.month)' must read as the
-    faithful negated comparison, never a negated 'have the same' (which would be ambiguous)."""
+    faithful negated comparison, never a negated 'have the same' (which would be ambiguous).
+    """
     p = variable(_Period, domain=None)
     query = an(entity(p).where(not_(p.begin.month == p.end.month)))
     text = verbalize_expression(query)

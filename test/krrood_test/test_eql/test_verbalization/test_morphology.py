@@ -40,6 +40,17 @@ def test_ordinal_is_zero_based_words():
     assert morphology.ordinal(2) == "third"
 
 
+def test_index_ordinal_counts_from_start_for_non_negative():
+    assert morphology.index_ordinal(0) == "first"
+    assert morphology.index_ordinal(2) == "third"
+
+
+def test_index_ordinal_counts_from_end_for_negative():
+    assert morphology.index_ordinal(-1) == "last"
+    assert morphology.index_ordinal(-2) == "second to last"
+    assert morphology.index_ordinal(-3) == "third to last"
+
+
 def test_cardinal_is_number_words():
     assert morphology.cardinal(2) == "two"
     assert morphology.cardinal(3) == "three"

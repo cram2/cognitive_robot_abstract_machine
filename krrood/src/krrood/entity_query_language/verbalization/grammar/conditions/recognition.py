@@ -27,7 +27,10 @@ from krrood.entity_query_language.query.aggregation_structure import (
 from krrood.entity_query_language.verbalization.microplanning.coordination import (
     chain_key,
     COINDEXED_OPERATORS,
+    fold_range_pairs,
     SharedSubjectComparisons,
+    SharedSubjectConjunction,
+    VALUE_COMPARISON_OPERATORS,
 )
 
 
@@ -215,6 +218,49 @@ def fold_shared_subject_comparisons(
             return None
     return SharedSubjectComparisons(
         subject_expression=operands[0].left, comparators=list(operands)
+    )
+
+
+def fold_shared_subject_conjunction(
+    operands: List[SymbolicExpression],
+) -> Optional[SharedSubjectConjunction]:
+    """
+    :param operands: The flattened operands of an ``AND``.
+    :return: a :class:`SharedSubjectConjunction` when *every* operand is a plain value comparison on
+        one shared *bare variable* (at least two of them), else ``None`` so the caller renders the
+        operands as separate clauses.
+
+    Bare-variable only — the relative pronoun of the *"<subject> that is …"* surface attaches
+    unambiguously to the subject noun. Unlike the disjunctive fold this admits ``!=`` (the
+    relative-clause tail keeps its polarity, *"is not 5"*), and it range-folds a complementary bound
+    pair so the clause reads *"between 1 and 10 and is not 5"*.
+
+    >>> x = variable(int, [])
+    >>> fold_shared_subject_conjunction([x > 1, x < 10, x != 5]) is not None
+    True
+    >>> robot = variable(Robot, [])
+    >>> fold_shared_subject_conjunction([robot.battery > 1, robot.battery < 10]) is None
+    True
+    """
+    if len(operands) < 2:
+        return None
+    subject = None
+    for operand in operands:
+        if not isinstance(operand, Comparator):
+            return None
+        if operand.operation not in VALUE_COMPARISON_OPERATORS:
+            return None
+        left = operand.left
+        if not isinstance(left, Variable) or isinstance(left, Literal):
+            return None
+        if subject is None:
+            subject = left
+        elif left._id_ != subject._id_:
+            return None
+        if is_none_literal(operand.right) or references(operand.right, left):
+            return None
+    return SharedSubjectConjunction(
+        subject_expression=operands[0].left, tails=fold_range_pairs(list(operands))
     )
 
 

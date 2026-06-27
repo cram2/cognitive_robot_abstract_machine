@@ -33,7 +33,7 @@ from typing_extensions import (
 )
 
 from krrood.entity_query_language.core.mapped_variable import Attribute, MappedVariable
-from krrood.entity_query_language.core.variable import Variable
+from krrood.entity_query_language.core.variable import Literal, Variable
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.core.expression_structure import walk_chain
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -60,6 +60,18 @@ ChainKey = Tuple
 #: the faithful *"… are <op> those of …"* form. ``ne``/``contains``/temporal never fold.
 COINDEXED_OPERATORS: Tuple[Callable, ...] = (
     operator.eq,
+    operator.gt,
+    operator.lt,
+    operator.ge,
+    operator.le,
+)
+
+#: Comparisons of a subject against a *value* (as opposed to another co-indexed chain): the order /
+#: equality operators plus ``ne``. The shared-subject conjunction fold coordinates these under one
+#: relative clause; named for what they are so it does not borrow the co-indexed fold's set.
+VALUE_COMPARISON_OPERATORS: Tuple[Callable, ...] = (
+    operator.eq,
+    operator.ne,
     operator.gt,
     operator.lt,
     operator.ge,
@@ -128,6 +140,26 @@ class SharedSubjectComparisons:
     comparators: List[Comparator]
     """The comparators in source order; each contributes its operator-and-value tail (*"greater than
     50"*), coordinated under the shared subject."""
+
+
+@dataclass
+class SharedSubjectConjunction:
+    """The conjunctive analogue of :class:`SharedSubjectComparisons`: two or more value comparisons
+    on the *same bare variable*, said once as a restrictive relative clause — *"an Integer that is
+    between 1 and 10 and is not 5"* — rather than repeating the subject per conjunct.
+
+    Scoped to a *bare variable* subject (not an attribute chain), so the relative pronoun attaches
+    unambiguously to the subject noun; an attribute-chain conjunction (*"the battery of a Robot"*)
+    keeps its per-clause surface, where a *"that"* clause would dangle.
+    """
+
+    subject_expression: SymbolicExpression
+    """The shared bare variable, rendered once via the normal recursion (*"an Integer"*)."""
+
+    tails: List[Union[Comparator, RangeFold]]
+    """The predicate tails in source order — a value :class:`Comparator` (its operator-and-value
+    tail, *"is not 5"*) or a folded :class:`RangeFold` (a *"between low and high"* tail), so a
+    complementary bound pair reads *"between 1 and 10"* within the clause."""
 
 
 @dataclass(frozen=True)
@@ -274,6 +306,25 @@ def chain_key(expression: SymbolicExpression) -> Optional[ChainKey]:
     return (root._id_, tuple(parts))
 
 
+def subject_key(expression: SymbolicExpression) -> Optional[ChainKey]:
+    """:return: The hashable identity of a comparison's subject — :func:`chain_key` for a pure
+    attribute chain, or ``(variable_id, ())`` for a bare variable — so a fold can group bounds on a
+    bare variable (*"an Integer"*) as readily as on a chain. ``None`` for anything else.
+
+    >>> x = variable(int, [])
+    >>> subject_key(x) == subject_key(x)
+    True
+    >>> subject_key(variable(Robot, []).battery) is not None
+    True
+    """
+    key = chain_key(expression)
+    if key is not None:
+        return key
+    if isinstance(expression, Variable) and not isinstance(expression, Literal):
+        return (expression._id_, ())
+    return None
+
+
 def _classify(conjunct: SymbolicExpression) -> Optional[Tuple[ChainKey, _Bound]]:
     """
     :param conjunct: A candidate conjunct.
@@ -287,7 +338,7 @@ def _classify(conjunct: SymbolicExpression) -> Optional[Tuple[ChainKey, _Bound]]
     """
     if not isinstance(conjunct, Comparator):
         return None
-    key = chain_key(conjunct.left)
+    key = subject_key(conjunct.left)
     if key is None:
         return None
     if conjunct.operation in (operator.gt, operator.ge):
@@ -673,11 +724,49 @@ def build_between(
     >>> flatten_fragment_to_plain_text(build_between(WordFragment("x"), WordFragment("1"), WordFragment("10"), compact=False))
     'x is between 1 and 10'
     """
-    op = _between_operator(compact, number)
-    bounds = oxford_comma(
-        [lower_fragment, upper_fragment], Conjunctions.AND.as_fragment()
+    # Spread the range phrase's parts so the clause stays flat ([left, operator, bounds]); the
+    # coreference agreement pass re-tags the operator leaf in place for a plural subject ("are
+    # between"), which a nested phrase would hide.
+    return PhraseFragment(
+        parts=[
+            left_fragment,
+            *between_phrase(
+                lower_fragment, upper_fragment, compact=compact, number=number
+            ).parts,
+        ]
     )
-    return PhraseFragment(parts=[left_fragment, op, bounds])
+
+
+def between_phrase(
+    lower_fragment: Fragment,
+    upper_fragment: Fragment,
+    *,
+    compact: bool,
+    number: Number = Number.SINGULAR,
+) -> Fragment:
+    """
+    Build the subject-less range predicate *"is between <low> and <high>"* (or the copula-less
+    *"between <low> and <high>"* when *compact*) — the part of a *between* clause after the subject,
+    shared by :func:`build_between` and the shared-subject conjunction's range tail.
+
+    :param lower_fragment: Rendered lower-bound value.
+    :param upper_fragment: Rendered upper-bound value.
+    :param compact: Drop the copula (a coordinated / post-nominal tail).
+    :param number: The number the copula agrees with — *"are between"* for a plural subject.
+    :return: The range-predicate fragment.
+
+    >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
+    >>> flatten_fragment_to_plain_text(between_phrase(WordFragment("1"), WordFragment("10"), compact=False))
+    'is between 1 and 10'
+    """
+    return PhraseFragment(
+        parts=[
+            _between_operator(compact, number),
+            oxford_comma(
+                [lower_fragment, upper_fragment], Conjunctions.AND.as_fragment()
+            ),
+        ]
+    )
 
 
 def _between_operator(compact: bool, number: Number) -> Fragment:

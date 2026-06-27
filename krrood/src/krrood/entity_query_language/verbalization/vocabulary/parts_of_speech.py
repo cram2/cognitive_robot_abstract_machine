@@ -159,7 +159,7 @@ class OneOf(ClauseElement):
         ...     flatten_fragment_to_plain_text,
         ... )
         >>> flatten_fragment_to_plain_text(OneOf((int, str)).as_fragment())
-        'one of int or str'
+        'one of Integer or Text'
         """
         members = list(
             self.members.value if isinstance(self.members, Field) else self.members

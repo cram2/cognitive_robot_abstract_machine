@@ -132,6 +132,28 @@ def ordinal(index: int) -> str:
     return _engine.ordinal(_engine.number_to_words(index + 1))
 
 
+def index_ordinal(index: int) -> str:
+    """
+    :param index: A sequence index — a non-negative index counts from the start, a negative one
+        from the end (Python slicing semantics).
+    :return: The ordinal phrase naming the position: a non-negative index reads from the start
+        (``0`` → ``"first"``), ``-1`` reads ``"last"``, and a more-negative index reads
+        *"<ordinal> to last"* (``-2`` → ``"second to last"``).
+
+    >>> index_ordinal(0)
+    'first'
+    >>> index_ordinal(-1)
+    'last'
+    >>> index_ordinal(-2)
+    'second to last'
+    """
+    if index >= 0:
+        return ordinal(index)
+    if index == -1:
+        return "last"
+    return f"{ordinal(abs(index) - 1)} to last"
+
+
 def cardinal(n: int) -> str:
     """
     :param n: A positive integer.

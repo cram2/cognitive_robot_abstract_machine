@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import operator
+
 from krrood.entity_query_language.core.base_expressions import Filter
 from krrood.entity_query_language.core.variable import InstantiatedVariable
 from krrood.entity_query_language.operators.comparator import Comparator
@@ -40,6 +42,7 @@ from krrood.entity_query_language.verbalization.grammar.instantiated.planner imp
 )
 from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
     fold_shared_subject_comparisons,
+    fold_shared_subject_conjunction,
     is_boolean_attribute_chain,
 )
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
@@ -47,11 +50,13 @@ from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule im
     RuleContext,
 )
 from krrood.entity_query_language.verbalization.microplanning.coordination import (
+    between_phrase,
     build_between,
     coindexed_natural_parts,
     CoindexedFold,
     RangeFold,
     SharedSubjectComparisons,
+    SharedSubjectConjunction,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
@@ -98,6 +103,9 @@ class AndRule(PhraseRule):
     "the battery of a Robot is greater than 50, and the name of the Robot is 'x'"
     >>> verbalize_expression(and_(robot.battery > 10, robot.battery < 90))
     'the battery of a Robot is between 10 and 90'
+    >>> x = variable(int, [])
+    >>> verbalize_expression(and_(x > 1, x < 10, x != 5))
+    'an Integer that is between 1 and 10 and is not 5'
     """
 
     construct = AND
@@ -107,13 +115,19 @@ class AndRule(PhraseRule):
         """Say the flattened conjuncts, comma-joined with a trailing *"and"*.
 
         It owns the *, and* coordination between the two conjuncts of the example; the conjunct
-        clauses themselves come from the shared statement assembler.
+        clauses themselves come from the shared statement assembler. When every conjunct is a value
+        comparison on one bare variable, it factors to the *"<subject> that is …"* relative clause via
+        the :class:`SharedSubjectConjunction` fold.
 
         >>> robot = variable(Robot, [])
         >>> verbalize_expression(and_(robot.battery > 50, robot.name == 'x'))
         "the battery of a Robot is greater than 50, and the name of the Robot is 'x'"
         """
-        parts = ConditionAssembler(context).as_statements(flatten_operands(node, AND))
+        operands = flatten_operands(node, AND)
+        shared_subject = fold_shared_subject_conjunction(operands)
+        if shared_subject is not None:
+            return context.child(shared_subject)
+        parts = ConditionAssembler(context).as_statements(operands)
         if len(parts) == 1:
             return parts[0]
         # Conjuncts are independent clauses, so a two-clause coordination keeps its comma.
@@ -280,6 +294,73 @@ class SharedSubjectComparisonsRule(PhraseRule):
         if not flatten_fragment_to_plain_text(operator).strip():
             return value
         return PhraseFragment(parts=[operator, value])
+
+
+class SharedSubjectConjunctionRule(PhraseRule):
+    """Factored conjunction *"<subject> that is <tail>, …, and <tail>"* — the
+    :class:`SharedSubjectConjunction` artifact produced when every conjunct of an ``AND`` is a value
+    comparison on one shared *bare variable*.
+
+    The subject and the leading copula are said once and the predicate tails coordinate under a
+    restrictive relative clause; the conjunctive analogue of :class:`SharedSubjectComparisonsRule`.
+
+    >>> x = variable(int, [])
+    >>> verbalize_expression(and_(x > 1, x < 10, x != 5))
+    'an Integer that is between 1 and 10 and is not 5'
+    """
+
+    construct = SharedSubjectConjunction
+    name = "shared-subject-conjunction"
+
+    def build(self, node: SharedSubjectConjunction, context: RuleContext) -> Fragment:
+        """Say the factored conjunction — subject once, the lead copula carried by the relative
+        clause, the tails coordinated Oxford-style.
+
+        >>> x = variable(int, [])
+        >>> verbalize_expression(and_(x > 5, x != 5))
+        'an Integer that is greater than 5 and is not 5'
+        """
+        tails = [
+            self._tail(tail, context, lead=index == 0)
+            for index, tail in enumerate(node.tails)
+        ]
+        return PhraseFragment(
+            parts=[
+                context.child(node.subject_expression),
+                Keywords.THAT.as_fragment(),
+                oxford_comma(tails, Conjunctions.AND.as_fragment()),
+            ]
+        )
+
+    @classmethod
+    def _tail(cls, tail, context: RuleContext, *, lead: bool) -> Fragment:
+        """:return: one relative-clause tail. A folded :class:`RangeFold` reads *"between low and
+        high"* (with the lead copula when it leads); a :class:`Comparator` reads its
+        operator-and-value tail. The lead tail carries the clause's copula (*"that is greater than
+        1"*); a negation re-introduces it (*"is not 5"*); a bare equality has an empty core, so it too
+        keeps the copula (*"is 5"*); every other positive tail shares the lead copula and drops it
+        (*"less than 10"*)."""
+        if isinstance(tail, RangeFold):
+            return between_phrase(
+                context.child(tail.lower_expression),
+                context.child(tail.upper_expression),
+                compact=not lead,
+            )
+        value = context.child(tail.right, as_value=True)
+        core = comparator_operator(
+            tail, context.services, compact=False, copula=False
+        )
+        keeps_copula = (
+            lead
+            or tail.operation is operator.ne
+            or not flatten_fragment_to_plain_text(core).strip()
+        )
+        if keeps_copula:
+            copular = comparator_operator(
+                tail, context.services, compact=False, copula=True
+            )
+            return PhraseFragment(parts=[copular, value])
+        return PhraseFragment(parts=[core, value])
 
 
 class OrRule(PhraseRule):

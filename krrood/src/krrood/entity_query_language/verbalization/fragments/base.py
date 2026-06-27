@@ -27,7 +27,10 @@ from krrood.entity_query_language.verbalization.fragments.source_reference impor
 )
 from krrood.entity_query_language.verbalization.navigation_path import PathStep
 from krrood.entity_query_language.verbalization.exceptions import UnloweredFragmentError
-from krrood.entity_query_language.verbalization.value_lexicon import value_phrase
+from krrood.entity_query_language.verbalization.value_lexicon import (
+    type_noun,
+    value_phrase,
+)
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.microplanning.coordination import (
@@ -203,7 +206,7 @@ class RoleFragment(HasText, HasNumber, HasPolarity, Fragment):
             text=(
                 text
                 if text is not None
-                else (type_.__name__ if is_class else str(type_))
+                else (type_noun(type_) if is_class else str(type_))
             ),
             role=SemanticRole.VARIABLE,
             source_reference=SourceReference.for_type(type_) if is_class else None,
@@ -325,6 +328,25 @@ class PossessiveChain(Fragment):
     """The chain's own terminal node id. When the chain is a query's selected / measured quantity,
     a later mention of that same quantity (a WHERE on the very attribute being aggregated) reduces
     to a bare *"the <attribute>"* instead of repeating the whole possessive."""
+
+
+@dataclass
+class OwnedAttributes(Fragment):
+    """One or more attributes bound to an owner, whose possessive-vs-genitive surface coreference
+    decides — *"its x, y, and z"* when the owner is the current discourse subject, else the genitive
+    *"the x, y, and z of <owner>"*. Lets a caller name an owner's attributes without itself choosing
+    the pronoun (which is the coreference pass's concern)."""
+
+    attributes: Fragment
+    """The possessed attribute(s), pre-joined (*"x, y, and z"*)."""
+
+    owner_fragment: Fragment
+    """The referring phrase for the owner, rendered by the normal recursion; used in the genitive
+    (non-subject) branch (*"… of the position"* / *"… of its position"*)."""
+
+    owner_referent_id: Optional[uuid.UUID] = None
+    """The owner's referent id — the surface pronominalises only when this is the current subject
+    (and the owner is not a numbered label)."""
 
 
 @dataclass

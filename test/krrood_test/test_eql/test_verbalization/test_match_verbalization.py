@@ -77,14 +77,15 @@ def test_grouped_attributes_say_respectively():
     """Several equalities on one object aggregate into one *"… respectively"* point."""
     text = verbalize_expression(underspecified(Position)(x=1, y=2, z=3))
     assert text == (
-        "Generate a Position given that x, y, and z of the Position are 1, 2, and 3 respectively"
+        "Generate a Position given that the x, y, and z of the Position are 1, 2, and 3 respectively"
     )
 
 
-def test_single_attribute_uses_is_not_respectively():
-    """A single equality uses *"is"* and never *"respectively"*."""
+def test_single_attribute_pronominalises_and_uses_is_not_respectively():
+    """A single equality is said through the shared comparator path, so it pronominalises to *"its
+    x is …"* and never uses *"respectively"*."""
     text = verbalize_expression(underspecified(Position)(x=5))
-    assert text == "Generate a Position given that x of the Position is 5"
+    assert text == "Generate a Position given that its x is 5"
     assert "respectively" not in text
 
 
@@ -94,7 +95,24 @@ def test_given_that_is_its_own_block_with_one_point_per_group():
     assert text == (
         "Generate a Position\n"
         "  given that\n"
-        "    - x, y, and z of the Position are 1, 2, and 3 respectively"
+        "    - the x, y, and z of the Position are 1, 2, and 3 respectively"
+    )
+
+
+def test_over_cap_singles_pronominalise_and_coordinate_with_and():
+    """Beyond the grouping cap the singles are said through the shared comparator path — each
+    pronominalised (*"its x is …"*) and Oxford-coordinated with a closing *"and"*."""
+
+    @dataclass
+    class _Quad:
+        x: int
+        w: int
+        y: int
+        t: int
+
+    text = verbalize_expression(underspecified(_Quad)(x=1, w=45, y=2, t=4))
+    assert text == (
+        "Generate a _Quad given that its x is 1, its w is 45, its y is 2, and its t is 4"
     )
 
 
@@ -116,9 +134,7 @@ def test_single_ellipsis_predicts_singular_value():
 def test_mixed_concrete_and_ellipsis():
     """Concrete kwargs go to *"given that"*; ``Ellipsis`` kwargs are predicted in the header."""
     text = verbalize_expression(underspecified(Position)(x=1, y=...))
-    assert text == (
-        "Generate a Position and predict its y value given that x of the Position is 1"
-    )
+    assert text == ("Generate a Position and predict its y value given that its x is 1")
 
 
 # ── where: free conditions as points ─────────────────────────────────────────
@@ -134,7 +150,7 @@ def test_where_conditions_are_their_own_block():
     assert text == (
         "Generate a Position\n"
         "  given that\n"
-        "    - x of the Position is 1\n"
+        "    - its x is 1\n"
         "  where\n"
         "    - its y is greater than 2"
     )
@@ -179,8 +195,8 @@ def test_nested_predict_groups_per_sub_object():
     assert text == (
         "Generate a Pose\n"
         "  and predict\n"
-        "    - x, y, and z of its position\n"
-        "    - x, y, and z of its orientation"
+        "    - the x, y, and z of its position\n"
+        "    - the x, y, and z of its orientation"
     )
     assert "Ellipsis" not in text
 
@@ -194,7 +210,7 @@ def test_nested_predict_with_where_range_on_sub_object():
     assert text == (
         "Generate a Pose\n"
         "  and predict\n"
-        "    - x, y, and z of its position\n"
+        "    - the x, y, and z of its position\n"
         "  where\n"
         "    - the x of its position is between 0.0 and 5.0"
     )
@@ -314,15 +330,15 @@ class _Quint:
 def test_atomic_scalars_group_under_respectively():
     """Up to three atomic scalar values coordinate under one *"… respectively"* point."""
     text = verbalize_expression(underspecified(_Trio)(a=1.0, b=2.0, c=3.0))
-    assert "a, b, and c of the _Trio are 1.0, 2.0, and 3.0 respectively" in text
+    assert "the a, b, and c of the _Trio are 1.0, 2.0, and 3.0 respectively" in text
 
 
 def test_over_cap_scalars_are_said_separately():
     """Beyond the cap, each assignment is its own point — no unreadable many-way zip."""
     text = verbalize_expression(underspecified(_Quint)(a=1, b=2, c=3, d=4, e=5))
     assert "respectively" not in text
-    assert "a of the _Quint is 1" in text
-    assert "e of the _Quint is 5" in text
+    assert "its a is 1" in text
+    assert "its e is 5" in text
 
 
 def test_compound_value_pulled_out_of_respectively_group():
@@ -330,5 +346,5 @@ def test_compound_value_pulled_out_of_respectively_group():
     text = verbalize_expression(
         underspecified(_Trio)(a=1.0, b=2.0, c=variable(float, [7.0, 8.0]))
     )
-    assert "a and b of the _Trio are 1.0 and 2.0 respectively" in text
-    assert "c of the _Trio is one of 7.0 or 8.0" in text
+    assert "the a and b of the _Trio are 1.0 and 2.0 respectively" in text
+    assert "its c is one of 7.0 or 8.0" in text

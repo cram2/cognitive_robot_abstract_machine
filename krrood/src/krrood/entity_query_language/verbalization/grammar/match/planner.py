@@ -31,6 +31,11 @@ class AttributeAssignment:
     """``True`` when the value is ``...`` (Ellipsis) — the attribute is to be generated, verbalised
     as *"predict …"* rather than an equality."""
 
+    comparator: Comparator
+    """The source ``attribute == value`` equality, so an ungrouped concrete assignment can be said
+    through the shared comparator-predicate path (and pronominalised by coreference) rather than a
+    hand-built genitive."""
+
 
 @dataclass(frozen=True)
 class AttributeGroup:
@@ -161,5 +166,8 @@ class MatchPlanner(Planner[Match, MatchPlan]):
         value = condition.right
         is_predicted = isinstance(value, Literal) and value._value_ is Ellipsis
         return owner, AttributeAssignment(
-            attribute=chain[-1], value=value, is_predicted=is_predicted
+            attribute=chain[-1],
+            value=value,
+            is_predicted=is_predicted,
+            comparator=condition,
         )
