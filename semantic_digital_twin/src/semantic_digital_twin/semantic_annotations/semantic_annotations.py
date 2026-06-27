@@ -477,7 +477,7 @@ class Dresser(Cabinet, HasDrawers, HasDoors): ...
 
 
 @dataclass(eq=False)
-class Cupboard(Cabinet, HasDoors): ...
+class Cupboard(Cabinet, HasDoors, HasDrawers): ...
 
 
 @dataclass(eq=False)
@@ -1185,3 +1185,16 @@ class DoorWithType(Door):
     """
 
     type_description: Optional[str] = field(kw_only=True, default=None)
+
+@dataclass(eq=False)
+class Leg(HasRootBody):
+    """
+    A leg that supports a piece of furniture.
+    """
+
+
+@dataclass(eq=False)
+class Cooktop(HasRootBody):
+    """
+    A cooktop surface for cooking.
+    """
