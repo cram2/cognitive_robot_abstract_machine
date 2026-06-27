@@ -17,6 +17,7 @@ from typing_extensions import (
     Set,
     Type,
     Union,
+    cast,
 )
 
 from krrood.class_diagrams.class_diagram import WrappedClass
@@ -75,6 +76,7 @@ from semantic_digital_twin.api.specifications import (
     BodySpecification,
     ConnectionSpecification,
     FixedConnectionSpecification,
+    RegionSpecification,
     SemanticAnnotationWithRootSpecification,
     KinematicStructureEntitySpecification,
 )
@@ -155,7 +157,7 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         connection_limits: Optional[DegreeOfFreedomLimits] = None,
         annotation_kwargs: Optional[dict] = None,
         **geometry_kwargs,
-    ) -> SemanticAnnotationWithRootSpecification:
+    ) -> SemanticAnnotationWithRootSpecification[Self]:
         """
         Build the default annotation specification for this semantic annotation type: a
         :class:`SemanticAnnotationWithRootSpecification` whose ``root_specification`` is this
@@ -262,30 +264,20 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
         :param scale: The scale used to generate the geometry of the body.
         :return: The created semantic annotation instance.
         """
-        body = Body(name=name)
-
-        if scale is not None:
-            collision_shapes = BoundingBoxCollection.from_event(
-                body, scale.to_simple_event().as_composite_set()
-            ).as_shapes()
-            body.collision = collision_shapes
-            body.visual = collision_shapes
-
-        instance = cls(name=name, root=body)
-        cls._parent_connection_specification_type.from_kwargs(
-            axis=active_axis,
-            multiplier=connection_multiplier,
-            offset=connection_offset,
-            dof_limits=connection_limits,
-        ).spawn(world, parent_T_self=world_root_T_self, child=body)
-        world.add_semantic_annotation(instance)
-        return instance
+        return cls.get_default_annotation_specification(
+            name,
+            scale,
+            active_axis=active_axis,
+            connection_multiplier=connection_multiplier,
+            connection_offset=connection_offset,
+            connection_limits=connection_limits,
+        ).spawn(world, parent_T_self=world_root_T_self)
 
     @classmethod
     def get_default_body_specification(
         cls,
         name: Union[str, PrefixedName],
-        scale: Scale,
+        scale: Optional[Scale] = None,
     ) -> BodySpecification:
         """
         Build the default body specification whose geometry matches what
@@ -294,10 +286,13 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
         This is the geometry-extraction counterpart of the factory: instead of
         mutating a world, it returns a reusable, world-independent specification.
 
-        :param name: The name of bodies created from the specification.
+        :param name: The name of bodies created from the specification. ``None`` yields a
+            geometry-less specification, matching a factory call without a scale.
         :param scale: The scale used to generate the box geometry.
         :return: A body specification with a single solid box derived from ``scale``.
         """
+        if scale is None:
+            return BodySpecification(name=name)
         return BodySpecification.from_event(
             name, scale.to_simple_event().as_composite_set()
         )
@@ -344,17 +339,40 @@ class HasRootRegion(HasRootKinematicStructureEntity, ABC):
         :param connection_offset: The offset for the connection.
         :return: The created semantic annotation instance.
         """
-        region = Region(name=name)
+        return cls.get_default_annotation_specification(
+            name,
+            active_axis=active_axis,
+            connection_multiplier=connection_multiplier,
+            connection_offset=connection_offset,
+            connection_limits=connection_limits,
+        ).spawn(world, parent_T_self=world_root_T_self)
 
-        instance = cls(name=name, root=region)
-        cls._parent_connection_specification_type.from_kwargs(
-            axis=active_axis,
-            multiplier=connection_multiplier,
-            offset=connection_offset,
-            dof_limits=connection_limits,
-        ).spawn(world, parent_T_self=world_root_T_self, child=region)
-        world.add_semantic_annotation(instance)
-        return instance
+    @classmethod
+    def get_default_region_specification(
+        cls,
+        name: Union[str, PrefixedName],
+        scale: Optional[Scale] = None,
+    ) -> RegionSpecification:
+        """
+        Build the default region specification whose geometry matches what
+        :meth:`create_with_new_region_in_world` generates.
+
+        :param name: The name of regions created from the specification.
+        :param scale: The scale used to generate the region area geometry. ``None`` yields a
+            geometry-less specification, matching the bare region of the base factory.
+        :return: A region specification.
+        """
+        if scale is None:
+            return RegionSpecification(name=name)
+        return RegionSpecification.from_event(
+            name, scale.to_simple_event().as_composite_set()
+        )
+
+    @classmethod
+    def _default_root_specification(
+        cls, name: Union[str, PrefixedName], *args, **kwargs
+    ) -> RegionSpecification:
+        return cls.get_default_region_specification(name, *args, **kwargs)
 
 
 class PartWholeRelationshipField(dataclasses.Field):
@@ -944,24 +962,15 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
         :param wall_thickness: The thickness of the case walls.
         :return: The created semantic annotation instance.
         """
-        container_event = cls._create_container_event(scale, wall_thickness)
-
-        body = Body(name=name)
-        collision_shapes = BoundingBoxCollection.from_event(
-            body, container_event
-        ).as_shapes()
-        body.collision = collision_shapes
-        body.visual = collision_shapes
-
-        instance = cls(name=name, root=body)
-        cls._parent_connection_specification_type.from_kwargs(
-            axis=active_axis,
-            multiplier=connection_multiplier,
-            offset=connection_offset,
-            dof_limits=connection_limits,
-        ).spawn(world, parent_T_self=world_root_T_self, child=body)
-        world.add_semantic_annotation(instance)
-        return instance
+        return cls.get_default_annotation_specification(
+            name,
+            scale,
+            wall_thickness=wall_thickness,
+            active_axis=active_axis,
+            connection_multiplier=connection_multiplier,
+            connection_offset=connection_offset,
+            connection_limits=connection_limits,
+        ).spawn(world, parent_T_self=world_root_T_self)
 
     @classmethod
     def _create_container_event(cls, scale: Scale, wall_thickness: float) -> Event:

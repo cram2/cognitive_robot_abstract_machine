@@ -59,6 +59,7 @@ from semantic_digital_twin.api.specifications import (
     PrismaticConnectionSpecification,
     RegionSpecification,
     RevoluteConnectionSpecification,
+    SemanticAnnotationWithRootSpecification,
 )
 
 if TYPE_CHECKING:
@@ -92,27 +93,9 @@ class Handle(HasRootBody):
         scale: Scale = Scale(0.1, 0.02, 0.02),
         thickness: float = 0.005,
     ) -> Self:
-        handle_event = cls._create_handle_geometry(scale=scale).as_composite_set()
-
-        inner_box = cls._create_handle_geometry(
-            scale=scale, thickness=thickness
-        ).as_composite_set()
-
-        handle_event -= inner_box
-
-        handle_body = Body(name=name)
-        collision = BoundingBoxCollection.from_event(
-            handle_body, handle_event
-        ).as_shapes()
-        handle_body.collision = collision
-        handle_body.visual = collision
-
-        instance = cls(name=name, root=handle_body)
-        cls._parent_connection_specification_type().spawn(
-            world, parent_T_self=world_root_T_self, child=handle_body
-        )
-        world.add_semantic_annotation(instance)
-        return instance
+        return cls.get_default_annotation_specification(
+            name, scale=scale, thickness=thickness
+        ).spawn(world, parent_T_self=world_root_T_self)
 
     @classmethod
     def _create_handle_geometry(
@@ -201,20 +184,9 @@ class Aperture(HasRootRegion):
         """
         Create a new semantic annotation with a new region in the given world.
         """
-        aperture_region = Region(name=name)
-
-        scale_event = scale.to_simple_event().as_composite_set()
-        aperture_geometry = BoundingBoxCollection.from_event(
-            aperture_region, scale_event
-        ).as_shapes()
-        aperture_region.area = aperture_geometry
-
-        instance = cls(name=name, root=aperture_region)
-        cls._parent_connection_specification_type().spawn(
-            world, parent_T_self=world_root_T_self, child=aperture_region
+        return cls.get_default_annotation_specification(name, scale=scale).spawn(
+            world, parent_T_self=world_root_T_self
         )
-        world.add_semantic_annotation(instance)
-        return instance
 
     @classmethod
     def create_with_new_region_in_world_from_body(
@@ -374,40 +346,28 @@ class Door(HasHandle, HasMechanicalJoint):
         *,
         scale: Scale = Scale(0.03, 1, 2),
     ) -> Self:
-        if not (scale.x < scale.y and scale.x < scale.z):
-            raise InvalidPlaneDimensions(scale, clazz=Door)
-
-        # This creates an event around the scale, so if the scale is 1 the event will be from -0.5 to 0.5.
-        door_event = scale.to_simple_event().as_composite_set()
-        door_body = Body(name=name)
-        bounding_box_collection = BoundingBoxCollection.from_event(
-            door_body, door_event
+        door = cls.get_default_annotation_specification(name, scale=scale).spawn(
+            world, parent_T_self=world_root_T_self
         )
-        collision = bounding_box_collection.as_shapes()
-        door_body.collision = collision
-        door_body.visual = collision
 
+        # TODO: The EntryWay is spawn-time structure that cannot yet be expressed as a nested
+        #       part-whole annotation spec, so it is built imperatively here for now (see
+        #       SemanticAnnotationWithRootSpecification.annotation_kwargs handling). Deprecate this
+        #       once the EntryWay can be declared on the door's specification.
         entry_way_name = PrefixedName(name.name + "entry_way", name.prefix)
         entry_way_region_name = PrefixedName(
             name.name + "entry_way_region", name.prefix
         )
-
         entry_way_region = Region(
             name=entry_way_region_name,
-            area=ShapeCollection([Mesh.from_trimesh(mesh=door_body.combined_mesh)]),
+            area=ShapeCollection([Mesh.from_trimesh(mesh=door.root.combined_mesh)]),
         )
         entry_way_region.area.dye_shapes(Color(R=1.0, G=1.0, B=1.0, A=0.2))
         entry_way = EntryWay(name=entry_way_name, root=entry_way_region)
         world.add_region(entry_way.root)
-        world.add_connection(FixedConnection(door_body, entry_way.root))
+        world.add_connection(FixedConnection(door.root, entry_way.root))
         world.add_semantic_annotation(entry_way)
-
-        door = cls(name=name, root=door_body)
-        cls._parent_connection_specification_type().spawn(
-            world, parent_T_self=world_root_T_self, child=door_body
-        )
         door.entry_way = entry_way
-        world.add_semantic_annotation(door)
         return door
 
     @classmethod
@@ -613,14 +573,11 @@ class Floor(HasSupportingSurface):
         :param name: The name of the floor body.
         :param floor_polytope: A list of 3D points defining the floor poly
         """
-        room_body = Body.from_3d_points(name=name, points_3d=floor_polytope)
-
-        instance = cls(name=name, root=room_body)
-        cls._parent_connection_specification_type().spawn(
-            world, parent_T_self=world_root_T_self, child=room_body
-        )
-        world.add_semantic_annotation(instance)
-        return instance
+        return SemanticAnnotationWithRootSpecification(
+            name=name,
+            semantic_annotation_type=cls,
+            root_specification=BodySpecification.from_3d_points(name, floor_polytope),
+        ).spawn(world, parent_T_self=world_root_T_self)
 
     @classmethod
     def get_default_body_specification(
@@ -638,11 +595,8 @@ class Floor(HasSupportingSurface):
         :return: A body specification with the floor polytope mesh.
         """
         scale = scale if scale is not None else Scale()
-        shapes = ShapeCollection(
-            [Mesh.from_3d_points(scale.to_bounding_box().get_points())]
-        )
-        return BodySpecification(
-            name=name, shapes=shapes.copy_without_reference_frame()
+        return BodySpecification.from_3d_points(
+            name, scale.to_bounding_box().get_points()
         )
 
 
@@ -693,25 +647,9 @@ class Wall(HasApertures):
         *,
         scale: Scale = Scale(),
     ) -> Self:
-        if not (scale.x < scale.y and scale.x < scale.z):
-            raise InvalidPlaneDimensions(scale, clazz=Wall)
-
-        wall_body = Body(name=name)
-        # This creates an event exactly as the scale, so if the scale is 1 the event will be from 0 to 1.
-        wall_event = cls._create_wall_event(scale).as_composite_set()
-        wall_collision = BoundingBoxCollection.from_event(
-            wall_body, wall_event
-        ).as_shapes()
-
-        wall_body.collision = wall_collision
-        wall_body.visual = wall_collision
-
-        instance = cls(name=name, root=wall_body)
-        cls._parent_connection_specification_type().spawn(
-            world, parent_T_self=world_root_T_self, child=wall_body
+        return cls.get_default_annotation_specification(name, scale=scale).spawn(
+            world, parent_T_self=world_root_T_self
         )
-        world.add_semantic_annotation(instance)
-        return instance
 
     @property
     def doors(self) -> Iterable[Door]:

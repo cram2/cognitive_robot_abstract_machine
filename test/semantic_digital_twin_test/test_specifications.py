@@ -40,7 +40,15 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Table,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+    Vector3,
+)
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasRootBody,
+    HasRootRegion,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -218,6 +226,37 @@ def test_from_event_constructor_spawns(empty_world):
     body = BodySpecification.from_event("event_body", event).spawn(empty_world)
     assert isinstance(body, Body)
     assert len(body.collision.shapes) >= 1
+
+
+def test_body_specification_from_3d_points_matches_direct_construction():
+    """``from_3d_points`` is the declarative counterpart of :meth:`Body.from_3d_points`."""
+    points = [Point3(0, 0, 0), Point3(1, 0, 0), Point3(0, 1, 0), Point3(1, 1, 1)]
+    name = PrefixedName("polytope")
+
+    materialized = BodySpecification.from_3d_points(name, points).to_domain_object(name)
+    directly_built = Body.from_3d_points(name=name, points_3d=points)
+
+    assert len(materialized.collision.shapes) == len(directly_built.collision.shapes) == 1
+
+
+def test_has_root_body_default_specification_without_scale_is_geometryless(empty_world):
+    """A scale-less body factory yields a bare body, mirrored by an empty body spec."""
+    spec = HasRootBody.get_default_body_specification(PrefixedName("bare_body"))
+    assert isinstance(spec, BodySpecification)
+
+    body = spec.spawn(empty_world)
+    assert isinstance(body, Body)
+    assert len(body.collision.shapes) == 0
+
+
+def test_has_root_region_default_specification_without_scale_is_geometryless(empty_world):
+    """The base region factory creates a bare region, mirrored by an empty region spec."""
+    spec = HasRootRegion.get_default_region_specification(PrefixedName("bare_region"))
+    assert isinstance(spec, RegionSpecification)
+
+    region = spec.spawn(empty_world)
+    assert isinstance(region, Region)
+    assert len(region.area.shapes) == 0
 
 
 def test_constructor_child_specification_param(empty_world):

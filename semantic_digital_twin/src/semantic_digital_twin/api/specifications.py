@@ -6,7 +6,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from typing import ClassVar, Iterable, Union, Optional, TYPE_CHECKING
 
-from typing_extensions import Self, Type, Any, Generic, TypeVar
+from typing_extensions import Self, Type, Any, Generic, List, TypeVar, cast
 
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.patterns.subclass_safe_generic import AbstractSubClassSafeGeneric
@@ -18,7 +18,11 @@ from semantic_digital_twin.datastructures.prefixed_name import (
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.exceptions import MissingConnectionChildError
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     WheeledDrive,
@@ -60,11 +64,11 @@ if TYPE_CHECKING:
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
 
-DomainObjectType = TypeVar("DomainObjectType", bound=KinematicStructureEntity)
+TWorldEntity = TypeVar("TWorldEntity", bound=WorldEntity)
 
 
 @dataclass
-class WorldEntitySpawnSpecification(ABC):
+class WorldEntitySpawnSpecification(Generic[TWorldEntity], ABC):
 
     name: Union[str, PrefixedName]
     """
@@ -103,9 +107,8 @@ class WorldEntitySpawnSpecification(ABC):
 
 @dataclass
 class KinematicStructureEntitySpecification(
-    Generic[DomainObjectType],
+    WorldEntitySpawnSpecification[TWorldEntity],
     AbstractSubClassSafeGeneric,
-    WorldEntitySpawnSpecification,
 ):
     """
     Declarative, world-independent description of a kinematic structure entity.
@@ -138,7 +141,7 @@ class KinematicStructureEntitySpecification(
 
     def to_domain_object(
         self, name: Union[str, PrefixedName, None] = None
-    ) -> DomainObjectType:
+    ) -> TWorldEntity:
         """Materialize a new, world-independent kinematic structure entity from this spec."""
         [domain_object_type] = get_generic_type_params(
             self, KinematicStructureEntitySpecification
@@ -154,7 +157,7 @@ class KinematicStructureEntitySpecification(
         name: Union[str, PrefixedName, None] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
-    ) -> DomainObjectType:
+    ) -> TWorldEntity:
         entity = self.to_domain_object(name)
         with world.modify_world():
             FixedConnectionSpecification().spawn(
@@ -321,6 +324,41 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
     collision and visual (one collection); an empty list means no visual geometry.
     """
 
+    @classmethod
+    def from_3d_points(
+        cls,
+        name: Union[str, PrefixedName],
+        points_3d: List[Point3],
+        minimum_thickness: float = 0.005,
+        sv_ratio_tol: float = 1e-7,
+        child_specification: list[WorldEntitySpawnSpecification] | None = None,
+    ) -> Self:
+        """
+        Specification whose geometry is the convex hull of a point cloud.
+
+        Declarative counterpart of :meth:`~...world_entity.Body.from_3d_points`: used by annotations
+        with polytope geometry (e.g. a floor derived from a list of points).
+
+        :param name: The name of the entity.
+        :param points_3d: The points whose convex hull defines the geometry.
+        :param minimum_thickness: Thickness added when the points are near-planar.
+        :param sv_ratio_tol: Singular-value ratio tolerance for the planarity test.
+        :return: The created specification.
+        """
+        return cls(
+            name=name,
+            shapes=ShapeCollection(
+                [
+                    Mesh.from_3d_points(
+                        points_3d,
+                        minimum_thickness=minimum_thickness,
+                        sv_ratio_tol=sv_ratio_tol,
+                    )
+                ]
+            ).copy_without_reference_frame(),
+            child_specification=child_specification or [],
+        )
+
     def to_domain_object(self, name: Union[str, PrefixedName, None] = None) -> Body:
         """
         Create a new, world-independent body from this specification.
@@ -347,7 +385,9 @@ class RegionSpecification(KinematicStructureEntitySpecification[Region]):
 
 
 @dataclass
-class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
+class SemanticAnnotationWithRootSpecification(
+    WorldEntitySpawnSpecification[TWorldEntity]
+):
     """
     Declarative description of a semantic annotation rooted in a single kinematic
     structure entity. The annotation type owns the parent connection specification type (via its
@@ -407,7 +447,7 @@ class SemanticAnnotationWithRootSpecification(WorldEntitySpawnSpecification):
         name: Union[str, PrefixedName, None] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
-    ) -> HasRootKinematicStructureEntity:
+    ) -> TWorldEntity:
         from semantic_digital_twin.semantic_annotations.mixins import (
             _wrapped_part_whole_relationship_fields,
             PartWholeRelationship,

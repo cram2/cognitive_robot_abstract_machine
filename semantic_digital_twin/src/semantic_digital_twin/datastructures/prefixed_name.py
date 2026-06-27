@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 
 from krrood.entity_query_language.predicate import Symbol
@@ -42,8 +43,10 @@ class PrefixedName(Symbol):
 
 def ensure_prefixed_name(
     name: Optional[str | PrefixedName],
-) -> Optional[PrefixedName]:
+) -> PrefixedName:
     """
-    Normalize a name into a :class:`PrefixedName`, wrapping a bare string and passing ``None`` through.
+    Normalize a name into a :class:`PrefixedName`, wrapping a bare string, or if None is the input, generating a random name.
     """
+    if name is None:
+        return PrefixedName(name=f"name_{uuid.uuid4()}")
     return PrefixedName(name) if isinstance(name, str) else name
