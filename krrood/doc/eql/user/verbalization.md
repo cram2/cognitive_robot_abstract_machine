@@ -708,11 +708,11 @@ HTML(VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter(), resolver)).verb
 
 - {py:func}`~krrood.entity_query_language.verbalization.pipeline.verbalize_expression` — the simplest entry point; returns plain text (``verbalize_expression(expr)``)
 - {py:class}`~krrood.entity_query_language.verbalization.pipeline.VerbalizationPipeline` — colour / layout / hyperlinks via a renderer
-  - ``VerbalizationPipeline.plain().verbalize(expr)`` — plain prose (what ``verbalize_expression`` uses)
-  - ``VerbalizationPipeline.ansi().verbalize(expr)`` — ANSI-coloured prose
-  - ``VerbalizationPipeline.html(hierarchical=True).verbalize(expr)`` — HTML indented bullets
-  - ``VerbalizationPipeline.html(hierarchical=True, link_resolver=resolver).verbalize(expr)`` — with source hyperlinks
-  - ``VerbalizationPipeline(renderer).verbalize(expr)`` — from a renderer you build directly
+  - ``VerbalizationPipeline.plain().verbalize(expression)`` — plain prose (what ``verbalize_expression`` uses)
+  - ``VerbalizationPipeline.ansi().verbalize(expression)`` — ANSI-coloured prose
+  - ``VerbalizationPipeline.html(hierarchical=True).verbalize(expression)`` — HTML indented bullets
+  - ``VerbalizationPipeline.html(hierarchical=True, link_resolver=resolver).verbalize(expression)`` — with source hyperlinks
+  - ``VerbalizationPipeline(renderer).verbalize(expression)`` — from a renderer you build directly
 - {py:class}`~krrood.entity_query_language.verbalization.rendering.renderer.ParagraphRenderer` — flat prose layout
 - {py:class}`~krrood.entity_query_language.verbalization.rendering.renderer.HierarchicalRenderer` — indented bullet list layout
 - {py:class}`~krrood.entity_query_language.verbalization.rendering.formatter.PlainFormatter` — no colour markup

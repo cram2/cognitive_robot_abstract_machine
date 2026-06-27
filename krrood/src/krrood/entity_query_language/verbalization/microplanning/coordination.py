@@ -27,6 +27,7 @@ from typing_extensions import (
     List,
     Optional,
     Tuple,
+    TypeAlias,
     TypeVar,
     Union,
 )
@@ -52,7 +53,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 )
 
 #: Hashable identity of a pure attribute chain: ``(root variable id, ((name, owner), …))``.
-ChainKey = Tuple
+ChainKey: TypeAlias = Tuple
 
 #: The comparison operators a co-indexed group folds over. Equality additionally licenses the
 #: natural *"… have the same …"* surface (see :func:`coindexed_natural_parts`); the others read in
@@ -167,9 +168,9 @@ class CoindexedNaturalParts:
 
 #: One node of a reduced conjunct list: an un-folded expression (e.g. a comparison) or a fold
 #: artifact the reducer produced.
-FoldNode = Union[SymbolicExpression, RangeFold, CoindexedFold]
+FoldNode: TypeAlias = Union[SymbolicExpression, RangeFold, CoindexedFold]
 
-ConjunctList = List[FoldNode]
+ConjunctList: TypeAlias = List[FoldNode]
 
 
 class ConjunctFold(ABC):
@@ -264,7 +265,7 @@ def reduce_conjuncts(conjuncts: List[SymbolicExpression]) -> ConjunctList:
 # ── range-bound fold ────────────────────────────────────────────────────────
 
 
-class _Bound(Enum):
+class _RangeBound(Enum):
     """Internal marker for the direction of a bound comparison in range folding."""
 
     LOWER = auto()
@@ -313,13 +314,13 @@ def subject_key(expression: SymbolicExpression) -> Optional[ChainKey]:
     return None
 
 
-def _classify(conjunct: SymbolicExpression) -> Optional[Tuple[ChainKey, _Bound]]:
+def _classify(conjunct: SymbolicExpression) -> Optional[Tuple[ChainKey, _RangeBound]]:
     """
     :param conjunct: A candidate conjunct.
-    :return: ``(chain_key, _Bound)`` when *conjunct* is a bound comparison, else ``None``.
+    :return: ``(chain_key, _RangeBound)`` when *conjunct* is a bound comparison, else ``None``.
 
     >>> robot = variable(Robot, [])
-    >>> _classify(robot.battery >= 20)[1] is _Bound.LOWER
+    >>> _classify(robot.battery >= 20)[1] is _RangeBound.LOWER
     True
     >>> _classify(robot) is None
     True
@@ -330,9 +331,9 @@ def _classify(conjunct: SymbolicExpression) -> Optional[Tuple[ChainKey, _Bound]]
     if key is None:
         return None
     if conjunct.operation in (operator.gt, operator.ge):
-        return key, _Bound.LOWER
+        return key, _RangeBound.LOWER
     if conjunct.operation in (operator.lt, operator.le):
-        return key, _Bound.UPPER
+        return key, _RangeBound.UPPER
     return None
 
 
@@ -374,7 +375,7 @@ def fold_range_pairs(
             j = queue.pop(0)
             lower, upper = (
                 (conjuncts[j], conjuncts[i])
-                if bound is _Bound.UPPER
+                if bound is _RangeBound.UPPER
                 else (conjuncts[i], conjuncts[j])
             )
             slots[min(i, j)] = RangeFold(
@@ -535,7 +536,9 @@ _Payload = TypeVar("_Payload")
 
 #: Classify a sibling item for owner-grouping: ``(owner, payload)`` when the item belongs to an
 #: owner (the owner is identified by its ``_id_``), or ``None`` when it does not group.
-OwnerClassifier = Callable[[_Item], Optional[Tuple["SymbolicExpression", _Payload]]]
+OwnerClassifier: TypeAlias = Callable[
+    [_Item], Optional[Tuple["SymbolicExpression", _Payload]]
+]
 
 
 @dataclass(frozen=True)

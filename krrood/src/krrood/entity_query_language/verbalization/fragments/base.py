@@ -434,10 +434,8 @@ def map_structural_children(
     """
     match fragment:
         case PhraseFragment(parts=parts):
-            # replace() preserves the separator (and any future fields); only children change.
             return replace(fragment, parts=[recurse(p) for p in parts])
         case BlockFragment(header=header, items=items):
-            # replace() preserves conjunction / bulleted_header (and source); only children change.
             return replace(
                 fragment,
                 header=None if header is None else recurse(header),
