@@ -5,7 +5,9 @@ from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.storage import StorageWriter
 
-from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
@@ -17,7 +19,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         return "storage"
 
     def implementation(self) -> Pipeline:
-        kinect_config = CrDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
 
         seq = Pipeline()
         seq.add_children(

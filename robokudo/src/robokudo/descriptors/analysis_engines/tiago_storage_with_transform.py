@@ -21,7 +21,9 @@ from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.storage import StorageWriter
-from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
@@ -69,7 +71,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for data recording
         """
-        tiago_config = CrDescriptorFactory.create_descriptor("tiago")
+        tiago_config = CollectionReaderDescriptorFactory.create_descriptor("tiago")
 
         seq = Pipeline()
         seq.add_children(

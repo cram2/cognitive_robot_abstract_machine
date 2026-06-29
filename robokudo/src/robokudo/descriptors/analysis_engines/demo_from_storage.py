@@ -10,7 +10,9 @@ from robokudo.annotators.outlier_removal_objecthypothesis import (
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.idioms import pipeline_init
 from robokudo.io.ros import get_node
 from robokudo.pipeline import Pipeline
@@ -42,7 +44,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         tf_publisher = TFPublisher(_world=world_instance(), node=get_node())
 
-        cr_storage_config = CrDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
         seq = Pipeline("StoragePipeline")
         seq.add_children(

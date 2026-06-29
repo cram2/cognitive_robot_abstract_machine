@@ -15,7 +15,9 @@ from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterEx
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.annotators.query import QueryAnnotator, GenerateQueryResult
 from robokudo.behaviours.action_server_checks import ActionServerCheck
-from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
@@ -25,7 +27,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         return "semdt_raytracer_query_demo"
 
     def implementation(self) -> Pipeline:
-        raytracer_config = CrDescriptorFactory.create_descriptor(
+        raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
             "semdt_raytracer",
             world_descriptor_name="world_semdt_raytracer_tabletop",
         )

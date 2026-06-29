@@ -33,7 +33,9 @@ from robokudo.annotators.world_visualizer import WorldVisualizer
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 from robokudo.annotators.static_object_detector import StaticObjectDetectorAnnotator
-from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -78,7 +80,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for object detection and visualization
         """
-        cr_storage_config = CrDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
         bootstrap = WorldDescriptorBootstrapAnnotator.Descriptor()
         bootstrap.parameters.world_descriptor_name = "world_iai_kitchen20"
 

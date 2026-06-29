@@ -18,7 +18,9 @@ from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.outputs import ClearAnnotatorOutputs
 from robokudo.annotators.storage import StorageWriter
 from robokudo.cas import CASViews
-from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.io.storage import Storage
 from robokudo.pipeline import Pipeline
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
@@ -37,7 +39,7 @@ def _cam_info_k_values(cam_info):
 
 
 def _build_writer_pipeline(db_name: str) -> Pipeline:
-    file_reader_descriptor = CrDescriptorFactory.create_descriptor(
+    file_reader_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
         "file_reader",
         loop=False,
         target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
@@ -61,7 +63,7 @@ def _build_writer_pipeline(db_name: str) -> Pipeline:
 
 
 def _build_reader_pipeline(db_name: str) -> Pipeline:
-    mongo_descriptor = CrDescriptorFactory.create_descriptor(
+    mongo_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
         "mongo", loop=False, db_name=db_name
     )
     pipeline = Pipeline("ReaderPipeline")

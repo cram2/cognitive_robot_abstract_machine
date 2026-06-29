@@ -22,7 +22,9 @@ from robokudo.annotators.file_writer import FileWriter
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline
-from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -59,7 +61,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for data transfer
         """
-        cr_storage_config = CrDescriptorFactory.create_descriptor("mongo", loop=False)
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            "mongo", loop=False
+        )
 
         seq = Pipeline("StoragePipeline")
         seq.add_children(

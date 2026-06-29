@@ -27,7 +27,9 @@ from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterEx
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.annotators.semantic_world_connector import SemanticDigitalTwinConnector
 from robokudo.annotators.shape_estimator import ShapeEstimatorAnnotator
-from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 @pytest.fixture
@@ -44,7 +46,7 @@ class TestFullAEExecution(object):
         # rclpy.init()
         # node = Node(robokudo.defs.TEST_ROS_NODE_NAME)
 
-        cr_fr_config = CrDescriptorFactory.create_descriptor(
+        cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
             "file_reader",
             loop=False,
             target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
@@ -87,7 +89,7 @@ class TestFullAEExecution(object):
     def test_run_file_reader_ae_synchronizes_semantic_digital_twin_belief_state(
         self, node, clean_semantic_world
     ):
-        cr_fr_config = CrDescriptorFactory.create_descriptor(
+        cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
             "file_reader",
             loop=False,
             target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
@@ -240,7 +242,7 @@ class TestFullAEExecution(object):
         ), "The object belief body should contain one visual shape derived from the latest bounding box."
 
     def test_run_semdt_raytracer_ae_successfully(self, node):
-        raytracer_config = CrDescriptorFactory.create_descriptor(
+        raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
             "semdt_raytracer",
             world_descriptor_name="world_semdt_raytracer_cylinders",
             resolution=128,

@@ -41,7 +41,9 @@ from robokudo.behaviours.action_server_checks import (
     ActionServerNoPreemptRequest,
     AbortGoal,
 )
-from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
@@ -103,7 +105,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             The pipeline will automatically fail after 30 iterations to
             demonstrate error handling mechanisms.
         """
-        cr_storage_config = CrDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
         processing_sequence = Sequence()
         processing_sequence.add_children(

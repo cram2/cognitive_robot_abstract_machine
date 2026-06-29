@@ -13,7 +13,7 @@ from robokudo.io.semdt_raytracer_camera_interface import (
 from robokudo.io.storage_reader_interface import StorageReaderInterface
 
 
-class CrDescriptorFactory:
+class CollectionReaderDescriptorFactory:
     """Factory class for creating CollectionReader descriptors."""
 
     _camera_interface_types = {
@@ -46,7 +46,7 @@ class CrDescriptorFactory:
         camera_config = CameraConfigRegistry.create_config(camera, **kwargs)
         return CollectionReaderAnnotator.Descriptor(
             camera_config=camera_config,
-            camera_interface=CrDescriptorFactory._camera_interface_types[camera](
-                camera_config
-            ),
+            camera_interface=CollectionReaderDescriptorFactory._camera_interface_types[
+                camera
+            ](camera_config),
         )
