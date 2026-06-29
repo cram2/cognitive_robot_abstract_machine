@@ -1,8 +1,11 @@
-import subprocess
 import os
 import shutil
+import subprocess
 from dataclasses import dataclass, field
-from typing import List, Optional
+
+
+class SystemDependencyInstallationError(Exception):
+    """Raised when apt cannot install missing system dependencies."""
 
 
 class bcolors:
@@ -26,32 +29,80 @@ class Repository:
     url: str
     branch: str
     name: str
-    cleanup_dirs: List[str] = field(default_factory=list)
+    cleanup_dirs: list[str] = field(default_factory=list)
 
 
+@dataclass
 class SystemDependencyManager:
     """
     Handles installation of system-level dependencies using apt.
     """
 
-    def __init__(self):
-        self.is_root = os.geteuid() == 0
+    is_root: bool = field(default_factory=lambda: os.geteuid() == 0)
+    """Whether apt commands can run without sudo."""
 
-    def install_packages(self, packages: List[str]):
+    def install_packages(self, packages: list[str]) -> None:
         """
-        Installs a list of packages via apt.
+        Install missing apt packages required by the ROS workspace.
         """
-        command = ["apt", "update"]
+        missing_packages = self.find_missing_packages(packages)
+        if not missing_packages:
+            print(
+                f"{bcolors.OKGREEN}System dependencies already installed.{bcolors.ENDC}"
+            )
+            return
+
+        self.install_missing_packages(missing_packages)
+
+    def find_missing_packages(self, packages: list[str]) -> list[str]:
+        """
+        Return the apt packages that are not installed yet.
+        """
+        missing_packages: list[str] = []
+        for package in packages:
+            if not self.is_package_installed(package):
+                missing_packages.append(package)
+        return missing_packages
+
+    def is_package_installed(self, package: str) -> bool:
+        """
+        Check whether an apt package is already installed.
+        """
+        command = ["dpkg-query", "-W", "-f=${Status}", package]
+        result = subprocess.run(
+            command,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        return (
+            result.returncode == 0 and result.stdout.strip() == "install ok installed"
+        )
+
+    def install_missing_packages(self, packages: list[str]) -> None:
+        """
+        Install apt packages that are absent from the local system.
+        """
+        command_prefix: list[str] = []
         if not self.is_root:
-            command = ["sudo"] + command
+            command_prefix = ["sudo", "-n"]
 
-        subprocess.run(command, check=True)
+        self.run_install_command([*command_prefix, "apt", "update"])
+        self.run_install_command([*command_prefix, "apt", "install", "-y", *packages])
 
-        command = ["apt", "install", "-y"] + packages
-        if not self.is_root:
-            command = ["sudo"] + command
-
-        subprocess.run(command, check=True)
+    def run_install_command(self, command: list[str]) -> None:
+        """
+        Run a system dependency installation command.
+        """
+        result = subprocess.run(command, check=False)
+        if result.returncode != 0:
+            raise SystemDependencyInstallationError(
+                "System dependency command failed with exit code "
+                f"{result.returncode}: {' '.join(command)}. "
+                "If sudo authentication is required, run sudo -v in a terminal "
+                "and rerun this setup."
+            )
 
 
 class GitManager:
@@ -144,44 +195,11 @@ class WorkspaceManager:
                 f.write(f"\n{setup_line}\n")
 
 
-def main():
+def create_repositories() -> list[Repository]:
     """
-    Main execution flow for setting up the ROS workspace.
+    Create repository definitions required by the ROS workspace.
     """
-    workspace_path = os.environ.get("OVERLAY_WS", os.path.expanduser("~/ros2_ws"))
-    manager = WorkspaceManager(workspace_path)
-
-    # 1. System Dependencies
-    packages = [
-        "python3.12-venv",
-        "ros-jazzy-xacro",
-        "ros-jazzy-navigation2",
-        "ros-jazzy-py-trees-ros",
-        "python3-vcstool",
-        "git",
-        "ros-dev-tools",
-        "default-jre",
-        "graphviz",
-        "graphviz-dev",
-        "ros-jazzy-rclpy-message-converter",
-        "pip",
-        "python3-colcon-common-extensions",
-        "ros-jazzy-compressed-image-transport",
-        "ros-jazzy-image-transport",
-        "ros-jazzy-image-transport-plugins",
-        "git-lfs",
-        "ros-jazzy-ament-cmake-auto",
-        "ros-jazzy-ament-lint-auto",
-        "ros-jazzy-ament-cmake-ros",
-        "ros-jazzy-launch-testing-ament-cmake",
-    ]
-    manager.dep_manager.install_packages(packages)
-
-    # 2. Setup Directories
-    manager.initialize_directories()
-
-    # 3. Repositories
-    repos = [
+    return [
         Repository("https://github.com/code-iai/iai_maps.git", "ros-jazzy", "iai_maps"),
         Repository(
             "https://github.com/code-iai/iai_robots.git", "ros-jazzy", "iai_robots"
@@ -269,11 +287,48 @@ def main():
             "https://github.com/code-iai/iai_weiss_wpg_300-120-gripper.git",
             "main",
             "iai_weiss_wpg_300-120-gripper",
-            ["griplink"],
         ),
     ]
 
-    for repo in repos:
+
+def main():
+    """
+    Main execution flow for setting up the ROS workspace.
+    """
+    workspace_path = os.environ.get("OVERLAY_WS", os.path.expanduser("~/ros2_ws"))
+    manager = WorkspaceManager(workspace_path)
+
+    # 1. System Dependencies
+    packages = [
+        "python3.12-venv",
+        "ros-jazzy-xacro",
+        "ros-jazzy-navigation2",
+        "ros-jazzy-py-trees-ros",
+        "python3-vcstool",
+        "git",
+        "ros-dev-tools",
+        "default-jre",
+        "graphviz",
+        "libgraphviz-dev",
+        "ros-jazzy-rclpy-message-converter",
+        "python3-pip",
+        "python3-colcon-common-extensions",
+        "ros-jazzy-compressed-image-transport",
+        "ros-jazzy-image-transport",
+        "ros-jazzy-image-transport-plugins",
+        "git-lfs",
+        "ros-jazzy-ament-cmake-auto",
+        "ros-jazzy-ament-lint-auto",
+        "ros-jazzy-ament-cmake-ros",
+        "ros-jazzy-launch-testing-ament-cmake",
+    ]
+    manager.dep_manager.install_packages(packages)
+
+    # 2. Setup Directories
+    manager.initialize_directories()
+
+    # 3. Repositories
+    for repo in create_repositories():
         manager.git_manager.setup_repository(repo)
 
     # 4. Build and Source
