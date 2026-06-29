@@ -1197,19 +1197,23 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
         )
         return tilt_expression_from_fk(root_T_child)
 
+    @property
+    def fill_position(self) -> Scalar:
+        """Symbolic normalized fill level (the fill DOF position) for :class:`FillContext`."""
+        return self.dof.variables.position
+
     def update_state(self, dt: float):
         """
         Advances the fill level by one physics step.
 
+        The connection is the :class:`FillContext` its equations are evaluated in.
+
         :param dt: Time elapsed since the previous step, in seconds.
         """
         state = self._world.state
-        velocity = 0.0
-        if self.outflow_equation is not None:
-            velocity += self.outflow_equation.symbolic_velocity(
-                self.tilt_expression,
-                self.dof.variables.position,
-            ).evaluate()[0]
-        if self.inflow_equation is not None:
-            velocity += self.inflow_equation.symbolic_velocity().evaluate()[0]
+        velocity = sum(
+            equation.symbolic_velocity(self).evaluate()[0]
+            for equation in (self.outflow_equation, self.inflow_equation)
+            if equation is not None
+        )
         state[self.dof.id].position = state[self.dof.id].position + velocity * dt

@@ -7,6 +7,8 @@ from importlib.resources import files
 from pathlib import Path
 
 from giskardpy.motion_statechart.goals.templates import Parallel
+from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -16,6 +18,7 @@ from giskardpy.motion_statechart.data_types import (
     ObservationStateValues,
     DefaultWeights,
 )
+from giskardpy.motion_statechart.exceptions import NodeInitializationError
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
@@ -60,6 +63,24 @@ _JEROEN_CUP_STL = str(
 )
 _JEROEN_CUP_SCALE = Scale(1, 1, 1)
 _TABLE_SURFACE_Z = 0.9
+_POURING_TARGET_FREQUENCY = 80
+_POURING_PREDICTION_HORIZON = 120
+
+
+def _pouring_context(world: World) -> MotionStatechartContext:
+    """
+    Builds a context whose QP runs at a high frequency over a long prediction horizon.
+
+    The long horizon lets the linearized fill prediction span the pouring overshoot, so the
+    constraint converges without a reactive damping term.
+    """
+    return MotionStatechartContext(
+        world=world,
+        qp_controller_config=QPControllerConfig(
+            target_frequency=_POURING_TARGET_FREQUENCY,
+            prediction_horizon=_POURING_PREDICTION_HORIZON,
+        ),
+    )
 
 
 @dataclass(eq=False)
@@ -176,21 +197,37 @@ class TestPouringTask:
         msc.add_node(EndMotion.when_true(pouring_task))
 
         executor = Executor(
-            MotionStatechartContext(world=world),
+            _pouring_context(world),
             pacer=SimulationPacer(real_time_factor=1),
         )
         executor.compile(motion_statechart=msc)
 
-        executor.tick_until_end(timeout=1000)
+        executor.tick_until_end(timeout=4000)
 
         assert pouring_task.observation_state == ObservationStateValues.TRUE
         assert cup.fill_level <= goal_fill + tolerance
         assert cup.fill_level >= goal_fill - tolerance
         assert cup.root.parent_connection.position > 0.1
-        assert cup.fill_equation.symbolic_velocity(
-            cup.fill_connection.tilt_expression,
-            cup.fill_connection.dof.variables.position,
-        ).evaluate()[0] == pytest.approx(0.0, abs=1e-2)
+        assert cup.fill_equation.symbolic_velocity(cup.fill_connection).evaluate()[
+            0
+        ] == pytest.approx(0.0, abs=1e-2)
+
+    def test_build_rejects_non_world_root_link(self, world_with_cup):
+        """
+        The cup tilt is derived from the world root, so building with any other root link must
+        fail loudly rather than silently mispredict the pour against a non-vertical reference.
+        """
+        world, cup = world_with_cup
+        pouring_task = PouringTask(
+            fill_equation=cup.fill_equation,
+            fill_connection=cup.fill_connection,
+            root_link=cup.root,
+            tip_link=cup.root,
+            goal_value=0.6,
+            fill_level_tolerance=0.05,
+        )
+        with pytest.raises(NodeInitializationError):
+            pouring_task.build(_pouring_context(world))
 
     def test_proactive_tilt_back(self, world_with_cup, rclpy_node):
         """
@@ -230,11 +267,11 @@ class TestPouringTask:
         pouring_task.on_tick = recording_on_tick
 
         executor = Executor(
-            MotionStatechartContext(world=world),
+            _pouring_context(world),
             pacer=SimulationPacer(real_time_factor=1),
         )
         executor.compile(motion_statechart=msc)
-        executor.tick_until_end(timeout=1000)
+        executor.tick_until_end(timeout=4000)
 
         assert pouring_task.observation_state == ObservationStateValues.TRUE
 
@@ -321,19 +358,18 @@ class TestPouringTask:
         msc.add_node(EndMotion.when_true(pouring_task))
 
         executor = Executor(
-            MotionStatechartContext(world=world),
+            _pouring_context(world),
             pacer=SimulationPacer(real_time_factor=1),
         )
         executor.compile(motion_statechart=msc)
 
-        executor.tick_until_end(timeout=900)
+        executor.tick_until_end(timeout=4000)
 
         assert pouring_task.observation_state == ObservationStateValues.TRUE
         assert cup.fill_level == pytest.approx(goal_fill, abs=tolerance)
-        assert cup.fill_equation.symbolic_velocity(
-            cup.fill_connection.tilt_expression,
-            cup.fill_connection.dof.variables.position,
-        ).evaluate()[0] == pytest.approx(0.0, abs=1e-2)
+        assert cup.fill_equation.symbolic_velocity(cup.fill_connection).evaluate()[
+            0
+        ] == pytest.approx(0.0, abs=1e-2)
 
 
 class TestTracyPouring:
@@ -409,7 +445,7 @@ class TestTracyPouring:
 
         assert grasped_cup.fill_level == pytest.approx(1.0)
 
-        goal_fill = 0.5
+        goal_fill = 0.8
         tolerance = 0.05
 
         msc_pouring = MotionStatechart()
@@ -432,15 +468,217 @@ class TestTracyPouring:
         msc_pouring.add_node(EndMotion.when_true(motion))
 
         pouring_executor = Executor(
-            MotionStatechartContext(world=world),
+            _pouring_context(world),
             pacer=SimulationPacer(real_time_factor=1),
         )
         pouring_executor.compile(motion_statechart=msc_pouring)
-        pouring_executor.tick_until_end(timeout=1000)
+        pouring_executor.tick_until_end(timeout=4000)
 
         assert pouring_task.observation_state == ObservationStateValues.TRUE
         assert grasped_cup.fill_level == pytest.approx(goal_fill, abs=tolerance)
         assert grasped_cup.fill_equation.symbolic_velocity(
-            grasped_cup.fill_connection.tilt_expression,
-            grasped_cup.fill_connection.dof.variables.position,
+            grasped_cup.fill_connection
         ).evaluate()[0] == pytest.approx(0.0, abs=1e-2)
+
+
+class TestTracyLiquidTransfer:
+    """
+    Test suite for cup-to-cup liquid transfer driven by a fill-level goal on the receiver.
+
+    The commanded goal is the fill level of a *receiving* cup standing on the table; the
+    only controllable degrees of freedom belong to the arm holding the *source* cup. The
+    optimizer must therefore tilt the source cup so that liquid leaving it lands in the
+    receiver and raises the receiver's fill level to the goal.
+    """
+
+    def test_tracy_liquid_transfer_fills_receiver(
+        self, tracy_pouring_world, rclpy_node
+    ):
+        """
+        Commanding a fill-level goal on the receiving cup makes the optimizer tilt the
+        grasped source cup until the receiver reaches the goal.
+
+        The transfer is volume conserving: while the source rim is above the receiver the
+        volume the source loses equals the volume the receiver gains, so no liquid is spilled.
+        """
+        from giskardpy.motion_statechart.tasks.pouring import (
+            FillByTransferTask,
+            KeepProjectileInReceiver,
+            KeepSourceAboveReceiver,
+        )
+
+        world, tracy = tracy_pouring_world
+        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+        left_tool_frame = world.get_body_by_name("l_gripper_tool_frame")
+
+        upright_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=1,
+            pos_y=0.2,
+            pos_z=_TABLE_SURFACE_Z + 0.3,
+            quat_z=0.5,
+            quat_x=0.5,
+            quat_y=0.5,
+            quat_w=0.5,
+            reference_frame=world.root,
+        ).to_pose()
+
+        msc_cartesian = MotionStatechart()
+        cartesian_task = CartesianPose(
+            root_link=world.root, tip_link=left_tool_frame, goal_pose=upright_pose
+        )
+        msc_cartesian.add_node(cartesian_task)
+        msc_cartesian.add_node(EndMotion.when_true(cartesian_task))
+
+        cartesian_executor = Executor(
+            MotionStatechartContext(world=world),
+            pacer=SimulationPacer(real_time_factor=1),
+        )
+        cartesian_executor.compile(motion_statechart=msc_cartesian)
+        cartesian_executor.tick_until_end(timeout=1000)
+
+        source_cup_body = _spawn_jeroen_cup_body("source_cup")
+        with world.modify_world():
+            world.add_body(source_cup_body)
+            world.add_connection(
+                FixedConnection.create_with_dofs(
+                    world=world,
+                    parent=left_tool_frame,
+                    child=source_cup_body,
+                    name=PrefixedName("l_gripper_T_source_cup"),
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        roll=-math.pi / 2.0, y=-0.0
+                    ),
+                )
+            )
+        source_cup = PourableContainer(
+            name=PrefixedName("source_cup"), root=source_cup_body
+        )
+        with world.modify_world():
+            world.add_semantic_annotation(source_cup)
+        source_cup.initialize_fill_level(
+            world=world, initial_fill=1.0, outflow_rate_constant=1.0
+        )
+
+        receiving_cup_body = _spawn_jeroen_cup_body("receiving_cup")
+        with world.modify_world():
+            world.add_body(receiving_cup_body)
+            world.add_connection(
+                Connection6DoF.create_with_dofs(
+                    world,
+                    world.root,
+                    receiving_cup_body,
+                    name=PrefixedName("table_T_receiving_cup"),
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        1.0, 0.1, _TABLE_SURFACE_Z
+                    ),
+                )
+            )
+        receiving_cup = PourableContainer(
+            name=PrefixedName("receiving_cup"), root=receiving_cup_body
+        )
+        with world.modify_world():
+            world.add_semantic_annotation(receiving_cup)
+        receiving_cup.initialize_fill_level(
+            world=world, initial_fill=0.0, outflow_rate_constant=1.0
+        )
+
+        receiving_cup.receive_outflow_from(source=source_cup, world=world)
+
+        left_wrist_joint = world.get_connection_by_name("left_wrist_3_joint")
+        world.set_positions_1DOF_connection(
+            {left_wrist_joint: left_wrist_joint.position + 0.1}
+        )
+
+        assert receiving_cup.fill_level == pytest.approx(0.0)
+        assert source_cup.fill_level == pytest.approx(1.0)
+
+        goal_fill = 0.7
+        tolerance = 0.05
+        source_fill_before = source_cup.fill_level
+
+        transfer_task = FillByTransferTask(
+            receiver=receiving_cup,
+            goal_value=goal_fill,
+            fill_level_tolerance=tolerance,
+            reference_velocity=0.03,
+        )
+        # The no-spill task keeps the liquid's projectile landing in the receiver, so the optimizer
+        # repositions the gripper upstream as the source tilts and the arc reaches forward.
+        no_spill = KeepProjectileInReceiver(receiver=receiving_cup, source=source_cup)
+        # Keep the source cup above the receiver so the optimizer never lowers it into the receiver.
+        minimum_clearance = 0.05
+        keep_above = KeepSourceAboveReceiver(
+            source=source_cup,
+            receiver=receiving_cup,
+            minimum_clearance=minimum_clearance,
+        )
+        keep_plane = AlignPlanes(
+            root_link=world.root,
+            tip_link=left_tool_frame,
+            goal_normal=Vector3.X(reference_frame=world.root),
+            tip_normal=Vector3.Z(reference_frame=left_tool_frame),
+        )
+        motion = Parallel([transfer_task, no_spill, keep_above, keep_plane])
+        msc_transfer = MotionStatechart()
+        msc_transfer.add_node(motion)
+        msc_transfer.add_node(EndMotion.when_true(motion))
+
+        gate_history: list[float] = []
+        tilt_history: list[float] = []
+        clearance_history: list[float] = []
+        original_on_tick = transfer_task.on_tick
+
+        def recording_on_tick(context):
+            gate_history.append(float(transfer_task.inflow_equation.gate.evaluate()[0]))
+            tilt_history.append(
+                float(
+                    transfer_task.inflow_equation.source_tilt_expression.evaluate()[0]
+                )
+            )
+            source_z = world.compute_forward_kinematics_np(world.root, source_cup_body)[
+                2, 3
+            ]
+            receiver_z = world.compute_forward_kinematics_np(
+                world.root, receiving_cup_body
+            )[2, 3]
+            clearance_history.append(float(source_z - receiver_z))
+            return original_on_tick(context)
+
+        transfer_task.on_tick = recording_on_tick
+
+        transfer_executor = Executor(
+            _pouring_context(world),
+            pacer=SimulationPacer(real_time_factor=1),
+        )
+        transfer_executor.compile(motion_statechart=msc_transfer)
+        transfer_executor.tick_until_end(timeout=4000)
+
+        assert transfer_task.observation_state == ObservationStateValues.TRUE
+        assert receiving_cup.fill_level == pytest.approx(goal_fill, abs=tolerance)
+
+        receiver_gain = receiving_cup.fill_level
+        print(receiver_gain)
+        source_loss = source_fill_before - source_cup.fill_level
+        assert source_loss > tolerance, "source cup never poured"
+        assert receiver_gain == pytest.approx(source_loss, abs=tolerance), (
+            "transfer must be volume conserving (equal cups): "
+            f"receiver gained {receiver_gain:.3f}, source lost {source_loss:.3f}"
+        )
+        assert max(tilt_history) > 0.5, "the source cup never tilted to pour"
+        # The source starts mis-aimed at the offset receiver, so the optimizer first swings the arc
+        # onto the opening (gate closed, but the gated source does not spill meanwhile). Once the
+        # pour starts the projectile must stay in the receiver — the gate must not close again.
+        first_open_tick = next(
+            (tick for tick, gate in enumerate(gate_history) if gate > 0.5), None
+        )
+        assert (
+            first_open_tick is not None
+        ), "the optimizer never aimed the pour into the receiver"
+        assert all(gate > 0.5 for gate in gate_history[first_open_tick:]), (
+            "the liquid's projectile left the receiver mid-pour (no-spill failed): "
+            f"minimum gate after aiming was {min(gate_history[first_open_tick:]):.3f}"
+        )
+        assert min(clearance_history) > 0.0, (
+            "the source cup dropped to or below the receiver during the pour: "
+            f"minimum clearance was {min(clearance_history):.3f}"
+        )

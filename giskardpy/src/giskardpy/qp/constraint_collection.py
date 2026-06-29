@@ -24,15 +24,12 @@ from giskardpy.qp.enforcement_strategy import (
     IntegralStrategy,
     VelocityStrategy,
 )
-from giskardpy.qp.fill_prediction_strategy import (
-    FillPredictionStrategy,
-    GiskardFillPredictionConstraint,
+from giskardpy.qp.terminal_state_prediction_strategy import (
+    TerminalStatePredictionStrategy,
+    TerminalStatePredictionConstraint,
 )
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.physics.equations.pouring_equations import (
-        PouringEquation,
-    )
     from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 
 
@@ -310,49 +307,46 @@ class ConstraintCollection:
         )
         self.add_constraint(constraint)
 
-    def add_fill_prediction_constraint(
+    def add_terminal_state_prediction_constraint(
         self,
-        tilt_expression: sm.SymbolicScalar,
-        fill_sym: sm.SymbolicScalar,
-        fill_vel_ode: sm.SymbolicScalar,
-        fill_equation: PouringEquation,
+        state_velocity: sm.SymbolicScalar,
+        state_variable: sm.SymbolicScalar,
         goal_value: float,
         quadratic_weight: sm.ScalarData,
         reference_velocity: sm.ScalarData,
         name: Optional[str] = None,
     ) -> None:
         """
-        Add a terminal fill-level prediction constraint using the linearized pouring ODE.
+        Add a terminal-state prediction constraint using a linearized first-order ODE.
 
-        At each QP solve the constraint drives the MPC-predicted fill level at the end of the
-        control horizon toward ``goal_value``.  The prediction is obtained by linearizing
-        :meth:`~PouringEquation.symbolic_velocity` at the current operating point and
-        unrolling the discrete-time recursion analytically, producing a single linear row
-        compatible with the existing PIQP solver.
+        At each QP solve the constraint drives the MPC-predicted value of a scalar state at the
+        end of the control horizon toward ``goal_value``.  The prediction linearizes the state's
+        ODE at the current operating point and unrolls the discrete-time recursion analytically,
+        producing a single linear row compatible with the existing PIQP solver.  The state's
+        symbolic dependence on the joint variables (through ``state_velocity``) lets the QP move
+        the robot to reach the goal — e.g. tilting a cup to pour or turning a valve to fill.
 
-        :param tilt_expression: Symbolic tilt angle α(q) from forward kinematics.
-        :param fill_sym: Symbolic current fill level h₀ (passive DOF position).
-        :param fill_vel_ode: Symbolic ODE value f(α₀, h₀) at the current state.
-        :param fill_equation: Pouring ODE providing the partial derivatives.
-        :param goal_value: Target fill level at the end of the horizon.
+        The strategy differentiates the state rate w.r.t. ``state_variable`` to obtain ``∂f/∂x``;
+        it is zero for a pure external inflow, which the linearization handles as a well-conditioned
+        integrator.
+
+        :param state_velocity: Symbolic state rate f(x₀, q₀) at the current operating point; its
+            jacobian w.r.t. the joint variables drives the prediction.
+        :param state_variable: Symbolic current state x₀ (passive DOF position variable).
+        :param goal_value: Target state value at the end of the horizon.
         :param quadratic_weight: Cost weight for violating the constraint.
-        :param reference_velocity: Expected fill-level change rate; used for normalization
-            and bound capping.
+        :param reference_velocity: Expected state change rate; used for normalization and bound
+            capping.
         :param name: Optional constraint name for debugging.
         """
-        _, df_dh = fill_equation.symbolic_ode_jacobians(tilt_expression, fill_sym)
-        constraint = GiskardFillPredictionConstraint(
+        constraint = TerminalStatePredictionConstraint(
             name=name,
-            expression=fill_vel_ode,
-            bound=sm.Scalar(goal_value) - fill_sym,
+            expression=state_velocity,
             normalization_factor=reference_velocity,
             quadratic_weight=quadratic_weight,
-            enforcement_strategy=FillPredictionStrategy,
+            enforcement_strategy=TerminalStatePredictionStrategy,
             linear_weight=0,
-            tilt_expression=tilt_expression,
-            fill_sym=fill_sym,
-            fill_vel_ode=fill_vel_ode,
-            df_dh=df_dh,
+            state_variable=state_variable,
             goal_value=goal_value,
         )
         self.add_constraint(constraint)
