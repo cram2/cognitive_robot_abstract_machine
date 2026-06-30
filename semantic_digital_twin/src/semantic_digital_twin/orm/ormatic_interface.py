@@ -5197,22 +5197,11 @@ class ConnectedBodySpecificationDAO(
         nullable=True,
         use_existing_column=True,
     )
-    connection_specification_id: Mapped[int] = mapped_column(
-        ForeignKey("ConnectionSpecificationDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
 
     body_specification: Mapped[BodySpecificationDAO] = relationship(
         "BodySpecificationDAO",
         uselist=False,
         foreign_keys=[body_specification_id],
-        post_update=True,
-    )
-    connection_specification: Mapped[ConnectionSpecificationDAO] = relationship(
-        "ConnectionSpecificationDAO",
-        uselist=False,
-        foreign_keys=[connection_specification_id],
         post_update=True,
     )
 

@@ -3,17 +3,17 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import ClassVar, Iterable, Union, Optional, TYPE_CHECKING
+from typing import Iterable, Union, Optional, TYPE_CHECKING
 
 from typing_extensions import Self, Type, Any, Generic, List, TypeVar
 
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.patterns.subclass_safe_generic import AbstractSubClassSafeGeneric
+from krrood.utils import get_generic_type_params
 from random_events.product_algebra import Event
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import (
     PrefixedName,
-    ensure_prefixed_name,
 )
 from semantic_digital_twin.exceptions import (
     MissingConnectionChildError,
@@ -71,6 +71,7 @@ TWorldEntity = TypeVar("TWorldEntity", bound=WorldEntity)
 TKinematicStructureEntity = TypeVar(
     "TKinematicStructureEntity", bound=KinematicStructureEntity
 )
+TConnection = TypeVar("TConnection", bound=Connection)
 
 
 @dataclass
@@ -164,20 +165,17 @@ class KinematicStructureEntitySpecification(
     override it. Identity by default.
     """
 
-    @abstractmethod
     def to_domain_object(self, name: Optional[str] = None) -> TKinematicStructureEntity:
         """
         Materialize a new, world-independent kinematic structure entity from this spec.
 
+        The concrete domain-object type is resolved from this spec's bound generic parameter.
+
         :param name: Optional name override. If None, the spec's own name is used.
         """
-
-    def _domain_object_from_shapes(
-        self,
-        domain_object_type: Type[TKinematicStructureEntity],
-        name: Optional[str] = None,
-    ) -> TKinematicStructureEntity:
-        """Build ``domain_object_type`` from this spec's shapes, copied into the entity frame."""
+        [domain_object_type] = get_generic_type_params(
+            self, KinematicStructureEntitySpecification
+        )
         return domain_object_type.from_shape_collection(
             self._resolved_name(name),
             self.shapes.copy_without_reference_frame(),
@@ -406,18 +404,6 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
     collision and visual (one collection); an empty list means no visual geometry.
     """
 
-    def _domain_object_from_shapes(
-        self,
-        domain_object_type: Type[TKinematicStructureEntity],
-        name: Optional[str] = None,
-    ) -> TKinematicStructureEntity:
-        """Build ``domain_object_type`` from this spec's shapes, copied into the entity frame."""
-        return Body.from_shape_collection(
-            self._resolved_name(name),
-            self.shapes.copy_without_reference_frame(),
-            visuals_shape_collection=self.visual_shapes,
-        )
-
     def to_domain_object(self, name: Optional[str] = None) -> Body:
         """
         Create a new, world-independent body from this specification.
@@ -425,7 +411,11 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
                      from the same specification.
         :return: The created body.
         """
-        body = self._domain_object_from_shapes(Body, name)
+        body = Body.from_shape_collection(
+            self._resolved_name(name),
+            self.shapes.copy_without_reference_frame(),
+            visuals_shape_collection=self.visual_shapes,
+        )
         if self.inertial is not None:
             body.inertial = deepcopy(self.inertial)
         return body
@@ -433,15 +423,12 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
 
 @dataclass
 class RegionSpecification(KinematicStructureEntitySpecification[Region]):
-
-    def to_domain_object(self, name: Optional[str] = None) -> Region:
-        """Create a new, world-independent region from this specification."""
-        return self._domain_object_from_shapes(Region, name)
+    pass
 
 
 @dataclass
 class SemanticAnnotationWithRootSpecification(
-    SpawnSpecification[HasRootKinematicStructureEntity]
+    SpawnSpecification["HasRootKinematicStructureEntity"]
 ):
     """
     Declarative description of a semantic annotation rooted in a single kinematic
@@ -632,17 +619,19 @@ class SemanticAnnotationWithRootSpecification(
 
 
 @dataclass
-class ConnectionSpecification(NamedSpecification, ABC):
+class ConnectionSpecification(
+    NamedSpecification, Generic[TConnection], AbstractSubClassSafeGeneric, ABC
+):
     """
     Declarative, world- and kinematic-structure-entity-independent description of a connection.
 
     A connection joins two pre-existing entities, so it is *not* a
-    :class:`WorldEntitySpawnSpecification` (which materializes an entity and its own parent
-    connection). It is materialized via :meth:`connect`, which takes the ``child`` to attach.
+    :class:`SpawnSpecification` (which materializes an entity and its own parent connection). It is
+    materialized via :meth:`connect`, which takes the ``child`` to attach.
 
-    Each connection family is a concrete subclass that binds its :attr:`connection_type` and
-    carries exactly the parameters that family uses. Materializing a specification forwards those
-    parameters to the connection type's
+    Each connection family is a concrete subclass that binds the connection type as its generic
+    parameter (e.g. ``ConnectionSpecification[FixedConnection]``) and carries exactly the parameters
+    that family uses. Materializing a specification forwards those parameters to the connection type's
     :meth:`~semantic_digital_twin.world_description.world_entity.Connection.create_with_dofs`.
     """
 
@@ -653,9 +642,10 @@ class ConnectionSpecification(NamedSpecification, ABC):
     """
 
     @property
-    @abstractmethod
-    def connection_type(self) -> Type[Connection]:
-        """The connection type this specification materializes."""
+    def connection_type(self) -> Type[TConnection]:
+        """The connection type this specification materializes, from its bound generic parameter."""
+        [connection_type] = get_generic_type_params(self, ConnectionSpecification)
+        return connection_type
 
     def _create_with_dofs_kwargs(self) -> dict[str, Any]:
         """Forward every public dataclass field except the connection ``name`` to ``create_with_dofs``."""
@@ -723,26 +713,20 @@ class ConnectionSpecification(NamedSpecification, ABC):
 
 
 @dataclass
-class FixedConnectionSpecification(ConnectionSpecification):
+class FixedConnectionSpecification(ConnectionSpecification[FixedConnection]):
     """Specification for a rigid :class:`~semantic_digital_twin.world_description.connections.FixedConnection`."""
 
-    connection_type: ClassVar[Type[Connection]] = FixedConnection
-    """The connection type this specification materializes."""
-
 
 @dataclass
-class Connection6DoFSpecification(ConnectionSpecification):
+class Connection6DoFSpecification(ConnectionSpecification[Connection6DoF]):
     """Specification for a free-floating :class:`~semantic_digital_twin.world_description.connections.Connection6DoF`."""
 
-    connection_type: ClassVar[Type[Connection]] = Connection6DoF
-    """The connection type this specification materializes."""
-
 
 @dataclass
-class ActiveConnection1DOFSpecification(ConnectionSpecification, ABC):
+class ActiveConnection1DOFSpecification(ConnectionSpecification[TConnection], ABC):
     """
-    Specification for a single-DoF active connection. Concrete leaf subclasses bind the
-    :attr:`connection_type` (e.g. prismatic or revolute).
+    Specification for a single-DoF active connection. Concrete leaf subclasses bind the connection
+    type as their generic parameter (e.g. prismatic or revolute).
     """
 
     axis: Optional[Vector3] = None
@@ -778,19 +762,17 @@ class ActiveConnection1DOFSpecification(ConnectionSpecification, ABC):
 
 
 @dataclass
-class PrismaticConnectionSpecification(ActiveConnection1DOFSpecification):
+class PrismaticConnectionSpecification(
+    ActiveConnection1DOFSpecification[PrismaticConnection]
+):
     """Specification for a :class:`~semantic_digital_twin.world_description.connections.PrismaticConnection`."""
-
-    connection_type: ClassVar[Type[Connection]] = PrismaticConnection
-    """The connection type this specification materializes."""
 
 
 @dataclass
-class RevoluteConnectionSpecification(ActiveConnection1DOFSpecification):
+class RevoluteConnectionSpecification(
+    ActiveConnection1DOFSpecification[RevoluteConnection]
+):
     """Specification for a :class:`~semantic_digital_twin.world_description.connections.RevoluteConnection`."""
-
-    connection_type: ClassVar[Type[Connection]] = RevoluteConnection
-    """The connection type this specification materializes."""
 
 
 @dataclass
