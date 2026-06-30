@@ -156,3 +156,12 @@ class_diagram.pdf
 *_evaluated_tree.svg
 *_rdr.dot
 *_rdr.svg
+
+
+# segmind gitignore
+rgb/
+__pycache__/
+*.stl
+*.dae
+/.idea/*
+
