@@ -3,9 +3,19 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Iterable, Union, Optional, TYPE_CHECKING, cast
+from typing import (
+    Iterable,
+    Union,
+    Optional,
+    TYPE_CHECKING,
+    cast,
+    Type,
+    Any,
+    Generic,
+    List,
+)
 
-from typing_extensions import Self, Type, Any, Generic, List, TypeVar
+from typing_extensions import Self, TypeVar
 
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.patterns.subclass_safe_generic import AbstractSubClassSafeGeneric
@@ -538,16 +548,8 @@ class SemanticAnnotationWithRootSpecification(
             name=self._resolved_name(name), root=root_entity, **self.annotation_kwargs
         )
 
-        effective_pose = parent_T_self or (
-            self.root_specification.parent_T_self
-            if self.root_specification is not None
-            else None
-        )
-        children = (
-            self.root_specification.child_specification
-            if self.root_specification is not None
-            else ()
-        )
+        effective_pose = parent_T_self or self.root_specification.parent_T_self
+        children = self.root_specification.child_specification
 
         connection_specification = self.semantic_annotation_type._parent_connection_specification_type.from_kwargs(
             axis=self.axis,
@@ -750,12 +752,22 @@ class ConnectionSpecification(
 
 @dataclass
 class FixedConnectionSpecification(ConnectionSpecification[FixedConnection]):
-    """Specification for a rigid :class:`~semantic_digital_twin.world_description.connections.FixedConnection`."""
+    """
+    Declares a rigid :class:`~semantic_digital_twin.world_description.connections.FixedConnection`.
+
+    Use this when two entities should keep a constant relative pose and never move with respect
+    to each other.
+    """
 
 
 @dataclass
 class Connection6DoFSpecification(ConnectionSpecification[Connection6DoF]):
-    """Specification for a free-floating :class:`~semantic_digital_twin.world_description.connections.Connection6DoF`."""
+    """
+    Declares a free-floating :class:`~semantic_digital_twin.world_description.connections.Connection6DoF`.
+
+    Use this when an entity may move and rotate freely relative to its parent, such as an object
+    resting in the world that is not rigidly attached to anything.
+    """
 
 
 @dataclass
@@ -807,14 +819,24 @@ class ActiveConnection1DOFSpecification(ConnectionSpecification[TConnection], AB
 class PrismaticConnectionSpecification(
     ActiveConnection1DOFSpecification[PrismaticConnection]
 ):
-    """Specification for a :class:`~semantic_digital_twin.world_description.connections.PrismaticConnection`."""
+    """
+    Declares a :class:`~semantic_digital_twin.world_description.connections.PrismaticConnection`.
+
+    Use this for a single translational degree of freedom along the connection axis, such as a
+    drawer sliding in or out.
+    """
 
 
 @dataclass
 class RevoluteConnectionSpecification(
     ActiveConnection1DOFSpecification[RevoluteConnection]
 ):
-    """Specification for a :class:`~semantic_digital_twin.world_description.connections.RevoluteConnection`."""
+    """
+    Declares a :class:`~semantic_digital_twin.world_description.connections.RevoluteConnection`.
+
+    Use this for a single rotational degree of freedom about the connection axis, such as a door
+    swinging on its hinge.
+    """
 
 
 @dataclass

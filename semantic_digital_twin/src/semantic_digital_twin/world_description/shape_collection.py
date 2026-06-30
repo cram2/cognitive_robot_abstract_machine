@@ -119,7 +119,7 @@ class ShapeCollection(SubclassJSONSerializer):
             self._transform_shape_to_reference_frame(shape)
         self.shapes.append(shape)
 
-    def copy_without_reference_frame(self):
+    def copy_without_reference_frame(self) -> ShapeCollection:
         """
         Creates a copy of this shape collection without the reference frame.
         """

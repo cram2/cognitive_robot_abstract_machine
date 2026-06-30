@@ -45,10 +45,16 @@ class classproperty(Generic[T]):
     """
 
     def __init__(self, fget: Callable[[Type[Any]], T]) -> None:
+        """
+        Stores the accessor function invoked when the property is read on the owning class.
+        """
         self.fget = fget
         """The underlying accessor; receives the owning class and returns the property value."""
 
     def __get__(self, instance: Any, owner: Optional[Type[Any]] = None) -> T:
+        """
+        Returns the property value by invoking the accessor with the owning class.
+        """
         return self.fget(owner)
 
 

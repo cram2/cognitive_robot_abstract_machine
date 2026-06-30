@@ -265,9 +265,14 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         active_axis: Optional[Vector3] = None,
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
-        scale: Scale = None,
+        scale: Optional[Scale] = None,
         **kwargs,
     ) -> Self:
+        """
+        Robot-part bodies originate from the parsed URDF, so they cannot be spawned from scratch.
+
+        :raises UselessConceptError: Always, since robot-part bodies must already exist in the world.
+        """
         raise UselessConceptError(
             reason="The bodies needed for RobotParts should already exist in the world after parsing a URDF"
         )

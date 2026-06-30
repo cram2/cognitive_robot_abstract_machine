@@ -1041,7 +1041,12 @@ class World(HasSimulatorProperties):
 
     def remove_branch_from_world(self, root: KinematicStructureEntity):
         """
-        Removes a branch of kinematic structure entities and their connections from the world.
+        Removes the subtree rooted at ``root`` from the world.
+
+        Removes ``root`` together with all of its descendant kinematic structure entities, every
+        connection within the branch, and the branch's connection to its parent. The removals are
+        performed atomically.
+
         :param root: The root entity of the branch to be removed.
         """
         kinematic_structure_entities = self.get_kinematic_structure_entities_of_branch(

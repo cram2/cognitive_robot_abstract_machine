@@ -515,7 +515,7 @@ class UnknownPartWholeRelationshipField(UsageError):
 
     annotation: Type[HasRootBody]
     """
-    The annotation the part was being added to.
+    The annotation type the part was being added to.
     """
 
     field_name: str

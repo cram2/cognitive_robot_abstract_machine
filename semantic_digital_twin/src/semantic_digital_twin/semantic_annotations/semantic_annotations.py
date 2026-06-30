@@ -90,9 +90,10 @@ class Handle(HasRootBody):
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
         *,
-        scale: Scale = Scale(0.1, 0.02, 0.02),
+        scale: Optional[Scale] = None,
         thickness: float = 0.005,
     ) -> Self:
+        scale = scale if scale is not None else Scale(0.1, 0.02, 0.02)
         return cls.get_default_annotation_specification(
             name, scale=scale, thickness=thickness
         ).spawn(world, parent_T_self=world_root_T_self)
@@ -179,11 +180,12 @@ class Aperture(HasRootRegion):
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
         *,
-        scale: Scale = Scale(),
+        scale: Optional[Scale] = None,
     ) -> Self:
         """
         Create a new semantic annotation with a new region in the given world.
         """
+        scale = scale if scale is not None else Scale()
         return cls.get_default_annotation_specification(name, scale=scale).spawn(
             world, parent_T_self=world_root_T_self
         )
@@ -344,8 +346,9 @@ class Door(HasHandle, HasMechanicalJoint):
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
         *,
-        scale: Scale = Scale(0.03, 1, 2),
+        scale: Optional[Scale] = None,
     ) -> Self:
+        scale = scale if scale is not None else Scale(0.03, 1, 2)
         door = cls.get_default_annotation_specification(name, scale=scale).spawn(
             world, parent_T_self=world_root_T_self
         )
@@ -541,14 +544,15 @@ class Floor(HasSupportingSurface):
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
         *,
-        scale: Scale = Scale(),
+        scale: Optional[Scale] = None,
     ) -> Self:
         """
         Create a Floor semantic annotation with a new body defined by the given scale.
 
         :param name: The name of the floor body.
-        :param scale: The scale defining the floor polytope.
+        :param scale: The scale defining the floor polytope. Defaults to a unit :class:`Scale`.
         """
+        scale = scale if scale is not None else Scale()
         polytope = scale.to_bounding_box().get_points()
         return cls.create_with_new_body_from_polytope_in_world(
             name=name,
@@ -643,8 +647,9 @@ class Wall(HasApertures):
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
         *,
-        scale: Scale = Scale(),
+        scale: Optional[Scale] = None,
     ) -> Self:
+        scale = scale if scale is not None else Scale()
         return cls.get_default_annotation_specification(name, scale=scale).spawn(
             world, parent_T_self=world_root_T_self
         )

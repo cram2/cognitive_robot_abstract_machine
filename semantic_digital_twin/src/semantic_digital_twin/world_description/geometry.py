@@ -36,6 +36,9 @@ if TYPE_CHECKING:
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
+    from semantic_digital_twin.world_description.shape_collection import (
+        ShapeCollection,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -361,7 +364,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         """
         return self.copy_without_reference_frame()
 
-    def copy_without_reference_frame(self):
+    def copy_without_reference_frame(self) -> Self:
         """
         Creates a copy of this shape without the reference frame.
         """
@@ -376,7 +379,10 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         }
         return self.__class__(origin=new_origin, **new_props)
 
-    def as_shape_collection(self):
+    def as_shape_collection(self) -> ShapeCollection:
+        """
+        Wraps this shape in a single-element shape collection anchored to its reference frame.
+        """
         from semantic_digital_twin.world_description.shape_collection import (
             ShapeCollection,
         )

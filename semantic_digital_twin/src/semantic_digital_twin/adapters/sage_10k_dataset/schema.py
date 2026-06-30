@@ -284,8 +284,6 @@ class Sage10kWall(Sage10kWithID):
         return wall_length, yaw
 
     def create_in_world(self, world: World, directory: Path, parent: Body) -> Wall:
-        wall_name = PrefixedName(name=self.id)
-
         wall_length, yaw = self.wall_length_and_yaw
 
         wall_scale = Scale(x=self.thickness, y=wall_length, z=self.height)
@@ -303,7 +301,7 @@ class Sage10kWall(Sage10kWithID):
 
         with world.modify_world():
             annotation = Wall.create_with_new_body_in_world(
-                name=wall_name.name,
+                name=self.id,
                 scale=wall_scale,
                 world=world,
                 world_root_T_self=parent_T_wall,
@@ -601,8 +599,6 @@ class Sage10kDoor(Sage10kWithID):
         :param sage_10k_wall: The sage 10k wall that is referenced by `self.wall_id`.
         :param wall_annotation: The wall annotation created in `world` before this call.
         """
-        name = PrefixedName(name=self.id, prefix=sage_10k_wall.id)
-
         scale = Scale(x=sage_10k_wall.thickness, y=self.width, z=self.height)
 
         wall_length, _ = sage_10k_wall.wall_length_and_yaw
@@ -616,7 +612,7 @@ class Sage10kDoor(Sage10kWithID):
 
         with world.modify_world():
             annotation = DoorWithType.create_with_new_body_in_world(
-                name=name.name,
+                name=self.id,
                 scale=scale,
                 world=world,
                 world_root_T_self=world_root_T_self,
@@ -688,11 +684,10 @@ class Sage10kDoor(Sage10kWithID):
             )
 
         world_root_T_handle = world.transform(door_T_handle, world.root)
-        handle_name = PrefixedName(name=f"{self.id}_handle", prefix=self.id)
 
         with world.modify_world():
             handle = Handle.create_with_new_body_in_world(
-                name=handle_name.name,
+                name=f"{self.id}_handle",
                 world=world,
                 world_root_T_self=world_root_T_handle,
                 scale=Scale(0.05, 0.02, 0.2),
@@ -718,7 +713,7 @@ class Sage10kDoor(Sage10kWithID):
 
         with world.modify_world():
             hinge = Hinge.create_with_new_body_in_world(
-                name="hinge",
+                name=f"{self.id}_hinge",
                 world=world,
                 active_axis=Vector3.Z(),
                 world_root_T_self=world_root_T_hinge,
@@ -782,7 +777,6 @@ class Sage10kRoom(Sage10kWithID):
         :return: The annotation of the created floor.
         """
         # create the floor
-        floor_name = PrefixedName(name="floor", prefix=self.id)
         floor_mesh = Box(
             scale=Scale(x=self.dimensions.x, y=self.dimensions.y, z=0.01)
         ).mesh
@@ -808,7 +802,7 @@ class Sage10kRoom(Sage10kWithID):
             floor_annotation = Floor.create_with_new_body_in_world(
                 scale=Scale(x=self.dimensions.x, y=self.dimensions.y, z=0.01),
                 world=world,
-                name=floor_name.name,
+                name=f"{self.id}_floor",
                 world_root_T_self=parent_T_floor,
             )
 
