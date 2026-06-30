@@ -2,21 +2,16 @@ import time
 from dataclasses import dataclass, field
 from typing import Union
 
-import numpy as np
 import rclpy
-from builtin_interfaces.msg import Duration
-from geometry_msgs.msg import (
-    Vector3 as RosVector3,
-    Pose as RosPose,
-    Point as RosPoint,
-    Quaternion as RosQuaternion,
-)
 from rclpy.qos import QoSProfile, DurabilityPolicy
-from std_msgs.msg import ColorRGBA, Header
 from typing_extensions import Any
-from visualization_msgs.msg import MarkerArray, Marker
+from visualization_msgs.msg import MarkerArray
 
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
+from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer import (
+    PoseLikeMarkerRenderer,
+    SpatialTypeVisualization,
+)
 from semantic_digital_twin.callbacks.callback import (
     ModelChangeCallback,
 )
@@ -42,7 +37,7 @@ class PosePublisher(ModelChangeCallback):
     """
     text: str = None
     """
-    Text to display at the pose position 
+    Text to display at the pose position
     """
     topic_name: str = "/semworld/viz_marker"
     """
@@ -91,97 +86,29 @@ class PosePublisher(ModelChangeCallback):
 
     def _create_marker_array(self) -> MarkerArray:
         """
-        Creates a MarkerArray to visualize a Pose in RViz. The pose is visualized as an arrow for each axis to represent
-        the position and orientation of the pose.
+        Creates a MarkerArray to visualize the pose as an RGB axis triad, with an optional text label.
         """
-        marker_array = MarkerArray()
-        position = self.pose.to_position().to_np()[:3]
-        orientation = self.pose.to_rotation_matrix().to_quaternion().to_np()
-
-        p = RosPose(
-            position=RosPoint(**dict(zip(["x", "y", "z"], position.tolist()))),
-            orientation=RosQuaternion(
-                **dict(zip(["x", "y", "z", "w"], orientation.tolist()))
-            ),
+        reference_frame = self.pose.reference_frame
+        reference_frame_name = (
+            self.fixed_frame if reference_frame is None else str(reference_frame.name)
         )
-        for i in range(3):
-            axis = [0.0, 0.0, 0.0]
-            axis[i] = 0.5  # Defines the length of the arrow
-            color = [0.0, 0.0, 0.0, 1.0]
-            color[i] = 1.0
-
-            c = ColorRGBA(**dict(zip(["r", "g", "b", "a"], color)))
-
-            end_point = RosPoint(**dict(zip(["x", "y", "z"], np.array(axis).tolist())))
-
-            marker_array.markers.append(
-                self._create_marker(
-                    c,
-                    i,
-                    p,
-                    RosPoint(),
-                    end_point,
-                )
-            )
-        if self.text:
-            marker_array.markers.append(
-                Marker(
-                    action=Marker.ADD,
-                    type=Marker.TEXT_VIEW_FACING,
-                    text=self.text,
-                    ns=f"pose/{self.pose.reference_frame.name}/{id(self)}",
-                    id=4,
-                    frame_locked=True,
-                    pose=p,
-                    scale=RosVector3(z=0.1),
-                    lifetime=Duration(
-                        sec=(
-                            round(self.end_time - time.time())
-                            if self.lifetime > 0
-                            else 0
-                        )
-                    ),
-                    color=ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0),
-                    header=Header(
-                        frame_id=str(self.pose.reference_frame.name),
-                    ),
-                )
-            )
-        return marker_array
-
-    def _create_marker(
-        self,
-        color: ColorRGBA,
-        _id: int,
-        pose: RosPose,
-        start_point: RosPoint,
-        end_point: RosPoint,
-    ) -> Marker:
-        """
-        Creates a visualization marker for one axis of the pose.
-        :param color: The color of the axis.
-        :param _id: The id of the axis to identify the arrow.
-        :param pose: The pose to publish
-        :param start_point: The start point of the arrow.
-        :param end_point: The end point of the arrow.
-        """
-        m = Marker()
-        m.action = Marker.ADD
-        m.type = Marker.ARROW
-        m.id = _id
-        m.header.frame_id = str(self.pose.reference_frame.name)
-        m.pose = pose
-        m.lifetime = Duration(
-            sec=round(self.end_time - time.time()) if self.lifetime > 0 else 0
+        request = SpatialTypeVisualization(
+            spatial_type=self.pose,
+            namespace=f"pose/{reference_frame_name}/{id(self)}",
+            label=self.text,
+            lifetime_seconds=self._remaining_lifetime(),
         )
-        m.points = [start_point, end_point]
+        return MarkerArray(
+            markers=PoseLikeMarkerRenderer.render_markers(request, self.fixed_frame)
+        )
 
-        m.scale = RosVector3(x=0.025, y=0.05, z=0.1)
-        m.color = color
-        m.ns = f"pose/{self.pose.reference_frame.name}/{id(self)}"
-        m.frame_locked = True
-
-        return m
+    def _remaining_lifetime(self) -> float:
+        """
+        The remaining marker lifetime in seconds, or ``0`` if the markers should stay indefinitely.
+        """
+        if self.lifetime <= 0:
+            return 0.0
+        return self.end_time - time.time()
 
     def __hash__(self):
         return hash(id(self))

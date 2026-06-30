@@ -31,7 +31,7 @@ def test_marker_array(rclpy_node, cylinder_bot_world):
     assert len(marker.markers) == 3
 
     assert marker.markers[0].header.frame_id == str(cylinder_bot_world.root.name)
-    assert marker.markers[0].points[1].x == 0.5
+    assert marker.markers[0].points[1].x == 0.25
 
-    assert marker.markers[1].points[1].y == 0.5
-    assert marker.markers[2].points[1].z == 0.5
+    assert marker.markers[1].points[1].y == 0.25
+    assert marker.markers[2].points[1].z == 0.25

@@ -32,6 +32,10 @@ jobs:
             doc_path: doc
             artifact_name: random-events-doc
             use_container: false
+          - lib: giskardpy
+            doc_path: doc
+            artifact_name: giskardpy-doc
+            use_container: false
     uses: ./.github/workflows/build_doc_reusable.yml
     with:
       lib: ${{ matrix.lib }}
@@ -99,6 +103,12 @@ jobs:
         with:
           name: random-events-doc
           path: aggregate/random_events
+
+      - name: Download giskardpy-doc
+        uses: actions/download-artifact@v4
+        with:
+          name: giskardpy-doc
+          path: aggregate/giskardpy
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
