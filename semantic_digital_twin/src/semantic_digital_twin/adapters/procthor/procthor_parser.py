@@ -71,7 +71,7 @@ class ProcthorDoor:
     Thickness of the door, since the door dictionary only provides a 2d polygon.
     """
 
-    name: PrefixedName = field(init=False)
+    name: str = field(init=False)
     """
     Name of the door, constructed from the assetId and room numbers.
     """
@@ -103,9 +103,7 @@ class ProcthorDoor:
         asset_id = self.door_dict["assetId"]
         room_numbers = self.door_dict["id"].split("|")[1:]
 
-        self.name = PrefixedName(
-            f"{asset_id}_room{room_numbers[0]}_room{room_numbers[1]}"
-        )
+        self.name = f"{asset_id}_room{room_numbers[0]}_room{room_numbers[1]}"
 
         hole_polygon = self.door_dict["holePolygon"]
 
@@ -158,9 +156,7 @@ class ProcthorDoor:
         doors = []
 
         for index, direction in enumerate(handle_directions):
-            single_door_name = PrefixedName(
-                f"{self.name.name}_{index}", self.name.prefix
-            )
+            single_door_name = f"{self.name}_{index}"
 
             horizontal_direction = (
                 HorizontalSemanticDirection.RIGHT
@@ -196,7 +192,7 @@ class ProcthorDoor:
             doors.append(door)
 
         double_door = DoubleDoor(
-            name=self.name,
+            name=PrefixedName(self.name),
             door_0=doors[0],
             door_1=doors[1],
         )
@@ -208,7 +204,7 @@ class ProcthorDoor:
         self,
         semantic_handle_position: SemanticPositionDescription,
         world: World,
-        name: Optional[PrefixedName] = None,
+        name: Optional[str] = None,
         scale: Optional[Scale] = None,
         world_T_door: Optional[HomogeneousTransformationMatrix] = None,
     ) -> Door:
@@ -228,7 +224,7 @@ class ProcthorDoor:
         world_T_door = world_T_door or self.world_T_parent_wall @ self.wall_T_door
         world_T_handle = world_T_door @ door_T_handle
 
-        handle_name = PrefixedName(f"{name.name}_handle", name.prefix)
+        handle_name = f"{name}_handle"
         with world.modify_world():
             handle = Handle.create_with_new_body_in_world(
                 name=handle_name,
@@ -247,7 +243,7 @@ class ProcthorDoor:
         with world.modify_world():
             world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
             hinge = Hinge.create_with_new_body_in_world(
-                name=PrefixedName(f"{name.name}_hinge", name.prefix),
+                name=f"{name}_hinge",
                 world=world,
                 world_root_T_self=world_T_hinge,
                 active_axis=Vector3.Z(),
@@ -262,7 +258,7 @@ class ProcthorDoor:
         depending on its name. If the door's name contains "double", it is treated as a double door.
         """
 
-        if "double" in self.name.name.lower():
+        if "double" in self.name.lower():
             return self._add_double_door_to_world(world)
         else:
             semantic_position = SemanticPositionDescription(
@@ -302,7 +298,7 @@ class ProcthorWall:
     Thickness of the wall, since the wall dictionary only provides a 2d polygon.
     """
 
-    name: PrefixedName = field(init=False)
+    name: str = field(init=False)
     """
     Name of the wall, constructed from the corners of the wall polygon and the room numbers associated with the wall.
     """
@@ -368,9 +364,7 @@ class ProcthorWall:
 
         room_numbers = [w["id"].split("|")[1] for w in self.wall_dicts]
         corners = used_wall["id"].split("|")[2:]
-        self.name = PrefixedName(
-            f"wall_{corners[0]}_{corners[1]}_{corners[2]}_{corners[3]}_room{room_numbers[0]}_room{room_numbers[1]}"
-        )
+        self.name = f"wall_{corners[0]}_{corners[1]}_{corners[2]}_{corners[3]}_room{room_numbers[0]}_room{room_numbers[1]}"
 
     @cached_property
     def scale(self) -> Scale:
@@ -450,7 +444,7 @@ class ProcthorRoom:
     Dictionary representing a room from Procthor's JSON format.
     """
 
-    name: PrefixedName = field(init=False)
+    name: str = field(init=False)
     """
     Name of the room, constructed from the room type and room ID.
     """
@@ -483,7 +477,7 @@ class ProcthorRoom:
         ]
 
         room_id = self.room_dict["id"].split("|")[-1]
-        self.name = PrefixedName(f"{self.room_dict['roomType']}_{room_id}")
+        self.name = f"{self.room_dict['roomType']}_{room_id}"
 
     @cached_property
     def world_T_room(self) -> HomogeneousTransformationMatrix:
@@ -499,7 +493,7 @@ class ProcthorRoom:
         """
         Returns a World instance with this room as a Region at its root.
         """
-        floor_name = PrefixedName(f"{self.name.name}_floor", self.name.prefix)
+        floor_name = f"{self.name}_floor"
         with world.modify_world():
             floor = Floor.create_with_new_body_from_polytope_in_world(
                 name=floor_name,
@@ -507,16 +501,17 @@ class ProcthorRoom:
                 floor_polytope=self.centered_polytope,
                 world_root_T_self=self.world_T_room,
             )
-        if "Bedroom" in self.name.name:
-            room = Bedroom(name=self.name, floor=floor)
-        elif "LivingRoom" in self.name.name:
-            room = LivingRoom(name=self.name, floor=floor)
-        elif "Kitchen" in self.name.name:
-            room = Kitchen(name=self.name, floor=floor)
-        elif "Bathroom" in self.name.name:
-            room = Bathroom(name=self.name, floor=floor)
+        room_name = PrefixedName(self.name)
+        if "Bedroom" in self.name:
+            room = Bedroom(name=room_name, floor=floor)
+        elif "LivingRoom" in self.name:
+            room = LivingRoom(name=room_name, floor=floor)
+        elif "Kitchen" in self.name:
+            room = Kitchen(name=room_name, floor=floor)
+        elif "Bathroom" in self.name:
+            room = Bathroom(name=room_name, floor=floor)
         else:
-            assert_never(self.name.name)
+            assert_never(self.name)
 
         with world.modify_world():
             world.add_semantic_annotation(room)
@@ -704,8 +699,6 @@ class ProcTHORParser:
             obj_world = procthor_object.get_world()
             if obj_world is None:
                 continue
-            # for kse in obj_world.kinematic_structure_entities:
-            #     kse.name.name += f"_{id(obj)}"
             obj_connection = FixedConnection(
                 parent=world.root,
                 child=obj_world.root,

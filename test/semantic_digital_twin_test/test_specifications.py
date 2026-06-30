@@ -246,7 +246,7 @@ def test_body_specification_from_3d_points_matches_direct_construction():
 
 def test_has_root_body_default_specification_without_scale_is_geometryless(empty_world):
     """A scale-less body factory yields a bare body, mirrored by an empty body spec."""
-    spec = HasRootBody.get_default_body_specification(PrefixedName("bare_body"))
+    spec = HasRootBody.get_default_body_specification("bare_body")
     assert isinstance(spec, BodySpecification)
 
     body = spec.spawn(empty_world)
@@ -258,7 +258,7 @@ def test_has_root_region_default_specification_without_scale_is_geometryless(
     empty_world,
 ):
     """The base region factory creates a bare region, mirrored by an empty region spec."""
-    spec = HasRootRegion.get_default_region_specification(PrefixedName("bare_region"))
+    spec = HasRootRegion.get_default_region_specification("bare_region")
     assert isinstance(spec, RegionSpecification)
 
     region = spec.spawn(empty_world)
@@ -338,13 +338,6 @@ def test_body_and_connection_6dof(empty_world):
     )
     body = spec.spawn(empty_world)
     assert isinstance(body.parent_connection, Connection6DoF)
-
-
-def test_connected_body_specification_name_defaults_to_body_name():
-    spec = ConnectedBodySpecification(
-        body_specification=BodySpecification.box("box", Scale(1, 1, 1))
-    )
-    assert spec.name == "box"
 
 
 def test_spawn_positional_name(empty_world):
@@ -573,7 +566,7 @@ def test_default_spec_matches_base_body(empty_world):
     scale = Scale(0.2, 0.3, 0.4)
     with empty_world.modify_world():
         factory = Milk.create_with_new_body_in_world(
-            name=PrefixedName("milk"), world=empty_world, scale=scale
+            name="milk", world=empty_world, scale=scale
         )
     spec_body = Milk.get_default_body_specification("milk", scale).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
@@ -584,7 +577,7 @@ def test_default_spec_matches_case_body(empty_world):
     scale = Scale(0.3, 0.4, 0.5)
     with empty_world.modify_world():
         factory = Drawer.create_with_new_body_in_world(
-            name=PrefixedName("drawer"), world=empty_world, scale=scale
+            name="drawer", world=empty_world, scale=scale
         )
     spec_body = Drawer.get_default_body_specification(
         "drawer", scale
@@ -597,7 +590,7 @@ def test_default_spec_matches_case_body_with_wall_thickness(empty_world):
     scale = Scale(0.4, 0.5, 0.6)
     with empty_world.modify_world():
         factory = Drawer.create_with_new_body_in_world(
-            name=PrefixedName("drawer"),
+            name="drawer",
             world=empty_world,
             scale=scale,
             wall_thickness=0.05,
@@ -612,7 +605,7 @@ def test_default_spec_matches_handle(empty_world):
     scale = Scale(0.1, 0.05, 0.05)
     with empty_world.modify_world():
         factory = Handle.create_with_new_body_in_world(
-            name=PrefixedName("handle"), world=empty_world, scale=scale, thickness=0.01
+            name="handle", world=empty_world, scale=scale, thickness=0.01
         )
     spec_body = Handle.get_default_body_specification(
         "handle", scale, thickness=0.01
@@ -624,7 +617,7 @@ def test_default_spec_matches_door(empty_world):
     scale = Scale(0.03, 1, 2)
     with empty_world.modify_world():
         factory = Door.create_with_new_body_in_world(
-            name=PrefixedName("door"), world=empty_world, scale=scale
+            name="door", world=empty_world, scale=scale
         )
     spec_body = Door.get_default_body_specification("door", scale).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
@@ -639,7 +632,7 @@ def test_default_spec_matches_floor(empty_world):
     scale = Scale(2, 2, 0.1)
     with empty_world.modify_world():
         factory = Floor.create_with_new_body_in_world(
-            name=PrefixedName("floor"), world=empty_world, scale=scale
+            name="floor", world=empty_world, scale=scale
         )
     spec_body = Floor.get_default_body_specification("floor", scale).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
@@ -649,7 +642,7 @@ def test_default_spec_matches_wall(empty_world):
     scale = Scale(0.1, 4, 2)
     with empty_world.modify_world():
         factory = Wall.create_with_new_body_in_world(
-            name=PrefixedName("wall"), world=empty_world, scale=scale
+            name="wall", world=empty_world, scale=scale
         )
     spec_body = Wall.get_default_body_specification("wall", scale).to_domain_object()
     _assert_same_geometry(spec_body.collision, factory.root.collision)
@@ -659,7 +652,7 @@ def test_default_spec_matches_aperture_region(empty_world):
     scale = Scale(0.1, 1, 2)
     with empty_world.modify_world():
         factory = Aperture.create_with_new_region_in_world(
-            name=PrefixedName("aperture"), world=empty_world, scale=scale
+            name="aperture", world=empty_world, scale=scale
         )
     spec_region = Aperture.get_default_region_specification(
         "aperture", scale
@@ -703,7 +696,7 @@ def test_annotation_spec_base_body(empty_world):
     factory_world = _fresh_world()
     with factory_world.modify_world():
         factory = Milk.create_with_new_body_in_world(
-            name=PrefixedName("milk_factory"), world=factory_world, scale=scale
+            name="milk_factory", world=factory_world, scale=scale
         )
     _assert_same_geometry(annotation.root.collision, factory.root.collision)
 
@@ -734,7 +727,7 @@ def test_annotation_spec_case_forwards_wall_thickness(empty_world):
     factory_world = _fresh_world()
     with factory_world.modify_world():
         factory = Drawer.create_with_new_body_in_world(
-            name=PrefixedName("drawer_factory"),
+            name="drawer_factory",
             world=factory_world,
             scale=scale,
             wall_thickness=0.05,
@@ -749,7 +742,7 @@ def test_annotation_spec_handle_forwards_thickness(empty_world):
     factory_world = _fresh_world()
     with factory_world.modify_world():
         factory = Handle.create_with_new_body_in_world(
-            name=PrefixedName("handle_factory"),
+            name="handle_factory",
             world=factory_world,
             scale=scale,
             thickness=0.01,
@@ -767,7 +760,7 @@ def test_annotation_spec_aperture_region(empty_world):
     factory_world = _fresh_world()
     with factory_world.modify_world():
         factory = Aperture.create_with_new_region_in_world(
-            name=PrefixedName("aperture_factory"), world=factory_world, scale=scale
+            name="aperture_factory", world=factory_world, scale=scale
         )
     _assert_same_geometry(annotation.root.area, factory.root.area)
 
@@ -1031,15 +1024,15 @@ def test_nested_composite_matches_imperative(empty_world):
     imperative_world = _fresh_world()
     with imperative_world.modify_world():
         imperative_drawer = Drawer.create_with_new_body_in_world(
-            name=PrefixedName("drawer_imperative"), world=imperative_world, scale=scale
+            name="drawer_imperative", world=imperative_world, scale=scale
         )
         imperative_handle = Handle.create_with_new_body_in_world(
-            name=PrefixedName("handle_imperative"),
+            name="handle_imperative",
             world=imperative_world,
             scale=handle_scale,
         )
         imperative_hinge = Hinge.create_with_new_body_in_world(
-            name=PrefixedName("hinge_imperative"),
+            name="hinge_imperative",
             world=imperative_world,
             scale=hinge_scale,
             active_axis=Vector3.Z(),

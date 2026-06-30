@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Iterable, Optional, Self, Tuple, Union, TYPE_CHECKING
+from typing import Iterable, Optional, Self, Tuple, TYPE_CHECKING
 
 from typing_extensions import List, Type
 
@@ -82,7 +82,7 @@ class Handle(HasRootBody):
     @classmethod
     def create_with_new_body_in_world(
         cls,
-        name: PrefixedName,
+        name: str,
         world: World,
         world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
         connection_limits: Optional[DegreeOfFreedomLimits] = None,
@@ -126,7 +126,7 @@ class Handle(HasRootBody):
     @classmethod
     def get_default_body_specification(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         scale: Optional[Scale] = None,
         *,
         thickness: float = 0.005,
@@ -171,7 +171,7 @@ class Aperture(HasRootRegion):
     @classmethod
     def create_with_new_region_in_world(
         cls,
-        name: PrefixedName,
+        name: str,
         world: World,
         world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
         connection_limits: Optional[DegreeOfFreedomLimits] = None,
@@ -191,7 +191,7 @@ class Aperture(HasRootRegion):
     @classmethod
     def create_with_new_region_in_world_from_body(
         cls,
-        name: PrefixedName,
+        name: str,
         world: World,
         body: Body,
         parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
@@ -237,7 +237,7 @@ class Aperture(HasRootRegion):
     @classmethod
     def get_default_region_specification(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         scale: Optional[Scale] = None,
     ) -> RegionSpecification:
         """
@@ -255,7 +255,7 @@ class Aperture(HasRootRegion):
 
     @classmethod
     def _default_root_specification(
-        cls, name: Union[str, PrefixedName], *args, **kwargs
+        cls, name: str, *args, **kwargs
     ) -> RegionSpecification:
         """Root spec for the Aperture annotation: its default region area geometry spec."""
         return cls.get_default_region_specification(name, *args, **kwargs)
@@ -336,7 +336,7 @@ class Door(HasHandle, HasMechanicalJoint):
     @classmethod
     def create_with_new_body_in_world(
         cls,
-        name: PrefixedName,
+        name: str,
         world: World,
         world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
         connection_limits: Optional[DegreeOfFreedomLimits] = None,
@@ -354,10 +354,8 @@ class Door(HasHandle, HasMechanicalJoint):
         #       part-whole annotation spec, so it is built imperatively here for now (see
         #       SemanticAnnotationWithRootSpecification.annotation_kwargs handling). Deprecate this
         #       once the EntryWay can be declared on the door's specification.
-        entry_way_name = PrefixedName(name.name + "entry_way", name.prefix)
-        entry_way_region_name = PrefixedName(
-            name.name + "entry_way_region", name.prefix
-        )
+        entry_way_name = PrefixedName(name + "entry_way")
+        entry_way_region_name = PrefixedName(name + "entry_way_region")
         entry_way_region = Region(
             name=entry_way_region_name,
             area=ShapeCollection([Mesh.from_trimesh(mesh=door.root.combined_mesh)]),
@@ -373,7 +371,7 @@ class Door(HasHandle, HasMechanicalJoint):
     @classmethod
     def get_default_body_specification(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         scale: Optional[Scale] = None,
     ) -> BodySpecification:
         """
@@ -535,7 +533,7 @@ class Floor(HasSupportingSurface):
     @classmethod
     def create_with_new_body_in_world(
         cls,
-        name: PrefixedName,
+        name: str,
         world: World,
         world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
         connection_limits: Optional[DegreeOfFreedomLimits] = None,
@@ -562,7 +560,7 @@ class Floor(HasSupportingSurface):
     @classmethod
     def create_with_new_body_from_polytope_in_world(
         cls,
-        name: PrefixedName,
+        name: str,
         world: World,
         floor_polytope: List[Point3],
         world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
@@ -582,7 +580,7 @@ class Floor(HasSupportingSurface):
     @classmethod
     def get_default_body_specification(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         scale: Optional[Scale] = None,
     ) -> BodySpecification:
         """
@@ -637,7 +635,7 @@ class Wall(HasApertures):
     @classmethod
     def create_with_new_body_in_world(
         cls,
-        name: PrefixedName,
+        name: str,
         world: World,
         world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
         connection_limits: Optional[DegreeOfFreedomLimits] = None,
@@ -681,7 +679,7 @@ class Wall(HasApertures):
     @classmethod
     def get_default_body_specification(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         scale: Optional[Scale] = None,
     ) -> BodySpecification:
         """

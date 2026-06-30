@@ -341,7 +341,7 @@ class MissingConnectionChildError(UsageError):
     Raised when a connection is spawned without a child kinematic structure entity.
     """
 
-    connection_name: Optional[PrefixedName]
+    connection_name: Optional[str]
     """
     The name of the connection specification that was spawned without a child.
     """
@@ -351,6 +351,24 @@ class MissingConnectionChildError(UsageError):
 
     def suggest_correction(self) -> str:
         return "pass the child entity via the 'child' keyword argument of connect."
+
+
+@dataclass
+class MissingConnectionParentError(UsageError):
+    """
+    Raised when a connection is spawned without a parent kinematic structure entity.
+    """
+
+    connection_name: Optional[str]
+    """
+    The name of the connection specification that was spawned without a child.
+    """
+
+    def error_message(self) -> str:
+        return f"Connecting the connection '{self.connection_name}' requires a parent kinematic structure entity."
+
+    def suggest_correction(self) -> str:
+        return "pass the parent entity via the 'parent' keyword argument of connect."
 
 
 @dataclass

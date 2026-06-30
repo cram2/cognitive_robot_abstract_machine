@@ -1,10 +1,8 @@
-import uuid
 from dataclasses import dataclass
 
-from krrood.entity_query_language.predicate import Symbol
-from typing_extensions import Optional, Dict, Any, Self
+from typing_extensions import Optional
 
-from krrood.adapters.json_serializer import SubclassJSONSerializer
+from krrood.entity_query_language.predicate import Symbol
 
 
 @dataclass
@@ -39,14 +37,3 @@ class PrefixedName(Symbol):
 
     def __ge__(self, other):
         return str(self) >= str(other)
-
-
-def ensure_prefixed_name(
-    name: Optional[str | PrefixedName],
-) -> PrefixedName:
-    """
-    Normalize a name into a :class:`PrefixedName`, wrapping a bare string, or if None is the input, generating a random name.
-    """
-    if name is None:
-        return PrefixedName(name=f"name_{uuid.uuid4()}")
-    return PrefixedName(name) if isinstance(name, str) else name

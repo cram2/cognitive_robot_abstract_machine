@@ -258,7 +258,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
     @classmethod
     def create_with_new_body_in_world(
         cls,
-        name: PrefixedName,
+        name: str,
         world: World,
         world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
         connection_limits: Optional[DegreeOfFreedomLimits] = None,
@@ -275,7 +275,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
     @classmethod
     def get_default_body_specification(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         scale: Optional[Scale] = None,
     ) -> BodySpecification:
         """

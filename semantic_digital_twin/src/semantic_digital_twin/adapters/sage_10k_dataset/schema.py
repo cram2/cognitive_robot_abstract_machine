@@ -303,7 +303,7 @@ class Sage10kWall(Sage10kWithID):
 
         with world.modify_world():
             annotation = Wall.create_with_new_body_in_world(
-                name=wall_name,
+                name=wall_name.name,
                 scale=wall_scale,
                 world=world,
                 world_root_T_self=parent_T_wall,
@@ -616,7 +616,7 @@ class Sage10kDoor(Sage10kWithID):
 
         with world.modify_world():
             annotation = DoorWithType.create_with_new_body_in_world(
-                name=name,
+                name=name.name,
                 scale=scale,
                 world=world,
                 world_root_T_self=world_root_T_self,
@@ -692,7 +692,7 @@ class Sage10kDoor(Sage10kWithID):
 
         with world.modify_world():
             handle = Handle.create_with_new_body_in_world(
-                name=handle_name,
+                name=handle_name.name,
                 world=world,
                 world_root_T_self=world_root_T_handle,
                 scale=Scale(0.05, 0.02, 0.2),
@@ -718,7 +718,7 @@ class Sage10kDoor(Sage10kWithID):
 
         with world.modify_world():
             hinge = Hinge.create_with_new_body_in_world(
-                name=PrefixedName(name="hinge", prefix=door.root.name.name),
+                name="hinge",
                 world=world,
                 active_axis=Vector3.Z(),
                 world_root_T_self=world_root_T_hinge,
@@ -808,7 +808,7 @@ class Sage10kRoom(Sage10kWithID):
             floor_annotation = Floor.create_with_new_body_in_world(
                 scale=Scale(x=self.dimensions.x, y=self.dimensions.y, z=0.01),
                 world=world,
-                name=floor_name,
+                name=floor_name.name,
                 world_root_T_self=parent_T_floor,
             )
 

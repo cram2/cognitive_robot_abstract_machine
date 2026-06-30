@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Iterable, Union, Optional, TYPE_CHECKING
+from typing import Iterable, Union, Optional, TYPE_CHECKING, cast
 
 from typing_extensions import Self, Type, Any, Generic, List, TypeVar
 
@@ -20,6 +20,7 @@ from semantic_digital_twin.exceptions import (
     PartWholeCardinalityError,
     PartWholeFieldInAnnotationKwargs,
     UnknownPartWholeRelationshipField,
+    MissingConnectionParentError,
 )
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -84,17 +85,21 @@ class NamedSpecification(ABC):
 
     name: Optional[str]
     """
-    The name of entities created from this specification, as a plain string. It is wrapped into a
-    :class:`PrefixedName` only at materialization time. ``None`` defers naming to materialization
-    (the spec's own name fallback or the domain object's / connection's default name generation).
+    The name of entities created from this specification, as a plain string. ``None`` defers naming to 
+    materialization.
     """
 
     def _resolved_name(self, name: Optional[str] = None) -> Optional[PrefixedName]:
-        """Wrap the spawn-time name override, or the spec's own name, into a :class:`PrefixedName`."""
+        """
+        Normalize the spawn-time name override, or the spec's own name, into a :class:`PrefixedName`.
+
+        An already-prefixed name is returned unchanged; a bare string is wrapped. ``None`` is
+        preserved so materialization can fall back to default name generation.
+        """
         used_name = name if name is not None else self.name
-        if used_name is not None:
-            used_name = PrefixedName(name=used_name)
-        return used_name
+        if used_name is None:
+            return None
+        return PrefixedName(name=used_name)
 
 
 @dataclass
@@ -213,6 +218,13 @@ class KinematicStructureEntitySpecification(
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> TKinematicStructureEntity:
+        """
+        Materialize the entity and attach it to ``parent`` via a fixed connection.
+
+        :param parent: The entity to attach to. If None, ``world.root`` is used.
+        :param parent_T_self: Overrides the specification's stored default pose. If None, the stored default is used.
+        :param name: Overrides the specification's own name. If None, the spec's name is used.
+        """
         return self._spawn_attached(
             world, FixedConnectionSpecification(), name, parent, parent_T_self
         )
@@ -392,6 +404,12 @@ class KinematicStructureEntitySpecification(
 
 @dataclass
 class BodySpecification(KinematicStructureEntitySpecification[Body]):
+    """
+    Declarative description of a :class:`~semantic_digital_twin.world_description.world_entity.Body`.
+
+    Extends the kinematic-structure-entity specification with body-only properties: inertial
+    parameters and a separate visual shape collection.
+    """
 
     inertial: Optional[Inertial] = None
     """
@@ -423,7 +441,12 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
 
 @dataclass
 class RegionSpecification(KinematicStructureEntitySpecification[Region]):
-    pass
+    """
+    Declarative description of a :class:`~semantic_digital_twin.world_description.world_entity.Region`.
+
+    Carries no fields beyond the base kinematic-structure-entity specification; it only binds the
+    materialized domain-object type to :class:`Region`.
+    """
 
 
 @dataclass
@@ -489,7 +512,7 @@ class SemanticAnnotationWithRootSpecification(
     """
 
     def __post_init__(self):
-        # Validate at construction so misuse fails fast, before any world mutation.
+        """Validate the annotation kwargs and part specifications so misuse fails fast, before any world mutation."""
         self._validate_annotation_kwargs()
         self._validate_part_specifications(self.semantic_annotation_type)
 
@@ -500,7 +523,15 @@ class SemanticAnnotationWithRootSpecification(
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> HasRootKinematicStructureEntity:
+        """
+        Materialize the annotation in ``world``: spawn its root entity, attach it to ``parent`` via the
+        annotation's parent connection, register the annotation, and spawn its geometry children and
+        mounted part specifications.
 
+        :param parent: The entity to attach the root to. If None, ``world.root`` is used.
+        :param parent_T_self: Overrides the root specification's stored default pose.
+        :param name: Overrides the specification's own name. If None, the spec's name is used.
+        """
         root_entity = self.root_specification.to_domain_object(name or self.name)
 
         instance = self.semantic_annotation_type(
@@ -650,11 +681,14 @@ class ConnectionSpecification(
     def _create_with_dofs_kwargs(self) -> dict[str, Any]:
         """Forward every public dataclass field except the connection ``name`` to ``create_with_dofs``."""
         discovered_attributes = DataclassOnlyIntrospector().discover(type(self))
-        return {
-            attribute.public_name: getattr(self, attribute.public_name)
-            for attribute in discovered_attributes
-            if attribute.public_name != "name"
-        }
+        instance_values = vars(self)
+        result = {}
+        for attribute in discovered_attributes:
+            public_name = cast(str, attribute.public_name)
+            if public_name != "name":
+                result[public_name] = instance_values[public_name]
+
+        return result
 
     @classmethod
     def from_kwargs(
@@ -690,6 +724,8 @@ class ConnectionSpecification(
             raise MissingConnectionChildError(connection_name=self.name)
 
         parent = parent or world.root
+        if parent is None:
+            raise MissingConnectionParentError(connection_name=self.name)
 
         parent_T_connection = (
             deepcopy(parent_T_connection)
@@ -752,6 +788,12 @@ class ActiveConnection1DOFSpecification(ConnectionSpecification[TConnection], AB
         dof_limits: Optional[DegreeOfFreedomLimits] = None,
         **_,
     ) -> Self:
+        """
+        Instantiate the specification from the single-DoF parameters (axis, multiplier, offset, limits).
+
+        Parameters this connection family does not use are ignored, so a caller holding a bare
+        specification type can parameterize any family uniformly.
+        """
         return cls(
             name=name,
             axis=axis,
@@ -796,10 +838,6 @@ class ConnectedBodySpecification(SpawnSpecification):
     How the spawned body is connected to its parent. A fixed connection by default.
     """
 
-    def __post_init__(self):
-        if self.name is None:
-            self.name = self.body_specification.name
-
     def spawn(
         self,
         world: World,
@@ -807,6 +845,13 @@ class ConnectedBodySpecification(SpawnSpecification):
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> Body:
+        """
+        Materialize the body and attach it to ``parent`` via the wrapped connection specification.
+
+        :param parent: The entity to attach to. If None, ``world.root`` is used.
+        :param parent_T_self: Overrides the body specification's stored default pose.
+        :param name: Overrides the specification's own name. If None, the spec's name is used.
+        """
         return self.body_specification._spawn_attached(
             world, self.connection_specification, name, parent, parent_T_self
         )

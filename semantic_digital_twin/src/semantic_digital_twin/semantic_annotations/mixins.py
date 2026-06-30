@@ -16,7 +16,6 @@ from typing_extensions import (
     Self,
     Set,
     Type,
-    Union,
 )
 
 from krrood.class_diagrams.class_diagram import WrappedClass
@@ -140,14 +139,14 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
     @classmethod
     @abstractmethod
     def _default_root_specification(
-        cls, name: Union[str, PrefixedName], *args, **kwargs
+        cls, name: str, *args, **kwargs
     ) -> KinematicStructureEntitySpecification:
         """Root spec for a kinematic structure entitiy-rooted annotation: its default geometry spec."""
 
     @classmethod
     def get_default_annotation_specification(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         *geometry_args,
         active_axis: Optional[Vector3] = None,
         connection_multiplier: float = 1.0,
@@ -242,7 +241,7 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
     @classmethod
     def create_with_new_body_in_world(
         cls,
-        name: PrefixedName,
+        name: str,
         world: World,
         world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
         connection_limits: Optional[DegreeOfFreedomLimits] = None,
@@ -250,7 +249,6 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
         scale: Scale = None,
-        **kwargs,
     ) -> Self:
         """
         Create a new semantic annotation with a new body in the given world.
@@ -277,7 +275,7 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
     @classmethod
     def get_default_body_specification(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         scale: Optional[Scale] = None,
     ) -> BodySpecification:
         """
@@ -300,7 +298,7 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
 
     @classmethod
     def _default_root_specification(
-        cls, name: Union[str, PrefixedName], *args, **kwargs
+        cls, name: str, *args, **kwargs
     ) -> BodySpecification:
         return cls.get_default_body_specification(name, *args, **kwargs)
 
@@ -319,7 +317,7 @@ class HasRootRegion(HasRootKinematicStructureEntity, ABC):
     @classmethod
     def create_with_new_region_in_world(
         cls,
-        name: PrefixedName,
+        name: str,
         world: World,
         world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
         connection_limits: Optional[DegreeOfFreedomLimits] = None,
@@ -351,7 +349,7 @@ class HasRootRegion(HasRootKinematicStructureEntity, ABC):
     @classmethod
     def get_default_region_specification(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         scale: Optional[Scale] = None,
     ) -> RegionSpecification:
         """
@@ -371,7 +369,7 @@ class HasRootRegion(HasRootKinematicStructureEntity, ABC):
 
     @classmethod
     def _default_root_specification(
-        cls, name: Union[str, PrefixedName], *args, **kwargs
+        cls, name: str, *args, **kwargs
     ) -> RegionSpecification:
         return cls.get_default_region_specification(name, *args, **kwargs)
 
@@ -938,7 +936,7 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
     @classmethod
     def create_with_new_body_in_world(
         cls,
-        name: PrefixedName,
+        name: str,
         world: World,
         world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
         connection_limits: Optional[DegreeOfFreedomLimits] = None,
@@ -996,8 +994,8 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
     @classmethod
     def get_default_body_specification(
         cls,
-        name: Union[str, PrefixedName],
-        scale: Scale,
+        name: str,
+        scale: Scale = None,
         *,
         wall_thickness: float = 0.01,
     ) -> BodySpecification:
