@@ -214,15 +214,30 @@ def test_world_specification_robotless(empty_world):
     world = WorldSpecification(
         world=empty_world,
         starting_objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
-    ).to_world()
+    ).to_domain_object()
     assert not world.is_empty()
     assert world.get_body_by_name("obj") is not None
+
+
+def test_to_domain_object_does_not_mutate_stored_world(empty_world):
+    spec = WorldSpecification(
+        world=empty_world,
+        starting_objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
+    )
+    first = spec.to_domain_object()
+    second = spec.to_domain_object()
+
+    assert len(spec.world.bodies) == 1
+    assert first is not spec.world
+    assert first is not second
+    assert len(first.bodies) == 2
+    assert len(second.bodies) == 2
 
 
 def test_world_specification_from_urdf_environment():
     world = WorldSpecification.from_urdf(
         os.path.join(RESOURCE_DIR, "urdf", "table.urdf")
-    ).to_world()
+    ).to_domain_object()
     assert not world.is_empty()
     assert world.root is not None
 
@@ -231,7 +246,7 @@ def test_world_specification_from_mjcf_environment():
     pytest.importorskip("mujoco")
     world = WorldSpecification.from_mjcf(
         os.path.join(RESOURCE_DIR, "mjcf", "table.xml")
-    ).to_world()
+    ).to_domain_object()
     assert not world.is_empty()
     assert world.root is not None
 
@@ -381,7 +396,7 @@ def test_world_specification_with_robot(empty_world):
             drive_connection_type=OmniDrive,
             world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
             odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(y=2.0),
-        ).to_world()
+        ).to_domain_object()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
@@ -403,7 +418,7 @@ def test_world_specification_from_urdf_with_robot():
             os.path.join(RESOURCE_DIR, "urdf", "table.urdf"),
             robot_semantic_annotation=PR2,
             drive_connection_type=OmniDrive,
-        ).to_world()
+        ).to_domain_object()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
@@ -424,7 +439,7 @@ def test_world_specification_annotation_starting_object(empty_world):
                 root_specification=BodySpecification.box("milk", Scale(0.1, 0.1, 0.2)),
             )
         ],
-    ).to_world()
+    ).to_domain_object()
     milks = world.get_semantic_annotations_by_type(Milk)
     assert len(milks) == 1
 

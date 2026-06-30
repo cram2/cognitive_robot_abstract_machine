@@ -989,35 +989,35 @@ class WorldSpecification:
             starting_objects=starting_objects or [],
         )
 
-    def to_world(self) -> World:
+    def to_domain_object(self) -> World:
         """
-        Augment the environment world in place and return it.
+        Materialize a new World from this specification.
 
-        When ``robot_semantic_annotation`` is set, the robot is parsed from its own description and
-        merged as ``world.root -> odom_combined -> drive -> robot``, with the localization and start
-        poses applied. Finally all ``starting_objects`` are spawned relative to the world root.
-
-        .. note::
-            This mutates and returns ``self.world``; it is intended to be applied once.
+        A deep copy of :attr:`world` is augmented and returned, so the specification's stored world
+        is never mutated and the method can be applied repeatedly. When ``robot_semantic_annotation``
+        is set, the robot is parsed from its own description and merged as
+        ``world.root -> odom_combined -> drive -> robot``, with the localization and start poses
+        applied. Finally all ``starting_objects`` are spawned relative to the world root.
         """
+        world = deepcopy(self.world)
         if self.robot_semantic_annotation is not None:
-            self._setup_robot()
+            self._setup_robot(world)
 
         for starting_object in self.starting_objects:
-            starting_object.spawn(self.world)
+            starting_object.spawn(world)
 
-        return self.world
+        return world
 
-    def _setup_robot(self):
+    def _setup_robot(self, world: World) -> None:
         """
-        Sets up the robot in the world, including adding odom in between the world root and the robot root.
+        Set up the robot in ``world``, inserting ``odom_combined`` between the world root and the robot root.
         """
-        with self.world.modify_world():
+        with world.modify_world():
             odom_body = Body(name=PrefixedName("odom_combined"))
             root_C_odom = Connection6DoF.create_with_dofs(
-                world=self.world, parent=cast(Body, self.world.root), child=odom_body
+                world=world, parent=cast(Body, world.root), child=odom_body
             )
-            self.world.add_connection(root_C_odom)
+            world.add_connection(root_C_odom)
 
             robot_world = URDFParser.from_file(
                 self.robot_semantic_annotation.get_ros_file_path()
@@ -1026,14 +1026,14 @@ class WorldSpecification:
 
             drive_connection_type = self.drive_connection_type or Connection6DoF
             odom_C_robot = drive_connection_type.create_with_dofs(
-                world=self.world, parent=odom_body, child=cast(Body, robot_world.root)
+                world=world, parent=odom_body, child=cast(Body, robot_world.root)
             )
-            self.world.merge_world(robot_world, root_connection=odom_C_robot)
+            world.merge_world(robot_world, root_connection=odom_C_robot)
             if issubclass(drive_connection_type, ActiveConnection):
                 odom_C_robot.has_hardware_interface = True
 
         self.robot_semantic_annotation.from_branch_in_world(
-            cast(Body, self.world.get_world_entity_with_id_by_id(robot_root_id))
+            cast(Body, world.get_world_entity_with_id_by_id(robot_root_id))
         )
 
         # Poses touch DoF state, so they are set after the modification block.
