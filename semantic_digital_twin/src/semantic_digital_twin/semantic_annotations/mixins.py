@@ -156,6 +156,7 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         connection_offset: float = 0.0,
         connection_limits: Optional[DegreeOfFreedomLimits] = None,
         annotation_kwargs: Optional[dict] = None,
+        part_specifications: Optional[dict] = None,
         **geometry_kwargs,
     ) -> SemanticAnnotationWithRootSpecification[Self]:
         """
@@ -176,7 +177,8 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         :param connection_multiplier: DoF multiplier for an active parent connection.
         :param connection_offset: DoF offset for an active parent connection.
         :param connection_limits: DoF limits for an active parent connection.
-        :param annotation_kwargs: Extra keyword arguments for the annotation constructor.
+        :param annotation_kwargs: Inert keyword arguments for the annotation constructor.
+        :param part_specifications: Nested annotation parts keyed by part-whole relationship field name.
         :return: The annotation specification.
         """
         root_specification = cls._default_root_specification(
@@ -191,6 +193,7 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
             offset=connection_offset,
             connection_limits=connection_limits,
             annotation_kwargs=annotation_kwargs or {},
+            part_specifications=part_specifications or {},
         )
 
     def _mount_strategy(self, main_has_root_body_annotation: HasRootBody) -> None:

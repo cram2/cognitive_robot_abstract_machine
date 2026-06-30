@@ -16,7 +16,7 @@ from semantic_digital_twin.api.specifications import (
     RevoluteConnectionSpecification,
     SemanticAnnotationWithRootSpecification,
     WorldSpecification,
-    WorldEntitySpawnSpecification,
+    SpawnSpecification,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
@@ -24,6 +24,8 @@ from semantic_digital_twin.exceptions import (
     MissingConnectionAxisError,
     MissingConnectionChildError,
     ParsingError,
+    PartWholeCardinalityError,
+    UnknownPartWholeRelationshipField,
     UselessConceptError,
 )
 from semantic_digital_twin.robots.pr2 import PR2
@@ -187,13 +189,13 @@ def test_nested_annotation_on_non_part_whole_field_raises(empty_world):
         name="milk",
         semantic_annotation_type=Milk,
         root_specification=BodySpecification.box("milk", Scale(0.1, 0.1, 0.2)),
-        annotation_kwargs={
+        part_specifications={
             "handle": Handle.get_default_annotation_specification(
                 "handle", Scale(0.1, 0.05, 0.05)
             )
         },
     )
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(UnknownPartWholeRelationshipField):
         spec.spawn(empty_world)
 
 
@@ -236,7 +238,9 @@ def test_body_specification_from_3d_points_matches_direct_construction():
     materialized = BodySpecification.from_3d_points(name, points).to_domain_object(name)
     directly_built = Body.from_3d_points(name=name, points_3d=points)
 
-    assert len(materialized.collision.shapes) == len(directly_built.collision.shapes) == 1
+    assert (
+        len(materialized.collision.shapes) == len(directly_built.collision.shapes) == 1
+    )
 
 
 def test_has_root_body_default_specification_without_scale_is_geometryless(empty_world):
@@ -249,7 +253,9 @@ def test_has_root_body_default_specification_without_scale_is_geometryless(empty
     assert len(body.collision.shapes) == 0
 
 
-def test_has_root_region_default_specification_without_scale_is_geometryless(empty_world):
+def test_has_root_region_default_specification_without_scale_is_geometryless(
+    empty_world,
+):
     """The base region factory creates a bare region, mirrored by an empty region spec."""
     spec = HasRootRegion.get_default_region_specification(PrefixedName("bare_region"))
     assert isinstance(spec, RegionSpecification)
@@ -455,9 +461,15 @@ def test_active_1dof_spec_kwargs_match_create_with_dofs_signature():
     assert set(spec._create_with_dofs_kwargs()).issubset(accepted_parameters)
 
 
-def test_connection_spec_spawn_fixed(empty_world):
+def test_connection_specification_is_not_a_spawn_specification():
+    # A connection joins two existing entities; it must not be substitutable for a spawn spec,
+    # so it cannot be placed in a child_specification / starting_objects list.
+    assert not issubclass(ConnectionSpecification, SpawnSpecification)
+
+
+def test_connection_spec_connect_fixed(empty_world):
     child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
-    connection = FixedConnectionSpecification().spawn(
+    connection = FixedConnectionSpecification().connect(
         empty_world, parent=empty_world.root, child=child
     )
     assert isinstance(connection, FixedConnection)
@@ -466,47 +478,47 @@ def test_connection_spec_spawn_fixed(empty_world):
     assert child in empty_world.bodies
 
 
-def test_connection_spec_spawn_defaults_parent_to_root(empty_world):
+def test_connection_spec_connect_defaults_parent_to_root(empty_world):
     child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
-    connection = Connection6DoFSpecification().spawn(empty_world, child=child)
+    connection = Connection6DoFSpecification().connect(empty_world, child=child)
     assert isinstance(connection, Connection6DoF)
     assert connection.parent is empty_world.root
 
 
-def test_connection_spec_spawn_active_forwards_kwargs(empty_world):
+def test_connection_spec_connect_active_forwards_kwargs(empty_world):
     limits = DegreeOfFreedomLimits(
         lower=DerivativeMap(velocity=-1.5), upper=DerivativeMap(velocity=1.5)
     )
     child = BodySpecification.box("slider", Scale(1, 1, 1)).to_domain_object()
     connection = PrismaticConnectionSpecification(
         axis=Vector3.Z(), dof_limits=limits
-    ).spawn(empty_world, child=child)
+    ).connect(empty_world, child=child)
     assert isinstance(connection, PrismaticConnection)
     assert connection.dof.limits.upper.velocity == 1.5
     assert connection.dof.limits.lower.velocity == -1.5
 
 
-def test_connection_spec_spawn_applies_pose(empty_world):
+def test_connection_spec_connect_applies_pose(empty_world):
     child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
-    FixedConnectionSpecification().spawn(
+    FixedConnectionSpecification().connect(
         empty_world,
-        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3),
+        parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3),
         child=child,
     )
     root_T_child = empty_world.compute_forward_kinematics(empty_world.root, child)
     np.testing.assert_allclose(root_T_child.to_position().to_np()[:3], [1, 2, 3])
 
 
-def test_connection_spec_spawn_without_child_raises(empty_world):
+def test_connection_spec_connect_without_child_raises(empty_world):
     with pytest.raises(MissingConnectionChildError):
-        FixedConnectionSpecification().spawn(empty_world)
+        FixedConnectionSpecification().connect(empty_world)
 
 
-def test_connection_spec_spawn_without_name_matches_direct_creation(empty_world):
+def test_connection_spec_connect_without_name_matches_direct_creation(empty_world):
     # A nameless spec must auto-generate the same connection name as creating the
     # connection directly between an identically-named parent and child.
     spec_child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
-    spec_connection = FixedConnectionSpecification().spawn(
+    spec_connection = FixedConnectionSpecification().connect(
         empty_world, parent=empty_world.root, child=spec_child
     )
 
@@ -765,7 +777,7 @@ def test_annotation_spec_robot_part_raises():
 
 
 #####################################################################
-# Nested annotations: spec-valued annotation_kwargs are spawned and
+# Nested annotations: part_specifications entries are spawned and
 # mounted via the part-whole `add`, keyed by the target field name.
 #####################################################################
 
@@ -773,7 +785,7 @@ def test_annotation_spec_robot_part_raises():
 def _spawn_with_parts(world, whole_type, whole_scale, parts):
     """Spawn ``whole_type`` from its default annotation spec, with ``parts`` as nested annotations."""
     return whole_type.get_default_annotation_specification(
-        "whole", whole_scale, annotation_kwargs=parts
+        "whole", whole_scale, part_specifications=parts
     ).spawn(world)
 
 
@@ -839,7 +851,7 @@ def test_nested_list_valued_parts_on_to_many_field(empty_world):
     wall = Wall.get_default_annotation_specification(
         "wall",
         Scale(0.1, 3, 3),
-        annotation_kwargs={"apertures": [aperture_a, aperture_b]},
+        part_specifications={"apertures": [aperture_a, aperture_b]},
     ).spawn(empty_world)
     assert len(wall.apertures) == 2
     assert all(isinstance(aperture, Aperture) for aperture in wall.apertures)
@@ -849,7 +861,7 @@ def test_list_value_on_singular_part_field_raises(empty_world):
     spec = Drawer.get_default_annotation_specification(
         "drawer",
         Scale(0.4, 0.5, 0.6),
-        annotation_kwargs={
+        part_specifications={
             "handle": [
                 Handle.get_default_annotation_specification(
                     "h1", Scale(0.1, 0.05, 0.05)
@@ -860,7 +872,7 @@ def test_list_value_on_singular_part_field_raises(empty_world):
             ]
         },
     )
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(PartWholeCardinalityError):
         spec.spawn(empty_world)
 
 
@@ -908,31 +920,31 @@ def test_inert_annotation_kwargs_reach_constructor(empty_world):
     assert drawer.handle is existing_handle
 
 
-def test_raw_entity_spec_in_annotation_kwargs_raises(empty_world):
-    # Raw entity specs (e.g. a supporting-surface region) are not supported in annotation_kwargs.
+def test_non_part_whole_field_in_part_specifications_raises(empty_world):
+    # supporting_surface is not a part-whole relationship, so it cannot hold a nested part spec.
     spec = Table.get_default_annotation_specification(
         "table",
         Scale(1, 1, 0.5),
-        annotation_kwargs={
+        part_specifications={
             "supporting_surface": RegionSpecification.box("surface", Scale(1, 1, 0.01))
         },
     )
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(UnknownPartWholeRelationshipField):
         spec.spawn(empty_world)
 
 
-def test_storage_objects_spec_in_annotation_kwargs_raises(empty_world):
+def test_storage_objects_in_part_specifications_raises(empty_world):
     # IsStorageSpace.objects is not a part-whole relationship, so spec-based occupants are unsupported.
     spec = Table.get_default_annotation_specification(
         "table",
         Scale(1, 1, 0.5),
-        annotation_kwargs={
+        part_specifications={
             "objects": [
                 Milk.get_default_annotation_specification("milk", Scale(0.1, 0.1, 0.2))
             ]
         },
     )
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(UnknownPartWholeRelationshipField):
         spec.spawn(empty_world)
 
 
@@ -940,7 +952,7 @@ def test_complex_spawned_world_is_deepcopyable(empty_world):
     Drawer.get_default_annotation_specification(
         "drawer",
         Scale(0.4, 0.5, 0.6),
-        annotation_kwargs={
+        part_specifications={
             "handle": Handle.get_default_annotation_specification(
                 "handle", Scale(0.1, 0.05, 0.05)
             ),
@@ -952,7 +964,7 @@ def test_complex_spawned_world_is_deepcopyable(empty_world):
     Wall.get_default_annotation_specification(
         "wall",
         Scale(0.1, 2, 2),
-        annotation_kwargs={
+        part_specifications={
             "apertures": Aperture.get_default_annotation_specification(
                 "hole", Scale(0.1, 0.5, 0.5)
             )
@@ -982,7 +994,7 @@ def test_nested_composite_matches_imperative(empty_world):
     drawer = Drawer.get_default_annotation_specification(
         "drawer",
         scale,
-        annotation_kwargs={
+        part_specifications={
             "handle": Handle.get_default_annotation_specification(
                 "handle", handle_scale
             ),

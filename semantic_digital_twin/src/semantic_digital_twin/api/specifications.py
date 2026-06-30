@@ -17,7 +17,11 @@ from semantic_digital_twin.datastructures.prefixed_name import (
     ensure_prefixed_name,
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.exceptions import MissingConnectionChildError
+from semantic_digital_twin.exceptions import (
+    MissingConnectionChildError,
+    PartWholeCardinalityError,
+    UnknownPartWholeRelationshipField,
+)
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -65,18 +69,37 @@ if TYPE_CHECKING:
 
 
 TWorldEntity = TypeVar("TWorldEntity", bound=WorldEntity)
+TKinematicStructureEntity = TypeVar(
+    "TKinematicStructureEntity", bound=KinematicStructureEntity
+)
 
 
 @dataclass
-class WorldEntitySpawnSpecification(Generic[TWorldEntity], ABC):
-
-    name: Union[str, PrefixedName]
+class NamedSpecification(ABC):
     """
-    The name of entities created from this specification. Can be overridden per spawn.
+    Base for every specification: it carries a name and normalizes it. It deliberately declares no
+    materialization contract, so entity-spawn specs and connection specs can derive their own
+    (incompatible) verbs from it without one masquerading as the other.
+    """
+
+    name: Union[str, PrefixedName, None]
+    """
+    The name of entities created from this specification. Can be overridden per materialization.
+    ``None`` is preserved, deferring naming to materialization time (the spec's own name fallback or
+    the domain object's / connection's default name generation).
     """
 
     def __post_init__(self):
-        self.name = ensure_prefixed_name(self.name)
+        if self.name is not None:
+            self.name = ensure_prefixed_name(self.name)
+
+
+@dataclass
+class SpawnSpecification(NamedSpecification, Generic[TWorldEntity], ABC):
+    """
+    Specification for a world entity that materializes itself together with the connection that
+    attaches it to its parent. Materialized via :meth:`spawn`.
+    """
 
     @abstractmethod
     def spawn(
@@ -85,7 +108,7 @@ class WorldEntitySpawnSpecification(Generic[TWorldEntity], ABC):
         name: Union[str, PrefixedName, None] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
-    ) -> WorldEntity:
+    ) -> TWorldEntity:
         """
         Instantiate the World Entity and add it to the given world.
 
@@ -98,7 +121,7 @@ class WorldEntitySpawnSpecification(Generic[TWorldEntity], ABC):
         self,
         world: World,
         parent: KinematicStructureEntity,
-        children: Iterable[WorldEntitySpawnSpecification],
+        children: Iterable[SpawnSpecification],
     ) -> None:
         """Spawn each child specification as a kinematic child of ``parent``."""
         for child in children:
@@ -107,7 +130,7 @@ class WorldEntitySpawnSpecification(Generic[TWorldEntity], ABC):
 
 @dataclass
 class KinematicStructureEntitySpecification(
-    WorldEntitySpawnSpecification[TWorldEntity],
+    SpawnSpecification[TKinematicStructureEntity],
     AbstractSubClassSafeGeneric,
 ):
     """
@@ -124,7 +147,7 @@ class KinematicStructureEntitySpecification(
     Prototype shapes with origins expressed in the entity frame.
     """
 
-    child_specification: list[WorldEntitySpawnSpecification] = field(
+    child_specification: list[KinematicStructureEntitySpecification] = field(
         default_factory=list
     )
     """
@@ -141,15 +164,41 @@ class KinematicStructureEntitySpecification(
 
     def to_domain_object(
         self, name: Union[str, PrefixedName, None] = None
-    ) -> TWorldEntity:
+    ) -> TKinematicStructureEntity:
         """Materialize a new, world-independent kinematic structure entity from this spec."""
         [domain_object_type] = get_generic_type_params(
             self, KinematicStructureEntitySpecification
         )
+        resolved_name = ensure_prefixed_name(name) if name is not None else self.name
         return domain_object_type.from_shape_collection(
-            ensure_prefixed_name(name) or self.name,
+            resolved_name,
             self.shapes.copy_without_reference_frame(),
         )
+
+    def _spawn_attached(
+        self,
+        world: World,
+        connection_specification: ConnectionSpecification,
+        name: Union[str, PrefixedName, None] = None,
+        parent: KinematicStructureEntity | None = None,
+        parent_T_self: HomogeneousTransformationMatrix | None = None,
+    ) -> TKinematicStructureEntity:
+        """
+        Materialize this entity, attach it to ``parent`` via ``connection_specification``, and spawn
+        its geometry children. This is the shared procedure behind both :meth:`spawn` and
+        :meth:`ConnectedBodySpecification.spawn`; they differ only in which connection is used.
+        """
+        entity = self.to_domain_object(name)
+        with world.modify_world():
+            connection_specification.connect(
+                world,
+                parent=parent,
+                child=entity,
+                parent_T_connection=parent_T_self or self.parent_T_self,
+            )
+            for child in self.child_specification:
+                child.spawn(world, parent=entity)
+        return entity
 
     def spawn(
         self,
@@ -157,17 +206,10 @@ class KinematicStructureEntitySpecification(
         name: Union[str, PrefixedName, None] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
-    ) -> TWorldEntity:
-        entity = self.to_domain_object(name)
-        with world.modify_world():
-            FixedConnectionSpecification().spawn(
-                world,
-                parent=parent,
-                parent_T_self=parent_T_self or self.parent_T_self,
-                child=entity,
-            )
-            self._spawn_children(world, entity, self.child_specification)
-        return entity
+    ) -> TKinematicStructureEntity:
+        return self._spawn_attached(
+            world, FixedConnectionSpecification(), name, parent, parent_T_self
+        )
 
     @classmethod
     def box(
@@ -176,7 +218,7 @@ class KinematicStructureEntitySpecification(
         scale: Scale,
         color: Optional[Color] = None,
         origin: Optional[HomogeneousTransformationMatrix] = None,
-        child_specification: list[WorldEntitySpawnSpecification] | None = None,
+        child_specification: list[KinematicStructureEntitySpecification] | None = None,
     ) -> Self:
         """
         Specification for a kinematic structure entity with a single box shape.
@@ -203,7 +245,7 @@ class KinematicStructureEntitySpecification(
         radius: float,
         color: Optional[Color] = None,
         origin: Optional[HomogeneousTransformationMatrix] = None,
-        child_specification: list[WorldEntitySpawnSpecification] | None = None,
+        child_specification: list[KinematicStructureEntitySpecification] | None = None,
     ) -> Self:
         """
         Specification for a kinematic structure entity with a single sphere shape.
@@ -231,7 +273,7 @@ class KinematicStructureEntitySpecification(
         height: float,
         color: Optional[Color] = None,
         origin: Optional[HomogeneousTransformationMatrix] = None,
-        child_specification: list[WorldEntitySpawnSpecification] | None = None,
+        child_specification: list[KinematicStructureEntitySpecification] | None = None,
     ) -> Self:
         """
         Specification for a kinematic structure entity with a single cylinder shape.
@@ -261,7 +303,7 @@ class KinematicStructureEntitySpecification(
         scale: Optional[Scale] = None,
         color: Optional[Color] = None,
         origin: Optional[HomogeneousTransformationMatrix] = None,
-        child_specification: list[WorldEntitySpawnSpecification] | None = None,
+        child_specification: list[KinematicStructureEntitySpecification] | None = None,
     ) -> Self:
         """
         Specification for a kinematic structure entity with a single mesh shape loaded from a file.
@@ -288,7 +330,7 @@ class KinematicStructureEntitySpecification(
         cls,
         name: Union[str, PrefixedName],
         event: Event,
-        child_specification: list[WorldEntitySpawnSpecification] | None = None,
+        child_specification: list[KinematicStructureEntitySpecification] | None = None,
     ) -> Self:
         """
         Specification whose shapes are the bounding boxes of a random event.
@@ -309,21 +351,6 @@ class KinematicStructureEntitySpecification(
             child_specification=child_specification or [],
         )
 
-
-@dataclass
-class BodySpecification(KinematicStructureEntitySpecification[Body]):
-
-    inertial: Optional[Inertial] = None
-    """
-    Inertia properties of created bodies. None means the Body default.
-    """
-
-    visual_shapes: Optional[ShapeCollection] = None
-    """
-    Visual shapes when they differ from `shapes`. None shares `shapes` for both
-    collision and visual (one collection); an empty list means no visual geometry.
-    """
-
     @classmethod
     def from_3d_points(
         cls,
@@ -331,13 +358,10 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
         points_3d: List[Point3],
         minimum_thickness: float = 0.005,
         sv_ratio_tol: float = 1e-7,
-        child_specification: list[WorldEntitySpawnSpecification] | None = None,
+        child_specification: list[KinematicStructureEntitySpecification] | None = None,
     ) -> Self:
         """
         Specification whose geometry is the convex hull of a point cloud.
-
-        Declarative counterpart of :meth:`~...world_entity.Body.from_3d_points`: used by annotations
-        with polytope geometry (e.g. a floor derived from a list of points).
 
         :param name: The name of the entity.
         :param points_3d: The points whose convex hull defines the geometry.
@@ -359,6 +383,21 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
             child_specification=child_specification or [],
         )
 
+
+@dataclass
+class BodySpecification(KinematicStructureEntitySpecification[Body]):
+
+    inertial: Optional[Inertial] = None
+    """
+    Inertia properties of created bodies. None means the Body default.
+    """
+
+    visual_shapes: Optional[ShapeCollection] = None
+    """
+    Visual shapes when they differ from `shapes`. None shares `shapes` for both
+    collision and visual (one collection); an empty list means no visual geometry.
+    """
+
     def to_domain_object(self, name: Union[str, PrefixedName, None] = None) -> Body:
         """
         Create a new, world-independent body from this specification.
@@ -367,7 +406,7 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
         :return: The created body.
         """
         if self.visual_shapes is None:
-            body = super().to_domain_object(name)
+            body = cast(Body, super().to_domain_object(name))
         else:
             body = Body(
                 name=ensure_prefixed_name(name) or self.name,
@@ -386,7 +425,7 @@ class RegionSpecification(KinematicStructureEntitySpecification[Region]):
 
 @dataclass
 class SemanticAnnotationWithRootSpecification(
-    WorldEntitySpawnSpecification[TWorldEntity]
+    SpawnSpecification[HasRootKinematicStructureEntity]
 ):
     """
     Declarative description of a semantic annotation rooted in a single kinematic
@@ -400,7 +439,7 @@ class SemanticAnnotationWithRootSpecification(
     The type of the semantic annotation that is a subclass of HasRootKinematicStructureEntity.
     """
 
-    root_specification: Optional[KinematicStructureEntitySpecification] = None
+    root_specification: KinematicStructureEntitySpecification
     """
     The specification of the root kinematic structure entity of the annotation.
     """
@@ -426,20 +465,32 @@ class SemanticAnnotationWithRootSpecification(
     Degree-of-freedom limits for the parent connection (active connections only).
     """
 
-    annotation_kwargs: dict[
+    annotation_kwargs: dict[str, Any] = field(default_factory=dict)
+    """
+    Inert keyword arguments passed straight to the annotation constructor, keyed by constructor field
+    name. Nested annotation parts do not belong here; use :attr:`part_specifications`.
+    """
+
+    part_specifications: dict[
         str,
         Union[
             SemanticAnnotationWithRootSpecification,
             list[SemanticAnnotationWithRootSpecification],
-            Any,
         ],
     ] = field(default_factory=dict)
     """
-    Everything the annotation references, keyed by the constructor/part-whole field name. Inert values
-    are passed to the annotation constructor. Spec-valued entries (``WorldEntitySpawnSpecification``,
-    i.e. nested annotations) are spawned during :meth:`spawn` and mounted via the annotation's part-whole
-    :meth:`~...mixins.PartWholeRelationship.add`, using the dict key as the target field name.
+    Nested annotation parts keyed by the target part-whole relationship field name. Each part is
+    spawned during :meth:`spawn` and mounted via the annotation's
+    :meth:`~...mixins.PartWholeRelationship.add`. A list value mounts several parts onto a to-many
+    field; a single value mounts onto a singular field.
     """
+
+    def __post_init__(self):
+        # Validate before any world mutation, so an invalid part_specifications fails fast
+        # rather than corrupting the world modification history mid-spawn.
+        self._validate_part_specifications(self.semantic_annotation_type)
+
+        super().__post_init__()
 
     def spawn(
         self,
@@ -447,64 +498,13 @@ class SemanticAnnotationWithRootSpecification(
         name: Union[str, PrefixedName, None] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
-    ) -> TWorldEntity:
-        from semantic_digital_twin.semantic_annotations.mixins import (
-            _wrapped_part_whole_relationship_fields,
-            PartWholeRelationship,
-        )
+    ) -> HasRootKinematicStructureEntity:
+        name = ensure_prefixed_name(name) if name is not None else self.name
 
-        name = ensure_prefixed_name(name) or self.name
-
-        part_whole_fields_by_name = {
-            wrapped_field.name: wrapped_field
-            for wrapped_field in _wrapped_part_whole_relationship_fields(
-                self.semantic_annotation_type
-            )
-        }
-
-        plain_kwargs = {}
-        part_semantic_annotation_specs = {}
-        unsupported_specs = {}
-
-        for key, value in self.annotation_kwargs.items():
-            wrapped_field = part_whole_fields_by_name.get(key)
-            value_is_sequence = isinstance(value, (list, tuple))
-            items = list(value) if value_is_sequence else [value]
-            all_nested_annotation_specs = bool(items) and all(
-                isinstance(item, SemanticAnnotationWithRootSpecification)
-                for item in items
-            )
-
-            # A part-whole field takes one nested annotation spec, or a list of them for a
-            # to-many relationship.
-            if (
-                wrapped_field is not None
-                and all_nested_annotation_specs
-                and (
-                    wrapped_field.is_many_to_many_relationship or not value_is_sequence
-                )
-            ):
-                part_semantic_annotation_specs[key] = items
-            elif any(isinstance(item, WorldEntitySpawnSpecification) for item in items):
-                unsupported_specs[key] = value
-            else:
-                plain_kwargs[key] = value
-
-        if unsupported_specs:
-            raise NotImplementedError(
-                "Only nested part-whole annotation specs are supported in annotation_kwargs. These "
-                "entries are not (e.g. raw entity specs, storage occupants, or non-part-whole fields): "
-                f"{ {key: type(value).__name__ for key, value in unsupported_specs.items()} } "
-                f"on {self.semantic_annotation_type.__name__}."
-            )
-
-        if self.root_specification is None:
-            root_entity = Body(name=name)
-        else:
-            root_entity = self.root_specification.to_domain_object(name)
+        root_entity = self.root_specification.to_domain_object(name)
 
         instance = self.semantic_annotation_type(
-            name=name, root=root_entity, **plain_kwargs
+            name=name, root=root_entity, **self.annotation_kwargs
         )
 
         effective_pose = parent_T_self or (
@@ -526,27 +526,87 @@ class SemanticAnnotationWithRootSpecification(
         )
 
         with world.modify_world():
-            connection_specification.spawn(
-                world, parent=parent, parent_T_self=effective_pose, child=root_entity
+            connection_specification.connect(
+                world,
+                parent=parent,
+                child=root_entity,
+                parent_T_connection=effective_pose,
             )
             world.add_semantic_annotation(instance)
-            self._spawn_children(world, root_entity, children)
-
-            if not isinstance(instance, PartWholeRelationship):
-                return instance
-
-            for field_name, part_specs in part_semantic_annotation_specs.items():
-                for part_spec in part_specs:
-                    part = part_spec.spawn(world, parent=root_entity)
-                    instance.add(part, field_name=field_name)
+            for child in children:
+                child.spawn(world, parent=root_entity)
+            self._mount_part_specifications(world, instance, root_entity)
 
         return instance
 
+    def _validate_part_specifications(
+        self, instance: type[HasRootKinematicStructureEntity]
+    ) -> None:
+        """
+        Validate that every :attr:`part_specifications` key names a part-whole relationship field of
+        the annotation and that list values target only to-many fields.
+
+        :raises UnknownPartWholeRelationshipField: If a key is not a part-whole relationship field.
+        :raises PartWholeCardinalityError: If a list is given for a singular field.
+        """
+        part_whole_fields_by_name = self._part_whole_fields_by_name()
+        for field_name, value in self.part_specifications.items():
+            wrapped_field = part_whole_fields_by_name.get(field_name)
+            if wrapped_field is None:
+                raise UnknownPartWholeRelationshipField(
+                    annotation=instance,
+                    field_name=field_name,
+                    available_fields=list(part_whole_fields_by_name),
+                )
+            if (
+                isinstance(value, list)
+                and not wrapped_field.is_many_to_many_relationship
+            ):
+                raise PartWholeCardinalityError(
+                    annotation_type_name=self.semantic_annotation_type.__name__,
+                    field_name=field_name,
+                )
+
+    def _part_whole_fields_by_name(self) -> dict[str, Any]:
+        """The annotation type's part-whole relationship fields, keyed by field name."""
+        from semantic_digital_twin.semantic_annotations.mixins import (
+            _wrapped_part_whole_relationship_fields,
+        )
+
+        return {
+            wrapped_field.name: wrapped_field
+            for wrapped_field in _wrapped_part_whole_relationship_fields(
+                self.semantic_annotation_type
+            )
+        }
+
+    def _mount_part_specifications(
+        self,
+        world: World,
+        instance: PartWholeRelationship,
+        root_entity: KinematicStructureEntity,
+    ) -> None:
+        """
+        Spawn each nested part and mount it onto ``instance`` via the part-whole
+        :meth:`~...mixins.PartWholeRelationship.add`, keyed by the target field name.
+
+        .. note:: Assumes :meth:`_validate_part_specifications` has already run.
+        """
+        for field_name, value in self.part_specifications.items():
+            part_specs = value if isinstance(value, list) else [value]
+            for part_spec in part_specs:
+                part = part_spec.spawn(world, parent=root_entity)
+                instance.add(part, field_name=field_name)
+
 
 @dataclass
-class ConnectionSpecification(WorldEntitySpawnSpecification, ABC):
+class ConnectionSpecification(NamedSpecification, ABC):
     """
     Declarative, world- and kinematic-structure-entity-independent description of a connection.
+
+    A connection joins two pre-existing entities, so it is *not* a
+    :class:`WorldEntitySpawnSpecification` (which materializes an entity and its own parent
+    connection). It is materialized via :meth:`connect`, which takes the ``child`` to attach.
 
     Each connection family is a concrete subclass that binds its :attr:`connection_type` and
     carries exactly the parameters that family uses. Materializing a specification forwards those
@@ -585,33 +645,33 @@ class ConnectionSpecification(WorldEntitySpawnSpecification, ABC):
         """
         return cls(name=name)
 
-    def spawn(
+    def connect(
         self,
         world: World,
-        name: Union[str, PrefixedName, None] = None,
         parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
-        *,
         child: KinematicStructureEntity | None = None,
+        parent_T_connection: HomogeneousTransformationMatrix | None = None,
+        name: Union[str, PrefixedName, None] = None,
     ) -> Connection:
         """
         Materialize the connection between ``parent`` and ``child`` and add it to the world.
 
-        Unlike the entity specifications, a connection joins two pre-existing entities, so the
-        child it connects must be supplied explicitly via ``child``.
+        A connection joins two pre-existing entities, so the child it connects must be supplied
+        explicitly via ``child``. If ``parent`` is omitted, ``world.root`` is used.
 
         :param child: The kinematic structure entity that becomes the connection's child.
+        :param parent_T_connection: Placement of the connection in the parent frame. Identity if None.
         :raises MissingConnectionChildError: If ``child`` is not provided.
         """
         if child is None:
             raise MissingConnectionChildError(connection_name=self.name)
 
         parent = parent or world.root
-        connection_name = ensure_prefixed_name(name) or self.name
+        connection_name = ensure_prefixed_name(name) if name is not None else self.name
 
         parent_T_connection = (
-            deepcopy(parent_T_self)
-            if parent_T_self is not None
+            deepcopy(parent_T_connection)
+            if parent_T_connection is not None
             else HomogeneousTransformationMatrix()
         )
         parent_T_connection.reference_frame = parent
@@ -702,7 +762,7 @@ class RevoluteConnectionSpecification(ActiveConnection1DOFSpecification):
 
 
 @dataclass
-class ConnectedBodySpecification(WorldEntitySpawnSpecification):
+class ConnectedBodySpecification(SpawnSpecification):
     """A body specification together with the connection that attaches it to its parent."""
 
     name: Union[str, PrefixedName, None] = field(default=None, kw_only=True)
@@ -734,16 +794,9 @@ class ConnectedBodySpecification(WorldEntitySpawnSpecification):
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> Body:
-        body = self.body_specification.to_domain_object(name)
-        pose = parent_T_self or self.body_specification.parent_T_self
-        with world.modify_world():
-            self.connection_specification.spawn(
-                world, parent=parent, parent_T_self=pose, child=body
-            )
-            self._spawn_children(
-                world, body, self.body_specification.child_specification
-            )
-        return body
+        return self.body_specification._spawn_attached(
+            world, self.connection_specification, name, parent, parent_T_self
+        )
 
 
 @dataclass
@@ -775,7 +828,7 @@ class WorldSpecification:
     The start pose of the robot in the ``odom_combined`` frame. If None, identity is used.
     """
 
-    starting_objects: list[WorldEntitySpawnSpecification] = field(default_factory=list)
+    starting_objects: list[SpawnSpecification] = field(default_factory=list)
     """
     Specifications spawned relative to the world root once the robot (if any) is in place.
     """

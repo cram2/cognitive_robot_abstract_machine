@@ -347,10 +347,10 @@ class MissingConnectionChildError(UsageError):
     """
 
     def error_message(self) -> str:
-        return f"Spawning the connection '{self.connection_name}' requires a child kinematic structure entity."
+        return f"Connecting the connection '{self.connection_name}' requires a child kinematic structure entity."
 
     def suggest_correction(self) -> str:
-        return "pass the child entity via the 'child' keyword argument of spawn."
+        return "pass the child entity via the 'child' keyword argument of connect."
 
 
 @dataclass
@@ -495,7 +495,7 @@ class UnknownPartWholeRelationshipField(UsageError):
     of the annotation.
     """
 
-    annotation: HasRootBody
+    annotation: Type[HasRootBody]
     """
     The annotation the part was being added to.
     """
@@ -512,7 +512,7 @@ class UnknownPartWholeRelationshipField(UsageError):
 
     def error_message(self) -> str:
         return (
-            f"{type(self.annotation).__name__} has no part-whole relationship field "
+            f"{self.annotation.__name__} has no part-whole relationship field "
             f"'{self.field_name}."
         )
 
@@ -521,6 +521,34 @@ class UnknownPartWholeRelationshipField(UsageError):
             f"the available fields are:"
             f" {', '.join(self.available_fields) or '(none)'}"
         )
+
+
+@dataclass
+class PartWholeCardinalityError(UsageError):
+    """
+    Raised when a part specification supplies a list of parts for a singular (non-to-many)
+    part-whole relationship field.
+    """
+
+    annotation_type_name: str
+    """
+    The name of the annotation type the parts were being mounted onto.
+    """
+
+    field_name: str
+    """
+    The singular part-whole relationship field that was given a list of parts.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The part-whole relationship field '{self.field_name}' of "
+            f"'{self.annotation_type_name}' is singular and accepts only one part, "
+            f"but a list of parts was supplied."
+        )
+
+    def suggest_correction(self) -> str:
+        return "supply a single part specification for this field instead of a list."
 
 
 @dataclass
