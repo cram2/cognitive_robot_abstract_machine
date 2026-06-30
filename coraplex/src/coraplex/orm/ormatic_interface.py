@@ -14569,6 +14569,10 @@ class NamedSpecificationDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
+    name: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
     polymorphic_type: Mapped[str] = mapped_column(
         String(255), nullable=False, use_existing_column=True
     )
@@ -14718,11 +14722,11 @@ class RevoluteConnectionSpecificationDAO(
     }
 
 
-class WorldEntitySpawnSpecificationDAO(
+class SpawnSpecificationDAO(
     NamedSpecificationDAO,
     DataAccessObject[semantic_digital_twin.api.specifications.SpawnSpecification],
 ):
-    __tablename__ = "WorldEntitySpawnSpecificationDAO"
+    __tablename__ = "SpawnSpecificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(NamedSpecificationDAO.database_id),
@@ -14731,14 +14735,14 @@ class WorldEntitySpawnSpecificationDAO(
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "WorldEntitySpawnSpecificationDAO",
+        "polymorphic_identity": "SpawnSpecificationDAO",
         "inherit_condition": database_id == NamedSpecificationDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
 
 class ConnectedBodySpecificationDAO(
-    WorldEntitySpawnSpecificationDAO,
+    SpawnSpecificationDAO,
     DataAccessObject[
         semantic_digital_twin.api.specifications.ConnectedBodySpecification
     ],
@@ -14746,7 +14750,7 @@ class ConnectedBodySpecificationDAO(
     __tablename__ = "ConnectedBodySpecificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(WorldEntitySpawnSpecificationDAO.database_id),
+        ForeignKey(SpawnSpecificationDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
@@ -14777,14 +14781,13 @@ class ConnectedBodySpecificationDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "ConnectedBodySpecificationDAO",
-        "inherit_condition": database_id
-        == WorldEntitySpawnSpecificationDAO.database_id,
+        "inherit_condition": database_id == SpawnSpecificationDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
 
 class KinematicStructureEntitySpecificationDAO(
-    WorldEntitySpawnSpecificationDAO,
+    SpawnSpecificationDAO,
     DataAccessObject[
         semantic_digital_twin.api.specifications.KinematicStructureEntitySpecification
     ],
@@ -14792,7 +14795,7 @@ class KinematicStructureEntitySpecificationDAO(
     __tablename__ = "KinematicStructureEntitySpecificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(WorldEntitySpawnSpecificationDAO.database_id),
+        ForeignKey(SpawnSpecificationDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
@@ -14822,8 +14825,7 @@ class KinematicStructureEntitySpecificationDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "KinematicStructureEntitySpecificationDAO",
-        "inherit_condition": database_id
-        == WorldEntitySpawnSpecificationDAO.database_id,
+        "inherit_condition": database_id == SpawnSpecificationDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -14890,7 +14892,7 @@ class RegionSpecificationDAO(
 
 
 class SemanticAnnotationWithRootSpecificationDAO(
-    WorldEntitySpawnSpecificationDAO,
+    SpawnSpecificationDAO,
     DataAccessObject[
         semantic_digital_twin.api.specifications.SemanticAnnotationWithRootSpecification
     ],
@@ -14898,7 +14900,7 @@ class SemanticAnnotationWithRootSpecificationDAO(
     __tablename__ = "SemanticAnnotationWithRootSpecificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(WorldEntitySpawnSpecificationDAO.database_id),
+        ForeignKey(SpawnSpecificationDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
@@ -14922,8 +14924,7 @@ class SemanticAnnotationWithRootSpecificationDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "SemanticAnnotationWithRootSpecificationDAO",
-        "inherit_condition": database_id
-        == WorldEntitySpawnSpecificationDAO.database_id,
+        "inherit_condition": database_id == SpawnSpecificationDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -17064,6 +17065,33 @@ class PartWholeCardinalityErrorDAO(
     }
 
 
+class PartWholeFieldInAnnotationKwargsDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.PartWholeFieldInAnnotationKwargs],
+):
+    __tablename__ = "PartWholeFieldInAnnotationKwargsDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    annotation_type_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    field_names: Mapped[typing.List[builtins.str]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PartWholeFieldInAnnotationKwargsDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class SemanticAnnotationCircularDependencyErrorDAO(
     UsageErrorDAO,
     DataAccessObject[
@@ -17316,18 +17344,11 @@ class UnknownPartWholeRelationshipFieldDAO(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
+    annotation: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
     available_fields: Mapped[typing.List[builtins.str]] = mapped_column(
         JSON, nullable=False, use_existing_column=True
-    )
-
-    annotation_id: Mapped[int] = mapped_column(
-        ForeignKey("HasRootBodyDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    annotation: Mapped[HasRootBodyDAO] = relationship(
-        "HasRootBodyDAO", uselist=False, foreign_keys=[annotation_id], post_update=True
     )
 
     __mapper_args__ = {

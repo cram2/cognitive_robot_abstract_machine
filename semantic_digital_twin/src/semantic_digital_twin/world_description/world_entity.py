@@ -461,9 +461,17 @@ class Body(KinematicStructureEntity):
 
     @classmethod
     def from_shape_collection(
-        cls, name: PrefixedName, shape_collection: ShapeCollection
+        cls,
+        name: PrefixedName,
+        shape_collection: ShapeCollection,
+        *,
+        visuals_shape_collection: ShapeCollection = None,
     ) -> Self:
-        return cls(name=name, collision=shape_collection, visual=shape_collection)
+        if visuals_shape_collection is None:
+            visuals_shape_collection = shape_collection
+        return cls(
+            name=name, collision=shape_collection, visual=visuals_shape_collection
+        )
 
     @property
     def combined_mesh(self) -> Optional[trimesh.Trimesh]:

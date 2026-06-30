@@ -25,6 +25,7 @@ from semantic_digital_twin.exceptions import (
     MissingConnectionChildError,
     ParsingError,
     PartWholeCardinalityError,
+    PartWholeFieldInAnnotationKwargs,
     UnknownPartWholeRelationshipField,
     UselessConceptError,
 )
@@ -177,26 +178,26 @@ def test_active_annotation_requires_parameters(empty_world):
     spec = SemanticAnnotationWithRootSpecification(
         name="slider",
         semantic_annotation_type=Slider,
-        root_specification=None,
+        root_specification=BodySpecification.box("slider", Scale(0.1, 0.1, 0.1)),
     )
     with pytest.raises(MissingConnectionAxisError):
         spec.spawn(empty_world)
 
 
-def test_nested_annotation_on_non_part_whole_field_raises(empty_world):
+def test_nested_annotation_on_non_part_whole_field_raises():
     # Milk has no part-whole field, so a nested annotation spec cannot be mounted onto it.
-    spec = SemanticAnnotationWithRootSpecification(
-        name="milk",
-        semantic_annotation_type=Milk,
-        root_specification=BodySpecification.box("milk", Scale(0.1, 0.1, 0.2)),
-        part_specifications={
-            "handle": Handle.get_default_annotation_specification(
-                "handle", Scale(0.1, 0.05, 0.05)
-            )
-        },
-    )
+    # part_specifications are validated at construction.
     with pytest.raises(UnknownPartWholeRelationshipField):
-        spec.spawn(empty_world)
+        SemanticAnnotationWithRootSpecification(
+            name="milk",
+            semantic_annotation_type=Milk,
+            root_specification=BodySpecification.box("milk", Scale(0.1, 0.1, 0.2)),
+            part_specifications={
+                "handle": Handle.get_default_annotation_specification(
+                    "handle", Scale(0.1, 0.05, 0.05)
+                )
+            },
+        )
 
 
 def test_world_specification_robotless():
@@ -343,7 +344,7 @@ def test_connected_body_specification_name_defaults_to_body_name():
     spec = ConnectedBodySpecification(
         body_specification=BodySpecification.box("box", Scale(1, 1, 1))
     )
-    assert spec.name == PrefixedName("box")
+    assert spec.name == "box"
 
 
 def test_spawn_positional_name(empty_world):
@@ -857,23 +858,23 @@ def test_nested_list_valued_parts_on_to_many_field(empty_world):
     assert all(isinstance(aperture, Aperture) for aperture in wall.apertures)
 
 
-def test_list_value_on_singular_part_field_raises(empty_world):
-    spec = Drawer.get_default_annotation_specification(
-        "drawer",
-        Scale(0.4, 0.5, 0.6),
-        part_specifications={
-            "handle": [
-                Handle.get_default_annotation_specification(
-                    "h1", Scale(0.1, 0.05, 0.05)
-                ),
-                Handle.get_default_annotation_specification(
-                    "h2", Scale(0.1, 0.05, 0.05)
-                ),
-            ]
-        },
-    )
+def test_list_value_on_singular_part_field_raises():
+    # part_specifications are validated at construction.
     with pytest.raises(PartWholeCardinalityError):
-        spec.spawn(empty_world)
+        Drawer.get_default_annotation_specification(
+            "drawer",
+            Scale(0.4, 0.5, 0.6),
+            part_specifications={
+                "handle": [
+                    Handle.get_default_annotation_specification(
+                        "h1", Scale(0.1, 0.05, 0.05)
+                    ),
+                    Handle.get_default_annotation_specification(
+                        "h2", Scale(0.1, 0.05, 0.05)
+                    ),
+                ]
+            },
+        )
 
 
 def test_nested_part_placement_is_relative_to_whole(empty_world):
@@ -911,41 +912,59 @@ def test_annotation_connection_limits_threaded(empty_world):
 
 
 def test_inert_annotation_kwargs_reach_constructor(empty_world):
-    existing_handle = Handle.get_default_annotation_specification(
-        "existing", Scale(0.1, 0.05, 0.05)
+    # supporting_surface is a plain (non-part-whole) constructor field, so it is allowed in
+    # annotation_kwargs and reaches the constructor unchanged.
+    surface = RegionSpecification.box("surface", Scale(1, 1, 0.01)).spawn(empty_world)
+    table = Table.get_default_annotation_specification(
+        "table", Scale(1, 1, 0.5), annotation_kwargs={"supporting_surface": surface}
     ).spawn(empty_world)
-    drawer = Drawer.get_default_annotation_specification(
-        "drawer", Scale(0.4, 0.5, 0.6), annotation_kwargs={"handle": existing_handle}
-    ).spawn(empty_world)
-    assert drawer.handle is existing_handle
+    assert table.supporting_surface is surface
 
 
-def test_non_part_whole_field_in_part_specifications_raises(empty_world):
+def test_part_whole_field_in_annotation_kwargs_raises():
+    # A part-whole relationship field (Drawer.handle) must not be passed via annotation_kwargs;
+    # it belongs in part_specifications. This is rejected at spec construction.
+    with pytest.raises(PartWholeFieldInAnnotationKwargs):
+        Drawer.get_default_annotation_specification(
+            "drawer",
+            Scale(0.4, 0.5, 0.6),
+            annotation_kwargs={
+                "handle": Handle.get_default_annotation_specification(
+                    "handle", Scale(0.1, 0.05, 0.05)
+                )
+            },
+        )
+
+
+def test_non_part_whole_field_in_part_specifications_raises():
     # supporting_surface is not a part-whole relationship, so it cannot hold a nested part spec.
-    spec = Table.get_default_annotation_specification(
-        "table",
-        Scale(1, 1, 0.5),
-        part_specifications={
-            "supporting_surface": RegionSpecification.box("surface", Scale(1, 1, 0.01))
-        },
-    )
+    # part_specifications are validated at construction.
     with pytest.raises(UnknownPartWholeRelationshipField):
-        spec.spawn(empty_world)
+        Table.get_default_annotation_specification(
+            "table",
+            Scale(1, 1, 0.5),
+            part_specifications={
+                "supporting_surface": RegionSpecification.box(
+                    "surface", Scale(1, 1, 0.01)
+                )
+            },
+        )
 
 
-def test_storage_objects_in_part_specifications_raises(empty_world):
+def test_storage_objects_in_part_specifications_raises():
     # IsStorageSpace.objects is not a part-whole relationship, so spec-based occupants are unsupported.
-    spec = Table.get_default_annotation_specification(
-        "table",
-        Scale(1, 1, 0.5),
-        part_specifications={
-            "objects": [
-                Milk.get_default_annotation_specification("milk", Scale(0.1, 0.1, 0.2))
-            ]
-        },
-    )
     with pytest.raises(UnknownPartWholeRelationshipField):
-        spec.spawn(empty_world)
+        Table.get_default_annotation_specification(
+            "table",
+            Scale(1, 1, 0.5),
+            part_specifications={
+                "objects": [
+                    Milk.get_default_annotation_specification(
+                        "milk", Scale(0.1, 0.1, 0.2)
+                    )
+                ]
+            },
+        )
 
 
 def test_complex_spawned_world_is_deepcopyable(empty_world):

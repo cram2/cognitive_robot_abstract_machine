@@ -552,6 +552,34 @@ class PartWholeCardinalityError(UsageError):
 
 
 @dataclass
+class PartWholeFieldInAnnotationKwargs(UsageError):
+    """
+    Raised when ``annotation_kwargs`` contains a key that names a part-whole relationship field.
+    Such fields must be supplied via ``part_specifications`` so they are spawned and mounted, not
+    passed straight to the annotation constructor.
+    """
+
+    annotation_type_name: str
+    """
+    The name of the annotation type the keyword arguments were meant for.
+    """
+
+    field_names: List[str]
+    """
+    The offending ``annotation_kwargs`` keys that name part-whole relationship fields.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"annotation_kwargs for '{self.annotation_type_name}' contains part-whole relationship "
+            f"fields: {', '.join(self.field_names)}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "move these entries to part_specifications instead of annotation_kwargs."
+
+
+@dataclass
 class MechanicalJointAlreadyMounted(UsageError):
     """
     Raised when a mechanical joint that already connects a child is mounted onto a different whole.

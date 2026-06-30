@@ -1,25 +1,24 @@
 from __future__ import annotations
 
-import difflib
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 from typing import ClassVar, Iterable, Union, Optional, TYPE_CHECKING
 
-from typing_extensions import Self, Type, Any, Generic, List, TypeVar, cast
+from typing_extensions import Self, Type, Any, Generic, List, TypeVar
 
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.patterns.subclass_safe_generic import AbstractSubClassSafeGeneric
-from krrood.utils import get_generic_type_params
 from random_events.product_algebra import Event
+from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import (
     PrefixedName,
     ensure_prefixed_name,
 )
-from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.exceptions import (
     MissingConnectionChildError,
     PartWholeCardinalityError,
+    PartWholeFieldInAnnotationKwargs,
     UnknownPartWholeRelationshipField,
 )
 from semantic_digital_twin.spatial_types import (
@@ -36,6 +35,9 @@ from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
     RevoluteConnection,
 )
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedomLimits,
+)
 from semantic_digital_twin.world_description.geometry import (
     Scale,
     Color,
@@ -43,9 +45,6 @@ from semantic_digital_twin.world_description.geometry import (
     Mesh,
     Sphere,
     Cylinder,
-)
-from semantic_digital_twin.world_description.degree_of_freedom import (
-    DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import (
@@ -82,16 +81,19 @@ class NamedSpecification(ABC):
     (incompatible) verbs from it without one masquerading as the other.
     """
 
-    name: Union[str, PrefixedName, None]
+    name: Optional[str]
     """
-    The name of entities created from this specification. Can be overridden per materialization.
-    ``None`` is preserved, deferring naming to materialization time (the spec's own name fallback or
-    the domain object's / connection's default name generation).
+    The name of entities created from this specification, as a plain string. It is wrapped into a
+    :class:`PrefixedName` only at materialization time. ``None`` defers naming to materialization
+    (the spec's own name fallback or the domain object's / connection's default name generation).
     """
 
-    def __post_init__(self):
-        if self.name is not None:
-            self.name = ensure_prefixed_name(self.name)
+    def _resolved_name(self, name: Optional[str] = None) -> Optional[PrefixedName]:
+        """Wrap the spawn-time name override, or the spec's own name, into a :class:`PrefixedName`."""
+        used_name = name if name is not None else self.name
+        if used_name is not None:
+            used_name = PrefixedName(name=used_name)
+        return used_name
 
 
 @dataclass
@@ -105,7 +107,7 @@ class SpawnSpecification(NamedSpecification, Generic[TWorldEntity], ABC):
     def spawn(
         self,
         world: World,
-        name: Union[str, PrefixedName, None] = None,
+        name: Optional[str] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> TWorldEntity:
@@ -162,16 +164,22 @@ class KinematicStructureEntitySpecification(
     override it. Identity by default.
     """
 
-    def to_domain_object(
-        self, name: Union[str, PrefixedName, None] = None
+    @abstractmethod
+    def to_domain_object(self, name: Optional[str] = None) -> TKinematicStructureEntity:
+        """
+        Materialize a new, world-independent kinematic structure entity from this spec.
+
+        :param name: Optional name override. If None, the spec's own name is used.
+        """
+
+    def _domain_object_from_shapes(
+        self,
+        domain_object_type: Type[TKinematicStructureEntity],
+        name: Optional[str] = None,
     ) -> TKinematicStructureEntity:
-        """Materialize a new, world-independent kinematic structure entity from this spec."""
-        [domain_object_type] = get_generic_type_params(
-            self, KinematicStructureEntitySpecification
-        )
-        resolved_name = ensure_prefixed_name(name) if name is not None else self.name
+        """Build ``domain_object_type`` from this spec's shapes, copied into the entity frame."""
         return domain_object_type.from_shape_collection(
-            resolved_name,
+            self._resolved_name(name),
             self.shapes.copy_without_reference_frame(),
         )
 
@@ -179,7 +187,7 @@ class KinematicStructureEntitySpecification(
         self,
         world: World,
         connection_specification: ConnectionSpecification,
-        name: Union[str, PrefixedName, None] = None,
+        name: Optional[str] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> TKinematicStructureEntity:
@@ -203,7 +211,7 @@ class KinematicStructureEntitySpecification(
     def spawn(
         self,
         world: World,
-        name: Union[str, PrefixedName, None] = None,
+        name: Optional[str] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> TKinematicStructureEntity:
@@ -214,7 +222,7 @@ class KinematicStructureEntitySpecification(
     @classmethod
     def box(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         scale: Scale,
         color: Optional[Color] = None,
         origin: Optional[HomogeneousTransformationMatrix] = None,
@@ -241,7 +249,7 @@ class KinematicStructureEntitySpecification(
     @classmethod
     def sphere(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         radius: float,
         color: Optional[Color] = None,
         origin: Optional[HomogeneousTransformationMatrix] = None,
@@ -268,7 +276,7 @@ class KinematicStructureEntitySpecification(
     @classmethod
     def cylinder(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         width: float,
         height: float,
         color: Optional[Color] = None,
@@ -298,7 +306,7 @@ class KinematicStructureEntitySpecification(
     @classmethod
     def mesh(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         filename: str,
         scale: Optional[Scale] = None,
         color: Optional[Color] = None,
@@ -328,7 +336,7 @@ class KinematicStructureEntitySpecification(
     @classmethod
     def from_event(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         event: Event,
         child_specification: list[KinematicStructureEntitySpecification] | None = None,
     ) -> Self:
@@ -354,7 +362,7 @@ class KinematicStructureEntitySpecification(
     @classmethod
     def from_3d_points(
         cls,
-        name: Union[str, PrefixedName],
+        name: str,
         points_3d: List[Point3],
         minimum_thickness: float = 0.005,
         sv_ratio_tol: float = 1e-7,
@@ -398,21 +406,26 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
     collision and visual (one collection); an empty list means no visual geometry.
     """
 
-    def to_domain_object(self, name: Union[str, PrefixedName, None] = None) -> Body:
+    def _domain_object_from_shapes(
+        self,
+        domain_object_type: Type[TKinematicStructureEntity],
+        name: Optional[str] = None,
+    ) -> TKinematicStructureEntity:
+        """Build ``domain_object_type`` from this spec's shapes, copied into the entity frame."""
+        return Body.from_shape_collection(
+            self._resolved_name(name),
+            self.shapes.copy_without_reference_frame(),
+            visuals_shape_collection=self.visual_shapes,
+        )
+
+    def to_domain_object(self, name: Optional[str] = None) -> Body:
         """
         Create a new, world-independent body from this specification.
         :param name: Optional name override, e.g. for spawning multiple bodies
                      from the same specification.
         :return: The created body.
         """
-        if self.visual_shapes is None:
-            body = cast(Body, super().to_domain_object(name))
-        else:
-            body = Body(
-                name=ensure_prefixed_name(name) or self.name,
-                collision=self.shapes.copy_without_reference_frame(),
-                visual=self.visual_shapes.copy_without_reference_frame(),
-            )
+        body = self._domain_object_from_shapes(Body, name)
         if self.inertial is not None:
             body.inertial = deepcopy(self.inertial)
         return body
@@ -420,7 +433,10 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
 
 @dataclass
 class RegionSpecification(KinematicStructureEntitySpecification[Region]):
-    pass
+
+    def to_domain_object(self, name: Optional[str] = None) -> Region:
+        """Create a new, world-independent region from this specification."""
+        return self._domain_object_from_shapes(Region, name)
 
 
 @dataclass
@@ -486,25 +502,22 @@ class SemanticAnnotationWithRootSpecification(
     """
 
     def __post_init__(self):
-        # Validate before any world mutation, so an invalid part_specifications fails fast
-        # rather than corrupting the world modification history mid-spawn.
+        # Validate at construction so misuse fails fast, before any world mutation.
+        self._validate_annotation_kwargs()
         self._validate_part_specifications(self.semantic_annotation_type)
-
-        super().__post_init__()
 
     def spawn(
         self,
         world: World,
-        name: Union[str, PrefixedName, None] = None,
+        name: Optional[str] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> HasRootKinematicStructureEntity:
-        name = ensure_prefixed_name(name) if name is not None else self.name
 
-        root_entity = self.root_specification.to_domain_object(name)
+        root_entity = self.root_specification.to_domain_object(name or self.name)
 
         instance = self.semantic_annotation_type(
-            name=name, root=root_entity, **self.annotation_kwargs
+            name=self._resolved_name(name), root=root_entity, **self.annotation_kwargs
         )
 
         effective_pose = parent_T_self or (
@@ -538,6 +551,25 @@ class SemanticAnnotationWithRootSpecification(
             self._mount_part_specifications(world, instance, root_entity)
 
         return instance
+
+    def _validate_annotation_kwargs(self) -> None:
+        """
+        Validate that :attr:`annotation_kwargs` carries no part-whole relationship field. Such fields
+        must be supplied via :attr:`part_specifications` so they are spawned and mounted.
+
+        :raises PartWholeFieldInAnnotationKwargs: If a key names a part-whole relationship field.
+        """
+        part_whole_field_names = self._part_whole_fields_by_name()
+        misplaced_field_names = [
+            field_name
+            for field_name in self.annotation_kwargs
+            if field_name in part_whole_field_names
+        ]
+        if misplaced_field_names:
+            raise PartWholeFieldInAnnotationKwargs(
+                annotation_type_name=self.semantic_annotation_type.__name__,
+                field_names=misplaced_field_names,
+            )
 
     def _validate_part_specifications(
         self, instance: type[HasRootKinematicStructureEntity]
@@ -614,9 +646,10 @@ class ConnectionSpecification(NamedSpecification, ABC):
     :meth:`~semantic_digital_twin.world_description.world_entity.Connection.create_with_dofs`.
     """
 
-    name: Union[str, PrefixedName, None] = field(default=None, kw_only=True)
+    name: Optional[str] = field(default=None, kw_only=True)
     """
-    Optional connection name. If None, ``create_with_dofs`` auto-generates one from parent and child.
+    Optional connection name as a plain string. If None, ``create_with_dofs`` auto-generates one
+    from parent and child. Wrapped into a :class:`PrefixedName` only at materialization time.
     """
 
     @property
@@ -635,7 +668,7 @@ class ConnectionSpecification(NamedSpecification, ABC):
 
     @classmethod
     def from_kwargs(
-        cls, *, name: PrefixedName | None = None, **connection_parameters
+        cls, *, name: Optional[str] = None, **connection_parameters
     ) -> Self:
         """
         Instantiate this specification, applying the parameters its connection family uses.
@@ -651,7 +684,7 @@ class ConnectionSpecification(NamedSpecification, ABC):
         parent: KinematicStructureEntity | None = None,
         child: KinematicStructureEntity | None = None,
         parent_T_connection: HomogeneousTransformationMatrix | None = None,
-        name: Union[str, PrefixedName, None] = None,
+        name: Optional[str] = None,
     ) -> Connection:
         """
         Materialize the connection between ``parent`` and ``child`` and add it to the world.
@@ -667,7 +700,6 @@ class ConnectionSpecification(NamedSpecification, ABC):
             raise MissingConnectionChildError(connection_name=self.name)
 
         parent = parent or world.root
-        connection_name = ensure_prefixed_name(name) if name is not None else self.name
 
         parent_T_connection = (
             deepcopy(parent_T_connection)
@@ -682,7 +714,7 @@ class ConnectionSpecification(NamedSpecification, ABC):
                 world=world,
                 parent=parent,
                 child=child,
-                name=connection_name,
+                name=self._resolved_name(name),
                 parent_T_connection_expression=parent_T_connection,
                 **self._create_with_dofs_kwargs(),
             )
@@ -729,7 +761,7 @@ class ActiveConnection1DOFSpecification(ConnectionSpecification, ABC):
     def from_kwargs(
         cls,
         *,
-        name: PrefixedName | None = None,
+        name: Optional[str] = None,
         axis: Vector3 | None = None,
         multiplier: float = 1.0,
         offset: float = 0.0,
@@ -765,7 +797,7 @@ class RevoluteConnectionSpecification(ActiveConnection1DOFSpecification):
 class ConnectedBodySpecification(SpawnSpecification):
     """A body specification together with the connection that attaches it to its parent."""
 
-    name: Union[str, PrefixedName, None] = field(default=None, kw_only=True)
+    name: Optional[str] = field(default=None, kw_only=True)
     """
     Optional name override for the spawned body. Defaults to the wrapped body specification's name.
     """
@@ -785,12 +817,11 @@ class ConnectedBodySpecification(SpawnSpecification):
     def __post_init__(self):
         if self.name is None:
             self.name = self.body_specification.name
-        super().__post_init__()
 
     def spawn(
         self,
         world: World,
-        name: Union[str, PrefixedName, None] = None,
+        name: Optional[str] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> Body:

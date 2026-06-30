@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import inspect
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, MISSING, Field
+from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Tuple
 
@@ -17,7 +17,6 @@ from typing_extensions import (
     Set,
     Type,
     Union,
-    cast,
 )
 
 from krrood.class_diagrams.class_diagram import WrappedClass
@@ -38,6 +37,14 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from random_events.product_algebra import Event
 from random_events.set import Set as EventSet
 from random_events.variable import Symbolic
+from semantic_digital_twin.api.specifications import (
+    BodySpecification,
+    ConnectionSpecification,
+    FixedConnectionSpecification,
+    RegionSpecification,
+    SemanticAnnotationWithRootSpecification,
+    KinematicStructureEntitySpecification,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
@@ -70,15 +77,6 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
-)
-
-from semantic_digital_twin.api.specifications import (
-    BodySpecification,
-    ConnectionSpecification,
-    FixedConnectionSpecification,
-    RegionSpecification,
-    SemanticAnnotationWithRootSpecification,
-    KinematicStructureEntitySpecification,
 )
 
 if TYPE_CHECKING:
@@ -454,7 +452,7 @@ class PartWholeRelationship(HasRootKinematicStructureEntity, ABC):
             ]
             if not named_fields:
                 raise UnknownPartWholeRelationshipField(
-                    self,
+                    type(self),
                     field_name,
                     [
                         wrapped_part_whole_relationship_field.field.name
