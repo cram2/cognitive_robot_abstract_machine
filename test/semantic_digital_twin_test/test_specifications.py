@@ -1,5 +1,6 @@
 import copy
 import inspect
+import os
 from pathlib import Path
 
 import numpy as np
@@ -200,12 +201,39 @@ def test_nested_annotation_on_non_part_whole_field_raises():
         )
 
 
-def test_world_specification_robotless():
+RESOURCE_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..",
+    "..",
+    "semantic_digital_twin",
+    "resources",
+)
+
+
+def test_world_specification_robotless(empty_world):
     world = WorldSpecification(
-        starting_objects=[BodySpecification.box("obj", Scale(1, 1, 1))]
+        world=empty_world,
+        starting_objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
     ).to_world()
     assert not world.is_empty()
     assert world.get_body_by_name("obj") is not None
+
+
+def test_world_specification_from_urdf_environment():
+    world = WorldSpecification.from_urdf(
+        os.path.join(RESOURCE_DIR, "urdf", "table.urdf")
+    ).to_world()
+    assert not world.is_empty()
+    assert world.root is not None
+
+
+def test_world_specification_from_mjcf_environment():
+    pytest.importorskip("mujoco")
+    world = WorldSpecification.from_mjcf(
+        os.path.join(RESOURCE_DIR, "mjcf", "table.xml")
+    ).to_world()
+    assert not world.is_empty()
+    assert world.root is not None
 
 
 @pytest.mark.parametrize(
@@ -345,9 +373,10 @@ def test_spawn_positional_name(empty_world):
     assert body.name == PrefixedName("renamed")
 
 
-def test_world_specification_with_robot():
+def test_world_specification_with_robot(empty_world):
     try:
         world = WorldSpecification(
+            world=empty_world,
             robot_semantic_annotation=PR2,
             drive_connection_type=OmniDrive,
             world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
@@ -356,28 +385,45 @@ def test_world_specification_with_robot():
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
-    map_body = world.get_body_by_name("map")
     odom_body = world.get_body_by_name("odom_combined")
-    assert map_body is not None
     assert odom_body is not None
     assert isinstance(odom_body.parent_connection, Connection6DoF)
+    assert odom_body.parent_connection.parent is world.root
 
     drive = world.get_body_by_name("base_footprint").parent_connection
     assert isinstance(drive, OmniDrive)
 
-    map_T_odom = world.compute_forward_kinematics(map_body, odom_body)
-    np.testing.assert_allclose(map_T_odom.to_position().to_np()[0], 1.0)
+    root_T_odom = world.compute_forward_kinematics(world.root, odom_body)
+    np.testing.assert_allclose(root_T_odom.to_position().to_np()[0], 1.0)
 
 
-def test_world_specification_annotation_starting_object():
+def test_world_specification_from_urdf_with_robot():
+    try:
+        world = WorldSpecification.from_urdf(
+            os.path.join(RESOURCE_DIR, "urdf", "table.urdf"),
+            robot_semantic_annotation=PR2,
+            drive_connection_type=OmniDrive,
+        ).to_world()
+    except ParsingError as error:
+        pytest.skip(f"PR2 URDF not available: {error}")
+
+    odom_body = world.get_body_by_name("odom_combined")
+    assert odom_body is not None
+    assert odom_body.parent_connection.parent is world.root
+    drive = world.get_body_by_name("base_footprint").parent_connection
+    assert isinstance(drive, OmniDrive)
+
+
+def test_world_specification_annotation_starting_object(empty_world):
     world = WorldSpecification(
+        world=empty_world,
         starting_objects=[
             SemanticAnnotationWithRootSpecification(
                 name="milk",
                 semantic_annotation_type=Milk,
                 root_specification=BodySpecification.box("milk", Scale(0.1, 0.1, 0.2)),
             )
-        ]
+        ],
     ).to_world()
     milks = world.get_semantic_annotations_by_type(Milk)
     assert len(milks) == 1

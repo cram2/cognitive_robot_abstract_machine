@@ -18,7 +18,6 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 import builtins
 import enum
 import krrood.adapters.json_serializer
-import krrood.entity_query_language.orm.model
 import krrood.ormatic.custom_types
 import krrood.ormatic.data_access_objects.alternative_mappings
 import krrood.ormatic.type_dict
@@ -135,25 +134,6 @@ class Base(DeclarativeBase):
 
 
 # Association tables for many-to-many relationships
-class SymbolGraphMappingDAO_instances_association(Base, AssociationDataAccessObject):
-    __tablename__ = "_81067648797638488542008423406786912563441407992272678641741406"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-    source_symbolgraphmappingdao_id: Mapped[int] = mapped_column(
-        ForeignKey("SymbolGraphMappingDAO.database_id")
-    )
-    target_wrappedinstancemappingdao_id: Mapped[int] = mapped_column(
-        ForeignKey("WrappedInstanceMappingDAO.database_id")
-    )
-
-    target: Mapped[WrappedInstanceMappingDAO] = relationship(
-        "WrappedInstanceMappingDAO",
-        foreign_keys=[target_wrappedinstancemappingdao_id],
-        lazy="selectin",
-    )
-
-
 class WorldModelSnapshotDAO_modifications_association(
     Base, AssociationDataAccessObject
 ):
@@ -1964,37 +1944,6 @@ class FunctionMappingDAO(
     )
     class_name: Mapped[typing.Optional[builtins.str]] = mapped_column(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-
-class SymbolGraphMappingDAO(
-    Base, DataAccessObject[krrood.entity_query_language.orm.model.SymbolGraphMapping]
-):
-    __tablename__ = "SymbolGraphMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    instances: Mapped[builtins.list[SymbolGraphMappingDAO_instances_association]] = (
-        relationship(
-            "SymbolGraphMappingDAO_instances_association",
-            collection_class=builtins.list,
-            cascade="all, delete-orphan",
-            foreign_keys="[SymbolGraphMappingDAO_instances_association.source_symbolgraphmappingdao_id]",
-            lazy="selectin",
-        )
-    )
-
-
-class WrappedInstanceMappingDAO(
-    Base,
-    DataAccessObject[krrood.entity_query_language.orm.model.WrappedInstanceMapping],
-):
-    __tablename__ = "WrappedInstanceMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
     )
 
 
@@ -5413,6 +5362,16 @@ class WorldSpecificationDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
+    )
+
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
     )
 
 

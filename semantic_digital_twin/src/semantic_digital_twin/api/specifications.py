@@ -76,6 +76,7 @@ if TYPE_CHECKING:
         PartWholeRelationship,
     )
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
+    from semantic_digital_twin.adapters.package_resolver import PathResolver
 
 
 TWorldEntity = TypeVar("TWorldEntity", bound=WorldEntity)
@@ -882,15 +883,22 @@ class ConnectedBodySpecification(SpawnSpecification):
 @dataclass
 class WorldSpecification:
     """
-    Declarative description of a whole world: an optional robot and the objects spawned around it.
+    Declarative description of a world: an environment, an optional robot, and objects around them.
 
-    Materializing it (:meth:`to_world`) builds either an empty world with a single root body or a
-    robot world wired as ``map -> odom_combined -> drive -> robot``, then spawns all starting objects.
+    The environment is supplied as a concrete :class:`World` (build one from a model file with
+    :meth:`from_urdf` or :meth:`from_mjcf`). Applying it (:meth:`to_world`) optionally parses and
+    merges a robot as ``world.root -> odom_combined -> drive -> robot``, then spawns all starting
+    objects, and returns the augmented environment world.
+    """
+
+    world: World
+    """
+    The environment world that the robot and starting objects are added to. Its root is ``world.root``.
     """
 
     robot_semantic_annotation: Optional[Type[AbstractRobot]] = None
     """
-    The robot to populate the world with. If None, an empty world with a single root body is created.
+    The robot to merge into the environment. If None, no robot is added.
     """
 
     drive_connection_type: Type[WheeledDrive] | None = None
@@ -900,7 +908,7 @@ class WorldSpecification:
 
     world_T_odom: HomogeneousTransformationMatrix | None = None
     """
-    The localization pose of ``odom_combined`` in the ``map`` frame. If None, identity is used.
+    The localization pose of ``odom_combined`` in the ``world.root`` frame. If None, identity is used.
     """
 
     odom_T_robot_start: HomogeneousTransformationMatrix | None = None
@@ -913,50 +921,123 @@ class WorldSpecification:
     Specifications spawned relative to the world root once the robot (if any) is in place.
     """
 
+    @classmethod
+    def from_urdf(
+        cls,
+        file_path: str,
+        *,
+        prefix: Optional[str] = None,
+        path_resolver: Optional[PathResolver] = None,
+        robot_semantic_annotation: Optional[Type[AbstractRobot]] = None,
+        drive_connection_type: Optional[Type[WheeledDrive]] = None,
+        world_T_odom: Optional[HomogeneousTransformationMatrix] = None,
+        odom_T_robot_start: Optional[HomogeneousTransformationMatrix] = None,
+        starting_objects: Optional[list[SpawnSpecification]] = None,
+    ) -> Self:
+        """
+        Build a specification whose environment is parsed from a URDF file.
+
+        :param file_path: Path to the environment URDF. This is never a robot description; the
+            robot, if any, is supplied through ``robot_semantic_annotation``.
+        :param prefix: Optional name prefix for the parsed environment.
+        :param path_resolver: Resolver for mesh/package paths referenced by the URDF.
+        """
+        world = URDFParser.from_file(
+            file_path, prefix=prefix, path_resolver=path_resolver
+        ).parse()
+        return cls(
+            world=world,
+            robot_semantic_annotation=robot_semantic_annotation,
+            drive_connection_type=drive_connection_type,
+            world_T_odom=world_T_odom,
+            odom_T_robot_start=odom_T_robot_start,
+            starting_objects=starting_objects or [],
+        )
+
+    @classmethod
+    def from_mjcf(
+        cls,
+        file_path: str,
+        *,
+        prefix: Optional[str] = None,
+        mimic_joints: Optional[dict[str, str]] = None,
+        robot_semantic_annotation: Optional[Type[AbstractRobot]] = None,
+        drive_connection_type: Optional[Type[WheeledDrive]] = None,
+        world_T_odom: Optional[HomogeneousTransformationMatrix] = None,
+        odom_T_robot_start: Optional[HomogeneousTransformationMatrix] = None,
+        starting_objects: Optional[list[SpawnSpecification]] = None,
+    ) -> Self:
+        """
+        Build a specification whose environment is parsed from an MJCF (MuJoCo XML) file.
+
+        :param file_path: Path to the environment MJCF. This is never a robot description; the
+            robot, if any, is supplied through ``robot_semantic_annotation``.
+        :param prefix: Optional name prefix for the parsed environment.
+        :param mimic_joints: Mapping of joint names to the joints they mimic.
+        """
+        from semantic_digital_twin.adapters.mjcf import MJCFParser
+
+        world = MJCFParser(
+            file_path=file_path, mimic_joints=mimic_joints or {}, prefix=prefix
+        ).parse()
+        return cls(
+            world=world,
+            robot_semantic_annotation=robot_semantic_annotation,
+            drive_connection_type=drive_connection_type,
+            world_T_odom=world_T_odom,
+            odom_T_robot_start=odom_T_robot_start,
+            starting_objects=starting_objects or [],
+        )
+
     def to_world(self) -> World:
         """
-        Materialize this specification into a new World.
+        Augment the environment world in place and return it.
 
-        Without a robot, an empty world with a single root body is created. With a robot,
-        the robot URDF is parsed and connected as ``map -> odom_combined -> drive -> robot``,
-        with the localization and start poses applied. Finally all ``starting_objects`` are
-        spawned relative to the world root.
+        When ``robot_semantic_annotation`` is set, the robot is parsed from its own description and
+        merged as ``world.root -> odom_combined -> drive -> robot``, with the localization and start
+        poses applied. Finally all ``starting_objects`` are spawned relative to the world root.
+
+        .. note::
+            This mutates and returns ``self.world``; it is intended to be applied once.
         """
-        if self.robot_semantic_annotation is None:
-            world = World()
-            with world.modify_world():
-                world.add_body(Body(name=PrefixedName("root", "world")))
-        else:
-            world = URDFParser.from_file(
-                self.robot_semantic_annotation.get_ros_file_path()
-            ).parse()
-            self.robot_semantic_annotation.from_world(world)
-
-            with world.modify_world():
-                robot_root = world.root
-                map_body = Body(name=PrefixedName("map"))
-                odom_body = Body(name=PrefixedName("odom_combined"))
-
-                map_C_odom = Connection6DoF.create_with_dofs(
-                    world=world, parent=map_body, child=odom_body
-                )
-                world.add_connection(map_C_odom)
-
-                drive_connection_type = self.drive_connection_type or Connection6DoF
-                odom_C_robot = drive_connection_type.create_with_dofs(
-                    world=world, parent=odom_body, child=robot_root
-                )
-                world.add_connection(odom_C_robot)
-                if issubclass(drive_connection_type, ActiveConnection):
-                    odom_C_robot.has_hardware_interface = True
-
-            # Poses touch DoF state, so they are set after the modification block.
-            if self.world_T_odom is not None:
-                map_C_odom.origin = self.world_T_odom
-            if self.odom_T_robot_start is not None:
-                odom_C_robot.origin = self.odom_T_robot_start
+        if self.robot_semantic_annotation is not None:
+            self._setup_robot()
 
         for starting_object in self.starting_objects:
-            starting_object.spawn(world)
+            starting_object.spawn(self.world)
 
-        return world
+        return self.world
+
+    def _setup_robot(self):
+        """
+        Sets up the robot in the world, including adding odom in between the world root and the robot root.
+        """
+        with self.world.modify_world():
+            odom_body = Body(name=PrefixedName("odom_combined"))
+            root_C_odom = Connection6DoF.create_with_dofs(
+                world=self.world, parent=cast(Body, self.world.root), child=odom_body
+            )
+            self.world.add_connection(root_C_odom)
+
+            robot_world = URDFParser.from_file(
+                self.robot_semantic_annotation.get_ros_file_path()
+            ).parse()
+            robot_root_id = robot_world.root.id
+
+            drive_connection_type = self.drive_connection_type or Connection6DoF
+            odom_C_robot = drive_connection_type.create_with_dofs(
+                world=self.world, parent=odom_body, child=cast(Body, robot_world.root)
+            )
+            self.world.merge_world(robot_world, root_connection=odom_C_robot)
+            if issubclass(drive_connection_type, ActiveConnection):
+                odom_C_robot.has_hardware_interface = True
+
+        self.robot_semantic_annotation.from_branch_in_world(
+            cast(Body, self.world.get_world_entity_with_id_by_id(robot_root_id))
+        )
+
+        # Poses touch DoF state, so they are set after the modification block.
+        if self.world_T_odom is not None:
+            root_C_odom.origin = self.world_T_odom
+        if self.odom_T_robot_start is not None:
+            odom_C_robot.origin = self.odom_T_robot_start

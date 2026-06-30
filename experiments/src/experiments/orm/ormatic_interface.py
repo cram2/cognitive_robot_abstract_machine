@@ -15741,6 +15741,16 @@ class WorldSpecificationDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+
 
 class ClosestPointsDAO(
     Base,
