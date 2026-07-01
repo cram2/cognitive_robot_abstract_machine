@@ -16,12 +16,17 @@ from typing_extensions import (
     Self,
     Set,
     Type,
+    TypeVar,
 )
 
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.factories import variable_from, entity, variable, an
+from krrood.entity_query_language.factories import variable_from, entity, variable, an
 from krrood.ormatic.utils import classproperty
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Generic
+from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.probabilistic_circuit.rx.helper import (
@@ -33,6 +38,9 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
+from random_events.product_algebra import Event
+from random_events.set import Set as RandomEventsSets
+from random_events.variable import Symbolic
 from random_events.product_algebra import Event
 from random_events.set import Set as EventSet
 from random_events.variable import Symbolic
@@ -94,13 +102,20 @@ class IsPerceivable:
     """
 
 
+TKinematicStructureEntity = TypeVar(
+    "TKinematicStructureEntity", bound=KinematicStructureEntity
+)
+
+
 @dataclass(eq=False)
-class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
+class HasRootKinematicStructureEntity(
+    SemanticAnnotation, Generic[TKinematicStructureEntity], SubClassSafeGeneric, ABC
+):
     """
     Base class for shared method for HasRootBody and HasRootRegion.
     """
 
-    root: KinematicStructureEntity = field(kw_only=True)
+    root: TKinematicStructureEntity = field(kw_only=True)
     """
     The root kinematic structure entity of the semantic annotation.
     """
@@ -139,7 +154,7 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         active_axis: Optional[Vector3] = None,
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
-    ):
+    ) -> Self:
         """
         Create a new instance and connect its root entity to the world's root.
 
@@ -215,18 +230,16 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         return self._world.get_kinematic_structure_entities_of_branch(self.root)
 
 
+TBody = TypeVar("TBody", bound=Body)
+
+
 @dataclass(eq=False)
-class HasRootBody(HasRootKinematicStructureEntity, ABC):
+class HasRootBody(HasRootKinematicStructureEntity[TBody], ABC):
     """
     Abstract base class for all household objects. Each semantic annotation refers to a single Body.
     Each subclass automatically derives a MatchRule from its own class name and
     the names of its HouseholdObject ancestors. This makes specialized subclasses
     naturally more specific than their bases.
-    """
-
-    root: Body = field(kw_only=True)
-    """
-    The root body of the semantic annotation.
     """
 
     @classmethod
@@ -276,15 +289,13 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
         )
 
 
+TRegion = TypeVar("TRegion", bound=Region)
+
+
 @dataclass(eq=False)
-class HasRootRegion(HasRootKinematicStructureEntity, ABC):
+class HasRootRegion(HasRootKinematicStructureEntity[TRegion], ABC):
     """
     A mixin class for semantic annotations that have a region.
-    """
-
-    root: Region = field(kw_only=True)
-    """
-    The root region of the semantic annotation.
     """
 
     @classmethod
@@ -508,14 +519,20 @@ class HasHandle(HasRootBody, PartWholeRelationship, ABC):
     """
 
 
+THasRootBody = TypeVar("THasRootBody", bound=HasRootBody)
+"""
+A type variable for HasRootBody.
+"""
+
+
 @dataclass(eq=False)
-class IsStorageSpace(HasRootBody, ABC):
+class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric, ABC):
     """
     A mixin class for semantic annotations that represent storage spaces. Used to afterthefact add object for example
     to a table, and have those objects move with the table when it is moved.
     """
 
-    objects: List[HasRootBody] = field(default_factory=list, hash=False, kw_only=True)
+    objects: List[THasRootBody] = field(default_factory=list, hash=False, kw_only=True)
     """
     The occupants currently contained in/on this annotation.
     """

@@ -599,7 +599,10 @@ def get_generic_type_params(
     Given a subclass and its generic base, return the concrete type parameter(s).
 
     Example:
-        get_generic_type_params(Employee, Role) -> (<class '__main__.Person'>,)
+        get_generic_type_params(Employee, Role) -> [<class '__main__.Person'>]
+
+    Direct parameterizations (e.g. ``class C(B, Generic[U])``) take priority over
+    an inherited binding discovered by recursing into an unparameterized base.
 
     :param cls: The subclass to check.
     :param generic_base: The generic base class to check against.
