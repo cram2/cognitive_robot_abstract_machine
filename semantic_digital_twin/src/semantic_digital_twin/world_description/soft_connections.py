@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Optional, Self
 from uuid import UUID
 
 import krrood.symbolic_math.symbolic_math as sm
-from semantic_digital_twin.world_description.world_entity import Connection
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.world_description.world_entity import (
+    Connection,
+    KinematicStructureEntity,
+)
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
 )
@@ -29,6 +34,21 @@ class PiecewiseConstantCurvatureConnection(Connection):
 
     segment_length: float = field(kw_only=True)
     """The physical arc length of this specific segment."""
+
+    @classmethod
+    def create_with_dofs(
+        cls,
+        world: World,
+        parent: KinematicStructureEntity,
+        child: KinematicStructureEntity,
+        name: Optional[PrefixedName] = None,
+        *args,
+        **kwargs,
+    ) -> Self:
+        """
+        Factory method to instantiate a PCC connection in the world.
+        """
+        return cls(parent=parent, child=child, name=name, **kwargs)
 
     def add_to_world(self, world: World):
         """
@@ -115,6 +135,21 @@ class CosseratRodConnection(Connection):
 
     segment_length: float = field(kw_only=True)
     """The intrinsic rest length of the rod segment."""
+
+    @classmethod
+    def create_with_dofs(
+        cls,
+        world: World,
+        parent: KinematicStructureEntity,
+        child: KinematicStructureEntity,
+        name: Optional[PrefixedName] = None,
+        *args,
+        **kwargs,
+    ) -> Self:
+        """
+        Factory method to instantiate a Cosserat connection in the world.
+        """
+        return cls(parent=parent, child=child, name=name, **kwargs)
 
     def add_to_world(self, world: World):
         """
