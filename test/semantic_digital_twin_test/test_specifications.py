@@ -9,7 +9,6 @@ import pytest
 from semantic_digital_twin.api.specifications import (
     BodySpecification,
     RegionSpecification,
-    ConnectedBodySpecification,
     ConnectionSpecification,
     FixedConnectionSpecification,
     Connection6DoFSpecification,
@@ -97,12 +96,25 @@ def test_region_specification_spawns(empty_world):
     assert isinstance(region.parent_connection, FixedConnection)
 
 
-def test_body_and_connection_pose_and_name_override(empty_world):
-    body_spec = BodySpecification.box("box", Scale(1, 1, 1))
-    body_spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(
-        x=1, y=2, z=3
+def test_connection_specification_defaults_to_none():
+    spec = BodySpecification.box("box", Scale(1, 1, 1))
+    assert spec.connection_specification is None
+
+
+def test_region_specification_uses_connection_specification(empty_world):
+    # The connection now lives on the entity spec, so regions get non-fixed connections too.
+    spec = RegionSpecification.box(
+        "sliding_region",
+        Scale(1, 1, 1),
+        connection_specification=PrismaticConnectionSpecification(axis=Vector3.Z()),
     )
-    spec = ConnectedBodySpecification(body_specification=body_spec)
+    region = spec.spawn(empty_world)
+    assert isinstance(region.parent_connection, PrismaticConnection)
+
+
+def test_body_and_connection_pose_and_name_override(empty_world):
+    spec = BodySpecification.box("box", Scale(1, 1, 1))
+    spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3)
     body = spec.spawn(empty_world, name="renamed")
     assert body.name == PrefixedName("renamed")
     root_T_body = empty_world.compute_forward_kinematics(empty_world.root, body)
@@ -110,9 +122,8 @@ def test_body_and_connection_pose_and_name_override(empty_world):
 
 
 def test_body_and_connection_spawn_arg_overrides_stored_pose(empty_world):
-    body_spec = BodySpecification.box("box", Scale(1, 1, 1))
-    body_spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
-    spec = ConnectedBodySpecification(body_specification=body_spec)
+    spec = BodySpecification.box("box", Scale(1, 1, 1))
+    spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
     body = spec.spawn(
         empty_world,
         parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=5),
@@ -122,8 +133,9 @@ def test_body_and_connection_spawn_arg_overrides_stored_pose(empty_world):
 
 
 def test_body_and_connection_active(empty_world):
-    spec = ConnectedBodySpecification(
-        body_specification=BodySpecification.box("drawer", Scale(1, 1, 1)),
+    spec = BodySpecification.box(
+        "drawer",
+        Scale(1, 1, 1),
         connection_specification=PrismaticConnectionSpecification(axis=Vector3.Z()),
     )
     body = spec.spawn(empty_world)
@@ -164,10 +176,27 @@ def test_active_annotation_spawns(empty_world):
     assert isinstance(annotation.root.parent_connection, PrismaticConnection)
 
 
+def test_annotation_root_connection_specification_overrides_type(empty_world):
+    # Milk fixes its root connection to fixed by type, but a connection set on the root
+    # specification wins.
+    spec = SemanticAnnotationWithRootSpecification(
+        name="milk",
+        semantic_annotation_type=Milk,
+        root_specification=BodySpecification.box(
+            "milk",
+            Scale(0.1, 0.1, 0.2),
+            connection_specification=Connection6DoFSpecification(),
+        ),
+    )
+    annotation = spec.spawn(empty_world)
+    assert isinstance(annotation.root.parent_connection, Connection6DoF)
+
+
 def test_active_connection_requires_parameters_body(empty_world):
     # An active connection without an axis is rejected at spawn time by create_with_dofs.
-    spec = ConnectedBodySpecification(
-        body_specification=BodySpecification.box("b", Scale(1, 1, 1)),
+    spec = BodySpecification.box(
+        "b",
+        Scale(1, 1, 1),
         connection_specification=PrismaticConnectionSpecification(),
     )
     with pytest.raises(MissingConnectionAxisError):
@@ -409,8 +438,9 @@ def test_to_domain_object_generic_resolution():
 
 
 def test_body_and_connection_6dof(empty_world):
-    spec = ConnectedBodySpecification(
-        body_specification=BodySpecification.box("free", Scale(1, 1, 1)),
+    spec = BodySpecification.box(
+        "free",
+        Scale(1, 1, 1),
         connection_specification=Connection6DoFSpecification(),
     )
     body = spec.spawn(empty_world)

@@ -14741,40 +14741,6 @@ class SpawnSpecificationDAO(
     }
 
 
-class ConnectedBodySpecificationDAO(
-    SpawnSpecificationDAO,
-    DataAccessObject[
-        semantic_digital_twin.api.specifications.ConnectedBodySpecification
-    ],
-):
-    __tablename__ = "ConnectedBodySpecificationDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(SpawnSpecificationDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    body_specification_id: Mapped[int] = mapped_column(
-        ForeignKey("BodySpecificationDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    body_specification: Mapped[BodySpecificationDAO] = relationship(
-        "BodySpecificationDAO",
-        uselist=False,
-        foreign_keys=[body_specification_id],
-        post_update=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "ConnectedBodySpecificationDAO",
-        "inherit_condition": database_id == SpawnSpecificationDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
 class KinematicStructureEntitySpecificationDAO(
     SpawnSpecificationDAO,
     DataAccessObject[

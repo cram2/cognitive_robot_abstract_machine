@@ -234,21 +234,20 @@ parameters that family needs:
 | `PrismaticConnectionSpecification` | `PrismaticConnection` | One translational DoF (a sliding drawer) |
 | `RevoluteConnectionSpecification` | `RevoluteConnection` | One rotational DoF (a swinging door) |
 
-A `ConnectedBodySpecification` bundles a body specification with the connection that should
-attach it. The active families (`Prismatic`/`Revolute`) require a movement `axis`, and
-optionally accept a `multiplier`, an `offset`, and `dof_limits`.
+Every entity specification carries an optional `connection_specification`; when it is left unset,
+`spawn` attaches the entity with a fixed connection. Set it to give the entity a degree of freedom.
+The active families (`Prismatic`/`Revolute`) require a movement `axis`, and optionally accept a
+`multiplier`, an `offset`, and `dof_limits`.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.api.specifications import (
-    ConnectedBodySpecification,
-    PrismaticConnectionSpecification,
-)
+from semantic_digital_twin.api.specifications import PrismaticConnectionSpecification
 from semantic_digital_twin.spatial_types import Vector3
 
 world = World.create_with_root_body()
 
-drawer = ConnectedBodySpecification(
-    body_specification=BodySpecification.box("drawer", Scale(0.4, 0.5, 0.2)),
+drawer = BodySpecification.box(
+    "drawer",
+    Scale(0.4, 0.5, 0.2),
     connection_specification=PrismaticConnectionSpecification(axis=Vector3.Z()),
 ).spawn(world)
 
@@ -324,12 +323,14 @@ assert isinstance(milk.root.parent_connection, FixedConnection)
 print("Spawned", type(milk).__name__, "rooted via", type(milk.root.parent_connection).__name__)
 ```
 
-Notice that the specification never states *how* the root is connected. The connection used for
-the root body is fixed by the annotation type through its `_parent_connection_specification_type`
-(a `FixedConnectionSpecification` for most annotations, a `PrismaticConnectionSpecification` for a
-`Slider`, a `RevoluteConnectionSpecification` for a `Hinge`). The specification only supplies the
-*parameters* an active connection needs — `axis`, `multiplier`, `offset`, and `connection_limits`
-— which are ignored for fixed annotations. This is why spawning a `Slider` requires an `axis`.
+Notice that the specification usually never states *how* the root is connected. By default the
+connection used for the root body is fixed by the annotation type through its
+`_parent_connection_specification_type` (a `FixedConnectionSpecification` for most annotations, a
+`PrismaticConnectionSpecification` for a `Slider`, a `RevoluteConnectionSpecification` for a
+`Hinge`). The specification only supplies the *parameters* an active connection needs — `axis`,
+`multiplier`, `offset`, and `connection_limits` — which are ignored for fixed annotations. This is
+why spawning a `Slider` requires an `axis`. If the root specification sets its own
+`connection_specification`, that connection is used instead and overrides the annotation-type default.
 
 ```{code-cell} ipython3
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Slider

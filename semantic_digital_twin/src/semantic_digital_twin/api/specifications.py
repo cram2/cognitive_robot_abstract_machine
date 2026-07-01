@@ -150,533 +150,6 @@ class SpawnSpecification(NamedSpecification, Generic[TWorldEntity], ABC):
 
 
 @dataclass
-class KinematicStructureEntitySpecification(
-    SpawnSpecification[TKinematicStructureEntity],
-    AbstractSubClassSafeGeneric,
-):
-    """
-    World-independent, reusable description of a kinematic structure entity.
-    A specification is reusable: every materialization copies the prototype shapes and the
-    pose, so the specification never becomes bound to an entity or world.
-
-    The concrete domain-object type (e.g. ``Body``/``Region``) is bound as the generic
-    parameter by each subclass and resolved at runtime in :meth:`to_domain_object`.
-    """
-
-    shapes: ShapeCollection = field(default_factory=ShapeCollection)
-    """
-    Prototype shapes with origins expressed in the entity frame.
-    """
-
-    child_specification: list[KinematicStructureEntitySpecification] = field(
-        default_factory=list
-    )
-    """
-    The child specifications of this specification. If set, the spawned entity will be a parent of the children.
-    """
-
-    parent_T_self: HomogeneousTransformationMatrix = field(
-        default_factory=HomogeneousTransformationMatrix
-    )
-    """
-    Default placement of the entity in its parent frame, used by :meth:`spawn` when the caller does not
-    override it. Identity by default.
-    """
-
-    def to_domain_object(self, name: Optional[str] = None) -> TKinematicStructureEntity:
-        """
-        Materialize a new, world-independent kinematic structure entity from this spec.
-
-        The concrete domain-object type is resolved from this spec's bound generic parameter.
-
-        :param name: Optional name override. If None, the spec's own name is used.
-        """
-        [domain_object_type] = get_generic_type_params(
-            self, KinematicStructureEntitySpecification
-        )
-        return domain_object_type.from_shape_collection(
-            self._resolved_name(name),
-            self.shapes.copy_without_reference_frame(),
-        )
-
-    def _spawn_attached(
-        self,
-        world: World,
-        connection_specification: ConnectionSpecification,
-        name: Optional[str] = None,
-        parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
-    ) -> TKinematicStructureEntity:
-        """
-        Materialize this entity, attach it to ``parent`` via ``connection_specification``, and spawn
-        its geometry children. This is the shared procedure behind both :meth:`spawn` and
-        :meth:`ConnectedBodySpecification.spawn`; they differ only in which connection is used.
-        """
-        entity = self.to_domain_object(name)
-        with world.modify_world():
-            connection_specification.connect(
-                world,
-                parent=parent,
-                child=entity,
-                parent_T_connection=parent_T_self or self.parent_T_self,
-            )
-            for child in self.child_specification:
-                child.spawn(world, parent=entity)
-        return entity
-
-    def spawn(
-        self,
-        world: World,
-        name: Optional[str] = None,
-        parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
-    ) -> TKinematicStructureEntity:
-        """
-        Materialize the entity and attach it to ``parent`` via a fixed connection.
-
-        :param parent: The entity to attach to. If None, ``world.root`` is used.
-        :param parent_T_self: Overrides the specification's stored default pose. If None, the stored default is used.
-        :param name: Overrides the specification's own name. If None, the spec's name is used.
-        """
-        return self._spawn_attached(
-            world, FixedConnectionSpecification(), name, parent, parent_T_self
-        )
-
-    @classmethod
-    def box(
-        cls,
-        name: str,
-        scale: Scale,
-        color: Optional[Color] = None,
-        origin: Optional[HomogeneousTransformationMatrix] = None,
-        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
-        child_specification: list[KinematicStructureEntitySpecification] | None = None,
-    ) -> Self:
-        """
-        Specification for a kinematic structure entity with a single box shape.
-        :param name: The name of the body.
-        :param scale: The extents of the box.
-        :param color: The color of the box.
-        :param origin: The origin of the box in the body frame. Defaults to identity.
-        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
-        :return: The created specification.
-        """
-        return cls(
-            name,
-            Box(
-                scale=scale,
-                origin=origin or HomogeneousTransformationMatrix(),
-                color=color or Color(),
-            ).as_shape_collection(),
-            child_specification=child_specification or [],
-            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
-        )
-
-    @classmethod
-    def sphere(
-        cls,
-        name: str,
-        radius: float,
-        color: Optional[Color] = None,
-        origin: Optional[HomogeneousTransformationMatrix] = None,
-        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
-        child_specification: list[KinematicStructureEntitySpecification] | None = None,
-    ) -> Self:
-        """
-        Specification for a kinematic structure entity with a single sphere shape.
-        :param name: The name of the kinematic structure entity.
-        :param radius: The radius of the sphere.
-        :param color: The color of the sphere.
-        :param origin: The origin of the sphere in the kinematic structure entity frame. Defaults to identity.
-        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
-        :return: The created specification.
-        """
-        return cls(
-            name,
-            Sphere(
-                radius=radius,
-                origin=origin or HomogeneousTransformationMatrix(),
-                color=color or Color(),
-            ).as_shape_collection(),
-            child_specification=child_specification or [],
-            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
-        )
-
-    @classmethod
-    def cylinder(
-        cls,
-        name: str,
-        width: float,
-        height: float,
-        color: Optional[Color] = None,
-        origin: Optional[HomogeneousTransformationMatrix] = None,
-        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
-        child_specification: list[KinematicStructureEntitySpecification] | None = None,
-    ) -> Self:
-        """
-        Specification for a kinematic structure entity with a single cylinder shape.
-        :param name: The name of the kinematic structure entity.
-        :param width: The diameter of the cylinder.
-        :param height: The height of the cylinder.
-        :param color: The color of the cylinder.
-        :param origin: The origin of the cylinder in the kinematic structure entity frame. Defaults to identity.
-        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
-        :return: The created specification.
-        """
-        return cls(
-            name,
-            Cylinder(
-                width=width,
-                height=height,
-                origin=origin or HomogeneousTransformationMatrix(),
-                color=color or Color(),
-            ).as_shape_collection(),
-            child_specification=child_specification or [],
-            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
-        )
-
-    @classmethod
-    def mesh(
-        cls,
-        name: str,
-        filename: str,
-        scale: Optional[Scale] = None,
-        color: Optional[Color] = None,
-        origin: Optional[HomogeneousTransformationMatrix] = None,
-        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
-        child_specification: list[KinematicStructureEntitySpecification] | None = None,
-    ) -> Self:
-        """
-        Specification for a kinematic structure entity with a single mesh shape loaded from a file.
-        :param name: The name of the kinematic structure entity.
-        :param filename: The path of the mesh file.
-        :param scale: The scale applied to the mesh.
-        :param color: The color of the mesh.
-        :param origin: The origin of the mesh in the kinematic structure entity frame. Defaults to identity.
-        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
-        :return: The created specification.
-        """
-        return cls(
-            name,
-            Mesh(
-                filename=filename,
-                origin=origin or HomogeneousTransformationMatrix(),
-                scale=scale or Scale(),
-                color=color or Color(),
-            ).as_shape_collection(),
-            child_specification=child_specification or [],
-            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
-        )
-
-    @classmethod
-    def from_event(
-        cls,
-        name: str,
-        event: Event,
-        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
-        child_specification: list[KinematicStructureEntitySpecification] | None = None,
-    ) -> Self:
-        """
-        Specification whose shapes are the bounding boxes of a random event.
-        This is the construction used by semantic annotations with composite
-        geometry (hollow handles, container cases, walls minus apertures, ...).
-        :param name: The name of the entity.
-        :param event: The event describing the geometry, in the entity frame.
-        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
-        :return: The created specification.
-        """
-        # BoundingBoxCollection requires a reference frame, so the shapes are
-        # built around a throwaway body and unbound again for the specification.
-        anchor = Body(name=PrefixedName("spec_anchor"))
-        return cls(
-            name=name,
-            shapes=BoundingBoxCollection.from_event(anchor, event)
-            .as_shapes()
-            .copy_without_reference_frame(),
-            child_specification=child_specification or [],
-            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
-        )
-
-    @classmethod
-    def from_3d_points(
-        cls,
-        name: str,
-        points_3d: List[Point3],
-        minimum_thickness: float = 0.005,
-        sv_ratio_tol: float = 1e-7,
-        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
-        child_specification: list[KinematicStructureEntitySpecification] | None = None,
-    ) -> Self:
-        """
-        Specification whose geometry is the convex hull of a point cloud.
-
-        :param name: The name of the entity.
-        :param points_3d: The points whose convex hull defines the geometry.
-        :param minimum_thickness: Thickness added when the points are near-planar.
-        :param sv_ratio_tol: Singular-value ratio tolerance for the planarity test.
-        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
-        :return: The created specification.
-        """
-        return cls(
-            name=name,
-            shapes=ShapeCollection(
-                [
-                    Mesh.from_3d_points(
-                        points_3d,
-                        minimum_thickness=minimum_thickness,
-                        sv_ratio_tol=sv_ratio_tol,
-                    )
-                ]
-            ).copy_without_reference_frame(),
-            child_specification=child_specification or [],
-            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
-        )
-
-
-@dataclass
-class BodySpecification(KinematicStructureEntitySpecification[Body]):
-    """
-    World-independent description of a :class:`~semantic_digital_twin.world_description.world_entity.Body`.
-
-    Extends the kinematic-structure-entity specification with body-only properties: inertial
-    parameters and a separate visual shape collection.
-    """
-
-    inertial: Optional[Inertial] = None
-    """
-    Inertia properties of created bodies. None means the Body default.
-    """
-
-    visual_shapes: Optional[ShapeCollection] = None
-    """
-    Visual shapes when they differ from `shapes`. None shares `shapes` for both
-    collision and visual (one collection); an empty list means no visual geometry.
-    """
-
-    def to_domain_object(self, name: Optional[str] = None) -> Body:
-        """
-        Create a new, world-independent body from this specification.
-        :param name: Optional name override, e.g. for spawning multiple bodies
-                     from the same specification.
-        :return: The created body.
-        """
-        body = Body.from_shape_collection(
-            self._resolved_name(name),
-            self.shapes.copy_without_reference_frame(),
-            visuals_shape_collection=(
-                self.visual_shapes.copy_without_reference_frame()
-                if self.visual_shapes is not None
-                else None
-            ),
-        )
-        if self.inertial is not None:
-            body.inertial = deepcopy(self.inertial)
-        return body
-
-
-@dataclass
-class RegionSpecification(KinematicStructureEntitySpecification[Region]):
-    """
-    World-independent description of a :class:`~semantic_digital_twin.world_description.world_entity.Region`.
-
-    Carries no fields beyond the base kinematic-structure-entity specification; it only binds the
-    materialized domain-object type to :class:`Region`.
-    """
-
-
-@dataclass
-class SemanticAnnotationWithRootSpecification(
-    SpawnSpecification["HasRootKinematicStructureEntity"]
-):
-    """
-    World-independent description of a semantic annotation rooted in a single kinematic
-    structure entity. The annotation type owns the parent connection specification type (via its
-    ``_parent_connection_specification_type``); this specification only supplies the connection
-    parameters for active connections.
-    """
-
-    semantic_annotation_type: Type[HasRootKinematicStructureEntity]
-    """
-    The type of the semantic annotation that is a subclass of HasRootKinematicStructureEntity.
-    """
-
-    root_specification: KinematicStructureEntitySpecification
-    """
-    The specification of the root kinematic structure entity of the annotation.
-    """
-
-    axis: Optional[Vector3] = None
-    """
-    Movement axis for the parent connection. Required when the annotation's
-    ``_parent_connection_specification_type`` is an active connection; ignored otherwise.
-    """
-
-    multiplier: float = 1.0
-    """
-    DoF multiplier for the parent connection (active connections only).
-    """
-
-    offset: float = 0.0
-    """
-    DoF offset for the parent connection (active connections only).
-    """
-
-    connection_limits: Optional[DegreeOfFreedomLimits] = None
-    """
-    Degree-of-freedom limits for the parent connection (active connections only).
-    """
-
-    annotation_kwargs: dict[str, Any] = field(default_factory=dict)
-    """
-    Inert keyword arguments passed straight to the annotation constructor, keyed by constructor field
-    name. Nested annotation parts do not belong here; use :attr:`part_specifications`.
-    """
-
-    part_specifications: dict[
-        str,
-        Union[
-            SemanticAnnotationWithRootSpecification,
-            list[SemanticAnnotationWithRootSpecification],
-        ],
-    ] = field(default_factory=dict)
-    """
-    Nested annotation parts keyed by the target part-whole relationship field name. Each part is
-    spawned during :meth:`spawn` and mounted via the annotation's
-    :meth:`~...mixins.PartWholeRelationship.add`. A list value mounts several parts onto a to-many
-    field; a single value mounts onto a singular field.
-    """
-
-    def __post_init__(self):
-        """Validate the annotation kwargs and part specifications so misuse fails fast, before any world mutation."""
-        self._validate_annotation_kwargs()
-        self._validate_part_specifications(self.semantic_annotation_type)
-
-    def spawn(
-        self,
-        world: World,
-        name: Optional[str] = None,
-        parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
-    ) -> HasRootKinematicStructureEntity:
-        """
-        Materialize the annotation in ``world``: spawn its root entity, attach it to ``parent`` via the
-        annotation's parent connection, register the annotation, and spawn its geometry children and
-        mounted part specifications.
-
-        :param parent: The entity to attach the root to. If None, ``world.root`` is used.
-        :param parent_T_self: Overrides the root specification's stored default pose.
-        :param name: Overrides the specification's own name. If None, the spec's name is used.
-        """
-        root_entity = self.root_specification.to_domain_object(name or self.name)
-
-        instance = self.semantic_annotation_type(
-            name=self._resolved_name(name), root=root_entity, **self.annotation_kwargs
-        )
-
-        used_parent_T_self = parent_T_self or self.root_specification.parent_T_self
-        children = self.root_specification.child_specification
-
-        connection_specification = self.semantic_annotation_type._parent_connection_specification_type.from_kwargs(
-            axis=self.axis,
-            multiplier=self.multiplier,
-            offset=self.offset,
-            dof_limits=self.connection_limits,
-        )
-
-        with world.modify_world():
-            connection_specification.connect(
-                world,
-                parent=parent,
-                child=root_entity,
-                parent_T_connection=used_parent_T_self,
-            )
-            world.add_semantic_annotation(instance)
-            for child in children:
-                child.spawn(world, parent=root_entity)
-            self._mount_part_specifications(world, instance, root_entity)
-
-        return instance
-
-    def _validate_annotation_kwargs(self) -> None:
-        """
-        Validate that :attr:`annotation_kwargs` carries no part-whole relationship field. Such fields
-        must be supplied via :attr:`part_specifications` so they are spawned and mounted.
-
-        :raises PartWholeFieldInAnnotationKwargs: If a key names a part-whole relationship field.
-        """
-        part_whole_field_names = self._part_whole_fields_by_name()
-        misplaced_field_names = [
-            field_name
-            for field_name in self.annotation_kwargs
-            if field_name in part_whole_field_names
-        ]
-        if misplaced_field_names:
-            raise PartWholeFieldInAnnotationKwargs(
-                annotation_type_name=self.semantic_annotation_type.__name__,
-                field_names=misplaced_field_names,
-            )
-
-    def _validate_part_specifications(
-        self, instance: type[HasRootKinematicStructureEntity]
-    ) -> None:
-        """
-        Validate that every :attr:`part_specifications` key names a part-whole relationship field of
-        the annotation and that list values target only to-many fields.
-
-        :raises UnknownPartWholeRelationshipField: If a key is not a part-whole relationship field.
-        :raises PartWholeCardinalityError: If a list is given for a singular field.
-        """
-        part_whole_fields_by_name = self._part_whole_fields_by_name()
-        for field_name, value in self.part_specifications.items():
-            wrapped_field = part_whole_fields_by_name.get(field_name)
-            if wrapped_field is None:
-                raise UnknownPartWholeRelationshipField(
-                    annotation=instance,
-                    field_name=field_name,
-                    available_fields=list(part_whole_fields_by_name),
-                )
-            if (
-                isinstance(value, list)
-                and not wrapped_field.is_many_to_many_relationship
-            ):
-                raise PartWholeCardinalityError(
-                    annotation_type_name=self.semantic_annotation_type.__name__,
-                    field_name=field_name,
-                )
-
-    def _part_whole_fields_by_name(self) -> dict[str, Any]:
-        """The annotation type's part-whole relationship fields, keyed by field name."""
-        from semantic_digital_twin.semantic_annotations.mixins import (
-            _wrapped_part_whole_relationship_fields,
-        )
-
-        return {
-            wrapped_field.name: wrapped_field
-            for wrapped_field in _wrapped_part_whole_relationship_fields(
-                self.semantic_annotation_type
-            )
-        }
-
-    def _mount_part_specifications(
-        self,
-        world: World,
-        instance: PartWholeRelationship,
-        root_entity: KinematicStructureEntity,
-    ) -> None:
-        """
-        Spawn each nested part and mount it onto ``instance`` via the part-whole
-        :meth:`~...mixins.PartWholeRelationship.add`, keyed by the target field name.
-
-        .. note:: Assumes :meth:`_validate_part_specifications` has already run.
-        """
-        for field_name, value in self.part_specifications.items():
-            part_specs = value if isinstance(value, list) else [value]
-            for part_spec in part_specs:
-                part = part_spec.spawn(world, parent=root_entity)
-                instance.add(part, field_name=field_name)
-
-
-@dataclass
 class ConnectionSpecification(
     NamedSpecification, Generic[TConnection], AbstractSubClassSafeGeneric, ABC
 ):
@@ -865,25 +338,83 @@ class RevoluteConnectionSpecification(
 
 
 @dataclass
-class ConnectedBodySpecification(SpawnSpecification):
-    """A body specification together with the connection that attaches it to its parent."""
+class KinematicStructureEntitySpecification(
+    SpawnSpecification[TKinematicStructureEntity],
+    AbstractSubClassSafeGeneric,
+):
+    """
+    World-independent, reusable description of a kinematic structure entity.
+    A specification is reusable: every materialization copies the prototype shapes and the
+    pose, so the specification never becomes bound to an entity or world.
 
-    name: Optional[str] = field(default=None, kw_only=True)
-    """
-    Optional name override for the spawned body. Defaults to the wrapped body specification's name.
-    """
-
-    body_specification: BodySpecification
-    """
-    The geometry and pose specification of the body to spawn.
+    The concrete domain-object type (e.g. ``Body``/``Region``) is bound as the generic
+    parameter by each subclass and resolved at runtime in :meth:`to_domain_object`.
     """
 
-    connection_specification: ConnectionSpecification = field(
-        default_factory=FixedConnectionSpecification
+    shapes: ShapeCollection = field(default_factory=ShapeCollection)
+    """
+    Prototype shapes with origins expressed in the entity frame.
+    """
+
+    child_specification: list[KinematicStructureEntitySpecification] = field(
+        default_factory=list
     )
     """
-    How the spawned body is connected to its parent. A fixed connection by default.
+    The child specifications of this specification. If set, the spawned entity will be a parent of the children.
     """
+
+    parent_T_self: HomogeneousTransformationMatrix = field(
+        default_factory=HomogeneousTransformationMatrix
+    )
+    """
+    Default placement of the entity in its parent frame, used by :meth:`spawn` when the caller does not
+    override it. Identity by default.
+    """
+
+    connection_specification: Optional[ConnectionSpecification] = None
+    """
+    How the spawned entity attaches to its parent. ``None`` means :meth:`spawn` uses a fixed connection.
+    """
+
+    def to_domain_object(self, name: Optional[str] = None) -> TKinematicStructureEntity:
+        """
+        Materialize a new, world-independent kinematic structure entity from this spec.
+
+        The concrete domain-object type is resolved from this spec's bound generic parameter.
+
+        :param name: Optional name override. If None, the spec's own name is used.
+        """
+        [domain_object_type] = get_generic_type_params(
+            self, KinematicStructureEntitySpecification
+        )
+        return domain_object_type.from_shape_collection(
+            self._resolved_name(name),
+            self.shapes.copy_without_reference_frame(),
+        )
+
+    def _spawn_attached(
+        self,
+        world: World,
+        connection_specification: ConnectionSpecification,
+        name: Optional[str] = None,
+        parent: KinematicStructureEntity | None = None,
+        parent_T_self: HomogeneousTransformationMatrix | None = None,
+    ) -> TKinematicStructureEntity:
+        """
+        Materialize this entity, attach it to ``parent`` via ``connection_specification``, and spawn
+        its geometry children.
+        """
+        entity = self.to_domain_object(name)
+        with world.modify_world():
+            connection_specification.connect(
+                world,
+                parent=parent,
+                child=entity,
+                parent_T_connection=parent_T_self or self.parent_T_self,
+            )
+            for child in self.child_specification:
+                child.spawn(world, parent=entity)
+        return entity
 
     def spawn(
         self,
@@ -891,17 +422,477 @@ class ConnectedBodySpecification(SpawnSpecification):
         name: Optional[str] = None,
         parent: KinematicStructureEntity | None = None,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
-    ) -> Body:
+    ) -> TKinematicStructureEntity:
         """
-        Materialize the body and attach it to ``parent`` via the wrapped connection specification.
+        Materialize the entity and attach it to ``parent`` via :attr:`connection_specification`,
+        defaulting to a fixed connection when none is set.
 
         :param parent: The entity to attach to. If None, ``world.root`` is used.
-        :param parent_T_self: Overrides the body specification's stored default pose.
+        :param parent_T_self: Overrides the specification's stored default pose. If None, the stored default is used.
         :param name: Overrides the specification's own name. If None, the spec's name is used.
         """
-        return self.body_specification._spawn_attached(
-            world, self.connection_specification, name, parent, parent_T_self
+        connection_specification = (
+            self.connection_specification or FixedConnectionSpecification()
         )
+        return self._spawn_attached(
+            world, connection_specification, name, parent, parent_T_self
+        )
+
+    @classmethod
+    def box(
+        cls,
+        name: str,
+        scale: Scale,
+        color: Optional[Color] = None,
+        origin: Optional[HomogeneousTransformationMatrix] = None,
+        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        child_specification: list[KinematicStructureEntitySpecification] | None = None,
+        connection_specification: Optional[ConnectionSpecification] = None,
+    ) -> Self:
+        """
+        Specification for a kinematic structure entity with a single box shape.
+        :param name: The name of the body.
+        :param scale: The extents of the box.
+        :param color: The color of the box.
+        :param origin: The origin of the box in the body frame. Defaults to identity.
+        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
+        :param connection_specification: How the entity attaches to its parent. Defaults to a fixed connection.
+        :return: The created specification.
+        """
+        return cls(
+            name,
+            Box(
+                scale=scale,
+                origin=origin or HomogeneousTransformationMatrix(),
+                color=color or Color(),
+            ).as_shape_collection(),
+            child_specification=child_specification or [],
+            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
+            connection_specification=connection_specification,
+        )
+
+    @classmethod
+    def sphere(
+        cls,
+        name: str,
+        radius: float,
+        color: Optional[Color] = None,
+        origin: Optional[HomogeneousTransformationMatrix] = None,
+        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        child_specification: list[KinematicStructureEntitySpecification] | None = None,
+        connection_specification: Optional[ConnectionSpecification] = None,
+    ) -> Self:
+        """
+        Specification for a kinematic structure entity with a single sphere shape.
+        :param name: The name of the kinematic structure entity.
+        :param radius: The radius of the sphere.
+        :param color: The color of the sphere.
+        :param origin: The origin of the sphere in the kinematic structure entity frame. Defaults to identity.
+        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
+        :param connection_specification: How the entity attaches to its parent. Defaults to a fixed connection.
+        :return: The created specification.
+        """
+        return cls(
+            name,
+            Sphere(
+                radius=radius,
+                origin=origin or HomogeneousTransformationMatrix(),
+                color=color or Color(),
+            ).as_shape_collection(),
+            child_specification=child_specification or [],
+            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
+            connection_specification=connection_specification,
+        )
+
+    @classmethod
+    def cylinder(
+        cls,
+        name: str,
+        width: float,
+        height: float,
+        color: Optional[Color] = None,
+        origin: Optional[HomogeneousTransformationMatrix] = None,
+        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        child_specification: list[KinematicStructureEntitySpecification] | None = None,
+        connection_specification: Optional[ConnectionSpecification] = None,
+    ) -> Self:
+        """
+        Specification for a kinematic structure entity with a single cylinder shape.
+        :param name: The name of the kinematic structure entity.
+        :param width: The diameter of the cylinder.
+        :param height: The height of the cylinder.
+        :param color: The color of the cylinder.
+        :param origin: The origin of the cylinder in the kinematic structure entity frame. Defaults to identity.
+        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
+        :param connection_specification: How the entity attaches to its parent. Defaults to a fixed connection.
+        :return: The created specification.
+        """
+        return cls(
+            name,
+            Cylinder(
+                width=width,
+                height=height,
+                origin=origin or HomogeneousTransformationMatrix(),
+                color=color or Color(),
+            ).as_shape_collection(),
+            child_specification=child_specification or [],
+            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
+            connection_specification=connection_specification,
+        )
+
+    @classmethod
+    def mesh(
+        cls,
+        name: str,
+        filename: str,
+        scale: Optional[Scale] = None,
+        color: Optional[Color] = None,
+        origin: Optional[HomogeneousTransformationMatrix] = None,
+        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        child_specification: list[KinematicStructureEntitySpecification] | None = None,
+        connection_specification: Optional[ConnectionSpecification] = None,
+    ) -> Self:
+        """
+        Specification for a kinematic structure entity with a single mesh shape loaded from a file.
+        :param name: The name of the kinematic structure entity.
+        :param filename: The path of the mesh file.
+        :param scale: The scale applied to the mesh.
+        :param color: The color of the mesh.
+        :param origin: The origin of the mesh in the kinematic structure entity frame. Defaults to identity.
+        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
+        :param connection_specification: How the entity attaches to its parent. Defaults to a fixed connection.
+        :return: The created specification.
+        """
+        return cls(
+            name,
+            Mesh(
+                filename=filename,
+                origin=origin or HomogeneousTransformationMatrix(),
+                scale=scale or Scale(),
+                color=color or Color(),
+            ).as_shape_collection(),
+            child_specification=child_specification or [],
+            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
+            connection_specification=connection_specification,
+        )
+
+    @classmethod
+    def from_event(
+        cls,
+        name: str,
+        event: Event,
+        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        child_specification: list[KinematicStructureEntitySpecification] | None = None,
+        connection_specification: Optional[ConnectionSpecification] = None,
+    ) -> Self:
+        """
+        Specification whose shapes are the bounding boxes of a random event.
+        This is the construction used by semantic annotations with composite
+        geometry (hollow handles, container cases, walls minus apertures, ...).
+        :param name: The name of the entity.
+        :param event: The event describing the geometry, in the entity frame.
+        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
+        :param connection_specification: How the entity attaches to its parent. Defaults to a fixed connection.
+        :return: The created specification.
+        """
+        # BoundingBoxCollection requires a reference frame, so the shapes are
+        # built around a throwaway body and unbound again for the specification.
+        anchor = Body(name=PrefixedName("spec_anchor"))
+        return cls(
+            name=name,
+            shapes=BoundingBoxCollection.from_event(anchor, event)
+            .as_shapes()
+            .copy_without_reference_frame(),
+            child_specification=child_specification or [],
+            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
+            connection_specification=connection_specification,
+        )
+
+    @classmethod
+    def from_3d_points(
+        cls,
+        name: str,
+        points_3d: List[Point3],
+        minimum_thickness: float = 0.005,
+        sv_ratio_tol: float = 1e-7,
+        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        child_specification: list[KinematicStructureEntitySpecification] | None = None,
+        connection_specification: Optional[ConnectionSpecification] = None,
+    ) -> Self:
+        """
+        Specification whose geometry is the convex hull of a point cloud.
+
+        :param name: The name of the entity.
+        :param points_3d: The points whose convex hull defines the geometry.
+        :param minimum_thickness: Thickness added when the points are near-planar.
+        :param sv_ratio_tol: Singular-value ratio tolerance for the planarity test.
+        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
+        :param connection_specification: How the entity attaches to its parent. Defaults to a fixed connection.
+        :return: The created specification.
+        """
+        return cls(
+            name=name,
+            shapes=ShapeCollection(
+                [
+                    Mesh.from_3d_points(
+                        points_3d,
+                        minimum_thickness=minimum_thickness,
+                        sv_ratio_tol=sv_ratio_tol,
+                    )
+                ]
+            ).copy_without_reference_frame(),
+            child_specification=child_specification or [],
+            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
+            connection_specification=connection_specification,
+        )
+
+
+@dataclass
+class BodySpecification(KinematicStructureEntitySpecification[Body]):
+    """
+    World-independent description of a :class:`~semantic_digital_twin.world_description.world_entity.Body`.
+
+    Extends the kinematic-structure-entity specification with body-only properties: inertial
+    parameters and a separate visual shape collection.
+    """
+
+    inertial: Optional[Inertial] = None
+    """
+    Inertia properties of created bodies. None means the Body default.
+    """
+
+    visual_shapes: Optional[ShapeCollection] = None
+    """
+    Visual shapes when they differ from `shapes`. None shares `shapes` for both
+    collision and visual (one collection); an empty list means no visual geometry.
+    """
+
+    def to_domain_object(self, name: Optional[str] = None) -> Body:
+        """
+        Create a new, world-independent body from this specification.
+        :param name: Optional name override, e.g. for spawning multiple bodies
+                     from the same specification.
+        :return: The created body.
+        """
+        body = Body.from_shape_collection(
+            self._resolved_name(name),
+            self.shapes.copy_without_reference_frame(),
+            visuals_shape_collection=(
+                self.visual_shapes.copy_without_reference_frame()
+                if self.visual_shapes is not None
+                else None
+            ),
+        )
+        if self.inertial is not None:
+            body.inertial = deepcopy(self.inertial)
+        return body
+
+
+@dataclass
+class RegionSpecification(KinematicStructureEntitySpecification[Region]):
+    """
+    World-independent description of a :class:`~semantic_digital_twin.world_description.world_entity.Region`.
+
+    Carries no fields beyond the base kinematic-structure-entity specification; it only binds the
+    materialized domain-object type to :class:`Region`.
+    """
+
+
+@dataclass
+class SemanticAnnotationWithRootSpecification(
+    SpawnSpecification["HasRootKinematicStructureEntity"]
+):
+    """
+    World-independent description of a semantic annotation rooted in a single kinematic
+    structure entity. The annotation type owns the parent connection specification type (via its
+    ``_parent_connection_specification_type``); this specification only supplies the connection
+    parameters for active connections.
+    """
+
+    semantic_annotation_type: Type[HasRootKinematicStructureEntity]
+    """
+    The type of the semantic annotation that is a subclass of HasRootKinematicStructureEntity.
+    """
+
+    root_specification: KinematicStructureEntitySpecification
+    """
+    The specification of the root kinematic structure entity of the annotation.
+    """
+
+    axis: Optional[Vector3] = None
+    """
+    Movement axis for the parent connection. Required when the annotation's
+    ``_parent_connection_specification_type`` is an active connection; ignored otherwise.
+    """
+
+    multiplier: float = 1.0
+    """
+    DoF multiplier for the parent connection (active connections only).
+    """
+
+    offset: float = 0.0
+    """
+    DoF offset for the parent connection (active connections only).
+    """
+
+    connection_limits: Optional[DegreeOfFreedomLimits] = None
+    """
+    Degree-of-freedom limits for the parent connection (active connections only).
+    """
+
+    annotation_kwargs: dict[str, Any] = field(default_factory=dict)
+    """
+    Inert keyword arguments passed straight to the annotation constructor, keyed by constructor field
+    name. Nested annotation parts do not belong here; use :attr:`part_specifications`.
+    """
+
+    part_specifications: dict[
+        str,
+        Union[
+            SemanticAnnotationWithRootSpecification,
+            list[SemanticAnnotationWithRootSpecification],
+        ],
+    ] = field(default_factory=dict)
+    """
+    Nested annotation parts keyed by the target part-whole relationship field name. Each part is
+    spawned during :meth:`spawn` and mounted via the annotation's
+    :meth:`~...mixins.PartWholeRelationship.add`. A list value mounts several parts onto a to-many
+    field; a single value mounts onto a singular field.
+    """
+
+    def __post_init__(self):
+        """Validate the annotation kwargs and part specifications so misuse fails fast, before any world mutation."""
+        self._validate_annotation_kwargs()
+        self._validate_part_specifications(self.semantic_annotation_type)
+
+    def spawn(
+        self,
+        world: World,
+        name: Optional[str] = None,
+        parent: KinematicStructureEntity | None = None,
+        parent_T_self: HomogeneousTransformationMatrix | None = None,
+    ) -> HasRootKinematicStructureEntity:
+        """
+        Materialize the annotation in ``world``: spawn its root entity, attach it to ``parent``,
+        register the annotation, and spawn its geometry children and mounted part specifications.
+
+        The root's connection is the root specification's :attr:`connection_specification` when set;
+        otherwise it is derived from the annotation type's parent connection.
+
+        :param parent: The entity to attach the root to. If None, ``world.root`` is used.
+        :param parent_T_self: Overrides the root specification's stored default pose.
+        :param name: Overrides the specification's own name. If None, the spec's name is used.
+        """
+        root_entity = self.root_specification.to_domain_object(name or self.name)
+
+        instance = self.semantic_annotation_type(
+            name=self._resolved_name(name), root=root_entity, **self.annotation_kwargs
+        )
+
+        used_parent_T_self = parent_T_self or self.root_specification.parent_T_self
+        children = self.root_specification.child_specification
+
+        connection_specification = (
+            self.root_specification.connection_specification
+            or self.semantic_annotation_type._parent_connection_specification_type.from_kwargs(
+                axis=self.axis,
+                multiplier=self.multiplier,
+                offset=self.offset,
+                dof_limits=self.connection_limits,
+            )
+        )
+
+        with world.modify_world():
+            connection_specification.connect(
+                world,
+                parent=parent,
+                child=root_entity,
+                parent_T_connection=used_parent_T_self,
+            )
+            world.add_semantic_annotation(instance)
+            for child in children:
+                child.spawn(world, parent=root_entity)
+            self._mount_part_specifications(world, instance, root_entity)
+
+        return instance
+
+    def _validate_annotation_kwargs(self) -> None:
+        """
+        Validate that :attr:`annotation_kwargs` carries no part-whole relationship field. Such fields
+        must be supplied via :attr:`part_specifications` so they are spawned and mounted.
+
+        :raises PartWholeFieldInAnnotationKwargs: If a key names a part-whole relationship field.
+        """
+        part_whole_field_names = self._part_whole_fields_by_name()
+        misplaced_field_names = [
+            field_name
+            for field_name in self.annotation_kwargs
+            if field_name in part_whole_field_names
+        ]
+        if misplaced_field_names:
+            raise PartWholeFieldInAnnotationKwargs(
+                annotation_type_name=self.semantic_annotation_type.__name__,
+                field_names=misplaced_field_names,
+            )
+
+    def _validate_part_specifications(
+        self, instance: type[HasRootKinematicStructureEntity]
+    ) -> None:
+        """
+        Validate that every :attr:`part_specifications` key names a part-whole relationship field of
+        the annotation and that list values target only to-many fields.
+
+        :raises UnknownPartWholeRelationshipField: If a key is not a part-whole relationship field.
+        :raises PartWholeCardinalityError: If a list is given for a singular field.
+        """
+        part_whole_fields_by_name = self._part_whole_fields_by_name()
+        for field_name, value in self.part_specifications.items():
+            wrapped_field = part_whole_fields_by_name.get(field_name)
+            if wrapped_field is None:
+                raise UnknownPartWholeRelationshipField(
+                    annotation=instance,
+                    field_name=field_name,
+                    available_fields=list(part_whole_fields_by_name),
+                )
+            if (
+                isinstance(value, list)
+                and not wrapped_field.is_many_to_many_relationship
+            ):
+                raise PartWholeCardinalityError(
+                    annotation_type_name=self.semantic_annotation_type.__name__,
+                    field_name=field_name,
+                )
+
+    def _part_whole_fields_by_name(self) -> dict[str, Any]:
+        """The annotation type's part-whole relationship fields, keyed by field name."""
+        from semantic_digital_twin.semantic_annotations.mixins import (
+            _wrapped_part_whole_relationship_fields,
+        )
+
+        return {
+            wrapped_field.name: wrapped_field
+            for wrapped_field in _wrapped_part_whole_relationship_fields(
+                self.semantic_annotation_type
+            )
+        }
+
+    def _mount_part_specifications(
+        self,
+        world: World,
+        instance: PartWholeRelationship,
+        root_entity: KinematicStructureEntity,
+    ) -> None:
+        """
+        Spawn each nested part and mount it onto ``instance`` via the part-whole
+        :meth:`~...mixins.PartWholeRelationship.add`, keyed by the target field name.
+
+        .. note:: Assumes :meth:`_validate_part_specifications` has already run.
+        """
+        for field_name, value in self.part_specifications.items():
+            part_specs = value if isinstance(value, list) else [value]
+            for part_spec in part_specs:
+                part = part_spec.spawn(world, parent=root_entity)
+                instance.add(part, field_name=field_name)
 
 
 @dataclass
