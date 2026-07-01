@@ -45,7 +45,7 @@ class TopicSubscriberNode(TopicNode[MsgType]):
     This node will automatically create a subscriber on build and cache the last message in `current_msg` on_tick.
     """
 
-    _subscriber: Subscription = field(init=False)
+    _subscriber: Subscription = field(init=False, default=None)
     """Internal ROS subscription object."""
     __last_msg: MsgType | None = field(init=False, default=None)
     """
@@ -60,8 +60,7 @@ class TopicSubscriberNode(TopicNode[MsgType]):
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         node_artifacts = super().build(context)
 
-        existing = getattr(self, "_subscriber", None)
-        if existing is not None:
+        if self._subscriber is not None:
             return node_artifacts
 
         self._subscriber = self.ros2_node.create_subscription(
@@ -94,9 +93,8 @@ class TopicSubscriberNode(TopicNode[MsgType]):
 
     def cleanup(self, context: MotionStatechartContext):
         super().cleanup(context)
-        subscriber = getattr(self, "_subscriber", None)
-        if subscriber is not None:
-            self.ros2_node.destroy_subscription(subscriber)
+        if self._subscriber is not None:
+            self.ros2_node.destroy_subscription(self._subscriber)
             self._subscriber = None
 
 
@@ -107,14 +105,13 @@ class TopicPublisherNode(TopicNode[MsgType]):
     This node will automatically create a publisher on build.
     """
 
-    _publisher: Publisher = field(init=False)
+    _publisher: Publisher = field(init=False, default=None)
     """Internal ROS publisher object."""
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         node_artifacts = super().build(context)
 
-        existing = getattr(self, "_publisher", None)
-        if existing is not None:
+        if self._publisher is not None:
             return node_artifacts
 
         self._publisher = self.ros2_node.create_publisher(
@@ -126,9 +123,8 @@ class TopicPublisherNode(TopicNode[MsgType]):
 
     def cleanup(self, context: MotionStatechartContext):
         super().cleanup(context)
-        publisher = getattr(self, "_publisher", None)
-        if publisher is not None:
-            self.ros2_node.destroy_publisher(publisher)
+        if self._publisher is not None:
+            self.ros2_node.destroy_publisher(self._publisher)
             self._publisher = None
 
 

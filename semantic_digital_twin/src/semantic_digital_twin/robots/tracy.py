@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from abc import ABC
-from collections import defaultdict
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
@@ -108,15 +107,6 @@ class TracyRightGripperLeftFinger(Finger):
                 robot_root, "right_robotiq_85_left_finger_tip_link"
             ),
         )
-
-    def _setup_velocity_limits(self):
-        """
-        The UR10e default velocity limits are either 2.09 or 3.14 depending on the joint. Wrist joints are 3.14.
-        Clipping the limits below 3.14 causes weird movements in end effector orientation space,
-        as the wrist stops moving with the correct speed relative to the other arm joints.
-        """
-        vel_limits = defaultdict(lambda: 4.0)
-        self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
 @dataclass(eq=False)
 class TracyRightGripperRightFinger(Finger):
@@ -355,7 +345,7 @@ class Tracy(
         )
 
     def _setup_velocity_limits(self):
-        self.tighten_dof_velocity_limits_proportionally(maximum_velocity=0.2)
+        self.tighten_dof_velocity_limits_proportionally(maximum_velocity=1.0)
 
     def get_end_effectors(self) -> list[EndEffector]:
         return [self.left_arm.end_effector, self.right_arm.end_effector]
