@@ -35,7 +35,7 @@ class Redraw(BaseAnnotator):
     def __init__(self, name: str = "Redraw") -> None:
         """Initialize the redraw annotator.
 
-        :param name: Annotator name, defaults to "Redraw"
+        :param name: Annotator name
         """
         super().__init__(name=name)
 

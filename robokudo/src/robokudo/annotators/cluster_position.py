@@ -18,15 +18,17 @@ The module uses:
    Can analyze either ObjectHypothesis or CloudAnnotation data.
 """
 
+from __future__ import annotations
+
 from timeit import default_timer
 
+import open3d as o3d
 from py_trees.common import Status
 from typing_extensions import List, Type
 
-import open3d as o3d
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.types import annotation, scene
 from robokudo.cas import CAS, CASViews
+from robokudo.types import annotation, scene
 
 
 class ClusterPositionAnnotator(BaseAnnotator):
@@ -60,12 +62,12 @@ class ClusterPositionAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ClusterPositionAnnotator",
-        descriptor: "ClusterPositionAnnotator.Descriptor" = Descriptor(),
+        descriptor: ClusterPositionAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the position estimator.
 
-        :param name: Name of this annotator instance, defaults to "ClusterPositionAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

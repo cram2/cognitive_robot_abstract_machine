@@ -10,6 +10,7 @@ from timeit import default_timer
 import numpy as np
 import open3d as o3d
 import py_trees
+from semantic_digital_twin.world_description.world_entity import Body, Region
 
 import robokudo.annotators.core
 import robokudo.utils.annotator_helper
@@ -17,9 +18,8 @@ import robokudo.utils.error_handling
 import robokudo.utils.o3d_helper
 import robokudo.world as rk_world
 from robokudo.cas import CASViews
-from robokudo.world_descriptor import PredefinedObject
 from robokudo.utils.region import region_obb_in_cam_coordinates
-from semantic_digital_twin.world_description.world_entity import Body, Region
+from robokudo.world_descriptor import PredefinedObject
 
 
 class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
@@ -36,7 +36,7 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
     def __init__(
         self,
         name: str = "WorldVisualizer",
-        descriptor: "WorldVisualizer.Descriptor" = Descriptor(),
+        descriptor: WorldVisualizer.Descriptor | None = None,
     ) -> None:
         super().__init__(name=name, descriptor=descriptor)
 

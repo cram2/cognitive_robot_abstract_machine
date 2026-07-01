@@ -1,18 +1,17 @@
 from __future__ import annotations
-from robokudo.annotators.core import ThreadedAnnotator
 
 import copy
 from enum import Enum
+
 import cv2
 import numpy as np
 import open3d as o3d
 from py_trees.common import Status
-from typing_extensions import TYPE_CHECKING, List, Any, Dict, Optional, Tuple
+from typing_extensions import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from robokudo.annotators.core import BaseAnnotator
+from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CASViews
-from robokudo.types.annotation import PoseAnnotation
-from robokudo.types.cv import TSDFAnnotation
+from robokudo.types.annotation import PoseAnnotation, TSDFAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.comparators import TranslationComparator
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
@@ -59,7 +58,7 @@ class TSDFAnnotator(ThreadedAnnotator):
                 self.depth_trunc: float = 3.0
                 """Depth truncation distance for the TSDF volume integration."""
 
-                self.geometry_visualization_mode: "TSDFAnnotatorVisualizationModes" = (
+                self.geometry_visualization_mode: TSDFAnnotatorVisualizationModes = (
                     TSDFAnnotatorVisualizationModes.MESH
                 )
                 """Whether to visualize the TSDF as a mesh or a point cloud. """
@@ -70,7 +69,7 @@ class TSDFAnnotator(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "TSDFAnnotator",
-        descriptor: "TSDFAnnotator.Descriptor" = Descriptor(),
+        descriptor: TSDFAnnotator.Descriptor | None = None,
     ) -> None:
         super().__init__(name, descriptor)
 

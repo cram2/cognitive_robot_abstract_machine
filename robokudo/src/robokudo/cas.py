@@ -15,14 +15,15 @@ The module provides:
 """
 
 from __future__ import annotations
+
 import copy
 import time
-import open3d as o3d
-import numpy as np
-
-from datetime import datetime, timezone, timedelta
+import warnings
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 
+import numpy as np
+import open3d as o3d
 from sensor_msgs.msg import CameraInfo
 from typing_extensions import (
     TYPE_CHECKING,
@@ -38,10 +39,12 @@ from typing_extensions import (
 from robokudo.types.tf import StampedTransform
 
 if TYPE_CHECKING:
-    from robokudo.types.core import Annotation
     from semantic_digital_twin.spatial_types.spatial_types import (
         HomogeneousTransformationMatrix,
     )
+    from semantic_digital_twin.world import World
+
+    from robokudo.types.core import Annotation
 
 
 class CASViews:
@@ -80,8 +83,14 @@ class CASViews:
     QUERY: str = "query"
     """Query information"""
 
+    WORLD_FRAME: str = "world_frame"
+    """Name of the world frame."""
+
+    CAM_FRAME: str = "camera_frame"
+    """Name of the camera frame."""
+
     VIEWPOINT_CAM_TO_WORLD: str = "viewpoint_cam_to_world"
-    """DEPRECATED: Use CAM_TO_WORLD_TRANSFORM instead.
+    """Deprecated: Use CAM_TO_WORLD_TRANSFORM instead.
     Camera to world transform.
     Type: robokudo.types.tf.StampedTransform"""
 
@@ -105,6 +114,14 @@ class CASViews:
 
     OBJECT_COLOR_MAP: str = "object_color_map"
     """Object color mapping data which assigns objects visible in OBJECT_IMAGE to entity names."""
+
+    GROUND_TRUTH_WORLD_REF: str = "ground_truth_world_ref"
+    """Read-only reference to the SemDT ground-truth world used for this CAS frame.
+
+    This view is intended for in-process consumers only and should be written
+    by producers via `CAS.set_ref(...)` to avoid deep-copying the world object.
+    Consumers must treat this object as strictly read-only.
+    """
 
 
 @dataclass
@@ -201,11 +218,41 @@ class CAS:
         self.views[CASViews.CLOUD] = value
 
     @property
+    def world_frame(self) -> Optional[str]:
+        """Name of the world frame."""
+        return self.views.get(CASViews.WORLD_FRAME)
+
+    @world_frame.setter
+    def world_frame(self, value: str) -> None:
+        self.views[CASViews.WORLD_FRAME] = value
+
+    @property
+    def cam_frame(self) -> Optional[str]:
+        """Name of the camera frame."""
+        return self.views.get(CASViews.CAM_FRAME)
+
+    @cam_frame.setter
+    def cam_frame(self, value: str) -> None:
+        self.views[CASViews.CAM_FRAME] = value
+
+    @property
     def viewpoint_cam_to_world(self) -> Optional[StampedTransform]:
+        warnings.warn(
+            "CAS.viewpoint_cam_to_world is deprecated. "
+            "Use CAS.cam_to_world_transform instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.views.get(CASViews.VIEWPOINT_CAM_TO_WORLD)
 
     @viewpoint_cam_to_world.setter
     def viewpoint_cam_to_world(self, value: StampedTransform) -> None:
+        warnings.warn(
+            "CAS.viewpoint_cam_to_world is deprecated. "
+            "Use CAS.cam_to_world_transform instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.views[CASViews.VIEWPOINT_CAM_TO_WORLD] = value
 
     @property
@@ -239,6 +286,14 @@ class CAS:
     @cas_id.setter
     def cas_id(self, value: int) -> None:
         self.views[CASViews.CAS_ID] = value
+
+    @property
+    def ground_truth_world_ref(self) -> Optional[World]:
+        return self.views.get(CASViews.GROUND_TRUTH_WORLD_REF)
+
+    @ground_truth_world_ref.setter
+    def ground_truth_world_ref(self, value: World) -> None:
+        self.views[CASViews.GROUND_TRUTH_WORLD_REF] = value
 
     def get(self, view_name: str) -> Any:
         """Get a view by name.

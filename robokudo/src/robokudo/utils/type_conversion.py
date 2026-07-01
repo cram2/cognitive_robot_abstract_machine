@@ -15,26 +15,28 @@ The module supports bidirectional conversion between:
 
 from __future__ import annotations
 
-import cv_bridge
 import numpy as np
 import open3d as o3d
 from geometry_msgs.msg import Pose, PoseStamped
 from rosidl_runtime_py import message_to_ordereddict
-from sensor_msgs.msg import CameraInfo
+from sensor_msgs.msg import CameraInfo, Image
 from std_msgs.msg import Header
 from typing_extensions import TYPE_CHECKING, Dict
 
+from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 from robokudo.utils.o3d_helper import get_obb_from_size_and_transform
 from robokudo.utils.transform import get_transform_matrix, get_rotation_matrix_from_q
 
 if TYPE_CHECKING:
-    from sensor_msgs.msg import Image
     import numpy.typing as npt
     from robokudo.types.annotation import (
         PositionAnnotation,
         BoundingBox3DAnnotation,
         PoseAnnotation,
     )
+
+
+_CV_BRIDGE_WORKAROUND = CVBridgeWorkaround()
 
 
 def ros_cam_info_to_dict(cam_info: CameraInfo) -> Dict:
@@ -251,10 +253,9 @@ def convert_ros_to_cv_image(ros_image: Image) -> npt.NDArray:
 
     :param ros_image: ROS image message
     :return: OpenCV image array
-    :raises CvBridgeError: If conversion fails
+    :raises ValueError: If conversion fails
     """
-    bridge = cv_bridge.CvBridge()
-    cv_rgb_image = bridge.imgmsg_to_cv2(ros_image)
+    cv_rgb_image = _CV_BRIDGE_WORKAROUND.imgmsg_to_cv2(ros_image)
     return cv_rgb_image
 
 
@@ -263,8 +264,9 @@ def convert_cv_to_ros_image(cv_image: npt.NDArray) -> Image:
 
     :param cv_image: OpenCV image array
     :return: ROS image message
-    :raises CvBridgeError: If conversion fails
+    :raises ValueError: If conversion fails
     """
-    bridge = cv_bridge.CvBridge()
-    ros_rgb_image = bridge.cv2_to_imgmsg(cv_image, encoding="passthrough")
+    ros_rgb_image = _CV_BRIDGE_WORKAROUND.cv2_to_imgmsg(
+        cv_image, encoding="passthrough"
+    )
     return ros_rgb_image

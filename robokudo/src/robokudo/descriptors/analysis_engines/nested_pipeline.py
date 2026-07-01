@@ -17,7 +17,9 @@ The pipeline implements the following functionality:
 """
 
 from robokudo.annotators.outputs import ClearAnnotatorOutputs
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.pipeline import Pipeline
 from py_trees.behaviours import Count, SuccessEveryN
@@ -73,7 +75,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with nested belief state processing
         """
-        kinect_config = CrDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
 
         # create second 'pipeline
         second_seq = Sequence(name="BS Pipeline")

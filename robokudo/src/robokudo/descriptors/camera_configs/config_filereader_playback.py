@@ -3,10 +3,13 @@ from dataclasses import dataclass
 from typing_extensions import Optional, Tuple, ClassVar
 
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
+from robokudo.descriptors.camera_configs.components import (
+    StaticCameraTransformComponent,
+)
 
 
 @dataclass(slots=True)
-class FileReaderCameraConfig(BaseCameraConfig):
+class FileReaderCameraConfig(BaseCameraConfig, StaticCameraTransformComponent):
     """Configuration class for file-based camera data playback.
 
     This class defines the configuration parameters for reading camera data from files,
@@ -21,6 +24,15 @@ class FileReaderCameraConfig(BaseCameraConfig):
     registry_name: ClassVar[str] = "file_reader"
 
     interface_type: str = "FileReader"
+
+    lookup_viewpoint: bool = False
+    """File reader does not support live TF lookup; use static_camera_transform_enabled instead."""
+
+    tf_from: str = "camera"
+    """Camera frame name accepted for compatibility with transform-aware configs."""
+
+    tf_to: str = "map"
+    """World frame name accepted for compatibility with transform-aware configs."""
 
     loop: bool = True
     """Shall we loop after iterating over a directory?"""

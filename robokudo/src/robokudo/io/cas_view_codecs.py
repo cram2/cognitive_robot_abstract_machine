@@ -322,11 +322,6 @@ class Open3DPinholeCameraIntrinsicCodec(ViewCodec):
 
     def decode(self, payload: ViewPayload) -> Any:
         """Decode payload data to an Open3D pinhole intrinsic object."""
-        if o3d is None:  # pragma: no cover - guarded by optional dependency
-            raise RuntimeError(
-                "Open3D is not available but Open3D camera intrinsic payload was provided."
-            )
-
         payload_data: Dict[str, Any] = payload.payload
         width = int(payload_data["width"])
         height = int(payload_data["height"])
@@ -408,6 +403,18 @@ class HomogeneousTransformationMatrixCodec(ViewCodec):
             serializer_id=self.serializer_id,
             payload=value.to_json(),
             type_name=_full_type_name(value),
+            metadata={
+                "reference_frame_name": (
+                    str(value.reference_frame.name)
+                    if value.reference_frame is not None
+                    else None
+                ),
+                "child_frame_name": (
+                    str(value.child_frame.name)
+                    if value.child_frame is not None
+                    else None
+                ),
+            },
         )
 
     def decode(self, payload: ViewPayload) -> HomogeneousTransformationMatrix:

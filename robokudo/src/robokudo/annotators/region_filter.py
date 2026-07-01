@@ -10,19 +10,21 @@ This module provides an annotator for:
    Regions are defined in a shared semantic_digital_twin World.
 """
 
+from __future__ import annotations
+
 from timeit import default_timer
 
 import open3d as o3d
 from py_trees.common import Status
+from semantic_digital_twin.world_description.world_entity import Region
 
 import robokudo.world as rk_world
-from robokudo.annotators.core import ThreadedAnnotator, BaseAnnotator
+from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.scene import RegionHypothesis
 from robokudo.utils.annotator_helper import get_world_to_cam_transform_matrix
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.region import region_obb_in_cam_coordinates, region_pose_annotation
-from semantic_digital_twin.world_description.world_entity import Region
 
 
 class RegionFilter(ThreadedAnnotator):
@@ -51,12 +53,12 @@ class RegionFilter(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "RegionFilter",
-        descriptor: "RegionFilter.Descriptor" = Descriptor(),
+        descriptor: RegionFilter.Descriptor | None = None,
     ) -> None:
         """Initialize the region filter.
 
-        :param name: Name of this annotator instance, defaults to "RegionFilter"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name=name, descriptor=descriptor)
 

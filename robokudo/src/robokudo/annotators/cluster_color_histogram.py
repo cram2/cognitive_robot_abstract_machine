@@ -62,13 +62,13 @@ class ClusterColorHistogramAnnotator(BaseAnnotator):
 
             def __init__(self) -> None:
                 self.histogram_cols: int = 16
-                """Number of histogram columns (hue bins), defaults to 16"""
+                """Number of histogram columns (hue bins)"""
 
                 self.histogram_rows: int = 16
-                """histogram_rows: Number of histogram rows(saturation bins), defaults to 16"""
+                """Number of histogram rows (saturation bins)"""
 
                 self.generate_plot_output: bool = False
-                """Whether to generate histogram plots, defaults to False. Plotting takes a lot of time in matplotlib (200-500ms)"""
+                """Whether to generate histogram plots. Plotting takes a lot of time in matplotlib (200-500ms)"""
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -76,12 +76,12 @@ class ClusterColorHistogramAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ClusterColorHistogramAnnotator",
-        descriptor: "ClusterColorHistogramAnnotator.Descriptor" = Descriptor(),
+        descriptor: ClusterColorHistogramAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the color histogram analyzer. Minimal one-time init!
 
-        :param name: Name of this annotator instance, defaults to "ClusterColorHistogramAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
@@ -101,10 +101,6 @@ class ClusterColorHistogramAnnotator(BaseAnnotator):
 
         cloud = self.get_cas().get(CASViews.CLOUD)
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
-
-        # List for visualization purposes
-        self.cluster_color_info: List[List[Tuple[Color, int, float]]] = []
-        self.cluster_rois: List[Rect] = []
 
         visualization_img = self.create_color_histogram_annotations(color)
 
@@ -213,9 +209,9 @@ class ClusterColorHistogramAnnotator(BaseAnnotator):
         if self.descriptor.parameters.generate_plot_output:
             # https://stackoverflow.com/questions/43099734/combining-cv2-imshow-with-matplotlib-plt-show-in-real-time/43101480
             fig.canvas.draw()
-            img = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
-            img = img.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            # Matplotlib >= 3.10 removed tostring_rgb(); buffer_rgba() is the supported Agg buffer API.
+            img = np.asarray(fig.canvas.buffer_rgba())
+            img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
             plt.cla()  # cleanup figures
             return img
 

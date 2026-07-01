@@ -25,7 +25,9 @@ from robokudo.pipeline import Pipeline
 
 from robokudo.idioms import pipeline_init
 from robokudo.behaviours.action_server_checks import ActionServerCheck
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.utils.tree import add_children_to_parent
 
 
@@ -73,7 +75,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for query processing
         """
-        kinect_config = CrDescriptorFactory.create_descriptor("kinect_wo_tf")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            "kinect_wo_tf"
+        )
 
         seq = Pipeline("RWPipeline")
 

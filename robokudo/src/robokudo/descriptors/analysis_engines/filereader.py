@@ -31,7 +31,9 @@ from robokudo.pipeline import Pipeline
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -80,7 +82,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             in your ROS workspace before running this pipeline.
         """
 
-        cr_fr_config = CrDescriptorFactory.create_descriptor(
+        cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
             "file_reader",
             loop=True,
             target_ros_package="robokudo_test_data",

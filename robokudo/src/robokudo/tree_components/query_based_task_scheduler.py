@@ -9,7 +9,7 @@ Original implementation by Malte Huerkamp.
 
 from py_trees.composites import Composite, Sequence
 from robokudo_msgs.action import Query
-from typing_extensions import Dict, Any, Optional, Callable
+from typing_extensions import Any, Callable, Dict, Optional
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
@@ -77,14 +77,12 @@ class QueryBasedScheduler(
         query = self.get_cas().get(CASViews.QUERY)
 
         task_key = self.filter_fn(query)
-        self.logger.info(f"Running perception task: {task_key}")
+        self.rk_logger.info(f"Running perception task: {task_key}")
 
-        if task_key in self.tasks.keys():
-            job_elements = self.tasks[task_key]
-            # p = job_elements.parent
-            add_child_to_parent(new_job, job_elements)
-        else:
-            self.logger.debug(f"Can't find task pipeline for '{task_key}'")
+        if task_key not in self.tasks.keys():
+            self.rk_logger.debug(f"Can't find task pipeline for '{task_key}'")
             return None
 
+        job_elements = self.tasks[task_key]
+        add_child_to_parent(new_job, job_elements)
         return new_job

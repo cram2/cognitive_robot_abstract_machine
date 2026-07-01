@@ -28,30 +28,28 @@ except (
     pass
 
 
-if o3d is not None:
+class Open3DPointCloudJSONSerializer(
+    ExternalClassJSONSerializer[o3d.geometry.PointCloud]
+):
+    """Serialize Open3D point clouds using base64-encoded PCD payloads."""
 
-    class Open3DPointCloudJSONSerializer(
-        ExternalClassJSONSerializer[o3d.geometry.PointCloud]
-    ):
-        """Serialize Open3D point clouds using base64-encoded PCD payloads."""
+    @classmethod
+    def to_json(cls, obj: o3d.geometry.PointCloud) -> Dict[str, Any]:
+        """Convert an Open3D point cloud into a JSON-compatible payload."""
+        return {
+            JSON_TYPE_NAME: get_full_class_name(type(obj)),
+            "payload": encode_open3d_point_cloud_to_base64_pcd(obj),
+        }
 
-        @classmethod
-        def to_json(cls, obj: o3d.geometry.PointCloud) -> Dict[str, Any]:
-            """Convert an Open3D point cloud into a JSON-compatible payload."""
-            return {
-                JSON_TYPE_NAME: get_full_class_name(type(obj)),
-                "payload": encode_open3d_point_cloud_to_base64_pcd(obj),
-            }
-
-        @classmethod
-        def from_json(
-            cls,
-            data: Dict[str, Any],
-            clazz: type[o3d.geometry.PointCloud],
-            **kwargs: Any,
-        ) -> o3d.geometry.PointCloud:
-            """Restore an Open3D point cloud from a JSON payload."""
-            return decode_open3d_point_cloud_from_base64_pcd(data["payload"])
+    @classmethod
+    def from_json(
+        cls,
+        data: Dict[str, Any],
+        clazz: type[o3d.geometry.PointCloud],
+        **kwargs: Any,
+    ) -> o3d.geometry.PointCloud:
+        """Restore an Open3D point cloud from a JSON payload."""
+        return decode_open3d_point_cloud_from_base64_pcd(data["payload"])
 
 
 class NumpyScalarJSONSerializer(ExternalClassJSONSerializer[np.generic]):

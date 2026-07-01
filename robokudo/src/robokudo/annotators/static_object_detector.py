@@ -18,14 +18,17 @@ from timeit import default_timer
 import cv2
 import numpy as np
 from py_trees.common import Status
-from typing_extensions import List, Optional, TYPE_CHECKING, Dict
+from semantic_digital_twin.world_description.world_entity import Body
+from typing_extensions import TYPE_CHECKING, Dict, List, Optional
 
+import robokudo.world as rk_world
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.exceptions import ColorToDepthRatioMissing, UnknownMode
 from robokudo.types.annotation import (
-    PoseAnnotation,
     BoundingBox3DAnnotation,
     Classification,
+    PoseAnnotation,
 )
 from robokudo.types.cv import ImageROI
 from robokudo.types.scene import ObjectHypothesis
@@ -35,27 +38,25 @@ from robokudo.utils.annotator_helper import (
     scale_cam_intrinsics,
 )
 from robokudo.utils.cv_helper import (
-    rect_outside_image,
     clamp_bounding_rect,
-    get_scaled_color_image_for_depth_image,
     get_scale_coordinates,
+    get_scaled_color_image_for_depth_image,
+    rect_outside_image,
 )
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.o3d_helper import (
     get_2d_bounding_rect_from_3d_bb,
     get_cloud_from_rgb_depth_and_mask,
+    get_obb_from_size_and_transform,
 )
-from robokudo.utils.o3d_helper import get_obb_from_size_and_transform
 from robokudo.utils.transform import (
+    get_quaternion_from_rotation_matrix,
+    get_quaternion_from_transform_matrix,
     get_rotation_matrix_from_euler_angles,
     get_transform_matrix_from_translation,
     get_translation_from_transform_matrix,
-    get_quaternion_from_transform_matrix,
-    get_quaternion_from_rotation_matrix,
 )
-import robokudo.world as rk_world
 from robokudo.world_descriptor import PredefinedObject
-from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -139,12 +140,12 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "StaticObjectDetector",
-        descriptor: "StaticObjectDetectorAnnotator.Descriptor" = Descriptor(),
-    ):
+        descriptor: StaticObjectDetectorAnnotator.Descriptor | None = None,
+    ) -> None:
         """Default construction. Minimal one-time init!
 
-        :param name: Name of the annotator instance, defaults to "StaticObjectDetector"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of the annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
@@ -261,7 +262,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
 
         if rect_outside_image(corner_points, image_width, image_height):
             self.rk_logger.info(
-                "ROI of object would be completely out of camera frame. Skipping ..."
+                f"ROI of object {self._body_name(body)} would be completely out of camera frame. Skipping ..."
             )
             return None
 
@@ -349,7 +350,8 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
           * Mask if enabled
 
         :return: SUCCESS if detection completed, FAILURE if required transforms not found
-        :raises Exception: If camera parameters are invalid or missing
+        :raises ColorToDepthRatioMissing: If color-to-depth ratio is not set
+        :raises UnknownMode: If the configured static object mode is unsupported
         """
         start_timer = default_timer()
 
@@ -406,13 +408,11 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
                 self.get_cas(), self.color
             )
             scale_cam_intrinsics(self)
-        except RuntimeError as e:
+        except ColorToDepthRatioMissing:
             self.rk_logger.error(
                 "No color to depth ratio set by your camera driver! Can't scale image for Point Cloud creation."
             )
-            raise Exception(
-                "No color to depth ratio set by your camera driver! Can't scale image for Point Cloud creation."
-            )
+            raise
 
         color_rgb = cv2.cvtColor(resized_color, cv2.COLOR_BGR2RGB)
 
@@ -431,7 +431,10 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
                 # Simply return early but don't die
                 return Status.SUCCESS
         else:
-            raise Exception("Unknown static object mode")
+            raise UnknownMode(
+                mode=self.descriptor.parameters.mode,
+                context="StaticObjectDetectorAnnotator",
+            )
 
         self.get_cas().annotations.extend(object_hypotheses)
 

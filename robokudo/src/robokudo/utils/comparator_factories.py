@@ -1,36 +1,38 @@
-from typing_extensions import Type, Dict, Optional
+from typing_extensions import Dict, Optional, Type
 
 from robokudo.types.annotation import (
-    Classification,
     BoundingBox3DAnnotation,
+    Classification,
     ColorHistogram,
-    SemanticColor,
-    PositionAnnotation,
-    StampedPositionAnnotation,
-    StampedPoseAnnotation,
-    StampedTransformAnnotation,
     PoseAnnotation,
+    PositionAnnotation,
+    SemanticColor,
+    SIFTAnnotation,
+    StampedPoseAnnotation,
+    StampedPositionAnnotation,
+    StampedTransformAnnotation,
 )
 from robokudo.types.core import Annotation
 from robokudo.types.core import Type as RkType
 from robokudo.types.cv import ImageROI, Rect
 from robokudo.types.tf import (
-    Position,
-    StampedPosition,
     Pose,
+    Position,
     StampedPose,
+    StampedPosition,
     StampedTransform,
 )
 from robokudo.utils.comparators import (
-    FeatureComparator,
     BboxComparator,
     ClassificationComparator,
+    FeatureComparator,
     HistogramComparator,
-    SemanticColorComparator,
     ImageROIComparator,
-    RoiComparator,
-    TranslationComparator,
     PoseComparator,
+    RoiComparator,
+    SemanticColorComparator,
+    SIFTComparator,
+    TranslationComparator,
 )
 
 
@@ -47,6 +49,7 @@ class FeatureComparatorFactory:
         PoseAnnotation: PoseComparator,
         StampedPoseAnnotation: PoseComparator,
         StampedTransformAnnotation: PoseComparator,
+        SIFTAnnotation: SIFTComparator,
     }
     """Mapping of annotation types to feature comparators."""
 

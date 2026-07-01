@@ -15,22 +15,21 @@ The module is primarily used for:
 * Development and debugging
 """
 
+import json
 import pathlib
 import re
-import json
-
-import cv2
-import ament_index_python.packages
-
-from typing_extensions import Any, Dict, List, Optional, TypeVar
-
+import warnings
 from pathlib import Path
 
-from robokudo.cas import CASViews, CAS
+import ament_index_python.packages
+import cv2
+from typing_extensions import Any, Dict, List, Optional, TypeVar
+
+from robokudo.cas import CAS, CASViews
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.utils.type_conversion import (
-    ros_cam_info_from_dict,
     o3d_cam_intrinsics_from_ros_cam_info,
+    ros_cam_info_from_dict,
 )
 
 T = TypeVar("T")
@@ -65,7 +64,7 @@ class FileReaderInterface(CameraInterface):
             self,
             data: Optional[Dict[str, Dict[str, Any]]] = None,
             data_sequence: Optional[List[str]] = None,
-        ):
+        ) -> None:
             """Initialize the dictionary iterator.
 
             :param data: Dictionary containing the data, defaults to empty dict
@@ -128,6 +127,15 @@ class FileReaderInterface(CameraInterface):
         :raises Exception: If target directory or ROS package is invalid
         """
         super().__init__(camera_config)
+
+        if camera_config.lookup_viewpoint:
+            warnings.warn(
+                "FileReaderInterface does not support live TF transform lookup. "
+                "lookup_viewpoint=True will be ignored; configure "
+                "static_camera_transform_enabled=True to write a transform into the CAS.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         self.initialized: bool = False
         """Whether the interface was successfully initialized"""
@@ -285,3 +293,4 @@ class RGBDFileReaderInterface(FileReaderInterface):
             o3d_cam_intrinsics_from_ros_cam_info(data[CASViews.CAM_INFO]),
         )
         cas.set(CASViews.COLOR2DEPTH_RATIO, self.camera_config.color2depth_ratio)
+        self.store_static_camera_transform_if_configured(cas)

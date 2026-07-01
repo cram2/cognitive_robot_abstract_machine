@@ -20,11 +20,11 @@ from __future__ import annotations
 import uuid
 
 from py_trees.behaviour import Behaviour
-from typing_extensions import TYPE_CHECKING, Optional, Generator, List, Type
+from typing_extensions import TYPE_CHECKING, Generator, List, Optional, Type, TypeVar
 
 if TYPE_CHECKING:
-    from py_trees_ros.trees import BehaviourTree
     from py_trees.composites import Composite
+    from py_trees_ros.trees import BehaviourTree
 
 
 def behavior_iterate_except_type(
@@ -60,7 +60,10 @@ def behavior_iterate_except_type(
         yield tree
 
 
-def find_parent_of_type(behaviour: Behaviour, parent_type: Type) -> Optional[Behaviour]:
+T = TypeVar("T", bound=Behaviour)
+
+
+def find_parent_of_type(behaviour: Behaviour, parent_type: Type[T]) -> Optional[T]:
     """Traverse the given behaviour up until we either hit the top of the tree or find a node of type parent_type.
 
     :param behaviour: Starting behavior node
@@ -69,7 +72,7 @@ def find_parent_of_type(behaviour: Behaviour, parent_type: Type) -> Optional[Beh
     """
     current_parent = behaviour.parent
     while current_parent is not None:
-        if type(current_parent) == parent_type:
+        if type(current_parent) is parent_type:
             return current_parent
         else:
             current_parent = current_parent.parent

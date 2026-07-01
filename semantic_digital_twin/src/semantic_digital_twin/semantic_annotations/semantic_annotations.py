@@ -427,7 +427,6 @@ class DoubleDoor(SemanticAnnotation):
 
 @dataclass(eq=False)
 class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMechanicalJoint):
-
     @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.Z()
@@ -458,14 +457,14 @@ class CounterTop(Furniture, HasSupportingSurface):
 
 
 @dataclass(eq=False)
-class Cabinet(Furniture, HasCaseAsRootBody, HasHandle):
+class Cabinet(Furniture, HasDoors, HasDrawers, HasCaseAsRootBody):
     @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.NEGATIVE_X()
 
 
 @dataclass(eq=False)
-class Fridge(Cabinet, HasDoors, HasDrawers): ...
+class Fridge(Cabinet): ...
 
 
 @dataclass(eq=False)
@@ -473,20 +472,19 @@ class Oven(HasRootBody): ...
 
 
 @dataclass(eq=False)
-class Dresser(Cabinet, HasDrawers, HasDoors): ...
+class Dresser(Cabinet): ...
 
 
 @dataclass(eq=False)
-class Cupboard(Cabinet, HasDoors): ...
+class Cupboard(Cabinet): ...
 
 
 @dataclass(eq=False)
-class Wardrobe(Cabinet, HasDrawers, HasDoors): ...
+class Wardrobe(Cabinet): ...
 
 
 @dataclass(eq=False)
 class Floor(HasSupportingSurface):
-
     @classmethod
     def create_with_new_body_in_world(
         cls,

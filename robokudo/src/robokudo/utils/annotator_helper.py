@@ -20,6 +20,7 @@ import open3d as o3d
 from typing_extensions import Callable, List, TYPE_CHECKING
 
 from robokudo.cas import CASViews
+from robokudo.exceptions import ColorToDepthRatioMissing
 from robokudo.types.annotation import PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
@@ -232,7 +233,7 @@ def get_color_image(annotator: BaseAnnotator) -> npt.NDArray:
             resized_color = get_scaled_color_image_for_depth_image(
                 annotator.get_cas(), img
             )
-        except RuntimeError as e:  # pylint: disable=invalid-name
+        except ColorToDepthRatioMissing as e:  # pylint: disable=invalid-name
             annotator.rk_logger.error(
                 f"No color to depth ratio set by your camera driver! Can't preprocess: {e}"
             )
@@ -261,7 +262,7 @@ def resize_mask(annotator: BaseAnnotator, mask: npt.NDArray) -> npt.NDArray:
     color2depth_ratio = annotator.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
 
     if not color2depth_ratio:
-        raise RuntimeError("No Color to Depth Ratio set. Can't continue.")
+        raise ColorToDepthRatioMissing(operation="resize mask")
 
     if color2depth_ratio == (1, 1):
         return mask

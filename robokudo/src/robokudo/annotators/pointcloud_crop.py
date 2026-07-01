@@ -12,12 +12,13 @@ This module provides an annotator for:
 """
 
 from __future__ import annotations
+
 from timeit import default_timer
 
 import cv2
 import open3d as o3d
 from py_trees.common import Status
-from typing_extensions import Optional, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, Optional
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
@@ -76,12 +77,12 @@ class PointcloudCropAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "PointcloudCropAnnotator",
-        descriptor: "PointcloudCropAnnotator.Descriptor" = Descriptor(),
+        descriptor: PointcloudCropAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the point cloud cropper.
 
-        :param name: Name of this annotator instance, defaults to "PointcloudCropAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

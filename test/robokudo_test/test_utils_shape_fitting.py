@@ -5,11 +5,14 @@ import numpy as np
 from robokudo.utils.shape_fitting import (
     CuboidFit,
     CylinderFit,
+    CylinderFitConstraints,
     SphereFit,
     compute_fit_score,
     fit_cuboid,
     fit_cylinder,
     fit_sphere,
+    refit_cuboid_with_fixed_orientation,
+    refit_cylinder_with_fixed_axis,
     select_best_shape,
 )
 
@@ -55,6 +58,41 @@ class TestShapeFitting:
         assert fit_result.height > 0.18
         assert fit_result.inlier_ratio > 0.8
 
+    def test_refit_cylinder_with_fixed_axis(self):
+        random_generator = np.random.default_rng(211)
+
+        radius = 0.06
+        height = 0.24
+        center = np.asarray([0.3, 0.05, -0.2], dtype=np.float64)
+
+        theta = random_generator.uniform(0.0, 2.0 * math.pi, size=700)
+        z = random_generator.uniform(-height / 2.0, height / 2.0, size=700)
+        x = radius * np.cos(theta)
+        y = radius * np.sin(theta)
+        points = np.stack([x, y, z], axis=1) + center
+        points += random_generator.normal(scale=0.0015, size=points.shape)
+
+        fit_result = refit_cylinder_with_fixed_axis(
+            points=points,
+            fixed_axis_direction=np.asarray([0.0, 0.0, 1.0], dtype=np.float64),
+            constraints=CylinderFitConstraints(
+                distance_threshold=0.01,
+                robust_loss="soft_l1",
+                max_radius=0.4,
+                max_height=1.0,
+                max_radius_to_bbox_diagonal_ratio=10.0,
+                max_radius_to_cross_section_extent_ratio=10.0,
+                max_axis_center_distance_to_bbox_diagonal_ratio=10.0,
+            ),
+            min_inlier_ratio=0.8,
+        )
+
+        assert fit_result is not None
+        assert abs(fit_result.radius - radius) < 0.01
+        assert abs(float(np.dot(fit_result.axis_direction, np.array([0, 0, 1])))) > 0.99
+        assert fit_result.height > 0.18
+        assert fit_result.inlier_ratio > 0.8
+
     def test_fit_cuboid_with_surface_points(self):
         random_generator = np.random.default_rng(2)
 
@@ -95,6 +133,51 @@ class TestShapeFitting:
             np.sort(extents),
             atol=0.03,
         )
+        assert fit_result.inlier_ratio > 0.7
+
+    def test_refit_cuboid_with_fixed_orientation(self):
+        random_generator = np.random.default_rng(22)
+
+        extents = np.asarray([0.20, 0.10, 0.06], dtype=np.float64)
+        half_extents = extents / 2.0
+        center = np.asarray([0.05, -0.1, 0.3], dtype=np.float64)
+        angle = math.radians(25.0)
+        rotation_matrix = np.asarray(
+            [
+                [math.cos(angle), -math.sin(angle), 0.0],
+                [math.sin(angle), math.cos(angle), 0.0],
+                [0.0, 0.0, 1.0],
+            ],
+            dtype=np.float64,
+        )
+
+        local_points = []
+        sample_count_per_face = 120
+        for axis_index in range(3):
+            for sign in (-1.0, 1.0):
+                face_points = random_generator.uniform(
+                    low=-half_extents,
+                    high=half_extents,
+                    size=(sample_count_per_face, 3),
+                )
+                face_points[:, axis_index] = sign * half_extents[axis_index]
+                local_points.append(face_points)
+        local_points_array = np.concatenate(local_points, axis=0)
+        points = local_points_array @ rotation_matrix.T + center
+        points += random_generator.normal(scale=0.001, size=points.shape)
+
+        fit_result = refit_cuboid_with_fixed_orientation(
+            points=points,
+            fixed_rotation_matrix=rotation_matrix,
+            extent_support_indices=np.arange(len(points), dtype=np.int64),
+            distance_threshold=0.01,
+            max_extent=0.6,
+            min_inlier_ratio=0.7,
+        )
+
+        assert fit_result is not None
+        assert np.linalg.norm(fit_result.center - center) < 0.03
+        assert np.allclose(fit_result.extents, extents, atol=0.03)
         assert fit_result.inlier_ratio > 0.7
 
     def test_select_best_shape_returns_highest_score(self):
