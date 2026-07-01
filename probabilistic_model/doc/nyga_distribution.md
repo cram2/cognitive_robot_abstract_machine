@@ -176,7 +176,7 @@ In simpler terms, the induction is terminated as soon as the likelihood does not
 anymore if a split is made. 
 
 This parameter is referenced to as `min_likelihood_improvement` in the code.
-This algorithm is implemented in the [NygaDistribution](https://probabilistic-model.readthedocs.io/en/latest/autoapi/probabilistic_model/learning/nyga_distribution/index.html#probabilistic_model.learning.nyga_distribution.NygaDistribution).
+This algorithm is implemented in the [NygaInduction](https://cram2.github.io/cognitive_robot_abstract_machine/probabilistic_model/autoapi/probabilistic_model/learning/nyga_induction/index.html#probabilistic_model.learning.nyga_induction.NygaInduction).
 
 # Theory Example
 

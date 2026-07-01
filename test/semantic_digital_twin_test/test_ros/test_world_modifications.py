@@ -65,7 +65,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
             dof = DegreeOfFreedom(name=PrefixedName("dofyboi"))
             w.add_degree_of_freedom(dof)
             connection = RevoluteConnection(
-                b1, b2, axis=Vector3.from_iterable([0, 0, 1]), dof_id=dof.id
+                b1, b2, axis=Vector3.from_iterable([0, 0, 1]), raw_dof=dof
             )
             w.add_connection(connection)
         assert connection.dof.has_hardware_interface is False
@@ -94,7 +94,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
                     parent=b2,
                     child=b3,
                     axis=Vector3.from_iterable([0, 0, 1]),
-                    dof_id=dof.id,
+                    raw_dof=dof,
                 )
             )
 

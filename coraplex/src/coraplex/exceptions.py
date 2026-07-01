@@ -11,6 +11,10 @@ from coraplex.plans.failures import PlanFailure
 if TYPE_CHECKING:
     from coraplex.plans.designator import Designator
     from coraplex.robot_plans.actions.base import ActionDescription
+    from semantic_digital_twin.robots.robot_parts import AbstractRobot
+    from semantic_digital_twin.world_description.world_entity import (
+        KinematicStructureEntity,
+    )
 
 
 @dataclass
@@ -33,6 +37,30 @@ class ContextIsUnavailable(DataclassException):
         return (
             "did you forget to call `add_subplan` when creating plans inside actions?"
         )
+
+
+@dataclass
+class TipLinkDoesNotMatchAnyArm(DataclassException):
+    """
+    Raised when a reachability validator's tip link is not the tool frame of any arm of the robot,
+    so no arm can be selected to reach the requested pose.
+    """
+
+    tip_link: KinematicStructureEntity
+    """
+    The tip link that did not match any arm.
+    """
+
+    robot: AbstractRobot
+    """
+    The robot whose arms were searched.
+    """
+
+    def error_message(self) -> str:
+        return f"tip_link {self.tip_link} does not match any arm of {self.robot}"
+
+    def suggest_correction(self) -> str:
+        return "ensure the tip_link is the tool frame of one of the robot's arms."
 
 
 @dataclass

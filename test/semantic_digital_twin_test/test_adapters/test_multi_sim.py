@@ -412,7 +412,7 @@ def test_spawn_body_with_connections():
                     parent=root_body,
                     child=spawn_left_shoulder_body,
                     axis=Vector3.Z(reference_frame=spawn_left_shoulder_body),
-                    dof_id=dof.id,
+                    raw_dof=dof,
                     parent_T_connection_expression=left_shoulder_origin,
                 )
             )
@@ -445,7 +445,7 @@ def test_spawn_body_with_connections():
                     parent=root_body,
                     child=spawn_right_shoulder_body,
                     axis=Vector3.Z(reference_frame=spawn_right_shoulder_body),
-                    dof_id=dof.id,
+                    raw_dof=dof,
                     parent_T_connection_expression=right_shoulder_origin,
                 )
             )

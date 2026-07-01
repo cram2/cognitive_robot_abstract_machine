@@ -127,7 +127,7 @@ class CollectionRelationship:
 
 
 @dataclass(frozen=True)
-class DataAccessObjectConversionPlan:
+class DataAccessObjectSchema:
     """
     Precomputed, class-level metadata used by the to_dao/from_dao hot paths.
 
@@ -185,7 +185,7 @@ def _build_single_relationship(
     :param relationship: The SQLAlchemy relationship property to inspect.
     :param domain_type: The expected domain type of the related object.
     :return: A :class:`SingleRelationship` ready for use in a
-        :class:`DataAccessObjectConversionPlan`.
+        :class:`DataAccessObjectSchema`.
     """
     local_columns = list(relationship.local_columns)
     foreign_key_attribute = (
@@ -202,7 +202,7 @@ def _build_single_relationship(
 
 
 @lru_cache(maxsize=None)
-def _get_conversion_plan(dao_class: Type) -> DataAccessObjectConversionPlan:
+def get_dao_schema(dao_class: Type) -> DataAccessObjectSchema:
     """
     Build (and cache) the conversion plan for a DAO class.
 
@@ -246,7 +246,7 @@ def _get_conversion_plan(dao_class: Type) -> DataAccessObjectConversionPlan:
                     )
                 )
 
-    return DataAccessObjectConversionPlan(
+    return DataAccessObjectSchema(
         data_column_names=tuple(
             column.name for column in mapper.columns if is_data_column(column)
         ),
@@ -321,8 +321,8 @@ def _get_alternative_partition_plan(
     parent_mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(
         alternative_base
     )
-    plan = _get_conversion_plan(dao_class)
-    parent_plan = _get_conversion_plan(alternative_base)
+    plan = get_dao_schema(dao_class)
+    parent_plan = get_dao_schema(alternative_base)
 
     parent_column_names = {column.name for column in parent_mapper.columns}
     parent_relationship_keys = set(parent_plan.relationship_keys)
@@ -554,7 +554,7 @@ class DataAccessObject(HasGeneric[T]):
 
         # Phase 3: Queueing & Processing
         is_entry_call = len(state.work_items) == 0
-        alternative_base = _get_conversion_plan(cls).alternative_base
+        alternative_base = get_dao_schema(cls).alternative_base
         state.push_work_item(resolved_source, result, alternative_base)
 
         if is_entry_call:
@@ -612,7 +612,7 @@ class DataAccessObject(HasGeneric[T]):
         :param source_object: The source object.
         :param state: The conversion state.
         """
-        plan = _get_conversion_plan(type(self))
+        plan = get_dao_schema(type(self))
 
         for name in plan.data_column_names:
             setattr(self, name, getattr(source_object, name))
@@ -767,7 +767,7 @@ class DataAccessObject(HasGeneric[T]):
             state.register(mapped_object, result)
 
         # Queue for filling
-        alternative_base = _get_conversion_plan(dao_clazz).alternative_base
+        alternative_base = get_dao_schema(dao_clazz).alternative_base
         state.push_work_item(mapped_object, result, alternative_base)
 
         return result
@@ -973,7 +973,7 @@ class DataAccessObject(HasGeneric[T]):
         :param domain_object: The domain object.
         :param state: The conversion state.
         """
-        plan = _get_conversion_plan(type(self))
+        plan = get_dao_schema(type(self))
 
         # check if self is a subclass of an alternative mapping and is not alternatively mapped on its own
         if plan.alternative_base is not None and not plan.uses_alternative_mapping:
@@ -1030,7 +1030,7 @@ class DataAccessObject(HasGeneric[T]):
         :param state: The conversion state.
         :return: The domain object.
         """
-        plan = _get_conversion_plan(type(self))
+        plan = get_dao_schema(type(self))
 
         for relationship in plan.single_relationships:
             value = _read_single_relationship(self, relationship)
@@ -1182,7 +1182,7 @@ class DataAccessObject(HasGeneric[T]):
         :return: The populated parent DAO instance.
         """
         parent_dao = base_clazz()
-        parent_plan = _get_conversion_plan(base_clazz)
+        parent_plan = get_dao_schema(base_clazz)
         for name in parent_plan.data_column_names:
             setattr(parent_dao, name, getattr(self, name))
         for key in parent_plan.relationship_keys:

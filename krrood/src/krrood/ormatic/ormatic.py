@@ -214,12 +214,35 @@ class ORMatic:
     @property
     def wrapped_classes_in_topological_order(self) -> List[WrappedClass]:
         """
-        :return: List of all tables in topological order.
+        :return: All wrapped classes in topological order (a parent precedes its children).
+
+        Sibling classes with no ordering constraint between them are emitted in a stable order keyed
+        on the class identity, so generation does not depend on the (hash-seed-dependent) order in
+        which classes were discovered. In particular, parametrised generic variants such as
+        ``GenericClass[float]`` and ``GenericClass[int]`` — which share a ``__name__`` — get a
+        deterministic relative order.
         """
+        wrapped_by_index = {
+            wrapped.index: wrapped
+            for wrapped in self.class_dependency_graph.wrapped_classes
+        }
+        tie_break_key = {
+            index: self._topological_tie_break_key(wrapped)
+            for index, wrapped in wrapped_by_index.items()
+        }
         return [
-            self.class_dependency_graph._dependency_graph[index]
-            for index in rx.topological_sort(self.inheritance_graph)
+            wrapped_by_index[index]
+            for index in rx.lexicographical_topological_sort(
+                self.inheritance_graph, key=lambda index: tie_break_key[index]
+            )
         ]
+
+    @staticmethod
+    def _topological_tie_break_key(wrapped_class: WrappedClass) -> str:
+        """:return: A stable, total-ordering string for a wrapped class — its ``str`` form, which
+        keeps parametrised generic variants (``GenericClass[float]`` vs ``GenericClass[int]``)
+        distinct even where their ``__name__`` coincides."""
+        return str(wrapped_class.clazz)
 
     @property
     def mapped_classes(self) -> List[Type]:

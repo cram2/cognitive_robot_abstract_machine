@@ -4,22 +4,17 @@ from typing import Union
 from json_msgs.action import JsonAction
 from py_trees.common import Status
 
-from giskardpy.motion_statechart.goals.base_traj_follower import BaseTrajFollower
-from giskardpy.motion_statechart.monitors.monitors import (
-    LocalMinimumReached,
-)
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from giskardpy.utils.decorators import record_time
 from giskardpy.middleware.ros2 import rospy
+from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.blackboard_utils import (
     catch_and_raise_to_blackboard,
     GiskardBlackboard,
 )
+from giskardpy.utils.decorators import record_time
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
-from semantic_digital_twin.world_description.connections import OmniDrive
 
 
 class ParseActionGoal(GiskardBehavior):
@@ -79,42 +74,4 @@ class SetExecutionMode(GiskardBehavior):
         #     raise InvalidGoalException(
         #         f"Goal of type {god_map.goal_msg.type} is not supported."
         #     )
-        return Status.SUCCESS
-
-
-class AddBaseTrajFollowerGoal(GiskardBehavior):
-    def __init__(self, name: str = "add base traj goal"):
-        super().__init__(name)
-        joints = GiskardBlackboard().executor.context.world.get_connections_by_type(
-            OmniDrive
-        )
-        assert len(joints) == 1
-        self.joint = joints[0]
-
-    @catch_and_raise_to_blackboard
-    @record_time
-    def update(self):
-        local_min = LocalMinimumReached("local min")
-        god_map.motion_statechart_manager.add_monitor(local_min)
-
-        time_monitor = TimeAbove(
-            threshold=len(GiskardBlackboard().trajectory)
-            * GiskardBlackboard().executor.qp_controller.config.mpc_dt,
-            name="timeout",
-        )
-        god_map.motion_statechart_manager.add_monitor(time_monitor)
-
-        end_motion = EndMotion(name="end motion")
-        end_motion.start_condition = f"{local_min.name} and {time_monitor.name}"
-        god_map.motion_statechart_manager.add_monitor(end_motion)
-
-        goal = BaseTrajFollower(
-            connection=self.joint.name,
-            track_only_velocity=True,
-            name="BaseTrajFollower",
-        )
-        goal.end_condition = f"{local_min.name}"
-        goal.apply_end_condition_to_nodes(time_monitor.name)
-        god_map.motion_statechart_manager.add_goal(goal)
-        god_map.motion_statechart_manager.parse_conditions()
         return Status.SUCCESS

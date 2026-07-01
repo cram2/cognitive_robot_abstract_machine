@@ -86,7 +86,8 @@ class InvalidConstraintExpressionShapeError(MotionStatechartError):
     actual_shape: list[int]
 
     def error_message(self) -> str:
-        return f"Constraint expression must have shape (1, 1), has ({" ".join(map(str, self.actual_shape))})."
+        shape_str = " ".join(map(str, self.actual_shape))
+        return f"Constraint expression must have shape (1, 1), has ({shape_str})."
 
     def suggest_correction(self) -> str:
         return ""

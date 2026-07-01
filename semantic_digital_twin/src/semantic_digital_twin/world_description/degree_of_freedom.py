@@ -3,10 +3,13 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass, field
 
-from typing_extensions import Dict, Any
+from typing_extensions import Dict, Any, Generic, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from semantic_digital_twin.world_description.world_entity import WorldEntityWithID
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
@@ -84,18 +87,21 @@ class JerkVariable(sm.FloatVariable):
         return self.dof._world.state[self.dof.id].jerk
 
 
+T = TypeVar("T")
+
+
 @dataclass
-class DegreeOfFreedomLimits:
+class DegreeOfFreedomLimits(Generic[T]):
     """
     A class representing the limits of a degree of freedom.
     """
 
-    lower: DerivativeMap[float] = field(default=None)
+    lower: DerivativeMap[T] = field(default=None)
     """
     Lower limits of the degree of freedom.
     """
 
-    upper: DerivativeMap[float] = field(default=None)
+    upper: DerivativeMap[T] = field(default=None)
     """
     Upper limits of the degree of freedom.
     """
@@ -120,7 +126,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     and provides methods to get and set limits for these derivatives.
     """
 
-    limits: DegreeOfFreedomLimits = field(default=None)
+    limits: DegreeOfFreedomLimits[float] = field(default=None)
     """
     Lower and upper bounds for each derivative
     """
@@ -187,15 +193,18 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> DegreeOfFreedom:
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
         uuid = from_json(data["id"])
         lower_limits = from_json(data["lower_limits"], **kwargs)
         upper_limits = from_json(data["upper_limits"], **kwargs)
-        return cls(
+        self = cls(
             name=from_json(data["name"]),
             limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
             id=uuid,
             has_hardware_interface=data["has_hardware_interface"],
         )
+        tracker.add_world_entity_with_id(self)
+        return self
 
     def __deepcopy__(self, memo):
         result = DegreeOfFreedom(

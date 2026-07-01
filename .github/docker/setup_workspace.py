@@ -265,6 +265,12 @@ def main():
             "main",
             "cram_ros2_packages",
         ),
+        Repository(
+            "https://github.com/code-iai/iai_weiss_wpg_300-120-gripper.git",
+            "main",
+            "iai_weiss_wpg_300-120-gripper",
+            ["griplink"],
+        ),
     ]
 
     for repo in repos:

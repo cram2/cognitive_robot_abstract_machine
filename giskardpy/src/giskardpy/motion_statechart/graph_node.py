@@ -5,6 +5,7 @@ import re
 import threading
 from abc import ABC
 from dataclasses import field, dataclass, fields
+from functools import cached_property
 
 import numpy as np
 from typing_extensions import (
@@ -51,6 +52,7 @@ from giskardpy.motion_statechart.exceptions import (
     NodeAlreadyBelongsToDifferentNodeError,
 )
 from giskardpy.motion_statechart.plotters.plot_specs import NodePlotSpec
+from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.utils.utils import string_shortener
 
@@ -357,6 +359,14 @@ class NodeArtifacts:
     A list of symbolic expressions used for debugging only.
     While in debug mode, you can call .evaluate() on them to get their current value.
     """
+
+    @cached_property
+    def geometry(self) -> GeometricConstraintBuilder:
+        """
+        Builder for high-level geometric constraints (point, vector, and rotation goals, and
+        Cartesian velocity limits) that writes into :attr:`constraints`.
+        """
+        return GeometricConstraintBuilder(self.constraints)
 
 
 @dataclass(repr=False, eq=False)
