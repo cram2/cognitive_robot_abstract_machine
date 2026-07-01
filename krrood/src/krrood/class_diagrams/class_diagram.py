@@ -255,6 +255,11 @@ class ClassDiagram:
 
     def __post_init__(self):
         """Initialize the diagram with the provided classes and build relations."""
+        self._rebuild_diagram(self.classes)
+
+    def _rebuild_diagram(self, classes: Iterable[Type]) -> None:
+        self.classes = list(classes)
+        self._cls_wrapped_cls_map = {}
         self._dependency_graph = rx.PyDiGraph()
         for clazz in self.classes:
             self.add_node(WrappedClass(clazz=clazz))

@@ -22,6 +22,6 @@ This part of the guide collects the semantic-annotation tutorials:
 
 - [](semantic_annotations) — what semantic annotations are and how to define your own.
 - [](semantic_annotation_part_whole) — building annotations from structural parts via the
-  part-whole relationship, using the unified `add` method and `part_whole_relationship_field`.
+  part-whole relationship, using the unified `add` method and part-whole relationship fields.
 - [](semantic_annotation_factories) — convenience factories that spawn an annotation together with
   a body and generated geometry.

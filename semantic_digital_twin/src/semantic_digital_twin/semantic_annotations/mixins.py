@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import dataclasses
-import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, MISSING, Field
 from functools import lru_cache
@@ -20,6 +18,7 @@ from typing_extensions import (
 
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.patterns.field_metadata import FieldMetadata
 from krrood.entity_query_language.factories import variable_from, entity, variable, an
 from krrood.ormatic.utils import classproperty
 from probabilistic_model.distributions.gaussian import GaussianDistribution
@@ -325,41 +324,24 @@ class HasRootRegion(HasRootKinematicStructureEntity, ABC):
         )
 
 
-class PartWholeRelationshipField(dataclasses.Field):
-    """
-    Used to mark PartWhole relationships for specific dataclass fields so that we can identify them later on.
-    """
-
-
-def part_whole_relationship_field(**overrides):
-    """
-    Factory method for class PartWholeRelationshipField(dataclasses.Field)
-    """
-    params = inspect.signature(dataclasses.field).parameters
-
-    kwargs = {
-        name: param.default
-        for name, param in params.items()
-        if param.default is not inspect.Parameter.empty
-    }
-    kwargs.update(overrides)
-
-    return PartWholeRelationshipField(**kwargs)
-
-
 @lru_cache(maxsize=None)
 def _wrapped_part_whole_relationship_fields(
     cls: Type[PartWholeRelationship],
 ) -> list[WrappedField]:
     """
-    Filters the fields of cls for all fields that are of type PartWholeRelationshipField, and returns them as a Wrapped Class.
+    Filters the fields of cls for all fields marked as a part-whole relationship (via
+    :attr:`FieldMetadata.is_part_whole_relationship`), and returns them as a Wrapped Class.
     """
     return [
         wrapped_part_whole_relationship_field
         for wrapped_part_whole_relationship_field in WrappedClass(cls).fields
-        if isinstance(
-            wrapped_part_whole_relationship_field.field, PartWholeRelationshipField
+        if (
+            metadata := FieldMetadata.of_field(
+                wrapped_part_whole_relationship_field.field
+            )
         )
+        is not None
+        and metadata.is_part_whole_relationship
     ]
 
 
@@ -433,8 +415,11 @@ class HasApertures(HasRootBody, PartWholeRelationship, ABC):
     A mixin class for semantic annotations that have apertures.
     """
 
-    apertures: List[Aperture] = part_whole_relationship_field(
-        default_factory=list, hash=False, kw_only=True
+    apertures: List[Aperture] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=FieldMetadata.as_dict(is_part_whole_relationship=True),
     )
     """
     The apertures of the semantic annotation.
@@ -447,8 +432,9 @@ class HasMechanicalJoint(HasRootBody, PartWholeRelationship, ABC):
     A mixin class for semantic annotations that have mechanical joints.
     """
 
-    mechanical_joint: Optional[MechanicalJoint] = part_whole_relationship_field(
-        default=None
+    mechanical_joint: Optional[MechanicalJoint] = field(
+        default=None,
+        metadata=FieldMetadata.as_dict(is_part_whole_relationship=True),
     )
     """
     The mechanical joint of the semantic annotation.
@@ -474,8 +460,11 @@ class HasDrawers(PartWholeRelationship, ABC):
     A mixin class for semantic annotations that have drawers.
     """
 
-    drawers: List[Drawer] = part_whole_relationship_field(
-        default_factory=list, hash=False, kw_only=True
+    drawers: List[Drawer] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=FieldMetadata.as_dict(is_part_whole_relationship=True),
     )
     """
     The drawers of the semantic annotation.
@@ -488,8 +477,11 @@ class HasDoors(PartWholeRelationship, ABC):
     A mixin class for semantic annotations that have doors.
     """
 
-    doors: List[Door] = part_whole_relationship_field(
-        default_factory=list, hash=False, kw_only=True
+    doors: List[Door] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=FieldMetadata.as_dict(is_part_whole_relationship=True),
     )
     """
     The doors of the semantic annotation.
@@ -502,7 +494,10 @@ class HasHandle(HasRootBody, PartWholeRelationship, ABC):
     A mixin class for semantic annotations that have a handle.
     """
 
-    handle: Optional[Handle] = part_whole_relationship_field(default=None)
+    handle: Optional[Handle] = field(
+        default=None,
+        metadata=FieldMetadata.as_dict(is_part_whole_relationship=True),
+    )
     """
     The handle of the semantic annotation.
     """

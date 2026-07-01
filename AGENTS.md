@@ -27,6 +27,7 @@
 
 ## Imports
 - Imports should always be absolute
+- Exception: within tests, importing another test module (for example a shared mimic or fixture from the test datasets) must use a relative import
 - Imports should always be global (top of module), except in very special cases (for example ORM interface imports)
 - Use stdlib type hints where possible, and for others use typing_extensions instead of typing
 - Whenever you would wrap types in strings for deferred resolution, use `from __future__ import annotations` instead.

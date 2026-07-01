@@ -8,6 +8,12 @@ from dataclasses import dataclass, field
 from typing_extensions import List, Iterator, Optional, Iterable, Type, TYPE_CHECKING
 
 from krrood.entity_query_language.predicate import Predicate
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    Adjective,
+    clause,
+    Copula,
+    Noun,
+)
 from coraplex.datastructures.dataclasses import Context
 
 if TYPE_CHECKING:
@@ -164,6 +170,16 @@ class PoseValidator(Predicate):
     @abstractmethod
     def __call__(self, *args, **kwargs) -> bool:
         pass
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields):
+        """Default clause for a pose validator — *"a pose candidate is valid"*.
+
+        A validator is a validity *check*, agnostic of who performs it, so it says the candidate is
+        valid rather than naming an agent. Concrete validators (visibility / reachability) may
+        override this with their own surface.
+        """
+        return clause(Noun("pose candidate"), Copula(), Adjective("valid"))
 
     @property
     def world(self) -> World:

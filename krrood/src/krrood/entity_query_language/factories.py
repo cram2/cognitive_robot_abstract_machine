@@ -352,10 +352,22 @@ def an(
     return entity_._quantify_(An, quantification_constraint=quantification)
 
 
-a = an
-"""
-This is an alias to accommodate for words not starting with vowels.
-"""
+def a(
+    entity_: Union[T, Query],
+    quantification: Optional[ResultQuantificationConstraint] = None,
+) -> Union[T, Query]:
+    """
+    Select all values satisfying the given entity description.
+
+    This accommodates words not starting with a vowel; it delegates to :func:`an`. It is a real
+    function (not an ``a = an`` alias) so its ``__name__`` is ``"a"``, which lets tools that key a
+    namespace by ``__name__`` (e.g. the doctest harness) expose it under the name ``a``.
+
+    :param entity_: An entity or a set expression to quantify over.
+    :param quantification: Optional quantification constraint.
+    :return: The entity with the applied quantifier.
+    """
+    return an(entity_, quantification=quantification)
 
 
 def the(

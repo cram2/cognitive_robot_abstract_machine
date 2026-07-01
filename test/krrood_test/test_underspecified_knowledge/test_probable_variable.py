@@ -7,6 +7,7 @@ from krrood.entity_query_language.factories import (
     or_,
     underspecified,
 )
+from krrood.entity_query_language.verbalization.pipeline import VerbalizationPipeline
 from krrood.parametrization.random_events_translator import (
     WhereExpressionToRandomEventTranslator,
     is_disjunctive_normal_form,
@@ -37,7 +38,6 @@ def test_underspecification_with_where():
         underspecified_pose.variable.position.z <= 1.0,
         underspecified_pose.variable.orientation.x != 1.0,
     )
-
     t = WhereExpressionToRandomEventTranslator(
         and_(*q._where_conditions_),
     )

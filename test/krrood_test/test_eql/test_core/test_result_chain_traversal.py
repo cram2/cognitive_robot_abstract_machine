@@ -145,9 +145,7 @@ def test_stage1_comparator_result_reachable_from_stage2():
 
     # r2.prev = r1; r1.prev = product_result; product_result.prev = comparator_result
     comparator_result = (
-        r2.previous_operation_result    # r1
-        .previous_operation_result      # product_result
-        .previous_operation_result      # comparator/where result
+        r2.previous_operation_result.previous_operation_result.previous_operation_result  # r1  # product_result  # comparator/where result
     )
     assert comparator_result is not None
     assert a._id_ in comparator_result.bindings
@@ -168,10 +166,7 @@ def test_stage1_literal_result_reachable_from_stage2():
     r2 = _first(b, r1)
 
     literal_result = (
-        r2.previous_operation_result    # r1
-        .previous_operation_result      # product_result
-        .previous_operation_result      # comparator_result
-        .previous_operation_result      # literal_result
+        r2.previous_operation_result.previous_operation_result.previous_operation_result.previous_operation_result  # r1  # product_result  # comparator_result  # literal_result
     )
     assert literal_result is not None
     assert a._id_ in literal_result.bindings
@@ -192,10 +187,7 @@ def test_stage1_variable_result_reachable_via_previous_on_literal():
     r2 = _first(b, r1)
 
     literal_result = (
-        r2.previous_operation_result
-        .previous_operation_result
-        .previous_operation_result
-        .previous_operation_result
+        r2.previous_operation_result.previous_operation_result.previous_operation_result.previous_operation_result
     )
     # Literal links the Variable-a result as its previous_operation_result
     a_result = literal_result.previous_operation_result
@@ -255,11 +247,7 @@ def test_three_stage_pipeline_intermediate_reachable():
 
     # Navigate: r3 → r2 → b_result_in_q2 → r1 → product_result_in_q1 → comparator_result
     comparator_result = (
-        r3.previous_operation_result           # r2
-        .previous_operation_result             # b_result in q2
-        .previous_operation_result             # r1
-        .previous_operation_result             # product_result in q1
-        .previous_operation_result             # comparator/where result
+        r3.previous_operation_result.previous_operation_result.previous_operation_result.previous_operation_result.previous_operation_result  # r2  # b_result in q2  # r1  # product_result in q1  # comparator/where result
     )
     assert comparator_result is not None
     assert a._id_ in comparator_result.bindings
@@ -337,7 +325,8 @@ def test_all_bindings_contains_all_stage_variable_values():
 
 def test_query_slim_bindings_vs_all_bindings():
     """Documents the slim-bindings characteristic: Query.bindings stores the query's own _id_,
-    not the original variable's _id_.  all_bindings includes both via the previous chain."""
+    not the original variable's _id_.  all_bindings includes both via the previous chain.
+    """
     a = variable_from([7])
     q1 = entity(a)
     q1.build()

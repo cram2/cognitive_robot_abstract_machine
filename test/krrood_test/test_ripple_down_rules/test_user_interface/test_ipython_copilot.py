@@ -3,6 +3,7 @@ from unittest import skip
 
 import requests
 from IPython.terminal.embed import InteractiveShellEmbed
+
 # from openai import OpenAI
 # client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 from prompt_toolkit.key_binding import KeyBindings
@@ -24,7 +25,7 @@ class ContextAwareCopilotShell:
     def _add_keybindings(self, shell):
         kb = KeyBindings()
 
-        @kb.add('c-space')  # Trigger with Ctrl+Space
+        @kb.add("c-space")  # Trigger with Ctrl+Space
         def suggest(event):
             buffer = event.app.current_buffer
             current_code = buffer.document.text.strip()
@@ -65,14 +66,18 @@ Based on this context, suggest how to complete or improve the following Python i
 Respond with a Python snippet that makes sense in context.
 """
         try:
-            response = client.chat.completions.create(model="gpt-4",
-                                                      messages=[
-                                                          {"role": "system",
-                                                           "content": "You're a helpful Python code assistant."},
-                                                          {"role": "user", "content": prompt}
-                                                      ],
-                                                      max_tokens=150,
-                                                      temperature=0.3)
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You're a helpful Python code assistant.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=150,
+                temperature=0.3,
+            )
             return response.choices[0].message.content.strip()
         except Exception as e:
             return f"❌ Error: {e}"
@@ -87,11 +92,14 @@ Respond with a Python snippet that makes sense in context.
     """
         print(f"Prompt:\n{prompt}\n")
         try:
-            response = requests.post("http://localhost:11434/api/generate", json={
-                "model": "codellama:7b-instruct",  # or "phi"
-                "prompt": prompt,
-                "stream": False,
-            })
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json={
+                    "model": "codellama:7b-instruct",  # or "phi"
+                    "prompt": prompt,
+                    "stream": False,
+                },
+            )
             result = response.json()
             return result.get("response", "").strip()
         except Exception as e:
