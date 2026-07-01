@@ -250,6 +250,8 @@ def is_disjunctive_normal_form(condition_root: ConditionType) -> bool:
     3. There is at most one disjunction (OR statement) which has to be at the root.
 
     Example:
+        Constant (Literal, e.g., 3, True, etc.) is DNF
+
         (x > 3) is DNF
 
         (x > 3) & (y < 5) is DNF
@@ -268,6 +270,7 @@ def is_disjunctive_normal_form(condition_root: ConditionType) -> bool:
         is_disjunction_of_conjunction_of_literal_comparators(condition_root)
         or is_conjunction_of_literal_comparators(condition_root)
         or is_literal_comparator(condition_root)
+        or isinstance(condition_root, Literal)
     )
 
 

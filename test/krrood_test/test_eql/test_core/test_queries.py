@@ -1340,3 +1340,13 @@ def test_presentation_example():
     q = an(entity(r).where(r.battery > 50, not_(r.tasks[0].completed)))
     visualize_query_graph(q, figure_size=(20, 20), spacing_x=2, spacing_y=2)
     assert q.tolist() == [robots[2]]
+
+
+def test_empty_data_to_aggregator():
+    data = variable(int, [])
+    @symbolic_function
+    def x_value(x_):
+        return x_
+    key = lambda x: x_value(x)
+    min_ = entity(eql.min(data, key=key))
+    assert min_.tolist() == [None]
