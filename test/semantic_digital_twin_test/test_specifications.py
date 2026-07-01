@@ -274,8 +274,35 @@ def test_from_event_constructor_spawns(empty_world):
     assert len(body.collision.shapes) >= 1
 
 
+@pytest.mark.parametrize(
+    "make_spec",
+    [
+        lambda pose: BodySpecification.box("shape", Scale(1, 1, 1), parent_T_self=pose),
+        lambda pose: BodySpecification.sphere("shape", 0.5, parent_T_self=pose),
+        lambda pose: BodySpecification.cylinder("shape", 0.4, 1.0, parent_T_self=pose),
+        lambda pose: BodySpecification.mesh(
+            "shape", str(RESOURCES / "milk.stl"), parent_T_self=pose
+        ),
+        lambda pose: BodySpecification.from_event(
+            "shape", Scale(1, 1, 1).to_simple_event().as_composite_set(), parent_T_self=pose
+        ),
+        lambda pose: BodySpecification.from_3d_points(
+            "shape",
+            [Point3(0, 0, 0), Point3(1, 0, 0), Point3(0, 1, 0), Point3(1, 1, 1)],
+            parent_T_self=pose,
+        ),
+        lambda pose: RegionSpecification.box("shape", Scale(1, 1, 1), parent_T_self=pose),
+    ],
+)
+def test_shape_constructors_apply_parent_T_self(empty_world, make_spec):
+    pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3)
+    entity = make_spec(pose).spawn(empty_world)
+    root_T_entity = empty_world.compute_forward_kinematics(empty_world.root, entity)
+    np.testing.assert_allclose(root_T_entity.to_position().to_np()[:3], [1, 2, 3])
+
+
 def test_body_specification_from_3d_points_matches_direct_construction():
-    """``from_3d_points`` is the declarative counterpart of :meth:`Body.from_3d_points`."""
+    """``from_3d_points`` mirrors :meth:`Body.from_3d_points`."""
     points = [Point3(0, 0, 0), Point3(1, 0, 0), Point3(0, 1, 0), Point3(1, 1, 1)]
     name = PrefixedName("polytope")
 
@@ -285,6 +312,13 @@ def test_body_specification_from_3d_points_matches_direct_construction():
     assert (
         len(materialized.collision.shapes) == len(directly_built.collision.shapes) == 1
     )
+
+
+def test_prefixed_name_is_not_double_wrapped():
+    """A :class:`PrefixedName` reaching a spec name must be kept as-is, not re-wrapped."""
+    body = BodySpecification.box(PrefixedName("box"), Scale(1, 1, 1)).to_domain_object()
+    assert body.name == PrefixedName("box")
+    assert isinstance(body.name.name, str)
 
 
 def test_has_root_body_default_specification_without_scale_is_geometryless(empty_world):
@@ -1059,7 +1093,7 @@ def test_complex_spawned_world_is_deepcopyable(empty_world):
     )
 
 
-def test_nested_composite_matches_imperative(empty_world):
+def test_nested_composite_matches_manual_construction(empty_world):
     scale = Scale(0.4, 0.5, 0.6)
     handle_scale = Scale(0.1, 0.05, 0.05)
     hinge_scale = Scale(0.05, 0.05, 0.05)
@@ -1082,26 +1116,24 @@ def test_nested_composite_matches_imperative(empty_world):
     assert drawer.handle.root.parent_connection.parent is drawer.root
     assert drawer.root.parent_connection.parent is drawer.mechanical_joint.root
 
-    imperative_world = _fresh_world()
-    with imperative_world.modify_world():
-        imperative_drawer = Drawer.create_with_new_body_in_world(
-            name="drawer_imperative", world=imperative_world, scale=scale
+    manual_world = _fresh_world()
+    with manual_world.modify_world():
+        manual_drawer = Drawer.create_with_new_body_in_world(
+            name="drawer_manual", world=manual_world, scale=scale
         )
-        imperative_handle = Handle.create_with_new_body_in_world(
-            name="handle_imperative",
-            world=imperative_world,
+        manual_handle = Handle.create_with_new_body_in_world(
+            name="handle_manual",
+            world=manual_world,
             scale=handle_scale,
         )
-        imperative_hinge = Hinge.create_with_new_body_in_world(
-            name="hinge_imperative",
-            world=imperative_world,
+        manual_hinge = Hinge.create_with_new_body_in_world(
+            name="hinge_manual",
+            world=manual_world,
             scale=hinge_scale,
             active_axis=Vector3.Z(),
         )
-        imperative_drawer.add(imperative_handle)
-        imperative_drawer.add(imperative_hinge)
+        manual_drawer.add(manual_handle)
+        manual_drawer.add(manual_hinge)
 
-    _assert_same_geometry(drawer.root.collision, imperative_drawer.root.collision)
-    _assert_same_geometry(
-        drawer.handle.root.collision, imperative_handle.root.collision
-    )
+    _assert_same_geometry(drawer.root.collision, manual_drawer.root.collision)
+    _assert_same_geometry(drawer.handle.root.collision, manual_handle.root.collision)

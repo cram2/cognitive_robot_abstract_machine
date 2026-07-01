@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - semdt_specifications_rewrite
   workflow_dispatch: {}
 
 jobs:

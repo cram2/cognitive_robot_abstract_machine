@@ -354,7 +354,7 @@ class Door(HasHandle, HasMechanicalJoint):
         )
 
         # TODO: The EntryWay is spawn-time structure that cannot yet be expressed as a nested
-        #       part-whole annotation spec, so it is built imperatively here for now (see
+        #       part-whole annotation spec, so it is built directly here for now (see
         #       SemanticAnnotationWithRootSpecification.annotation_kwargs handling). Deprecate this
         #       once the EntryWay can be declared on the door's specification.
         entry_way_name = PrefixedName(name + "entry_way")

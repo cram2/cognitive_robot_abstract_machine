@@ -162,7 +162,7 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         type's default geometry spec (see :meth:`_default_root_specification`), plus the
         parent-connection parameters.
 
-        This is the declarative, reusable equivalent of :meth:`create_with_new_body_in_world`;
+        This is the reusable specification form of :meth:`create_with_new_body_in_world`;
         spawn the returned specification to materialize the annotation in a world.
 
         Extra positional/keyword arguments are forwarded to the geometry method, so per-class

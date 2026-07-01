@@ -18,6 +18,7 @@ parts:
             - file: examples/semantic_annotations
             - file: examples/semantic_annotation_part_whole
             - file: examples/semantic_annotation_factories
+        - file: examples/building_worlds_with_specifications
         - file: examples/world_state_manipulation
         - file: examples/regions
         - file: examples/persistence_of_annotated_worlds

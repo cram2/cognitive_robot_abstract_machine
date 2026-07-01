@@ -522,6 +522,20 @@ class World(HasSimulatorProperties):
         )
         self.collision_manager.add_to_world(self)
 
+    @classmethod
+    def create_with_root_body(
+        cls, root_body_name: Optional[PrefixedName] = None
+    ) -> World:
+        """
+        Creates a new instance of the World class with a root body.
+        """
+        used_root_name = root_body_name or PrefixedName("map")
+        root_body = Body(name=used_root_name)
+        world = World()
+        with world.modify_world():
+            world.add_body(root_body)
+        return world
+
     def __hash__(self):
         return hash((id(self), self._model_manager.version))
 

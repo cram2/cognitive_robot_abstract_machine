@@ -110,6 +110,8 @@ class NamedSpecification(ABC):
         used_name = name if name is not None else self.name
         if used_name is None:
             return None
+        if isinstance(used_name, PrefixedName):
+            return used_name
         return PrefixedName(name=used_name)
 
 
@@ -153,7 +155,7 @@ class KinematicStructureEntitySpecification(
     AbstractSubClassSafeGeneric,
 ):
     """
-    Declarative, world-independent description of a kinematic structure entity.
+    World-independent, reusable description of a kinematic structure entity.
     A specification is reusable: every materialization copies the prototype shapes and the
     pose, so the specification never becomes bound to an entity or world.
 
@@ -247,6 +249,7 @@ class KinematicStructureEntitySpecification(
         scale: Scale,
         color: Optional[Color] = None,
         origin: Optional[HomogeneousTransformationMatrix] = None,
+        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
         child_specification: list[KinematicStructureEntitySpecification] | None = None,
     ) -> Self:
         """
@@ -255,6 +258,7 @@ class KinematicStructureEntitySpecification(
         :param scale: The extents of the box.
         :param color: The color of the box.
         :param origin: The origin of the box in the body frame. Defaults to identity.
+        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
         :return: The created specification.
         """
         return cls(
@@ -265,6 +269,7 @@ class KinematicStructureEntitySpecification(
                 color=color or Color(),
             ).as_shape_collection(),
             child_specification=child_specification or [],
+            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
         )
 
     @classmethod
@@ -274,6 +279,7 @@ class KinematicStructureEntitySpecification(
         radius: float,
         color: Optional[Color] = None,
         origin: Optional[HomogeneousTransformationMatrix] = None,
+        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
         child_specification: list[KinematicStructureEntitySpecification] | None = None,
     ) -> Self:
         """
@@ -282,6 +288,7 @@ class KinematicStructureEntitySpecification(
         :param radius: The radius of the sphere.
         :param color: The color of the sphere.
         :param origin: The origin of the sphere in the kinematic structure entity frame. Defaults to identity.
+        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
         :return: The created specification.
         """
         return cls(
@@ -292,6 +299,7 @@ class KinematicStructureEntitySpecification(
                 color=color or Color(),
             ).as_shape_collection(),
             child_specification=child_specification or [],
+            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
         )
 
     @classmethod
@@ -302,6 +310,7 @@ class KinematicStructureEntitySpecification(
         height: float,
         color: Optional[Color] = None,
         origin: Optional[HomogeneousTransformationMatrix] = None,
+        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
         child_specification: list[KinematicStructureEntitySpecification] | None = None,
     ) -> Self:
         """
@@ -311,6 +320,7 @@ class KinematicStructureEntitySpecification(
         :param height: The height of the cylinder.
         :param color: The color of the cylinder.
         :param origin: The origin of the cylinder in the kinematic structure entity frame. Defaults to identity.
+        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
         :return: The created specification.
         """
         return cls(
@@ -322,6 +332,7 @@ class KinematicStructureEntitySpecification(
                 color=color or Color(),
             ).as_shape_collection(),
             child_specification=child_specification or [],
+            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
         )
 
     @classmethod
@@ -332,6 +343,7 @@ class KinematicStructureEntitySpecification(
         scale: Optional[Scale] = None,
         color: Optional[Color] = None,
         origin: Optional[HomogeneousTransformationMatrix] = None,
+        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
         child_specification: list[KinematicStructureEntitySpecification] | None = None,
     ) -> Self:
         """
@@ -341,6 +353,7 @@ class KinematicStructureEntitySpecification(
         :param scale: The scale applied to the mesh.
         :param color: The color of the mesh.
         :param origin: The origin of the mesh in the kinematic structure entity frame. Defaults to identity.
+        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
         :return: The created specification.
         """
         return cls(
@@ -352,6 +365,7 @@ class KinematicStructureEntitySpecification(
                 color=color or Color(),
             ).as_shape_collection(),
             child_specification=child_specification or [],
+            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
         )
 
     @classmethod
@@ -359,6 +373,7 @@ class KinematicStructureEntitySpecification(
         cls,
         name: str,
         event: Event,
+        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
         child_specification: list[KinematicStructureEntitySpecification] | None = None,
     ) -> Self:
         """
@@ -367,6 +382,7 @@ class KinematicStructureEntitySpecification(
         geometry (hollow handles, container cases, walls minus apertures, ...).
         :param name: The name of the entity.
         :param event: The event describing the geometry, in the entity frame.
+        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
         :return: The created specification.
         """
         # BoundingBoxCollection requires a reference frame, so the shapes are
@@ -378,6 +394,7 @@ class KinematicStructureEntitySpecification(
             .as_shapes()
             .copy_without_reference_frame(),
             child_specification=child_specification or [],
+            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
         )
 
     @classmethod
@@ -387,6 +404,7 @@ class KinematicStructureEntitySpecification(
         points_3d: List[Point3],
         minimum_thickness: float = 0.005,
         sv_ratio_tol: float = 1e-7,
+        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
         child_specification: list[KinematicStructureEntitySpecification] | None = None,
     ) -> Self:
         """
@@ -396,6 +414,7 @@ class KinematicStructureEntitySpecification(
         :param points_3d: The points whose convex hull defines the geometry.
         :param minimum_thickness: Thickness added when the points are near-planar.
         :param sv_ratio_tol: Singular-value ratio tolerance for the planarity test.
+        :param parent_T_self: The default placement of the entity in its parent frame. Defaults to identity.
         :return: The created specification.
         """
         return cls(
@@ -410,13 +429,14 @@ class KinematicStructureEntitySpecification(
                 ]
             ).copy_without_reference_frame(),
             child_specification=child_specification or [],
+            parent_T_self=parent_T_self or HomogeneousTransformationMatrix(),
         )
 
 
 @dataclass
 class BodySpecification(KinematicStructureEntitySpecification[Body]):
     """
-    Declarative description of a :class:`~semantic_digital_twin.world_description.world_entity.Body`.
+    World-independent description of a :class:`~semantic_digital_twin.world_description.world_entity.Body`.
 
     Extends the kinematic-structure-entity specification with body-only properties: inertial
     parameters and a separate visual shape collection.
@@ -443,7 +463,11 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
         body = Body.from_shape_collection(
             self._resolved_name(name),
             self.shapes.copy_without_reference_frame(),
-            visuals_shape_collection=self.visual_shapes,
+            visuals_shape_collection=(
+                self.visual_shapes.copy_without_reference_frame()
+                if self.visual_shapes is not None
+                else None
+            ),
         )
         if self.inertial is not None:
             body.inertial = deepcopy(self.inertial)
@@ -453,7 +477,7 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
 @dataclass
 class RegionSpecification(KinematicStructureEntitySpecification[Region]):
     """
-    Declarative description of a :class:`~semantic_digital_twin.world_description.world_entity.Region`.
+    World-independent description of a :class:`~semantic_digital_twin.world_description.world_entity.Region`.
 
     Carries no fields beyond the base kinematic-structure-entity specification; it only binds the
     materialized domain-object type to :class:`Region`.
@@ -465,7 +489,7 @@ class SemanticAnnotationWithRootSpecification(
     SpawnSpecification["HasRootKinematicStructureEntity"]
 ):
     """
-    Declarative description of a semantic annotation rooted in a single kinematic
+    World-independent description of a semantic annotation rooted in a single kinematic
     structure entity. The annotation type owns the parent connection specification type (via its
     ``_parent_connection_specification_type``); this specification only supplies the connection
     parameters for active connections.
@@ -549,7 +573,7 @@ class SemanticAnnotationWithRootSpecification(
             name=self._resolved_name(name), root=root_entity, **self.annotation_kwargs
         )
 
-        effective_pose = parent_T_self or self.root_specification.parent_T_self
+        used_parent_T_self = parent_T_self or self.root_specification.parent_T_self
         children = self.root_specification.child_specification
 
         connection_specification = self.semantic_annotation_type._parent_connection_specification_type.from_kwargs(
@@ -564,7 +588,7 @@ class SemanticAnnotationWithRootSpecification(
                 world,
                 parent=parent,
                 child=root_entity,
-                parent_T_connection=effective_pose,
+                parent_T_connection=used_parent_T_self,
             )
             world.add_semantic_annotation(instance)
             for child in children:
@@ -657,7 +681,7 @@ class ConnectionSpecification(
     NamedSpecification, Generic[TConnection], AbstractSubClassSafeGeneric, ABC
 ):
     """
-    Declarative, world- and kinematic-structure-entity-independent description of a connection.
+    World- and kinematic-structure-entity-independent description of a connection.
 
     A connection joins two pre-existing entities, so it is *not* a
     :class:`SpawnSpecification` (which materializes an entity and its own parent connection). It is
@@ -883,7 +907,7 @@ class ConnectedBodySpecification(SpawnSpecification):
 @dataclass
 class WorldSpecification:
     """
-    Declarative description of a world: an environment, an optional robot, and objects around them.
+    World-independent description of a world: an environment, an optional robot, and objects around them.
 
     The environment is supplied as a concrete :class:`World` (build one from a model file with
     :meth:`from_urdf` or :meth:`from_mjcf`). Applying it (:meth:`to_world`) optionally parses and
