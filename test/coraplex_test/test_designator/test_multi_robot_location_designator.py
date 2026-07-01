@@ -4,10 +4,16 @@ import pytest
 import rclpy
 from typing_extensions import Generator, Tuple
 
-import coraplex.alternative_motion_mappings.hsrb_motion_mapping  # type: ignore
-import coraplex.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
-import coraplex.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
+from coraplex.alternative_motion_mappings.hsrb_motion_mapping import HSRBMoveMotion
+from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
+    StretchMoveToolCenterPoint,
+    StretchMoveSim,
+    StretchMoveReal,
+    StretchClose,
+)
+from coraplex.alternative_motion_mappings.tiago_motion_mapping import TiagoMoveSim
 from coraplex.datastructures.dataclasses import Context
+
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.locations.factories import (
@@ -42,6 +48,17 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.world import World
+
+# The alternative motion mappings that should be available to the plans in this test module.
+# Resolution filters by robot type and execution type, so passing the full set is always safe.
+ALTERNATIVE_MOTION_MAPPINGS = [
+    HSRBMoveMotion,
+    StretchMoveToolCenterPoint,
+    StretchMoveSim,
+    StretchMoveReal,
+    StretchClose,
+    TiagoMoveSim,
+]
 
 
 @pytest.fixture(
@@ -137,7 +154,9 @@ def immutable_multiple_robot_simple_apartment(
 ) -> Generator[Tuple[World, AbstractRobot, Context]]:
     world, view = setup_multi_robot_simple_apartment
     state = deepcopy(world.state._data)
-    yield world, view, Context(world, view)
+    yield world, view, Context(
+        world, view, alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS
+    )
     world.state._data[:] = state
     world.notify_state_change()
 
@@ -147,7 +166,15 @@ def mutable_multiple_robot_simple_apartment(setup_multi_robot_simple_apartment):
     world, view = setup_multi_robot_simple_apartment
     copy_world = deepcopy(world)
     copy_view = view.from_world(copy_world)
-    return copy_world, copy_view, Context(copy_world, copy_view)
+    return (
+        copy_world,
+        copy_view,
+        Context(
+            copy_world,
+            copy_view,
+            alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS,
+        ),
+    )
 
 
 def test_new_reachability_location_pose(
@@ -279,8 +306,8 @@ def test_visibility_reachability_merge(
         context,
     )
 
-    context.debug_mode = True
     context.ros_node = rclpy_node
+    context.debug = True
 
     with simulated_robot:
         plan.perform()

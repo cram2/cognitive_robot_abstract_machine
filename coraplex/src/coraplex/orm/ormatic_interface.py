@@ -134,6 +134,7 @@ import semantic_digital_twin.adapters.ros.ros_msg_serializer
 import semantic_digital_twin.adapters.ros.semdt_to_ros2_converters
 import semantic_digital_twin.adapters.ros.tf_publisher
 import semantic_digital_twin.adapters.ros.tfwrapper
+import semantic_digital_twin.adapters.ros.visualization.collision_viz_marker
 import semantic_digital_twin.adapters.ros.visualization.pose_publisher
 import semantic_digital_twin.adapters.ros.visualization.viz_marker
 import semantic_digital_twin.adapters.ros.world_fetcher
@@ -2684,6 +2685,37 @@ class ContextIsUnavailableDAO(
     )
 
 
+class TipLinkDoesNotMatchAnyArmDAO(
+    Base, DataAccessObject[coraplex.exceptions.TipLinkDoesNotMatchAnyArm]
+):
+    __tablename__ = "TipLinkDoesNotMatchAnyArmDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    tip_link_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    robot_id: Mapped[int] = mapped_column(
+        ForeignKey("AbstractRobotDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    tip_link: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+    )
+    robot: Mapped[AbstractRobotDAO] = relationship(
+        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+    )
+
+
 class LocationDAO(Base, DataAccessObject[coraplex.locations.base.Location]):
     __tablename__ = "LocationDAO"
 
@@ -2867,22 +2899,14 @@ class PoseValidatorDAO(Base, DataAccessObject[coraplex.locations.base.PoseValida
         String(255), nullable=False, use_existing_column=True
     )
 
-    world_id: Mapped[int] = mapped_column(
-        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    robot_id: Mapped[int] = mapped_column(
-        ForeignKey("AbstractRobotDAO.database_id", use_alter=True),
+    context_id: Mapped[int] = mapped_column(
+        ForeignKey("ContextDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
-    )
-    robot: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+    context: Mapped[ContextDAO] = relationship(
+        "ContextDAO", uselist=False, foreign_keys=[context_id], post_update=True
     )
 
     __mapper_args__ = {
@@ -5411,6 +5435,27 @@ class HSRBMoveMotionDAO(
     }
 
 
+class StretchMoveRealDAO(
+    MoveMotionDAO,
+    DataAccessObject[
+        coraplex.alternative_motion_mappings.stretch_motion_mapping.StretchMoveReal
+    ],
+):
+    __tablename__ = "StretchMoveRealDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MoveMotionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "StretchMoveRealDAO",
+        "inherit_condition": database_id == MoveMotionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class StretchMoveSimDAO(
     MoveMotionDAO,
     DataAccessObject[
@@ -7794,6 +7839,7 @@ class DifferentialDriveBaseGoalDAO(
     )
 
     weight: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    threshold: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
     goal_pose_id: Mapped[int] = mapped_column(
         ForeignKey("PoseMappingDAO.database_id", use_alter=True),
@@ -15019,6 +15065,46 @@ class CollisionConsumerDAO(
     __mapper_args__ = {
         "polymorphic_on": "polymorphic_type",
         "polymorphic_identity": "CollisionConsumerDAO",
+    }
+
+
+class CollisionVisualizationMarkerPublisherDAO(
+    CollisionConsumerDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.collision_viz_marker.CollisionVisualizationMarkerPublisher
+    ],
+):
+    __tablename__ = "CollisionVisualizationMarkerPublisherDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(CollisionConsumerDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    topic_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    namespace: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    throttle: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    line_width: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CollisionVisualizationMarkerPublisherDAO",
+        "inherit_condition": database_id == CollisionConsumerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
