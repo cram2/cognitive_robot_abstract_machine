@@ -24,7 +24,7 @@ jobs:
           - lib: semantic_digital_twin
             doc_path: doc
             artifact_name: semantic-digital-twin-doc
-            use_container: true
+            use_container: False
           - lib: probabilistic_model
             doc_path: doc
             artifact_name: probabilistic-model-doc
