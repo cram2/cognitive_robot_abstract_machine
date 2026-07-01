@@ -31,6 +31,19 @@ class CollisionViolatedError(DataclassException):
 
 
 @dataclass
+class LocalMinimumReachedError(DataclassException):
+    """
+    Raised when the QP solver converges to a local minimum and can no longer make progress.
+    """
+
+    def error_message(self) -> str:
+        return "Motion planning reached a local minimum."
+
+    def suggest_correction(self) -> str:
+        return "Try a different starting configuration or base placement."
+
+
+@dataclass
 class MotionStatechartError(DataclassException):
     """
     Base class for errors in the motion statechart.
@@ -151,6 +164,7 @@ class NonObservationVariableError(InvalidConditionError):
 
     def reason(self) -> str:
         return f'Contains "{self.non_observation_variable}", which is not an observation variable.'
+        super().__post_init__()
 
 
 @dataclass

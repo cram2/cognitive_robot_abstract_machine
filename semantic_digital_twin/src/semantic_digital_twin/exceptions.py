@@ -778,6 +778,48 @@ class DuplicateRobotAssignmentsError(UsageError):
 
 
 @dataclass
+class MissingFillEquationError(UsageError):
+    """
+    Raised when a liquid transfer is requested from a source that has no outflow physics.
+    """
+
+    source: HasRootBody
+    """
+    The annotation that was supposed to act as the liquid source.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Cannot transfer liquid from '{self.source.root.name}': it has no fill equation "
+            f"or fill connection, so its outflow is undefined."
+        )
+
+    def suggest_correction(self) -> str:
+        return "call source.initialize_fill_level(world, ...) before connecting its outflow."
+
+
+@dataclass
+class SourceAlreadyCoupledError(UsageError):
+    """
+    Raised when a liquid source whose outflow is already coupled to a receiver is coupled again.
+    """
+
+    source: HasRootBody
+    """
+    The annotation acting as the liquid source that is already coupled.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The outflow of '{self.source.root.name}' is already coupled to a receiver; "
+            f"coupling it again would corrupt the existing transfer."
+        )
+
+    def suggest_correction(self) -> str:
+        return "couple each source to a single receiver, or re-initialize the source's fill level first."
+
+
+@dataclass
 class SpatialTypesError(UsageError):
     pass
 

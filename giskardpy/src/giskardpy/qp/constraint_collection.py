@@ -24,6 +24,10 @@ from giskardpy.qp.enforcement_strategy import (
     IntegralStrategy,
     VelocityStrategy,
 )
+from giskardpy.qp.terminal_state_prediction_strategy import (
+    TerminalStatePredictionStrategy,
+    TerminalStatePredictionConstraint,
+)
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.graph_node import MotionStatechartNode
@@ -300,5 +304,49 @@ class ConstraintCollection:
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
             linear_weight=0,
+        )
+        self.add_constraint(constraint)
+
+    def add_terminal_state_prediction_constraint(
+        self,
+        state_velocity: sm.SymbolicScalar,
+        state_variable: sm.SymbolicScalar,
+        goal_value: float,
+        quadratic_weight: sm.ScalarData,
+        reference_velocity: sm.ScalarData,
+        name: Optional[str] = None,
+    ) -> None:
+        """
+        Add a terminal-state prediction constraint using a linearized first-order ODE.
+
+        At each QP solve the constraint drives the MPC-predicted value of a scalar state at the
+        end of the control horizon toward ``goal_value``.  The prediction linearizes the state's
+        ODE at the current operating point and unrolls the discrete-time recursion analytically,
+        producing a single linear row compatible with the existing PIQP solver.  The state's
+        symbolic dependence on the joint variables (through ``state_velocity``) lets the QP move
+        the robot to reach the goal — e.g. tilting a cup to pour or turning a valve to fill.
+
+        The strategy differentiates the state rate w.r.t. ``state_variable`` to obtain ``∂f/∂x``;
+        it is zero for a pure external inflow, which the linearization handles as a well-conditioned
+        integrator.
+
+        :param state_velocity: Symbolic state rate f(x₀, q₀) at the current operating point; its
+            jacobian w.r.t. the joint variables drives the prediction.
+        :param state_variable: Symbolic current state x₀ (passive DOF position variable).
+        :param goal_value: Target state value at the end of the horizon.
+        :param quadratic_weight: Cost weight for violating the constraint.
+        :param reference_velocity: Expected state change rate; used for normalization and bound
+            capping.
+        :param name: Optional constraint name for debugging.
+        """
+        constraint = TerminalStatePredictionConstraint(
+            name=name,
+            expression=state_velocity,
+            normalization_factor=reference_velocity,
+            quadratic_weight=quadratic_weight,
+            enforcement_strategy=TerminalStatePredictionStrategy,
+            linear_weight=0,
+            state_variable=state_variable,
+            goal_value=goal_value,
         )
         self.add_constraint(constraint)
