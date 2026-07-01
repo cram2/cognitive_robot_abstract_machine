@@ -59,6 +59,7 @@ import semantic_digital_twin.collision_checking.trimesh_collision_detector
 import semantic_digital_twin.datastructures.field_of_view
 import semantic_digital_twin.datastructures.joint_state
 import semantic_digital_twin.datastructures.prefixed_name
+import semantic_digital_twin.datastructures.soft_trunk
 import semantic_digital_twin.exceptions
 import semantic_digital_twin.mixin
 import semantic_digital_twin.orm.exceptions
@@ -102,6 +103,7 @@ import semantic_digital_twin.world_description.degree_of_freedom
 import semantic_digital_twin.world_description.geometry
 import semantic_digital_twin.world_description.inertial_properties
 import semantic_digital_twin.world_description.shape_collection
+import semantic_digital_twin.world_description.soft_connections
 import semantic_digital_twin.world_description.world_entity
 import semantic_digital_twin.world_description.world_modification
 import semantic_digital_twin.world_description.world_state
@@ -916,6 +918,120 @@ class WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_asso
     target: Mapped[SimulatorAdditionalPropertyDAO] = relationship(
         "SimulatorAdditionalPropertyDAO",
         foreign_keys=[target_simulatoradditionalpropertydao_id],
+        lazy="selectin",
+    )
+
+
+class SoftTrunkDAO_kappa_dofs_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_96541826676661785775695933169170327310719246329273491038593527"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_softtrunkdao_id: Mapped[int] = mapped_column(
+        ForeignKey("SoftTrunkDAO.database_id")
+    )
+    target_degreeoffreedomdao_id: Mapped[int] = mapped_column(
+        ForeignKey("DegreeOfFreedomDAO.database_id")
+    )
+
+    target: Mapped[DegreeOfFreedomDAO] = relationship(
+        "DegreeOfFreedomDAO",
+        foreign_keys=[target_degreeoffreedomdao_id],
+        lazy="selectin",
+    )
+
+
+class SoftTrunkDAO_phi_dofs_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_64921934507455274664111639514194223017089954082170851135591032"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_softtrunkdao_id: Mapped[int] = mapped_column(
+        ForeignKey("SoftTrunkDAO.database_id")
+    )
+    target_degreeoffreedomdao_id: Mapped[int] = mapped_column(
+        ForeignKey("DegreeOfFreedomDAO.database_id")
+    )
+
+    target: Mapped[DegreeOfFreedomDAO] = relationship(
+        "DegreeOfFreedomDAO",
+        foreign_keys=[target_degreeoffreedomdao_id],
+        lazy="selectin",
+    )
+
+
+class SoftTrunkDAO_bending_x_dofs_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_46068770505823881529629795126744307970534092545181143971261417"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_softtrunkdao_id: Mapped[int] = mapped_column(
+        ForeignKey("SoftTrunkDAO.database_id")
+    )
+    target_degreeoffreedomdao_id: Mapped[int] = mapped_column(
+        ForeignKey("DegreeOfFreedomDAO.database_id")
+    )
+
+    target: Mapped[DegreeOfFreedomDAO] = relationship(
+        "DegreeOfFreedomDAO",
+        foreign_keys=[target_degreeoffreedomdao_id],
+        lazy="selectin",
+    )
+
+
+class SoftTrunkDAO_bending_y_dofs_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_83530208417436236817699575737832889327052749951414792798166358"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_softtrunkdao_id: Mapped[int] = mapped_column(
+        ForeignKey("SoftTrunkDAO.database_id")
+    )
+    target_degreeoffreedomdao_id: Mapped[int] = mapped_column(
+        ForeignKey("DegreeOfFreedomDAO.database_id")
+    )
+
+    target: Mapped[DegreeOfFreedomDAO] = relationship(
+        "DegreeOfFreedomDAO",
+        foreign_keys=[target_degreeoffreedomdao_id],
+        lazy="selectin",
+    )
+
+
+class SoftTrunkDAO_torsion_dofs_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_33117354195900399229762248010110729013546133844107511840817720"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_softtrunkdao_id: Mapped[int] = mapped_column(
+        ForeignKey("SoftTrunkDAO.database_id")
+    )
+    target_degreeoffreedomdao_id: Mapped[int] = mapped_column(
+        ForeignKey("DegreeOfFreedomDAO.database_id")
+    )
+
+    target: Mapped[DegreeOfFreedomDAO] = relationship(
+        "DegreeOfFreedomDAO",
+        foreign_keys=[target_degreeoffreedomdao_id],
+        lazy="selectin",
+    )
+
+
+class SoftTrunkDAO_extension_dofs_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_97757782501860805943132689022228912521164770573222681648891148"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_softtrunkdao_id: Mapped[int] = mapped_column(
+        ForeignKey("SoftTrunkDAO.database_id")
+    )
+    target_degreeoffreedomdao_id: Mapped[int] = mapped_column(
+        ForeignKey("DegreeOfFreedomDAO.database_id")
+    )
+
+    target: Mapped[DegreeOfFreedomDAO] = relationship(
+        "DegreeOfFreedomDAO",
+        foreign_keys=[target_degreeoffreedomdao_id],
         lazy="selectin",
     )
 
@@ -5972,6 +6088,21 @@ class PrefixedNameDAO(
     )
 
 
+class SoftTrunkSectionDAO(
+    Base,
+    DataAccessObject[semantic_digital_twin.datastructures.soft_trunk.SoftTrunkSection],
+):
+    __tablename__ = "SoftTrunkSectionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    length: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    radius: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    resolution: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+
 class AtomicWorldModificationNotAtomicDAO(
     Base,
     DataAccessObject[semantic_digital_twin.exceptions.AtomicWorldModificationNotAtomic],
@@ -10454,6 +10585,72 @@ class OmniDriveDAO(
     }
 
 
+class CosseratRodConnectionDAO(
+    ConnectionDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.soft_connections.CosseratRodConnection
+    ],
+):
+    __tablename__ = "CosseratRodConnectionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ConnectionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    segment_length: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    bending_x_dof_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+    bending_y_dof_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+    torsion_dof_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+    extension_dof_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CosseratRodConnectionDAO",
+        "inherit_condition": database_id == ConnectionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PiecewiseConstantCurvatureConnectionDAO(
+    ConnectionDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.soft_connections.PiecewiseConstantCurvatureConnection
+    ],
+):
+    __tablename__ = "PiecewiseConstantCurvatureConnectionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ConnectionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    segment_length: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    kappa_dof_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+    phi_dof_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PiecewiseConstantCurvatureConnectionDAO",
+        "inherit_condition": database_id == ConnectionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class WorldEntityWithIDDAO(
     WorldEntityDAO,
     DataAccessObject[
@@ -11272,6 +11469,87 @@ class SemanticAnnotationDAO(
         "polymorphic_identity": "SemanticAnnotationDAO",
         "inherit_condition": database_id
         == WorldEntityWithSimulatorPropertiesDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class SoftTrunkDAO(
+    SemanticAnnotationDAO,
+    DataAccessObject[semantic_digital_twin.datastructures.soft_trunk.SoftTrunk],
+):
+    __tablename__ = "SoftTrunkDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SemanticAnnotationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    root_id: Mapped[int] = mapped_column(
+        ForeignKey("BodyDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    root: Mapped[BodyDAO] = relationship(
+        "BodyDAO", uselist=False, foreign_keys=[root_id], post_update=True
+    )
+    kappa_dofs: Mapped[builtins.list[SoftTrunkDAO_kappa_dofs_association]] = (
+        relationship(
+            "SoftTrunkDAO_kappa_dofs_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[SoftTrunkDAO_kappa_dofs_association.source_softtrunkdao_id]",
+            lazy="selectin",
+        )
+    )
+    phi_dofs: Mapped[builtins.list[SoftTrunkDAO_phi_dofs_association]] = relationship(
+        "SoftTrunkDAO_phi_dofs_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[SoftTrunkDAO_phi_dofs_association.source_softtrunkdao_id]",
+        lazy="selectin",
+    )
+    bending_x_dofs: Mapped[builtins.list[SoftTrunkDAO_bending_x_dofs_association]] = (
+        relationship(
+            "SoftTrunkDAO_bending_x_dofs_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[SoftTrunkDAO_bending_x_dofs_association.source_softtrunkdao_id]",
+            lazy="selectin",
+        )
+    )
+    bending_y_dofs: Mapped[builtins.list[SoftTrunkDAO_bending_y_dofs_association]] = (
+        relationship(
+            "SoftTrunkDAO_bending_y_dofs_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[SoftTrunkDAO_bending_y_dofs_association.source_softtrunkdao_id]",
+            lazy="selectin",
+        )
+    )
+    torsion_dofs: Mapped[builtins.list[SoftTrunkDAO_torsion_dofs_association]] = (
+        relationship(
+            "SoftTrunkDAO_torsion_dofs_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[SoftTrunkDAO_torsion_dofs_association.source_softtrunkdao_id]",
+            lazy="selectin",
+        )
+    )
+    extension_dofs: Mapped[builtins.list[SoftTrunkDAO_extension_dofs_association]] = (
+        relationship(
+            "SoftTrunkDAO_extension_dofs_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[SoftTrunkDAO_extension_dofs_association.source_softtrunkdao_id]",
+            lazy="selectin",
+        )
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SoftTrunkDAO",
+        "inherit_condition": database_id == SemanticAnnotationDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -13667,6 +13945,25 @@ class EndEffectorDAO(
     }
 
 
+class SoftEndEffectorDAO(
+    EndEffectorDAO,
+    DataAccessObject[semantic_digital_twin.datastructures.soft_trunk.SoftEndEffector],
+):
+    __tablename__ = "SoftEndEffectorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(EndEffectorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SoftEndEffectorDAO",
+        "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class Armar7LeftGripperDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.armar7.Armar7LeftGripper],
@@ -14048,6 +14345,22 @@ class ArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ArmDAO",
         "inherit_condition": database_id == KinematicChainDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class SoftArmDAO(
+    ArmDAO, DataAccessObject[semantic_digital_twin.datastructures.soft_trunk.SoftArm]
+):
+    __tablename__ = "SoftArmDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ArmDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SoftArmDAO",
+        "inherit_condition": database_id == ArmDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
