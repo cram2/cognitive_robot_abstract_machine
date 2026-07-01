@@ -47,6 +47,7 @@ from krrood.class_diagrams.attribute_introspector import (
 from krrood.class_diagrams.method_classifier import factory_method_names
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Generic
 
 from krrood.class_diagrams.exceptions import (
     ClassIsUnMappedInClassDiagram,
@@ -247,7 +248,7 @@ T = TypeVar("T")
 
 
 @dataclass
-class WrappedClass(SubClassSafeGeneric[T]):
+class WrappedClass(Generic[T], SubClassSafeGeneric):
     """A node wrapper around a Python class used in the class diagram graph."""
 
     index: Optional[int] = dataclass_field(init=False, default=None)

@@ -17,7 +17,7 @@ from typing_extensions import (
 
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.patterns.subclass_safe_generic import (
-    AbstractSubClassSafeGeneric,
+    SubClassSafeGeneric,
 )
 from krrood.utils import get_generic_type_params
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
@@ -62,7 +62,7 @@ class RobotPartMixin(ABC):
 @dataclass(eq=False)
 class HasFingers(
     Generic[TGenericThumb, Unpack[TGenericFingers]],
-    AbstractSubClassSafeGeneric,
+    SubClassSafeGeneric,
     RobotPartMixin,
     ABC,
 ):
@@ -100,7 +100,7 @@ class HasFingers(
 class HasTwoFingers(
     Generic[TGenericLeftFinger, TGenericRightFinger],
     HasFingers[TGenericLeftFinger, TGenericRightFinger],
-    AbstractSubClassSafeGeneric,
+    SubClassSafeGeneric,
     ABC,
 ):
     """
@@ -126,7 +126,7 @@ class HasTwoFingers(
 
 @dataclass(eq=False)
 class HasSensors(
-    Generic[Unpack[TGenericSensors]], AbstractSubClassSafeGeneric, RobotPartMixin, ABC
+    Generic[Unpack[TGenericSensors]], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
     """
     Mixin class for robots or robot parts that have sensors
@@ -145,7 +145,7 @@ class HasSensors(
 
 @dataclass(eq=False)
 class HasEndEffector(
-    Generic[TGenericEndEffector], AbstractSubClassSafeGeneric, RobotPartMixin, ABC
+    Generic[TGenericEndEffector], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
     """
     Mixin class for robots or robot parts that have an end effector as their direct child.
@@ -162,7 +162,7 @@ class HasEndEffector(
 
 @dataclass(eq=False)
 class HasArms(
-    Generic[Unpack[TGenericArms]], AbstractSubClassSafeGeneric, RobotPartMixin, ABC
+    Generic[Unpack[TGenericArms]], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
     """
     Mixin class for robots or robot parts that have arms as their direct children.
@@ -197,7 +197,7 @@ class HasOneArm(HasArms[TGenericArm], RobotPartMixin, ABC):
 @dataclass(eq=False)
 class HasLeftRightArm(
     HasArms[TGenericLeftArm, TGenericRightArm],
-    AbstractSubClassSafeGeneric,
+    SubClassSafeGeneric,
     RobotPartMixin,
     ABC,
 ):
@@ -250,7 +250,7 @@ class HasLeftRightArm(
 
 @dataclass(eq=False)
 class HasMobileBase(
-    Generic[TGenericMobileBase], AbstractSubClassSafeGeneric, RobotPartMixin, ABC
+    Generic[TGenericMobileBase], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
     """
     Mixin class for robots that have a mobile base.
@@ -267,7 +267,7 @@ class HasMobileBase(
 
 @dataclass(eq=False)
 class HasTorso(
-    Generic[TGenericTorso], AbstractSubClassSafeGeneric, RobotPartMixin, ABC
+    Generic[TGenericTorso], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
     """
     Mixin class for robots or robot parts that have a torso as their direct child.
@@ -283,7 +283,7 @@ class HasTorso(
 
 
 @dataclass(eq=False)
-class HasNeck(Generic[TGenericNeck], AbstractSubClassSafeGeneric, RobotPartMixin, ABC):
+class HasNeck(Generic[TGenericNeck], SubClassSafeGeneric, RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have a neck as their direct child.
     """

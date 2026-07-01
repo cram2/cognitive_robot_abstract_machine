@@ -34,6 +34,7 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Generic
 from krrood.singleton import SingletonMeta
 from krrood.utils import recursive_subclasses
 
@@ -67,7 +68,7 @@ TSymbol = TypeVar("TSymbol", bound=Symbol)
 
 
 @dataclass
-class PredicateClassRelation(SubClassSafeGeneric[TSymbol]):
+class PredicateClassRelation(Generic[TSymbol], SubClassSafeGeneric):
     """
     Edge data representing a predicate-based relation between two wrapped instances.
 
@@ -121,7 +122,7 @@ class PredicateClassRelation(SubClassSafeGeneric[TSymbol]):
 
 
 @dataclass
-class WrappedInstance(SubClassSafeGeneric[TSymbol]):
+class WrappedInstance(Generic[TSymbol], SubClassSafeGeneric):
     """
     A node wrapper around a concrete Symbol instance used in the instance graph.
     """

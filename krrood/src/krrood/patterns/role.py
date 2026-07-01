@@ -23,12 +23,13 @@ from krrood.patterns.exceptions import (
 )
 from krrood.patterns.role_registry import RoleRegistry
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Generic
 from krrood.symbol_graph.symbol_graph import Symbol
 from krrood.utils import get_generic_type_params
 
 
 @dataclass(eq=False)
-class Role(Symbol, SubClassSafeGeneric[T]):
+class Role(Symbol, Generic[T], SubClassSafeGeneric):
     """
     Base class for the Role design pattern.
 

@@ -20,6 +20,7 @@ from krrood.patterns.exceptions import DelegatedFactoryMethodError
 from krrood.patterns.role import Role
 from krrood.patterns.role_predicates import IsSameEntity
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Generic
 from ..dataset.role_and_ontology import (
     university_ontology_like_classes,
     university_ontology_like_classes_without_descriptors,
@@ -376,7 +377,7 @@ def test_wrapped_class_exposes_factory_methods():
 
 
 @dataclass
-class EntityAndType(SubClassSafeGeneric[T]):
+class EntityAndType(Generic[T], SubClassSafeGeneric):
     entity: T
     type: Type[T] = field(init=False)
 

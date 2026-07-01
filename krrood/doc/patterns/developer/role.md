@@ -49,7 +49,7 @@ The implementation centres on three collaborating components:
 
 **`Role[T]`** (`role.py`) is the base dataclass that every role class inherits. It provides
 identity-based equality/hashing (`__hash__`, `__eq__`), attribute delegation (`__getattr__`,
-`__setattr__`), and all querying class methods. It inherits from `SubClassSafeGeneric[T]` so that
+`__setattr__`), and all querying class methods. It inherits from `Generic[T], SubClassSafeGeneric` so that
 fields whose annotation uses the generic parameter are rewritten to the bound concrete type on each
 role subclass (keeping generic roles introspectable by the class diagram), and from `Symbol` so a
 role participates in the class diagram and ORM like any other entity. A role sets
@@ -168,8 +168,7 @@ the class diagram and the property descriptors.
 - `krrood/src/krrood/patterns/role_registry.py` — `RoleRegistry`
 - `krrood/src/krrood/patterns/exceptions.py` — `DelegatedFactoryMethodError`,
   `RoleAttributeNotDeclaredError`
-- `krrood/src/krrood/patterns/subclass_safe_generic.py` — `SubClassSafeGeneric`,
-  `AbstractSubClassSafeGeneric`
+- `krrood/src/krrood/patterns/subclass_safe_generic.py` — `SubClassSafeGeneric`
 - `krrood/src/krrood/symbol_graph/symbol_graph.py` — `Symbol`
 - `test/krrood_test/test_patterns/test_role.py` — behavioural tests for the role pattern
 - `test/krrood_test/dataset/role_and_ontology/university_ontology_like_classes_without_descriptors.py`

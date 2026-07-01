@@ -23,10 +23,7 @@ from typing_extensions import (
 )
 
 from krrood.entity_query_language.factories import variable_from
-from krrood.patterns.subclass_safe_generic import (
-    SubClassSafeGeneric,
-    AbstractSubClassSafeGeneric,
-)
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_params
 from ..dataset.classes_with_generic import (
     FirstGeneric,
@@ -59,14 +56,14 @@ def test_multi_generic_through_inheritance():
     U = TypeVar("U")
 
     @dataclass
-    class A(SubClassSafeGeneric[T]):
+    class A(Generic[T], SubClassSafeGeneric):
         a: T
 
     @dataclass
     class B(A[int]): ...
 
     @dataclass
-    class C(B, SubClassSafeGeneric[U]):
+    class C(B, Generic[U], SubClassSafeGeneric):
         b: U
 
     @dataclass
@@ -127,7 +124,7 @@ def assert_field_kwargs_are_preserved_when_resolving_generic_type(cls, kw_only=F
     assert get_origin(evaluated_type) is list
     assert (
         get_args(evaluated_type)[0]
-        is get_generic_type_params(cls, SubClassSafeGeneric)[0]
+        is get_generic_type_params(cls, FirstGeneric)[0]
     )
 
 
@@ -161,7 +158,7 @@ def test_resolve_two_generic_types_subclass_with_built_in_types():
 
 def _assert_generic_type_is_resolved(cls):
     resolved_hints = get_type_hints(cls, include_extras=True)
-    generic_type = get_generic_type_params(cls, SubClassSafeGeneric)[0]
+    generic_type = get_generic_type_params(cls, FirstGeneric)[0]
     assert (
         resolved_hints[variable_from(cls).attribute_using_generic._attribute_name_]
         is generic_type
@@ -205,7 +202,7 @@ def test_update_field_kwargs_finds_field_via_full_mro_not_only_nearest_ancestor(
     U_local = TypeVar("U_local")
 
     @dataclass
-    class _Inner(SubClassSafeGeneric[T_local]):
+    class _Inner(Generic[T_local], SubClassSafeGeneric):
         inner_items: list = dataclass_field(default_factory=list, kw_only=True)
 
     @dataclass
@@ -243,7 +240,7 @@ def test_subclass_safe_generic_type_resolution_failure_does_not_kill_class_defin
     T_local = TypeVar("T_local")
 
     @dataclass
-    class _Storage(SubClassSafeGeneric[T_local]):
+    class _Storage(Generic[T_local], SubClassSafeGeneric):
         items: list = dataclass_field(default_factory=list, kw_only=True)
         required: T_local = dataclass_field(kw_only=True)
 
@@ -278,7 +275,7 @@ def test_subclass_safe_generic_propagates_non_transient_resolution_errors():
     T_local = TypeVar("T_local")
 
     @dataclass
-    class _Storage(SubClassSafeGeneric[T_local]):
+    class _Storage(Generic[T_local], SubClassSafeGeneric):
         required: T_local = dataclass_field(kw_only=True)
 
     target = (
@@ -301,7 +298,7 @@ def test_subclass_safe_generic_flags_a_lost_concrete_binding():
     T_local = TypeVar("T_local")
 
     assert (
-        AbstractSubClassSafeGeneric._concrete_binding_was_lost({T_local: int}) is True
+        SubClassSafeGeneric._concrete_binding_was_lost({T_local: int}) is True
     )
 
 
@@ -313,10 +310,10 @@ def test_subclass_safe_generic_does_not_flag_a_typevar_only_rename():
     Renamed = TypeVar("Renamed")
 
     assert (
-        AbstractSubClassSafeGeneric._concrete_binding_was_lost({T_local: Renamed})
+        SubClassSafeGeneric._concrete_binding_was_lost({T_local: Renamed})
         is False
     )
-    assert AbstractSubClassSafeGeneric._concrete_binding_was_lost({}) is False
+    assert SubClassSafeGeneric._concrete_binding_was_lost({}) is False
 
 
 def test_subclass_safe_generic_inherited_default_factory_survives_type_update():
@@ -330,7 +327,7 @@ def test_subclass_safe_generic_inherited_default_factory_survives_type_update():
     T_local = TypeVar("T_local")
 
     @dataclass
-    class _Container(SubClassSafeGeneric[T_local]):
+    class _Container(Generic[T_local], SubClassSafeGeneric):
         objects: list = dataclass_field(default_factory=list, kw_only=True)
         key: T_local = dataclass_field(kw_only=True)
 
@@ -392,7 +389,7 @@ def test_multiple_generic_parameters_specialization():
     """
 
     @dataclass
-    class MultiBase(Generic[T, T2], AbstractSubClassSafeGeneric):
+    class MultiBase(Generic[T, T2], SubClassSafeGeneric):
         attr1: T
         attr2: T2
 
@@ -415,7 +412,7 @@ def test_deep_inheritance_substitution():
     """
 
     @dataclass
-    class Base(Generic[T], AbstractSubClassSafeGeneric):
+    class Base(Generic[T], SubClassSafeGeneric):
         attr: T
 
     @dataclass
@@ -437,7 +434,7 @@ def test_transitive_resolution_complex():
     """
 
     @dataclass
-    class Base(Generic[T], AbstractSubClassSafeGeneric):
+    class Base(Generic[T], SubClassSafeGeneric):
         attr: List[T]
 
     @dataclass
@@ -463,11 +460,11 @@ def test_multiple_generic_bases_map_failure():
     from krrood.utils import ensure_hashable
 
     @dataclass
-    class Base1(Generic[T, T2], AbstractSubClassSafeGeneric):
+    class Base1(Generic[T, T2], SubClassSafeGeneric):
         pass
 
     @dataclass
-    class Base2(Generic[V], AbstractSubClassSafeGeneric):
+    class Base2(Generic[V], SubClassSafeGeneric):
         pass
 
     @dataclass
@@ -499,7 +496,7 @@ def test_transitive_map_failure():
     """
 
     @dataclass
-    class Base(Generic[T], AbstractSubClassSafeGeneric):
+    class Base(Generic[T], SubClassSafeGeneric):
         pass
 
     @dataclass
@@ -534,7 +531,7 @@ def test_complex_type_resolution(type_hint, expected_resolved):
     """
 
     @dataclass
-    class Base(Generic[T, U, V], AbstractSubClassSafeGeneric):
+    class Base(Generic[T, U, V], SubClassSafeGeneric):
         attribute: type_hint
 
     @dataclass
@@ -554,7 +551,7 @@ def test_circular_reference_resolution():
 
     # Direct cycle: T -> U, U -> T
     substitutions = {T_local: U_local, U_local: T_local}
-    resolved = AbstractSubClassSafeGeneric._resolve_substitutions_transitively(
+    resolved = SubClassSafeGeneric._resolve_substitutions_transitively(
         substitutions
     )
     assert resolved[T_local] in {T_local, U_local}
@@ -562,7 +559,7 @@ def test_circular_reference_resolution():
 
     # Indirect cycle: T -> List[U], U -> T
     substitutions = {T_local: List[U_local], U_local: T_local}
-    resolved = AbstractSubClassSafeGeneric._resolve_substitutions_transitively(
+    resolved = SubClassSafeGeneric._resolve_substitutions_transitively(
         substitutions
     )
     assert resolved[T_local] is not None
@@ -578,7 +575,7 @@ def test_typevartuple_basic_substitution():
     """
 
     @dataclass
-    class Base(Generic[Unpack[Ts]], AbstractSubClassSafeGeneric):
+    class Base(Generic[Unpack[Ts]], SubClassSafeGeneric):
         attribute: Tuple[Unpack[Ts]]
 
     @dataclass
@@ -595,7 +592,7 @@ def test_typevartuple_mixed_with_typevar():
     """
 
     @dataclass
-    class Base(Generic[T, Unpack[Ts]], AbstractSubClassSafeGeneric):
+    class Base(Generic[T, Unpack[Ts]], SubClassSafeGeneric):
         attribute: Tuple[T, Unpack[Ts]]
 
     @dataclass
@@ -612,7 +609,7 @@ def test_typevartuple_multiple_subclasses():
     """
 
     @dataclass
-    class Base(Generic[Unpack[Ts]], AbstractSubClassSafeGeneric):
+    class Base(Generic[Unpack[Ts]], SubClassSafeGeneric):
         attribute: Tuple[Unpack[Ts]]
 
     @dataclass
@@ -634,7 +631,7 @@ def test_typevartuple_unpack_in_different_positions():
     """
 
     @dataclass
-    class Base(Generic[Unpack[Ts]], AbstractSubClassSafeGeneric):
+    class Base(Generic[Unpack[Ts]], SubClassSafeGeneric):
         attribute: Tuple[int, Unpack[Ts], float]
 
     @dataclass
@@ -652,7 +649,7 @@ def test_typevartuple_at_start():
     """
 
     @dataclass
-    class Base(Generic[Unpack[Ts], T], AbstractSubClassSafeGeneric):
+    class Base(Generic[Unpack[Ts], T], SubClassSafeGeneric):
         first: Tuple[Unpack[Ts]]
         last: T
 
@@ -671,7 +668,7 @@ def test_typevartuple_in_middle():
     """
 
     @dataclass
-    class Base(Generic[T, Unpack[Ts], U], AbstractSubClassSafeGeneric):
+    class Base(Generic[T, Unpack[Ts], U], SubClassSafeGeneric):
         first: T
         middle: Tuple[Unpack[Ts]]
         last: U
@@ -692,7 +689,7 @@ def test_typevartuple_empty_middle():
     """
 
     @dataclass
-    class Base(Generic[T, Unpack[Ts], U], AbstractSubClassSafeGeneric):
+    class Base(Generic[T, Unpack[Ts], U], SubClassSafeGeneric):
         first: T
         middle: Tuple[Unpack[Ts]]
         last: U
@@ -713,7 +710,7 @@ def test_typevartuple_multiple_usage_in_fields():
     """
 
     @dataclass
-    class Base(Generic[Unpack[Ts]], AbstractSubClassSafeGeneric):
+    class Base(Generic[Unpack[Ts]], SubClassSafeGeneric):
         first: Tuple[Unpack[Ts]]
         second: List[Tuple[Unpack[Ts]]]
 

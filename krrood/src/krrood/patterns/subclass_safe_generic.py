@@ -3,12 +3,10 @@ from __future__ import annotations
 from abc import ABC
 from copy import copy
 from dataclasses import dataclass, Field
-from functools import lru_cache
 from inspect import isclass
 from typing import Tuple
 
 from typing_extensions import (
-    Generic,
     TypeVar,
     Type,
     Optional,
@@ -30,7 +28,6 @@ from krrood.class_diagrams.utils import (
 from krrood.exceptions import MismatchingNumberOfGenericParametersAndResolvedTypes
 from krrood.utils import (
     get_generic_type_params,
-    T,
     ensure_hashable,
     get_existing_field_by_name,
 )
@@ -58,23 +55,31 @@ ResolvableType: TypeAlias = (
 
 
 @dataclass
-class AbstractSubClassSafeGeneric(ABC):
+class SubClassSafeGeneric(ABC):
     """
     Generic-agnostic engine that updates field types when a subclass binds the generic type
     parameters of its generic base to concrete types. It resolves every parameter (multiple
     ``TypeVar`` s and ``TypeVarTuple`` s) across the whole inheritance chain.
 
-    Inherit this directly when the class declares its **own** ``Generic[...]`` — including multiple
-    parameters (``Generic[T, T2]``) or a ``TypeVarTuple`` (``Generic[Unpack[Ts]]``). Put
-    ``Generic[...]`` before ``AbstractSubClassSafeGeneric`` in the bases.
+    A class that wants safe subclassing declares its **own** ``Generic[...]`` and inherits this
+    class alongside it — for a single parameter (``Generic[T]``), multiple parameters
+    (``Generic[T, T2]``), or a ``TypeVarTuple`` (``Generic[Unpack[Ts]]``). Put ``Generic[...]``
+    before ``SubClassSafeGeneric`` in the bases.
+
+    Example:
+        >>> T = TypeVar("T")
+        >>> @dataclass
+        ... class MyClass(Generic[T], SubClassSafeGeneric):
+        ...     my_attribute: T
+        >>>
+        >>> @dataclass
+        ... class MyClass2(MyClass[int]): ...
+        >>> assert next(f for f in fields(MyClass2) if f.name == "my_attribute").type is int
 
     ..note::
-        This class is intentionally **not** ``Generic`` and is kept separate from
-        :class:`SubClassSafeGeneric`, which *is* ``Generic[T]``. The two cannot be merged: a class
-        that supplies its own ``Generic[Unpack[Ts]]`` cannot also inherit a ``Generic[T]`` base
-        without raising ``TypeError: Cannot create a consistent MRO``. So
-        ``SubClassSafeGeneric[T]`` serves the common single-parameter case, while this class serves
-        every other generic shape.
+        This class is intentionally **not** ``Generic`` itself; it only carries the field-updating
+        engine. The parameterization always comes from the subclass's own ``Generic[...]`` base, so
+        one class serves every generic shape.
     """
 
     def __init_subclass__(cls, **kwargs):
@@ -178,8 +183,8 @@ class AbstractSubClassSafeGeneric(ABC):
         :return: A mapping from each old generic type (as declared on the parent class) to the
             new generic type used by this class, for every position whose binding changed.
         """
-        if cls is AbstractSubClassSafeGeneric or not issubclass(
-            cls, AbstractSubClassSafeGeneric
+        if cls is SubClassSafeGeneric or not issubclass(
+            cls, SubClassSafeGeneric
         ):
             return {}
 
@@ -192,7 +197,7 @@ class AbstractSubClassSafeGeneric(ABC):
         for base in getattr(cls, "__orig_bases__", []):
             base_origin, resolved_types = cls._resolve_base_origin_and_arguments(base)
             if base_origin is None or not issubclass(
-                base_origin, AbstractSubClassSafeGeneric
+                base_origin, SubClassSafeGeneric
             ):
                 continue
 
@@ -228,7 +233,7 @@ class AbstractSubClassSafeGeneric(ABC):
         """
         root_parameters = get_generic_type_params(
             base_origin,
-            AbstractSubClassSafeGeneric,
+            SubClassSafeGeneric,
             include_root_generic_base=True,
             include_specialized_generic_base=False,
         )
@@ -424,46 +429,12 @@ class AbstractSubClassSafeGeneric(ABC):
         """
         origin = get_origin(base)
         if origin is None:
-            if isclass(base) and issubclass(base, AbstractSubClassSafeGeneric):
+            if isclass(base) and issubclass(base, SubClassSafeGeneric):
                 return base, ()
             return None, ()
 
         # Ensure origin is a class before calling issubclass
-        if isclass(origin) and issubclass(origin, AbstractSubClassSafeGeneric):
+        if isclass(origin) and issubclass(origin, SubClassSafeGeneric):
             return origin, get_args(base)
 
         return None, ()
-
-
-@dataclass
-class SubClassSafeGeneric(Generic[T], AbstractSubClassSafeGeneric):
-    """
-    A generic class that can be subclassed safely because it automatically updates the field types that use the generic
-     type with the new specified type.
-     Example:
-         >>> T = TypeVar("T")
-         >>> @dataclass
-         >>> class MyClass(SubClassSafeGeneric[T]):
-         >>>     my_attribute: T
-         >>>
-         >>> @dataclass
-         >>> class MyClass2(SubClassSafeGeneric[int]): ...
-         >>> assert next(f for f in fields(MyClass2) if f.name == "my_attribute").type == int)
-
-    This is the ``Generic[T]`` convenience for the common single-parameter case; the field-type
-    updating itself is performed by :class:`AbstractSubClassSafeGeneric`. For multiple parameters or
-    a ``TypeVarTuple``, inherit :class:`AbstractSubClassSafeGeneric` directly alongside your own
-    ``Generic[...]`` — the two classes cannot be merged because a class supplying its own
-    ``Generic[Unpack[Ts]]`` cannot also inherit this ``Generic[T]`` base (it would break the MRO).
-    """
-
-    @classmethod
-    @lru_cache
-    def get_generic_type(cls) -> Optional[Type[T]]:
-        """
-        :return: The type that is currently bound to the generic type parameter T for this class, or None if T is not bound.
-        """
-        generic_types = get_generic_type_params(cls, SubClassSafeGeneric)
-        if not generic_types:
-            return None
-        return generic_types[0]
