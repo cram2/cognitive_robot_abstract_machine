@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import numpy as np
 import pytest
 from copy import deepcopy
 from importlib.resources import files
@@ -39,6 +40,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
+    LiquidConnection,
     RevoluteConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -65,6 +67,7 @@ _JEROEN_CUP_SCALE = Scale(1, 1, 1)
 _TABLE_SURFACE_Z = 0.9
 _POURING_TARGET_FREQUENCY = 80
 _POURING_PREDICTION_HORIZON = 120
+_DEFAULT_PERCEPTION_HZ: int = 10
 
 
 def _pouring_context(world: World) -> MotionStatechartContext:
@@ -168,6 +171,155 @@ def tracy_pouring_world(tracy_world):
         )
 
     return world, tracy
+
+
+@pytest.fixture(scope="function")
+def tracy_transfer_world(tracy_pouring_world):
+    """
+    World with a source cup attached to Tracy's left gripper and a receiving cup on the table,
+    pre-coupled for liquid transfer.
+
+    Extends :func:`tracy_pouring_world` by positioning the left gripper upright, attaching a
+    source cup via a fixed connection, placing a receiving cup on the table, and coupling them
+    with :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasFillLevel.receive_outflow_from`.
+
+    :returns: ``(world, source_cup, receiving_cup, left_tool_frame)``
+    """
+    world, _tracy = tracy_pouring_world
+    left_tool_frame = world.get_body_by_name("l_gripper_tool_frame")
+
+    upright_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=1,
+        pos_y=0.2,
+        pos_z=_TABLE_SURFACE_Z + 0.3,
+        quat_z=0.5,
+        quat_x=0.5,
+        quat_y=0.5,
+        quat_w=0.5,
+        reference_frame=world.root,
+    ).to_pose()
+
+    msc_cartesian = MotionStatechart()
+    cartesian_task = CartesianPose(
+        root_link=world.root, tip_link=left_tool_frame, goal_pose=upright_pose
+    )
+    msc_cartesian.add_node(cartesian_task)
+    msc_cartesian.add_node(EndMotion.when_true(cartesian_task))
+    cartesian_executor = Executor(
+        MotionStatechartContext(world=world),
+        pacer=SimulationPacer(real_time_factor=1),
+    )
+    cartesian_executor.compile(motion_statechart=msc_cartesian)
+    cartesian_executor.tick_until_end(timeout=1000)
+
+    source_cup_body = _spawn_jeroen_cup_body("source_cup")
+    with world.modify_world():
+        world.add_body(source_cup_body)
+        world.add_connection(
+            FixedConnection.create_with_dofs(
+                world=world,
+                parent=left_tool_frame,
+                child=source_cup_body,
+                name=PrefixedName("l_gripper_T_source_cup"),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    roll=-math.pi / 2.0, y=-0.0
+                ),
+            )
+        )
+    source_cup = PourableContainer(
+        name=PrefixedName("source_cup"), root=source_cup_body
+    )
+    with world.modify_world():
+        world.add_semantic_annotation(source_cup)
+    source_cup.initialize_fill_level(
+        world=world, initial_fill=1.0, outflow_rate_constant=1.0
+    )
+
+    receiving_cup_body = _spawn_jeroen_cup_body("receiving_cup")
+    with world.modify_world():
+        world.add_body(receiving_cup_body)
+        world.add_connection(
+            Connection6DoF.create_with_dofs(
+                world,
+                world.root,
+                receiving_cup_body,
+                name=PrefixedName("table_T_receiving_cup"),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    1.0, 0.1, _TABLE_SURFACE_Z
+                ),
+            )
+        )
+    receiving_cup = PourableContainer(
+        name=PrefixedName("receiving_cup"), root=receiving_cup_body
+    )
+    with world.modify_world():
+        world.add_semantic_annotation(receiving_cup)
+    receiving_cup.initialize_fill_level(
+        world=world, initial_fill=0.0, outflow_rate_constant=1.0
+    )
+
+    receiving_cup.receive_outflow_from(source=source_cup, world=world)
+
+    left_wrist_joint = world.get_connection_by_name("left_wrist_3_joint")
+    world.set_positions_1DOF_connection(
+        {left_wrist_joint: left_wrist_joint.position + 0.1}
+    )
+
+    return world, source_cup, receiving_cup, left_tool_frame
+
+
+def _tick_with_perception_correction(
+    executor: Executor,
+    world: "World",
+    fill_connection: LiquidConnection,
+    sigma: float,
+    perception_hz: float,
+    rng: np.random.Generator,
+    timeout: int = 4000,
+) -> None:
+    """
+    Run the executor tick loop, injecting a noisy fill-level measurement at ``perception_hz``.
+
+    After each tick the ODE has already advanced the fill level via
+    :meth:`~semantic_digital_twin.world.World.step_physics`.  When the current tick index
+    aligns with the perception period the ODE-integrated value is replaced by the true fill
+    plus additive Gaussian noise, making it the QP's linearization point on the next tick.
+    This models a perception pipeline that corrects the controller's fill-level belief at a
+    rate lower than the control frequency.
+
+    Cleanup (zero velocities/accelerations/jerks, node and context teardown) mirrors
+    :meth:`~giskardpy.executor.Executor.tick_until_end`.
+
+    :param executor: The executor driving the motion statechart.
+    :param world: The world whose fill state is corrected by perception.
+    :param fill_connection: The receiver's fill DOF to update on each perception tick.
+    :param sigma: Standard deviation of additive Gaussian noise on the fill measurement.
+    :param perception_hz: Frequency at which perception measurements arrive, in Hz.
+    :param rng: Random number generator for reproducible noise sequences.
+    :param timeout: Maximum number of control ticks before raising ``TimeoutError``.
+    """
+    control_hz = executor.context.qp_controller_config.target_frequency
+    ticks_per_perception = max(1, round(control_hz / perception_hz))
+    try:
+        for tick_index in range(timeout):
+            executor.tick()
+            if tick_index % ticks_per_perception == 0:
+                true_fill = float(fill_connection.position)
+                noisy_fill = float(
+                    np.clip(true_fill + rng.normal(0.0, sigma), 0.0, 1.0)
+                )
+                world.set_positions_1DOF_connection({fill_connection: noisy_fill})
+            executor.pacer.sleep()
+            if executor.motion_statechart.is_end_motion():
+                return
+        raise TimeoutError("Timeout reached while waiting for end of motion.")
+    finally:
+        state = executor.context.world.state
+        state.velocities[:] = 0
+        state.accelerations[:] = 0
+        state.jerks[:] = 0
+        executor.motion_statechart.cleanup_nodes(context=executor.context)
+        executor.context.cleanup()
 
 
 class TestPouringTask:
@@ -492,7 +644,7 @@ class TestTracyLiquidTransfer:
     """
 
     def test_tracy_liquid_transfer_fills_receiver(
-        self, tracy_pouring_world, rclpy_node
+        self, tracy_transfer_world, rclpy_node
     ):
         """
         Commanding a fill-level goal on the receiving cup makes the optimizer tilt the
@@ -507,87 +659,8 @@ class TestTracyLiquidTransfer:
             KeepSourceAboveReceiver,
         )
 
-        world, tracy = tracy_pouring_world
+        world, source_cup, receiving_cup, left_tool_frame = tracy_transfer_world
         VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
-        left_tool_frame = world.get_body_by_name("l_gripper_tool_frame")
-
-        upright_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
-            pos_x=1,
-            pos_y=0.2,
-            pos_z=_TABLE_SURFACE_Z + 0.3,
-            quat_z=0.5,
-            quat_x=0.5,
-            quat_y=0.5,
-            quat_w=0.5,
-            reference_frame=world.root,
-        ).to_pose()
-
-        msc_cartesian = MotionStatechart()
-        cartesian_task = CartesianPose(
-            root_link=world.root, tip_link=left_tool_frame, goal_pose=upright_pose
-        )
-        msc_cartesian.add_node(cartesian_task)
-        msc_cartesian.add_node(EndMotion.when_true(cartesian_task))
-
-        cartesian_executor = Executor(
-            MotionStatechartContext(world=world),
-            pacer=SimulationPacer(real_time_factor=1),
-        )
-        cartesian_executor.compile(motion_statechart=msc_cartesian)
-        cartesian_executor.tick_until_end(timeout=1000)
-
-        source_cup_body = _spawn_jeroen_cup_body("source_cup")
-        with world.modify_world():
-            world.add_body(source_cup_body)
-            world.add_connection(
-                FixedConnection.create_with_dofs(
-                    world=world,
-                    parent=left_tool_frame,
-                    child=source_cup_body,
-                    name=PrefixedName("l_gripper_T_source_cup"),
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                        roll=-math.pi / 2.0, y=-0.0
-                    ),
-                )
-            )
-        source_cup = PourableContainer(
-            name=PrefixedName("source_cup"), root=source_cup_body
-        )
-        with world.modify_world():
-            world.add_semantic_annotation(source_cup)
-        source_cup.initialize_fill_level(
-            world=world, initial_fill=1.0, outflow_rate_constant=1.0
-        )
-
-        receiving_cup_body = _spawn_jeroen_cup_body("receiving_cup")
-        with world.modify_world():
-            world.add_body(receiving_cup_body)
-            world.add_connection(
-                Connection6DoF.create_with_dofs(
-                    world,
-                    world.root,
-                    receiving_cup_body,
-                    name=PrefixedName("table_T_receiving_cup"),
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                        1.0, 0.1, _TABLE_SURFACE_Z
-                    ),
-                )
-            )
-        receiving_cup = PourableContainer(
-            name=PrefixedName("receiving_cup"), root=receiving_cup_body
-        )
-        with world.modify_world():
-            world.add_semantic_annotation(receiving_cup)
-        receiving_cup.initialize_fill_level(
-            world=world, initial_fill=0.0, outflow_rate_constant=1.0
-        )
-
-        receiving_cup.receive_outflow_from(source=source_cup, world=world)
-
-        left_wrist_joint = world.get_connection_by_name("left_wrist_3_joint")
-        world.set_positions_1DOF_connection(
-            {left_wrist_joint: left_wrist_joint.position + 0.1}
-        )
 
         assert receiving_cup.fill_level == pytest.approx(0.0)
         assert source_cup.fill_level == pytest.approx(1.0)
@@ -635,11 +708,11 @@ class TestTracyLiquidTransfer:
                     transfer_task.inflow_equation.source_tilt_expression.evaluate()[0]
                 )
             )
-            source_z = world.compute_forward_kinematics_np(world.root, source_cup_body)[
+            source_z = world.compute_forward_kinematics_np(world.root, source_cup.root)[
                 2, 3
             ]
             receiver_z = world.compute_forward_kinematics_np(
-                world.root, receiving_cup_body
+                world.root, receiving_cup.root
             )[2, 3]
             clearance_history.append(float(source_z - receiver_z))
             return original_on_tick(context)
@@ -681,4 +754,123 @@ class TestTracyLiquidTransfer:
         assert min(clearance_history) > 0.0, (
             "the source cup dropped to or below the receiver during the pour: "
             f"minimum clearance was {min(clearance_history):.3f}"
+        )
+
+
+class TestPerceptionCorrectedTransfer:
+    """
+    Stability of :class:`~giskardpy.motion_statechart.tasks.pouring.FillByTransferTask`
+    under noisy fill-level perception at a rate lower than the control loop.
+
+    Models the real-world scenario in which a perception pipeline (e.g., RoboKudo) supplies
+    fill-level estimates at ``perception_hz`` while the controller runs at
+    :data:`_POURING_TARGET_FREQUENCY`.  After each perception tick the receiver's ODE-integrated
+    fill level is replaced by the true value plus additive Gaussian noise, so the QP linearizes
+    at the (possibly inaccurate) corrected belief.
+
+    Parametrized over noise standard deviation ``sigma`` and ``perception_hz`` so the stability
+    boundary can be explored as both dimensions vary independently.
+    """
+
+    @pytest.mark.parametrize(
+        "sigma,perception_hz",
+        [
+            (0.0, _DEFAULT_PERCEPTION_HZ),
+            (0.01, _DEFAULT_PERCEPTION_HZ),
+            (0.02, _DEFAULT_PERCEPTION_HZ),
+            (0.05, _DEFAULT_PERCEPTION_HZ),
+            (0.01, 20),
+            (0.01, 30),
+        ],
+        ids=[
+            "sigma=0.00_10Hz",
+            "sigma=0.01_10Hz",
+            "sigma=0.02_10Hz",
+            "sigma=0.05_10Hz",
+            "sigma=0.01_20Hz",
+            "sigma=0.01_30Hz",
+        ],
+    )
+    def test_convergence_under_perception_noise(
+        self,
+        tracy_transfer_world,
+        rclpy_node,
+        sigma: float,
+        perception_hz: float,
+    ) -> None:
+        """
+        Verifies that the transfer task converges to the fill-level goal when the receiver's
+        fill level is observed with Gaussian noise at a sub-control-rate frequency.
+
+        Perception updates arrive at ``perception_hz`` and overwrite the ODE-integrated fill
+        belief; between updates the ODE integrates freely from the last corrected value.  The
+        task terminates only once the perceived fill level reaches the goal within
+        ``fill_level_tolerance``, so a noise-adjusted bound is used for the final assertion.
+
+        :param sigma: Standard deviation of additive Gaussian noise on the fill measurement.
+        :param perception_hz: Rate of perception updates in Hz.
+        """
+        from giskardpy.motion_statechart.tasks.pouring import (
+            FillByTransferTask,
+            KeepProjectileInReceiver,
+            KeepSourceAboveReceiver,
+        )
+
+        world, source_cup, receiving_cup, left_tool_frame = tracy_transfer_world
+        VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+
+        goal_fill = 0.7
+        tolerance = 0.01
+
+        transfer_task = FillByTransferTask(
+            receiver=receiving_cup,
+            goal_value=goal_fill,
+            fill_level_tolerance=tolerance,
+            reference_velocity=0.03,
+        )
+        no_spill = KeepProjectileInReceiver(receiver=receiving_cup, source=source_cup)
+        keep_above = KeepSourceAboveReceiver(
+            source=source_cup,
+            receiver=receiving_cup,
+            minimum_clearance=0.05,
+        )
+        keep_plane = AlignPlanes(
+            root_link=world.root,
+            tip_link=left_tool_frame,
+            goal_normal=Vector3.X(reference_frame=world.root),
+            tip_normal=Vector3.Z(reference_frame=left_tool_frame),
+        )
+        motion = Parallel([transfer_task, no_spill, keep_above, keep_plane])
+        msc_transfer = MotionStatechart()
+        msc_transfer.add_node(motion)
+        msc_transfer.add_node(EndMotion.when_true(motion))
+
+        transfer_executor = Executor(
+            _pouring_context(world),
+            pacer=SimulationPacer(real_time_factor=1),
+        )
+        transfer_executor.compile(motion_statechart=msc_transfer)
+
+        _tick_with_perception_correction(
+            executor=transfer_executor,
+            world=world,
+            fill_connection=receiving_cup.fill_connection,
+            sigma=sigma,
+            perception_hz=perception_hz,
+            rng=np.random.default_rng(seed=42),
+        )
+
+        assert transfer_task.observation_state == ObservationStateValues.TRUE, (
+            f"Transfer task did not converge "
+            f"(sigma={sigma}, perception_hz={perception_hz} Hz)"
+        )
+        source_loss = 1.0 - float(source_cup.fill_level)
+        assert source_loss > tolerance, "source cup never poured"
+        # The task terminates once the *perceived* fill ≥ goal_fill − tolerance.
+        # Noise can shift the perceived value by up to ~sigma relative to the true fill,
+        # so the post-termination assertion is relaxed by a 2-sigma headroom.
+        noise_headroom = 2.0 * sigma
+        assert receiving_cup.fill_level >= goal_fill - tolerance - noise_headroom, (
+            f"receiver fill {receiving_cup.fill_level:.3f} too far below goal {goal_fill} "
+            f"(sigma={sigma}, perception_hz={perception_hz} Hz)"
         )
