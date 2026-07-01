@@ -81,20 +81,6 @@ jobs:
           uv sync --extra doc --active --inexact
           uv pip install pygraphviz
 
-      - name: Strip exercise-tagged cells (semantic_digital_twin only)
-        if: ${{ inputs.lib == 'semantic_digital_twin' }}
-        run: |
-          cd $GITHUB_WORKSPACE/semantic_digital_twin/doc/self_assessment/exercises
-          source /opt/ros/cram-env/bin/activate
-          find . -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
-            ipynb="${f%.md}.ipynb"
-            jupytext --from md:myst --to ipynb "$f" -o "$ipynb"
-            jupyter nbconvert --config $GITHUB_WORKSPACE/semantic_digital_twin/scripts/configs/nb_remove_exercises.json \
-              --to notebook --inplace \
-              "$ipynb"
-            jupytext --to md:myst "$ipynb" -o "$f"
-            rm -f "$ipynb"
-          done
 
       - name: Build the book (Non-container)
         if: ${{ !inputs.use_container }}
