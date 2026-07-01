@@ -551,11 +551,11 @@ def test_semantic_annotation_modifications_merge_world(rclpy_node):
 
     with w0.modify_world():
         door = Door.create_with_new_body_in_world(
-            name=PrefixedName("door"),
+            name="door",
             world=w0,
         )
         handle = Handle.create_with_new_body_in_world(
-            name=PrefixedName("handle"),
+            name="handle",
             world=w0,
         )
         door.add(handle)
@@ -901,12 +901,12 @@ def test_attribute_updates(rclpy_node):
     time.sleep(1)
     with world1.modify_world():
         fridge = Fridge.create_with_new_body_in_world(
-            name=PrefixedName("case"),
+            name="case",
             world=world1,
             scale=Scale(1, 1, 2.0),
         )
         door = Door.create_with_new_body_in_world(
-            name=PrefixedName("left_door"),
+            name="left_door",
             world=world1,
         )
     time.sleep(1)
@@ -1096,7 +1096,7 @@ def test_skipping_incorrect_message(rclpy_node):
 
     synchronizer_1.apply_missed_messages()
     with w1.modify_world():
-        handle = Handle.create_with_new_body_in_world(PrefixedName("handle"), w1)
+        handle = Handle.create_with_new_body_in_world("handle", w1)
 
     time.sleep(1)
     assert len(w1.kinematic_structure_entities) == len(w2.kinematic_structure_entities)
@@ -1132,16 +1132,16 @@ def test_world_simultaneous_synchronization_stress_test(
     with w1.modify_world():
         # Create handles before nested context
         for _ in range(before_w2):
-            Handle.create_with_new_body_in_world(PrefixedName("handle"), w1)
+            Handle.create_with_new_body_in_world("handle", w1)
 
         # Nested w2 context
         with w2.modify_world():
             for _ in range(in_w2):
-                Handle.create_with_new_body_in_world(PrefixedName("handle2"), w2)
+                Handle.create_with_new_body_in_world("handle2", w2)
 
         # Create handles after nested context
         for _ in range(after_w2):
-            Handle.create_with_new_body_in_world(PrefixedName("handle"), w1)
+            Handle.create_with_new_body_in_world("handle", w1)
 
     w1_ids, w2_ids = wait_for_sync_kse_and_return_ids(w1, w2)
     assert len(w1.kinematic_structure_entities) == len(w2.kinematic_structure_entities)
@@ -1174,20 +1174,20 @@ def test_nested_modify_world_publish_changes_true_false(rclpy_node):
 
     with pytest.raises(BrokenWorldModificationHistoryError):
         with w1.modify_world():
-            handle = Handle.create_with_new_body_in_world(PrefixedName("handle"), w1)
+            handle = Handle.create_with_new_body_in_world("handle", w1)
 
             with w1.modify_world(publish_changes=False):
                 handle = Handle.create_with_new_body_in_world(
-                    PrefixedName("handle"), w1
+                    "handle", w1
                 )
 
     with pytest.raises(MismatchingPublishChangesAttribute):
         with w1.modify_world(publish_changes=False):
-            handle = Handle.create_with_new_body_in_world(PrefixedName("handle"), w1)
+            handle = Handle.create_with_new_body_in_world("handle", w1)
 
             with w1.modify_world(publish_changes=True):
                 handle = Handle.create_with_new_body_in_world(
-                    PrefixedName("handle"), w1
+                    "handle", w1
                 )
 
     synchronizer_1.close()
@@ -1591,17 +1591,17 @@ def test_bidirectional_nested_modify_worlds_no_deadlock(rclpy_node):
     def a():
         for _ in range(5):
             with w1.modify_world():
-                Handle.create_with_new_body_in_world(PrefixedName("h1"), w1)
+                Handle.create_with_new_body_in_world("h1", w1)
                 with w2.modify_world():
-                    Handle.create_with_new_body_in_world(PrefixedName("h2"), w2)
+                    Handle.create_with_new_body_in_world("h2", w2)
 
     # Thread B: w2 -> w1 nested (reverse order)
     def b():
         for _ in range(5):
             with w2.modify_world():
-                Handle.create_with_new_body_in_world(PrefixedName("g2"), w2)
+                Handle.create_with_new_body_in_world("g2", w2)
                 with w1.modify_world():
-                    Handle.create_with_new_body_in_world(PrefixedName("g1"), w1)
+                    Handle.create_with_new_body_in_world("g1", w1)
 
     t1 = threading.Thread(target=a, daemon=True)
     t2 = threading.Thread(target=b, daemon=True)
@@ -2320,7 +2320,7 @@ def test_bidirectional_synchronous_publish_does_not_stall(rclpy_node):
         def worker(world, suffix, done_event):
             with world.modify_world():
                 Handle.create_with_new_body_in_world(
-                    name=PrefixedName(f"h_{suffix}"), world=world
+                    name=f"h_{suffix}", world=world
                 )
             done_event.set()
 

@@ -23,6 +23,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
+from semantic_digital_twin.exceptions import MissingConnectionAxisError
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
@@ -71,6 +72,7 @@ class FixedConnection(Connection):
             HomogeneousTransformationMatrix
         ] = None,
         connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
+        **kwargs,
     ) -> Self:
         return cls(
             parent=parent,
@@ -189,6 +191,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         offset: float = 0.0,
         dof_limits: Optional[DegreeOfFreedomLimits] = None,
         axis: Vector3 | None = None,
+        **kwargs,
     ) -> Self:
         """
         Creates and returns an instance of the class with its single degree of freedom, initializing a
@@ -208,6 +211,8 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         :return: An instance of the class representing the defined relationship with
                  its DOF added to the world.
         """
+        if axis is None:
+            raise MissingConnectionAxisError(connection_type_name=cls.__name__)
         name = name or cls._generate_default_name(parent=parent, child=child)
         dof = DegreeOfFreedom(name=PrefixedName("dof", str(name)), limits=dof_limits)
         world.add_degree_of_freedom(dof)
@@ -459,10 +464,13 @@ class Connection6DoF(Connection):
             HomogeneousTransformationMatrix
         ] = None,
         connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
+        **kwargs,
     ) -> Self:
         """
         Creates an instance of the class with automatically generated degrees of freedom (DoFs)
         for the provided parent and child kinematic entities within the specified world.
+
+        The additional kwargs parameters are accepted for interface consistency with other connections and ignored here.
 
         This method initializes and adds the required degrees of freedom to the world,
         and sets their properties accordingly. It generates a name for the connection if
@@ -679,11 +687,14 @@ class OmniDrive(WheeledDrive):
         connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
         translation_velocity_limits: float = 0.6,
         rotation_velocity_limits: float = 0.5,
+        **kwargs,
     ) -> Self:
         """
         Creates an instance of the class with automatically generated degrees of freedom
         (DOFs) for translation on the x and y axes, rotation along roll, pitch, and yaw
         axes, and velocity limits for translation and rotation.
+
+        The additional kwargs parameters are accepted for interface consistency with other connections and ignored here.
 
         This method modifies the provided world to add all required degrees of freedom
         and their limits, based on the provided settings. Names for the degrees of
@@ -942,10 +953,13 @@ class DifferentialDrive(WheeledDrive):
         connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
         translation_velocity_limits: float = 0.6,
         rotation_velocity_limits: float = 0.5,
+        **kwargs,
     ) -> Self:
         """
         Creates an instance of the class with automatically generated DoFs for translation on the x-axis,
         rotation along roll, pitch, and yaw axes, and velocity limits for translation and rotation.
+
+        The additional kwargs parameters are accepted for interface consistency with other connections and ignored here.
 
         :param world: The world where the configuration is being applied, and degrees of freedom are added.
         :param parent: The parent kinematic structure entity.

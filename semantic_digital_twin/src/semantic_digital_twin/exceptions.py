@@ -336,6 +336,60 @@ class InvalidConnectionLimits(UsageError):
 
 
 @dataclass
+class MissingConnectionChildError(UsageError):
+    """
+    Raised when a connection is spawned without a child kinematic structure entity.
+    """
+
+    connection_name: Optional[str]
+    """
+    The name of the connection specification that was spawned without a child.
+    """
+
+    def error_message(self) -> str:
+        return f"Connecting the connection '{self.connection_name}' requires a child kinematic structure entity."
+
+    def suggest_correction(self) -> str:
+        return "pass the child entity via the 'child' keyword argument of connect."
+
+
+@dataclass
+class MissingConnectionParentError(UsageError):
+    """
+    Raised when a connection is spawned without a parent kinematic structure entity.
+    """
+
+    connection_name: Optional[str]
+    """
+    The name of the connection specification that was spawned without a child.
+    """
+
+    def error_message(self) -> str:
+        return f"Connecting the connection '{self.connection_name}' requires a parent kinematic structure entity."
+
+    def suggest_correction(self) -> str:
+        return "pass the parent entity via the 'parent' keyword argument of connect."
+
+
+@dataclass
+class MissingConnectionAxisError(UsageError):
+    """
+    Raised when an active connection is created without a movement axis.
+    """
+
+    connection_type_name: str
+    """
+    The name of the active connection type that was created without an axis.
+    """
+
+    def error_message(self) -> str:
+        return f"'{self.connection_type_name}' is an active connection and requires an axis."
+
+    def suggest_correction(self) -> str:
+        return "pass a movement axis via the 'axis' keyword argument."
+
+
+@dataclass
 class MimicDofLimitOverwriteError(UsageError):
     """
     Raised when trying to overwrite the limits of a mimic degree of freedom.
@@ -459,9 +513,9 @@ class UnknownPartWholeRelationshipField(UsageError):
     of the annotation.
     """
 
-    annotation: HasRootBody
+    annotation: Type[HasRootBody]
     """
-    The annotation the part was being added to.
+    The annotation type the part was being added to.
     """
 
     field_name: str
@@ -476,7 +530,7 @@ class UnknownPartWholeRelationshipField(UsageError):
 
     def error_message(self) -> str:
         return (
-            f"{type(self.annotation).__name__} has no part-whole relationship field "
+            f"{self.annotation.__name__} has no part-whole relationship field "
             f"'{self.field_name}."
         )
 
@@ -485,6 +539,62 @@ class UnknownPartWholeRelationshipField(UsageError):
             f"the available fields are:"
             f" {', '.join(self.available_fields) or '(none)'}"
         )
+
+
+@dataclass
+class PartWholeCardinalityError(UsageError):
+    """
+    Raised when a part specification supplies a list of parts for a singular (non-to-many)
+    part-whole relationship field.
+    """
+
+    annotation_type_name: str
+    """
+    The name of the annotation type the parts were being mounted onto.
+    """
+
+    field_name: str
+    """
+    The singular part-whole relationship field that was given a list of parts.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The part-whole relationship field '{self.field_name}' of "
+            f"'{self.annotation_type_name}' is singular and accepts only one part, "
+            f"but a list of parts was supplied."
+        )
+
+    def suggest_correction(self) -> str:
+        return "supply a single part specification for this field instead of a list."
+
+
+@dataclass
+class PartWholeFieldInAnnotationKwargs(UsageError):
+    """
+    Raised when ``annotation_kwargs`` contains a key that names a part-whole relationship field.
+    Such fields must be supplied via ``part_specifications`` so they are spawned and mounted, not
+    passed straight to the annotation constructor.
+    """
+
+    annotation_type_name: str
+    """
+    The name of the annotation type the keyword arguments were meant for.
+    """
+
+    field_names: List[str]
+    """
+    The offending ``annotation_kwargs`` keys that name part-whole relationship fields.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"annotation_kwargs for '{self.annotation_type_name}' contains part-whole relationship "
+            f"fields: {', '.join(self.field_names)}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "move these entries to part_specifications instead of annotation_kwargs."
 
 
 @dataclass

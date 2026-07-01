@@ -45,40 +45,34 @@ Let's build a dresser whose drawer has a handle and a slider. We use the factori
 together with `add`.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Slider, Dresser
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.world_description.geometry import Scale
-from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world import World
 
-world = World()
-root = Body(name=PrefixedName("root"))
-
-with world.modify_world():
-    world.add_body(root)
+world = World.create_with_root_body()
 
 with world.modify_world():
     dresser = Dresser.create_with_new_body_in_world(
-        name=PrefixedName("dresser"),
+        name="dresser",
         scale=Scale(0.31, 0.31, 0.21),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix(),
     )
     drawer = Drawer.create_with_new_body_in_world(
-        name=PrefixedName("drawer"),
+        name="drawer",
         scale=Scale(0.3, 0.3, 0.2),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix(),
     )
     handle = Handle.create_with_new_body_in_world(
-        name=PrefixedName("drawer_handle"),
+        name="drawer_handle",
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.15),
         world=world,
     )
     slider = Slider.create_with_new_body_in_world(
-        name=PrefixedName("drawer_slider"),
+        name="drawer_slider",
         world_root_T_self=HomogeneousTransformationMatrix(),
         world=world,
         active_axis=Vector3.X(),
@@ -90,6 +84,10 @@ with world.modify_world():
     # drawer -> dresser.drawers (a list field, so it is appended)
     dresser.add(drawer)
 
+# add routed each part to the field whose element type it matches.
+assert drawer.handle is handle
+assert drawer.mechanical_joint is slider
+assert drawer in dresser.drawers
 print("drawer.handle:", drawer.handle)
 print("drawer.mechanical_joint:", drawer.mechanical_joint)
 print("dresser.drawers:", dresser.drawers)
@@ -136,19 +134,20 @@ Now we can build a `ControlPanel` and add a handle to it exactly like the built-
 ```{code-cell} ipython3
 with world.modify_world():
     panel = ControlPanel.create_with_new_body_in_world(
-        name=PrefixedName("panel"),
+        name="panel",
         scale=Scale(0.3, 0.2, 0.02),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=0.5),
     )
     panel_handle = Handle.create_with_new_body_in_world(
-        name=PrefixedName("panel_handle"),
+        name="panel_handle",
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.1, z=0.5),
         world=world,
         scale=Scale(0.05, 0.1, 0.02),
     )
     panel.add(panel_handle)
 
+assert panel.handle is panel_handle
 print("panel.handle is panel_handle:", panel.handle is panel_handle)
 ```
 
@@ -162,13 +161,17 @@ from semantic_digital_twin.exceptions import CannotBeAPartOf
 
 with world.modify_world():
     stray_drawer = Drawer.create_with_new_body_in_world(
-        name=PrefixedName("stray_drawer"),
+        name="stray_drawer",
         scale=Scale(0.2, 0.2, 0.2),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.6),
     )
+    rejected = False
     try:
         panel.add(stray_drawer)
     except CannotBeAPartOf as error:
+        rejected = True
         print("Rejected as expected:", error)
+
+assert rejected
 ```

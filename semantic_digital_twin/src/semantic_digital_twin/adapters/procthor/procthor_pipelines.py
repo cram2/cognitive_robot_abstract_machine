@@ -1,6 +1,5 @@
 import re
 
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.semantic_annotations.position_descriptions import (
     SemanticPositionDescription,
@@ -33,7 +32,7 @@ def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
 
     with world.modify_world():
         drawer = Drawer.create_with_new_body_in_world(
-            name=drawer_body.name,
+            name=drawer_body.name.name,
             scale=drawer_scale,
             world=world,
         )
@@ -43,9 +42,7 @@ def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
         )
         world_T_handle = world_T_drawer @ drawer_T_handle
         handle = Handle.create_with_new_body_in_world(
-            name=PrefixedName(
-                drawer_body.name.name + "_handle", drawer_body.name.prefix
-            ),
+            name=drawer_body.name.name + "_handle",
             scale=Scale(0.05, 0.1, 0.02),
             world=world,
             world_root_T_self=world_T_handle,
@@ -81,13 +78,13 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
 
     with world.modify_world():
         door = Door.create_with_new_body_in_world(
-            name=door_body.name,
+            name=door_body.name.name,
             scale=door_body.collision.scale,
             world=world,
         )
 
         handle = Handle.create_with_new_body_in_world(
-            name=PrefixedName(door_body.name.name + "_handle", door_body.name.prefix),
+            name=door_body.name.name + "_handle",
             scale=Scale(0.05, 0.1, 0.02),
             world=world,
             world_root_T_self=world_T_handle,
@@ -96,7 +93,7 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
     with world.modify_world():
         world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
         hinge = Hinge.create_with_new_body_in_world(
-            name=PrefixedName(door_body.name.name + "_hinge", door_body.name.prefix),
+            name=door_body.name.name + "_hinge",
             world=world,
             world_root_T_self=world_T_hinge,
             active_axis=Vector3.Z(),
@@ -118,7 +115,7 @@ def dresser_from_body_in_world(dresser: Body, world: World) -> Dresser:
     door_pattern = re.compile(r"^.*_door_.*$")
     with world.modify_world():
         dresser = Dresser.create_with_new_body_in_world(
-            name=dresser.name,
+            name=dresser.name.name,
             scale=dresser.collision.scale,
             world=world,
         )

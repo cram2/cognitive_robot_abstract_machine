@@ -74,6 +74,7 @@ from semantic_digital_twin.world_description.world_modification import (
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
+    from semantic_digital_twin.api.specifications import BodySpecification
 else:
     World = Any
 
@@ -257,16 +258,37 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
     @classmethod
     def create_with_new_body_in_world(
         cls,
-        name: PrefixedName,
+        name: str,
         world: World,
         world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
         connection_limits: Optional[DegreeOfFreedomLimits] = None,
         active_axis: Optional[Vector3] = None,
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
-        scale: Scale = None,
+        scale: Optional[Scale] = None,
         **kwargs,
     ) -> Self:
+        """
+        Robot-part bodies originate from the parsed URDF, so they cannot be spawned from scratch.
+
+        :raises UselessConceptError: Always, since robot-part bodies must already exist in the world.
+        """
+        raise UselessConceptError(
+            reason="The bodies needed for RobotParts should already exist in the world after parsing a URDF"
+        )
+
+    @classmethod
+    def get_default_body_specification(
+        cls,
+        name: str,
+        scale: Optional[Scale] = None,
+    ) -> BodySpecification:
+        """
+        Robot-part geometry comes from the parsed URDF, not from a scale, so a default
+        body specification cannot be derived.
+
+        :raises UselessConceptError: Always, since robot-part bodies must already exist in the world.
+        """
         raise UselessConceptError(
             reason="The bodies needed for RobotParts should already exist in the world after parsing a URDF"
         )

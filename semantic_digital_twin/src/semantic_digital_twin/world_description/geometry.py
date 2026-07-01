@@ -10,11 +10,11 @@ from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from functools import cached_property
 
-from plyfile import PlyData
 import numpy as np
 import trimesh
 import trimesh.exchange.stl
 from PIL import Image
+from plyfile import PlyData
 from trimesh.visual.texture import TextureVisuals, SimpleMaterial
 from typing_extensions import Optional, List, Dict, Any, Self, Tuple, TYPE_CHECKING
 
@@ -28,7 +28,6 @@ from semantic_digital_twin.spatial_types import (
     Point3,
     Vector3,
 )
-from semantic_digital_twin.utils import IDGenerator
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import (
@@ -37,8 +36,9 @@ if TYPE_CHECKING:
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
-
-id_generator = IDGenerator()
+    from semantic_digital_twin.world_description.shape_collection import (
+        ShapeCollection,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -357,9 +357,16 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
 
     def copy_for_world(self, world: World) -> Self:
         """
-        Copies this shape with references to the given world.
-        :param world: The world to copy to.
-        :return: A copy of this shape with references to the given world.
+        Creates a reference-frame-free copy of this shape for use in another world.
+
+        :param world: Accepted for interface consistency with other ``copy_for_world`` methods; ignored here.
+        :return: A copy of this shape without a reference frame.
+        """
+        return self.copy_without_reference_frame()
+
+    def copy_without_reference_frame(self) -> Self:
+        """
+        Creates a copy of this shape without the reference frame.
         """
         new_origin = HomogeneousTransformationMatrix(
             self.origin.to_np(),
@@ -371,6 +378,33 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
             if f.name not in ["origin"]
         }
         return self.__class__(origin=new_origin, **new_props)
+
+    def as_shape_collection(self) -> ShapeCollection:
+        """
+        Wraps this shape in a single-element shape collection anchored to its reference frame.
+        """
+        from semantic_digital_twin.world_description.shape_collection import (
+            ShapeCollection,
+        )
+
+        return ShapeCollection(
+            shapes=[self], reference_frame=self.origin.reference_frame
+        )
+
+    def recenter_origin(self) -> None:
+        """
+        Moves the origin so the shape's local-frame bounding box is centered on it.
+
+        The translation is set to the negated bounding-box center, leaving the shape's
+        geometry symmetric about its origin.
+        """
+        bounding_box = self.local_frame_bounding_box
+        center_x = (bounding_box.min_x + bounding_box.max_x) / 2
+        center_y = (bounding_box.min_y + bounding_box.max_y) / 2
+        center_z = (bounding_box.min_z + bounding_box.max_z) / 2
+        self.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            -center_x, -center_y, -center_z, 0, 0, 0
+        )
 
 
 @dataclass(eq=False)
@@ -471,7 +505,9 @@ class Mesh(Shape):
         mesh = trimesh.load_mesh(self.filename)
         mesh.apply_scale(self.scale.to_np())
         if not isinstance(mesh.visual, TextureVisuals):
-            mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
+            mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(
+                self.color.to_rgba()
+            )
         return mesh
 
     @classmethod
@@ -535,7 +571,13 @@ class Mesh(Shape):
             visual=trimesh.visual.TextureVisuals(uv=uv_unindexed, image=texture_image),
         )
 
-        return Mesh.from_trimesh(mesh=mesh, origin=origin, scale=scale, file_type="obj", texture_file_path=texture_file_path)
+        return Mesh.from_trimesh(
+            mesh=mesh,
+            origin=origin,
+            scale=scale,
+            file_type="obj",
+            texture_file_path=texture_file_path,
+        )
 
     @classmethod
     def from_trimesh(
