@@ -58,10 +58,16 @@ class TestExternalCollisionExpressionManager:
 
         # test point on a
         point1 = external_collisions.get_group_a_P_point_on_a_symbol(group, 0)
-        assert np.allclose(point1.evaluate(), np.array([0.0, 0.05, 0.499, 1.0]))
+        assert np.allclose(
+            point1.evaluate(), np.array([0.0, 0.05, 0.249, 1.0]), atol=1e-3
+        )
         point2 = external_collisions.get_group_a_P_point_on_a_symbol(group, 1)
         assert np.allclose(
-            point2.evaluate(), np.array([0.05, 0.0, 0.499, 1.0]), atol=1e-4
+            point2.evaluate(), np.array([0.05, 0.0, 0.249, 1.0]), atol=1e-3
+        )
+        point2 = external_collisions.get_group_a_P_point_on_a_symbol(group, 1)
+        assert np.allclose(
+            point2.evaluate(), np.array([0.05, 0.0, 0.249, 1.0]), atol=1e-3
         )
 
         # test contact normal
@@ -80,9 +86,9 @@ class TestExternalCollisionExpressionManager:
 
         # test contact distance
         contact_distance1 = external_collisions.get_contact_distance_symbol(group, 0)
-        assert np.allclose(contact_distance1.evaluate()[0], 0.2)
+        assert np.allclose(contact_distance1.evaluate()[0], 0.2, atol=1e-3)
         contact_distance2 = external_collisions.get_contact_distance_symbol(group, 1)
-        assert np.allclose(contact_distance2.evaluate()[0], 0.7)
+        assert np.allclose(contact_distance2.evaluate()[0], 0.7, atol=1e-3)
 
         # test violated distance
         violated_distance1 = external_collisions.get_violated_distance_symbol(group, 0)

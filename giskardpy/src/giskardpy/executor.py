@@ -2,10 +2,6 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-import numpy as np
-from typing_extensions import Optional
-
-from giskardpy.data_types.exceptions import NoQPControllerConfigException
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.qp.exceptions import EmptyProblemException
@@ -15,6 +11,7 @@ from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
     WorldStateTrajectoryPlotter,
 )
+from typing_extensions import Optional
 
 
 @dataclass
@@ -197,10 +194,6 @@ class Executor:
             self.qp_controller = None
             # to not build controller, if there are no constraints
             return
-        elif controller_config is None:
-            raise NoQPControllerConfigException(
-                "constraints but no controller config given."
-            )
         self.qp_controller = QPController(
             config=controller_config,
             degrees_of_freedom=ordered_dofs,

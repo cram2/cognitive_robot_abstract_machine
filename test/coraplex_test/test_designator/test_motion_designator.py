@@ -15,6 +15,7 @@ from coraplex.datastructures.grasp import GraspDescription
 from coraplex.motion_executor import simulated_robot, real_robot
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.plans.plan_node import MotionNode, ActionNode
+from coraplex.robot_plans import MoveMotion
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
@@ -25,13 +26,14 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 try:
     from coraplex.alternative_motion_mappings.hsrb_motion_mapping import *
+    from giskardpy.motion_statechart.ros2_nodes.ros_tasks import NavigateActionServerTask
 
     skip_tests = False
 except (ImportError, ModuleNotFoundError, AttributeError):
     skip_tests = True
 
 
-@pytest.mark.skipIf(skip_tests, "Alternative motion mappings not available")
+@pytest.mark.skipif(skip_tests, reason="Alternative motion mappings not available")
 def test_pick_up_motion(immutable_model_world):
     world, view, context = immutable_model_world
     test_world = deepcopy(world)
@@ -95,9 +97,10 @@ def test_move_motion_chart(immutable_model_world):
     np.testing.assert_equal(msc.goal_pose.to_position().to_np(), np.array([1, 1, 1, 1]))
 
 
-@pytest.mark.skipIf(skip_tests, "Alternative motion mappings not available")
+@pytest.mark.skipif(skip_tests, reason="Alternative motion mappings not available")
 def test_alternative_mapping(hsr_apartment_world):
     world, view, context = hsr_apartment_world
+    context.alternative_motion_mappings = [HSRBMoveMotion]
     move_motion = MoveMotion(
         Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root)
     )

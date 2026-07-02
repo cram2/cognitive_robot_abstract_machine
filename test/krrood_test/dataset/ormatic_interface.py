@@ -16,15 +16,20 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 
 import builtins
+import coraplex.orm.model
 import datetime
 import enum
 import krrood.adapters.json_serializer
 import krrood.entity_query_language.orm.model
+import krrood.entity_query_language.predicate
 import krrood.ormatic.custom_types
 import krrood.ormatic.data_access_objects.alternative_mappings
 import krrood.ormatic.type_dict
 import krrood.symbol_graph.symbol_graph
 import pathlib
+import semantic_digital_twin.orm.model
+import semantic_digital_twin.world_description.degree_of_freedom
+import semantic_digital_twin.world_description.world_entity
 import sqlalchemy.sql.sqltypes
 import test.krrood_test.dataset.alternative_mappings_construction_order
 import test.krrood_test.dataset.example_classes
@@ -95,23 +100,6 @@ class GenericClassAssociationDAO_associated_value_list_association(
     )
 
 
-class MissingBaseClassDAO_objects_association(Base, AssociationDataAccessObject):
-    __tablename__ = "_49116363858473014278438249507848772264681022340380896275396332"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-    source_missingbaseclassdao_id: Mapped[int] = mapped_column(
-        ForeignKey("MissingBaseClassDAO.database_id")
-    )
-    target_exampleintdao_id: Mapped[int] = mapped_column(
-        ForeignKey("ExampleIntDAO.database_id")
-    )
-
-    target: Mapped[ExampleIntDAO] = relationship(
-        "ExampleIntDAO", foreign_keys=[target_exampleintdao_id], lazy="selectin"
-    )
-
-
 class ParentAlternativelyMappedMappingDAO_entities_association(
     Base, AssociationDataAccessObject
 ):
@@ -145,23 +133,6 @@ class PersonDAO_knows_association(Base, AssociationDataAccessObject):
 
     target: Mapped[PersonDAO] = relationship(
         "PersonDAO", foreign_keys=[target_persondao_id], lazy="selectin"
-    )
-
-
-class SceneRoomDAO_objects_association(Base, AssociationDataAccessObject):
-    __tablename__ = "_41896291563655570123326561014529018280292791361420111771921539"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-    source_sceneroomdao_id: Mapped[int] = mapped_column(
-        ForeignKey("SceneRoomDAO.database_id")
-    )
-    target_sceneobjectdao_id: Mapped[int] = mapped_column(
-        ForeignKey("SceneObjectDAO.database_id")
-    )
-
-    target: Mapped[SceneObjectDAO] = relationship(
-        "SceneObjectDAO", foreign_keys=[target_sceneobjectdao_id], lazy="selectin"
     )
 
 
@@ -404,40 +375,6 @@ class SymbolGraphMappingDAO_predicate_relations_association(
     )
 
 
-class TestExPartsDAO_objects_association(Base, AssociationDataAccessObject):
-    __tablename__ = "_13414878723368313611184808466201711284901757356557250326094396"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-    source_testexpartsdao_id: Mapped[int] = mapped_column(
-        ForeignKey("TestExPartsDAO.database_id")
-    )
-    target_sceneobjectdao_id: Mapped[int] = mapped_column(
-        ForeignKey("SceneObjectDAO.database_id")
-    )
-
-    target: Mapped[SceneObjectDAO] = relationship(
-        "SceneObjectDAO", foreign_keys=[target_sceneobjectdao_id], lazy="selectin"
-    )
-
-
-class TestExPartsDAO_rooms_association(Base, AssociationDataAccessObject):
-    __tablename__ = "_91299099733580933622654779849770155284567250717459502838045192"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-    source_testexpartsdao_id: Mapped[int] = mapped_column(
-        ForeignKey("TestExPartsDAO.database_id")
-    )
-    target_sceneroomdao_id: Mapped[int] = mapped_column(
-        ForeignKey("SceneRoomDAO.database_id")
-    )
-
-    target: Mapped[SceneRoomDAO] = relationship(
-        "SceneRoomDAO", foreign_keys=[target_sceneroomdao_id], lazy="selectin"
-    )
-
-
 class TestKRROODPositionSetDAO_positions_association(Base, AssociationDataAccessObject):
     __tablename__ = "_49970617061457501785278404617162306493823313032515305857356796"
 
@@ -510,29 +447,6 @@ class CabinetDAO_drawers_association(Base, AssociationDataAccessObject):
 
     target: Mapped[DrawerDAO] = relationship(
         "DrawerDAO", foreign_keys=[target_drawerdao_id], lazy="selectin"
-    )
-
-
-class ActionWithMissingAggregationsMixinDAO(
-    Base,
-    DataAccessObject[
-        test.krrood_test.dataset.example_classes.ActionWithMissingAggregationsMixin
-    ],
-):
-    __tablename__ = "ActionWithMissingAggregationsMixinDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    domain_object_id: Mapped[int] = mapped_column(
-        ForeignKey("CabinetDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    domain_object: Mapped[CabinetDAO] = relationship(
-        "CabinetDAO", uselist=False, foreign_keys=[domain_object_id], post_update=True
     )
 
 
@@ -677,32 +591,6 @@ class EnumActionDAO(
     )
 
 
-class ExampleIntDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.ExampleInt]
-):
-    __tablename__ = "ExampleIntDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    attribute: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-
-
-class ExampleStringDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.ExampleString]
-):
-    __tablename__ = "ExampleStringDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    attribute: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-
 class GenericClassDAO(
     Base, DataAccessObject[test.krrood_test.dataset.example_classes.GenericClass]
 ):
@@ -836,6 +724,55 @@ class GenericClassAssociationDAO(
     )
 
 
+class HomogeneousTransformationMatrixMappingDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.orm.model.HomogeneousTransformationMatrixMapping
+    ],
+):
+    __tablename__ = "HomogeneousTransformationMatrixMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    reference_frame: Mapped[
+        typing.Optional[
+            semantic_digital_twin.world_description.world_entity.KinematicStructureEntity
+        ]
+    ] = mapped_column(
+        sqlalchemy.sql.sqltypes.JSON, nullable=True, use_existing_column=True
+    )
+    child_frame: Mapped[
+        typing.Optional[
+            semantic_digital_twin.world_description.world_entity.KinematicStructureEntity
+        ]
+    ] = mapped_column(
+        sqlalchemy.sql.sqltypes.JSON, nullable=True, use_existing_column=True
+    )
+
+    position_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    rotation_id: Mapped[int] = mapped_column(
+        ForeignKey("QuaternionMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    position: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO", uselist=False, foreign_keys=[position_id], post_update=True
+    )
+    rotation: Mapped[QuaternionMappingDAO] = relationship(
+        "QuaternionMappingDAO",
+        uselist=False,
+        foreign_keys=[rotation_id],
+        post_update=True,
+    )
+
+
 class InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO(
     Base,
     DataAccessObject[
@@ -935,26 +872,6 @@ class JSONWrapperDAO(
     ] = mapped_column(JSON, nullable=False, use_existing_column=True)
 
 
-class MissingBaseClassDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.MissingBaseClass]
-):
-    __tablename__ = "MissingBaseClassDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    objects: Mapped[builtins.list[MissingBaseClassDAO_objects_association]] = (
-        relationship(
-            "MissingBaseClassDAO_objects_association",
-            collection_class=builtins.list,
-            cascade="all, delete-orphan",
-            foreign_keys="[MissingBaseClassDAO_objects_association.source_missingbaseclassdao_id]",
-            lazy="selectin",
-        )
-    )
-
-
 class MixinDAO(Base, DataAccessObject[test.krrood_test.dataset.example_classes.Mixin]):
     __tablename__ = "MixinDAO"
 
@@ -1008,7 +925,7 @@ class NestedActionDAO(
         nullable=True,
         use_existing_column=True,
     )
-    pose_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+    pose_id: Mapped[int] = mapped_column(
         ForeignKey("KRROODPoseDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
@@ -1146,6 +1063,49 @@ class PersonDAO(
     )
 
 
+class PlanMappingDAO(Base, DataAccessObject[coraplex.orm.model.PlanMapping]):
+    __tablename__ = "PlanMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    initial_world_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    initial_world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[initial_world_id],
+        post_update=True,
+    )
+
+
+class Point3MappingDAO(
+    Base, DataAccessObject[semantic_digital_twin.orm.model.Point3Mapping]
+):
+    __tablename__ = "Point3MappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    x: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    y: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    z: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    reference_frame: Mapped[
+        typing.Optional[
+            semantic_digital_twin.world_description.world_entity.KinematicStructureEntity
+        ]
+    ] = mapped_column(
+        sqlalchemy.sql.sqltypes.JSON, nullable=True, use_existing_column=True
+    )
+
+
 class PolymorphicEnumAssociationDAO(
     Base,
     DataAccessObject[
@@ -1164,6 +1124,99 @@ class PolymorphicEnumAssociationDAO(
             nullable=False,
             use_existing_column=True,
         )
+    )
+
+
+class PoseMappingDAO(
+    Base, DataAccessObject[semantic_digital_twin.orm.model.PoseMapping]
+):
+    __tablename__ = "PoseMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    reference_frame: Mapped[
+        typing.Optional[
+            semantic_digital_twin.world_description.world_entity.KinematicStructureEntity
+        ]
+    ] = mapped_column(
+        sqlalchemy.sql.sqltypes.JSON, nullable=True, use_existing_column=True
+    )
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    position_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    orientation_id: Mapped[int] = mapped_column(
+        ForeignKey("QuaternionMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    position: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO", uselist=False, foreign_keys=[position_id], post_update=True
+    )
+    orientation: Mapped[QuaternionMappingDAO] = relationship(
+        "QuaternionMappingDAO",
+        uselist=False,
+        foreign_keys=[orientation_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "PoseMappingDAO",
+    }
+
+
+class GrasPoseMappingDAO(
+    PoseMappingDAO, DataAccessObject[coraplex.orm.model.GrasPoseMapping]
+):
+    __tablename__ = "GrasPoseMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(PoseMappingDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    arm: Mapped[typing.Optional[coraplex.datastructures.enums.Arms]] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GrasPoseMappingDAO",
+        "inherit_condition": database_id == PoseMappingDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class Pose2DMappingDAO(
+    Base, DataAccessObject[semantic_digital_twin.orm.model.Pose2DMapping]
+):
+    __tablename__ = "Pose2DMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    x: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    y: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    yaw: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    reference_frame: Mapped[
+        typing.Optional[
+            semantic_digital_twin.world_description.world_entity.KinematicStructureEntity
+        ]
+    ] = mapped_column(
+        sqlalchemy.sql.sqltypes.JSON, nullable=True, use_existing_column=True
     )
 
 
@@ -1252,119 +1305,58 @@ class MultipleInheritanceDAO(
     }
 
 
-class SceneObjectDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.SceneObject]
+class QuaternionMappingDAO(
+    Base, DataAccessObject[semantic_digital_twin.orm.model.QuaternionMapping]
 ):
-    __tablename__ = "SceneObjectDAO"
+    __tablename__ = "QuaternionMappingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    type: Mapped[test.krrood_test.dataset.example_classes.SceneObjectType] = (
-        mapped_column(
-            krrood.ormatic.custom_types.PolymorphicEnumType,
-            nullable=False,
-            use_existing_column=True,
-        )
+    x: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    y: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    z: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    w: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    reference_frame: Mapped[
+        typing.Optional[
+            semantic_digital_twin.world_description.world_entity.KinematicStructureEntity
+        ]
+    ] = mapped_column(
+        sqlalchemy.sql.sqltypes.JSON, nullable=True, use_existing_column=True
     )
 
 
-class SceneObjectAggregationBaseDAO(
-    Base,
-    DataAccessObject[
-        test.krrood_test.dataset.example_classes.SceneObjectAggregationBase
-    ],
+class RotationMatrixMappingDAO(
+    Base, DataAccessObject[semantic_digital_twin.orm.model.RotationMatrixMapping]
 ):
-    __tablename__ = "SceneObjectAggregationBaseDAO"
+    __tablename__ = "RotationMatrixMappingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    field_name: Mapped[typing.Optional[builtins.str]] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    reference_frame: Mapped[
+        typing.Optional[
+            semantic_digital_twin.world_description.world_entity.KinematicStructureEntity
+        ]
+    ] = mapped_column(
+        sqlalchemy.sql.sqltypes.JSON, nullable=True, use_existing_column=True
     )
 
-    polymorphic_type: Mapped[str] = mapped_column(
-        String(255), nullable=False, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_on": "polymorphic_type",
-        "polymorphic_identity": "SceneObjectAggregationBaseDAO",
-    }
-
-
-class SceneRoomDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.SceneRoom]
-):
-    __tablename__ = "SceneRoomDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    type_in_need_of_preprocessing: Mapped[builtins.bool] = mapped_column(
-        use_existing_column=True
-    )
-
-    position_id: Mapped[int] = mapped_column(
-        ForeignKey("KRROODPositionDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    orientation_id: Mapped[int] = mapped_column(
-        ForeignKey("KRROODOrientationDAO.database_id", use_alter=True),
+    rotation_id: Mapped[int] = mapped_column(
+        ForeignKey("QuaternionMappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    position: Mapped[KRROODPositionDAO] = relationship(
-        "KRROODPositionDAO", uselist=False, foreign_keys=[position_id], post_update=True
-    )
-    orientation: Mapped[KRROODOrientationDAO] = relationship(
-        "KRROODOrientationDAO",
+    rotation: Mapped[QuaternionMappingDAO] = relationship(
+        "QuaternionMappingDAO",
         uselist=False,
-        foreign_keys=[orientation_id],
+        foreign_keys=[rotation_id],
         post_update=True,
     )
-    objects: Mapped[builtins.list[SceneRoomDAO_objects_association]] = relationship(
-        "SceneRoomDAO_objects_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[SceneRoomDAO_objects_association.source_sceneroomdao_id]",
-        lazy="selectin",
-    )
-
-
-class SceneRoomAggregationsDAO(
-    SceneObjectAggregationBaseDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.SceneRoomAggregations],
-):
-    __tablename__ = "SceneRoomAggregationsDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(SceneObjectAggregationBaseDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    instance_id: Mapped[int] = mapped_column(
-        ForeignKey("SceneRoomDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    instance: Mapped[SceneRoomDAO] = relationship(
-        "SceneRoomDAO", uselist=False, foreign_keys=[instance_id], post_update=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "SceneRoomAggregationsDAO",
-        "inherit_condition": database_id == SceneObjectAggregationBaseDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
 
 
 class SymbolDAO(Base, DataAccessObject[krrood.symbol_graph.symbol_graph.Symbol]):
@@ -2308,6 +2300,22 @@ class ChildBaseMappingDAO(
     }
 
 
+class PredicateDAO(
+    SymbolDAO, DataAccessObject[krrood.entity_query_language.predicate.Predicate]
+):
+    __tablename__ = "PredicateDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PredicateDAO",
+        "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class PrivateDefaultFactoryDAO(
     SymbolDAO,
     DataAccessObject[test.krrood_test.dataset.example_classes.PrivateDefaultFactory],
@@ -2511,60 +2519,6 @@ class SymbolGraphMappingDAO(
     )
 
 
-class TestExPartsDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.TestExParts]
-):
-    __tablename__ = "TestExPartsDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    objects: Mapped[builtins.list[TestExPartsDAO_objects_association]] = relationship(
-        "TestExPartsDAO_objects_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[TestExPartsDAO_objects_association.source_testexpartsdao_id]",
-        lazy="selectin",
-    )
-    rooms: Mapped[builtins.list[TestExPartsDAO_rooms_association]] = relationship(
-        "TestExPartsDAO_rooms_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[TestExPartsDAO_rooms_association.source_testexpartsdao_id]",
-        lazy="selectin",
-    )
-
-
-class TestExPartsAggregationsDAO(
-    SceneObjectAggregationBaseDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.TestExPartsAggregations],
-):
-    __tablename__ = "TestExPartsAggregationsDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(SceneObjectAggregationBaseDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    instance_id: Mapped[int] = mapped_column(
-        ForeignKey("TestExPartsDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    instance: Mapped[TestExPartsDAO] = relationship(
-        "TestExPartsDAO", uselist=False, foreign_keys=[instance_id], post_update=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "TestExPartsAggregationsDAO",
-        "inherit_condition": database_id == SceneObjectAggregationBaseDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
 class TestKRROODPositionSetDAO(
     Base,
     DataAccessObject[test.krrood_test.dataset.example_classes.TestKRROODPositionSet],
@@ -2613,6 +2567,71 @@ class UnderspecifiedTypesContainerDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class Vector3MappingDAO(
+    Base, DataAccessObject[semantic_digital_twin.orm.model.Vector3Mapping]
+):
+    __tablename__ = "Vector3MappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    x: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    y: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    z: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    reference_frame: Mapped[
+        typing.Optional[
+            semantic_digital_twin.world_description.world_entity.KinematicStructureEntity
+        ]
+    ] = mapped_column(
+        sqlalchemy.sql.sqltypes.JSON, nullable=True, use_existing_column=True
+    )
+
+
+class WorldMappingDAO(
+    Base, DataAccessObject[semantic_digital_twin.orm.model.WorldMapping]
+):
+    __tablename__ = "WorldMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    name: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    kinematic_structure_entities: Mapped[
+        typing.List[
+            semantic_digital_twin.world_description.world_entity.KinematicStructureEntity
+        ]
+    ] = mapped_column(JSON, nullable=False, use_existing_column=True)
+    connections: Mapped[
+        typing.List[semantic_digital_twin.world_description.world_entity.Connection]
+    ] = mapped_column(JSON, nullable=False, use_existing_column=True)
+    semantic_annotations: Mapped[
+        typing.List[
+            semantic_digital_twin.world_description.world_entity.SemanticAnnotation
+        ]
+    ] = mapped_column(JSON, nullable=False, use_existing_column=True)
+    degrees_of_freedom: Mapped[
+        typing.List[
+            semantic_digital_twin.world_description.degree_of_freedom.DegreeOfFreedom
+        ]
+    ] = mapped_column(JSON, nullable=False, use_existing_column=True)
+
+    state_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldStateMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    state: Mapped[WorldStateMappingDAO] = relationship(
+        "WorldStateMappingDAO", uselist=False, foreign_keys=[state_id], post_update=True
     )
 
 
@@ -2668,13 +2687,13 @@ class WorldEntityDAO(
     )
 
     world_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("WorldDAO.database_id", use_alter=True),
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    world: Mapped[WorldDAO] = relationship(
-        "WorldDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
     )
 
     __mapper_args__ = {
@@ -3087,6 +3106,23 @@ class WardrobeDAO(
         "inherit_condition": database_id == ViewDAO.database_id,
         "polymorphic_load": "selectin",
     }
+
+
+class WorldStateMappingDAO(
+    Base, DataAccessObject[semantic_digital_twin.orm.model.WorldStateMapping]
+):
+    __tablename__ = "WorldStateMappingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    data: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+    ids: Mapped[typing.List[uuid.UUID]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
 
 
 class WrappedInstanceMappingDAO(

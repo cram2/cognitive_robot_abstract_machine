@@ -1,9 +1,8 @@
 import hashlib
 import logging
 import os
-import tempfile
 from dataclasses import dataclass, field
-from krrood.utils import memoize, clear_memoization_cache
+from importlib.resources import files
 from pathlib import Path
 from typing import Dict
 from typing import List, Tuple, Optional
@@ -12,9 +11,9 @@ from uuid import UUID
 import giskardpy_bullet_bindings as bullet
 import numpy as np
 import trimesh
-from platformdirs import user_cache_dir
-
 from giskardpy.utils.utils import create_path
+from krrood.utils import memoize, clear_memoization_cache
+from platformdirs import user_cache_dir
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionDetector,
     CollisionCheckingResult,
@@ -93,13 +92,24 @@ def create_cube_shape(extents: Tuple[float, float, float]) -> bullet.BoxShape:
 def create_cylinder_shape(diameter: float, height: float) -> bullet.CylinderShape:
     """
     Creates a bullet cylinder shape.
+    .. note:: we are using an obj, because the cylinder primitive of bullet produces wrong contact points sometimes.
+              The obj is scaled by 0.996 because it is slightly too large. The number was determined by comparing results
+              to fcl.
     :param diameter: the diameter of the cylinder.
     :param height: the height of the cylinder.
     :return: the bullet cylinder shape.
     """
-    out = bullet.CylinderShapeZ(bullet.Vector3(diameter / 2, diameter / 2, height))
-    out.margin = 0.001
-    return out
+    cylinder_mesh = os.path.join(
+        Path(files("semantic_digital_twin")).parent.parent,
+        "resources",
+        "obj",
+        "cylinder.obj",
+    )
+    return bullet.load_convex_shape(
+        cylinder_mesh,
+        single_shape=True,
+        scaling=bullet.Vector3(diameter, diameter, height) * 0.996,
+    )
 
 
 def create_sphere_shape(diameter: float) -> bullet.SphereShape:
