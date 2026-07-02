@@ -92,6 +92,12 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
         return convert_args_and_kwargs_into_hashable_key(all_kwargs)
 
     def __getattr__(self, name: str) -> CanBehaveLikeAVariable[T]:
+        # Dunder names are never symbolic attribute access. Mapping them would (a) let copy/pickle
+        # and other machinery that probes optional dunder hooks recurse into endless variable
+        # creation, and (b) blur language semantics. Access a dunder-named member symbolically via a
+        # :func:`symbolic_function` instead.
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(name)
         return self._get_mapped_variable_(Attribute, name)
 
     def __getitem__(self, key) -> CanBehaveLikeAVariable[T]:

@@ -29,6 +29,7 @@ from giskardpy.motion_statechart.graph_node import (
     GenericMotionStatechartNode,
     ObservationVariable,
     LifeCycleVariable,
+    DebugExpression,
 )
 from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.motion_statechart.plotters.graphviz import MotionStatechartGraphviz
@@ -378,6 +379,16 @@ class MotionStatechart(SubclassJSONSerializer):
     @property
     def nodes(self) -> List[MotionStatechartNode]:
         return list(self.rx_graph.nodes())
+
+    def collect_debug_expressions(self) -> List[DebugExpression]:
+        """
+        Gather the debug expressions registered by every node into a single flat list.
+        """
+        return [
+            debug_expression
+            for node in self.nodes
+            for debug_expression in node.debug_expressions
+        ]
 
     @property
     def top_level_nodes(self) -> List[MotionStatechartNode]:

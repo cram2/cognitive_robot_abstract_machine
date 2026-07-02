@@ -2,10 +2,6 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
-import rclpy
-from rustworkx.rustworkx import NoEdgeBetweenNodes
-from typing_extensions import Tuple, Generator
-
 from coraplex.alternative_motion_mappings.hsrb_motion_mapping import HSRBMoveMotion
 from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
     StretchMoveToolCenterPoint,
@@ -14,8 +10,6 @@ from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
     StretchClose,
 )
 from coraplex.alternative_motion_mappings.tiago_motion_mapping import TiagoMoveSim
-
-from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
     Arms,
@@ -26,7 +20,6 @@ from coraplex.datastructures.enums import (
 )
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.datastructures.trajectory import PoseTrajectory
-
 from coraplex.motion_executor import simulated_robot
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.robot_plans.actions.composite.facing import FaceAtAction
@@ -46,24 +39,20 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     FollowToolCenterPointPathAction,
 )
-
 from coraplex.view_manager import ViewManager
-from semantic_digital_twin.adapters.ros.visualization.pose_publisher import (
-    PosePublisher,
-)
+from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
+from rustworkx.rustworkx import NoEdgeBetweenNodes
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
-from coraplex.view_manager import ViewManager
-
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
     GripperState,
-    JointStateType,
     StaticJointState,
 )
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
+from typing_extensions import Tuple, Generator
 
 try:
     from semantic_digital_twin.robots.garmi import Garmi

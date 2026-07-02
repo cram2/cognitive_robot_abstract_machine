@@ -77,6 +77,8 @@ if TYPE_CHECKING:
         Handle,
         Aperture,
         MechanicalJoint,
+        Leg,
+        Sink,
     )
     from semantic_digital_twin.world import World
 
@@ -507,6 +509,39 @@ class HasHandle(HasRootBody, PartWholeRelationship, ABC):
     """
     The handle of the semantic annotation.
     """
+
+
+@dataclass(eq=False)
+class HasLegs(PartWholeRelationship, ABC):
+    """
+    A mixin class for semantic annotations that have legs.
+    """
+
+    legs: List[Leg] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=FieldMetadata(other_metadata=[IsPartWholeRelationship()]).as_dict(),
+    )
+    """
+    The legs of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasSink(PartWholeRelationship, ABC):
+    """
+    A mixin class for semantic annotations that have a sink.
+    """
+
+    sink: Optional[Sink] = field(
+        default=None,
+        metadata=FieldMetadata(other_metadata=[IsPartWholeRelationship()]).as_dict(),
+    )
+    """
+    The sink of the semantic annotation.
+    """
+
 
 
 @dataclass(eq=False)
@@ -951,3 +986,5 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
         container_event = outer_box.as_composite_set() - inner_box.as_composite_set()
 
         return container_event
+
+

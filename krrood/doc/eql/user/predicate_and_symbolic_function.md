@@ -58,6 +58,21 @@ EQL provides a built-in {py:func}`~krrood.entity_query_language.predicate.length
 checking the size of collections.
 ```
 
+:::{warning}
+Symbolic attribute access covers **regular** attributes only. Dunder names (e.g. `variable.__name__`)
+are *not* resolved symbolically — they are reserved for Python's own protocols, so intercepting them
+would break `copy`, pickling, and debugging. To read a dunder-named member of a matched object inside
+a query, wrap the access in a `@symbolic_function`:
+
+```python
+@symbolic_function
+def class_name(cls: type) -> str:
+    return cls.__name__
+
+query = entity(v).where(class_name(v).startswith("C"))
+```
+:::
+
 ## Full Example: Custom Logic
 
 Let's define a custom predicate and a symbolic function to find robots with specific capabilities.
