@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from semantic_digital_twin.utils import MockedNodeClass
 
@@ -10,11 +11,13 @@ except ImportError:
     Node = MockedNodeClass
 
 from giskardpy.executor import Executor
-from giskardpy.motion_statechart.debug_expression_publisher import (
-    DebugExpressionPublisher,
-)
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.ros_context import RosContextExtension
+
+if TYPE_CHECKING:
+    from giskardpy.motion_statechart.debug_expression_publisher import (
+        DebugExpressionPublisher,
+    )
 
 
 @dataclass
@@ -29,8 +32,8 @@ class Ros2Executor(Executor):
     publish_debug_expressions: bool = field(kw_only=True, default=False)
     """
     Whether the debug expressions of the compiled nodes are visualized as RViz markers.
-    
-    ..warning: 
+
+    .. warning::
         You should only use these tools actively while debugging and preferably only in simulation, because it slows down the control loop.
     """
 
@@ -50,6 +53,12 @@ class Ros2Executor(Executor):
             self._debug_expression_publisher = None
         if not self.publish_debug_expressions:
             return
+        # Deferred: DebugExpressionPublisher pulls in rclpy unconditionally, which would
+        # otherwise make giskardpy.ros_executor unimportable without ROS2 installed.
+        from giskardpy.motion_statechart.debug_expression_publisher import (
+            DebugExpressionPublisher,
+        )
+
         self._debug_expression_publisher = DebugExpressionPublisher(
             world=self.context.world, node=self.ros_node
         )

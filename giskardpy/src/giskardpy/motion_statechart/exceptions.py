@@ -219,3 +219,14 @@ class PlotterNotConfiguredError(MotionStatechartError):
 
     def suggest_correction(self) -> str:
         return f"Pass a {self.plotter_name} when constructing the executor."
+
+
+@dataclass
+class EmptyDebugExpressionTrajectoryError(MotionStatechartError):
+    """Raised when a plot is requested but no debug expression samples were recorded."""
+
+    def error_message(self) -> str:
+        return "Cannot plot: no debug expression samples were recorded."
+
+    def suggest_correction(self) -> str:
+        return "Call tick() at least once before plotting, or configure debug expressions to record."

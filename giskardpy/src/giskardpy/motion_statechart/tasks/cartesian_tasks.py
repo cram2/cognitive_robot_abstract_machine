@@ -3,10 +3,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import field, dataclass
 from functools import cached_property
-from typing import Optional, ClassVar
 
 import numpy as np
-from typing_extensions import List
+from typing_extensions import ClassVar, List
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.binding_policy import (
@@ -67,7 +66,9 @@ class CartesianTask(Task, ABC):
     )
     """Transformation matrix from root to goal_reference_frame link."""
 
-    _fk_binding: ForwardKinematicsBinding = field(kw_only=True, init=False)
+    _forward_kinematics_binding: ForwardKinematicsBinding = field(
+        kw_only=True, init=False
+    )
     """Binding for the goal pose."""
 
     GOAL_COLOR: ClassVar[Color] = Color(R=0.0, G=1.0, B=0.0, A=1.0)
@@ -79,20 +80,20 @@ class CartesianTask(Task, ABC):
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
-        self._fk_binding = ForwardKinematicsBinding(
+        self._forward_kinematics_binding = ForwardKinematicsBinding(
             name=PrefixedName("root_T_goal_ref", str(self.name)),
             root=self.root_link,
             tip=self.goal_reference_frame,
             float_variable_data=context.float_variable_data,
         )
-        self._fk_binding.bind(context.world)
-        self.root_T_goal_reference_frame = self._fk_binding.root_T_tip
+        self._forward_kinematics_binding.bind(context.world)
+        self.root_T_goal_reference_frame = self._forward_kinematics_binding.root_T_tip
 
         return artifacts
 
     def on_start(self, context: MotionStatechartContext):
         if self.binding_policy == GoalBindingPolicy.Bind_on_start:
-            self._fk_binding.bind(context.world)
+            self._forward_kinematics_binding.bind(context.world)
 
     @property
     @abstractmethod
@@ -142,7 +143,7 @@ class CartesianPosition(CartesianTask):
     threshold: float = field(default=0.01, kw_only=True)
     """Distance threshold for goal achievement in meters."""
 
-    reference_velocity: Optional[float] = field(
+    reference_velocity: float | None = field(
         default_factory=lambda: CartesianPosition.default_reference_velocity,
         kw_only=True,
     )
@@ -215,7 +216,7 @@ class CartesianPositionTrajectory(CartesianTask):
     Increasing this value can increase the tracking velocity, but might reduce tracking accuracy.
     """
 
-    reference_velocity: Optional[float] = field(
+    reference_velocity: float | None = field(
         default_factory=lambda: CartesianPosition.default_reference_velocity,
         kw_only=True,
     )
@@ -362,7 +363,7 @@ class CartesianPositionTrajectory(CartesianTask):
 
     def on_tick(
         self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
+    ) -> ObservationStateValues | None:
         """
         Update the target point on the trajectory and return true if we have reached the end of the trajectory.
         """

@@ -20,7 +20,10 @@ class CannotRenderSpatialTypeError(DataclassException):
         )
 
     def suggest_correction(self) -> str:
-        return ""
+        return (
+            f"Register a SpatialTypeMarkerRenderer subclass whose input type "
+            f"matches {self.spatial_type_type.__name__}."
+        )
 
 
 @dataclass

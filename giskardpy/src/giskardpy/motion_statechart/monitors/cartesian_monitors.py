@@ -38,7 +38,7 @@ class RootRelativeGoalMonitor(MotionStatechartNode, ABC):
     )
     """When the goal reference frame is captured. See :class:`GoalBindingPolicy`."""
 
-    _fk_binding: Optional[ForwardKinematicsBinding] = field(
+    _forward_kinematics_binding: Optional[ForwardKinematicsBinding] = field(
         default=None, init=False, repr=False
     )
     """Binding used to freeze the forward kinematics of the goal reference frame."""
@@ -55,18 +55,18 @@ class RootRelativeGoalMonitor(MotionStatechartNode, ABC):
         Express the goal in the root link frame, captured relative to the goal reference frame via
         a forward kinematics binding.
         """
-        self._fk_binding = ForwardKinematicsBinding(
+        self._forward_kinematics_binding = ForwardKinematicsBinding(
             name=PrefixedName("root_T_goal_ref", str(self.name)),
             root=self.root_link,
             tip=self.goal.reference_frame,
             float_variable_data=context.float_variable_data,
         )
-        self._fk_binding.bind(context.world)
-        return self._fk_binding.root_T_tip @ self.goal
+        self._forward_kinematics_binding.bind(context.world)
+        return self._forward_kinematics_binding.root_T_tip @ self.goal
 
     def on_start(self, context: MotionStatechartContext) -> None:
         if self.binding_policy == GoalBindingPolicy.Bind_on_start:
-            self._fk_binding.bind(context.world)
+            self._forward_kinematics_binding.bind(context.world)
 
 
 @dataclass(eq=False, repr=False)

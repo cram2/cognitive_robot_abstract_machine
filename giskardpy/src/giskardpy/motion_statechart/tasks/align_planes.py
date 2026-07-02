@@ -28,8 +28,11 @@ class AlignPlanes(Task):
     """normal vector of the tip plane."""
 
     threshold: float = field(default=0.01, kw_only=True)
+    """angle in radians below which the planes are considered aligned."""
     reference_velocity: float = field(default=0.5, kw_only=True)
+    """reference angular velocity for normalization in rad/s."""
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
+    """priority weight relative to other tasks."""
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()

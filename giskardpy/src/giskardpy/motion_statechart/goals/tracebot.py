@@ -1,7 +1,7 @@
-from __future__ import division
+from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing_extensions import Optional
 
 import numpy as np
 

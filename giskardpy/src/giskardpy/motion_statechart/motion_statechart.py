@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Dict, Any
 
 import numpy as np
 import rustworkx as rx
-from typing_extensions import List, MutableMapping, ClassVar, Self, Type
+from typing_extensions import Any, List, MutableMapping, ClassVar, Self, Type
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.plotters.gantt_chart_plotter import (
@@ -125,14 +124,14 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
             data=self.data.copy(),
         )
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         """
         :return: The JSON representation of the base class, extended with the raw :attr:`data` array.
         """
         return {**super().to_json(), "data": self.data.tolist()}
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         """
         Reconstruct a state from its JSON representation.
 
@@ -823,7 +822,7 @@ class MotionStatechart(SubclassJSONSerializer):
             self, second_width_in_cm=second_length_in_cm, context=context
         ).plot_gantt_chart(path)
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         """
         :return: The JSON representation of this motion statechart, including all nodes and their unique edges.
         .. warning:: This rebuilds the graph's edges from the nodes' current conditions as a side effect, see :meth:`_add_transitions`.
@@ -837,7 +836,7 @@ class MotionStatechart(SubclassJSONSerializer):
         return result
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         """
         Reconstructs a motion statechart from its JSON representation, as produced by :meth:`to_json`:
         first all nodes, then their transition conditions, then goal/child parent links.

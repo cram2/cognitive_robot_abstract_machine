@@ -147,6 +147,7 @@ class Executor:
             self.debug_expression_plotter.reset(
                 self.motion_statechart.collect_debug_expressions()
             )
+            self.debug_expression_plotter.debug_expression_trajectory.append(self.time)
         self.context.collision_manager.update_collision_matrix()
         # do one tick to immediately active nodes whose start condition is constant true.
         self.motion_statechart.tick(self.context)

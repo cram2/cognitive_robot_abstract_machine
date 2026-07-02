@@ -69,6 +69,35 @@ def test_wiggle_insert_reaches_hole(pr2_world_state_reset: World, rclpy_node):
     assert wiggle.observation_state == ObservationStateValues.TRUE
 
 
+def test_wiggle_insert_basis_uses_root_frame_hole_normal(pr2_world_state_reset: World):
+    """
+    The wiggle basis vectors must be perpendicular to hole_normal as expressed in root_link,
+    since the wiggle noise they span is added to a root_link-frame point (root_P_hole).
+    """
+    tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        "r_gripper_tool_frame"
+    )
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    hole_point = _hole_at_current_tip(pr2_world_state_reset, tip, root)
+    hole_normal_in_tip_frame = Vector3.Z(reference_frame=tip)
+
+    wiggle = WiggleInsert(
+        root_link=root,
+        tip_link=tip,
+        hole_point=hole_point,
+        hole_normal=hole_normal_in_tip_frame,
+    )
+    context = MotionStatechartContext(world=pr2_world_state_reset)
+    wiggle.build(context)
+
+    expected_normal_in_root = pr2_world_state_reset.transform(
+        target_frame=root, spatial_object=hole_normal_in_tip_frame
+    ).to_np()[:3]
+
+    assert np.isclose(np.dot(wiggle._v1, expected_normal_in_root), 0.0, atol=1e-9)
+    assert np.isclose(np.dot(wiggle._v2, expected_normal_in_root), 0.0, atol=1e-9)
+
+
 def test_wiggle_insert_on_tick_updates_noise(pr2_world_state_reset: World):
     random.seed(1)
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
@@ -130,7 +159,7 @@ def test_wiggle_insert(hsr_world_state_reset):
                 ),
                 Parallel(
                     [
-                        WiggleInsert(
+                        wiggle := WiggleInsert(
                             name="wiggle",
                             root_link=root_link,
                             tip_link=hpl,
@@ -164,3 +193,6 @@ def test_wiggle_insert(hsr_world_state_reset):
     )
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
+
+    assert motion.observation_state == ObservationStateValues.TRUE
+    assert not np.allclose(wiggle._current_vector, np.zeros(3))

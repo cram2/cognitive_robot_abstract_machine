@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 
@@ -23,6 +23,7 @@ class Pointing(CartesianTask):
     """the axis of tip_link that will be used for pointing"""
 
     max_velocity: float = field(default=0.3, kw_only=True)
+    """Reference angular velocity for normalization in rad/s."""
     threshold: float = field(default=0.01, kw_only=True)
     """
     Observation is true if the pointing angle is below this threshold.
@@ -87,6 +88,7 @@ class PointingCone(CartesianTask):
     cone_theta: float = field(default=0.0, kw_only=True)
     """Slack cone region in radians"""
     max_velocity: float = field(default=0.3, kw_only=True)
+    """Reference angular velocity for normalization in rad/s."""
     threshold: float = field(default=0.01, kw_only=True)
     """
     Observation is true if the pointing angle is below this threshold.

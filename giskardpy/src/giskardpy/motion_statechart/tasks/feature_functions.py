@@ -1,8 +1,7 @@
-from __future__ import division
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import field, dataclass
-from typing import Union
 
 import krrood.symbolic_math.symbolic_math as sm
 from semantic_digital_twin.spatial_types import Point3, Vector3
@@ -33,11 +32,11 @@ class FeatureFunctionGoal(Task, ABC):
     """
     The static reference link. Defines the fixed frame of reference.
     """
-    controlled_feature: Union[Point3, Vector3] = field(init=False)
+    controlled_feature: Point3 | Vector3 = field(init=False)
     """
     The geometric feature (point or vector) that is being controlled, expressed in the tip link frame.
     """
-    reference_feature: Union[Point3, Vector3] = field(init=False)
+    reference_feature: Point3 | Vector3 = field(init=False)
     """
     The geometric feature (point or vector) that serves as reference, expressed in the root link frame.
     """
@@ -45,7 +44,7 @@ class FeatureFunctionGoal(Task, ABC):
     @abstractmethod
     def get_controlled_and_reference_features(
         self,
-    ) -> tuple[Union[Point3, Vector3], Union[Point3, Vector3]]:
+    ) -> tuple[Point3 | Vector3, Point3 | Vector3]:
         """
         Return the controlled and reference features.
 

@@ -415,9 +415,9 @@ class QPDataTwoSidedInequality(QPData):
             box_finite_filter  # [zero_quadratic_weight_filter]
         )
 
-        inequality_matrix = self.inequality_matrix[:, zero_quadratic_weight_filter][
-            constraint_filter, :
-        ]
+        inequality_matrix = self.inequality_matrix[
+            self.num_box_constraints :, zero_quadratic_weight_filter
+        ][constraint_filter, :]
 
         box_matrix = self._direct_limit_model(
             self.quadratic_weights.shape[0],

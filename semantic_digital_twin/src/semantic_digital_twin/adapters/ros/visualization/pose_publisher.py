@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import time
 from dataclasses import dataclass, field
-from typing import Union
 
 import rclpy
 from rclpy.qos import QoSProfile, DurabilityPolicy
@@ -23,7 +24,7 @@ from semantic_digital_twin.spatial_types import (
 
 @dataclass
 class PosePublisher(ModelChangeCallback):
-    pose: Union[HomogeneousTransformationMatrix, Pose] = field(kw_only=True)
+    pose: HomogeneousTransformationMatrix | Pose = field(kw_only=True)
     """
     The pose to publish.
     """
@@ -35,7 +36,7 @@ class PosePublisher(ModelChangeCallback):
     """
     Lifetime of the PosePublisher and viz marker in seconds. If the lifetime is 0 the marker will stay indefinitely.
     """
-    text: str = None
+    text: str | None = None
     """
     Text to display at the pose position
     """
@@ -44,6 +45,10 @@ class PosePublisher(ModelChangeCallback):
     Topic name to publish the pose marker on.
     """
 
+    fixed_frame: str = field(init=False)
+    """
+    Name of the world's root frame, used as the marker's reference frame when the pose has none.
+    """
     publisher: Any = field(init=False)
     """
     Ros publisher for viz marker

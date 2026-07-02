@@ -6,6 +6,10 @@ from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.debug_expression_trajectory import (
     DebugExpressionTrajectory,
 )
+from giskardpy.motion_statechart.exceptions import (
+    EmptyDebugExpressionTrajectoryError,
+    PlotterNotConfiguredError,
+)
 from giskardpy.motion_statechart.graph_node import DebugExpression, EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.plotters.debug_expression_trajectory_plotter import (
@@ -18,8 +22,8 @@ from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.world import World
 
 
-def _build_executor(cylinder_bot_world: World) -> Executor:
-    """Build an executor that moves the bot to a Cartesian point while recording."""
+def _build_motion_statechart(cylinder_bot_world: World) -> MotionStatechart:
+    """Build a motion statechart that moves the bot to a Cartesian point."""
     root = cylinder_bot_world.root
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     motion_statechart = MotionStatechart()
@@ -31,11 +35,16 @@ def _build_executor(cylinder_bot_world: World) -> Executor:
     )
     motion_statechart.add_node(goal)
     motion_statechart.add_node(EndMotion.when_true(goal))
+    return motion_statechart
+
+
+def _build_executor(cylinder_bot_world: World) -> Executor:
+    """Build an executor that moves the bot to a Cartesian point while recording."""
     executor = Executor(
         context=MotionStatechartContext(world=cylinder_bot_world),
         debug_expression_plotter=DebugExpressionTrajectoryPlotter(),
     )
-    executor.compile(motion_statechart=motion_statechart)
+    executor.compile(motion_statechart=_build_motion_statechart(cylinder_bot_world))
     return executor
 
 
@@ -75,8 +84,25 @@ class TestDebugExpressionRecording:
         assert output.exists()
         assert output.stat().st_size > 0
 
+    def test_plot_raises_when_plotter_not_configured(
+        self, cylinder_bot_world: World, tmp_path
+    ):
+        executor = Executor(context=MotionStatechartContext(world=cylinder_bot_world))
+        executor.compile(motion_statechart=_build_motion_statechart(cylinder_bot_world))
+
+        output = tmp_path / "debug_expressions.pdf"
+        with pytest.raises(PlotterNotConfiguredError):
+            executor.plot_debug_expressions(str(output))
+
 
 class TestDebugExpressionTrajectory:
+    def test_plot_raises_when_no_samples_were_recorded(self, tmp_path):
+        plotter = DebugExpressionTrajectoryPlotter()
+        plotter.reset([DebugExpression(name="constant", expression=Scalar(data=2.0))])
+
+        with pytest.raises(EmptyDebugExpressionTrajectoryError):
+            plotter.plot(str(tmp_path / "debug_expressions.pdf"))
+
     def test_append_rejects_non_monotonic_time(self):
         trajectory = DebugExpressionTrajectory.from_debug_expressions(
             [DebugExpression(name="constant", expression=Scalar(data=2.0))]

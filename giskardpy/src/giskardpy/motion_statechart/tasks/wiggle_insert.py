@@ -36,11 +36,11 @@ class WiggleInsert(Task):
     hole_point: Point3 = field(kw_only=True)
     """Center point of the hole."""
     noise_translation: float = field(kw_only=True, default=0.5)
-    """Strength of the translational wiggle."""
+    """Strength of the translational wiggle. Default is an untuned preset, not a calibrated value."""
     noise_angle: float = field(kw_only=True, default=10)
-    """Strength of the angular wiggle."""
+    """Strength of the angular wiggle. Default is an untuned preset, not a calibrated value."""
     down_velocity: float = field(kw_only=True, default=0.2)
-    """Reference velocity for pressing down in m/s."""
+    """Reference velocity for pressing down in m/s. Default is an untuned preset, not a calibrated value."""
     hole_normal: Optional[Vector3] = field(default=None, kw_only=True)
     """Vector perpendicular to the hole. Defaults to the root z-axis."""
     threshold: float = field(default=0.01, kw_only=True)
@@ -82,10 +82,13 @@ class WiggleInsert(Task):
 
         # The previous default was a zero vector, which has no well-defined perpendicular plane;
         # the root z-axis is used instead so the default is usable.
-        hole_normal = (
-            self.hole_normal
-            if self.hole_normal is not None
-            else Vector3.Z(reference_frame=self.root_link)
+        hole_normal = context.world.transform(
+            target_frame=self.root_link,
+            spatial_object=(
+                self.hole_normal
+                if self.hole_normal is not None
+                else Vector3.Z(reference_frame=self.root_link)
+            ),
         )
 
         control_dt = context.qp_controller_config.control_dt
@@ -142,9 +145,11 @@ class WiggleInsert(Task):
             quadratic_weight=self.weight + 1,
         )
 
-        artifacts.debug_expressions.append(DebugExpression("root_P_hole", root_P_hole))
         artifacts.debug_expressions.append(
-            DebugExpression("root_P_hole_wiggled", root_P_hole_wiggled)
+            DebugExpression(f"{self.name}/root_P_hole", root_P_hole)
+        )
+        artifacts.debug_expressions.append(
+            DebugExpression(f"{self.name}/root_P_hole_wiggled", root_P_hole_wiggled)
         )
 
         distance = root_P_current.euclidean_distance(root_P_hole)
