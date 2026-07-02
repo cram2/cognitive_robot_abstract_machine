@@ -10,9 +10,12 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
+from semantic_digital_twin.robots.hsrb import HSRB
+from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
+    Pose,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -58,7 +61,6 @@ logger.setLevel(logging.DEBUG)
 
 headless = os.environ.get("CI", "false").lower() == "true"
 only_run_test_in_CI = os.environ.get("CI", "false").lower() == "false"
-# only_run_test_in_CI = False
 
 pytestmark = pytest.mark.skipif(
     only_run_test_in_CI,
@@ -66,8 +68,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 TEST_URDF_1 = os.path.normpath(os.path.join(urdf_dir, "simple_two_arm_robot.urdf"))
-TEST_URDF_2 = os.path.normpath(os.path.join(urdf_dir, "hsrb.urdf"))
-TEST_URDF_TRACY = os.path.normpath(os.path.join(urdf_dir, "tracy.urdf"))
+TEST_URDF_2 = HSRB.get_ros_file_path()
+TEST_URDF_TRACY = Tracy.get_ros_file_path()
 TEST_MJCF_1 = os.path.normpath(os.path.join(mjcf_dir, "mjx_single_cube_no_mesh.xml"))
 TEST_MJCF_2 = os.path.normpath(os.path.join(mjcf_dir, "jeroen_cups.xml"))
 STEP_SIZE = 1e-3
@@ -103,7 +105,7 @@ def test_empty_multi_sim_in_5s():
 
     try:
         assert isinstance(multi_sim.simulator, MujocoSimulator)
-        assert multi_sim.simulator.file_path == "/tmp/scene.xml"
+        assert multi_sim.simulator.file_path == MujocoSim.default_file_path
         assert multi_sim.simulator.headless is headless
         assert multi_sim.simulator.step_size == STEP_SIZE
 
@@ -122,7 +124,7 @@ def test_world_multi_sim_in_5s(test_urdf_1_world):
 
     try:
         assert isinstance(multi_sim.simulator, MujocoSimulator)
-        assert multi_sim.simulator.file_path == "/tmp/scene.xml"
+        assert multi_sim.simulator.file_path == MujocoSim.default_file_path
         assert multi_sim.simulator.headless is headless
         assert multi_sim.simulator.step_size == STEP_SIZE
 
@@ -146,7 +148,7 @@ def test_apartment_multi_sim_in_5s():
 
     try:
         assert isinstance(multi_sim.simulator, MujocoSimulator)
-        assert multi_sim.simulator.file_path == "/tmp/scene.xml"
+        assert multi_sim.simulator.file_path == MujocoSim.default_file_path
         assert multi_sim.simulator.headless is headless
         assert multi_sim.simulator.step_size == STEP_SIZE
 
@@ -165,7 +167,7 @@ def test_world_multi_sim_with_change(test_urdf_1_world):
 
     try:
         assert isinstance(multi_sim.simulator, MujocoSimulator)
-        assert multi_sim.simulator.file_path == "/tmp/scene.xml"
+        assert multi_sim.simulator.file_path == MujocoSim.default_file_path
         assert multi_sim.simulator.headless is headless
         assert multi_sim.simulator.step_size == STEP_SIZE
 
@@ -309,7 +311,7 @@ def test_mujoco_with_tracy_dae_files():
 
     try:
         assert isinstance(multi_sim.simulator, MujocoSimulator)
-        assert multi_sim.simulator.file_path == "/tmp/scene.xml"
+        assert multi_sim.simulator.file_path == MujocoSim.default_file_path
         assert multi_sim.simulator.headless is headless
         assert multi_sim.simulator.step_size == STEP_SIZE
 
@@ -347,7 +349,7 @@ def test_mujocosim_world_with_added_objects(test_urdf_1_world):
 
     try:
         assert isinstance(multi_sim.simulator, MujocoSimulator)
-        assert multi_sim.simulator.file_path == "/tmp/scene.xml"
+        assert multi_sim.simulator.file_path == MujocoSim.default_file_path
         assert multi_sim.simulator.headless is headless
         assert multi_sim.simulator.step_size == STEP_SIZE
 
@@ -410,7 +412,7 @@ def test_spawn_body_with_connections():
                     parent=root_body,
                     child=spawn_left_shoulder_body,
                     axis=Vector3.Z(reference_frame=spawn_left_shoulder_body),
-                    dof_id=dof.id,
+                    raw_dof=dof,
                     parent_T_connection_expression=left_shoulder_origin,
                 )
             )
@@ -443,7 +445,7 @@ def test_spawn_body_with_connections():
                     parent=root_body,
                     child=spawn_right_shoulder_body,
                     axis=Vector3.Z(reference_frame=spawn_right_shoulder_body),
-                    dof_id=dof.id,
+                    raw_dof=dof,
                     parent_T_connection_expression=right_shoulder_origin,
                 )
             )
@@ -510,7 +512,9 @@ def test_world_sim_state_sync():
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                         reference_frame=falling_box
                     ),
-                    scale=Scale(box_half_size * 2, box_half_size * 2, box_half_size * 2),
+                    scale=Scale(
+                        box_half_size * 2, box_half_size * 2, box_half_size * 2
+                    ),
                     color=Color(1.0, 0.0, 0.0, 1.0),
                 )
             ],
@@ -543,9 +547,9 @@ def test_world_sim_state_sync():
         falling_box, box_connection = spawn_state_sync_scene(world)
 
         body_names = multi_sim.simulator.get_all_body_names().result
-        assert {"ground_plane", "falling_box"}.issubset(body_names), (
-            f"scene bodies were not spawned in the simulator; bodies={body_names}"
-        )
+        assert {"ground_plane", "falling_box"}.issubset(
+            body_names
+        ), f"scene bodies were not spawned in the simulator; bodies={body_names}"
 
         box_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=float(init_pos[0]),

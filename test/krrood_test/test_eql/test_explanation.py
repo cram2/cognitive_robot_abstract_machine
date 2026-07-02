@@ -8,9 +8,10 @@ from krrood.entity_query_language.core.base_expressions import SymbolicExpressio
 from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.evaluation import is_condition_participant
 from krrood.entity_query_language._stack import CallStack
+from krrood.entity_query_language._monitoring import monitored
 from krrood.entity_query_language.explanation.explanation import (
     explain_inference,
-    register_inference, monitored,
+    register_inference,
 )
 from krrood.entity_query_language.factories import (
     inference,
@@ -18,13 +19,20 @@ from krrood.entity_query_language.factories import (
     variable_from,
     and_,
     or_,
-    not_, variable, match_variable,
+    not_,
+    variable,
+    match_variable,
 )
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.query.query import Query
 from krrood.entity_query_language.query_graph import QueryGraph
 from krrood.symbol_graph.symbol_graph import Symbol
-from ..dataset.semantic_world_like_classes import Handle, PrismaticConnection, FixedConnection, Drawer
+from ..dataset.semantic_world_like_classes import (
+    Handle,
+    PrismaticConnection,
+    FixedConnection,
+    Drawer,
+)
 
 
 @dataclass(unsafe_hash=True)
@@ -200,7 +208,9 @@ def test_explain_inference_focus_package():
     explanation_full = explanation_obj.as_string()
     assert "test_explanation.py" in explanation_full
     # focus_package only filters when show_trace=True
-    explanation_filtered = explanation_obj.as_string(show_trace=True, focus_package="test_explanation.py")
+    explanation_filtered = explanation_obj.as_string(
+        show_trace=True, focus_package="test_explanation.py"
+    )
     assert "test_explanation.py" in explanation_filtered
 
 
@@ -415,9 +425,7 @@ def test_condition_graph_pipeline_simple():
     assert qg is not None
     assert len(qg.expression_node_map) > 0
 
-    comp_nodes = [
-        node for node in qg.expression_node_map.values() if node.name == ">"
-    ]
+    comp_nodes = [node for node in qg.expression_node_map.values() if node.name == ">"]
     assert len(comp_nodes) == 1
     assert comp_nodes[0].is_satisfied is True
 
@@ -437,9 +445,7 @@ def test_condition_graph_pipeline_nested_and_or():
     qg = explanation.condition_graph()
     assert qg is not None
 
-    nodes_by_name = {
-        node.name: node for node in qg.expression_node_map.values()
-    }
+    nodes_by_name = {node.name: node for node in qg.expression_node_map.values()}
     assert "AND" in nodes_by_name
     assert "OR" in nodes_by_name
     assert nodes_by_name["AND"].is_satisfied is True
@@ -462,9 +468,7 @@ def test_condition_graph_pipeline_not():
     qg = explanation.condition_graph()
     assert qg is not None
 
-    nodes_by_name = {
-        node.name: node for node in qg.expression_node_map.values()
-    }
+    nodes_by_name = {node.name: node for node in qg.expression_node_map.values()}
     assert "Not" in nodes_by_name
     assert nodes_by_name["Not"].is_satisfied is True
     assert nodes_by_name[">"].is_satisfied is False
@@ -496,9 +500,7 @@ def test_condition_graph_pipeline_or_short_circuit():
     qg = explanation.condition_graph()
     assert qg is not None
 
-    nodes_by_name = {
-        node.name: node for node in qg.expression_node_map.values()
-    }
+    nodes_by_name = {node.name: node for node in qg.expression_node_map.values()}
     assert "OR" in nodes_by_name
     assert nodes_by_name["OR"].is_satisfied is True
     assert nodes_by_name[">"].is_satisfied is True
@@ -520,9 +522,7 @@ def test_condition_graph_pipeline_complex():
     qg = explanation.condition_graph()
     assert qg is not None
 
-    nodes_by_name = {
-        node.name: node for node in qg.expression_node_map.values()
-    }
+    nodes_by_name = {node.name: node for node in qg.expression_node_map.values()}
     # Look up AND nodes directly from expression_node_map using the actual expressions
     and_nodes = [
         (expr, node)
@@ -540,9 +540,7 @@ def test_condition_graph_pipeline_complex():
     assert nodes_by_name["Not"].is_satisfied is True
     assert nodes_by_name["=="].is_satisfied is False
     # Two ">" nodes: val > 0 (satisfied) and val > 1 (short-circuited, not satisfied)
-    gt_nodes = [
-        node for node in qg.expression_node_map.values() if node.name == ">"
-    ]
+    gt_nodes = [node for node in qg.expression_node_map.values() if node.name == ">"]
     assert len(gt_nodes) == 2
     assert sum(1 for n in gt_nodes if n.is_satisfied) == 1
 
@@ -719,7 +717,9 @@ def test_nested_rule_explanation(drawer_rule):
     explanation = explain_inference(found_drawers[0])
     assert explanation is not None
     assert isinstance(explanation.query_root, SymbolicExpression)
-    for i, condition_and_bindings in enumerate(explanation.get_satisfied_conditions_and_their_bindings()):
+    for i, condition_and_bindings in enumerate(
+        explanation.get_satisfied_conditions_and_their_bindings()
+    ):
         condition = condition_and_bindings.condition
         bindings = condition_and_bindings.bindings
         assert isinstance(condition, Comparator)
@@ -729,15 +729,18 @@ def test_nested_rule_explanation(drawer_rule):
             assert condition.left._attribute_name_ == "parent"
             assert condition.left._child_._type_ is FixedConnection
             assert condition.right._child_._type_ is PrismaticConnection
-            assert isinstance(bindings[condition.right._child_._id_], PrismaticConnection)
+            assert isinstance(
+                bindings[condition.right._child_._id_], PrismaticConnection
+            )
         else:
             assert isinstance(condition.left, Attribute)
             assert condition.left._attribute_name_ == "child"
             assert condition.left._child_._type_ is FixedConnection
             assert isinstance(bindings[condition.left._child_._id_], FixedConnection)
     assert explanation.get_satisfied_conditions_as_string() == (
-        '(FixedConnection.parent == PrismaticConnection.child)'
-        '\nAND (FixedConnection.child == Handle)')
+        "(FixedConnection.parent == PrismaticConnection.child)"
+        "\nAND (FixedConnection.child == Handle)"
+    )
     explanation.condition_graph().visualize(filename="drawer_explanation.pdf")
 
 
@@ -793,7 +796,9 @@ def test_explanation_lifecycle_tied_to_instance():
         "likely an InferenceExplanation or a class-level cache holding a strong "
         "reference to a WorldEntity."
     )
-    assert drawer_ref() is None, "Drawer should have been garbage-collected together with its World."
+    assert (
+        drawer_ref() is None
+    ), "Drawer should have been garbage-collected together with its World."
 
 
 @pytest.fixture

@@ -2,7 +2,7 @@
 Tests for the fragment model, formatters, renderers, and VerbalizationPipeline.
 
 Coverage:
-- Fragment tree structure: SemanticRole tagging for variables, aggregations, keywords, operators
+- VerbalizationFragment tree structure: SemanticRole tagging for variables, aggregations, keywords, operators
 - PlainFormatter: identity pass-through
 - ANSIFormatter: wraps text in ANSI escape sequences; plain for PLAIN role
 - HTMLFormatter: wraps text in <span> tags; plain for PLAIN role; uses &nbsp; / <br>
@@ -30,7 +30,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     BlockFragment,
     PhraseFragment,
     RoleFragment,
-    VerbFragment,
+    VerbalizationFragment,
     WordFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
@@ -46,7 +46,10 @@ from krrood.entity_query_language.verbalization.rendering.renderer import (
     HierarchicalRenderer,
     ParagraphRenderer,
 )
-from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer, _str
+from krrood.entity_query_language.verbalization.fragments.base import (
+    flatten_fragment_to_plain_text,
+)
+from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
 from ...dataset.semantic_world_like_classes import (
     Drawer,
     FixedConnection,
@@ -66,10 +69,10 @@ class _Task:
     completed: bool
 
 
-# ── Fragment helpers ───────────────────────────────────────────────────────────
+# ── VerbalizationFragment helpers ───────────────────────────────────────────────────────────
 
 
-def _collect_roles(fragment: VerbFragment) -> list[SemanticRole]:
+def _collect_roles(fragment: VerbalizationFragment) -> list[SemanticRole]:
     """Recursively collect all SemanticRole values from a fragment tree."""
     match fragment:
         case RoleFragment(role=role):
@@ -83,7 +86,9 @@ def _collect_roles(fragment: VerbFragment) -> list[SemanticRole]:
             return []
 
 
-def _collect_role_texts(fragment: VerbFragment, role: SemanticRole) -> list[str]:
+def _collect_role_texts(
+    fragment: VerbalizationFragment, role: SemanticRole
+) -> list[str]:
     """Return all text values in the tree that carry *role*."""
     match fragment:
         case RoleFragment(text=text, role=r) if r == role:
@@ -99,7 +104,7 @@ def _collect_role_texts(fragment: VerbFragment, role: SemanticRole) -> list[str]
             return []
 
 
-# ── Fragment structure tests ───────────────────────────────────────────────────
+# ── VerbalizationFragment structure tests ───────────────────────────────────────────────────
 
 
 def test_variable_fragment_carries_variable_role():
@@ -587,12 +592,14 @@ def test_hierarchical_plain_rule_structure(doors_and_drawers_world):
 
 
 def _find_block_with_keyword(
-    fragment: VerbFragment, keyword: str
+    fragment: VerbalizationFragment, keyword: str
 ) -> BlockFragment | None:
     """Return the first BlockFragment whose header text contains keyword."""
     if not isinstance(fragment, BlockFragment):
         return None
-    if fragment.header is not None and keyword in _str(fragment.header):
+    if fragment.header is not None and keyword in flatten_fragment_to_plain_text(
+        fragment.header
+    ):
         return fragment
     for item in fragment.items:
         found = _find_block_with_keyword(item, keyword)
@@ -601,7 +608,7 @@ def _find_block_with_keyword(
     return None
 
 
-def _drawer_rule_fragment(doors_and_drawers_world) -> VerbFragment:
+def _drawer_rule_fragment(doors_and_drawers_world) -> VerbalizationFragment:
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
@@ -632,44 +639,40 @@ def test_attribute_chain_owner_carries_variable_role(doors_and_drawers_world):
     assert any("FixedConnection" in t for t in variable_texts)
 
 
-def test_rule_if_antecedent_is_block_fragment(doors_and_drawers_world):
+def test_rule_if_antecedent_repeats_whose_per_condition(doors_and_drawers_world):
+    """An antecedent renders as one phrase — the existential intro woven with its conditions, each
+    condition prefixed with its own *"whose"* and joined *"whose …, and whose …"* (the query
+    restriction form)."""
     frag = _drawer_rule_fragment(doors_and_drawers_world)
     if_block = _find_block_with_keyword(frag, "If")
     assert if_block is not None
-    antecedent_blocks = [
-        item for item in if_block.items if isinstance(item, BlockFragment)
-    ]
-    assert (
-        antecedent_blocks
-    ), "IF clause must contain at least one antecedent BlockFragment"
-    for block in antecedent_blocks:
-        assert isinstance(
-            block.header, PhraseFragment
-        ), "antecedent intro must be a PhraseFragment"
-        assert block.items, "antecedent block must have condition items"
+    assert if_block.items, "IF clause must contain at least one antecedent"
+    texts = [flatten_fragment_to_plain_text(item) for item in if_block.items]
+    antecedent = next(t for t in texts if "FixedConnection" in t)
+    assert antecedent.startswith("there's a FixedConnection whose")
+    assert ", and whose " in antecedent
+    # "whose" is repeated per condition, not shared
+    assert antecedent.count("whose") == 2
 
 
-def test_rule_then_consequent_is_block_fragment(doors_and_drawers_world):
+def test_rule_then_consequent_repeats_whose_per_binding(doors_and_drawers_world):
+    """The THEN clause is a single consequent phrase: the existential intro with each field binding
+    prefixed by its own *"whose"* and joined *"whose …, and whose …"*."""
     frag = _drawer_rule_fragment(doors_and_drawers_world)
     then_block = _find_block_with_keyword(frag, "then")
     assert then_block is not None
-    assert (
-        len(then_block.items) == 1
-    ), "THEN clause must contain exactly one consequent BlockFragment"
-    consequent = then_block.items[0]
-    assert isinstance(consequent, BlockFragment), "THEN item must be a BlockFragment"
-    assert isinstance(
-        consequent.header, PhraseFragment
-    ), "consequent intro must be a PhraseFragment"
-    assert "Drawer" in _str(consequent.header)
-    assert consequent.items, "consequent block must have binding items"
+    assert len(then_block.items) == 1
+    text = flatten_fragment_to_plain_text(then_block.items[0])
+    assert text.startswith("there's a Drawer whose")
+    assert ", and whose " in text
+    assert text.count("whose") == 2
 
 
 # ── VerbalizationPipeline factories ───────────────────────────────────────────
 
 
 def test_pipeline_plain_matches_verbalize_expression():
-    from krrood.entity_query_language.verbalization.verbalizer import (
+    from krrood.entity_query_language.verbalization.pipeline import (
         verbalize_expression,
     )
 
@@ -692,11 +695,10 @@ def test_pipeline_html_contains_span():
 
 def test_pipeline_html_hierarchical_has_br():
     r = variable(_Robot, [])
-    text = VerbalizationPipeline.ansi(hierarchical=True).verbalize(
+    text = VerbalizationPipeline.html(hierarchical=True).verbalize(
         an(entity(r).where(r.battery > 50))
     )
-    print("\n" + text)
-    # assert "<br>" in text
+    assert "<br>" in text
 
 
 def test_pipeline_html_hierarchical_has_br_between_items_on_rule(
@@ -706,9 +708,6 @@ def test_pipeline_html_hierarchical_has_br_between_items_on_rule(
     text = VerbalizationPipeline.html(hierarchical=True).verbalize_fragment(
         drawer_fragment
     )
-    print_ = False
-    if print_:
-        print("\n" + text)
     assert "<br>" in text
 
 
@@ -717,8 +716,5 @@ def test_pipeline_ansi_hierarchical_has_newlines_on_rule(doors_and_drawers_world
     text = VerbalizationPipeline.ansi(hierarchical=True).verbalize_fragment(
         drawer_fragment
     )
-    print_ = True
-    if print_:
-        print("\n" + text)
     assert "\n" in text
     assert "<br>" not in text

@@ -50,10 +50,12 @@ def test_inner_var_reachable_without_intermediate_query():
 
     for result in results:
         # With no Query wrapper, val._id_ accumulates through the cartesian product
-        assert val._id_ in result.all_bindings, (
-            "val._id_ should be reachable via all_bindings when no Query sits in between"
+        assert (
+            val._id_ in result.all_bindings
+        ), "val._id_ should be reachable via all_bindings when no Query sits in between"
+        assert (
+            inner_expr._id_ in result.all_bindings or inner_expr._id_ in result.bindings
         )
-        assert inner_expr._id_ in result.all_bindings or inner_expr._id_ in result.bindings
 
 
 # ---------------------------------------------------------------------------
@@ -90,12 +92,12 @@ def test_inner_var_reachable_through_query_wrapper_after_fix():
         assert inner_query._id_ in result.all_bindings
 
         # After the fix: val._id_ and inner_expr._id_ are now reachable via deep traversal
-        assert val._id_ in result.all_bindings, (
-            "val._id_ should now be reachable via all_bindings deep traversal"
-        )
-        assert inner_expr._id_ in result.all_bindings, (
-            "inner_expr._id_ should now be reachable via all_bindings deep traversal"
-        )
+        assert (
+            val._id_ in result.all_bindings
+        ), "val._id_ should now be reachable via all_bindings deep traversal"
+        assert (
+            inner_expr._id_ in result.all_bindings
+        ), "inner_expr._id_ should now be reachable via all_bindings deep traversal"
 
 
 def test_slim_query_binding_and_deep_binding_after_fix():
@@ -125,12 +127,12 @@ def test_slim_query_binding_and_deep_binding_after_fix():
     assert result.all_bindings[inner_query._id_] == Inner(value=5)
 
     # After the fix: val and inner_expr ARE now in all_bindings via deep traversal
-    assert val._id_ in result.all_bindings, (
-        "val._id_ should now be reachable via all_bindings deep graph traversal"
-    )
-    assert inner_expr._id_ in result.all_bindings, (
-        "inner_expr._id_ should now be reachable via all_bindings deep graph traversal"
-    )
+    assert (
+        val._id_ in result.all_bindings
+    ), "val._id_ should now be reachable via all_bindings deep graph traversal"
+    assert (
+        inner_expr._id_ in result.all_bindings
+    ), "inner_expr._id_ should now be reachable via all_bindings deep graph traversal"
     assert result.all_bindings[val._id_] == 5
 
 

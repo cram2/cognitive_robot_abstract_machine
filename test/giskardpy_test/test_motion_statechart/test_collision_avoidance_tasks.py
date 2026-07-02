@@ -1,4 +1,5 @@
 import json
+import time
 from copy import deepcopy
 
 import numpy as np
@@ -45,14 +46,19 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
+)
+from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidCollisionBetweenGroups,
     AvoidExternalCollisions,
     AvoidAllCollisions,
     AllowAllCollisions,
 )
+from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
+from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -205,6 +211,8 @@ def test_external_collision_avoidance_battle():
                 child=strong_robot_world.root,
             ),
         )
+        strong = world.get_kinematic_structure_entity_by_id(strong.id)
+        strong_robot_sa = world.get_semantic_annotation_by_id(strong_robot_sa.id)
         world.merge_world(
             weak_robot_world,
             omni2 := OmniDrive.create_with_dofs(
@@ -213,6 +221,9 @@ def test_external_collision_avoidance_battle():
                 child=weak_robot_world.root,
             ),
         )
+        weak = world.get_kinematic_structure_entity_by_id(weak.id)
+        weak_robot_sa = world.get_semantic_annotation_by_id(weak_robot_sa.id)
+
         omni1.has_hardware_interface = True
         omni2.has_hardware_interface = True
 
@@ -701,8 +712,7 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box):
     kin_sim.tick_until_end(500)
 
 
-def test_hard_constraints_violated(cylinder_bot_world: World, rclpy_node):
-    VizMarkerPublisher(_world=cylinder_bot_world, node=rclpy_node).with_tf_publisher()
+def test_hard_constraints_violated(cylinder_bot_world: World):
     root = cylinder_bot_world.root
     with cylinder_bot_world.modify_world():
         env2 = Body(
@@ -812,7 +822,7 @@ def test_hard_constraints_violated(cylinder_bot_world: World, rclpy_node):
 
 def test_collision_for_robot_with_static_base(tracy_world):
     world = deepcopy(tracy_world)
-    robot = Tracy.from_world(world)
+    robot = world.get_semantic_annotations_by_type(Tracy)[0]
 
     tool_frame = world.get_body_by_name("r_gripper_tool_frame")
     with world.modify_world():
@@ -822,11 +832,11 @@ def test_collision_for_robot_with_static_base(tracy_world):
         )
         world.add_connection(
             Connection6DoF.create_with_dofs(
-                world,
-                world.root,
-                obstacle,
-                PrefixedName("obstacle_conn"),
-                HomogeneousTransformationMatrix.from_xyz_rpy(
+                world=world,
+                parent=world.root,
+                child=obstacle,
+                name=PrefixedName("obstacle_conn"),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     0.5, 0.5, 1, reference_frame=world.root
                 ),
             )
@@ -868,3 +878,74 @@ def test_collision_for_robot_with_static_base(tracy_world):
                 f"Gripper penetrated the obstacle (distance={contact.distance:.4f}m)."
                 "ExternalCollisionAvoidance is not avoiding the obstacle."
             )
+
+
+def test_repeated_collision_pr2_apartment_does_not_increase_execution_time(
+    pr2_apartment_world,
+):
+    world = deepcopy(pr2_apartment_world)
+
+    tool_frame = world.get_body_by_name("r_gripper_tool_frame")
+    robot = world.get_semantic_annotations_by_type(PR2)[0]
+
+    left_arm_park = robot.left_arm.get_joint_state_by_type(StaticJointState.PARK)
+    right_arm_park = robot.right_arm.get_joint_state_by_type(StaticJointState.PARK)
+    world.set_positions_1DOF_connection(dict(left_arm_park.items()))
+    world.set_positions_1DOF_connection(dict(right_arm_park.items()))
+
+    body = world.get_body_by_name("handle_cab11_t")
+
+    execution_times = []
+    for i in range(10):
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                UpdateTemporaryCollisionRules(
+                    temporary_rules=[
+                        AvoidExternalCollisions(robot=robot),
+                        AllowCollisionBetweenGroups(
+                            body_group_a=[
+                                b
+                                for b in robot.right_arm.end_effector.bodies
+                                if b.has_collision()
+                            ],
+                            body_group_b=[
+                                b
+                                for b in world.bodies
+                                if "apartment" in str(b.name) and b.has_collision()
+                            ],
+                        ),
+                    ]
+                ),
+                CartesianPose(
+                    root_link=world.root,
+                    tip_link=tool_frame,
+                    goal_pose=body.global_pose,
+                ),
+                ExternalCollisionAvoidance(robot=robot),
+                SelfCollisionAvoidance(robot=robot),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(msc.nodes[1]))
+
+        kin_sim = Executor(
+            MotionStatechartContext(world=world),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        with world.reset_state_context():
+            start_time = time.time()
+            kin_sim.tick_until_end(500)
+            end_time = time.time()
+            execution_times.append(end_time - start_time)
+
+    # Split execution times into two halves
+    half = len(execution_times) // 2
+    first_half_median = np.median(execution_times[:half])
+    second_half_median = np.median(execution_times[half:])
+
+    # Assert that the second half is not significantly slower than the first half.
+    # We allow a small margin (e.g., 20%) for natural noise.
+    assert second_half_median <= first_half_median * 1.2, (
+        f"Execution time is increasing: first half median {first_half_median:.4f}s, "
+        f"second half median {second_half_median:.4f}s"
+    )

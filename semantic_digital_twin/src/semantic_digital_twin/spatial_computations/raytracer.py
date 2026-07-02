@@ -187,10 +187,14 @@ class RayTracer:
             min_distance=min_distance,
             max_distance=max_distance,
         )
+
+        # Filters rays to the first hit only to create a depth map. This is done by finding the unique indices of the
+        # rays that hit the scene and keeping only the first hit for each ray.
         unique_index = np.unique(index_ray, return_index=True)[1]
-        index_ray = index_ray[unique_index]
-        points = points[unique_index]
-        ray_origins = ray_origins[unique_index]
+        if len(unique_index) != 0:
+            index_ray = index_ray[unique_index]
+            points = points[unique_index]
+            ray_origins = ray_origins[unique_index]
 
         depth = trimesh.util.diagonal_dot(
             points - ray_origins[0], ray_directions[index_ray]

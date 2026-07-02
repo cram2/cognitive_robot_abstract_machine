@@ -22,6 +22,7 @@ from typing_extensions import (
     Dict,
     FrozenSet,
     Hashable,
+    Set,
 )
 
 from krrood.entity_query_language.core.variable import Literal, ExternallySetVariable
@@ -46,8 +47,10 @@ from krrood.entity_query_language.exceptions import (
 from krrood.entity_query_language.operators.set_operations import (
     MultiArityExpressionThatPerformsACartesianProduct,
 )
-from krrood.entity_query_language.utils import ensure_hashable, is_iterable
+from krrood.entity_query_language.utils import is_iterable
+from krrood.utils import ensure_hashable
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
+from krrood.entity_query_language.core.expression_structure import root_variable_ids
 from krrood.utils import memoize
 
 GroupKey = Tuple[Any, ...]
@@ -167,7 +170,9 @@ class OrderedBy(BinaryExpression, DerivedExpression):
         var = self.variable
         var_id = var._id_
         if var_id not in result.all_bindings:
-            variable_value = next(var._evaluate_(OperationResult(result.all_bindings))).value
+            variable_value = next(
+                var._evaluate_(OperationResult(result.all_bindings))
+            ).value
         else:
             variable_value = result.all_bindings[var_id]
         if self.key:
@@ -202,7 +207,9 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
     The variables to group the results by their values.
     """
 
-    def _evaluate__(self, sources: Optional[OperationResult] = None) -> Iterator[OperationResult]:
+    def _evaluate__(
+        self, sources: Optional[OperationResult] = None
+    ) -> Iterator[OperationResult]:
         """
         Generate results grouped by the specified variables in the grouped_by clause.
 
@@ -317,6 +324,14 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         :return: A tuple of the binding IDs of the variables to group by.
         """
         return tuple(var._id_ for var in self.variables_to_group_by)
+
+    @cached_property
+    def group_key_root_ids(self) -> Set[uuid.UUID]:
+        """
+        :return: The ids of the distinct ``Variable`` chain-roots of the group-by keys (e.g. for a
+            key ``employee.department`` the root is the ``employee`` variable).
+        """
+        return root_variable_ids(self.variables_to_group_by)
 
     @property
     def _name_(self) -> str:

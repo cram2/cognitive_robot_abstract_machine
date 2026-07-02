@@ -79,7 +79,7 @@ rt = RayTracer(table_world); rt.update_scene(); rt.scene.show("jupyter")
 ## 1. Craft a transform: Place the cube on top of the table
 Now we will move the cube using a rigid transform. The pose of a 6DoF connection can be set via
 the `origin`, which is a `HomogeneousTransformationMatrix` between the parent (in this case world root) and the child (in this case the cube).
-This naming style, while not strictly pythonic, makes calculating with transformations a lot easier. To learn more about this naming convention, please refer to our [style guide](https://cram2.github.io/semantic_digital_twin/style_guide.html)!
+This naming style, while not strictly pythonic, makes calculating with transformations a lot easier. To learn more about this naming convention, please refer to our [style guide](https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/style_guide.html)!
 
 Our goal is now to place the cube on top of the table (the cube should be lifted 72cm from the ground). For this you need to create a transform `new_table_world_T_box` below, and then comment in the rest of the code in the code in the cell, which will apply the transform to the Connection6DoF which connects the cube to the table.
 
@@ -134,7 +134,7 @@ You may accomplish both tasks at once by constructing a single transform and app
 
 Store your updated transform in `table_world_T_moved_box` and apply it to `table_world_C_box.origin`.
 
-If you don't know how to combine two transforms, you can check out [the appropriate section in our style guide](https://cram2.github.io/semantic_digital_twin/style_guide.html#combine-multiple-transformations)!.
+If you don't know how to combine two transforms, you can check out [the appropriate section in our style guide](https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/style_guide.html#combine-multiple-transformations)!.
 
 ```{code-cell} ipython3 
 :tags: [exercise]
@@ -174,5 +174,5 @@ rt = RayTracer(table_world); rt.update_scene(); rt.scene.show("jupyter")
 
 ## Final Notes
 
-This is just a very basic introduction to transformations. To learn more about transformations, please refer to the [Wikipedia Article about transformations](https://en.wikipedia.org/wiki/Transformation_matrix), as well as our [TransformationMatrix API](https://cram2.github.io/semantic_digital_twin/autoapi/semantic_digital_twin/spatial_types/spatial_types/index.html#semantic_digital_twin.spatial_types.spatial_types.TransformationMatrix) for further details.
+This is just a very basic introduction to transformations. To learn more about transformations, please refer to the [Wikipedia Article about transformations](https://en.wikipedia.org/wiki/Transformation_matrix), as well as our [TransformationMatrix API](https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/autoapi/semantic_digital_twin/spatial_types/spatial_types/index.html#semantic_digital_twin.spatial_types.spatial_types.TransformationMatrix) for further details.
 

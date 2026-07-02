@@ -26,6 +26,7 @@ sphinx:
     - autoapi.extension  # Add the AutoAPI extension
     - 'sphinx.ext.autodoc'
     - sphinxcontrib.plantuml
+    - sphinxcontrib.mermaid
   config:
     bibtex_bibfiles:
       - references.bib
@@ -39,10 +40,6 @@ sphinx:
       - show-inheritance
       - show-module-summary
     autoapi_add_toctree_entry: True
-    # Copy mock API HTML into the build root so AutoAPIResolver finds it at
-    # _build/html/autoapi/verbalization_domain/ (same tree as real AutoAPI output).
-    html_extra_path:
-      - eql/user/api_mock
     html_css_files:
       - custom.css
 

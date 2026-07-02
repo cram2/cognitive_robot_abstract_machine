@@ -51,7 +51,7 @@ class QPSolverQPalm(QPSolver[QPDataTwoSidedInequality]):
         solver.solve()
         if solver.info.status_val != QPALMInfo.SOLVED:
             raise InfeasibleException(
-                f"Failed to solve qp: {str(QPALMInfo(solver.info.status_val))}"
+                solver_status=str(QPALMInfo(solver.info.status_val))
             )
         return solver.solution.x
 

@@ -40,3 +40,7 @@ dependencies = {file = "requirements.txt"}
 gui = [
     "ripple_down_rules[gui]",
 ]
+dev = [
+    "pytest>=7.0.0,<8.0.0"
+]
+

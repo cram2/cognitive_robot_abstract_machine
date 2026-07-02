@@ -45,23 +45,7 @@ from krrood.rustworkx_utils import (
 
 import rustworkx as rx
 
-def _fade_color(color: str, alpha: float) -> str:
-    """Blend a color with white to create a faded/washed-out hex version.
-
-    Uses matplotlib's ``to_rgb`` to handle both hex and named colors,
-    then blends with white at the given alpha ratio.
-
-    :param color: A hex string (``\"#ff7f0e\"``) or named color (``\"cornflowerblue\"``).
-    :param alpha: How much of the original color to keep (0.0–1.0).
-    :return: A hex color string.
-    """
-    from matplotlib.colors import to_rgb
-
-    r, g, b = to_rgb(color)
-    r = r * alpha + (1 - alpha)
-    g = g * alpha + (1 - alpha)
-    b = b * alpha + (1 - alpha)
-    return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
+_UNSATISFIED_BORDER_COLOR: str = "red"
 
 
 def _is_faded_gate(node, satisfied_condition_ids: OrderedSet[UUID]) -> bool:
@@ -157,7 +141,7 @@ class QueryGraph:
         for node in self.expression_node_map.values():
             if node.id not in reachable:
                 node.faded = True
-                node.border_color = "red"
+                node.border_color = _UNSATISFIED_BORDER_COLOR
 
     def visualize(
         self,
@@ -241,9 +225,9 @@ class QueryGraph:
             return self.expression_node_map[expression]
 
         is_satisfied = (
-                self.satisfied_condition_ids is not None
-                and is_condition_participant(expression)
-                and expression._id_ in self.satisfied_condition_ids
+            self.satisfied_condition_ids is not None
+            and is_condition_participant(expression)
+            and expression._id_ in self.satisfied_condition_ids
         )
         node = QueryNode(
             self.get_expression_name(expression),

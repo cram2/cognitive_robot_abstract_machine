@@ -18,6 +18,7 @@ parts:
         - file: eql/user/result_processors
         - file: eql/user/predicate_and_symbolic_function
         - file: eql/user/match
+        - file: eql/user/underspecified
         - file: eql/user/eql_for_sql_experts
         - file: eql/user/writing_rule_trees
         - file: eql/user/inference_explanation

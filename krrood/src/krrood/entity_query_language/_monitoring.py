@@ -6,23 +6,34 @@ safely imported by modules (variable.py, query.py) that are themselves
 dependencies of the main explanation module, without triggering circular
 imports.
 """
+
 from __future__ import annotations
 
-import inspect
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Any, Optional, Type, Callable, Union
+from typing_extensions import Any, Optional, Type, Callable, Union
 
-from krrood.entity_query_language._stack import CallStack, StackFrame
+from krrood.entity_query_language._stack import CallStack
+from krrood.singleton import SingletonMeta
 
 
 @dataclass
-class MonitoredRegistry:
+class MonitoredRegistry(metaclass=SingletonMeta):
     """
     Registry for monitoring EQL object creation stacks.
     Acts as a class decorator and provides lookup methods.
     """
+
     _monitored: set[type] = field(default_factory=set)
+    """
+    Set of classes that are currently being monitored.
+    """
+
+    _is_disabled: bool = field(default=False)
+    """
+    When True, stack capture is skipped for all monitored classes.
+    """
 
     def __call__(self, cls: Type) -> Type:
         """Decorate a class to automatically record its creation stack as a :class:`CallStack`."""
@@ -33,9 +44,10 @@ class MonitoredRegistry:
 
         @wraps(original_post_init)
         def new_post_init(self, *args, **kwargs):
-            raw_frames = inspect.stack()[1:]
-            stack = CallStack([StackFrame.from_frame_info(fi) for fi in raw_frames])
-            self._creation_stack = stack.filter()  # drop site-packages immediately
+            if not monitored._is_disabled:
+                # ``skip=1`` drops this ``new_post_init`` frame so capture starts at the caller
+                # of ``__post_init__``; site-packages frames are filtered during the walk.
+                self._creation_stack = CallStack.capture(skip=1)
             original_post_init(self, *args, **kwargs)
 
         cls.__post_init__ = new_post_init
@@ -49,7 +61,9 @@ class MonitoredRegistry:
 
     def is_monitored(self, target: Union[Type, Callable]) -> bool:
         """Check whether a class or callable is monitored."""
-        return target in self._monitored or bool(getattr(target, "_is_monitored_", False))
+        return target in self._monitored or bool(
+            getattr(target, "_is_monitored_", False)
+        )
 
     def unregister(self, cls: Type) -> None:
         """Remove a class from monitoring."""
@@ -57,11 +71,22 @@ class MonitoredRegistry:
         if hasattr(cls, "_is_monitored_"):
             del cls._is_monitored_
 
+    @contextmanager
+    def disabled(self):
+        """Context manager that suppresses stack capture for all monitored classes."""
+        self._is_disabled = True
+        try:
+            yield
+        finally:
+            self._is_disabled = False
+
     @property
     def monitored_classes(self) -> tuple[type, ...]:
-        """Return an immutable snapshot of all monitored classes."""
+        """
+        :return: An immutable snapshot of all currently monitored classes as a tuple.
+        """
         return tuple(self._monitored)
 
 
-# Singleton — import this wherever @monitored decoration is needed.
+# The decorator to use for classes to be monitored.
 monitored = MonitoredRegistry()

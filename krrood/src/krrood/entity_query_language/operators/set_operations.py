@@ -18,7 +18,9 @@ from krrood.entity_query_language.core.base_expressions import (
     OperationResult,
     SymbolicExpression,
 )
-from krrood.entity_query_language.utils import cartesian_product_while_passing_the_bindings_around
+from krrood.entity_query_language.utils import (
+    cartesian_product_while_passing_the_bindings_around,
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -70,7 +72,9 @@ class PerformsCartesianProduct(SymbolicExpression, ABC):
         """
         ...
 
-    def _evaluate_product_(self, sources: Optional[OperationResult]) -> Iterator[OperationResult]:
+    def _evaluate_product_(
+        self, sources: Optional[OperationResult]
+    ) -> Iterator[OperationResult]:
         """
         Evaluate the symbolic expressions by generating combinations of values from their evaluation generators.
 

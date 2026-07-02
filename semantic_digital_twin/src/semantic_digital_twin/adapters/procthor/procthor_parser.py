@@ -14,7 +14,7 @@ from typing_extensions import assert_never
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
-from semantic_digital_twin.orm.ormatic_interface import *
+
 from semantic_digital_twin.semantic_annotations.position_descriptions import (
     SemanticPositionDescription,
     HorizontalSemanticDirection,
@@ -242,7 +242,7 @@ class ProcthorDoor:
                 scale=scale,
                 world_root_T_self=world_T_door,
             )
-            door.add_handle(handle)
+            door.add(handle)
 
         with world.modify_world():
             world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
@@ -253,7 +253,7 @@ class ProcthorDoor:
                 active_axis=Vector3.Z(),
             )
 
-            door.add_hinge(hinge)
+            door.add(hinge)
         return door
 
     def add_to_world(self, world: World) -> Union[Door, DoubleDoor]:
@@ -429,10 +429,10 @@ class ProcthorWall:
             door = procthor_door.add_to_world(world)
             with world.modify_world():
                 if isinstance(door, Door):
-                    wall.add_aperture(door.entry_way)
+                    wall.add(door.entry_way)
                 elif isinstance(door, DoubleDoor):
-                    wall.add_aperture(door.door_0.entry_way)
-                    wall.add_aperture(door.door_1.entry_way)
+                    wall.add(door.door_0.entry_way)
+                    wall.add(door.door_1.entry_way)
                 else:
                     assert_never(door)
 
@@ -822,6 +822,8 @@ def get_world_by_asset_id(session: Session, asset_id: str) -> Optional[World]:
     """
     Queries the database for a WorldMapping with the given asset_id provided by the procthor file.
     """
+    from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
     asset_id = asset_id.lower()
     other_possible_name = "_".join(asset_id.split("_")[:-1])
 

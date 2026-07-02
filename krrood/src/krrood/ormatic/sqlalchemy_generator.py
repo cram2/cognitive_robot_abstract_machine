@@ -52,3 +52,5 @@ class SQLAlchemyGenerator:
 
         # format the output with black
         run_black_on_file(str(file.name))
+
+

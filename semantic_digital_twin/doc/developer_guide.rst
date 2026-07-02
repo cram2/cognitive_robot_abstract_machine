@@ -5,7 +5,7 @@ Developer Guide
 
 This guide explains how to effectively contribute to the semantic digital twin.
 General code style related guidelines that can also be used for your AI assistant are found in the
-`junie guidelines <https://github.com/cram2/semantic_digital_twin/tree/main/.junie/guidelines.md>`_.
+`junie guidelines <https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/AGENTS.md>`_.
 
 Environment Setup
 -----------------

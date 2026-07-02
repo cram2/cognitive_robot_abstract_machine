@@ -5,7 +5,6 @@ from giskardpy.tree.behaviors.plot_motion_graph import PlotMotionGraph
 from giskardpy.tree.behaviors.ros_msg_to_goal import (
     SetExecutionMode,
     ParseActionGoal,
-    AddBaseTrajFollowerGoal,
 )
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
 
@@ -36,7 +35,6 @@ class PrepareBaseTrajControlLoop(Sequence):
         super().__init__(name, memory=True)
         self.has_compile_debug_expressions = False
         self.add_child(CleanUpPlanning("CleanUpPlanning"))
-        self.add_child(AddBaseTrajFollowerGoal())
         self.add_child(SetTrackingStartTime("start tracking time"))
 
     def add_plot_goal_graph(self):

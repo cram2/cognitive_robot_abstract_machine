@@ -343,7 +343,9 @@ class Next(EQLUnion, ConclusionSelector):
     ) -> Iterable[OperationResult]:
         for child in self._operation_children_:
             for child_result in self._evaluate_child_as_condition_(child, sources):
-                output = OperationResult(child_result.bindings, child_result.is_false, self, child_result)
+                output = OperationResult(
+                    child_result.bindings, child_result.is_false, self, child_result
+                )
                 if output.is_true:
                     self._conclusions_.update(child_result.operand._conclusions_)
                 yield output

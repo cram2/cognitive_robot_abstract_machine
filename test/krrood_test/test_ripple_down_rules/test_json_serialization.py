@@ -33,6 +33,7 @@ class Robot:
     name: str
     position: Position
 
+
 TEST_RESULTS_DIR: str = os.path.join(os.path.dirname(__file__), "test_results")
 CACHE_FILE: str = os.path.join(TEST_RESULTS_DIR, "zoo_dataset.pkl")
 zoo_cases, _ = load_zoo_dataset(cache_file=CACHE_FILE)

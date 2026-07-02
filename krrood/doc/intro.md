@@ -78,7 +78,7 @@ The examples are designed to be incremental and self-contained.
 @software{bassiouny2025krrood,
 author = {Bassiouny, Abdelrhman AND Schierenbeck, Tom},
 title = {Knowledge Representation & Reasoning Through Object-Oriented Design},
-url = {https://github.com/code-iai/krrood},
+url = {https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html},
 version = {1.0.0},
 }
 ```

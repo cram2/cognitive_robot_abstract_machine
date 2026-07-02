@@ -66,7 +66,7 @@ with world.modify_world():
     c_base_link = RevoluteConnection(
         parent=base,
         child=link,
-        dof_id=dof.id,
+        raw_dof=dof,
         axis=Vector3.Z(reference_frame=base),
     )
     world.add_connection(c_base_link)

@@ -52,8 +52,8 @@ class ForAll(QuantifiedConditional):
         ]
 
     def _evaluate__(
-            self,
-            sources: OperationResult,
+        self,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         solution_set = None
 
@@ -81,7 +81,7 @@ class ForAll(QuantifiedConditional):
         values_that_satisfy_condition = []
         # Evaluate the condition under this particular universal value
         for condition_val in self._evaluate_child_as_condition_(
-                self.condition, var_val
+            self.condition, var_val
         ):
             if condition_val.is_false:
                 continue
@@ -95,7 +95,7 @@ class ForAll(QuantifiedConditional):
 
     def evaluate_condition(self, sources: OperationResult) -> bool:
         for condition_val in self._evaluate_child_as_condition_(
-                self.condition, sources
+            self.condition, sources
         ):
             return condition_val.is_true
         return False
@@ -113,8 +113,8 @@ class Exists(QuantifiedConditional):
     """
 
     def _evaluate__(
-            self,
-            sources: OperationResult,
+        self,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         for val in self._evaluate_child_as_condition_(self.variable, sources):
             if val.is_false or self.variable._id_ not in val.bindings:
@@ -123,8 +123,12 @@ class Exists(QuantifiedConditional):
             for cond_val in self._evaluate_child_as_condition_(self.condition, val):
                 if cond_val.is_true:
                     yield OperationResult(
-                        sources.bindings | {id_: val.bindings[id_] for id_ in self._ids_of_variables_to_add_to_sources_
-                                            if id_ in val.bindings},
+                        sources.bindings
+                        | {
+                            id_: val.bindings[id_]
+                            for id_ in self._ids_of_variables_to_add_to_sources_
+                            if id_ in val.bindings
+                        },
                         is_false=False,
                         operand=self,
                         previous_operation_result=val,
@@ -141,4 +145,8 @@ class Exists(QuantifiedConditional):
         """
         if self._root_query_ is None:
             return []
-        return [v._id_ for v in self._root_query_._selected_variables_ if v._id_ != self.variable._id_]
+        return [
+            v._id_
+            for v in self._root_query_._selected_variables_
+            if v._id_ != self.variable._id_
+        ]

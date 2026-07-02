@@ -1,12 +1,3 @@
-"""
-Source-link resolution — maps Python class/attribute references to documentation URLs.
-
-:class:`SourceLinkResolver` is the protocol; :class:`AutoAPIResolver` resolves
-references to Sphinx AutoAPI-generated HTML pages.  ``AutoAPIResolver.for_package``
-auto-detects the base URL for a locally installed package whose docs are served
-by the JetBrains IDE built-in HTTP server.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -14,36 +5,27 @@ import inspect
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Protocol
+from typing_extensions import Optional, Protocol
 
-from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
+from krrood.entity_query_language.verbalization.fragments.source_reference import (
+    SourceReference,
+)
 
 _log = logging.getLogger(__name__)
 
 
 class SourceLinkResolver(Protocol):
     """
-    Protocol: maps a
-    :class:`~krrood.entity_query_language.verbalization.fragments.source_ref.SourceRef`
-    to a URL string, or ``None`` when the class or attribute cannot be located.
-
-    Implementations are passed to
-    :class:`~krrood.entity_query_language.verbalization.rendering.renderer.FragmentRenderer`
-    and used to wrap
-    :class:`~krrood.entity_query_language.verbalization.fragments.base.RoleFragment`
-    text with hyperlinks.
-
-    Built-in implementation: :class:`AutoAPIResolver`.
+    Protocol: maps a source reference to a URL string, or ``None`` when the class or attribute
+    cannot be located.
     """
 
-    def resolve(self, ref: SourceRef) -> Optional[str]:
+    def resolve(self, reference: SourceReference) -> Optional[str]:
         """
-        Resolve *ref* to a URL string.
+        Resolve *reference* to a URL string.
 
-        :param ref: Source reference to resolve.
-        :type ref: ~krrood.entity_query_language.verbalization.fragments.source_ref.SourceRef
-        :returns: URL string, or ``None`` when the reference cannot be resolved.
-        :rtype: str or None
+        :param reference: Source reference to resolve.
+        :return: URL string, or ``None`` when the reference cannot be resolved.
         """
         ...
 
@@ -52,48 +34,38 @@ class SourceLinkResolver(Protocol):
 class AutoAPIResolver:
     """
     Resolves source references to Sphinx AutoAPI documentation pages.
-
-    :param base_url: Root URL of the generated docs site, e.g.
-        ``"https://myproject.readthedocs.io/en/latest"`` or
-        ``"http://localhost:63342/project/doc/_build/html"``.
-    :type base_url: str
-    :param html_root: Optional local path to the Sphinx HTML output directory.
-        When set, :meth:`resolve` verifies that the AutoAPI page exists on disk
-        and logs a warning if it does not.
-    :type html_root: pathlib.Path or None
-
-    Use :meth:`for_package` to auto-detect the base URL for a locally installed
-    package whose docs are served by the JetBrains IDE built-in HTTP server.
     """
 
     base_url: str
-    html_root: Optional[Path] = None
+    """Root URL of the generated docs site, e.g. ``"https://myproject.readthedocs.io/en/latest"``
+    or ``"http://localhost:63342/project/doc/_build/html"``."""
 
-    def resolve(self, ref: SourceRef) -> Optional[str]:
+    html_root: Optional[Path] = None
+    """Optional local path to the Sphinx HTML output directory.  When set, resolution verifies
+    that the AutoAPI page exists on disk and logs a warning if it does not."""
+
+    def resolve(self, reference: SourceReference) -> Optional[str]:
         """
-        Resolve *ref* to a Sphinx AutoAPI page URL.
+        Resolve *reference* to a Sphinx AutoAPI page URL.
 
         Constructs the URL as::
 
-            {base_url}/autoapi/{module/path}/index.html#{module.QualName[.attr]}
+            {base_url}/autoapi/{module/path}/index.html#{module.QualName[.attribute]}
 
-        When :attr:`html_root` is set and the page does not exist on disk,
-        logs a ``WARNING`` suggesting the docs be rebuilt.
+        When ``html_root`` is set and the page does not exist on disk, logs a warning suggesting
+        the docs be rebuilt.
 
-        :param ref: Source reference to resolve.
-        :type ref: ~krrood.entity_query_language.verbalization.fragments.source_ref.SourceRef
-        :returns: AutoAPI page URL, or ``None`` when *ref.cls* has no ``__module__``.
-        :rtype: str or None
+        :param reference: Source reference to resolve.
+        :return: AutoAPI page URL, or ``None`` when *reference.owner_type* has no ``__module__``.
         """
-        try:
-            module = ref.cls.__module__
-            qualname = ref.cls.__qualname__
-        except AttributeError:
+        if not isinstance(reference.owner_type, type):
             return None
+        module = reference.owner_type.__module__
+        qualname = reference.owner_type.__qualname__
         module_path = module.replace(".", "/")
         anchor = f"{module}.{qualname}"
-        if ref.attribute is not None:
-            anchor = f"{anchor}.{ref.attribute}"
+        if reference.attribute is not None:
+            anchor = f"{anchor}.{reference.attribute}"
         base = self.base_url.rstrip("/")
         url = f"{base}/autoapi/{module_path}/index.html#{anchor}"
         if self.html_root is not None:
@@ -110,17 +82,38 @@ class AutoAPIResolver:
         return url
 
     @classmethod
+    def for_in_site_docs(cls, levels_up: int = 2) -> AutoAPIResolver:
+        """Build a resolver for links rendered *inside* the documentation site itself.
+
+        The verbalization output is embedded in a docs page (e.g. ``eql/user/verbalization.html``),
+        and the AutoAPI tree is a sibling at the site root (``autoapi/…``). Emitting links relative
+        to the current page therefore resolves them correctly in *any* build or host — a standalone
+        ``_build/html``, a Pages preview, or the published aggregate — without baking in an absolute
+        URL. Prefer this over :meth:`for_package` (which targets a specific local IDE server) for
+        links that ship in the built docs.
+
+        :param levels_up: The current page's directory depth below the site root, i.e. how many
+            ``..`` segments reach the root. The verbalization pages live at ``eql/<section>/`` → 2.
+        :return: A resolver whose links are relative to a page *levels_up* directories deep.
+
+        >>> AutoAPIResolver.for_in_site_docs().base_url
+        '../..'
+        """
+        return cls(base_url="/".join([".."] * levels_up) or ".")
+
+    @classmethod
     def for_package(cls, package_name: str, port: int = 63342) -> AutoAPIResolver:
-        """Build an :class:`AutoAPIResolver` for *package_name*'s locally built Sphinx docs.
+        """Build a resolver for *package_name*'s locally built Sphinx docs, with the base URL
+        targeting the JetBrains IDE built-in HTTP server.
 
-        The base URL targets the JetBrains IDE built-in HTTP server using this algorithm:
+        .. note::
+            This targets a live ``localhost`` IDE server, so it is for the local
+            preview-while-editing workflow only. For links that ship inside the built docs, use
+            :meth:`for_in_site_docs` instead (relative links that resolve on any host).
 
-        1. Import *package_name* to locate its source tree.
-        2. Walk up to the directory containing ``pyproject.toml`` (the package root).
-        3. Expect the Sphinx HTML output at ``{package_root}/doc/_build/html``.
-        4. Walk up to the git root (directory containing ``.git``).
-        5. Construct ``http://localhost:{port}/{git_root_name}/{relative_html_path}``.
-
+        :param package_name: The installed package whose docs to resolve against.
+        :param port: Port of the JetBrains IDE built-in HTTP server.
+        :return: A resolver pointing at the package's local Sphinx HTML output.
         :raises ImportError: if *package_name* cannot be imported.
         :raises FileNotFoundError: if ``doc/_build/html`` does not exist —
             build the docs first with ``sphinx-build doc doc/_build/html``.
@@ -138,7 +131,9 @@ class AutoAPIResolver:
                 package_root = parent
                 break
         if package_root is None:
-            raise FileNotFoundError(f"No pyproject.toml found in any parent of {pkg_file}")
+            raise FileNotFoundError(
+                f"No pyproject.toml found in any parent of {pkg_file}"
+            )
 
         html_root = package_root / "doc" / "_build" / "html"
         if not html_root.exists():

@@ -32,7 +32,9 @@ jobs:
           source /opt/ros/cram-env/bin/activate
           sudo apt-get update
           sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libegl1
-          poetry install
+          uv sync --extra dev --active
+          uv tree --depth 1
+          python -c "import sys; print(sys.executable)"
 
       - name: Restore cache
         uses: actions/cache/restore@v4
@@ -45,7 +47,7 @@ jobs:
             ${{ runner.os }}-cache-
 
       - name: Build ORM
-        if: ${{inputs.lib == 'pycram' || inputs.lib == 'semantic_digital_twin'}}
+        if: ${{inputs.lib == 'coraplex' || inputs.lib == 'semantic_digital_twin' || inputs.lib == 'experiments'}}
         run: |
           cd cognitive_robot_abstract_machine/${{ inputs.lib }}/scripts/
           source /opt/ros/cram-env/bin/activate
@@ -75,7 +77,7 @@ jobs:
           if [[ "${{ inputs.lib }}" == "probabilistic_model" ]]; then
             export QT_QPA_PLATFORM=offscreen
           fi
-          python -m pytest -sv cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
+          python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
 
       - name: Save cache
         uses: actions/cache/save@v4

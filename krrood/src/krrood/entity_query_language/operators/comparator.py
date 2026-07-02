@@ -109,7 +109,9 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
             return self.left, self.right
         elif not left_has_the and right_has_the:
             return self.right, self.left
-        if sources is not None and any(v._id_ in sources.bindings for v in self.right._unique_variables_):
+        if sources is not None and any(
+            v._id_ in sources.bindings for v in self.right._unique_variables_
+        ):
             return self.right, self.left
         else:
             return self.left, self.right

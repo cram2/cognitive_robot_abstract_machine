@@ -15,15 +15,10 @@ from giskardpy.middleware.ros2.utils.utils_for_tests import compare_poses, Giska
 from giskardpy.motion_statechart.goals.collision_avoidance import SelfCollisionAvoidance
 from giskardpy.motion_statechart.goals.open_close import Open, Close
 from giskardpy.motion_statechart.goals.templates import Sequence
-from giskardpy.motion_statechart.goals.test import Cutting
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
     SetOdometry,
     SetSeedConfiguration,
-)
-from giskardpy.motion_statechart.monitors.payload_monitors import (
-    Pulse,
-    CheckControlCycleCount,
 )
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
@@ -31,14 +26,12 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, Joi
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.tree.blackboard_utils import GiskardBlackboard
-from krrood.symbolic_math.symbolic_math import trinary_logic_not
 from numpy import pi
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,
-    RotationMatrix,
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
@@ -278,18 +271,18 @@ class TestJointGoals:
         state_version = giskard.api.world.state.version
         giskard.api.execute(msc)
         for i in range(1000):
-            if giskard.api.world.state.version != state_version:
+            try:
+                np.testing.assert_almost_equal(
+                    giskard.api.world.state[arm_lift_joints.dof.id].position,
+                    0.5,
+                    decimal=2,
+                )
                 break
+            except AssertionError as e:
+                pass
             sleep(0.01)
         else:
             assert False
-            #state version never changed
-        np.testing.assert_almost_equal(
-            giskard.api.world.state[arm_lift_joints.dof.id].position,
-            0.5,
-            decimal=2,
-        )
-
 
 
 class TestCartGoals:
@@ -470,71 +463,6 @@ class TestCartGoals:
 
 
 class TestConstraints:
-
-    @pytest.mark.skip(reason="suturo must fix")
-    def test_schnibbeln_sequence(self, box_setup: HSRTester):
-        box = box_setup.api.world.get_body_by_name("box")
-
-        box_setup.add_box_to_world(
-            name="Schnibbler",
-            size=(0.05, 0.01, 0.15),
-            pose=HomogeneousTransformationMatrix.from_xyz_rpy(
-                z=0.06, reference_frame=box_setup.tip
-            ),
-            parent_link=box_setup.tip,
-        )
-        schnibbler = box_setup.api.world.get_body_by_name("Schnibbler")
-        box_setup.add_box_to_world(
-            name="Bernd",
-            size=(0.1, 0.2, 0.06),
-            pose=HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=0.91, y=0.25, z=0.62, reference_frame=box_setup.map
-            ),
-            parent_link=box,
-        )
-
-        pre_schnibble_pose = Pose.from_point_rotation_matrix(
-            point=Point3(0.85, 0.2, 0.75, reference_frame=box_setup.map),
-            rotation_matrix=RotationMatrix(
-                [[0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1]],
-                reference_frame=box_setup.map,
-            ),
-            reference_frame=box_setup.map,
-        )
-
-        msc = MotionStatechart()
-        msc.add_nodes(
-            [
-                pre_schnibble := CartesianPose(
-                    name="Position Knife",
-                    goal_pose=pre_schnibble_pose,
-                    tip_link=box_setup.tip,
-                    root_link=box_setup.map,
-                ),
-                human_close := Pulse(name="Human Close?", delay=15, length=15),
-                cutting := Cutting(
-                    name="Cut",
-                    root_link=box_setup.map,
-                    tip_link=schnibbler,
-                    depth=0.1,
-                    right_shift=-0.1,
-                ),
-                schnibbel_done := CheckControlCycleCount(name="Done?", threshold=120),
-            ]
-        )
-        pre_schnibble.end_condition = pre_schnibble.observation_variable
-        cutting.start_condition = pre_schnibble.observation_variable
-        schnibbel_done.start_condition = cutting.observation_variable
-        human_close.start_condition = pre_schnibble.observation_variable
-
-        reset = trinary_logic_not(schnibbel_done.observation_variable)
-        cutting.reset_condition = reset
-        schnibbel_done.reset_condition = reset
-        human_close.end_condition = schnibbel_done.observation_variable
-        cutting.pause_condition = human_close.observation_variable
-
-        msc.add_node(EndMotion.when_true(schnibbel_done))
-        box_setup.api.execute(msc)
 
     def test_Pointing(self, giskard: HSRTester):
         kopf = giskard.api.world.get_body_by_name("head_rgbd_sensor_gazebo_frame")

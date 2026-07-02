@@ -50,7 +50,7 @@ def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
             world=world,
             world_root_T_self=world_T_handle,
         )
-        drawer.add_handle(handle)
+        drawer.add(handle)
 
     return drawer
 
@@ -92,7 +92,7 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
             world=world,
             world_root_T_self=world_T_handle,
         )
-        door.add_handle(handle)
+        door.add(handle)
     with world.modify_world():
         world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
         hinge = Hinge.create_with_new_body_in_world(
@@ -101,7 +101,7 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
             world_root_T_self=world_T_hinge,
             active_axis=Vector3.Z(),
         )
-        door.add_hinge(hinge)
+        door.add(hinge)
 
     return door
 
@@ -128,9 +128,9 @@ def dresser_from_body_in_world(dresser: Body, world: World) -> Dresser:
             child: Body
             if bool(drawer_pattern.fullmatch(child.name.name)):
                 drawer = drawer_from_body_in_world(child, world)
-                dresser.add_drawer(drawer)
+                dresser.add(drawer)
             elif bool(door_pattern.fullmatch(child.name.name)):
                 door = door_from_body_in_world(child, world)
-                dresser.add_door(door)
+                dresser.add(door)
 
     return dresser

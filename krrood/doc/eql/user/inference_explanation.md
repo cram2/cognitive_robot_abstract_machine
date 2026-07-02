@@ -179,6 +179,44 @@ plt.close(fig)
 Image(buf.read())
 ```
 
+### Including the call stack in the output
+
+`as_string()` accepts two optional parameters for richer output. Pass `show_trace=True` to
+append the call stack recorded at the time the query was defined. Optionally filter the stack to
+frames from a specific package with `focus_package`:
+
+```{code-cell} ipython3
+# Show the full explanation including the call stack, filtered to user frames only
+print(expl.as_string(show_trace=True))
+```
+
+### Comparator-only conditions
+
+`get_satisfied_comparator_conditions()` is a convenience filter that returns only the satisfied
+conditions that are `Comparator` nodes (equality or ordering checks between two expressions),
+dropping higher-level logical wrappers such as `OR` or `Exists`:
+
+```{code-cell} ipython3
+from krrood.entity_query_language.explanation.explanation import ConditionAndBindings
+
+comparator_conds = expl.get_satisfied_comparator_conditions().tolist()
+print(f"{len(comparator_conds)} satisfied comparator condition(s):")
+for c in comparator_conds:
+    print(" ", ConditionAndBindings(c, expl.operation_result.all_bindings))
+```
+
+`get_satisfied_comparator_conditions_between_attributes()` narrows this further to comparators
+whose both sides are `Attribute` nodes — that is, conditions of the form
+`variable_a.some_field == variable_b.some_field`. These are the structural join conditions that
+the planner uses to link variables together:
+
+```{code-cell} ipython3
+attr_conds = expl.get_satisfied_comparator_conditions_between_attributes().tolist()
+print(f"{len(attr_conds)} attribute-to-attribute comparator(s):")
+for c in attr_conds:
+    print(" ", ConditionAndBindings(c, expl.operation_result.all_bindings))
+```
+
 ---
 
 ## OR Branch Short-Circuit
@@ -317,6 +355,61 @@ for c in fixed_to_handle:
 
 ---
 
+## Stack Queries
+
+Every `InferenceExplanation` also captures the Python call stack at the moment the query was
+defined. The following methods let you inspect that provenance without converting it to a string.
+
+### How many frames were captured?
+
+```{code-cell} ipython3
+print(f"Captured {expl.frame_count} call stack frame(s)")
+```
+
+### Was the inference triggered from inside a class method?
+
+```{code-cell} ipython3
+print(f"Triggered from a method: {expl.is_triggered_from_method()}")
+```
+
+### Which classes appear in the call stack?
+
+`triggering_classes()` returns the distinct class objects that appear in the captured call
+stack, in order of first occurrence (innermost first):
+
+```{code-cell} ipython3
+classes = expl.triggering_classes()
+print("Triggering class(es):", [c.__name__ for c in classes])
+```
+
+### Which functions appear in the call stack?
+
+`triggering_functions()` returns the distinct resolved callable objects, innermost first. Nested
+functions defined inside other functions may not be resolvable and will be absent from this list:
+
+```{code-cell} ipython3
+funcs = expl.triggering_functions()
+print("Triggering function(s):", [f.__name__ if hasattr(f, "__name__") else repr(f) for f in funcs])
+```
+
+### Locating the outermost entry point into a package
+
+`root_frame_in(package)` returns the outermost (highest in the call hierarchy) frame whose
+`module_name` contains the given package string. This identifies the highest-level entry point
+into your library that triggered the inference — useful when you want to know where inside your
+own codebase the query originated:
+
+```{code-cell} ipython3
+frame = expl.root_frame_in("krrood")
+if frame is not None:
+    import os
+    print(f"Root krrood frame: {frame.function_name} at {os.path.basename(frame.filename)}:{frame.lineno}")
+else:
+    print("No krrood frame found")
+```
+
+---
+
 ## API Reference
 - {py:func}`~krrood.entity_query_language.explanation.explanation.explain_inference`
 - {py:class}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation`
@@ -326,7 +419,16 @@ for c in fixed_to_handle:
 - {py:meth}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation.get_satisfied_conditions_as_string`
 - {py:meth}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation.condition_graph`
 - {py:meth}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation.get_satisfied_condition_expressions_for_the_instance`
+- {py:meth}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation.get_satisfied_comparator_conditions`
+- {py:meth}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation.get_satisfied_comparator_conditions_between_attributes`
 - {py:meth}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation.get_variable_nodes_of_given_type`
 - {py:meth}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation.get_values_of_variable_nodes_of_given_type`
 - {py:meth}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation.get_conditions_that_relate_the_variables_of_type`
 - {py:meth}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation.get_conditions_that_relate_variables_of_types`
+- {py:attr}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation.frame_count`
+- {py:meth}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation.is_triggered_from_method`
+- {py:meth}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation.triggering_classes`
+- {py:meth}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation.triggering_functions`
+- {py:meth}`~krrood.entity_query_language.explanation.explanation.InferenceExplanation.root_frame_in`
+- {py:class}`~krrood.entity_query_language._stack.CallStack`
+- {py:class}`~krrood.entity_query_language._stack.StackFrame`
