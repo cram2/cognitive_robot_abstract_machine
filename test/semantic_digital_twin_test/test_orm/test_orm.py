@@ -39,7 +39,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
 )
 from semantic_digital_twin.orm.ormatic_interface import *
 from krrood.ormatic.data_access_objects.helper import to_dao
-from krrood.patterns.field_metadata import FieldMetadata
+from krrood.patterns.field_metadata import FieldMetadata, IsPartWholeRelationship
 
 
 import pytest
@@ -179,7 +179,10 @@ def _field(annotation_type, field_name):
 def _is_part_whole_relationship(annotation_type, field_name):
     """Return whether ``field_name`` on ``annotation_type`` is marked as a part-whole relationship."""
     metadata = FieldMetadata.of_field(_field(annotation_type, field_name))
-    return metadata is not None and metadata.is_part_whole_relationship
+    return (
+        metadata is not None
+        and metadata.get_metadata_by_type(IsPartWholeRelationship) is not None
+    )
 
 
 def test_part_whole_relationship_field_survives_deepcopy():
@@ -260,8 +263,8 @@ def test_hsrb_world(hsr_world_state_reset, session):
 
 def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session):
     """
-    The part-whole relationship marker is the field's
-    ``FieldMetadata.is_part_whole_relationship`` flag and lives on the dataclass definition, not
+    The part-whole relationship marker is an ``IsPartWholeRelationship`` in the field's
+    ``FieldMetadata.other_metadata`` and lives on the dataclass definition, not
     in the persisted row (ORMatic never inspects the field metadata). Reconstructing an annotation from
     its DAO must therefore yield an instance whose type still carries the marker, the marked-field
     discovery must still find it, and the field *values* (handle, mechanical_joint) must survive the

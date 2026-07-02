@@ -29,7 +29,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasCaseAsRootBody,
 )
-from krrood.patterns.field_metadata import FieldMetadata
+from krrood.patterns.field_metadata import FieldMetadata, IsPartWholeRelationship
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     DoubleDoor,
     Floor,
@@ -979,11 +979,11 @@ class _AnnotationWithOverlappingPartWholeRelationshipFields(
 
     joint: Optional[MechanicalJoint] = field(
         default=None,
-        metadata=FieldMetadata.as_dict(is_part_whole_relationship=True),
+        metadata=FieldMetadata(other_metadata=[IsPartWholeRelationship()]).as_dict(),
     )
     specific_joint: Optional[Hinge] = field(
         default=None,
-        metadata=FieldMetadata.as_dict(is_part_whole_relationship=True),
+        metadata=FieldMetadata(other_metadata=[IsPartWholeRelationship()]).as_dict(),
     )
 
 

@@ -199,8 +199,8 @@ m = variable(Mission, domain=None)
 print(verbalize_expression(m.assigned_to == robots[0]))   # robots[0] is Robot("R2D2", …)
 ```
 
-The identifying field(s) are the dataclass fields marked with
-`FieldMetadata.is_identifying_attribute` (via `field(metadata=FieldMetadata.as_dict(is_identifying_attribute=True))`),
+The identifying field(s) are the dataclass fields marked with `GrammarMetadata.is_identifying_field`
+(via `field(metadata=FieldMetadata(other_metadata=[GrammarMetadata(is_identifying_field=True)]).as_dict())`),
 otherwise the first present of `name` / `id` / `label` / `key` / `uuid` (`Robot` has `name`, so this
 reads *"a specific Robot with name 'R2D2'"*). With none of those, it falls back to a bare *"a
 specific Robot"*.

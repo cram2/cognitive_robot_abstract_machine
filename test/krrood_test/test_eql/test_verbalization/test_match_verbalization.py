@@ -23,7 +23,7 @@ from krrood.entity_query_language.verbalization.pipeline import (
     VerbalizationPipeline,
     verbalize_expression,
 )
-from krrood.patterns.field_metadata import FieldMetadata
+from krrood.patterns.field_metadata import FieldMetadata, GrammarMetadata
 from krrood.entity_query_language.verbalization.rendering.formatter import (
     PlainFormatter,
 )
@@ -283,7 +283,9 @@ class _NamedThing:
 @dataclass
 class _Coded:
     serial: int = field(
-        metadata=FieldMetadata.as_dict(is_identifying_attribute=True)
+        metadata=FieldMetadata(
+            other_metadata=[GrammarMetadata(is_identifying_field=True)]
+        ).as_dict()
     )
     name: str = ""
 
@@ -297,7 +299,7 @@ def test_concrete_object_qualified_by_conventional_name_field():
 
 
 def test_concrete_object_uses_declared_identifying_attributes():
-    """A field marked ``is_identifying_attribute`` controls which field identifies the object."""
+    """A field marked ``is_identifying_field`` controls which field identifies the object."""
     text = verbalize_expression(
         underspecified(_Widget)(owner=_Coded(serial=7, name="x"))
     )
