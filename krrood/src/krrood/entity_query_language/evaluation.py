@@ -70,10 +70,10 @@ class EvaluationTracker(EvaluationObserver):
         evaluated = evaluation_context.data.setdefault(
             EvaluationContextKey.EVALUATED_IDS_KEY, OrderedSet()
         )
+        # Every evaluated expression records its own id here on entry, so the cumulative set is
+        # already complete. Re-merging the source result's cumulative set (which is a subset built in
+        # this same evaluation) on every step added nothing but re-hashed the whole set each time.
         evaluated.add(expression._id_)
-
-        if isinstance(sources, OperationResult) and sources.evaluated_expression_ids:
-            evaluated.update(sources.evaluated_expression_ids)
 
     def on_result_yielded(self, expression, result):
         evaluation_context = get_evaluation_context()

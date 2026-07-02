@@ -280,6 +280,25 @@ def test_satisfied_conditions_simple():
     assert len(result.satisfied_condition_ids) > 0
 
 
+def test_evaluated_expression_ids_are_complete_without_source_propagation():
+    """Every evaluated condition node is recorded on the result by its own ``on_evaluate_enter``.
+
+    The evaluated-id set must be complete from each expression recording itself when entered, so it
+    does not depend on re-merging a source result's cumulative set on every evaluation step. This
+    pins the invariant that lets that (redundant) per-step merge be dropped.
+    """
+    val = variable_from([6])
+    query = entity(val).where(and_(val > 5, val < 10))
+
+    true_results = _get_true_results(query)
+    assert len(true_results) == 1
+    result = true_results[0]
+
+    condition_root = val._conditions_root_
+    condition_names = _get_satisfied_names(result.evaluated_expression_ids, condition_root)
+    assert {"AND", ">", "<"} <= condition_names
+
+
 def test_satisfied_conditions_and_both_true():
     """AND with both children true: AND and both comparators are satisfied."""
     val = variable_from([6])
