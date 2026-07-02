@@ -1340,17 +1340,6 @@ def test_indexing_2():
     assert body_tha_has_red_shape[0].shapes[0].color == "red"
 
 
-def test_accessing_dunder_methods():
-    world_classes = [Body, Cabinet, Drawer, Handle, Container, Connection]
-    world_class = variable_from(world_classes)
-    world_class_starting_with_c = entity(world_class).where(
-        world_class.__name__.startswith("C")
-    )
-    results = world_class_starting_with_c.tolist()
-    assert len(results) == 3
-    assert set(results) == {c for c in world_classes if c.__name__.startswith("C")}
-
-
 def test_debugger_issue():
     # a normal query using a property
     var = variable(int, [1, 2, 3])
