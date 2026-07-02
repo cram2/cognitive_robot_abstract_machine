@@ -151,9 +151,13 @@ def underspecified(
     :param target_type: The constructed type, required only when ``expression`` is a factory
         function whose return type cannot be inferred.
     """
+    from krrood.entity_query_language.scope import attach_definition_scope
+
     if target_type is not None:
-        return Match(factory=expression, type_=target_type, domain=domain)
-    return Match(factory=expression, domain=domain)
+        result = Match(factory=expression, type_=target_type, domain=domain)
+    else:
+        result = Match(factory=expression, domain=domain)
+    return attach_definition_scope(result)
 
 
 # %% Variable Declaration

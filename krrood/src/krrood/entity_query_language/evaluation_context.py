@@ -83,6 +83,12 @@ class EvaluationContext:
     Observers should use well-known keys defined in :class:`~krrood.entity_query_language.enums.EvaluationContextKey`
     to avoid collisions.
     """
+    structural_cache: Dict[Any, Any] = field(default_factory=dict)
+    """
+    Memoizes structural facts about the expression graph that are constant for the duration of an
+    evaluation (the tree is not mutated while it is being evaluated). Lets hot evaluation paths
+    answer structural questions once instead of re-walking the graph on every step.
+    """
 
     def on_evaluate_enter(
         self,

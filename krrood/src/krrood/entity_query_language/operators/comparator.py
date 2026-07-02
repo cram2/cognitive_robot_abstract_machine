@@ -103,8 +103,8 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
     ) -> Tuple[SymbolicExpression, SymbolicExpression]:
         from krrood.entity_query_language.query.quantifiers import The
 
-        left_has_the = any(isinstance(desc, The) for desc in self.left._descendants_)
-        right_has_the = any(isinstance(desc, The) for desc in self.right._descendants_)
+        left_has_the = self.left._subtree_contains_(The)
+        right_has_the = self.right._subtree_contains_(The)
         if left_has_the and not right_has_the:
             return self.left, self.right
         elif not left_has_the and right_has_the:

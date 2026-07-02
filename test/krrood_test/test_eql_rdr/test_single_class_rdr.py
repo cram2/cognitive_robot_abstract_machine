@@ -10,6 +10,7 @@ import dataclasses
 import unittest
 from unittest.mock import patch
 
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.factories import and_
 from krrood.entity_query_language.rdr.condition_resolver import ChainConditionResolver
 from krrood.entity_query_language.rdr.expert import Expert
@@ -468,6 +469,35 @@ class TestFitConvergent(unittest.TestCase):
         rdr.fit([case], [Species.mammal], expert, max_passes=3)
         # The loop exited after max_passes — assert a rule was added.
         self.assertIsNotNone(rdr.query)
+
+
+@unittest.skipIf(len(animals) == 0, "Failed to load zoo dataset")
+class TestFitDoesNotRewalkStructureEveryEvaluation(unittest.TestCase):
+    """Fitting must not re-walk expression subtrees once per evaluation step.
+
+    Structural facts (e.g. whether an operand's subtree contains a ``The`` quantifier)
+    are constant for the duration of an evaluation, so they must be memoized rather than
+    recomputed by a full ``_descendants_`` walk on every comparator evaluation. Without
+    memoization a tiny 8-case fit performs tens of thousands of subtree walks, which grows
+    into a multi-second stall on the full dataset.
+    """
+
+    def test_subtree_walks_stay_bounded_during_a_small_fit(self):
+        walk_count = {"value": 0}
+        original_iter = SymbolicExpression._iter_descendants_
+
+        def counting_iter(self, visited_ids):
+            walk_count["value"] += 1
+            yield from original_iter(self, visited_ids)
+
+        cases, case_targets = animals[:8], targets[:8]
+        expert = maximally_specific_expert()
+        rdr = EQLSingleClassRDR(Animal, "species")
+        with patch.object(SymbolicExpression, "_iter_descendants_", counting_iter):
+            rdr.fit(cases, case_targets, expert)
+
+        # The pre-memoization implementation performs ~59k walks for just 8 cases.
+        self.assertLess(walk_count["value"], 15000)
 
 
 @unittest.skipIf(len(animals) == 0, "Failed to load zoo dataset")

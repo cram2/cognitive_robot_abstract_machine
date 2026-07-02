@@ -123,15 +123,26 @@ class SymbolicExpression(ABC):
         # Per-instance cache stored in _expression_id_cache_ so it is collected with the expression object.
         # A class-level @lru_cache would hold strong refs to `self` indefinitely, keeping
         # query trees (and their domain data) alive well beyond the query's lifetime.
-        if id_ not in self._expression_id_cache_:
-            try:
-                self._expression_id_cache_[id_] = next(
-                    expression
-                    for expression in self._all_expressions_
-                    if expression._id_ == id_
-                )
-            except StopIteration:
-                raise NoExpressionFoundForGivenID(self, id_)
+        if id_ in self._expression_id_cache_:
+            return self._expression_id_cache_[id_]
+
+        # During an evaluation the tree is immutable, so resolve against the id->node index built
+        # once per evaluation instead of re-scanning the whole graph on every (often failing) lookup.
+        evaluation_scoped_index = self._evaluation_scoped_expression_index_()
+        if evaluation_scoped_index is not None:
+            if id_ in evaluation_scoped_index:
+                self._expression_id_cache_[id_] = evaluation_scoped_index[id_]
+                return evaluation_scoped_index[id_]
+            raise NoExpressionFoundForGivenID(self, id_)
+
+        try:
+            self._expression_id_cache_[id_] = next(
+                expression
+                for expression in self._all_expressions_
+                if expression._id_ == id_
+            )
+        except StopIteration:
+            raise NoExpressionFoundForGivenID(self, id_)
         return self._expression_id_cache_[id_]
 
     def tolist(
@@ -374,6 +385,22 @@ class SymbolicExpression(ABC):
     def _conditions_root_(self) -> Optional[SymbolicExpression]:
         """
         :return: The root of the symbolic expression graph that contains conditions, or None if no conditions found.
+
+        The conditions root is a structural property of the whole tree, so within an active
+        evaluation it is memoized per tree to avoid re-scanning the graph on every evaluation step.
+        """
+        evaluation_context = get_evaluation_context()
+        if evaluation_context is None:
+            return self._compute_conditions_root_()
+        cache_key = ("conditions_root", self._root_._id_)
+        cache = evaluation_context.structural_cache
+        if cache_key not in cache:
+            cache[cache_key] = self._compute_conditions_root_()
+        return cache[cache_key]
+
+    def _compute_conditions_root_(self) -> Optional[SymbolicExpression]:
+        """
+        :return: The root of the symbolic expression graph that contains conditions, found by scanning the tree.
         """
         return next(
             (
@@ -425,6 +452,27 @@ class SymbolicExpression(ABC):
         yield self._root_
         yield from self._root_._descendants_
 
+    def _evaluation_scoped_expression_index_(
+        self,
+    ) -> Optional[Dict[uuid.UUID, SymbolicExpression]]:
+        """
+        :return: An ``id -> node`` index of the whole tree, built once per evaluation, or ``None``
+            when called outside an active evaluation.
+
+        The tree is immutable while it is being evaluated, so the index is memoized on the evaluation
+        context (keyed by the tree root) and reused for every id lookup instead of re-scanning.
+        """
+        evaluation_context = get_evaluation_context()
+        if evaluation_context is None:
+            return None
+        cache_key = ("expression_index", self._root_._id_)
+        cache = evaluation_context.structural_cache
+        if cache_key not in cache:
+            cache[cache_key] = {
+                expression._id_: expression for expression in self._all_expressions_
+            }
+        return cache[cache_key]
+
     @property
     def _descendants_(self) -> Iterator[SymbolicExpression]:
         """
@@ -453,6 +501,36 @@ class SymbolicExpression(ABC):
         yield from fresh_children
         for child in fresh_children:
             yield from child._iter_descendants_(visited_ids)
+
+    def _subtree_contains_(self, expression_type: Type[SymbolicExpression]) -> bool:
+        """
+        :return: Whether this expression's subtree contains a descendant of the given type.
+
+        Whether a subtree contains a node of some type is a structural fact that is constant for the
+        duration of an evaluation, so within an active evaluation it is memoized on the evaluation
+        context to avoid re-walking the subtree on every evaluation step. Outside an evaluation it is
+        computed directly.
+        """
+        evaluation_context = get_evaluation_context()
+        if evaluation_context is None:
+            return self._compute_subtree_contains_(expression_type)
+        cache_key = (self._id_, expression_type)
+        cache = evaluation_context.structural_cache
+        if cache_key not in cache:
+            cache[cache_key] = self._compute_subtree_contains_(expression_type)
+        return cache[cache_key]
+
+    def _compute_subtree_contains_(
+        self, expression_type: Type[SymbolicExpression]
+    ) -> bool:
+        """
+        :return: Whether this expression's subtree contains a descendant of the given type, computed
+            by walking the subtree.
+        """
+        return any(
+            isinstance(descendant, expression_type)
+            for descendant in self._descendants_
+        )
 
     @classmethod
     def _current_parent_in_context_stack_(cls) -> Optional[SymbolicExpression]:
