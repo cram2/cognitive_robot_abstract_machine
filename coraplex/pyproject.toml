@@ -22,7 +22,7 @@ classifiers = [
 ]
 keywords=["robotics"]
 dynamic = ["version", "dependencies"]
-license = { text = "GPL-3.0-only" }
+license = "GPL-3.0-only"
 
 [project.urls]
 "Source" = 'https://github.com/cram2/coraplex'

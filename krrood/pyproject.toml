@@ -12,7 +12,7 @@ dynamic = ["version", "dependencies"]
 description = "A python package for Knowledge Representation and Reasoning systems based on Object Oriented Design."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de"},
     {name = "Tom Schierenbeck", email = "tom_sch@uni-bremen.de"}

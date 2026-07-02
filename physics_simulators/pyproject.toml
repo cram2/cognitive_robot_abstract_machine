@@ -29,7 +29,7 @@ dev = [
     "pytest>=7.0.0,<8.0.0",
 ]
 
-license = {text = "MIT"}
+license = "MIT"
 authors = [
   { name="Giang Nguyen", email="hoanggia@uni-bremen.de" },
 ]
