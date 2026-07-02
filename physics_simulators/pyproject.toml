@@ -1,22 +1,43 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "physics_simulators"
-version = "0.0.16"
-authors = [
-  { name="Giang Nguyen", email="hoanggia@uni-bremen.de" },
-]
 description = "A collection of physics simulators."
-readme = "README.md"
 requires-python = ">=3.10"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
-]
-license = {text = "MIT"}
+dynamic = ["version", "dependencies"]
 
-dependencies = [
-    "mujoco==3.9.0",
-]
+[project.urls]
+"Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
+"Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["physics_simulators*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "physics_simulators.__version__"}
+dependencies = {file = ["requirements.txt"]}
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0,<8.0.0",
+]
+
+license = {text = "MIT"}
+authors = [
+  { name="Giang Nguyen", email="hoanggia@uni-bremen.de" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "mujoco==3.9.0",
+]
