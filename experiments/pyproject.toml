@@ -7,11 +7,23 @@ name = "experiments"
 version = "0.0.1"
 description = "Experiment scripts and actions for CRAM."
 requires-python = ">=3.10"
-dynamic = ["dependencies"]
+dependencies = [
+    "line_profiler",
+    "coraplex",
+    "krrood",
+    "semantic_digital_twin",
+    "random_events",
+    "giskardpy",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0,<8.0.0",
+    "pytest-asyncio>=0.23.0,<0.24.0",
+    "pytest-xdist",
+    "objgraph",
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 include-package-data = true
-
-[tool.setuptools.dynamic]
-dependencies = { file = ["requirements.txt"] }
