@@ -100,6 +100,29 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
             raise AttributeError(name)
         return self._get_mapped_variable_(Attribute, name)
 
+    def __dir__(self) -> List[str]:
+        """
+        Surface the wrapped value type's attributes for interactive completion.
+
+        ``__getattr__`` already makes every non-dunder name a valid (symbolic) attribute, but
+        completion engines list ``__dir__`` only — which would otherwise show just this
+        expression's own members. We union those with the public attributes of the value type so
+        e.g. ``case_variable.<tab>`` offers the case type's fields.
+
+        ``_type_`` is read from ``__dict__`` directly (never ``getattr``, which routes through
+        ``__getattr__`` and would return a :class:`MappedVariable` instead of ``None``). This does
+        not affect attribute resolution in any way.
+        """
+        names = set(super().__dir__())
+        type_ = self.__dict__.get("_type_")
+        if isinstance(type_, type):
+            names.update(
+                name for name in dir(type_) if not (name.startswith("__") and name.endswith("__"))
+            )
+            for klass in type_.__mro__:
+                names.update(getattr(klass, "__annotations__", {}).keys())
+        return sorted(names)
+
     def __getitem__(self, key) -> CanBehaveLikeAVariable[T]:
         return self._get_mapped_variable_(Index, key)
 

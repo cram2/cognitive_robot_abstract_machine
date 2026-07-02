@@ -135,17 +135,25 @@ def match_variable(
 
 
 def underspecified(
-    expression: Union[Type[T], Callable[..., T]], target_type: Type[T] | None = None
+    expression: Union[Type[T], Callable[..., T]],
+    domain: Optional[DomainType] = None,
+    target_type: Type[T] | None = None,
 ) -> Union[Type[T], Match[T]]:
     """
-    Same as :py:func:`krrood.entity_query_language.factories.match` but instead
-    of searching for solutions in the domain objects, it is used as a query for
-    generative processes to infer solutions that satisfy the constraints in the
-    query.
+    Same as :py:func:`krrood.entity_query_language.factories.match` but instead of searching for
+    solutions in the domain objects, it is used as a query for generative processes to infer
+    solutions that satisfy the constraints in the query.
+
+    :param expression: The type (or factory) of the object whose attributes are underspecified.
+    :param domain: Optional instances to range over. When given, a backend (e.g. the RDR backend)
+        can iterate the domain and infer the underspecified (``...``) attributes on each instance,
+        rather than generating solutions from scratch.
+    :param target_type: The constructed type, required only when ``expression`` is a factory
+        function whose return type cannot be inferred.
     """
     if target_type is not None:
-        return Match(factory=expression, type_=target_type)
-    return Match(factory=expression)
+        return Match(factory=expression, type_=target_type, domain=domain)
+    return Match(factory=expression, domain=domain)
 
 
 # %% Variable Declaration

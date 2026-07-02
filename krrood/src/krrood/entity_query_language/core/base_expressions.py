@@ -429,10 +429,30 @@ class SymbolicExpression(ABC):
     def _descendants_(self) -> Iterator[SymbolicExpression]:
         """
         :return: All descendants of this symbolic expression in children first, then depth-first by subtree order.
+
+        A node reachable by more than one path (the expression graph is a DAG once conditions
+        share variables, and rule trees share whole subtrees) is yielded only on its first visit.
+        Without this a naive walk revisits shared subtrees once per path, which compounds into an
+        exponential traversal on deep rule trees.
         """
-        yield from self._children_
-        for child in self._children_:
-            yield from child._descendants_
+        yield from self._iter_descendants_(set())
+
+    def _iter_descendants_(
+        self, visited_ids: Set[uuid.UUID]
+    ) -> Iterator[SymbolicExpression]:
+        """
+        Yield descendants once each, tracking already-seen ``_id_`` values across the recursion.
+
+        :param visited_ids: The identifiers of nodes already yielded, shared across the whole walk.
+        """
+        fresh_children = [
+            child for child in self._children_ if child._id_ not in visited_ids
+        ]
+        for child in fresh_children:
+            visited_ids.add(child._id_)
+        yield from fresh_children
+        for child in fresh_children:
+            yield from child._iter_descendants_(visited_ids)
 
     @classmethod
     def _current_parent_in_context_stack_(cls) -> Optional[SymbolicExpression]:
