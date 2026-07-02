@@ -154,6 +154,36 @@ class NonObservationVariableError(InvalidConditionError):
 
 
 @dataclass
+class ConditionScopeError(InvalidConditionError):
+    """
+    Raised when a condition references a node from a different scope level.
+    A condition may only reference the owning node itself or nodes sharing the same parent.
+    """
+
+    dependency: MotionStatechartNode
+    """The referenced node that lives in a different scope than the condition's owner."""
+
+    def reason(self) -> str:
+        owner_scope = self._scope_name(self.condition.owner)
+        dependency_scope = self._scope_name(self.dependency)
+        return (
+            f'References "{self.dependency.unique_name}" from scope "{dependency_scope}", '
+            f'but the condition\'s owner lives in scope "{owner_scope}". '
+            f"Conditions may only reference the node itself or its siblings."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Reference a sibling of the owning node instead, e.g. the template node that contains the dependency."
+
+    @staticmethod
+    def _scope_name(node: MotionStatechartNode) -> str:
+        parent_node = node.parent_node
+        if parent_node is None:
+            return "top level"
+        return parent_node.unique_name
+
+
+@dataclass
 class MissingContextExtensionError(MotionStatechartError):
     expected_extension: Type
 

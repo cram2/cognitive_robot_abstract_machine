@@ -374,15 +374,17 @@ class TestCartesianTasks:
         expected = pr2_world_state_reset.transform(tip_goal, root)
 
         motion_statechart = MotionStatechart()
-        cart_goal = CartesianPose(
-            root_link=root,
-            tip_link=tip,
-            goal_pose=tip_goal,
+
+        motion_statechart.add_nodes(
+            [
+                cart_goal := CartesianPose(
+                    root_link=root,
+                    tip_link=tip,
+                    goal_pose=tip_goal,
+                ),
+                EndMotion.when_true(cart_goal),
+            ]
         )
-        motion_statechart.add_node(cart_goal)
-        end = EndMotion()
-        motion_statechart.add_node(end)
-        end.start_condition = cart_goal.observation_variable
 
         executor = Executor(
             MotionStatechartContext(

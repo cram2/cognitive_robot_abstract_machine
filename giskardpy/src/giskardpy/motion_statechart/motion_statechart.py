@@ -19,7 +19,10 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
-from giskardpy.motion_statechart.exceptions import EmptyMotionStatechartError
+from giskardpy.motion_statechart.exceptions import (
+    EmptyMotionStatechartError,
+    ConditionScopeError,
+)
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
     TrinaryCondition,
@@ -431,12 +434,44 @@ class MotionStatechart(SubclassJSONSerializer):
         return self.rx_graph.get_node_data(index)
 
     def _add_transitions(self):
+        self._validate_condition_scopes()
         self.rx_graph.clear_edges()
         for node in self.nodes:
             self._create_edge_for_condition(node, node._start_condition)
             self._create_edge_for_condition(node, node._pause_condition)
             self._create_edge_for_condition(node, node._end_condition)
             self._create_edge_for_condition(node, node._reset_condition)
+
+    def _validate_condition_scopes(self):
+        """
+        Ensures that every condition only references its owning node or siblings of it.
+
+        .. note:: Must run after goal expansion, because parent relationships are only known then.
+
+        :raises ConditionScopeError: If a condition references a node from a different scope level.
+        """
+        for node in self.nodes:
+            for condition in (
+                node._start_condition,
+                node._pause_condition,
+                node._end_condition,
+                node._reset_condition,
+            ):
+                self._validate_condition_scope(node, condition)
+
+    def _validate_condition_scope(
+        self, owner: MotionStatechartNode, condition: TrinaryCondition
+    ):
+        for dependency in condition.node_dependencies:
+            if dependency is owner:
+                continue
+            if dependency.parent_node_index == owner.parent_node_index:
+                continue
+            raise ConditionScopeError(
+                condition=condition,
+                new_expression=condition.expression,
+                dependency=dependency,
+            )
 
     def _create_edge_for_condition(
         self, owner: MotionStatechartNode, condition: TrinaryCondition

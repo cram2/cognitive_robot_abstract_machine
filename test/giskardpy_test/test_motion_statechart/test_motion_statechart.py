@@ -21,6 +21,7 @@ from giskardpy.motion_statechart.exceptions import (
     SelfInStartConditionError,
     NonObservationVariableError,
     NodeAlreadyBelongsToDifferentNodeError,
+    ConditionScopeError,
 )
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import (
@@ -1955,3 +1956,100 @@ class TestEagerStateVariables:
         node = ConstTrueNode()
         with pytest.raises(SelfInStartConditionError):
             node.start_condition = node.observation_variable
+
+
+class TestConditionScoping:
+    """
+    A condition may only reference the node itself or nodes sharing the same parent.
+    References across template levels raise :class:`ConditionScopeError` during compilation.
+    """
+
+    def test_outside_node_cannot_reference_node_inside_template(self):
+        msc = MotionStatechart()
+        child = ConstTrueNode()
+        msc.add_node(Sequence([child]))
+        msc.add_node(EndMotion.when_true(child))
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        with pytest.raises(ConditionScopeError):
+            kin_sim.compile(motion_statechart=msc)
+
+    def test_template_node_cannot_reference_node_in_sibling_template(self):
+        msc = MotionStatechart()
+        node_a = ConstTrueNode()
+        node_b = ConstTrueNode()
+        msc.add_node(first := Parallel([node_a]))
+        msc.add_node(Parallel([node_b]))
+        node_b.start_condition = node_a.observation_variable
+        msc.add_node(EndMotion.when_true(first))
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        with pytest.raises(ConditionScopeError):
+            kin_sim.compile(motion_statechart=msc)
+
+    def test_nested_template_node_cannot_reference_outer_node(self):
+        msc = MotionStatechart()
+        node_a = ConstTrueNode()
+        node_b = ConstTrueNode()
+        msc.add_node(sequence := Sequence([node_a, Parallel([node_b])]))
+        node_b.pause_condition = node_a.observation_variable
+        msc.add_node(EndMotion.when_true(sequence))
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        with pytest.raises(ConditionScopeError):
+            kin_sim.compile(motion_statechart=msc)
+
+    def test_parent_cannot_reference_child(self):
+        msc = MotionStatechart()
+        child = ConstTrueNode()
+        parallel = Parallel([child])
+        parallel.end_condition = child.observation_variable
+        msc.add_node(parallel)
+        msc.add_node(EndMotion.when_true(parallel))
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        with pytest.raises(ConditionScopeError):
+            kin_sim.compile(motion_statechart=msc)
+
+    def test_child_cannot_reference_parent(self):
+        msc = MotionStatechart()
+        child = ConstTrueNode()
+        parallel = Parallel([child])
+        child.pause_condition = parallel.observation_variable
+        msc.add_node(parallel)
+        msc.add_node(EndMotion.when_true(parallel))
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        with pytest.raises(ConditionScopeError):
+            kin_sim.compile(motion_statechart=msc)
+
+    def test_siblings_inside_template_can_reference_each_other(self):
+        msc = MotionStatechart()
+        node_a = ConstTrueNode()
+        node_b = ConstTrueNode()
+        node_b.start_condition = node_a.observation_variable
+        msc.add_node(parallel := Parallel([node_a, node_b]))
+        msc.add_node(EndMotion.when_true(parallel))
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+    def test_self_referential_end_condition_inside_template_compiles(self):
+        msc = MotionStatechart()
+        msc.add_node(
+            sequence := Sequence(
+                [
+                    ConstTrueNode(),
+                    barrier := Parallel(
+                        [ConstTrueNode(), ConstFalseNode()], minimum_success=1
+                    ),
+                ]
+            )
+        )
+        barrier.end_condition = barrier.observation_variable
+        msc.add_node(EndMotion.when_true(sequence))
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
