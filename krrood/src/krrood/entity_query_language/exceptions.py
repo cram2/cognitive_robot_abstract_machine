@@ -657,13 +657,15 @@ class SelfReferentialInsertionError(DataclassException):
 
     anchor: "SymbolicExpression" = field(kw_only=True)
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"The new condition is the same node as the anchor {self.anchor!r} — "
             "this would create a self-referential Refinement/Alternative and corrupt "
-            "the anchor's conclusions. Provide a different condition."
+            "the anchor's conclusions."
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return "Provide a condition that is a different node than the anchor."
 
 
 @dataclass
