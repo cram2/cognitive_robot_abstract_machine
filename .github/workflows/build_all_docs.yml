@@ -7,7 +7,16 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  to-lowercase:
+    runs-on: ubuntu-latest
+    outputs:
+      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
+    steps:
+      - id: lowercase
+        run: |
+          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
   build-docs:
+    needs: [to-lowercase]
     strategy:
       fail-fast: false
       matrix:
@@ -38,6 +47,7 @@ jobs:
       doc_path: ${{ matrix.doc_path }}
       artifact_name: ${{ matrix.artifact_name }}
       use_container: ${{ matrix.use_container }}
+      repo_lowercase: ${{ needs.to-lowercase.outputs.repo_lowercase }}
 
   deploy-all-docs:
     needs: [build-docs]
