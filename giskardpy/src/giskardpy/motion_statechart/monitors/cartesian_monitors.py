@@ -130,7 +130,7 @@ class PointingAt(MotionStatechartNode):
         root_P_tip = root_T_tip.to_position()
 
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
-        root_V_pointing_axis.vis_frame = self.tip_link
+        root_V_pointing_axis.visualisation_frame = self.tip_link
         distance = self.root_P_goal_point.distance_point_to_line(
             frame_P_line_point=root_P_tip,
             frame_V_line_direction=root_V_pointing_axis,

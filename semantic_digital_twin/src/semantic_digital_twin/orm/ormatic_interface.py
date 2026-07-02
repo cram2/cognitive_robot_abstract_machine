@@ -39,7 +39,9 @@ import semantic_digital_twin.adapters.ros.semdt_to_ros2_converters
 import semantic_digital_twin.adapters.ros.tf_publisher
 import semantic_digital_twin.adapters.ros.tfwrapper
 import semantic_digital_twin.adapters.ros.visualization.collision_viz_marker
-import semantic_digital_twin.adapters.ros.visualization.pose_publisher
+import semantic_digital_twin.adapters.ros.visualization.exceptions
+import semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer
+import semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher
 import semantic_digital_twin.adapters.ros.visualization.viz_marker
 import semantic_digital_twin.adapters.ros.world_fetcher
 import semantic_digital_twin.adapters.ros.world_synchronizer
@@ -4469,6 +4471,194 @@ class TFWrapperDAO(
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
     )
+
+
+class CannotRenderSpatialTypeErrorDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.exceptions.CannotRenderSpatialTypeError
+    ],
+):
+    __tablename__ = "CannotRenderSpatialTypeErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    spatial_type_type: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+
+class WorldNotResolvableErrorDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.exceptions.WorldNotResolvableError
+    ],
+):
+    __tablename__ = "WorldNotResolvableErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    spatial_type_id: Mapped[int] = mapped_column(
+        ForeignKey("SpatialTypeDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    spatial_type: Mapped[SpatialTypeDAO] = relationship(
+        "SpatialTypeDAO",
+        uselist=False,
+        foreign_keys=[spatial_type_id],
+        post_update=True,
+    )
+
+
+class SpatialTypeMarkerRendererDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer.SpatialTypeMarkerRenderer
+    ],
+):
+    __tablename__ = "SpatialTypeMarkerRendererDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "SpatialTypeMarkerRendererDAO",
+    }
+
+
+class Point3MarkerRendererDAO(
+    SpatialTypeMarkerRendererDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer.Point3MarkerRenderer
+    ],
+):
+    __tablename__ = "Point3MarkerRendererDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SpatialTypeMarkerRendererDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Point3MarkerRendererDAO",
+        "inherit_condition": database_id == SpatialTypeMarkerRendererDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PoseLikeMarkerRendererDAO(
+    SpatialTypeMarkerRendererDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer.PoseLikeMarkerRenderer
+    ],
+):
+    __tablename__ = "PoseLikeMarkerRendererDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SpatialTypeMarkerRendererDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PoseLikeMarkerRendererDAO",
+        "inherit_condition": database_id == SpatialTypeMarkerRendererDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class SpatialTypeVisualizationDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer.SpatialTypeVisualization
+    ],
+):
+    __tablename__ = "SpatialTypeVisualizationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    namespace: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    marker_id_offset: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    lifetime_seconds: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    arrow_length: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    sphere_diameter: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    spatial_type_id: Mapped[int] = mapped_column(
+        ForeignKey("SpatialTypeDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    color_id: Mapped[int] = mapped_column(
+        ForeignKey("ColorDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    spatial_type: Mapped[SpatialTypeDAO] = relationship(
+        "SpatialTypeDAO",
+        uselist=False,
+        foreign_keys=[spatial_type_id],
+        post_update=True,
+    )
+    color: Mapped[ColorDAO] = relationship(
+        "ColorDAO", uselist=False, foreign_keys=[color_id], post_update=True
+    )
+
+
+class Vector3MarkerRendererDAO(
+    SpatialTypeMarkerRendererDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer.Vector3MarkerRenderer
+    ],
+):
+    __tablename__ = "Vector3MarkerRendererDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SpatialTypeMarkerRendererDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Vector3MarkerRendererDAO",
+        "inherit_condition": database_id == SpatialTypeMarkerRendererDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MarkerIdentityDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher.MarkerIdentity
+    ],
+):
+    __tablename__ = "MarkerIdentityDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    namespace: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    marker_id: Mapped[builtins.int] = mapped_column(use_existing_column=True)
 
 
 class FetchWorldServerDAO(
@@ -10707,35 +10897,6 @@ class TfPublisherModelCallbackDAO(
     }
 
 
-class PosePublisherDAO(
-    ModelChangeCallbackDAO,
-    DataAccessObject[
-        semantic_digital_twin.adapters.ros.visualization.pose_publisher.PosePublisher
-    ],
-):
-    __tablename__ = "PosePublisherDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(ModelChangeCallbackDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    lifetime: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-    text: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-    topic_name: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "PosePublisherDAO",
-        "inherit_condition": database_id == ModelChangeCallbackDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
 class VizMarkerPublisherDAO(
     ModelChangeCallbackDAO,
     DataAccessObject[
@@ -10850,6 +11011,31 @@ class TFPublisherDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "TFPublisherDAO",
+        "inherit_condition": database_id == StateChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class SpatialTypePublisherDAO(
+    StateChangeCallbackDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher.SpatialTypePublisher
+    ],
+):
+    __tablename__ = "SpatialTypePublisherDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(StateChangeCallbackDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    topic_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SpatialTypePublisherDAO",
         "inherit_condition": database_id == StateChangeCallbackDAO.database_id,
         "polymorphic_load": "selectin",
     }

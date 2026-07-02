@@ -82,7 +82,7 @@ class InsertCylinder(Goal):
             reference_velocity=0.1,
             weight=self.weight,
         )
-        root_V_cylinder_z.vis_frame = self.tip
+        root_V_cylinder_z.visualisation_frame = self.tip
         tilt_task.observation_expression = sm.abs(tilt_error - self.tilt) <= 0.01
 
         init_done = f"{reach_top} and {tilt_task}"
