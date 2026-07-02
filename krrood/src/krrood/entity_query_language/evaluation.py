@@ -53,14 +53,13 @@ def is_condition_participant(expr: OperationResult) -> bool:
 
 
 class EvaluationTracker(EvaluationObserver):
-    """Observer that tracks which expressions were evaluated and stamps the cumulative set on each OperationResult.
+    """Observer that accumulates the ids of all expressions evaluated during an evaluation pass.
 
-    Maintains a cumulative set of expression IDs in the evaluation context, adding each expression's ID
-    on :meth:`on_evaluate_enter`. On :meth:`on_result_yielded`, snapshots the current set onto the result
-    as ``evaluated_expression_ids``.
-
-    This tracking is the foundation for distinguishing evaluated-from-skipped logical operators (for example,
-    short-circuited OR/AND branches) in inference explanations.
+    Adds each expression's id to a cumulative set in the evaluation context on
+    :meth:`on_evaluate_enter`. The set (read from the context by consumers such as
+    :func:`~krrood.entity_query_language.rdr.observer.trace_case`) is the foundation for
+    distinguishing evaluated-from-skipped logical operators (for example, short-circuited OR/AND
+    branches) in inference explanations.
     """
 
     def on_evaluate_enter(self, expression, sources):
@@ -70,48 +69,7 @@ class EvaluationTracker(EvaluationObserver):
         evaluated = evaluation_context.data.setdefault(
             EvaluationContextKey.EVALUATED_IDS_KEY, OrderedSet()
         )
-        # Every evaluated expression records its own id here on entry, so the cumulative set is
-        # already complete. Re-merging the source result's cumulative set (which is a subset built in
-        # this same evaluation) on every step added nothing but re-hashed the whole set each time.
         evaluated.add(expression._id_)
-
-    def on_result_yielded(self, expression, result):
-        evaluation_context = get_evaluation_context()
-        if evaluation_context is None:
-            return
-        evaluated = evaluation_context.data.get(EvaluationContextKey.EVALUATED_IDS_KEY)
-        if evaluated is not None and result.evaluated_expression_ids is None:
-            result.evaluated_expression_ids = self._snapshot_evaluated(
-                evaluation_context, evaluated
-            )
-
-    @staticmethod
-    def _snapshot_evaluated(evaluation_context, evaluated):
-        """
-        Return an immutable snapshot of the cumulative *evaluated* id set, reusing the cached one
-        when the set has not grown since it was taken.
-
-        The evaluated-id set is only ever extended (never reduced), so its length uniquely
-        identifies its contents. Caching the snapshot keyed on that length collapses the previous
-        per-result copy (O(n) each, O(n^2) overall) into one copy per growth event. The returned
-        snapshot is shared between results and must be treated as read-only.
-
-        :param evaluation_context: The active evaluation context whose ``data`` holds the cache.
-        :param evaluated: The live cumulative :class:`OrderedSet` of evaluated expression ids.
-        :return: A snapshot :class:`OrderedSet` safe to stamp onto a result.
-        """
-        cached = evaluation_context.data.get(
-            EvaluationContextKey.EVALUATED_SNAPSHOT_KEY
-        )
-        current_length = len(evaluated)
-        if cached is None or cached[0] != current_length:
-            snapshot = OrderedSet(evaluated)
-            evaluation_context.data[EvaluationContextKey.EVALUATED_SNAPSHOT_KEY] = (
-                current_length,
-                snapshot,
-            )
-            return snapshot
-        return cached[1]
 
 
 class SatisfiedConditionTracker(EvaluationObserver):

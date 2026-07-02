@@ -797,12 +797,6 @@ class OperationResult:
     during this evaluation. Populated at the conditions root after all conditions have been evaluated.
     Only set when the overall condition result is True.
     """
-    evaluated_expression_ids: Optional[OrderedSet[UUID]] = None
-    """
-    A set of UUIDs of all expressions that were evaluated along the evaluation path that produced
-    this result. Populated by the EvaluationTracker observer. Unlike satisfied_condition_ids, this
-    includes all evaluated expressions regardless of truth value.
-    """
 
     @property
     def all_bindings(self) -> Bindings:
