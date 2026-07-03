@@ -36,3 +36,7 @@ dependencies = {file = ["requirements.txt"]}
 dev = [
     "pytest>=7.0.0,<8.0.0",
 ]
+
+dependencies = [
+    "mujoco==3.9.0",
+]
