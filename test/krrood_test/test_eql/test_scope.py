@@ -6,13 +6,13 @@ Covers:
   - capture_caller_scope: finds the user frame, skips EQL internals, snapshots ns
   - eql_factory_namespace: exposes the EQL verbs
   - attach_definition_scope / get_definition_scope: round-trip + factory overlay
-  - underspecified(): attaches the caller scope where it was invoked
+  - EQLSingleClassRDR: snapshots the caller scope onto its case variable
 """
 
 import inspect
 
 from krrood.entity_query_language._stack import StackFrame
-from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR
 from krrood.entity_query_language.scope import (
     attach_definition_scope,
     capture_caller_scope,
@@ -76,15 +76,15 @@ def test_capture_caller_scope_sees_caller_locals_and_globals():
 
 
 def test_capture_caller_scope_skips_eql_internal_frames():
-    # underspecified() lives in the EQL package; the scope it attaches must be the
-    # caller's (this test), proving EQL-internal frames are skipped.
+    # The RDR snapshots the *caller's* namespace onto its case variable via capture_caller_scope,
+    # skipping the EQL-internal frames of the RDR constructor: the caller's locals are present and
+    # EQL-internal locals (such as the RDR instance ``self``) are not.
     marker_in_test = object()  # noqa: F841
-    q = underspecified(int)
-    scope = getattr(q, "_definition_scope_")
+    rdr = EQLSingleClassRDR(int, "denominator")
+    scope = get_definition_scope(rdr.case_variable, include_factories=False)
     assert "marker_in_test" in scope
     assert scope["MODULE_LEVEL_SENTINEL"] == "module_global_value"
-    # No EQL-internal local leaked in (factory locals like `result`).
-    assert "result" not in scope
+    assert "self" not in scope
 
 
 # ---------------------------------------------------------------------------
@@ -161,12 +161,4 @@ def test_get_definition_scope_falls_back_to_live_caller():
     fallback_local = "present"  # noqa: F841
     scope = get_definition_scope(None)
     assert scope["fallback_local"] == "present"
-    assert "entity" in scope
-
-
-def test_underspecified_attaches_scope():
-    sentinel_local = "abc"  # noqa: F841
-    q = underspecified(int)
-    scope = get_definition_scope(q)
-    assert scope["sentinel_local"] == "abc"
     assert "entity" in scope
