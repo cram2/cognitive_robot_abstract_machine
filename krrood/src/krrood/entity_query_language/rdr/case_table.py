@@ -226,10 +226,19 @@ def render_cases_side_by_side(
 
     # Triplet overhead: │ attr │ corner │ new │  (3 cells × 4 padding/border)
     triplet_border = 12
-    triplet_budget = max(min_column_width, key_width + triplet_border + 1)
+    # A value column is always at least as wide as its header, so wrapping a value narrower than
+    # that only splits it pointlessly (e.g. "eagle" -> "ea"/"gl"/"e"). Reserve the header widths
+    # both when deciding how many triplets fit and when wrapping values.
+    min_value_width = max(len(corner_label), len(new_label))
+    triplet_budget = max(
+        min_column_width, key_width + triplet_border + 2 * min_value_width
+    )
     triplets_per_row = max(1, min(len(all_attrs), width // triplet_budget,
                                   _MAX_TRIPLETS_PER_ROW))
-    value_width = max(1, (width // triplets_per_row - key_width - triplet_border) // 2)
+    value_width = max(
+        min_value_width,
+        (width // triplets_per_row - key_width - triplet_border) // 2,
+    )
 
     # --- style helpers -------------------------------------------------------
 

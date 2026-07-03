@@ -88,6 +88,22 @@ def test_render_cases_side_by_side_contains_both_case_values():
     assert "badger" in result
 
 
+def test_render_cases_side_by_side_keeps_values_intact_on_a_narrow_terminal(monkeypatch):
+    """Short values stay intact even when the terminal is narrow.
+
+    On a narrow terminal the renderer may not wrap a value narrower than its own column
+    header, otherwise a value like ``"eagle"`` is split character-by-character
+    (``ea``/``gl``/``e``) even though the column is already wide enough to hold the header.
+    """
+    monkeypatch.setattr(
+        "krrood.entity_query_language.rdr.case_table._terminal_width", lambda: 80
+    )
+    result = render_cases_side_by_side(_NEW_CASE, _CORNER_CASE, use_color=False)
+
+    assert "eagle" in result
+    assert "badger" in result
+
+
 # ---------------------------------------------------------------------------
 # Test 4 — default labels ("New case" / "Corner case") appear when omitted
 # ---------------------------------------------------------------------------
