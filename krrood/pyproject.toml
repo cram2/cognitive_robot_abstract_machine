@@ -88,5 +88,5 @@ exclude_lines = [
 ]
 
 [tool.setuptools.dynamic]
-version = {attr = "krrood.__version__"}
+version = {attr = "krrood._version.__version__"}
 dependencies = { file = ["requirements.txt"] }

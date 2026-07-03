@@ -36,5 +36,5 @@ include = ["random_events*"]
 include-dirs = ["src/random_events_lib/random_events_lib/include"]
 
 [tool.setuptools.dynamic]
-version = {attr = "random_events.__version__"}
+version = {attr = "random_events._version.__version__"}
 dependencies = {file = "requirements.txt"}

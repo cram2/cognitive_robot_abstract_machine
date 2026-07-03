@@ -31,7 +31,7 @@ where = ["src"]  # list of folders that contain the packages (["."] by default)
 include = ["robokudo*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "robokudo.__version__"}
+version = {attr = "robokudo._version.__version__"}
 dependencies = {file = "requirements.txt"}
 
 [project.optional-dependencies]

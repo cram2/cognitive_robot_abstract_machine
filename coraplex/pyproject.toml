@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.pyrefly]
@@ -32,7 +32,7 @@ where = ["src"]  # list of folders that contain the packages (["."] by default)
 include = ["coraplex*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "coraplex.__version__"}
+version = {attr = "coraplex._version.__version__"}
 dependencies = {file = "requirements.txt"}
 
 [project.optional-dependencies]

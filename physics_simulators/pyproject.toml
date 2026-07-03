@@ -29,7 +29,7 @@ where = ["src"]
 include = ["physics_simulators*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "physics_simulators.__version__"}
+version = {attr = "physics_simulators._version.__version__"}
 dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]

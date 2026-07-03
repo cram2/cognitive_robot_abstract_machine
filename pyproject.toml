@@ -105,7 +105,7 @@ packages = ["cognitive_robot_abstract_machine"]
 package-dir = {"" = "."}
 
 [tool.setuptools.dynamic]
-version = {attr = "cognitive_robot_abstract_machine.__version__"}
+version = {attr = "cognitive_robot_abstract_machine._version.__version__"}
 
 [tool.docformatter]
 make-summary-multi-line = true

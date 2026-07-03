@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.pyrefly]
@@ -33,5 +33,5 @@ where = ["src"]  # list of folders that contain the packages (["."] by default)
 include = ["probabilistic_model*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "probabilistic_model.__version__"}
+version = {attr = "probabilistic_model._version.__version__"}
 dependencies = {file = "requirements.txt"}

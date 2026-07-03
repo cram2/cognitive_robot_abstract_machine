@@ -31,7 +31,7 @@ where = ["src"]  # list of folders that contain the packages (["."] by default)
 include = ["giskardpy*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "giskardpy.__version__"}
+version = {attr = "giskardpy._version.__version__"}
 dependencies = {file = "requirements.txt"}
 
 [project.optional-dependencies]

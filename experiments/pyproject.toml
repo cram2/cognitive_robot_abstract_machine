@@ -14,5 +14,5 @@ package-dir = {"" = "src"}
 include-package-data = true
 
 [tool.setuptools.dynamic]
-version = {attr = "experiments.__version__"}
+version = {attr = "experiments._version.__version__"}
 dependencies = { file = ["requirements.txt"] }
