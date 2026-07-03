@@ -31,6 +31,7 @@ from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
     UnificationDict,
 )
+from krrood.entity_query_language.exceptions import SymbolicDunderAccessError
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.utils import (
     T,
@@ -95,9 +96,10 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
         # Dunder names are never symbolic attribute access. Mapping them would (a) let copy/pickle
         # and other machinery that probes optional dunder hooks recurse into endless variable
         # creation, and (b) blur language semantics. Access a dunder-named member symbolically via a
-        # :func:`symbolic_function` instead.
+        # :func:`symbolic_function` instead. SymbolicDunderAccessError is an AttributeError so that
+        # optional-hook probing still treats it as a missing attribute.
         if name.startswith("__") and name.endswith("__"):
-            raise AttributeError(name)
+            raise SymbolicDunderAccessError(name)
         return self._get_mapped_variable_(Attribute, name)
 
     def __dir__(self) -> List[str]:

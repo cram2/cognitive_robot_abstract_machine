@@ -15,6 +15,7 @@ from krrood.entity_query_language.exceptions import (
     LiteralConditionError,
     UnsupportedExpressionTypeForDistinct,
     TryingToModifyAnAlreadyBuiltQuery,
+    SymbolicDunderAccessError,
 )
 from krrood.entity_query_language.factories import (
     entity,
@@ -1242,6 +1243,28 @@ def test_type_availability_in_mapped_variables(handles_and_containers_world):
     assert cabinet_drawers._type_ is Drawer
     assert first_drawer._type_ is Drawer
     assert first_drawer_handle._type_ is Handle
+
+
+def test_accessing_a_dunder_attribute_symbolically_raises_a_helpful_error():
+    """Dunder attribute access on a variable raises a helpful, AttributeError-compatible error.
+
+    It must remain an :class:`AttributeError` so that ``copy``/``pickle`` machinery probing optional
+    dunder hooks still treats it as a missing attribute, while its message points at
+    ``@symbolic_function`` as the correct way to reach a dunder-named member.
+    """
+    var = variable(int, [1, 2, 3])
+
+    with pytest.raises(SymbolicDunderAccessError) as exception_info:
+        var.__name__
+
+    assert isinstance(exception_info.value, AttributeError)
+    assert exception_info.value.attribute_name == "__name__"
+    message = str(exception_info.value)
+    assert "__name__" in message
+    assert "symbolic_function" in message
+
+    # The AttributeError contract keeps optional-hook probing working.
+    assert getattr(var, "__name__", "fallback") == "fallback"
 
 
 def test_descendants_yields_each_shared_node_only_once():

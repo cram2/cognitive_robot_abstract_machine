@@ -173,6 +173,37 @@ class TryingToModifyAnAlreadyBuiltQuery(UsageError):
 
 
 @dataclass
+class SymbolicDunderAccessError(AttributeError, UsageError):
+    """
+    Raised when a dunder attribute is accessed symbolically on a query variable.
+
+    Subclasses :class:`AttributeError` so that ``copy``/``pickle`` and other machinery that probes
+    optional dunder hooks via ``getattr(obj, "__hook__", default)`` still treats the access as a
+    missing attribute instead of propagating an error.
+    """
+
+    attribute_name: str
+    """
+    The dunder attribute name that was accessed symbolically.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The dunder attribute {self.attribute_name!r} cannot be accessed symbolically on a "
+            f"query variable. Dunder (double-underscore) names are never treated as symbolic "
+            f"attribute access: mapping them would let copy/pickle machinery recurse into endless "
+            f"variable creation and blur the language semantics."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Perform the access inside a @symbolic_function that receives the concrete object, e.g. "
+            f"`@symbolic_function` def get_value(obj): return obj.{self.attribute_name}, then call "
+            f"get_value(variable) inside the query."
+        )
+
+
+@dataclass
 class UnsupportedExpressionTypeForDistinct(UsageError):
     """
     Raised when an expression type is not supported for distinct operation.
