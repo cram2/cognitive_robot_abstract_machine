@@ -1,5 +1,7 @@
+import faulthandler
 import gc
 import os
+import sys
 import threading
 import time
 from copy import deepcopy
@@ -160,6 +162,26 @@ def _describe_world_retainers(sample_size: int = 3, max_depth: int = 20) -> str:
         )
         descriptions.append(f"  {id(world):#x}: {rendered}")
     return "\n".join(descriptions)
+
+
+_HANG_WATCHDOG_SECONDS = int(os.environ.get("PYTEST_HANG_WATCHDOG_SECONDS", "300"))
+"""Seconds a single test may run before its stack is dumped; overridable via env var."""
+
+
+@pytest.fixture(autouse=True)
+def dump_stack_if_hanging():
+    """Dump every thread's stack to stderr if a test runs longer than the watchdog interval.
+
+    A hanging test (no result even after an hour on CI) otherwise leaves no evidence of *where* it
+    is stuck. Arming a per-test faulthandler timer makes such a test print the exact frame it is
+    blocked in on every interval, so the hang is localizable from the CI log without a local
+    reproduction. The timer is cancelled at teardown so healthy tests never dump.
+    """
+    faulthandler.dump_traceback_later(
+        _HANG_WATCHDOG_SECONDS, repeat=True, file=sys.stderr
+    )
+    yield
+    faulthandler.cancel_dump_traceback_later()
 
 
 @pytest.fixture(autouse=True, scope="module")
