@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "physics_simulators"
 description = "A collection of physics simulators."
 requires-python = ">=3.10"
-dynamic = ["version", "dependencies"]
+dynamic = ["version"]
 license = "LGPL-3.0-only"
 authors = [
   { name="Giang Nguyen", email="hoanggia@uni-bremen.de" },
@@ -33,7 +33,7 @@ include = ["physics_simulators*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "physics_simulators._version.__version__"}
-dependencies = {file = ["requirements.txt"]}
+dependencies = {file = "requirements.txt"}
 
 [project.optional-dependencies]
 dev = [

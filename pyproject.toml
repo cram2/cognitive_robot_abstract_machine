@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "cognitive-robot-abstract-machine"
 description = "Meta-package that wires local subprojects together"
 requires-python = ">=3.12,<3.13"
+license = "LGPL-3.0-only"
 dynamic = ["version"]
 readme = "README.md"
 authors = [{ name = "AICOR Institute", email = "you@example.com" }]
@@ -32,7 +33,6 @@ dev = [
     "pytest-asyncio>=0.23.0,<0.24.0",
     "pytest-xdist",
     "objgraph",
-
 ]
 
 # Requirements for building the documentation of all sub-packages.
