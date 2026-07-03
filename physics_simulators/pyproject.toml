@@ -7,6 +7,14 @@ name = "physics_simulators"
 description = "A collection of physics simulators."
 requires-python = ">=3.10"
 dynamic = ["version", "dependencies"]
+license = "LGPL-3.0-only"
+authors = [
+  { name="Giang Nguyen", email="hoanggia@uni-bremen.de" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
 
 [project.urls]
 "Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
@@ -27,17 +35,4 @@ dependencies = {file = ["requirements.txt"]}
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0,<8.0.0",
-]
-
-license = "MIT"
-authors = [
-  { name="Giang Nguyen", email="hoanggia@uni-bremen.de" },
-]
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
-]
-
-dependencies = [
-    "mujoco==3.9.0",
 ]
