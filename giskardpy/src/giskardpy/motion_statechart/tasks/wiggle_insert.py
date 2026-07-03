@@ -174,12 +174,23 @@ class WiggleInsert(Task):
         return None
 
     def _random_sample_angle(self) -> float:
+        """
+        Draw an uncorrelated random angular offset for the current control cycle.
+
+        :return: The sampled angle.
+        """
         self._current_angle = (
             (random.random() - 0.5) * self.noise_angle
         ) / self._control_frequency
         return self._current_angle
 
     def _random_walk_angle(self) -> float:
+        """
+        Advance the angular random walk by one control cycle, blending in new random change,
+        applying momentum, and pulling back towards the starting angle.
+
+        :return: The updated accumulated angle.
+        """
         random_angular_change = (
             (random.random() - 0.5) * self.noise_angle
         ) / self._control_frequency
@@ -195,6 +206,11 @@ class WiggleInsert(Task):
         return self._current_angle
 
     def _random_sample_translation(self) -> np.ndarray:
+        """
+        Draw an uncorrelated random translational offset within the plane perpendicular to the hole normal.
+
+        :return: The sampled translation vector.
+        """
         self._current_vector = (
             (random.random() - 0.5)
             * self.noise_translation
@@ -206,6 +222,12 @@ class WiggleInsert(Task):
         return self._current_vector
 
     def _random_walk_translation(self) -> np.ndarray:
+        """
+        Advance the translational random walk by one control cycle, blending in new random change,
+        applying momentum, and pulling back towards the hole center.
+
+        :return: The updated accumulated translation vector.
+        """
         random_vector_change = (
             (random.random() - 0.5)
             * self.noise_translation
@@ -231,6 +253,9 @@ class WiggleInsert(Task):
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Return two orthonormal vectors spanning the plane perpendicular to ``normal``.
+
+        :param normal: Unit vector to compute the perpendicular plane for.
+        :return: Two orthonormal vectors spanning the plane perpendicular to ``normal``.
         """
         if abs(normal[0]) >= abs(normal[1]):
             first = np.array([-normal[2], 0, normal[0]])
