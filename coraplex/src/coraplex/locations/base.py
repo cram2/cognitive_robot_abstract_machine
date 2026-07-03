@@ -3,12 +3,18 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from typing_extensions import List, Iterator, Optional, Iterable
+from typing_extensions import List, Iterator, Optional, Iterable, Type, TYPE_CHECKING
 
 from krrood.entity_query_language.predicate import Predicate
 from coraplex.datastructures.dataclasses import Context
+
+if TYPE_CHECKING:
+    from coraplex.alternative_motion_mapping import AlternativeMotion
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
 try:
     from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 except ImportError:
@@ -67,8 +73,11 @@ class Location(Iterable[Pose]):
         test_world = deepcopy(self.world)
         test_robot = test_world.get_semantic_annotations_by_type(type(self.robot))[0]
         for validator in self.validators:
-            validator.world = test_world
-            validator.robot = test_robot
+            validator.context = Context(
+                world=test_world,
+                robot=test_robot,
+                alternative_motion_mappings=self.context.alternative_motion_mappings,
+            )
 
         if self.context.debug:
             VizMarkerPublisher(
@@ -147,16 +156,23 @@ class PoseValidator(Predicate):
     Validates a pose candidate.
     """
 
-    world: World
+    context: Context = field(default=None, kw_only=True)
     """
-    The world in which the pose candidate should be validated.
-    """
-
-    robot: AbstractRobot
-    """
-    The robot that should be used to validate the pose candidate.
+    Context that holds the important information about the robot and world. 
     """
 
     @abstractmethod
     def __call__(self, *args, **kwargs) -> bool:
         pass
+
+    @property
+    def world(self) -> World:
+        return self.context.world
+
+    @property
+    def robot(self) -> AbstractRobot:
+        return self.context.robot
+
+    @property
+    def alternative_motion_mappings(self) -> List[Type[AlternativeMotion]]:
+        return self.context.alternative_motion_mappings

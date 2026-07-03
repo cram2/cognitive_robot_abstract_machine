@@ -20,10 +20,17 @@ class SendControls(RunningSelector):
         self.add_child(JointVelController(namespaces=namespaces))
 
     def add_joint_velocity_group_controllers(
-        self, cmd_topic: str, connections: List[ActiveConnection1DOF]
+        self,
+        cmd_topic: str,
+        connections: List[ActiveConnection1DOF],
+        minimum_valid_velocity: float,
     ):
         self.add_child(
-            JointGroupVelController(cmd_topic=cmd_topic, connections=connections)
+            JointGroupVelController(
+                cmd_topic=cmd_topic,
+                connections=connections,
+                minimum_valid_velocity=minimum_valid_velocity,
+            )
         )
 
     def add_send_cmd_velocity(self, topic_name: str, joint: OmniDrive = None):

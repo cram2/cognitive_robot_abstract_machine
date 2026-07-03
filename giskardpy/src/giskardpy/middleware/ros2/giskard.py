@@ -7,6 +7,9 @@ from dataclasses import dataclass, field
 from typing import List
 
 import rclpy
+from semantic_digital_twin.adapters.ros.visualization.collision_viz_marker import (
+    CollisionVisualizationMarkerPublisher,
+)
 from sqlalchemy.orm import sessionmaker
 
 from giskardpy.data_types.exceptions import NoControlledJointsError
@@ -65,6 +68,9 @@ class Giskard:
     world_synchronizer: WorldSynchronizer = field(init=False)
     tf_publisher: TFPublisher = field(init=False)
     viz_marker_publisher: VizMarkerPublisher = field(init=False)
+    collision_marker_publisher: CollisionVisualizationMarkerPublisher = field(
+        init=False
+    )
     model_reload_synchronizer: ModelReloadSynchronizer = field(init=False)
     world_fetcher: FetchWorldServer = field(init=False)
 
@@ -135,6 +141,9 @@ class Giskard:
         self.tf_publisher.pause()
         self.viz_marker_publisher = VizMarkerPublisher(
             node=rospy.node, _world=self.world_config.world
+        )
+        self.collision_marker_publisher = CollisionVisualizationMarkerPublisher(
+            node=rospy.node, throttle=5, world=self.world_config.world
         )
 
     def sanity_check(self):

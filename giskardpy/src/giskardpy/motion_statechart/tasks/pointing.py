@@ -53,8 +53,8 @@ class Pointing(CartesianTask):
         root_V_goal_axis = root_P_goal_point - root_T_tip.to_position()
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_tip @ tip_V_pointing_axis
-        root_V_pointing_axis.vis_frame = self.tip_link
-        root_V_goal_axis.vis_frame = self.tip_link
+        root_V_pointing_axis.visualisation_frame = self.tip_link
+        root_V_goal_axis.visualisation_frame = self.tip_link
 
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_pointing_axis,
@@ -65,6 +65,11 @@ class Pointing(CartesianTask):
         artifacts.observation = (
             root_V_pointing_axis.angle_between(root_V_goal_axis) <= self.threshold
         )
+
+        self.add_goal_and_current_debug_expressions(
+            artifacts, goal=root_V_goal_axis, current=root_V_pointing_axis
+        )
+
         return artifacts
 
 
@@ -108,14 +113,14 @@ class PointingCone(CartesianTask):
         root_V_goal_axis = root_P_goal_point - root_T_tip.to_position()
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
-        root_V_pointing_axis.vis_frame = self.tip_link
+        root_V_pointing_axis.visualisation_frame = self.tip_link
 
-        root_V_goal_axis.vis_frame = self.tip_link
+        root_V_goal_axis.visualisation_frame = self.tip_link
 
         root_V_goal_axis_proj = root_V_pointing_axis.project_to_cone(
             root_V_goal_axis, self.cone_theta
         )
-        root_V_goal_axis_proj.vis_frame = self.tip_link
+        root_V_goal_axis_proj.visualisation_frame = self.tip_link
 
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_pointing_axis,
@@ -126,4 +131,9 @@ class PointingCone(CartesianTask):
         artifacts.observation = (
             root_V_pointing_axis.angle_between(root_V_goal_axis_proj) <= self.threshold
         )
+
+        self.add_goal_and_current_debug_expressions(
+            artifacts, goal=root_V_goal_axis_proj, current=root_V_pointing_axis
+        )
+
         return artifacts

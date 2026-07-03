@@ -1868,3 +1868,9 @@ def test_memoized_queries_match_graph_after_exception():
     graph_names = {b.name.name for b in world.kinematic_structure.nodes()}
     memoized_names = {b.name.name for b in world.bodies}
     assert memoized_names == graph_names
+
+
+def test_is_kinematic_structure_entity_in_world_by_name(world_setup):
+    world, l1, *_ = world_setup
+    assert world.is_kinematic_structure_entity_in_world_by_name("l1")
+    assert not world.is_kinematic_structure_entity_in_world_by_name("nonexistent")

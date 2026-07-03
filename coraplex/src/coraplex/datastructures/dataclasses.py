@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 from typing_extensions import (
     Optional,
-    Any, TYPE_CHECKING, ClassVar,
+    Any, TYPE_CHECKING, ClassVar, List, Type,
 )
 
 from krrood.entity_query_language.backends import QueryBackend, EntityQueryLanguageBackend
@@ -17,6 +17,7 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 if TYPE_CHECKING:
     from coraplex.plans.plan import Plan
     from semantic_digital_twin.world import World
+    from coraplex.alternative_motion_mapping import AlternativeMotion
 
 try:
     import rclpy
@@ -56,6 +57,13 @@ class Context(PlanEntity):
     The backend used to answer queries about underspecified statements.
     """
 
+    alternative_motion_mappings: List[Type[AlternativeMotion]] = field(default_factory=list)
+    """
+    The alternative motion mappings that are used to resolve motions in this plan. A motion is
+    replaced by an alternative motion from this list if the alternative matches the motion type,
+    the robot and the current execution type. If empty, motions use their default motion chart.
+    """
+
     _debug: bool = field(default=False)
     """
     Should debug information be printed or visualized
@@ -74,13 +82,15 @@ class Context(PlanEntity):
 
 
     @classmethod
-    def from_world(cls, world: World, plan: Plan = None, query_backend: Optional[QueryBackend] = None):
+    def from_world(cls, world: World, plan: Plan = None, query_backend: Optional[QueryBackend] = None,
+                   alternative_motion_mappings: Optional[List[Type[AlternativeMotion]]] = None):
         """
         Create a context from a world by getting the first robot in the world. There is no super plan in this case.
 
         :param world: The world for which to create the context
         :param plan: The plan that manages this context
         :param query_backend: The query backend to use for answering queries
+        :param alternative_motion_mappings: The alternative motion mappings used to resolve motions
         :return: A context with the first robot in the world and no super plan
         """
 
@@ -90,7 +100,8 @@ class Context(PlanEntity):
         result =  cls(
             world=world,
             robot=world.get_semantic_annotations_by_type(AbstractRobot)[0],
-            query_backend=query_backend
+            query_backend=query_backend,
+            alternative_motion_mappings=alternative_motion_mappings or []
         )
         if plan:
             plan.add_plan_entity(result)

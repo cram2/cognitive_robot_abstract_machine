@@ -2,14 +2,14 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
-import rclpy
-from rustworkx.rustworkx import NoEdgeBetweenNodes
-from typing_extensions import Tuple, Generator
-
-# The alternative mapping needs to be imported for the stretch to work properly
-import coraplex.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
-import coraplex.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
-from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
+from coraplex.alternative_motion_mappings.hsrb_motion_mapping import HSRBMoveMotion
+from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
+    StretchMoveToolCenterPoint,
+    StretchMoveSim,
+    StretchMoveReal,
+    StretchClose,
+)
+from coraplex.alternative_motion_mappings.tiago_motion_mapping import TiagoMoveSim
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
     Arms,
@@ -20,7 +20,6 @@ from coraplex.datastructures.enums import (
 )
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.datastructures.trajectory import PoseTrajectory
-
 from coraplex.motion_executor import simulated_robot
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.robot_plans.actions.composite.facing import FaceAtAction
@@ -40,24 +39,20 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     FollowToolCenterPointPathAction,
 )
-
 from coraplex.view_manager import ViewManager
-from semantic_digital_twin.adapters.ros.visualization.pose_publisher import (
-    PosePublisher,
-)
+from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
+from rustworkx.rustworkx import NoEdgeBetweenNodes
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
-from coraplex.view_manager import ViewManager
-
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
     GripperState,
-    JointStateType,
     StaticJointState,
 )
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
+from typing_extensions import Tuple, Generator
 
 try:
     from semantic_digital_twin.robots.garmi import Garmi
@@ -75,6 +70,17 @@ from semantic_digital_twin.spatial_types import (
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
+
+# The alternative motion mappings that should be available to the plans in this test module.
+# Resolution filters by robot type and execution type, so passing the full set is always safe.
+ALTERNATIVE_MOTION_MAPPINGS = [
+    HSRBMoveMotion,
+    StretchMoveToolCenterPoint,
+    StretchMoveSim,
+    StretchMoveReal,
+    StretchClose,
+    TiagoMoveSim,
+]
 
 
 @pytest.fixture(
@@ -187,7 +193,9 @@ def immutable_multiple_robot_apartment(
         if isinstance(view, HasMobileBase)
         else False
     )
-    yield world, view, Context(world, view)
+    yield world, view, Context(
+        world, view, alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS
+    )
     view.mobile_base.full_body_controlled = full_body_controlled
     world.state._data[:] = state
     world.notify_state_change()
@@ -198,7 +206,15 @@ def mutable_multiple_robot_apartment(setup_multi_robot_apartment):
     world, view = setup_multi_robot_apartment
     copy_world: World = deepcopy(world)
     copy_view = copy_world.get_semantic_annotation_by_id(view.id)
-    return copy_world, copy_view, Context(copy_world, copy_view)
+    return (
+        copy_world,
+        copy_view,
+        Context(
+            copy_world,
+            copy_view,
+            alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS,
+        ),
+    )
 
 
 def test_move_torso_multi(immutable_multiple_robot_apartment):

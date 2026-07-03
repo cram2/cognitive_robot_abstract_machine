@@ -12,6 +12,10 @@ parts:
         - file: examples/basic_motion
         - file: examples/cartesian_goals
 
+- caption: Debugging
+  chapters:
+    - file: debugging_guide
+
 - caption: References
   chapters:
     - file: autoapi/index
