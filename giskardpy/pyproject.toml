@@ -16,7 +16,6 @@ readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: OS Independent",
 ]
 keywords=["robotics"]
@@ -32,7 +31,7 @@ where = ["src"]  # list of folders that contain the packages (["."] by default)
 include = ["giskardpy*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "giskardpy.__version__"}
+version = {attr = "giskardpy._version.__version__"}
 dependencies = {file = "requirements.txt"}
 
 [project.optional-dependencies]

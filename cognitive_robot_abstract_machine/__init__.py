@@ -1,8 +1,4 @@
-from pathlib import Path
-
-def _get_version():
-    version_file = Path(__file__).resolve().parents[1] / "VERSION"
-    with open(version_file) as f:
-        return f.read().strip()
-
-__version__ = _get_version()
+try:
+    from ._version import __version__
+except ImportError:
+    __version__ = "0.0.0"
