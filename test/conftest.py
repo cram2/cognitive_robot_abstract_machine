@@ -141,6 +141,27 @@ def cleanup_after_test():
     class_diagram.clear()
 
 
+def _describe_world_retainers(sample_size: int = 3, max_depth: int = 20) -> str:
+    """Render the reference chain that keeps leaked ``World`` objects alive.
+
+    For a sample of the currently live worlds, walk the shortest chain of back-references up to a
+    module-level object and render it as ``module -> ... -> World``. This names the persistent
+    structure holding the worlds, so a leak failure in CI is diagnosable without a local
+    reproduction.
+    """
+    worlds = objgraph.by_type("World")
+    descriptions = []
+    for world in worlds[:sample_size]:
+        chain = objgraph.find_backref_chain(
+            world, objgraph.is_proper_module, max_depth=max_depth
+        )
+        rendered = " -> ".join(
+            f"{type(obj).__module__}.{type(obj).__name__}" for obj in chain
+        )
+        descriptions.append(f"  {id(world):#x}: {rendered}")
+    return "\n".join(descriptions)
+
+
 @pytest.fixture(autouse=True, scope="module")
 def count_worlds():
     yield
@@ -148,7 +169,8 @@ def count_worlds():
     world_in_mem = objgraph.count("World")
     if world_in_mem > 30:
         raise MemoryError(
-            "Something is leaking worlds, there are more than 20 worlds in memory after the test"
+            f"Something is leaking worlds, there are {world_in_mem} worlds in memory after the test.\n"
+            f"Retaining chains (module -> ... -> World):\n{_describe_world_retainers()}"
         )
 
 
