@@ -2041,18 +2041,6 @@ def encapsulate_code_lines_into_a_function(
     return code
 
 
-def get_method_object_from_pytest_request(request) -> Callable:
-    test_module = request.module.__name__  # e.g., "test_my_module"
-    test_class = request.cls.__name__ if request.cls else None  # if inside a class
-    test_name = request.node.name
-    func = importlib.import_module(test_module)
-    if test_class:
-        func = getattr(getattr(func, test_class), test_name)
-    else:
-        func = getattr(func, test_name)
-    return func
-
-
 # ---------------------------------------------------------------------------
 # Backward-compat — canonical implementations moved to krrood.code_generation
 # ---------------------------------------------------------------------------

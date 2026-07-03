@@ -30,8 +30,6 @@ from krrood.ripple_down_rules.utils import (
     make_set,
     get_origin_and_args_from_type_hint,
     render_tree,
-    get_function_representation,
-    get_method_object_from_pytest_request,
     typing_to_python_type,
 )
 
@@ -63,28 +61,6 @@ class CaseQuery:
     mutually_exclusive: bool
     """
     Whether the attribute can only take one value (i.e. True) or multiple values (i.e. False).
-    """
-    case_factory: Optional[Callable[[], Any]] = None
-    """
-    The factory method that can be used to recreate the original case.
-    """
-    case_factory_idx: Optional[int] = None
-    """
-    This is used when the case factory is a list of cases, this index is used to select the case from the list.
-    """
-    case_conf: Optional[CaseConf] = None
-    """
-    The case configuration that is used to (re)create the original case, recommended to be used when you want to 
-    the case to persist in the rule base, this would allow it to be used for merging with other similar conclusion RDRs.
-    """
-    scenario: Optional[Callable] = None
-    """
-    The executable scenario is the root callable that recreates the situation that the case is 
-    created in, for example, when the case is created from a test function, this would be the test function itself.
-    """
-    this_case_target_value: Optional[Any] = None
-    """
-    The non relational case query instance target value.
     """
     _target: Optional[CallableExpression] = None
     """
@@ -365,10 +341,6 @@ class CaseQuery:
             conditions=self.conditions,
             is_function=self.is_function,
             function_args_type_hints=self.function_args_type_hints,
-            case_factory=self.case_factory,
-            case_factory_idx=self.case_factory_idx,
-            case_conf=self.case_conf,
-            scenario=self.scenario,
             rdr=self.rdr,
         )
 
@@ -379,48 +351,6 @@ class CaseConf:
 
     def create(self) -> Any:
         return self.factory_method()
-
-
-@dataclass
-class CaseFactoryMetaData:
-    factory_method: Optional[Callable[[Optional[CaseConf]], Any]] = None
-    factory_idx: Optional[int] = None
-    case_conf: Optional[CaseConf] = None
-    scenario: Optional[Callable] = None
-    pytest_request: Optional[Callable] = field(hash=False, compare=False, default=None)
-    this_case_target_value: Optional[Any] = None
-
-    def __post_init__(self):
-        if self.pytest_request is not None and self.scenario is None:
-            self.scenario = get_method_object_from_pytest_request(self.pytest_request)
-
-    @classmethod
-    def from_case_query(cls, case_query: CaseQuery) -> CaseFactoryMetaData:
-        return cls(
-            factory_method=case_query.case_factory,
-            factory_idx=case_query.case_factory_idx,
-            case_conf=case_query.case_conf,
-            scenario=case_query.scenario,
-        )
-
-    def __repr__(self):
-        factory_method_repr = None
-        scenario_repr = None
-        if self.factory_method is not None:
-            factory_method_repr = get_function_representation(self.factory_method)
-        if self.scenario is not None:
-            scenario_repr = get_function_representation(self.scenario)
-        return (
-            f"CaseFactoryMetaData("
-            f"factory_method={factory_method_repr}, "
-            f"factory_idx={self.factory_idx}, "
-            f"case_conf={self.case_conf}, "
-            f"scenario={scenario_repr}, "
-            f"this_case_target_value={self.this_case_target_value})"
-        )
-
-    def __str__(self):
-        return self.__repr__()
 
 
 @dataclass

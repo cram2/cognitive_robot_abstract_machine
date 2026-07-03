@@ -14,7 +14,6 @@ from krrood.ripple_down_rules.datastructures.callable_expression import (
 )
 from krrood.ripple_down_rules.datastructures.case import Case
 from krrood.ripple_down_rules.datastructures.dataclasses import (
-    CaseFactoryMetaData,
     CaseQuery,
 )
 from krrood.ripple_down_rules.datastructures.enums import RDREdge, Stop
@@ -56,10 +55,6 @@ class Rule(SubclassJSONSerializer, ABC):
     uid: str = field(default_factory=lambda: str(uuid4().int))
     """
     A unique id for the rule using uuid4
-    """
-    corner_case_metadata: Optional[CaseFactoryMetaData] = field(default=None)
-    """
-    Metadata about the corner case, such as the factory that created it or the scenario it is based on.
     """
     json_serialization: Optional[Dict[str, Any]] = field(init=False, default=None)
     """
@@ -194,13 +189,11 @@ class Rule(SubclassJSONSerializer, ABC):
         :param parent: The parent rule of this rule.
         :return: A SingleClassRule instance.
         """
-        corner_case_metadata = CaseFactoryMetaData.from_case_query(case_query)
         return cls(
             conditions=case_query.conditions,
             conclusion=case_query.target,
             corner_case=case_query.case,
             _parent=parent,
-            corner_case_metadata=corner_case_metadata,
             conclusion_name=case_query.attribute_name,
         )
 
@@ -236,35 +229,6 @@ class Rule(SubclassJSONSerializer, ABC):
         """
         pass
 
-    def write_corner_case_as_source_code(
-        self, cases_file: str, package_name: Optional[str] = None
-    ) -> None:
-        """
-        Write the source code representation of the corner case of the rule to a file.
-
-        :param cases_file: The file to write the corner case to.
-        :param package_name: The package name to use for relative imports.
-        """
-        if self.corner_case_metadata is None:
-            return
-        with open(cases_file, "a") as f:
-            f.write(f"corner_case_{self.uid} = {self.corner_case_metadata}" + "\n\n\n")
-
-    def get_corner_case_types_to_import(self) -> Set[Type]:
-        """
-        Get the types that need to be imported for the corner case of the rule.
-        """
-        if self.corner_case_metadata is None:
-            return
-        types_to_import = set()
-        if self.corner_case_metadata.factory_method is not None:
-            types_to_import.add(self.corner_case_metadata.factory_method)
-        if self.corner_case_metadata.scenario is not None:
-            types_to_import.add(self.corner_case_metadata.scenario)
-        if self.corner_case_metadata.case_conf is not None:
-            types_to_import.add(self.corner_case_metadata.case_conf)
-        return types_to_import
-
     def write_conclusion_as_source_code(
         self, parent_indent: str = "", defs_file: Optional[str] = None
     ) -> str:
@@ -294,10 +258,6 @@ class Rule(SubclassJSONSerializer, ABC):
     @property
     def generated_conditions_function_name(self) -> str:
         return f"conditions_{self.uid}"
-
-    @property
-    def generated_corner_case_object_name(self) -> str:
-        return f"corner_case_{self.uid}"
 
     def get_conclusion_as_source_code(
         self, conclusion: Any, parent_indent: str = ""
@@ -582,13 +542,11 @@ class SingleClassRule(Rule, HasAlternativeRule, HasRefinementRule):
         return returned_rule if returned_rule.fired else self
 
     def fit_rule(self, case_query: CaseQuery):
-        corner_case_metadata = CaseFactoryMetaData.from_case_query(case_query)
         new_rule = SingleClassRule(
             case_query.conditions,
             case_query.target,
             corner_case=case_query.case,
             _parent=self,
-            corner_case_metadata=corner_case_metadata,
         )
         if self.fired:
             self.refinement = new_rule
