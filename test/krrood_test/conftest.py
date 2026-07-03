@@ -1,5 +1,6 @@
 import logging
 import os
+import tempfile
 import traceback
 from dataclasses import is_dataclass
 
@@ -93,8 +94,18 @@ def generate_sqlalchemy_interface():
         os.path.dirname(__file__), "dataset", "ormatic_interface.py"
     )
 
-    with open(file_path, "w") as f:
-        instance.to_sqlalchemy_file(f)
+    # Write atomically: under pytest-xdist every worker regenerates this shared file at import
+    # time, so a plain truncating write lets one worker read a half-written (or empty) file while
+    # another is still writing it, which surfaces as "cannot import name ..." at collection and
+    # "different tests collected between gw0 and gw1". Writing to a temporary file in the same
+    # directory and os.replace-ing it into place means every reader always sees a complete file.
+    directory = os.path.dirname(file_path)
+    with tempfile.NamedTemporaryFile(
+        "w", dir=directory, prefix="ormatic_interface.", suffix=".py.tmp", delete=False
+    ) as temporary_file:
+        instance.to_sqlalchemy_file(temporary_file)
+        temporary_path = temporary_file.name
+    os.replace(temporary_path, file_path)
 
     return instance
 
