@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from typing_extensions import Optional, Tuple
 
-import krrood.symbolic_math.symbolic_math as sm
+import krrood.symbolic_math.symbolic_math as symbolic_math
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     DefaultWeights,
@@ -58,11 +58,13 @@ class WiggleInsert(Task):
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
     """Priority weight relative to other tasks."""
 
-    _hz: float = field(default=0.0, init=False, repr=False)
+    _control_frequency: float = field(default=0.0, init=False, repr=False)
     """Control frequency, used to scale the per-cycle noise."""
-    _v1: np.ndarray = field(default=None, init=False, repr=False)
+    _perpendicular_basis_first: np.ndarray = field(default=None, init=False, repr=False)
     """First basis vector of the plane perpendicular to the hole normal."""
-    _v2: np.ndarray = field(default=None, init=False, repr=False)
+    _perpendicular_basis_second: np.ndarray = field(
+        default=None, init=False, repr=False
+    )
     """Second basis vector of the plane perpendicular to the hole normal."""
     _current_angle: float = field(default=0.0, init=False, repr=False)
     """Current accumulated wiggle angle."""
@@ -72,9 +74,11 @@ class WiggleInsert(Task):
     """Current accumulated wiggle translation."""
     _vector_momentum: np.ndarray = field(default=None, init=False, repr=False)
     """Current translational momentum of the random walk."""
-    _rand_translation: Vector3 = field(default=None, init=False, repr=False)
+    _random_translation: Vector3 = field(default=None, init=False, repr=False)
     """Auxiliary variable holding the current translational noise in the root frame."""
-    _rand_angle: sm.FloatVariable = field(default=None, init=False, repr=False)
+    _random_angle: symbolic_math.FloatVariable = field(
+        default=None, init=False, repr=False
+    )
     """Auxiliary variable holding the current angular noise."""
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
@@ -92,14 +96,14 @@ class WiggleInsert(Task):
         )
 
         control_dt = context.qp_controller_config.control_dt
-        self._hz = 1 / control_dt
+        self._control_frequency = 1 / control_dt
 
         self._current_angle = 0.0
         self._angular_momentum = 0.0
         self._current_vector = np.zeros(3)
         self._vector_momentum = np.zeros(3)
-        self._v1, self._v2 = self._calculate_perpendicular_basis(
-            hole_normal.to_np()[:3]
+        self._perpendicular_basis_first, self._perpendicular_basis_second = (
+            self._calculate_perpendicular_basis(hole_normal.to_np()[:3])
         )
 
         root_P_current = context.world.compose_forward_kinematics_expression(
@@ -109,13 +113,13 @@ class WiggleInsert(Task):
             target_frame=self.root_link, spatial_object=self.hole_point
         )
 
-        self._rand_translation = Vector3.create_with_variables(
+        self._random_translation = Vector3.create_with_variables(
             f"{self.name}_rand_translation"
         )
-        self._rand_translation.reference_frame = self.root_link
-        context.float_variable_data.register_expression(self._rand_translation)
+        self._random_translation.reference_frame = self.root_link
+        context.float_variable_data.register_expression(self._random_translation)
 
-        root_P_hole_wiggled = root_P_hole + self._rand_translation
+        root_P_hole_wiggled = root_P_hole + self._random_translation
         artifacts.geometry.add_point_goal_constraints(
             frame_P_current=root_P_current,
             frame_P_goal=root_P_hole_wiggled,
@@ -124,14 +128,14 @@ class WiggleInsert(Task):
             name=f"{self.name}_point_goal",
         )
 
-        self._rand_angle = sm.FloatVariable(f"{self.name}_rand_angle")
-        context.float_variable_data.register_expression(self._rand_angle)
+        self._random_angle = symbolic_math.FloatVariable(f"{self.name}_rand_angle")
+        context.float_variable_data.register_expression(self._random_angle)
 
         tip_V_hole_normal = context.world.transform(
             target_frame=self.tip_link, spatial_object=hole_normal
         )
         tip_R_hole_normal = RotationMatrix.from_axis_angle(
-            angle=self._rand_angle, axis=tip_V_hole_normal
+            angle=self._random_angle, axis=tip_V_hole_normal
         )
         root_R_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
@@ -165,16 +169,20 @@ class WiggleInsert(Task):
         else:
             translation = self._random_sample_translation()
             angle = self._random_sample_angle()
-        context.float_variable_data.set_value(self._rand_translation, translation)
-        context.float_variable_data.set_value(self._rand_angle, angle)
+        context.float_variable_data.set_value(self._random_translation, translation)
+        context.float_variable_data.set_value(self._random_angle, angle)
         return None
 
     def _random_sample_angle(self) -> float:
-        self._current_angle = ((random.random() - 0.5) * self.noise_angle) / self._hz
+        self._current_angle = (
+            (random.random() - 0.5) * self.noise_angle
+        ) / self._control_frequency
         return self._current_angle
 
     def _random_walk_angle(self) -> float:
-        random_angular_change = ((random.random() - 0.5) * self.noise_angle) / self._hz
+        random_angular_change = (
+            (random.random() - 0.5) * self.noise_angle
+        ) / self._control_frequency
         self._angular_momentum = (
             self.angular_momentum_factor * self._angular_momentum
             + (1 - self.angular_momentum_factor) * random_angular_change
@@ -188,16 +196,24 @@ class WiggleInsert(Task):
 
     def _random_sample_translation(self) -> np.ndarray:
         self._current_vector = (
-            (random.random() - 0.5) * self.noise_translation * self._v1
-            + (random.random() - 0.5) * self.noise_translation * self._v2
-        ) / self._hz
+            (random.random() - 0.5)
+            * self.noise_translation
+            * self._perpendicular_basis_first
+            + (random.random() - 0.5)
+            * self.noise_translation
+            * self._perpendicular_basis_second
+        ) / self._control_frequency
         return self._current_vector
 
     def _random_walk_translation(self) -> np.ndarray:
         random_vector_change = (
-            (random.random() - 0.5) * self.noise_translation * self._v1
-            + (random.random() - 0.5) * self.noise_translation * self._v2
-        ) / self._hz
+            (random.random() - 0.5)
+            * self.noise_translation
+            * self._perpendicular_basis_first
+            + (random.random() - 0.5)
+            * self.noise_translation
+            * self._perpendicular_basis_second
+        ) / self._control_frequency
         self._vector_momentum = (
             self.vector_momentum_factor * self._vector_momentum
             + (1 - self.vector_momentum_factor) * random_vector_change

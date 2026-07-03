@@ -61,14 +61,10 @@ class CartesianTask(Task, ABC):
     )
     """Describes when the goal is computed. See GoalBindingPolicy for more information."""
 
-    root_T_goal_reference_frame: HomogeneousTransformationMatrix = field(
-        kw_only=True, init=False
-    )
+    root_T_goal_reference_frame: HomogeneousTransformationMatrix = field(init=False)
     """Transformation matrix from root to goal_reference_frame link."""
 
-    _forward_kinematics_binding: ForwardKinematicsBinding = field(
-        kw_only=True, init=False
-    )
+    _forward_kinematics_binding: ForwardKinematicsBinding = field(init=False)
     """Binding for the goal pose."""
 
     GOAL_COLOR: ClassVar[Color] = Color(R=0.0, G=1.0, B=0.0, A=1.0)

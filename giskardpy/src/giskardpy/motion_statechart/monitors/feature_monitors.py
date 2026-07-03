@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import field, dataclass
-from typing import Union
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -21,9 +20,9 @@ class FeatureMonitor(MotionStatechartNode):
     """Link the controlled feature is attached to."""
     root_link: Body = field(kw_only=True)
     """Link the reference feature is attached to."""
-    reference_feature: Union[Point3, Vector3] = field(init=False)
+    reference_feature: Point3 | Vector3 = field(init=False)
     """Reference feature, expressed in the root link frame after :meth:`build`."""
-    controlled_feature: Union[Point3, Vector3] = field(init=False)
+    controlled_feature: Point3 | Vector3 = field(init=False)
     """Controlled feature, expressed in the root link frame after :meth:`build`."""
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:

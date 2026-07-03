@@ -94,8 +94,16 @@ def test_wiggle_insert_basis_uses_root_frame_hole_normal(pr2_world_state_reset: 
         target_frame=root, spatial_object=hole_normal_in_tip_frame
     ).to_np()[:3]
 
-    assert np.isclose(np.dot(wiggle._v1, expected_normal_in_root), 0.0, atol=1e-9)
-    assert np.isclose(np.dot(wiggle._v2, expected_normal_in_root), 0.0, atol=1e-9)
+    assert np.isclose(
+        np.dot(wiggle._perpendicular_basis_first, expected_normal_in_root),
+        0.0,
+        atol=1e-9,
+    )
+    assert np.isclose(
+        np.dot(wiggle._perpendicular_basis_second, expected_normal_in_root),
+        0.0,
+        atol=1e-9,
+    )
 
 
 def test_wiggle_insert_on_tick_updates_noise(pr2_world_state_reset: World):
@@ -124,9 +132,9 @@ def test_wiggle_insert_on_tick_updates_noise(pr2_world_state_reset: World):
     kin_sim.compile(motion_statechart=msc)
 
     kin_sim.tick()
-    first_translation = wiggle._rand_translation.evaluate().flatten()[:3].copy()
+    first_translation = wiggle._random_translation.evaluate().flatten()[:3].copy()
     kin_sim.tick()
-    second_translation = wiggle._rand_translation.evaluate().flatten()[:3].copy()
+    second_translation = wiggle._random_translation.evaluate().flatten()[:3].copy()
 
     # The injected noise must change between control cycles.
     assert not np.allclose(first_translation, second_translation)
