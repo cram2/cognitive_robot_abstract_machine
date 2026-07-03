@@ -143,24 +143,21 @@ def cleanup_after_test():
     class_diagram.clear()
 
 
-def _describe_world_retainers(sample_size: int = 3, max_depth: int = 20) -> str:
-    """Render the reference chain that keeps leaked ``World`` objects alive.
+def _describe_world_retainers(sample_size: int = 3) -> str:
+    """Summarize, by type, the objects that directly reference a sample of live ``World`` objects.
 
-    For a sample of the currently live worlds, walk the shortest chain of back-references up to a
-    module-level object and render it as ``module -> ... -> World``. This names the persistent
-    structure holding the worlds, so a leak failure in CI is diagnosable without a local
-    reproduction.
+    This is a single-level ``gc.get_referrers`` histogram, so it is bounded and fast. A full
+    back-reference-chain search (``objgraph.find_backref_chain``) must not be used here: on the
+    large, densely connected worlds built in the ROS/physics tests it walks the whole object graph
+    and can run for hours, turning a leak *failure* into a CI *hang*.
     """
-    worlds = objgraph.by_type("World")
     descriptions = []
-    for world in worlds[:sample_size]:
-        chain = objgraph.find_backref_chain(
-            world, objgraph.is_proper_module, max_depth=max_depth
-        )
-        rendered = " -> ".join(
-            f"{type(obj).__module__}.{type(obj).__name__}" for obj in chain
-        )
-        descriptions.append(f"  {id(world):#x}: {rendered}")
+    for world in objgraph.by_type("World")[:sample_size]:
+        kinds: dict = {}
+        for referrer in gc.get_referrers(world):
+            key = type(referrer).__qualname__
+            kinds[key] = kinds.get(key, 0) + 1
+        descriptions.append(f"  {id(world):#x} direct referrers: {kinds}")
     return "\n".join(descriptions)
 
 
@@ -192,7 +189,7 @@ def count_worlds():
     if world_in_mem > 30:
         raise MemoryError(
             f"Something is leaking worlds, there are {world_in_mem} worlds in memory after the test.\n"
-            f"Retaining chains (module -> ... -> World):\n{_describe_world_retainers()}"
+            f"Direct referrers of leaked worlds:\n{_describe_world_retainers()}"
         )
 
 
