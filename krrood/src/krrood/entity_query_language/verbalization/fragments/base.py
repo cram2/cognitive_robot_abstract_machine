@@ -31,6 +31,7 @@ from krrood.entity_query_language.verbalization.value_lexicon import (
     type_noun,
     value_phrase,
 )
+from krrood.patterns.field_metadata import GrammarMetadata
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.microplanning.coordination import (
@@ -163,14 +164,17 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         :param attribute_name: Canonical attribute name on *owner* (always used for the link).
         :param number: Grammatical-number feature.
         :param text: Surface word override — a display name or a relational verb phrase
-            (*"assigned to"*); defaults to *attribute_name*.
+            (*"assigned to"*); defaults to the field's registered display name, else *attribute_name*.
         :return: A fragment with the ``ATTRIBUTE`` role.
 
         >>> RoleFragment.for_attribute(Robot, "battery").text
         'battery'
         """
+        surface_text = (
+            text if text is not None else cls._display_name(owner, attribute_name)
+        )
         return cls(
-            text=text if text is not None else attribute_name,
+            text=surface_text,
             role=SemanticRole.ATTRIBUTE,
             source_reference=(
                 SourceReference.for_attribute(owner, attribute_name)
@@ -179,6 +183,17 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
             ),
             number=number,
         )
+
+    @staticmethod
+    def _display_name(owner: Optional[type], attribute_name: str) -> str:
+        """:return: the field's registered display name when *owner* declares one for
+        *attribute_name*, else *attribute_name* unchanged."""
+        if owner is None:
+            return attribute_name
+        grammar_metadata = GrammarMetadata.of_field(owner, attribute_name)
+        if grammar_metadata is None or grammar_metadata.display_name is None:
+            return attribute_name
+        return grammar_metadata.display_name
 
     @classmethod
     def for_type(

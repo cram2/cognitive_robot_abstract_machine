@@ -15,7 +15,6 @@ from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
     GrammaticalNumber,
 )
-from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.vocabulary.countability import (
     NounCountability,
 )
@@ -35,15 +34,17 @@ def attribute_fragment(
     """:return: A role-tagged attribute fragment for *step*, tagged with *number* for inflection
     (a single-hop possessive of a plural subject distributes — *"their salaries"*).
 
+    Routed through :meth:`RoleFragment.for_attribute` so a field's registered display name
+    (*"beginning"* for ``begin``) applies here just as it does for a standalone attribute leaf.
+
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
     >>> flatten_fragment_to_plain_text(attribute_fragment(PathStep("salary")))
     'salary'
     """
-    return RoleFragment(
-        text=step.name,
-        role=SemanticRole.ATTRIBUTE,
-        source_reference=step.source_reference,
-        number=number,
+    if step.source_reference is None:
+        return RoleFragment.for_attribute(None, step.name, number)
+    return RoleFragment.for_attribute(
+        step.source_reference.owner_type, step.source_reference.attribute, number
     )
 
 

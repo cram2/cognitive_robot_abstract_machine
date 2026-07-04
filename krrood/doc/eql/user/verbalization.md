@@ -209,10 +209,15 @@ specific Robot"*.
 ## Factoring Repeated Comparisons
 
 Two comparisons that pair the same attribute across sibling chains fold into one natural clause —
-*"the begin and end of the period have the same month and year"* — instead of repeating each.
+*"the beginning and end of the period have the same month and year"* — instead of repeating each.
+
+A field whose attribute name reads awkwardly can register a `display_name` in its
+`GrammarMetadata`; the verbalizer then uses that word wherever the field appears (here `begin`
+surfaces as *"beginning"*).
 
 ```{code-cell} ipython3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from krrood.patterns.field_metadata import FieldMetadata, GrammarMetadata
 
 @dataclass
 class Date:
@@ -221,8 +226,12 @@ class Date:
 
 @dataclass
 class Period:
-    begin: Date
-    end: Date
+    begin: Date = field(
+        metadata=FieldMetadata(
+            other_metadata=[GrammarMetadata(display_name="beginning")]
+        ).as_dict()
+    )
+    end: Date = None
 
 p = variable(Period, domain=None)
 query = an(entity(p).where(p.begin.month == p.end.month, p.begin.year == p.end.year))
