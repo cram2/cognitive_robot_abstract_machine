@@ -271,8 +271,6 @@ def create_case_query_from_method(
     func_kwargs: Dict[str, Any],
     case: Optional[Case] = None,
     case_dict: Optional[Dict[str, Any]] = None,
-    scenario: Optional[Callable] = None,
-    this_case_target_value: Optional[Any] = None,
 ) -> CaseQuery:
     """
     Create a CaseQuery from the function and its arguments.
@@ -285,8 +283,6 @@ def create_case_query_from_method(
     :param func_kwargs: The keyword arguments of the function.
     :param case: The case to create.
     :param case_dict: The dictionary of the case.
-    :param scenario: The scenario that produced the given case.
-    :param this_case_target_value: The target value for the case.
     :return: A CaseQuery object representing the case.
     """
     output_type = make_set(output_type)
@@ -324,8 +320,6 @@ def create_case_query_from_method(
         tuple(output_type),
         mutual_exclusive,
         scope=scope,
-        scenario=scenario,
-        this_case_target_value=this_case_target_value,
         is_function=True,
         function_args_type_hints=func_args_type_hints,
     )

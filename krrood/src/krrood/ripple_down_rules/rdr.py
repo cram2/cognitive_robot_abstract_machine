@@ -10,8 +10,6 @@ from io import TextIOWrapper
 from pathlib import Path
 from types import NoneType, ModuleType
 
-from krrood.ripple_down_rules.datastructures.dataclasses import CaseFactoryMetaData
-
 from krrood.ripple_down_rules import logger
 from krrood.ripple_down_rules.exceptions import RDRLoadError
 
@@ -489,7 +487,6 @@ class RippleDownRules(SubclassJSONSerializer, ABC):
         case_query: CaseQuery,
         expert: Optional[Expert] = None,
         update_existing_rules: bool = True,
-        scenario: Optional[Callable] = None,
         ask_now: Callable = lambda _: False,
         clear_expert_answers: bool = True,
         ask_now_target: Optional[Any] = None,
@@ -503,7 +500,6 @@ class RippleDownRules(SubclassJSONSerializer, ABC):
         :param expert: The expert to ask for differentiating features as new rule conditions.
         :param update_existing_rules: Whether to update the existing same conclusion type rules that already gave
         some conclusions with the type required by the case query.
-        :param scenario: The scenario at which the case was created, this is used to recreate the case if needed.
         :param ask_now: Whether to ask the expert for refinements or alternatives.
         :param clear_expert_answers: Whether to clear expert answers after saving the new rule.
         :param ask_now_target: The target output for the case that is triggers the ask_now function to return True.
@@ -518,9 +514,6 @@ class RippleDownRules(SubclassJSONSerializer, ABC):
         )
         self.case_name = (
             case_query.case_name if self.case_name is None else self.case_name
-        )
-        case_query.scenario = (
-            scenario if case_query.scenario is None else case_query.scenario
         )
         case_query.rdr = self
 
@@ -646,18 +639,6 @@ class RippleDownRules(SubclassJSONSerializer, ABC):
         """
         model_name = cls.get_model_name_from_model_path(model_path)
         return os.path.join(model_path, cls.metadata_folder, f"{model_name}.json")
-
-    @classmethod
-    def get_generated_cases_file_path(cls, model_path: str) -> str:
-        """
-        Get the path to the python file that contains the RDR classifier cases.
-
-        :param model_path : The path to the model directory.
-        :return: The path to the generated python file.
-        """
-        return cls.get_generated_python_file_path(model_path).replace(
-            ".py", "_cases.py"
-        )
 
     @classmethod
     def get_generated_defs_file_path(cls, model_path: str) -> str:
@@ -1076,12 +1057,10 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         ]
         all_func_names = condition_func_names + conclusion_func_names
 
-        main_module, defs_module, cases_module = (
-            self.get_and_import_model_python_modules(
-                model_dir,
-                python_file_path=python_file_path,
-                parent_package_name=parent_package_name,
-            )
+        main_module, defs_module = self.get_and_import_model_python_modules(
+            model_dir,
+            python_file_path=python_file_path,
+            parent_package_name=parent_package_name,
         )
         self.generated_python_file_name = Path(main_module.__file__).name.replace(
             ".py", ""
@@ -1095,14 +1074,6 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         scope = get_scope_from_imports(
             defs_module.__file__, package_name=parent_package_name
         )
-
-        cases_source, cases_scope = None, None
-        if cases_module:
-            with open(cases_module.__file__, "r") as f:
-                cases_source = f.read()
-            cases_scope = get_scope_from_imports(
-                cases_module.__file__, package_name=parent_package_name
-            )
 
         with open(main_module.__file__, "r") as f:
             main_source = f.read()
@@ -1126,20 +1097,6 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
                     user_input.split("\n")[1:]
                 )  # Remove the function signature line
                 rule.conditions = CallableExpression(user_input, (bool,), scope=scope)
-                if cases_module:
-                    try:
-                        rule.corner_case_metadata = cases_module.__dict__[
-                            rule.generated_corner_case_object_name
-                        ]
-                    except KeyError:
-                        case_def_lines = [
-                            l
-                            for l in cases_source.split("\n")
-                            if rule.generated_corner_case_object_name in l
-                        ]
-                        if len(case_def_lines) > 0:
-                            case_def_line = case_def_lines[0].split("=")[-1].strip()
-                            rule.corner_case_metadata = eval(case_def_line, cases_scope)
 
             if not isinstance(rule, MultiClassStopRule):
                 if conclusion_name:
@@ -1173,15 +1130,15 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         model_dir: str,
         python_file_path: Optional[str] = None,
         parent_package_name: Optional[str] = None,
-    ) -> Tuple[ModuleType, ModuleType, ModuleType]:
+    ) -> Tuple[ModuleType, ModuleType]:
         """
-        Get and import the python modules that contain the RDR classifier function, definitions, and corner cases.
+        Get and import the python modules that contain the RDR classifier function and definitions.
 
         :param model_dir: The path to the directory where the generated python files are located.
         :param python_file_path: The path to the generated python file that contains the RDR classifier function.
         :param parent_package_name: The name of the package that contains the RDR classifier function, this
         is required in case of relative imports in the generated python file.
-        :return: A tuple containing the main module, defs module, and cases module.
+        :return: A tuple containing the main module and the defs module.
         """
         if python_file_path is None:
             main_file_path = cls.get_generated_python_file_path(model_dir)
@@ -1191,15 +1148,12 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
             raise ModuleNotFoundError(main_file_path)
 
         defs_file_path = main_file_path.replace(".py", "_defs.py")
-        cases_path = main_file_path.replace(".py", "_cases.py")
 
-        main_module, defs_module, cases_module = (
-            get_and_import_python_modules_in_a_package(
-                [main_file_path, defs_file_path, cases_path],
-                parent_package_name=parent_package_name,
-            )
+        main_module, defs_module = get_and_import_python_modules_in_a_package(
+            [main_file_path, defs_file_path],
+            parent_package_name=parent_package_name,
         )
-        return main_module, defs_module, cases_module
+        return main_module, defs_module
 
     @abstractmethod
     def write_rules_as_source_code_to_file(
@@ -1208,7 +1162,6 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         file,
         parent_indent: str = "",
         defs_file: Optional[str] = None,
-        cases_file: Optional[str] = None,
         package_name: Optional[str] = None,
     ):
         """
@@ -1218,7 +1171,6 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         :param file: The file to write the source code to.
         :param parent_indent: The indentation of the parent rule.
         :param defs_file: The file to write the definitions to.
-        :param cases_file: The file to write the cases to.
         :param package_name: The name of the package that contains the RDR classifier function, this
         is required in case of relative imports in the generated python file.
         """
@@ -1241,29 +1193,16 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         # Set the file names for the generated python files
         file_name = model_dir + f"/{self.generated_python_file_name}.py"
         defs_file_name = model_dir + f"/{self.generated_python_defs_file_name}.py"
-        cases_file_name = model_dir + f"/{self.generated_python_cases_file_name}.py"
 
         # Get the required imports for the main file and the defs file
-        main_types, defs_types, corner_cases_types = self._get_types_to_import()
+        main_types, defs_types = self._get_types_to_import()
         imports = get_imports_from_types(main_types, file_name, package_name)
         defs_imports = get_imports_from_types(defs_types, defs_file_name, package_name)
-        corner_cases_imports = get_imports_from_types(
-            corner_cases_types, cases_file_name, package_name
-        )
 
         defs_imports.append(f"from krrood.ripple_down_rules import *")
         # Add the imports to the defs file
         with open(defs_file_name, "w") as f:
             f.write("\n".join(defs_imports) + "\n\n\n")
-
-        # Add the imports to the cases file
-        case_factory_import = get_imports_from_types(
-            [CaseFactoryMetaData], cases_file_name, package_name
-        )
-        corner_cases_imports.extend(case_factory_import)
-        with open(cases_file_name, "w") as cases_f:
-            cases_f.write("# This file contains the corner cases for the rules.\n")
-            cases_f.write("\n".join(corner_cases_imports) + "\n\n\n")
 
         # Add the imports, the attributes, and the function definition to the main file
         func_def = f"def classify(case: {self.case_type.__name__}, **kwargs) -> {self.conclusion_type_hint}:\n"
@@ -1292,7 +1231,6 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
             file_name,
             " " * 4,
             defs_file=defs_file_name,
-            cases_file=cases_file_name,
             package_name=package_name,
         )
 
@@ -1306,12 +1244,11 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
 
     def _get_types_to_import(
         self,
-    ) -> Tuple[Set[Union[Type, Callable]], Set[Type], Set[Type]]:
+    ) -> Tuple[Set[Union[Type, Callable]], Set[Type]]:
         """
-        :return: The types of the main, defs, and corner cases files of the RDR classifier that will be imported.
+        :return: The types of the main and defs files of the RDR classifier that will be imported.
         """
         defs_types = set()
-        cases_types = set()
         for rule in [self.start_rule] + list(self.start_rule.descendants):
             if not rule.conditions:
                 continue
@@ -1326,9 +1263,6 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
                     except TypeError:
                         continue
                 defs_types.update(scope_values)
-            corner_case_types = rule.get_corner_case_types_to_import()
-            if corner_case_types is not None:
-                cases_types.update(corner_case_types)
         defs_types.add(self.case_type)
         main_types = set()
         main_types.add(self.case_type)
@@ -1337,7 +1271,7 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         defs_types.add(Union)
         main_types.update({Case, create_case, copy_case})
         # main_types = main_types.difference(defs_types)
-        return main_types, defs_types, cases_types
+        return main_types, defs_types
 
     @property
     def _default_generated_python_file_name(self) -> Optional[str]:
@@ -1351,10 +1285,6 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
     @property
     def generated_python_defs_file_name(self) -> str:
         return f"{self.generated_python_file_name}_defs"
-
-    @property
-    def generated_python_cases_file_name(self) -> str:
-        return f"{self.generated_python_file_name}_cases"
 
     @property
     def conclusion_type(self) -> Tuple[Type]:
@@ -1491,15 +1421,6 @@ class SingleClassRDR(RDRWithCodeWriter):
             pred.last_conclusion = conclusion
             if case_query is not None:
                 pred.contributed_to_case_query = True
-        if pred is not None and pred.fired and case_query is not None:
-            if (
-                pred.corner_case_metadata is None
-                and conclusion is not None
-                and type(conclusion) in case_query.core_attribute_type
-            ):
-                pred.corner_case_metadata = CaseFactoryMetaData.from_case_query(
-                    case_query
-                )
         return conclusion
 
     def evaluate(self, case: Case) -> SingleClassRule:
@@ -1520,14 +1441,12 @@ class SingleClassRDR(RDRWithCodeWriter):
         filename: str,
         parent_indent: str = "",
         defs_file: Optional[str] = None,
-        cases_file: Optional[str] = None,
         package_name: Optional[str] = None,
     ):
         """
         Write the rules as source code to a file.
         """
         if rule.conditions:
-            rule.write_corner_case_as_source_code(cases_file, package_name=package_name)
             if_clause = rule.write_condition_as_source_code(parent_indent, defs_file)
             with open(filename, "a") as file:
                 file.write(if_clause)
@@ -1537,7 +1456,6 @@ class SingleClassRDR(RDRWithCodeWriter):
                     filename,
                     parent_indent + "    ",
                     defs_file=defs_file,
-                    cases_file=cases_file,
                     package_name=package_name,
                 )
 
@@ -1553,7 +1471,6 @@ class SingleClassRDR(RDRWithCodeWriter):
                     filename,
                     parent_indent,
                     defs_file=defs_file,
-                    cases_file=cases_file,
                     package_name=package_name,
                 )
 
@@ -1570,14 +1487,14 @@ class SingleClassRDR(RDRWithCodeWriter):
         type_names = [stringify_type_hint(t) for t in all_types]
         return f"Union[{', '.join(type_names)}]"
 
-    def _get_types_to_import(self) -> Tuple[Set[Type], Set[Type], Set[Type]]:
-        main_types, def_types, case_types = super()._get_types_to_import()
+    def _get_types_to_import(self) -> Tuple[Set[Type], Set[Type]]:
+        main_types, def_types = super()._get_types_to_import()
         main_types.add(type(self.default_conclusion))
         def_types.add(type(self.default_conclusion))
         if self.default_conclusion is None:
             main_types.add(Optional)
             def_types.add(Optional)
-        return main_types, def_types, case_types
+        return main_types, def_types
 
     @property
     def conclusion_type(self) -> Tuple[Type]:
@@ -1651,21 +1568,6 @@ class MultiClassRDR(RDRWithCodeWriter):
                     rule_conclusion = make_set(rule_conclusion) - make_set(
                         self.conclusions
                     )
-                if (
-                    evaluated_rule.corner_case_metadata is None
-                    and case_query is not None
-                ):
-                    if (
-                        rule_conclusion is not None
-                        and len(make_list(rule_conclusion)) > 0
-                        and any(
-                            ct in case_query.core_attribute_type
-                            for ct in map(type, make_list(rule_conclusion))
-                        )
-                    ):
-                        evaluated_rule.corner_case_metadata = (
-                            CaseFactoryMetaData.from_case_query(case_query)
-                        )
                 if rule_conclusion is not None and any(make_list(rule_conclusion)):
                     evaluated_rule.contributed = True
                     evaluated_rule.last_conclusion = rule_conclusion
@@ -1735,14 +1637,12 @@ class MultiClassRDR(RDRWithCodeWriter):
         filename: str,
         parent_indent: str = "",
         defs_file: Optional[str] = None,
-        cases_file: Optional[str] = None,
         package_name: Optional[str] = None,
     ):
         if rule == self.start_rule:
             with open(filename, "a") as file:
                 file.write(f"{parent_indent}conclusions = set()\n")
         if rule.conditions:
-            rule.write_corner_case_as_source_code(cases_file, package_name=package_name)
             if_clause = rule.write_condition_as_source_code(parent_indent, defs_file)
             with open(filename, "a") as file:
                 file.write(if_clause)
@@ -1753,7 +1653,6 @@ class MultiClassRDR(RDRWithCodeWriter):
                     filename,
                     parent_indent + "    ",
                     defs_file=defs_file,
-                    cases_file=cases_file,
                     package_name=package_name,
                 )
                 conclusion_indent = parent_indent + " " * 4
@@ -1772,7 +1671,6 @@ class MultiClassRDR(RDRWithCodeWriter):
                     filename,
                     parent_indent,
                     defs_file=defs_file,
-                    cases_file=cases_file,
                     package_name=package_name,
                 )
             elif isinstance(rule, MultiClassTopRule):
@@ -1795,14 +1693,14 @@ class MultiClassRDR(RDRWithCodeWriter):
 
     def _get_types_to_import(
         self,
-    ) -> Tuple[Set[Union[Type, Callable]], Set[Type], Set[Type]]:
-        main_types, defs_types, cases_types = super()._get_types_to_import()
+    ) -> Tuple[Set[Union[Type, Callable]], Set[Type]]:
+        main_types, defs_types = super()._get_types_to_import()
         main_types.update(
             {get_an_updated_case_copy, update_case_and_conclusions_with_rule_output}
         )
         main_types.update({Set, make_set})
         defs_types.update({List, Set})
-        return main_types, defs_types, cases_types
+        return main_types, defs_types
 
     def update_start_rule(self, case_query: CaseQuery, expert: Expert):
         """

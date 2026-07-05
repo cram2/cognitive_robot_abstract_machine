@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 from unittest import skip
 
-from typing_extensions import List, Callable, Optional
+from typing_extensions import List
 
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 from krrood.ripple_down_rules.experts import Human
@@ -203,7 +203,6 @@ def get_two_molecules_model(
     filename=os.path.join(
         os.path.dirname(__file__), "test_expert_answers", "mutagenic_expert_answers"
     ),
-    scenario: Optional[Callable] = None,
 ) -> SingleClassRDR:
     expert = Human(use_loaded_answers=load_answers)
     if load_answers:
@@ -218,7 +217,6 @@ def get_two_molecules_model(
             (bool,),
             True,
             _target=molecule_1.mutagenic,
-            case_factory=make_molecule_1,
         ),
         CaseQuery(
             molecule_2,
@@ -226,12 +224,11 @@ def get_two_molecules_model(
             (bool,),
             True,
             _target=molecule_2.mutagenic,
-            case_factory=make_molecule_2,
         ),
     ]
 
     rdr = SingleClassRDR()
-    rdr.fit(case_queries, expert=expert, animate_tree=draw_tree, scenario=scenario)
+    rdr.fit(case_queries, expert=expert, animate_tree=draw_tree)
 
     for case_query in case_queries:
         r = rdr.classify(case_query.case)
@@ -253,12 +250,11 @@ def test_two_molecules():
         draw_tree=False,
         load_answers=True,
         save_answers=False,
-        scenario=test_two_molecules,
     )
 
 
 def test_serialize_two_molecules_model():
-    rdr = get_two_molecules_model(scenario=test_serialize_two_molecules_model)
+    rdr = get_two_molecules_model()
     filename = os.path.join(
         os.path.dirname(__file__), "test_results", "two_molecules_model"
     )
@@ -269,7 +265,7 @@ def test_serialize_two_molecules_model():
 
 
 def test_write_two_molecules_model_to_python():
-    rdr = get_two_molecules_model(scenario=test_write_two_molecules_model_to_python)
+    rdr = get_two_molecules_model()
     filename = os.path.join(
         os.path.dirname(__file__), "test_generated_rdrs", "two_molecules"
     )

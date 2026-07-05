@@ -1,5 +1,7 @@
+import faulthandler
 import gc
 import os
+import sys
 import threading
 import time
 from copy import deepcopy
@@ -141,6 +143,44 @@ def cleanup_after_test():
     class_diagram.clear()
 
 
+def _describe_world_retainers(sample_size: int = 3) -> str:
+    """Summarize, by type, the objects that directly reference a sample of live ``World`` objects.
+
+    This is a single-level ``gc.get_referrers`` histogram, so it is bounded and fast. A full
+    back-reference-chain search (``objgraph.find_backref_chain``) must not be used here: on the
+    large, densely connected worlds built in the ROS/physics tests it walks the whole object graph
+    and can run for hours, turning a leak *failure* into a CI *hang*.
+    """
+    descriptions = []
+    for world in objgraph.by_type("World")[:sample_size]:
+        kinds: dict = {}
+        for referrer in gc.get_referrers(world):
+            key = type(referrer).__qualname__
+            kinds[key] = kinds.get(key, 0) + 1
+        descriptions.append(f"  {id(world):#x} direct referrers: {kinds}")
+    return "\n".join(descriptions)
+
+
+_HANG_WATCHDOG_SECONDS = int(os.environ.get("PYTEST_HANG_WATCHDOG_SECONDS", "300"))
+"""Seconds a single test may run before its stack is dumped; overridable via env var."""
+
+
+@pytest.fixture(autouse=True)
+def dump_stack_if_hanging():
+    """Dump every thread's stack to stderr if a test runs longer than the watchdog interval.
+
+    A hanging test (no result even after an hour on CI) otherwise leaves no evidence of *where* it
+    is stuck. Arming a per-test faulthandler timer makes such a test print the exact frame it is
+    blocked in on every interval, so the hang is localizable from the CI log without a local
+    reproduction. The timer is cancelled at teardown so healthy tests never dump.
+    """
+    faulthandler.dump_traceback_later(
+        _HANG_WATCHDOG_SECONDS, repeat=True, file=sys.stderr
+    )
+    yield
+    faulthandler.cancel_dump_traceback_later()
+
+
 @pytest.fixture(autouse=True, scope="module")
 def count_worlds():
     yield
@@ -148,7 +188,8 @@ def count_worlds():
     world_in_mem = objgraph.count("World")
     if world_in_mem > 30:
         raise MemoryError(
-            "Something is leaking worlds, there are more than 20 worlds in memory after the test"
+            f"Something is leaking worlds, there are {world_in_mem} worlds in memory after the test.\n"
+            f"Direct referrers of leaked worlds:\n{_describe_world_retainers()}"
         )
 
 

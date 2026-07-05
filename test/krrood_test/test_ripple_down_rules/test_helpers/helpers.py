@@ -1,7 +1,7 @@
 import inspect
 import os
 
-from typing_extensions import List, Any, Tuple, Type, Callable, Optional
+from typing_extensions import List, Any, Tuple, Type
 
 from test.krrood_test.test_ripple_down_rules.datasets import (
     Species,
@@ -27,8 +27,6 @@ def get_fit_scrdr(
     load_answers: bool = True,
     save_answers: bool = False,
     update_existing_rules: bool = True,
-    case_factory: Callable = load_zoo_cases,
-    scenario: Optional[Callable] = None,
 ) -> Tuple[SingleClassRDR, List[CaseQuery]]:
     filename = os.path.join(
         os.path.dirname(__file__), "..", expert_answers_dir, expert_answers_file
@@ -46,11 +44,8 @@ def get_fit_scrdr(
             (attribute_type,),
             True,
             _target=target,
-            case_factory=case_factory,
-            case_factory_idx=i,
-            scenario=scenario,
         )
-        for i, (case, target) in enumerate(zip(cases, targets))
+        for case, target in zip(cases, targets)
     ]
     scrdr.fit(
         case_queries,
@@ -78,8 +73,6 @@ def get_fit_mcrdr(
     load_answers: bool = True,
     save_answers: bool = False,
     update_existing_rules: bool = True,
-    case_factory: Callable = load_zoo_cases,
-    scenario: Optional[Callable] = None,
 ) -> MultiClassRDR:
     filename = os.path.join(
         os.path.dirname(__file__), "..", expert_answers_dir, expert_answers_file
@@ -96,11 +89,8 @@ def get_fit_mcrdr(
             (attribute_type,),
             mutually_exclusive,
             _target=target,
-            case_factory=case_factory,
-            case_factory_idx=i,
-            scenario=scenario,
         )
-        for i, (case, target) in enumerate(zip(cases, targets))
+        for case, target in zip(cases, targets)
     ]
     mcrdr.fit(
         case_queries,
@@ -127,8 +117,6 @@ def get_fit_grdr(
     append: bool = False,
     no_targets: bool = False,
     update_existing_rules: bool = True,
-    case_factory: Callable = load_zoo_cases,
-    scenario: Optional[Callable] = None,
 ) -> Tuple[GeneralRDR, List[dict]]:
     filename = os.path.join(
         os.path.dirname(__file__), "..", expert_answers_dir, expert_answers_file
@@ -157,9 +145,6 @@ def get_fit_grdr(
             (Species,) if name == "species" else (Habitat,),
             True if name == "species" else False,
             _target=target,
-            case_factory=case_factory,
-            case_factory_idx=i,
-            scenario=scenario,
         )
         for i, (case, targets) in enumerate(zip(cases[:n], all_targets))
         for name, target in targets.items()

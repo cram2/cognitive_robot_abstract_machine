@@ -199,25 +199,23 @@ def test_handle_semantic_annotation_eql(apartment_world_copy):
 
 
 @pytest.mark.parametrize(
-    "semantic_annotation_type, update_existing_semantic_annotations, scenario",
+    "semantic_annotation_type, update_existing_semantic_annotations",
     [
-        (Handle, False, None),
-        (Drawer, False, None),
-        (Wardrobe, False, None),
-        (Door, False, None),
+        (Handle, False),
+        (Drawer, False),
+        (Wardrobe, False),
+        (Door, False),
     ],
 )
 def test_infer_apartment_semantic_annotation(
     semantic_annotation_type,
     update_existing_semantic_annotations,
-    scenario,
     apartment_world_copy,
 ):
     fit_rules_and_assert_semantic_annotations(
         apartment_world_copy,
         semantic_annotation_type,
         update_existing_semantic_annotations,
-        scenario,
     )
 
 
@@ -239,8 +237,6 @@ def test_apartment_semantic_annotations(apartment_world_copy):
     world_reasoner = WorldReasoner(apartment_world_copy)
     world_reasoner.fit_semantic_annotations(
         [Handle, Drawer, Wardrobe],
-        world_factory=lambda: apartment_world_copy,
-        scenario=None,
     )
 
     found_semantic_annotations = world_reasoner.infer_semantic_annotations()
@@ -299,14 +295,12 @@ def test_verbalize_query_that_inferred_semantic_annotations(_apartment_world_set
 
 
 def fit_rules_and_assert_semantic_annotations(
-    world, semantic_annotation_type, update_existing_semantic_annotations, scenario
+    world, semantic_annotation_type, update_existing_semantic_annotations
 ):
     world_reasoner = WorldReasoner(world)
     world_reasoner.fit_semantic_annotations(
         [semantic_annotation_type],
         update_existing_semantic_annotations=update_existing_semantic_annotations,
-        world_factory=lambda: world,
-        scenario=scenario,
     )
 
     found_semantic_annotations = world_reasoner.infer_semantic_annotations()

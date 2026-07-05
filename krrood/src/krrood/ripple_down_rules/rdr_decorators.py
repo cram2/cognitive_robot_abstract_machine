@@ -11,7 +11,6 @@ from functools import wraps
 
 from typing_extensions import Callable, Optional, Type, Tuple, Dict, Any, List
 
-from krrood.ripple_down_rules.datastructures.dataclasses import CaseFactoryMetaData
 from krrood.ripple_down_rules.experts import Expert, Human
 from krrood.ripple_down_rules.rdr import GeneralRDR
 from krrood.ripple_down_rules.utils import (
@@ -124,12 +123,6 @@ class RDRDecorator:
     This is a flag that indicates that a not None output for the rdr has been inferred, this is used to update the 
     generated dot file if it is set to `True`.
     """
-    case_factory_metadata: CaseFactoryMetaData = field(
-        init=False, default_factory=CaseFactoryMetaData
-    )
-    """
-    Metadata that contains the case factory method, and the scenario that is being run during the case query.
-    """
     generated_classifier: Optional[Callable] = field(init=False, default=None)
     """
     The generated classifier file of the rdr model, this is used when `use_generated_classifier` is set to `True`.
@@ -177,8 +170,6 @@ class RDRDecorator:
                     kwargs,
                     case=case,
                     case_dict=case_dict,
-                    scenario=self.case_factory_metadata.scenario,
-                    this_case_target_value=self.case_factory_metadata.this_case_target_value,
                 )
                 output = self.rdr.fit_case(
                     case_query,
@@ -244,12 +235,3 @@ class RDRDecorator:
         Load the RDR model from the specified directory, otherwise create a new one.
         """
         self.rdr = GeneralRDR(save_dir=self.models_dir, model_name=self.model_name)
-
-
-def fit_rdr_func(
-    scenario: Callable, rdr_decorated_func: Callable, *func_args, **func_kwargs
-) -> None:
-    rdr_decorated_func._rdr_decorator_instance.case_factory_metadata = (
-        CaseFactoryMetaData(scenario=scenario)
-    )
-    rdr_decorated_func(*func_args, **func_kwargs)

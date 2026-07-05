@@ -48,10 +48,8 @@ class TestRDR(TestCase):
                 Species,
                 True,
                 _target=target,
-                case_factory=load_zoo_cases,
-                case_factory_idx=i,
             )
-            for i, (case, target) in enumerate(zip(cls.all_cases, cls.targets))
+            for case, target in zip(cls.all_cases, cls.targets)
         ]
         for test_dir in [
             cls.test_results_dir,
@@ -74,7 +72,7 @@ class TestRDR(TestCase):
 
         scrdr = SingleClassRDR()
         cat = scrdr.fit_case(
-            self.case_queries[0], expert=expert, scenario=self.test_classify_scrdr
+            self.case_queries[0], expert=expert
         )
         self.assertEqual(cat, self.targets[0])
 
