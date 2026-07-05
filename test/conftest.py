@@ -206,7 +206,13 @@ def _describe_world_retainers(sample_size: int = 3) -> str:
             kinds[key] = kinds.get(key, 0) + 1
         descriptions.append(f"  {id(world):#x} direct referrers: {kinds}")
     if worlds:
-        descriptions.append(f"  external root of {id(worlds[0]):#x}: {_external_root_of(worlds[0])}")
+        count = len(worlds)
+        probe_indices = sorted({0, count // 3, 2 * count // 3, count - 1})
+        for index in probe_indices:
+            world = worlds[index]
+            descriptions.append(
+                f"  external root of world[{index}] {id(world):#x}: {_external_root_of(world)}"
+            )
     return "\n".join(descriptions)
 
 
