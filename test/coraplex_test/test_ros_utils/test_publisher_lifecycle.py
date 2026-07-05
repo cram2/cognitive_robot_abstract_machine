@@ -6,6 +6,11 @@ it, to the :class:`~semantic_digital_twin.world.World` it reads from), so every 
 constructed stayed alive for the whole interpreter session and pinned its world -- surfacing as the
 coraplex "leaking worlds" failures. These tests assert that once a publisher's thread has stopped,
 nothing keeps the publisher alive.
+
+The publish loop body is replaced with a no-op so the worker thread exits cleanly: a real body
+would raise inside the thread, and pytest's thread-exception capture would retain that traceback
+(and through it the publisher), masking what these tests actually check -- process-global
+retention such as an ``atexit`` registration.
 """
 
 import gc
@@ -30,6 +35,7 @@ def _weakref_to_stopped_publisher(construct: Callable) -> weakref.ref:
     return weakref.ref(publisher)
 
 
+@patch.object(JointStatePublisher, "_publish", lambda self: None)
 @patch("coraplex.ros_utils.joint_state_publisher.create_publisher")
 def test_joint_state_publisher_is_not_retained_after_stop(mock_create_publisher):
     reference = _weakref_to_stopped_publisher(
@@ -39,6 +45,7 @@ def test_joint_state_publisher_is_not_retained_after_stop(mock_create_publisher)
     assert reference() is None, "publisher was retained after its thread stopped"
 
 
+@patch.object(ForceTorqueSensorSimulated, "_publish", lambda self: None)
 @patch("coraplex.ros_utils.force_torque_sensor.create_publisher")
 def test_force_torque_sensor_is_not_retained_after_stop(mock_create_publisher):
     reference = _weakref_to_stopped_publisher(
