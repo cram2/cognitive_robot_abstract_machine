@@ -129,7 +129,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
                 self.source.instance
             )
             source = SymbolGraph().get_wrapped_instance(original_source_instance)
-            yield source, association.field
+            yield source, association.wrapped_field
 
     @property
     def inverse_domain_and_field(self) -> Tuple[WrappedInstance, WrappedField]:
@@ -146,7 +146,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             self.target.instance
         )
         source = SymbolGraph().get_wrapped_instance(original_source_instance)
-        return source, self.inverse_association.field
+        return source, self.inverse_association.wrapped_field
 
     @cached_property
     def inverse_association(

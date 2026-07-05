@@ -231,7 +231,7 @@ class URDFParser:
             )
 
         dof_name = connection_name
-        multiplier = offset = None
+        multiplier, offset = 1.0, 0.0
         if joint.mimic:
             multiplier = (
                 joint.mimic.multiplier if joint.mimic.multiplier is not None else 1
@@ -258,7 +258,7 @@ class URDFParser:
             multiplier=multiplier,
             offset=offset,
             axis=Vector3(*map(int, joint.axis), reference_frame=parent),
-            dof_id=dof.id,
+            raw_dof=dof,
         )
         return result
 

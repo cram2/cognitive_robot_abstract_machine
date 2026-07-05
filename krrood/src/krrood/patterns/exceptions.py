@@ -8,24 +8,6 @@ from krrood.exceptions import DataclassException
 
 
 @dataclass
-class RoleTakerFieldNotFound(DataclassException):
-    """
-    Raised when a role class has no field declared as its role taker.
-    """
-
-    role_type: Type
-    """
-    The role class that is missing a role-taker field.
-    """
-
-    def error_message(self) -> str:
-        return f"{self.role_type.__name__} declares no role-taker field."
-
-    def suggest_correction(self) -> str:
-        return "Mark exactly one field with role_taker_field()."
-
-
-@dataclass
 class DelegatedFactoryMethodError(DataclassException):
     """
     Raised when a role-taker factory method is invoked through a role.

@@ -4,7 +4,7 @@ import gc
 from dataclasses import dataclass
 
 from krrood.entity_query_language.predicate import Symbol
-from krrood.patterns.role import Role, role_taker_field
+from krrood.patterns.role import Role
 from krrood.patterns.role_registry import RoleRegistry
 
 
@@ -23,19 +23,17 @@ class PersistentEntityWithValueEquality(Symbol):
 
 
 @dataclass(eq=False)
-class RoleOverEntity(Role[PersistentEntityWithValueEquality]):
-    entity: PersistentEntityWithValueEquality = role_taker_field()
+class RoleOverEntity(Role[PersistentEntityWithValueEquality]): ...
 
 
 @dataclass(eq=False)
-class RoleOverRole(Role[RoleOverEntity]):
-    inner: RoleOverEntity = role_taker_field()
+class RoleOverRole(Role[RoleOverEntity]): ...
 
 
 def test_a_registered_role_is_retrievable_by_its_taker():
     registry = RoleRegistry()
     entity = PersistentEntityWithValueEquality(name="entity")
-    role = RoleOverEntity(entity=entity)
+    role = RoleOverEntity(role_taker=entity)
 
     registry.register(role)
 
@@ -45,8 +43,8 @@ def test_a_registered_role_is_retrievable_by_its_taker():
 def test_a_role_is_retrievable_by_every_taker_in_its_chain():
     registry = RoleRegistry()
     entity = PersistentEntityWithValueEquality(name="entity")
-    inner = RoleOverEntity(entity=entity)
-    outer = RoleOverRole(inner=inner)
+    inner = RoleOverEntity(role_taker=entity)
+    outer = RoleOverRole(role_taker=inner)
 
     registry.register(outer)
 
@@ -60,7 +58,7 @@ def test_roles_are_keyed_by_taker_identity_not_equality():
     second_entity = PersistentEntityWithValueEquality(name="same")
     assert first_entity == second_entity and first_entity is not second_entity
 
-    role = RoleOverEntity(entity=first_entity)
+    role = RoleOverEntity(role_taker=first_entity)
     registry.register(role)
 
     assert role in set(registry.roles_of(first_entity))
@@ -70,7 +68,7 @@ def test_roles_are_keyed_by_taker_identity_not_equality():
 def test_dead_roles_are_pruned_from_the_index():
     registry = RoleRegistry()
     entity = PersistentEntityWithValueEquality(name="entity")
-    role = RoleOverEntity(entity=entity)
+    role = RoleOverEntity(role_taker=entity)
     registry.register(role)
     assert list(registry.roles_of(entity))
 
@@ -84,6 +82,6 @@ def test_a_fresh_registry_shares_no_state_with_the_role_default():
     isolated_registry = RoleRegistry()
     entity = PersistentEntityWithValueEquality(name="entity")
 
-    RoleOverEntity(entity=entity)
+    RoleOverEntity(role_taker=entity)
 
     assert list(isolated_registry.roles_of(entity)) == []

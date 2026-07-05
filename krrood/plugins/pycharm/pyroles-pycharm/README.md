@@ -16,18 +16,17 @@ class Person:
     age: int
 
 @dataclass
-class Teacher(Role[Person]):
-    person: Person = role_taker_field()      # the taker, in a domain-named field
+class Teacher(Role[Person]):                  # the taker type is the generic argument
     courses: list[str] = field(default_factory=list)
 
-teacher = Teacher(person=Person("Ahmed", 20))
+teacher = Teacher(role_taker=Person("Ahmed", 20))
 teacher.name   # ← autocompletes, infers `str`, and Ctrl/Cmd+Click jumps to Person.name
 ```
 
 Because access is delegated through `__getattr__` (composition, not inheritance), PyCharm
-normally sees nothing on `teacher` except its own fields. This plugin reads the taker type —
-from the `Role[…]` generic argument or a `role_taker_field()` — and injects the taker's
-members onto any `Role[…]` subclass.
+normally sees nothing on `teacher` except its own fields. This plugin reads the taker type
+from the `Role[…]` generic argument and injects the taker's members onto any `Role[…]`
+subclass.
 
 ---
 
@@ -127,11 +126,10 @@ const val GETATTR: String = "__getattr__"
 `ROLE_QUALIFIED_NAME` is a fast, precise match. When it doesn't match, the plugin falls back
 to a *structural* check — any base class that defines a `__getattr__` method is treated as a
 role. That fallback is what lets the bundled `sample/roles_demo.py` work without
-configuration. The taker type is read from **either** the `Role[…]` generic argument **or**
-the field declared with `role_taker_field()` (krrood's own primary signal), so roles can keep
-their taker in any domain-named field, with or without a generic argument. A `Role[T]`
-parameterised by a bounded `TypeVar` (`T = TypeVar("T", bound=Person)`) resolves to the
-bound.
+configuration. The taker type is read from the `Role[…]` generic argument — the inherited
+`role_taker` field carries the taker at runtime, so a role must declare `Role[Taker]` for the
+plugin to resolve its members. A `Role[T]` parameterised by a bounded `TypeVar`
+(`T = TypeVar("T", bound=Person)`) resolves to the bound.
 
 ---
 
@@ -212,9 +210,8 @@ The algorithm (see `RoleMembersProvider.kt`):
 
 1. Skip class objects (`Teacher.x`); only **instances** delegate.
 2. Find the taker(s): scan the role class **and its ancestors** for `Role[X]` base
-   expressions *and* for fields declared with `role_taker_field()`, resolving the taker `X`
-   to a `PyClass` (a bounded `TypeVar` resolves to its bound). (handles *direct* +
-   *transitive* roles, with or without a generic argument)
+   expressions, resolving the taker `X` to a `PyClass` (a bounded `TypeVar` resolves to its
+   bound). (handles *direct* + *transitive* roles)
 3. For each taker, walk its **full MRO** — minus `Role`, `object`, `Generic` — collecting
    class-level fields, instance attributes, and methods. (handles *inherited* members)
 4. If a taker is itself a role, recurse into it. (handles *nested* roles)

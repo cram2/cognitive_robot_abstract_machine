@@ -77,7 +77,7 @@ jobs:
           if [[ "${{ inputs.lib }}" == "probabilistic_model" ]]; then
             export QT_QPA_PLATFORM=offscreen
           fi
-          python -m pytest cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
+          python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
 
       - name: Save cache
         uses: actions/cache/save@v4

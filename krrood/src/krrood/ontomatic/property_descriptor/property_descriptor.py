@@ -306,7 +306,7 @@ class PropertyDescriptor(Symbol):
         """
         class_diagram = SymbolGraph().class_diagram
         association_condition = (
-            lambda association: type(association.field.property_descriptor) is cls
+            lambda association: type(association.wrapped_field.property_descriptor) is cls
         )
         result = next(
             class_diagram.get_outgoing_associations_with_condition(
@@ -330,8 +330,8 @@ class PropertyDescriptor(Symbol):
 
         def association_condition(association: Association) -> bool:
             return (
-                issubclass(cls, type(association.field.property_descriptor))
-                and type(association.field.property_descriptor) is not cls
+                    issubclass(cls, type(association.wrapped_field.property_descriptor))
+                    and type(association.wrapped_field.property_descriptor) is not cls
             )
 
         class_diagram = SymbolGraph().class_diagram

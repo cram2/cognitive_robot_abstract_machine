@@ -54,13 +54,13 @@ def test_set_container_property():
 def test_setting_a_role_affects_role_taker():
     company = Company(name="BassCo")
     person1 = Person(name="Bass1")
-    ceo1 = CEOAsFirstRole(person=person1)
+    ceo1 = CEOAsFirstRole(role_taker=person1)
 
     ceo1.head_of = company
     assert ceo1.head_of == company
-    assert ceo1.person.works_for == company
+    assert ceo1.role_taker.works_for == company
     assert ceo1 in company.members
-    assert company in ceo1.person.member_of
+    assert company in ceo1.role_taker.member_of
 
 
 def test_transitive_property():

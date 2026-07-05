@@ -8,8 +8,13 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
 
-from giskardpy.data_types.exceptions import SetupException
+from giskardpy.data_types.exceptions import (
+    JointRegistrationRequiresStandaloneModeError,
+)
 from giskardpy.middleware.ros2 import rospy
+from giskardpy.middleware.ros2.exceptions import (
+    FollowJointTrajectoryServerRequiresPlanningModeError,
+)
 from giskardpy.middleware.ros2.ros2_interface import (
     search_for_subscriber_of_node_with_type,
     get_parameters,
@@ -130,9 +135,7 @@ class RobotInterfaceConfig(ABC):
         self, joint_names: List[Union[str, PrefixedName]]
     ) -> None:
         if not GiskardBlackboard().tree_config.is_standalone():
-            raise SetupException(
-                f"Joints only need to be registered in StandAlone mode."
-            )
+            raise JointRegistrationRequiresStandaloneModeError()
         for joint_name in joint_names:
             connection: ActiveConnection = self.world.get_connection_by_name(joint_name)
             if not isinstance(connection, ActiveConnection):
@@ -158,9 +161,7 @@ class RobotInterfaceConfig(ABC):
         if group_name is None:
             group_name = self.world.robot_name
         if not GiskardBlackboard().tree_config.is_open_loop():
-            raise SetupException(
-                "add_follow_joint_trajectory_server only works in planning mode"
-            )
+            raise FollowJointTrajectoryServerRequiresPlanningModeError()
         self.tree.execute_traj.add_follow_joint_traj_action_server(
             namespace=namespace,
             group_name=group_name,
@@ -247,10 +248,16 @@ class RobotInterfaceConfig(ABC):
         )
 
     def add_joint_velocity_group_controller(
-        self, cmd_topic: str, connections: List[str]
+        self,
+        cmd_topic: str,
+        connections: List[str],
+        minimum_valid_velocity: float = 0.0,
     ):
         """
         For closed loop mode. Tell Giskard how it can send velocities for a group of connections.
+        :param minimum_valid_velocity: minimum magnitude that small non-prismatic, non-finger
+                                       joint velocities are raised to so the hardware moves.
+                                       ``0.0`` disables clamping.
         """
         controlled_connections: List[Connection] = []
         for i in range(len(connections)):
@@ -260,7 +267,9 @@ class RobotInterfaceConfig(ABC):
                 )
             )
         self.tree.control_loop_branch.send_controls.add_joint_velocity_group_controllers(
-            cmd_topic=cmd_topic, connections=controlled_connections
+            cmd_topic=cmd_topic,
+            connections=controlled_connections,
+            minimum_valid_velocity=minimum_valid_velocity,
         )
 
 

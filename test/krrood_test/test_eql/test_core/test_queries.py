@@ -39,7 +39,7 @@ from krrood.entity_query_language.predicate import (
     symbolic_function,
     Predicate,
 )
-from krrood.patterns.role_predicates import IsSameEntity
+from krrood.patterns.role_predicates import IsSameSemanticEntity
 from krrood.entity_query_language.query.quantifiers import (
     ResultQuantificationConstraint,
     Exactly,
@@ -679,12 +679,12 @@ def test_is_same_entity_predicate_in_query(handles_and_containers_world):
     target = world.bodies[0]
 
     body = variable(type_=Body, domain=world.bodies)
-    same = IsSameEntity(body, target)
+    same = IsSameSemanticEntity(body, target)
     query = the(entity(same).where(same))
 
     matches = query.tolist()
     assert len(matches) == 1
-    assert isinstance(matches[0], IsSameEntity)
+    assert isinstance(matches[0], IsSameSemanticEntity)
     assert matches[0].entity_1 is target
 
 

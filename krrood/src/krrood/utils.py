@@ -383,6 +383,17 @@ def get_method_name(method: Callable) -> str:
     return method.__name__ if hasattr(method, "__name__") else str(method)
 
 
+def get_class_and_attribute_name(class_name: str, attribute_name: str) -> str:
+    """
+    Return the dot-qualified name ``"{class_name}.{attribute_name}"``.
+
+    :param class_name: The owner class name, typically ``SomeClass.__name__``.
+    :param attribute_name: The attribute or variable name to qualify.
+    :return: The qualified name string.
+    """
+    return f"{class_name}.{attribute_name}"
+
+
 def get_method_class_name_if_exists(method: Callable) -> Optional[str]:
     """
     Get the class name of a method if it has one.
@@ -578,7 +589,7 @@ def run_subprocess_on_file(command: List[str]):
         raise SubprocessExecutionError(command, e.returncode, e.stdout, e.stderr) from e
 
 
-def get_generic_type_params(
+def get_generic_type_parameters(
     cls,
     generic_base: Type,
     include_root_generic_base: bool = True,
@@ -588,7 +599,7 @@ def get_generic_type_params(
     Given a subclass and its generic base, return the concrete type parameter(s).
 
     Example:
-        get_generic_type_params(Employee, Role) -> [<class '__main__.Person'>]
+        get_generic_type_parameters(Employee, Role) -> [<class '__main__.Person'>]
 
     Direct parameterizations (e.g. ``class C(B, Generic[U])``) take priority over
     an inherited binding discovered by recursing into an unparameterized base.

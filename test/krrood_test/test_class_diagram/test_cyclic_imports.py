@@ -1,4 +1,4 @@
-from krrood.class_diagrams import ClassDiagram
+from krrood.class_diagrams.class_diagram import ClassDiagram
 from ..dataset.cyclic_imports import PoseAnnotation
 
 from ..dataset.example_classes import KRROODPose

@@ -32,17 +32,15 @@ import com.jetbrains.python.psi.types.TypeEvalContext
  *
  * @dataclass
  * class Teacher(Role[Person]):
- *     person: Person = role_taker_field()
  *     courses: list[str] = field(default_factory=list)
  *
- * teacher = Teacher(person=Person("Ahmed", 20))
+ * teacher = Teacher(role_taker=Person("Ahmed", 20))
  * teacher.name   # <-- completion, type (str) and Go-to-Declaration now work
  * ```
  *
  * Because the access goes through `__getattr__`, PyCharm's static engine normally sees
- * nothing on `teacher` except its own fields. This provider reads the taker type — from the
- * `Role[...]` base's generic argument or from the field declared with `role_taker_field()` —
- * and injects the taker's members onto the role's *type*.
+ * nothing on `teacher` except its own fields. This provider reads the taker type from the
+ * `Role[...]` base's generic argument and injects the taker's members onto the role's *type*.
  *
  * ### Why one hook is enough
  * Each injected [PyCustomMember] resolves to the **real** declaration inside the taker
@@ -76,14 +74,6 @@ class RoleMembersProvider : PyClassMembersProviderBase() {
 
         /** Dunder used to detect a delegating base in the structural fallback. */
         const val GETATTR: String = "__getattr__"
-
-        /**
-         * Name of the krrood factory that declares a role's taker field
-         * (`taker: Taker = role_taker_field()`). Its presence on a class attribute is the
-         * second, krrood-native way to discover the taker — independent of the `Role[X]`
-         * generic argument, and matching how `Role.get_role_taker_type` resolves it at runtime.
-         */
-        const val ROLE_TAKER_FIELD_FACTORY: String = "role_taker_field"
 
         /** The `typing.TypeVar` factory; used to read a `TypeVar(..., bound=...)` annotation. */
         const val TYPE_VAR: String = "TypeVar"
@@ -138,25 +128,17 @@ class RoleMembersProvider : PyClassMembersProviderBase() {
     }
 
     /**
-     * Returns the taker classes of [roleClass], discovered two complementary ways across the
-     * class itself and its whole ancestry (so a subclass of a role still resolves the taker
-     * declared on its parent):
-     *
-     * 1. the `X` in every `Role[X]` base expression, and
-     * 2. the annotation of every field declared with [ROLE_TAKER_FIELD_FACTORY]
-     *    (`taker: X = role_taker_field()`), krrood's own primary taker signal.
-     *
-     * The field source is consulted only on classes that are themselves roles, and both
-     * sources are de-duplicated (a krrood role usually declares the taker both ways).
+     * Returns the taker classes of [roleClass]: the `X` in every `Role[X]` base expression,
+     * searched across the class itself and its whole ancestry (so a subclass of a role still
+     * resolves the taker declared on its parent). The taker comes solely from the generic
+     * argument, matching how `Role.get_role_taker_type` resolves it at runtime now that the
+     * taker is the inherited `role_taker` field rather than a domain-named one.
      */
     private fun findTakers(roleClass: PyClass, context: TypeEvalContext): List<PyClass> {
         val takers = LinkedHashSet<PyClass>()
         for (cls in selfAndAncestors(roleClass, context)) {
             for (superExpr in cls.superClassExpressions) {
                 extractTaker(superExpr, context)?.let(takers::add)
-            }
-            if (isRoleBase(cls, context)) {
-                extractTakerFromField(cls, context)?.let(takers::add)
             }
         }
         return takers.toList()
@@ -171,31 +153,9 @@ class RoleMembersProvider : PyClassMembersProviderBase() {
     }
 
     /**
-     * Resolves the taker from a `taker: X = role_taker_field()` declaration on [cls], if any:
-     * the first class attribute whose assigned value calls [ROLE_TAKER_FIELD_FACTORY], read
-     * from that attribute's type annotation `X`.
-     */
-    private fun extractTakerFromField(cls: PyClass, context: TypeEvalContext): PyClass? {
-        for (attribute in cls.classAttributes) {
-            if (!isRoleTakerField(attribute)) continue
-            val annotation = attribute.annotation?.value ?: continue
-            resolveClass(annotation, context)?.let { return it }
-        }
-        return null
-    }
-
-    /** True when [attribute] is assigned a `role_taker_field(...)` call. */
-    private fun isRoleTakerField(attribute: PyTargetExpression): Boolean {
-        val call = attribute.findAssignedValue() as? PyCallExpression ?: return false
-        return (call.callee as? PyReferenceExpression)?.referencedName == ROLE_TAKER_FIELD_FACTORY
-    }
-
-    /**
      * Decides whether [cls] is the `Role` base. Matches by [ROLE_QUALIFIED_NAME] first, then
      * falls back to a structural test: a role-like base delegates through a `__getattr__`
-     * method (declared on the base itself or one of its ancestors). The krrood `Role` stores
-     * its taker in a domain-named field rather than a fixed one, so the field name is not used
-     * as a signal.
+     * method (declared on the base itself or one of its ancestors).
      */
     private fun isRoleBase(cls: PyClass, context: TypeEvalContext): Boolean {
         if (cls.qualifiedName == ROLE_QUALIFIED_NAME) return true

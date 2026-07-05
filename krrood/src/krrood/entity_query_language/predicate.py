@@ -171,3 +171,20 @@ def _any_of_the_kwargs_is_a_variable(bindings: Dict[str, Any]) -> bool:
     :return: ``True`` if any value in ``bindings`` is a :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression`, ``False`` otherwise.
     """
     return any(isinstance(binding, SymbolicExpression) for binding in bindings.values())
+
+
+@dataclass(eq=False)
+class Is(Predicate):
+    """
+    Predicate asserting that two operands refer to the same object in memory.
+    """
+
+    first_entity: Any
+    """The first entity"""
+
+    second_entity: Any
+    """The second entity."""
+
+    def __call__(self) -> bool:
+        return self.first_entity is self.second_entity
+

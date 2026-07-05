@@ -8,7 +8,7 @@ from test.krrood_test.dataset.role_and_ontology.role_takers_in_another_module im
     RoleTakerInAnotherModule,
 )
 from krrood.entity_query_language.predicate import Symbol
-from krrood.patterns.role import Role, factory_method, role_taker_field
+from krrood.patterns.role import Role, factory_method
 
 
 @dataclass(eq=False)
@@ -59,8 +59,8 @@ class PersonInRoleAndOntology(HasName, Symbol):
         """A factory classmethod detected via its ``-> Self`` return annotation."""
         return cls(name=name)
 
-    @classmethod
     @factory_method
+    @classmethod
     def spawn(cls):
         """A factory classmethod detected only via the ``@factory_method`` marker."""
         return cls(name="spawned")
@@ -83,18 +83,16 @@ TPersonInRoleAndOntology = TypeVar(
 
 @dataclass(eq=False)
 class CEOAsFirstRole(Role[TPersonInRoleAndOntology], Symbol):
-    person: TPersonInRoleAndOntology = role_taker_field()
     head_of: RecognizedGroup = None
 
 
 @dataclass(eq=False)
 class CEOThatOverridesFactory(Role[TPersonInRoleAndOntology], Symbol):
-    person: TPersonInRoleAndOntology = role_taker_field()
 
     @classmethod
     def from_name(cls, name: str) -> Self:
         """Overrides the taker factory so the role is preserved instead of being dropped."""
-        return cls(person=PersonInRoleAndOntology(name=name))
+        return cls(role_taker=PersonInRoleAndOntology(name=name))
 
 
 TSubclassOfARoleTaker = TypeVar("TSubclassOfARoleTaker", bound=SubclassOfARoleTaker)
@@ -106,7 +104,6 @@ class SubclassOfRoleThatUpdatesRoleTakerType(CEOAsFirstRole[TSubclassOfARoleTake
 
 @dataclass(eq=False)
 class ProfessorAsFirstRole(Role[TPersonInRoleAndOntology], Symbol):
-    person: TPersonInRoleAndOntology = role_taker_field()
     teacher_of: List[Course] = field(default_factory=list, kw_only=True)
 
 
@@ -121,7 +118,6 @@ TCEOAsFirstRole = TypeVar("TCEOAsFirstRole", bound=CEOAsFirstRole)
 
 @dataclass(eq=False)
 class RepresentativeAsSecondRole(Role[TCEOAsFirstRole], Symbol):
-    ceo: TCEOAsFirstRole = role_taker_field()
     representative_of: RecognizedGroup = field(default=None, kw_only=True)
 
 
@@ -132,13 +128,11 @@ TRepresentativeAsSecondRole = TypeVar(
 
 @dataclass(eq=False)
 class DelegateAsThirdRole(Role[TRepresentativeAsSecondRole], Symbol):
-    representative: TRepresentativeAsSecondRole = role_taker_field()
     delegate_of: RecognizedGroup = field(kw_only=True, default=None)
 
 
 @dataclass(eq=False)
 class RoleForTakerInAnotherModule(Role[RoleTakerInAnotherModule]):
-    taker: RoleTakerInAnotherModule = role_taker_field()
     introduced_attribute: str = field(default="", kw_only=True)
     same_module_annotated_introduced_attribute: DelegateAsThirdRole = field(
         default=None, kw_only=True

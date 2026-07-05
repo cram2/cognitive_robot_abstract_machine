@@ -673,6 +673,11 @@ class Query(
         def _update_aggregated_and_non_aggregated_variables(
             variable_: SymbolicExpression,
         ):
+            """
+            Update the aggregated and non-aggregated variable collections based on the given variable.
+
+            :param variable_: The variable to check.
+            """
             if isinstance(variable_, Aggregator):
                 aggregated_variables.append(variable_)
             elif isinstance(variable_, InstantiatedVariable):

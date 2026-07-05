@@ -324,23 +324,6 @@ class AggregatorInWhereConditionsError(AggregationUsageError):
 
 
 @dataclass
-class NoKwargsInMatchVar(UsageError):
-    """
-    Raised when a match_variable is used without any keyword arguments.
-
-    For further details, see the notes on using `match_variable` vs `variable` in :doc:`/krrood/doc/eql/match`.
-    """
-
-    match_variable: Match
-
-    def error_message(self) -> str:
-        return f"The match variable {self.match_variable} was used without any keyword arguments."
-
-    def suggest_correction(self) -> str:
-        return "if you don't want to specify keyword arguments use variable() instead."
-
-
-@dataclass
 class WrongSelectableType(UsageError):
     """
     Raised when a wrong variable type is given to the select() statement.

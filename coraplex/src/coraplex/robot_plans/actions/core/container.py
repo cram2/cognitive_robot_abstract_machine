@@ -89,10 +89,13 @@ class OpenAction(ActionDescription):
         return and_(
             GripperIsFree(end_effector),
             IsReachableBy(
-                world=test_world,
-                robot=test_world.get_semantic_annotations_by_type(type(context.robot))[
-                    0
-                ],
+                context=Context(
+                    world=test_world,
+                    robot=test_world.get_semantic_annotations_by_type(
+                        type(context.robot)
+                    )[0],
+                    alternative_motion_mappings=context.alternative_motion_mappings,
+                ),
                 pose=kwargs["object_designator"].global_pose,
                 tip_link=end_effector.tool_frame,
                 grasp_description=GraspDescription(

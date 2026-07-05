@@ -70,3 +70,14 @@ kotlin {
     // PyCharm 2024.3+ runs on JBR 21; build for the same target.
     jvmToolchain(21)
 }
+
+// One-shot release command: build & sign the distributable, then upload the current
+// `pluginVersion` to the JetBrains Marketplace. Bump `pluginVersion` in gradle.properties first,
+// export `PYCHARM_PUBLISH_TOKEN` (and the signing env vars), then run `./gradlew publishRelease`.
+// A plain aggregator (no execution-time logic) keeps it compatible with the configuration cache;
+// `publishPlugin` already logs the upload result.
+tasks.register("publishRelease") {
+    group = "publishing"
+    description = "Builds, signs, and publishes the current plugin version to the JetBrains Marketplace."
+    dependsOn(tasks.named("publishPlugin"))
+}

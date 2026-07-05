@@ -7,9 +7,6 @@ import pytest
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription, GraspPose
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
@@ -65,13 +62,6 @@ def immutable_simple_pr2_holding_world(simple_pr2_world_setup):
     with copy_world.modify_world():
         copy_world.move_branch(milk, tcp)
     return copy_world, robot_view, Context(copy_world, robot_view)
-
-
-def test_grasp_pose_structure():
-    grasp_pose = GraspPose()
-    assert grasp_pose.x == 0.0
-    assert grasp_pose.y == 0.0
-    assert grasp_pose.z == 0.0
 
 
 def test_grasp_pose_front(immutable_simple_pr2_world):

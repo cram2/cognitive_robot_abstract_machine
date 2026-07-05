@@ -21,7 +21,7 @@
           <code>Role[Taker]</code> base that delegates through <code>__getattr__</code>.
         </p>
         <pre><code>from dataclasses import dataclass, field
-from krrood.patterns.role import Role, role_taker_field
+from krrood.patterns.role import Role
 
 @dataclass
 class Person:
@@ -31,11 +31,10 @@ class Person:
         return f"Hi, I'm {self.name}"
 
 @dataclass
-class Teacher(Role[Person]):
-    person: Person = role_taker_field()        # the role taker
+class Teacher(Role[Person]):                    # the taker type is the generic argument
     courses: list[str] = field(default_factory=list)
 
-teacher = Teacher(person=Person("Ahmed", 20))
+teacher = Teacher(role_taker=Person("Ahmed", 20))
 teacher.name       # completes, inferred as str
 teacher.greet()    # completes; Ctrl/Cmd-Click jumps to Person.greet
 teacher.courses    # the role's own field</code></pre>
@@ -58,17 +57,20 @@ teacher.courses    # the role's own field</code></pre>
         <p>
           Works out of the box with krrood's <code>Role</code>, and with any
           <code>Role[...]</code> base that delegates via <code>__getattr__</code>. The role
-          taker is read from either the <code>Role[...]</code> generic argument or a field
-          declared with <code>role_taker_field()</code>.
+          taker is read from the <code>Role[...]</code> generic argument.
         </p>
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>0.2.0</b> — The role taker is now resolved solely from the <code>Role[Taker]</code>
+        generic argument, matching krrood's move to an inherited keyword-only <code>role_taker</code>
+        field (the <code>role_taker_field()</code> declaration was removed). Roles must declare
+        <code>Role[Taker]</code> for their taker's members to be injected.
+        <br/>
         <b>0.1.0</b> — Initial release. Completion, type inference, and Go to Declaration for
         the Role / delegation pattern: the taker's members (plus everything it inherits and any
-        nested roles) are injected onto a role declared with <code>Role[Taker]</code> or a
-        <code>role_taker_field()</code>. A <code>Role[T]</code> parameterised by a bounded
-        <code>TypeVar</code> resolves to its bound.
+        nested roles) are injected onto a role declared with <code>Role[Taker]</code>. A
+        <code>Role[T]</code> parameterised by a bounded <code>TypeVar</code> resolves to its bound.
     ]]></change-notes>
 
     <!--

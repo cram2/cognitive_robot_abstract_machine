@@ -14,7 +14,6 @@ from typing_extensions import (
     Optional,
     Set,
     Type,
-    TypeVar,
     get_origin,
 )
 
@@ -581,8 +580,7 @@ class WrappedTable:
             specific ORM container properties.
         """
 
-        # Resolve TypeVar to its bound for proper type matching.
-        type_endpoint = self._resolve_type_endpoint(wrapped_field)
+        type_endpoint = wrapped_field.type_endpoint
 
         # check underspecified generic fields
         if (
@@ -698,7 +696,7 @@ class WrappedTable:
         :param wrapped_field: The wrapped field to get the table for.
         :return: The wrapped table for the given wrapped field.
         """
-        type_endpoint = self._resolve_type_endpoint(wrapped_field)
+        type_endpoint = wrapped_field.type_endpoint
         try:
             result = self.ormatic.wrapped_tables[
                 self.ormatic.class_dependency_graph.get_wrapped_class(type_endpoint)
@@ -802,21 +800,13 @@ class WrappedTable:
             ColumnConstructor(rel_name, rel_type, rel_constructor)
         )
 
-    @staticmethod
-    def _resolve_type_endpoint(wrapped_field: WrappedField) -> type:
-        """Resolve a TypeVar to its bound, returning the concrete type endpoint."""
-        type_endpoint = wrapped_field.type_endpoint
-        if isinstance(type_endpoint, TypeVar):
-            type_endpoint = type_endpoint.__bound__
-        return type_endpoint
-
     def create_json_column(self, wrapped_field: WrappedField):
         """
         Create a column for a list-like of built-in values.
 
         :param wrapped_field: The field to extract the information from.
         """
-        type_endpoint = self._resolve_type_endpoint(wrapped_field)
+        type_endpoint = wrapped_field.type_endpoint
         self.ormatic.imported_modules.add("typing_extensions")
         self.ormatic.imported_modules.add(type_endpoint.__module__)
         column_name = wrapped_field.field.name
@@ -833,7 +823,7 @@ class WrappedTable:
         )
 
     def create_custom_type(self, wrapped_field: WrappedField):
-        type_endpoint = self._resolve_type_endpoint(wrapped_field)
+        type_endpoint = wrapped_field.type_endpoint
         custom_type = self.ormatic.type_mappings[type_endpoint]
         self.ormatic.type_mappings[type_endpoint] = custom_type
         column_name = wrapped_field.field.name

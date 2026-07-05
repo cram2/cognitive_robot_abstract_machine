@@ -5,6 +5,7 @@ import sys
 import weakref
 from collections import defaultdict
 from dataclasses import InitVar, dataclass, field
+from enum import StrEnum, auto
 
 from rustworkx import PyDiGraph
 from typing_extensions import (
@@ -27,15 +28,29 @@ if TYPE_CHECKING:
         InferenceExplanation,
     )
 
-from krrood import logger
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Generic
 from krrood.singleton import SingletonMeta
 from krrood.utils import recursive_subclasses
+
+
+class GraphType(StrEnum):
+    """
+    Graph type for symbol graphs.
+    """
+    CLASS = "class"
+    """
+    Refers to the class diagram graph.
+    """
+    INSTANCE = "instance"
+    """
+    Refers to the instances graph in the SymbolGraph.
+    """
 
 
 @dataclass(eq=False)
@@ -67,7 +82,7 @@ TSymbol = TypeVar("TSymbol", bound=Symbol)
 
 
 @dataclass
-class PredicateClassRelation(SubClassSafeGeneric[TSymbol]):
+class PredicateClassRelation(Generic[TSymbol], SubClassSafeGeneric):
     """
     Edge data representing a predicate-based relation between two wrapped instances.
 
@@ -121,7 +136,7 @@ class PredicateClassRelation(SubClassSafeGeneric[TSymbol]):
 
 
 @dataclass
-class WrappedInstance(SubClassSafeGeneric[TSymbol]):
+class WrappedInstance(Generic[TSymbol], SubClassSafeGeneric):
     """
     A node wrapper around a concrete Symbol instance used in the instance graph.
     """
@@ -473,7 +488,7 @@ class SymbolGraph(metaclass=SingletonMeta):
         self,
         filepath: str,
         format_="svg",
-        graph_type="instance",
+        graph_type: GraphType = GraphType.INSTANCE,
         without_inherited_associations: bool = True,
     ) -> None:
         """
@@ -481,12 +496,10 @@ class SymbolGraph(metaclass=SingletonMeta):
 
         :param filepath: The path to the dot file.
         :param format_: The format of the dot file (svg, png, ...).
-        :param graph_type: The type of the graph to generate (instance, type).
+        :param graph_type: The type of the graph to generate (instance, class).
         :param without_inherited_associations: Whether to include inherited associations in the graph.
         """
-        import pydot
-
-        if graph_type == "type":
+        if graph_type == GraphType.CLASS:
             if without_inherited_associations:
                 graph = self.class_diagram.to_subdiagram_without_inherited_associations(
                     True
@@ -495,26 +508,4 @@ class SymbolGraph(metaclass=SingletonMeta):
                 graph = self.class_diagram._dependency_graph
         else:
             graph = self._instance_graph
-        if not filepath.endswith(f".{format_}"):
-            filepath += f".{format_}"
-        dot_str = graph.to_dot(
-            lambda node: dict(
-                color="black",
-                fillcolor="lightblue",
-                style="filled",
-                label=node.name,
-            ),
-            lambda edge: dict(color=edge.color, style="solid", label=str(edge)),
-            dict(rankdir="LR"),
-        )
-        dot = pydot.graph_from_dot_data(dot_str)[0]
-        try:
-            dot.write(filepath, format=format_)
-        except FileNotFoundError:
-            tmp_filepath = filepath.replace(f".{format_}", ".dot")
-            dot.write(tmp_filepath, format="raw")
-            try:
-                os.system(f"/usr/bin/dot -T{format_} {tmp_filepath} -o {filepath}")
-                os.remove(tmp_filepath)
-            except Exception as e:
-                logger.error(e)
+        ClassDiagram.graph_to_dot(filepath=filepath, graph=graph, format_=format_)

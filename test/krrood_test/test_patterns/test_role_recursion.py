@@ -13,8 +13,8 @@ from ..dataset.role_and_ontology.classes_for_testing_role_recursion_error import
 
 def test_role_attribute_resolution():
     p = PersonForRoleRecursion(name="John")
-    s = StudentForRoleRecursion(student_id="S123", person=p)
-    t = TeacherForRoleRecursion(employee_id="T456", person=p)
+    s = StudentForRoleRecursion(student_id="S123", role_taker=p)
+    t = TeacherForRoleRecursion(employee_id="T456", role_taker=p)
 
     # Taker attr accessible from role via __getattr__ delegation.
     assert s.name == "John"
@@ -35,8 +35,8 @@ def test_role_attribute_resolution():
 
 def test_role_recursion_with_chained_roles():
     b = BaseForRoleRecursion()
-    i = IntermediateForRoleRecursion(base=b)
-    top = TopForRoleRecursion(inter=i)
+    i = IntermediateForRoleRecursion(role_taker=b)
+    top = TopForRoleRecursion(role_taker=i)
 
     # Role-native attrs on each role directly.
     assert top.top_attr == "top"

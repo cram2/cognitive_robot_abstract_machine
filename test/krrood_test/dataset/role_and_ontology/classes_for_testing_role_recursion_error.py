@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from krrood.patterns.role import Role, role_taker_field
+from krrood.patterns.role import Role
 
 # ---------------------------------------------------------------------------
 # Simple two-role / one-taker scenario
@@ -23,13 +23,11 @@ class PersonForRoleRecursion:
 @dataclass(eq=False)
 class StudentForRoleRecursion(Role[PersonForRoleRecursion]):
     student_id: str
-    person: PersonForRoleRecursion = role_taker_field()
 
 
 @dataclass(eq=False)
 class TeacherForRoleRecursion(Role[PersonForRoleRecursion]):
     employee_id: str
-    person: PersonForRoleRecursion = role_taker_field()
 
 
 # ---------------------------------------------------------------------------
@@ -44,11 +42,9 @@ class BaseForRoleRecursion:
 
 @dataclass(eq=False)
 class IntermediateForRoleRecursion(Role[BaseForRoleRecursion]):
-    base: BaseForRoleRecursion = role_taker_field()
     inter_attr: str = "inter"
 
 
 @dataclass(eq=False)
 class TopForRoleRecursion(Role[IntermediateForRoleRecursion]):
-    inter: IntermediateForRoleRecursion = role_taker_field()
     top_attr: str = "top"

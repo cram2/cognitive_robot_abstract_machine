@@ -7,9 +7,12 @@ from dataclasses import dataclass, field
 from typing import List
 
 import rclpy
+from semantic_digital_twin.adapters.ros.visualization.collision_viz_marker import (
+    CollisionVisualizationMarkerPublisher,
+)
 from sqlalchemy.orm import sessionmaker
 
-from giskardpy.data_types.exceptions import SetupException
+from giskardpy.data_types.exceptions import NoControlledJointsError
 from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.model.world_config import WorldConfig
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -65,6 +68,9 @@ class Giskard:
     world_synchronizer: WorldSynchronizer = field(init=False)
     tf_publisher: TFPublisher = field(init=False)
     viz_marker_publisher: VizMarkerPublisher = field(init=False)
+    collision_marker_publisher: CollisionVisualizationMarkerPublisher = field(
+        init=False
+    )
     model_reload_synchronizer: ModelReloadSynchronizer = field(init=False)
     world_fetcher: FetchWorldServer = field(init=False)
 
@@ -136,6 +142,9 @@ class Giskard:
         self.viz_marker_publisher = VizMarkerPublisher(
             node=rospy.node, _world=self.world_config.world
         )
+        self.collision_marker_publisher = CollisionVisualizationMarkerPublisher(
+            node=rospy.node, throttle=5, world=self.world_config.world
+        )
 
     def sanity_check(self):
         self._controlled_joints_sanity_check()
@@ -154,7 +163,7 @@ class Giskard:
         controlled_joints = self.robot.controlled_connections
         non_controlled_joints = set(movable_joints).difference(set(controlled_joints))
         if len(controlled_joints) == 0 and len(world.connections) > 0:
-            raise SetupException("No joints are flagged as controlled.")
+            raise NoControlledJointsError()
         if len(non_controlled_joints) > 0:
             rospy.node.get_logger().info(
                 f"The following joints are non-fixed according to the urdf, "

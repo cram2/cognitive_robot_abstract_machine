@@ -35,6 +35,7 @@ from krrood.entity_query_language.operators.aggregators import (
     Average,
     Count,
     CountAll,
+    CountRange,
     Mode,
     MultiMode,
 )
@@ -51,7 +52,6 @@ from krrood.entity_query_language.predicate import *  # type: ignore
 from krrood.entity_query_language.predicate import symbolic_function
 from krrood.entity_query_language.query.match import (
     Match,
-    MatchVariable,
 )
 from krrood.entity_query_language.query.quantifiers import (
     ResultQuantificationConstraint,
@@ -74,7 +74,6 @@ ConditionType = Union[SymbolicExpression, bool, Predicate, TruthValueOperator]
 The possible types for conditions.
 """
 
-
 # %% Query Construction
 
 
@@ -92,7 +91,8 @@ def set_of(*selected_variables: Union[Selectable[T], Any]) -> SetOf:
     """
     Create a set descriptor for the selected variables.
 
-    :param selected_variables: The variables to select in the result set.
+    :param selected_variables: The variables to select in the result
+        set.
     :return: Set descriptor.
     """
     return SetOf(_selected_variables_=selected_variables)
@@ -103,7 +103,7 @@ def set_of(*selected_variables: Union[Selectable[T], Any]) -> SetOf:
 
 def variable(
     type_: Type[T],
-    domain: Optional[DomainType],
+    domain: Optional[DomainType] = None,
 ) -> Union[T, Selectable[T], Variable[T]]:
     """
     Declare a symbolic variable that can be used inside queries.
@@ -155,7 +155,8 @@ def variable_from(
     """
     Create a variable from a given domain.
 
-    :param domain: An iterable or selectable expression to use as the variable's domain.
+    :param domain: An iterable or selectable expression to use as the
+        variable's domain.
     :return: A variable that can be queried for.
     """
     return Variable(_domain_=domain)
@@ -181,7 +182,8 @@ def contains(
 
     :param container: The container expression.
     :param item: The item to look for.
-    :return: A comparator expression equivalent to ``item in container``.
+    :return: A comparator expression equivalent to ``item in
+        container``.
     :rtype: SymbolicExpression
     """
     return in_(item, container)
@@ -203,9 +205,12 @@ def flat_variable(
     var: Union[CanBehaveLikeAVariable[T], Iterable[T]],
 ) -> Union[FlatVariable[T], T]:
     """
-    Flatten a nested iterable domain into individual items while preserving the parent bindings.
-    This returns a DomainMapping that, when evaluated, yields one solution per inner element
-    (similar to SQL UNNEST), keeping existing variable bindings intact.
+    Flatten a nested iterable domain into individual items while preserving the
+    parent bindings.
+
+    This returns a DomainMapping that, when evaluated, yields one
+    solution per inner element (similar to SQL UNNEST), keeping existing
+    variable bindings intact.
     """
     return FlatVariable(var)
 
@@ -251,12 +256,15 @@ def for_all(
     condition: ConditionType,
 ) -> ForAll:
     """
-    A universal on variable that finds all sets of variable bindings (values) that satisfy the condition for **every**
-     value of the universal_variable.
+    A universal on variable that finds all sets of variable bindings (values)
+    that satisfy the condition for **every** value of the universal_variable.
 
-    :param universal_variable: The universal on variable that the condition must satisfy for all its values.
-    :param condition: A SymbolicExpression or bool representing a condition that must be satisfied.
-    :return: A SymbolicExpression that can be evaluated producing every set that satisfies the condition.
+    :param universal_variable: The universal on variable that the
+        condition must satisfy for all its values.
+    :param condition: A SymbolicExpression or bool representing a
+        condition that must be satisfied.
+    :return: A SymbolicExpression that can be evaluated producing every
+        set that satisfies the condition.
     """
     return ForAll(universal_variable, condition)
 
@@ -266,12 +274,15 @@ def exists(
     condition: ConditionType,
 ) -> Exists:
     """
-    A universal on variable that finds all sets of variable bindings (values) that satisfy the condition for **any**
-     value of the universal_variable.
+    A universal on variable that finds all sets of variable bindings (values)
+    that satisfy the condition for **any** value of the universal_variable.
 
-    :param universal_variable: The universal on variable that the condition must satisfy for any of its values.
-    :param condition: A SymbolicExpression or bool representing a condition that must be satisfied.
-    :return: A SymbolicExpression that can be evaluated producing every set that satisfies the condition.
+    :param universal_variable: The universal on variable that the
+        condition must satisfy for any of its values.
+    :param condition: A SymbolicExpression or bool representing a
+        condition that must be satisfied.
+    :return: A SymbolicExpression that can be evaluated producing every
+        set that satisfies the condition.
     """
     return Exists(universal_variable, condition)
 
@@ -284,9 +295,8 @@ def _quantify_or_build_match(
     quantifier_type: Type[ResultQuantifier],
     quantification: Optional[ResultQuantificationConstraint] = None,
     *,
-    domain: Optional[DomainType] = None,
     target_type: Optional[Type[T]] = None,
-) -> Union[T, Query, Match[T], MatchVariable[T]]:
+) -> Union[T, Query, Match[T]]:
     """
     Shared implementation for :py:func:`an` and :py:func:`the`.
 
@@ -298,26 +308,23 @@ def _quantify_or_build_match(
       :class:`~krrood.entity_query_language.query.query.Query` are first wrapped with
       :py:func:`entity`.
     * Otherwise ``arg`` is treated as a type (or a callable factory) and a structural
-      :class:`~krrood.entity_query_language.query.match.Match` is built. If ``domain`` is
-      provided, a :class:`~krrood.entity_query_language.query.match.MatchVariable` bound to
-      that domain is built instead.
+      :class:`~krrood.entity_query_language.query.match.Match` is built — selectable by default
+      and generative-ready through a
+      :class:`~krrood.entity_query_language.backends.GenerativeBackend`. Restrict the search to
+      specific instances with :meth:`~krrood.entity_query_language.query.match.Match.from_`.
 
     :param arg: An entity/set/variable/attribute to quantify, or a type/callable to match.
     :param quantifier_type: The result quantifier to apply (``An`` or ``The``).
     :param quantification: Optional quantification constraint (quantify path only).
-    :param domain: Optional domain that turns the match into a ``MatchVariable``.
     :param target_type: Optional explicit type for callable factories (match path only).
-    :return: A quantified query, or a ``Match``/``MatchVariable`` builder.
+    :return: A quantified query, or a ``Match`` builder.
     """
     if isinstance(arg, SymbolicExpression):
         if not isinstance(arg, Query):
             arg = entity(arg)
         return arg._quantify_(quantifier_type, quantification_constraint=quantification)
 
-    if domain is not None:
-        match_ = MatchVariable(factory=arg, type_=target_type, domain=domain)
-    else:
-        match_ = Match(factory=arg, type_=target_type)
+    match_ = Match(factory=arg, type_=target_type)
     match_._quantifier_type_ = quantifier_type
     return match_
 
@@ -327,17 +334,6 @@ def an(
     entity_: Type[T],
     quantification: None = ...,
     *,
-    domain: DomainType,
-    target_type: None = ...,
-) -> MatchVariable[T]: ...
-
-
-@overload
-def an(
-    entity_: Type[T],
-    quantification: None = ...,
-    *,
-    domain: None = ...,
     target_type: None = ...,
 ) -> Match[T]: ...
 
@@ -347,7 +343,6 @@ def an(
     entity_: Callable[..., T],
     quantification: None = ...,
     *,
-    domain: None = ...,
     target_type: Type[T],
 ) -> Match[T]: ...
 
@@ -357,7 +352,6 @@ def an(
     entity_: T,
     quantification: Optional[ResultQuantificationConstraint] = ...,
     *,
-    domain: None = ...,
     target_type: None = ...,
 ) -> T: ...
 
@@ -366,7 +360,6 @@ def an(
     entity_,
     quantification=None,
     *,
-    domain=None,
     target_type=None,
 ):
     """
@@ -374,16 +367,17 @@ def an(
 
     Depending on ``entity_`` this either quantifies an existing symbolic expression with the
     ``An`` quantifier (zero or more results), or builds a structural ``Match`` when ``entity_``
-    is a type or a callable factory. See :py:func:`_quantify_or_build_match` for details.
+    is a type or a callable factory. See :py:func:`_quantify_or_build_match` for details;
+    restrict a match to specific instances with
+    :meth:`~krrood.entity_query_language.query.match.Match.from_`.
 
     :param entity_: An entity/set/variable/attribute to quantify, or a type/callable to match.
     :param quantification: Optional quantification constraint (quantify path only).
-    :param domain: Optional domain that turns a type into a ``MatchVariable``.
     :param target_type: Optional explicit type for callable factories (match path only).
     :return: The applied quantifier or the constructed match.
     """
     return _quantify_or_build_match(
-        entity_, An, quantification, domain=domain, target_type=target_type
+        entity_, An, quantification, target_type=target_type
     )
 
 
@@ -397,16 +391,6 @@ This is an alias to accommodate for words not starting with vowels.
 def the(
     entity_: Type[T],
     *,
-    domain: DomainType,
-    target_type: None = ...,
-) -> MatchVariable[T]: ...
-
-
-@overload
-def the(
-    entity_: Type[T],
-    *,
-    domain: None = ...,
     target_type: None = ...,
 ) -> Match[T]: ...
 
@@ -415,7 +399,6 @@ def the(
 def the(
     entity_: Callable[..., T],
     *,
-    domain: None = ...,
     target_type: Type[T],
 ) -> Match[T]: ...
 
@@ -424,7 +407,6 @@ def the(
 def the(
     entity_: T,
     *,
-    domain: None = ...,
     target_type: None = ...,
 ) -> T: ...
 
@@ -432,22 +414,21 @@ def the(
 def the(
     entity_,
     *,
-    domain=None,
     target_type=None,
 ):
     """
     Select the unique value satisfying the given description.
 
     Behaves like :py:func:`an` but applies the ``The`` quantifier, which expects exactly one
-    result when the expression is materialized (raising otherwise).
+    result when the expression is materialized (raising otherwise). Restrict a match to
+    specific instances with :meth:`~krrood.entity_query_language.query.match.Match.from_`.
 
     :param entity_: An entity/set/variable/attribute to quantify, or a type/callable to match.
-    :param domain: Optional domain that turns a type into a ``MatchVariable``.
     :param target_type: Optional explicit type for callable factories (match path only).
     :return: The applied quantifier or the constructed match.
     """
     return _quantify_or_build_match(
-        entity_, The, None, domain=domain, target_type=target_type
+        entity_, The, None, target_type=target_type
     )
 
 
@@ -469,10 +450,11 @@ def inference(
     type_: Type[T],
 ) -> Union[Callable[[], Union[T, InstantiatedVariable[T]]]]:
     """
-    This returns a factory function that creates a new variable of the given type and takes keyword arguments for the
-    type constructor.
+    This returns a factory function that creates a new variable of the given
+    type and takes keyword arguments for the type constructor.
 
-    :param type_: The type of the variable (i.e., The class you want to instantiate).
+    :param type_: The type of the variable (i.e., The class you want to
+        instantiate).
     :return: The factory function for creating a new variable.
     """
     return lambda **kwargs: InstantiatedVariable(
@@ -483,13 +465,15 @@ def inference(
 
 def refinement(*conditions: ConditionType) -> SymbolicExpression:
     """
-    Add a refinement branch (ExceptIf node with its right the new conditions and its left the base/parent rule/query)
-     to the current condition tree.
+    Add a refinement branch (ExceptIf node with its right the new conditions
+    and its left the base/parent rule/query) to the current condition tree.
 
-    Each provided condition is chained with AND, and the resulting branch is
-    connected via ExceptIf to the current node, representing a refinement/specialization path.
+    Each provided condition is chained with AND, and the resulting
+    branch is connected via ExceptIf to the current node, representing a
+    refinement/specialization path.
 
-    :param conditions: The refinement conditions. They are chained with AND.
+    :param conditions: The refinement conditions. They are chained with
+        AND.
     :returns: The newly created branch node for further chaining.
     """
     return Refinement.create_and_update_rule_tree(*conditions)
@@ -499,10 +483,12 @@ def alternative(*conditions: ConditionType) -> SymbolicExpression:
     """
     Add an alternative branch (logical ElseIf) to the current condition tree.
 
-    Each provided condition is chained with AND, and the resulting branch is
-    connected via ElseIf to the current node, representing an alternative path.
+    Each provided condition is chained with AND, and the resulting
+    branch is connected via ElseIf to the current node, representing an
+    alternative path.
 
-    :param conditions: Conditions to chain with AND and attach as an alternative.
+    :param conditions: Conditions to chain with AND and attach as an
+        alternative.
     :returns: The newly created branch node for further chaining.
     """
     return Alternative.create_and_update_rule_tree(*conditions)
@@ -512,10 +498,12 @@ def next_rule(*conditions: ConditionType) -> SymbolicExpression:
     """
     Add a consequent rule that gets always executed after the current rule.
 
-    Each provided condition is chained with AND, and the resulting branch is
-    connected via Next to the current node, representing the next path.
+    Each provided condition is chained with AND, and the resulting
+    branch is connected via Next to the current node, representing the
+    next path.
 
-    :param conditions: Conditions to chain with AND and attach as an alternative.
+    :param conditions: Conditions to chain with AND and attach as an
+        alternative.
     :returns: The newly created branch node for further chaining.
     """
     return Next.create_and_update_rule_tree(*conditions)
@@ -559,11 +547,14 @@ def max(
     """
     Maps the variable values to their maximum value.
 
-    :param variable: The variable for which the maximum value is to be found.
-    :param key: A function that extracts a comparison key from each variable value.
+    :param variable: The variable for which the maximum value is to be
+        found.
+    :param key: A function that extracts a comparison key from each
+        variable value.
     :param default: The value returned when the iterable is empty.
     :param distinct: Whether to only consider distinct values.
-    :return: A Max object that can be evaluated to find the maximum value.
+    :return: A Max object that can be evaluated to find the maximum
+        value.
     """
     return Max(
         variable, _key_function_=key, _default_value_=default, _distinct_=distinct
@@ -575,12 +566,17 @@ def mode(
     default: Optional[T] = None,
 ) -> Union[T, Mode[T]]:
     """
-    Calculate and return the first mode from the variable values. The mode is the most common value in the iterable. It is found by
-    counting the occurrences of each value and returning the one with the highest count. If there are multiple values
-    with the same highest count, the first one encountered is returned. This is an aggregation function, thus the query
-    will be fully evaluated before the result is returned.
+    Calculate and return the first mode from the variable values.
 
-    :param variable: The variable for which the mode value is to be found.
+    The mode is the most common value in the iterable. It is found by
+    counting the occurrences of each value and returning the one with
+    the highest count. If there are multiple values with the same
+    highest count, the first one encountered is returned. This is an
+    aggregation function, thus the query will be fully evaluated before
+    the result is returned.
+
+    :param variable: The variable for which the mode value is to be
+        found.
     :param default: The value returned when the iterable is empty.
     :return: A Max object that can be evaluated to find the mode value.
     """
@@ -592,8 +588,9 @@ def multimode(
     default: Optional[T] = None,
 ) -> Union[T, MultiMode[T]]:
     """
-    Calculate and return all mode values from the variable values. Similar to :py:func:`krrood.entity_query_language.factories.mode`
-    but returns all values that have the same mode value (i.e., all values that have the same highest count).
+    Calculate and return all mode values from the variable values.
+
+    Similar to :py:func:`krrood.entity_query_language.factories.mode` but returns all values that have the same mode value (i.e., all values that have the same highest count).
 
     :param variable: The variable for which the mode value is to be found.
     :param default: The value returned when the iterable is empty.
@@ -611,11 +608,14 @@ def min(
     """
     Maps the variable values to their minimum value.
 
-    :param variable: The variable for which the minimum value is to be found.
-    :param key: A function that extracts a comparison key from each variable value.
+    :param variable: The variable for which the minimum value is to be
+        found.
+    :param key: A function that extracts a comparison key from each
+        variable value.
     :param default: The value returned when the iterable is empty.
     :param distinct: Whether to only consider distinct values.
-    :return: A Min object that can be evaluated to find the minimum value.
+    :return: A Min object that can be evaluated to find the minimum
+        value.
     """
     return Min(
         variable, _key_function_=key, _default_value_=default, _distinct_=distinct
@@ -632,10 +632,12 @@ def sum(
     Computes the sum of values produced by the given variable.
 
     :param variable: The variable for which the sum is calculated.
-    :param key: A function that extracts a comparison key from each variable value.
+    :param key: A function that extracts a comparison key from each
+        variable value.
     :param default: The value returned when the iterable is empty.
     :param distinct: Whether to only consider distinct values.
-    :return: A Sum object that can be evaluated to find the sum of values.
+    :return: A Sum object that can be evaluated to find the sum of
+        values.
     """
     return Sum(
         variable, _key_function_=key, _default_value_=default, _distinct_=distinct
@@ -652,10 +654,12 @@ def average(
     Computes the sum of values produced by the given variable.
 
     :param variable: The variable for which the sum is calculated.
-    :param key: A function that extracts a comparison key from each variable value.
+    :param key: A function that extracts a comparison key from each
+        variable value.
     :param default: The value returned when the iterable is empty.
     :param distinct: Whether to only consider distinct values.
-    :return: A Sum object that can be evaluated to find the sum of values.
+    :return: A Sum object that can be evaluated to find the sum of
+        values.
     """
     return Average(
         variable, _key_function_=key, _default_value_=default, _distinct_=distinct
@@ -668,7 +672,8 @@ def count(variable: Selectable[T], distinct: bool = False) -> Union[T, Count[T]]
 
     :param variable: The variable for which the count is calculated.
     :param distinct: Whether to only consider distinct values.
-    :return: A Count object that can be evaluated to count the number of values.
+    :return: A Count object that can be evaluated to count the number of
+        values.
     """
     return Count(variable, _distinct_=distinct)
 
@@ -678,9 +683,29 @@ def count_all(distinct: bool = False) -> Union[T, Count[T]]:
     Count all results (by group).
 
     :param distinct: Whether to only consider distinct values.
-    :return: A Count object that can be evaluated to count the number of values.
+    :return: A Count object that can be evaluated to count the number of
+        values.
     """
     return CountAll(_distinct_=distinct)
+
+
+def count_range(
+    variable: Selectable[T], distinct: bool = False
+) -> Union[T, CountRange[T]]:
+    """
+    Count values produced by the given variable and return a closed interval
+    reflecting uncertainty.
+
+    Concrete (non-``...``) values set the lower bound; ``...``
+    (Ellipsis) values are added to the upper bound to represent items
+    whose category is unknown.
+
+    :param variable: The variable whose values are counted.
+    :param distinct: Whether to only consider distinct values.
+    :return: A CountRange that evaluates to a SimpleInterval
+        ``[concrete_count, concrete_count + ellipsis_count]``.
+    """
+    return CountRange(variable, _distinct_=distinct)
 
 
 def distinct(
@@ -703,10 +728,12 @@ def get_conditioned_statements(
     statement, condition: Callable[OperationResult, bool]
 ) -> List[SymbolicExpression]:
     """
-    Iterates over all sub-statements of the statement and returns all statements that satisfy the condition.
+    Iterates over all sub-statements of the statement and returns all
+    statements that satisfy the condition.
 
     :param statement: The statement to iterate over.
-    :param condition: The condition to evaluate each sub-statement against.
+    :param condition: The condition to evaluate each sub-statement
+        against.
     :return: A list of sub-statements that satisfy the condition.
     """
     condition_results = []

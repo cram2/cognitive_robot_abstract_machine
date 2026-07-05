@@ -18,13 +18,8 @@ Role pattern as implemented in `krrood.patterns.role`.
 
 ## Architectural Goals and Constraints
 
-The Role pattern solves a modelling problem that arises in knowledge representation: a single
-real-world entity can participate in many different relationships and carry many different
-context-specific properties, but its *identity* remains constant throughout. Subclassing cannot
-express this because a subclass implies a permanent, type-level distinction. Association cannot
-express it because an associated object is a separate entity with its own identity.
-
-The design optimises for four properties:
+This guide assumes the {doc}`user guide <../role>`, which introduces what a role is and when to
+choose it over subclassing or association. The design optimises for four properties:
 
 1. **Distinct identity, explicit equivalence.** A role is an ordinary object with its own
    identity (equal only to itself), so multiple roles — even of the same type — on one taker stay
@@ -49,7 +44,7 @@ The implementation centres on three collaborating components:
 
 **`Role[T]`** (`role.py`) is the base dataclass that every role class inherits. It provides
 identity-based equality/hashing (`__hash__`, `__eq__`), attribute delegation (`__getattr__`,
-`__setattr__`), and all querying class methods. It inherits from `SubClassSafeGeneric[T]` so that
+`__setattr__`), and all querying class methods. It inherits from `Generic[T], SubClassSafeGeneric` so that
 fields whose annotation uses the generic parameter are rewritten to the bound concrete type on each
 role subclass (keeping generic roles introspectable by the class diagram), and from `Symbol` so a
 role participates in the class diagram and ORM like any other entity. A role sets
@@ -58,17 +53,11 @@ membership uses the `RoleRegistry` and persistence uses the role's own ORM mappi
 needs to be a graph node. Role *classes* still take part in the class diagram, which is built from
 `Symbol` subclasses, not from cached instances.
 
-**`role_taker_field()`** is a thin wrapper around `dataclasses.field()` that produces a
-`RoleTakerField` (a `dataclasses.Field` subclass) by building a field and reassigning its
-`__class__`. The field's type is the single source of truth that the role uses to identify
-which field is the role taker. It also allows the class diagram (`krrood.class_diagrams`) to
-recognise role-taker relationships during graph construction.
+**`role_taker`** is the keyword-only field, declared once on `Role[T]` and inherited by every role
+class, that holds the entity the role is attached to (see *Fixed-Name Discovery of the Role Taker*).
 
-**`RoleRegistry`** (`role_registry.py`) is the runtime inverse index. When a role is constructed,
-`Role.__post_init__` calls `RoleRegistry.register`, which indexes the role under every taker in its
-chain. Querying whether a taker has a given role type then becomes a lookup in this index. The
-registry is held on `Role` as a shared class attribute and can be replaced with a fresh instance to
-isolate state.
+**`RoleRegistry`** (`role_registry.py`) is the runtime inverse index from a taker to its roles that
+backs all role lookup (see *The Role Registry*).
 
 ## Key Design Decisions and Rationale
 
@@ -95,15 +84,13 @@ This means that the constructor signature of every concrete role class is exactl
 declarations and know exactly what arguments its constructor accepts, with no hidden
 transformations.
 
-### Explicit Construction Only
+### Fixed-Name Discovery of the Role Taker
 
-A role is only created when calling code explicitly passes a role taker instance to the role
-constructor (or to `from_role_taker`).
-
-### Field-Type Discovery of the Role Taker
-
-The role taker field is identified at runtime by an `isinstance` check against `RoleTakerField`.
-The name of that field is cached per class via `@lru_cache` on `role_taker_field_name()`.
+The role taker is the inherited `role_taker` field, so it is identified by its fixed name
+(`role_taker_field_name()`) on any `Role` subclass. The taker *type* comes from the role's
+`Role[Taker]` generic argument, resolved by `get_role_taker_type()` (a bounded `TypeVar`
+resolves to its bound). The class diagram derives the role-taker association from that generic
+argument because the inherited field's own annotation is the unbound generic parameter.
 
 ### Distinct Identity and the `IsSameEntity` Predicate
 
@@ -133,17 +120,14 @@ membership behaviour is independent of whether its class has been added to the c
 
 ## Attribute Access
 
-`__getattr__` delegates attribute reads that failed normal lookup to the role taker. Because
-`__getattr__` is only called when the standard attribute resolution chain has already failed,
-role-native attributes (those declared as dataclass fields on the role class) are read from the
-role directly and never reach the taker.
-
-`__setattr__` always sets attributes on the role itself, never on the role taker. Only the role's
-own declared fields and private (underscore-prefixed) attributes may be assigned; any other name
-raises `RoleAttributeNotDeclaredError`. Reads are delegated but writes are not, so writing through a
-role cannot mutate the shared entity as a side effect, and the rejection of undeclared names keeps a
-write from silently shadowing a role-taker attribute. Code that needs to modify the taker does so
-explicitly through `role.role_taker` (or `role.root_persistent_entity`).
+The mechanics (read delegation via `__getattr__`, write-local via `__setattr__`) are covered in the
+{doc}`user guide <../role>`. The design decision worth recording here is the deliberate **asymmetry**:
+reads are transparent so a consumer need not know which attributes belong to the role and which to
+the taker, but writes are not — an assignment always targets the role and rejects any undeclared
+name with `RoleAttributeNotDeclaredError`. That asymmetry is what prevents a write through a role
+from mutating the shared taker as a side effect or silently shadowing one of its attributes; changing
+the taker is therefore the explicit `role.role_taker` operation rather than an implicit consequence
+of assignment.
 
 ## Role-Taker Associations and Property Descriptors
 
@@ -164,12 +148,11 @@ the class diagram and the property descriptors.
 
 ## Source References
 
-- `krrood/src/krrood/patterns/role.py` — `Role`, `role_taker_field`, `RoleTakerField`
+- `krrood/src/krrood/patterns/role.py` — `Role` (and its inherited `role_taker` field)
 - `krrood/src/krrood/patterns/role_registry.py` — `RoleRegistry`
-- `krrood/src/krrood/patterns/exceptions.py` — `RoleTakerFieldNotFound`,
-  `DelegatedFactoryMethodError`, `RoleAttributeNotDeclaredError`
-- `krrood/src/krrood/patterns/subclass_safe_generic.py` — `SubClassSafeGeneric`,
-  `AbstractSubClassSafeGeneric`
+- `krrood/src/krrood/patterns/exceptions.py` — `DelegatedFactoryMethodError`,
+  `RoleAttributeNotDeclaredError`
+- `krrood/src/krrood/patterns/subclass_safe_generic.py` — `SubClassSafeGeneric`
 - `krrood/src/krrood/symbol_graph/symbol_graph.py` — `Symbol`
 - `test/krrood_test/test_patterns/test_role.py` — behavioural tests for the role pattern
 - `test/krrood_test/dataset/role_and_ontology/university_ontology_like_classes_without_descriptors.py`

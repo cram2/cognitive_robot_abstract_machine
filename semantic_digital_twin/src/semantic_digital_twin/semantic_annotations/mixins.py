@@ -25,6 +25,7 @@ from krrood.entity_query_language.factories import variable_from, entity, variab
 from krrood.entity_query_language.factories import variable_from, entity, variable, an
 from krrood.ormatic.utils import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Generic
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.helper import make_dirac
@@ -85,6 +86,8 @@ if TYPE_CHECKING:
         Handle,
         Aperture,
         MechanicalJoint,
+        Leg,
+        Sink,
     )
     from semantic_digital_twin.world import World
 
@@ -108,7 +111,7 @@ TKinematicStructureEntity = TypeVar(
 
 @dataclass(eq=False)
 class HasRootKinematicStructureEntity(
-    SemanticAnnotation, SubClassSafeGeneric[TKinematicStructureEntity], ABC
+    SemanticAnnotation, Generic[TKinematicStructureEntity], SubClassSafeGeneric, ABC
 ):
     """
     Base class for shared method for HasRootBody and HasRootRegion.
@@ -525,7 +528,34 @@ A type variable for HasRootBody.
 
 
 @dataclass(eq=False)
-class IsStorageSpace(HasRootBody, SubClassSafeGeneric[THasRootBody], ABC):
+class HasLegs(PartWholeRelationship, ABC):
+    """
+    A mixin class for semantic annotations that have legs.
+    """
+
+    legs: List[Leg] = part_whole_relationship_field(
+        default_factory=list, hash=False, kw_only=True
+    )
+    """
+    The legs of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasSink(PartWholeRelationship, ABC):
+    """
+    A mixin class for semantic annotations that have a sink.
+    """
+
+    sink: Optional[Sink] = part_whole_relationship_field(default=None)
+    """
+    The sink of the semantic annotation.
+    """
+
+
+
+@dataclass(eq=False)
+class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric, ABC):
     """
     A mixin class for semantic annotations that represent storage spaces. Used to afterthefact add object for example
     to a table, and have those objects move with the table when it is moved.
@@ -966,3 +996,5 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
         container_event = outer_box.as_composite_set() - inner_box.as_composite_set()
 
         return container_event
+
+

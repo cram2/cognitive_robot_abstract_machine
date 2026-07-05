@@ -14,38 +14,70 @@ A method is a factory method when it is a ``@classmethod`` and either:
 Only classmethods are considered; instance and static methods are ignored.
 """
 
+from __future__ import annotations
+
 import inspect
+from dataclasses import dataclass
 from functools import lru_cache
 
 from typing_extensions import Any, Callable, Self, Tuple, Type
 
-try:  # ``typing.Self`` exists on Python 3.11+; ``typing_extensions`` backfills the rest.
-    from typing import Self as _TypingSelf
-except ImportError:  # pragma: no cover - depends on the interpreter version
-    _TypingSelf = None
-
-FACTORY_METHOD_MARKER = "__krrood_factory_method__"
-"""Attribute set on a function to mark it (and any ``classmethod`` wrapping it) as a factory."""
-
-_SELF_ANNOTATIONS = {
-    annotation for annotation in (Self, _TypingSelf) if annotation is not None
-}
+from krrood.class_diagrams.exceptions import FactoryMethodDecoratorError
+from krrood.class_diagrams.factory_method_registry import FactoryMethodRegistry
 
 
-def factory_method(func: Callable) -> Callable:
+@dataclass
+class FactoryMethodMarker:
+    """
+    Descriptor that marks the classmethod it wraps as a factory and registers it eagerly.
+
+    Python calls :meth:`__set_name__` once, when the owning class body finishes executing, and
+    hands over both the owner class and the attribute name. The descriptor uses that single event
+    to record itself in :class:`FactoryMethodRegistry`, so no marker attribute is written onto the
+    wrapped function. Attribute access is forwarded transparently to the wrapped ``classmethod``,
+    preserving its original call semantics.
+
+    ..note::
+        The descriptor must be the **outermost** decorator (applied above ``@classmethod``):
+        ``classmethod`` does not forward ``__set_name__`` to the object it wraps, so wrapping the
+        descriptor inside ``classmethod`` would skip registration silently. :func:`factory_method`
+        enforces this by rejecting anything that is not a ``classmethod``.
+    """
+
+    wrapped: classmethod
+    """The ``classmethod`` being marked as a factory."""
+
+    def __set_name__(self, owner: Type, name: str) -> None:
+        """Register the factory with :class:`FactoryMethodRegistry` once the owner is known."""
+        FactoryMethodRegistry().register(owner, name)
+
+    def __get__(self, instance: Any, owner: Type = None) -> Any:
+        """Bind the wrapped classmethod so the factory stays callable on the class and instances."""
+        return self.wrapped.__get__(instance, owner)
+
+
+def factory_method(method: classmethod) -> FactoryMethodMarker:
     """
     Mark a classmethod as a factory method explicitly, regardless of its return annotation.
 
-    The marker is written on the underlying function so it survives ``classmethod`` wrapping and
-    is inherited by subclasses. The decorator may be stacked in either order relative to
-    ``@classmethod``.
-
-    :param func: The function or ``classmethod``/``staticmethod`` descriptor to mark.
-    :return: The same object, marked as a factory method.
+    :param method: The ``classmethod`` to mark.
+    :return: A descriptor that registers the factory at class-definition time.
+    :raises FactoryMethodDecoratorError: If ``method`` is not a ``classmethod`` (for example when
+        the marker is applied below ``@classmethod`` instead of above it).
     """
-    target = func.__func__ if isinstance(func, (classmethod, staticmethod)) else func
-    setattr(target, FACTORY_METHOD_MARKER, True)
-    return func
+    if not isinstance(method, classmethod):
+        raise FactoryMethodDecoratorError(decorated_name=_decorated_name(method))
+    return FactoryMethodMarker(method)
+
+
+def _decorated_name(method: Any) -> str:
+    """
+    :param method: The object ``@factory_method`` was applied to.
+    :return: A readable name for the object, used only in the rejection error message.
+    """
+    if hasattr(method, "__name__"):
+        return method.__name__
+    return repr(method)
 
 
 def _return_annotation_is_self_or_owner(func: Callable, cls: Type) -> bool:
@@ -60,7 +92,7 @@ def _return_annotation_is_self_or_owner(func: Callable, cls: Type) -> bool:
     if isinstance(annotation, str):
         name = annotation.strip().strip("\"'")
         return name in ("Self", cls.__name__) or name.endswith("." + cls.__name__)
-    return annotation in _SELF_ANNOTATIONS or annotation is cls
+    return annotation is Self or annotation is cls
 
 
 @lru_cache(maxsize=None)
@@ -70,13 +102,12 @@ def is_factory_method(cls: Type, name: str) -> bool:
     :param name: The attribute name to classify.
     :return: Whether ``cls.<name>`` is a factory classmethod.
     """
+    if FactoryMethodRegistry().is_registered(cls, name):
+        return True
     attribute = inspect.getattr_static(cls, name, None)
     if not isinstance(attribute, classmethod):
         return False
-    func = attribute.__func__
-    if getattr(func, FACTORY_METHOD_MARKER, False):
-        return True
-    return _return_annotation_is_self_or_owner(func, cls)
+    return _return_annotation_is_self_or_owner(attribute.__func__, cls)
 
 
 def factory_method_names(cls: Type) -> Tuple[str, ...]:
@@ -91,6 +122,8 @@ def factory_method_names(cls: Type) -> Tuple[str, ...]:
             if name in seen:
                 continue
             seen.add(name)
-            if isinstance(member, classmethod) and is_factory_method(cls, name):
+            if isinstance(member, (classmethod, FactoryMethodMarker)) and is_factory_method(
+                cls, name
+            ):
                 names.append(name)
     return tuple(names)

@@ -22,6 +22,7 @@ from typing_extensions import (
     Type,
     TYPE_CHECKING,
     Optional,
+    TypeVar,
     Union,
 )
 
@@ -94,6 +95,8 @@ class WrappedField:
         return hash((self.clazz.clazz, self.field))
 
     def __eq__(self, other):
+        if not isinstance(other, WrappedField):
+            return False
         return (self.clazz.clazz, self.field) == (
             other.clazz.clazz,
             other.field,
@@ -101,33 +104,6 @@ class WrappedField:
 
     def __repr__(self):
         return f"{module_and_class_name(self.clazz.clazz)}.{self.field.name}"
-
-    def type_at_definer(self, defining_base: type) -> Any:
-        """Return the type annotation of this field as declared on defining_base.
-
-        Falls back to raw ``__annotations__`` inspection when ``get_type_hints``
-        raises ``TypeError`` (e.g. when SubClassSafeGeneric injects a narrowed
-        TypeVar that confuses the resolver).
-
-        :param defining_base: The ancestor class whose declaration is authoritative.
-        :return: The resolved type annotation, or ``self.field.type`` as a fallback.
-        """
-        try:
-            return get_type_hints_of_object(defining_base).get(
-                self.field.name, self.field.type
-            )
-        except TypeError:
-            raw = vars(defining_base).get("__annotations__", {}).get(self.field.name)
-            if raw is not None and not isinstance(raw, str):
-                return raw
-            if isinstance(raw, str):
-                module = inspect.getmodule(defining_base)
-                globalns = getattr(module, "__dict__", {}) if module is not None else {}
-                try:
-                    return eval(raw, globalns)  # noqa: S307
-                except Exception:
-                    pass
-            return self.field.type
 
     @cached_property
     def resolved_type(self):
@@ -271,6 +247,25 @@ class WrappedField:
 
     @cached_property
     def type_endpoint(self) -> Type:
+        """
+        The concrete type this field ultimately points to, ready to be used directly.
+
+        A bounded ``TypeVar`` is reduced to its bound, since the field is specified to that bound; an
+        unbounded ``TypeVar`` is returned unchanged. Predicates that must reason about the type
+        variable itself use :attr:`_unresolved_type_endpoint`.
+        """
+        endpoint = self._unresolved_type_endpoint
+        if isinstance(endpoint, TypeVar) and endpoint.__bound__ is not None:
+            return endpoint.__bound__
+        return endpoint
+
+    @cached_property
+    def _unresolved_type_endpoint(self) -> Type:
+        """
+        The type this field points to before a bounded ``TypeVar`` is reduced to its bound: the
+        contained type for containers and optionals, the lowest common ancestor for unions, otherwise
+        the resolved type. May be a ``TypeVar``.
+        """
         if self.is_container or self.is_optional:
             return self.contained_type
         resolved = self.resolved_type
@@ -283,11 +278,19 @@ class WrappedField:
 
     @cached_property
     def is_role_taker(self) -> bool:
-        # Imported lazily: RoleTakerField lives with the Role class, and importing it at module
-        # level would close an import cycle through symbol_graph -> class_diagram -> wrapped_field.
-        from krrood.patterns.role import RoleTakerField
+        # Imported lazily: Role lives in patterns, and importing it at module level would close an
+        # import cycle through symbol_graph -> class_diagram -> wrapped_field.
+        from krrood.patterns.role import Role
 
-        return isinstance(self.field, RoleTakerField)
+        owner = self.clazz.clazz
+        origin = get_origin(owner)
+        if origin is not None and not isinstance(owner, type):
+            owner = origin
+        # The base ``Role`` declares ``role_taker`` as an abstract, unbound-generic slot; only a
+        # concrete role subclass binds it to a real taker type.
+        if not (isinstance(owner, type) and issubclass(owner, Role) and owner is not Role):
+            return False
+        return self.field.name == Role.role_taker_field_name()
 
     @property
     def type_name(self) -> str:
@@ -341,6 +344,13 @@ class WrappedField:
 
         :return: True if the type hint is an underspecified generic class.
         """
+        # A bounded type variable is specified to its bound, so it is not underspecified even when
+        # that bound is a generic class with free parameters. An unbounded type variable specifies
+        # nothing and is therefore underspecified.
+        endpoint = self._unresolved_type_endpoint
+        if isinstance(endpoint, TypeVar):
+            return endpoint.__bound__ is None
+
         # A class is underspecified only if it still has free TypeVar parameters.
         # Concrete subclasses of generic parents (e.g. HSRBMobileBase(MobileBase, HasTorso[HSRBTorso]))
         # are subclasses of Generic but have __parameters__ == (), so they must not be skipped.

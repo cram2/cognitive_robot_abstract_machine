@@ -6,8 +6,8 @@ import os
 from abc import ABC
 from copy import copy
 from dataclasses import dataclass, is_dataclass
-from dataclasses import field as dataclass_field
-from functools import cached_property, lru_cache
+from dataclasses import field
+from functools import cached_property
 from typing import _GenericAlias
 
 import rustworkx as rx
@@ -19,6 +19,8 @@ from krrood.utils import (
     module_and_class_name,
     own_dataclass_fields,
     memoize,
+    clear_memoization_cache,
+    T,
 )
 
 try:
@@ -37,7 +39,6 @@ from typing_extensions import (
     TYPE_CHECKING,
     TypeVar,
     Iterator,
-    Generic,
 )
 
 
@@ -47,6 +48,8 @@ from krrood.class_diagrams.attribute_introspector import (
 )
 from krrood.class_diagrams.method_classifier import factory_method_names
 from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Generic
 
 from krrood.class_diagrams.exceptions import (
     ClassIsUnMappedInClassDiagram,
@@ -72,12 +75,12 @@ class ClassRelation(ABC):
     target: WrappedClass
     """The target class in the relation."""
 
-    index: Optional[int] = dataclass_field(init=False, default=None)
+    index: Optional[int] = field(init=False, default=None)
     """
     The index of the relation in the dependency graph. This is used to uniquely identify the relation.
     """
 
-    inferred: bool = dataclass_field(default=False, init=False)
+    inferred: bool = field(default=False, init=False)
     """
     Whether this relation was inferred (e.g. associations from role takers) or explicitly defined.
     """
@@ -116,7 +119,7 @@ class Association(ClassRelation):
     are connected to instances of another class. In UML notation, this is shown as a solid line.
     """
 
-    field: WrappedField
+    wrapped_field: WrappedField
     """The field in the source class that creates this association with the target class."""
 
     def get_original_source_instance_given_this_relation_source_instance(
@@ -134,18 +137,21 @@ class Association(ClassRelation):
     @cached_property
     def many_to_many(self) -> bool:
         """Whether the association is one-to-many (True) or many-to-one (False)."""
-        return self.field.is_many_to_many_relationship and not self.field.is_type_type
+        return (
+            self.wrapped_field.is_many_to_many_relationship
+            and not self.wrapped_field.is_type_type
+        )
 
     def get_key(self, include_field_name: bool = False) -> tuple:
         """
         A tuple representing the key of the association.
         """
         if include_field_name:
-            return (self.__class__, self.target.clazz, self.field.field.name)
+            return (self.__class__, self.target.clazz, self.wrapped_field.field.name)
         return (self.__class__, self.target.clazz)
 
     def __str__(self):
-        return f"has-{self.field.public_name}"
+        return f"has-{self.wrapped_field.public_name}"
 
     def __hash__(self):
         return hash((self.__class__, self.source.index, self.target.index))
@@ -161,7 +167,7 @@ class HasRoleTaker(Association):
     """
 
     def __str__(self):
-        return f"role-taker({self.field.public_name})"
+        return f"role-taker({self.wrapped_field.public_name})"
 
 
 @dataclass(eq=False)
@@ -172,7 +178,7 @@ class AssociationThroughRoleTaker(Association):
     get to the target class.
     """
 
-    field: WrappedField = dataclass_field(init=False)
+    wrapped_field: WrappedField = field(init=False)
     """
     The last field in the path that is the association to the target class.
     """
@@ -180,13 +186,16 @@ class AssociationThroughRoleTaker(Association):
     """
     The path of associations that are traversed to get to the target class.
     """
-    field_path: List[WrappedField] = dataclass_field(init=False)
+    field_path: List[WrappedField] = field(init=False)
     """
     The path of fields that are traversed to get to the target class.
     """
+    inferred: bool = field(init=False, default=True)
+    """
+    Redefined inferred to be always true, and never initialized through the init method.
+    """
 
     def __post_init__(self):
-        self.inferred = True
         flat_association_path = []
         for assoc in self.association_path:
             if isinstance(assoc, AssociationThroughRoleTaker):
@@ -194,10 +203,10 @@ class AssociationThroughRoleTaker(Association):
             else:
                 flat_association_path.append(assoc)
         self.association_path = flat_association_path
-        self.field_path = [assoc.field for assoc in self.association_path]
-        self.field = self.field_path[-1]
+        self.field_path = [assoc.wrapped_field for assoc in self.association_path]
+        self.wrapped_field = self.field_path[-1]
 
-    @lru_cache(maxsize=None)
+    @memoize
     def get_original_source_instance_given_this_relation_source_instance(
         self, source_instance: Any
     ):
@@ -240,26 +249,36 @@ class ParseError(TypeError):
     For instance, Union types
     """
 
-    pass
-
-
-T = TypeVar("T")
-
 
 @dataclass
-class WrappedClass(Generic[T]):
+class WrappedClass(Generic[T], SubClassSafeGeneric):
     """A node wrapper around a Python class used in the class diagram graph."""
 
-    index: Optional[int] = dataclass_field(init=False, default=None)
+    index: Optional[int] = field(init=False, default=None)
+    """
+    The class unique index in the graph.
+    """
     clazz: Type[T]
-    _class_diagram: Optional[ClassDiagram] = dataclass_field(
+    """
+    The class to be wrapped.
+    """
+    _class_diagram: Optional[ClassDiagram] = field(
         init=False, hash=False, default=None, repr=False
     )
-    _wrapped_field_name_map_: Dict[str, WrappedField] = dataclass_field(
+    """
+    The class diagram where this class is part of.
+    """
+    _wrapped_field_name_map_: Dict[str, WrappedField] = field(
         init=False, hash=False, default_factory=dict, repr=False
     )
+    """
+    A mapping from field name to its WrappedField instance.
+    """
 
     def _get_introspector(self) -> AttributeIntrospector:
+        """
+        :return: The introspector to use for finding the fields to wrap in a WrappedField.
+        """
         if self._class_diagram is None:
             introspector = DataclassOnlyIntrospector()
         else:
@@ -372,21 +391,21 @@ class ClassDiagram:
     A list of classes to be represented in the diagram.
     """
 
-    introspector: AttributeIntrospector = dataclass_field(
+    introspector: AttributeIntrospector = field(
         default_factory=DataclassOnlyIntrospector, init=True, repr=False
     )
     """
     The attribute introspector used to discover class attributes.
     """
 
-    _dependency_graph: rx.PyDiGraph[WrappedClass, ClassRelation] = dataclass_field(
+    _dependency_graph: rx.PyDiGraph[WrappedClass, ClassRelation] = field(
         default_factory=rx.PyDiGraph, init=False
     )
     """
     A directed graph representing class relationships.
     """
 
-    _cls_wrapped_cls_map: Dict[Type, WrappedClass] = dataclass_field(
+    _cls_wrapped_cls_map: Dict[Type, WrappedClass] = field(
         default_factory=dict, init=False, repr=False
     )
     """
@@ -508,7 +527,7 @@ class ClassDiagram:
                 continue
             if assoc2.source.clazz != cls2.clazz:
                 continue
-            if assoc2.field.is_role_taker:
+            if assoc2.wrapped_field.is_role_taker:
                 return assoc1, assoc2
         return None, None
 
@@ -522,7 +541,7 @@ class ClassDiagram:
         """
         cls = self.get_wrapped_class(cls)
         for assoc in self.get_out_edges(cls):
-            if isinstance(assoc, HasRoleTaker) and assoc.field.is_role_taker:
+            if isinstance(assoc, HasRoleTaker) and assoc.wrapped_field.is_role_taker:
                 return assoc
         return None
 
@@ -662,7 +681,7 @@ class ClassDiagram:
                 )
         return assoc_keys_by_source
 
-    @lru_cache(maxsize=None)
+    @memoize
     def to_subdiagram_without_inherited_associations(
         self,
         include_field_name: bool = False,
@@ -834,11 +853,23 @@ class ClassDiagram:
 
         :raises: This method does not explicitly raise any exceptions.
         """
-        from krrood.patterns.role import Role
-
         for clazz in self.wrapped_classes:
+            # Handle GenericAlias in issubclass
+            origin = get_origin(clazz.clazz)
+            actual_cls = (
+                origin
+                if (origin is not None and not isinstance(clazz.clazz, type))
+                else clazz.clazz
+            )
             for wrapped_field in clazz.fields:
-                target_type = wrapped_field.type_endpoint
+                # The inherited ``role_taker`` field is annotated with an unbound ``TypeVar``, so its
+                # concrete target comes from the role's generic argument rather than the annotation.
+                if wrapped_field.is_role_taker:
+                    target_type = actual_cls.get_role_taker_type()
+                    association_type = HasRoleTaker
+                else:
+                    target_type = wrapped_field.type_endpoint
+                    association_type = Association
                 try:
                     if isinstance(target_type, TypeVar):
                         target_type = target_type.__bound__
@@ -848,27 +879,8 @@ class ClassDiagram:
                 except ClassIsUnMappedInClassDiagram:
                     continue
 
-                association_type = Association
-                # Handle GenericAlias in issubclass
-                origin = get_origin(clazz.clazz)
-                actual_cls = (
-                    origin
-                    if (origin is not None and not isinstance(clazz.clazz, type))
-                    else clazz.clazz
-                )
-
-                try:
-                    is_role_subclass = issubclass(actual_cls, Role)
-                except TypeError:
-                    is_role_subclass = False
-
-                if wrapped_field.is_role_taker and is_role_subclass:
-                    role_taker_type = actual_cls.get_role_taker_type()
-                    if role_taker_type is target_type:
-                        association_type = HasRoleTaker
-
                 relation = association_type(
-                    field=wrapped_field,
+                    wrapped_field=wrapped_field,
                     source=clazz,
                     target=wrapped_target_class,
                 )
@@ -913,9 +925,9 @@ class ClassDiagram:
         role_taker_clazz = role_taker_assoc.source
         association_path = []
         role_association_chain = list(self.role_chain_starting_from_node(role_clazz))
-        for a in role_association_chain:
-            association_path.append(a)
-            if a.target is role_taker_clazz:
+        for role_association in role_association_chain:
+            association_path.append(role_association)
+            if role_association.target is role_taker_clazz:
                 break
         association_path.append(role_taker_assoc)
         self.add_relation(
@@ -976,7 +988,7 @@ class ClassDiagram:
         )
         return inheritance_graph
 
-    @lru_cache(maxsize=None)
+    @memoize
     def role_chain_starting_from_node(self, node: WrappedClass) -> Tuple[HasRoleTaker]:
         """
         :return: The role chain starting from the given node following HasRoleTaker edges.
@@ -1027,8 +1039,15 @@ class ClassDiagram:
         graph: Optional[rx.PyDiGraph] = None,
         without_inherited_associations: bool = True,
     ):
-        import pydot
+        """
+        Convert the given graph or the current one if none is given to a dot file that can be converted to the given
+        specified output format.
 
+        :param filepath: Filepath to save the output file in.
+        :param format_: Format of the output file.
+        :param graph: Graph to save the output file to.
+        :param without_inherited_associations: Whether to remove association relations that are inherited or not.
+        """
         if graph is None:
             if without_inherited_associations:
                 graph = (
@@ -1037,8 +1056,26 @@ class ClassDiagram:
             else:
                 graph = self._dependency_graph
 
+        self.graph_to_dot(filepath, graph, format_)
+
+    @staticmethod
+    def graph_to_dot(filepath: str, graph: rx.PyDiGraph, format_: str = "dot"):
+        """
+        Convert the given graph to a dot file then output it in the given format. The format is `dot` by default which
+        will output the raw dot file.
+
+        :param filepath: Filepath to save the output file in.
+        :param graph: Graph to save the output file to.
+        :param format_: Format of the output file.
+        """
+        import pydot
+
         if not filepath.endswith(f".{format_}"):
             filepath += f".{format_}"
+
+        # `raw` is the correct name to give to graphviz to tell it to output the dot file.
+        format_ = "raw" if format_ == "dot" else format_
+
         dot_str = graph.to_dot(
             lambda node: dict(
                 color="black",
@@ -1063,9 +1100,11 @@ class ClassDiagram:
 
     def clear(self):
         self._dependency_graph.clear()
-        AssociationThroughRoleTaker.get_original_source_instance_given_this_relation_source_instance.cache_clear()
-        self.__class__.role_chain_starting_from_node.cache_clear()
-        self.__class__.to_subdiagram_without_inherited_associations.cache_clear()
+        # ``role_chain_starting_from_node`` and ``to_subdiagram_without_inherited_associations`` are
+        # memoized on this instance, so clearing its ``__memo__`` invalidates them once the graph
+        # changes. The per-association ``get_original_source_instance_...`` memo is scoped to each
+        # association instance and is dropped with the graph, so it needs no explicit clearing.
+        clear_memoization_cache(self)
 
     def __hash__(self):
         return hash(id(self))
@@ -1204,9 +1243,7 @@ def make_specialized_dataclass(alias: _GenericAlias) -> Type:
             kwargs.pop("default")
         if kwargs["default_factory"] is dataclasses.MISSING:
             kwargs.pop("default_factory")
-        new_fields.append(
-            (f.name, type_resolution.resolved_type, dataclass_field(**kwargs))
-        )
+        new_fields.append((f.name, type_resolution.resolved_type, field(**kwargs)))
 
     # Name and namespace
     arg_names = [getattr(a, "__name__", repr(a)) for a in args]

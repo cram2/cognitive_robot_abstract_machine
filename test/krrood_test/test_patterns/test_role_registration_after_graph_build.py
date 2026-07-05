@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from krrood.entity_query_language.predicate import Symbol
-from krrood.patterns.role import Role, role_taker_field
+from krrood.patterns.role import Role
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 
 
@@ -26,10 +26,9 @@ def test_role_registers_when_class_defined_after_symbol_graph_built():
     assert SymbolGraph().class_diagram is not None
 
     @dataclass(eq=False)
-    class RoleDefinedAfterGraph(Role[PersistentEntityDefinedBeforeGraph]):
-        taker: PersistentEntityDefinedBeforeGraph = role_taker_field()
+    class RoleDefinedAfterGraph(Role[PersistentEntityDefinedBeforeGraph]): ...
 
-    role = RoleDefinedAfterGraph(taker=entity)
+    role = RoleDefinedAfterGraph(role_taker=entity)
 
     assert Role.has_role(entity, RoleDefinedAfterGraph)
     assert role in Role.roles_for(entity, RoleDefinedAfterGraph)
