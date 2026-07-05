@@ -143,42 +143,21 @@ def cleanup_after_test():
     class_diagram.clear()
 
 
-def _type_histogram(objects) -> dict:
-    """:return: A count of the given objects by their type's qualified name."""
-    kinds: dict = {}
-    for obj in objects:
-        key = type(obj).__qualname__
-        kinds[key] = kinds.get(key, 0) + 1
-    return kinds
+def _describe_world_retainers(sample_size: int = 3) -> str:
+    """Summarize, by type, the objects that directly reference a sample of live ``World`` objects.
 
-
-def _describe_world_retainers(sample_size: int = 3, tuple_sample: int = 4) -> str:
-    """Summarize what keeps a sample of live ``World`` objects alive.
-
-    Reports each world's direct-referrer type histogram and, for a bounded sample of its
-    ``tuple`` referrers, the *grandparent* type histogram (what holds those tuples) plus a
-    preview of the tuple's element types — this is what reveals the external container behind a
-    runaway ``tuple`` count. Also lists live non-daemon threads, since an unstopped
-    world-referencing thread (e.g. a publisher) is a common external root.
-
-    Every step is a single bounded ``gc.get_referrers`` level over a small sample. A full
+    This is a single-level ``gc.get_referrers`` histogram, so it is bounded and fast. A full
     back-reference-chain search (``objgraph.find_backref_chain``) must not be used here: on the
     large, densely connected worlds built in the ROS/physics tests it walks the whole object graph
     and can run for hours, turning a leak *failure* into a CI *hang*.
     """
     descriptions = []
     for world in objgraph.by_type("World")[:sample_size]:
-        referrers = gc.get_referrers(world)
-        descriptions.append(f"  {id(world):#x} direct referrers: {_type_histogram(referrers)}")
-        tuple_referrers = [r for r in referrers if type(r) is tuple][:tuple_sample]
-        for holding_tuple in tuple_referrers:
-            element_types = sorted({type(element).__qualname__ for element in holding_tuple})
-            grandparents = _type_histogram(gc.get_referrers(holding_tuple))
-            descriptions.append(
-                f"      tuple(len={len(holding_tuple)}, elements={element_types}) held by: {grandparents}"
-            )
-    live_threads = [t.name for t in threading.enumerate() if t.is_alive()]
-    descriptions.append(f"  live threads: {live_threads}")
+        kinds: dict = {}
+        for referrer in gc.get_referrers(world):
+            key = type(referrer).__qualname__
+            kinds[key] = kinds.get(key, 0) + 1
+        descriptions.append(f"  {id(world):#x} direct referrers: {kinds}")
     return "\n".join(descriptions)
 
 
