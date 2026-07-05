@@ -19,7 +19,7 @@ import sys
 from sqlalchemy import select
 from sqlalchemy.orm import configure_mappers, sessionmaker
 
-from krrood.class_diagrams import ClassDiagram
+from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.helper import get_classes_of_ormatic_interface
 from krrood.ormatic.ormatic import ORMatic

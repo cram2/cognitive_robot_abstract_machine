@@ -1,0 +1,7 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="40" height="40" rx="8" fill="#2B2D30"/>
+  <!-- taker (solid) delegating to role (outline), linked -->
+  <circle cx="13.5" cy="20" r="6" fill="#3592C4"/>
+  <circle cx="26.5" cy="20" r="6" fill="none" stroke="#3592C4" stroke-width="2.5"/>
+  <path d="M15.5 20 H24.5" stroke="#F2C55C" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

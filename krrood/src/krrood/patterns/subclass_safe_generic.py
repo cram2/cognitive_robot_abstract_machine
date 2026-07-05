@@ -2,16 +2,13 @@ from __future__ import annotations
 
 from abc import ABC
 from copy import copy
-from dataclasses import dataclass, fields, Field
-from functools import lru_cache
+from dataclasses import dataclass, Field
 from inspect import isclass
-from typing import Tuple
+from typing import Tuple, Union, List
 
 from typing_extensions import (
-    Generic,
     TypeVar,
     Type,
-    TYPE_CHECKING,
     Optional,
     Dict,
     Any,
@@ -22,20 +19,29 @@ from typing_extensions import (
     Unpack,
 )
 
+from krrood import logger
 from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
 )
 from krrood.exceptions import MismatchingNumberOfGenericParametersAndResolvedTypes
 from krrood.utils import (
-    get_generic_type_params,
-    T,
+    get_generic_type_parameters,
     ensure_hashable,
     get_existing_field_by_name,
 )
 
-if TYPE_CHECKING:
-    pass
+TRANSIENT_TYPE_RESOLUTION_ERRORS = (
+    ImportError,
+    NameError,
+    TypeError,
+    CouldNotResolveType,
+)
+"""Exceptions raised while importing and resolving a field's type annotation when that type is
+not yet available (typically a circular import during module load). They are transient: the field
+is narrowed later, once a subclass binds the parameter to a concrete type. Any other exception is
+a genuine fault and is left to propagate."""
 
 
 ResolvableType: TypeAlias = (
@@ -49,14 +55,31 @@ ResolvableType: TypeAlias = (
 
 
 @dataclass
-class AbstractSubClassSafeGeneric(ABC):
+class SubClassSafeGeneric(ABC):
     """
-    Base implementation that automatically updates field types when a subclass binds the generic
-    type parameters of its generic base to concrete types.
+    Generic-agnostic engine that updates field types when a subclass binds the generic type
+    parameters of its generic base to concrete types. It resolves every parameter (multiple
+    ``TypeVar`` s and ``TypeVarTuple`` s) across the whole inheritance chain.
 
-    Concrete subclasses must declare the generic parameters via ``Generic[...]`` and inherit from
-    this class. Here it is important that in the inheritance order, ``Generic[...]`` is positioned before
-    ``AbstractSubClassSafeGeneric`` similar to how it is done in ``SubClassSafeGeneric``.
+    A class that wants safe subclassing declares its **own** ``Generic[...]`` and inherits this
+    class alongside it — for a single parameter (``Generic[T]``), multiple parameters
+    (``Generic[T, T2]``), or a ``TypeVarTuple`` (``Generic[Unpack[Ts]]``). Put ``Generic[...]``
+    before ``SubClassSafeGeneric`` in the bases.
+
+    Example:
+        >>> T = TypeVar("T")
+        >>> @dataclass
+        ... class MyClass(Generic[T], SubClassSafeGeneric):
+        ...     my_attribute: T
+        >>>
+        >>> @dataclass
+        ... class MyClass2(MyClass[int]): ...
+        >>> assert next(f for f in fields(MyClass2) if f.name == "my_attribute").type is int
+
+    ..note::
+        This class is intentionally **not** ``Generic`` itself; it only carries the field-updating
+        engine. The parameterization always comes from the subclass's own ``Generic[...]`` base, so
+        one class serves every generic shape.
     """
 
     def __init_subclass__(cls, **kwargs):
@@ -68,15 +91,57 @@ class AbstractSubClassSafeGeneric(ABC):
         substitutions = cls._get_generic_type_substitutions()
         if not substitutions:
             return
-        resolution_results = (
-            get_and_resolve_generic_type_hints_of_object_using_substitutions(
-                cls, substitutions
+        try:
+            resolution_results = (
+                get_and_resolve_generic_type_hints_of_object_using_substitutions(
+                    cls, substitutions
+                )
             )
-        )
+        except TRANSIENT_TYPE_RESOLUTION_ERRORS as error:
+            # The annotation is not resolvable yet (typically a circular import at module load). The
+            # class must stay definable; the field is narrowed later when a subclass binds the
+            # parameter to a concrete type.
+            message = (
+                f"SubClassSafeGeneric: could not resolve type hints for {cls}; "
+                f"field types will not be updated. Cause: {error}"
+            )
+            if cls._substitutions_bind_a_concrete_type(substitutions):
+                logger.warning(message)
+            else:
+                logger.debug(message)
+            return
         for name, result in resolution_results.items():
             if not result.resolved:
                 continue
             cls._update_field_kwargs(name, {"type": result.resolved_type})
+
+    @classmethod
+    def get_generic_type_parameters(cls) -> List[Type]:
+        """
+        :return: The generic type parameters of this class.
+        """
+        return get_generic_type_parameters(cls, SubClassSafeGeneric)
+
+
+    @staticmethod
+    def _substitutions_bind_a_concrete_type(
+        substitutions: Dict[Any, ResolvableType],
+    ) -> bool:
+        """
+        Report whether the substitution map assigns at least one type parameter to a concrete type,
+        rather than only renaming type variables.
+
+        When resolution fails, this distinguishes a genuine loss (a field would have been narrowed
+        to a concrete type — worth a warning) from a pure type-variable rename (a no-op).
+
+        :param substitutions: The substitution map that could not be applied.
+        :return: True if any substitution assigns a concrete type; False if every substitution only
+            renames a type variable, or the map is empty.
+        """
+        return any(
+            not isinstance(value, (TypeVar, TypeVarTuple))
+            for value in substitutions.values()
+        )
 
     @classmethod
     def _update_field_kwargs(
@@ -127,8 +192,8 @@ class AbstractSubClassSafeGeneric(ABC):
         :return: A mapping from each old generic type (as declared on the parent class) to the
             new generic type used by this class, for every position whose binding changed.
         """
-        if cls is AbstractSubClassSafeGeneric or not issubclass(
-            cls, AbstractSubClassSafeGeneric
+        if cls is SubClassSafeGeneric or not issubclass(
+            cls, SubClassSafeGeneric
         ):
             return {}
 
@@ -141,7 +206,7 @@ class AbstractSubClassSafeGeneric(ABC):
         for base in getattr(cls, "__orig_bases__", []):
             base_origin, resolved_types = cls._resolve_base_origin_and_arguments(base)
             if base_origin is None or not issubclass(
-                base_origin, AbstractSubClassSafeGeneric
+                base_origin, SubClassSafeGeneric
             ):
                 continue
 
@@ -175,9 +240,9 @@ class AbstractSubClassSafeGeneric(ABC):
         :param resolved_types: The resolved types to match against the base origin's generic parameters.
         :return: A dictionary of resolved type substitutions.
         """
-        root_parameters = get_generic_type_params(
+        root_parameters = get_generic_type_parameters(
             base_origin,
-            AbstractSubClassSafeGeneric,
+            SubClassSafeGeneric,
             include_root_generic_base=True,
             include_specialized_generic_base=False,
         )
@@ -373,40 +438,12 @@ class AbstractSubClassSafeGeneric(ABC):
         """
         origin = get_origin(base)
         if origin is None:
-            if isclass(base) and issubclass(base, AbstractSubClassSafeGeneric):
+            if isclass(base) and issubclass(base, SubClassSafeGeneric):
                 return base, ()
             return None, ()
 
         # Ensure origin is a class before calling issubclass
-        if isclass(origin) and issubclass(origin, AbstractSubClassSafeGeneric):
+        if isclass(origin) and issubclass(origin, SubClassSafeGeneric):
             return origin, get_args(base)
 
         return None, ()
-
-
-@dataclass
-class SubClassSafeGeneric(Generic[T], AbstractSubClassSafeGeneric, ABC):
-    """
-    A generic class that can be subclassed safely because it automatically updates the field types that use the generic
-     type with the new specified type.
-     Example:
-         >>> T = TypeVar("T")
-         >>> @dataclass
-         >>> class MyClass(SubClassSafeGeneric[T]):
-         >>>     my_attribute: T
-         >>>
-         >>> @dataclass
-         >>> class MyClass2(SubClassSafeGeneric[int]): ...
-         >>> assert next(f for f in fields(MyClass2) if f.name == "my_attribute").type == int)
-    """
-
-    @classmethod
-    @lru_cache
-    def get_generic_type(cls) -> Optional[Type[T]]:
-        """
-        :return: The type that is currently bound to the generic type parameter T for this class, or None if T is not bound.
-        """
-        generic_types = get_generic_type_params(cls, SubClassSafeGeneric)
-        if not generic_types:
-            return None
-        return generic_types[0]

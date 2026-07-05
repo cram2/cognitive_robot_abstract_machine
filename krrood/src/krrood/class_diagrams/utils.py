@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import inspect
 import os
 import sys
@@ -8,14 +9,20 @@ import typing
 from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
-from typing import get_args, get_origin
 from uuid import UUID
-import builtins
 
 import typing_extensions
-from typing_extensions import Callable, get_args, get_origin
-from typing_extensions import List, Optional, Type, Any, Dict, Tuple, Generic
-from typing_extensions import TypeVar, TypeVarTuple
+from typing_extensions import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    TypeVarTuple,
+    get_origin,
+)
 
 from krrood import logger
 from krrood.class_diagrams.exceptions import CouldNotResolveType
@@ -23,6 +30,7 @@ from krrood.utils import (
     ensure_hashable,
     get_scope_from_imports,
     get_full_class_name,
+    is_builtin_type,
 )
 
 
@@ -39,6 +47,22 @@ def classes_of_module(module) -> List[Type]:
         if inspect.isclass(obj) and obj.__module__ == module.__name__:
             result.append(obj)
     return result
+
+
+def behaves_like_a_built_in_type(
+    clazz: Type,
+) -> bool:
+    """
+    Return whether *clazz* should be treated as a built-in for class-diagram purposes.
+
+    :param clazz: The class to check.
+    :return: True for built-in types, :class:`uuid.UUID`, and enums.
+    """
+    return (
+        is_builtin_type(clazz)
+        or clazz == UUID
+        or (inspect.isclass(clazz) and issubclass(clazz, Enum))
+    )
 
 
 def common_base_class(types: List[Type]) -> Optional[Type]:
@@ -63,17 +87,11 @@ def common_base_class(types: List[Type]) -> Optional[Type]:
     return None
 
 
-def behaves_like_a_built_in_class(
-    clazz: Type,
-) -> bool:
-    return (
-        is_builtin_class(clazz)
-        or clazz == UUID
-        or (inspect.isclass(clazz) and issubclass(clazz, Enum))
-    )
-
-
 def is_builtin_class(clazz: Type) -> bool:
+    """
+    :param clazz: The class to check.
+    :return: Whether *clazz* is defined in the ``builtins`` module.
+    """
     return clazz.__module__ == "builtins"
 
 
@@ -147,35 +165,6 @@ def resolve_name_in_hierarchy(name: str, start_object: Any) -> Any:
 
 
 T = TypeVar("T")
-
-
-@dataclass
-class Role(Generic[T]):
-    """
-    Represents a role with generic typing. This is used in Role Design Pattern in OOP.
-
-    This class serves as a container for defining roles with associated generic
-    types, enabling flexibility and type safety when modeling role-specific
-    behavior and data.
-    """
-
-
-def get_type_hint_of_keyword_argument(callable_: Callable, name: str):
-    """
-    :param callable_: A callable to inspect
-    :param name: The name of the argument
-    :return: The type hint of the argument
-    """
-    global_namespace = (
-        callable_.__globals__ if hasattr(callable_, "__globals__") else None
-    )
-    hints = typing_extensions.get_type_hints(
-        callable_,
-        globalns=global_namespace,
-        localns=None,
-        include_extras=True,  # keeps Annotated[...] / other extras if you use them
-    )
-    return hints.get(name)
 
 
 @dataclass
@@ -360,14 +349,20 @@ def get_object_by_name_from_another_object_in_same_module(
     scope = _cached_scope_from_imports(source_path)
     if name in scope:
         return scope[name]
-    elif name in builtins.__dict__:
+    if name in builtins.__dict__:
         return builtins.__dict__[name]
-    else:
-        raise CouldNotResolveType(
-            name,
-            extra_information=f"Could not find {name} in {source_path}, could be a deprecated import statement or "
-            f"a type defined in a module that is not imported in the source file.",
-        )
+    # The cached scope can be incomplete if it was first built while a dependency was only partially
+    # initialized (a circular import during module load), which makes a TYPE_CHECKING import such as
+    # ``World`` silently unresolvable and that absence gets cached. Recompute the scope without the
+    # cache now that imports may have completed before giving up.
+    fresh_scope = get_scope_from_imports(file_path=source_path)
+    if name in fresh_scope:
+        return fresh_scope[name]
+    raise CouldNotResolveType(
+        name,
+        extra_information=f"Could not find {name} in {source_path}, could be a deprecated import statement or "
+        f"a type defined in a module that is not imported in the source file.",
+    )
 
 
 def get_class_unique_name(cls: type) -> str:

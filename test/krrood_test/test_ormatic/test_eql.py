@@ -1,4 +1,5 @@
 import pytest
+
 from sqlalchemy import select, func, case
 from sqlalchemy.exc import MultipleResultsFound
 from sqlalchemy.orm import aliased
@@ -53,8 +54,6 @@ from krrood.entity_query_language.factories import (
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
-from coraplex.robot_plans.actions.core.pick_up import PickUpAction
-from coraplex.orm.ormatic_interface import PickUpActionDAO, GraspDescriptionDAO
 from krrood.entity_query_language.query.query import UnificationDict
 
 
@@ -827,39 +826,6 @@ def test_set_of_multi_variable(session, database):
     sql_results = translator.evaluate()
     eql_results = list(query.evaluate())
     assert len(sql_results) == len(eql_results)
-
-
-def test_set_of_transitive_attributes(session):
-    """Verify that set_of with transitive attributes generates a JOIN to GraspDescriptionDAO."""
-    pu = variable(type_=PickUpAction, domain=[])
-    query = an(
-        set_of(
-            pu.arm,
-            pu.grasp_description.rotate_gripper,
-            pu.grasp_description.approach_direction,
-            pu.grasp_description.manipulation_offset,
-        )
-    )
-
-    translator = eql_to_sql(query, session)
-
-    grasp_alias = aliased(GraspDescriptionDAO, flat=True)
-
-    expected = (
-        select(PickUpActionDAO)
-        .join(
-            grasp_alias,
-            onclause=grasp_alias.database_id == PickUpActionDAO.grasp_description_id,
-        )
-        .with_only_columns(
-            PickUpActionDAO.arm,
-            grasp_alias.rotate_gripper,
-            grasp_alias.approach_direction,
-            grasp_alias.manipulation_offset,
-        )
-    )
-
-    assert str(translator.sql_query) == str(expected)
 
 
 def test_set_of_move_action_transitive(session):

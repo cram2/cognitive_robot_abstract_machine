@@ -57,4 +57,6 @@ jobs:
           cd cognitive_robot_abstract_machine
           source /opt/ros/overlay_ws/install/setup.bash
           source /opt/ros/cram-env/bin/activate
+          export QT_QPA_PLATFORM=offscreen
+          export LIBGL_ALWAYS_SOFTWARE=1
           ./${{inputs.script}}

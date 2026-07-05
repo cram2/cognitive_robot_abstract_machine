@@ -48,6 +48,11 @@ parts:
     - file: ripple_down_rules/relational_example_tutorial
     - file: ripple_down_rules/relational_example_with_decorator_tutorial
     - file: ripple_down_rules/test_driven_rdr_fitting_tutorial
+- caption: Role Pattern
+  chapters:
+    - file: patterns/role
+    - file: patterns/developer/role
+
 - caption: rustworkx_utils
   chapters:
     - file: rustworkx_utils/visualize_graph

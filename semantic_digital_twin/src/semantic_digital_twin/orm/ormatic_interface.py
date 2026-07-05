@@ -7495,16 +7495,6 @@ class UnknownPartWholeRelationshipFieldDAO(
         JSON, nullable=False, use_existing_column=True
     )
 
-    annotation_id: Mapped[int] = mapped_column(
-        ForeignKey("HasRootBodyDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    annotation: Mapped[HasRootBodyDAO] = relationship(
-        "HasRootBodyDAO", uselist=False, foreign_keys=[annotation_id], post_update=True
-    )
-
     __mapper_args__ = {
         "polymorphic_identity": "UnknownPartWholeRelationshipFieldDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
@@ -18884,7 +18874,7 @@ class CabinetDAO(
     )
 
     root_id: Mapped[int] = mapped_column(
-        ForeignKey("BodyDAO.database_id", use_alter=True),
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
@@ -18899,8 +18889,11 @@ class CabinetDAO(
         use_existing_column=True,
     )
 
-    root: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_id], post_update=True
+    root: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[root_id],
+        post_update=True,
     )
     drawers: Mapped[builtins.list[CabinetDAO_drawers_association]] = relationship(
         "CabinetDAO_drawers_association",
@@ -18991,7 +18984,7 @@ class CounterTopDAO(
     )
 
     root_id: Mapped[int] = mapped_column(
-        ForeignKey("BodyDAO.database_id", use_alter=True),
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
@@ -19006,8 +18999,11 @@ class CounterTopDAO(
         use_existing_column=True,
     )
 
-    root: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_id], post_update=True
+    root: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[root_id],
+        post_update=True,
     )
     sink: Mapped[SinkDAO] = relationship(
         "SinkDAO", uselist=False, foreign_keys=[sink_id], post_update=True
@@ -19065,7 +19061,7 @@ class DrawerDAO(
     )
 
     root_id: Mapped[int] = mapped_column(
-        ForeignKey("BodyDAO.database_id", use_alter=True),
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
@@ -19085,8 +19081,11 @@ class DrawerDAO(
         use_existing_column=True,
     )
 
-    root: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_id], post_update=True
+    root: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[root_id],
+        post_update=True,
     )
     mechanical_joint: Mapped[MechanicalJointDAO] = relationship(
         "MechanicalJointDAO",
@@ -20182,7 +20181,7 @@ class SofaDAO(
     )
 
     root_id: Mapped[int] = mapped_column(
-        ForeignKey("BodyDAO.database_id", use_alter=True),
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
@@ -20192,8 +20191,11 @@ class SofaDAO(
         use_existing_column=True,
     )
 
-    root: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_id], post_update=True
+    root: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[root_id],
+        post_update=True,
     )
     objects: Mapped[builtins.list[SofaDAO_objects_association]] = relationship(
         "SofaDAO_objects_association",
@@ -20294,7 +20296,7 @@ class TableDAO(
     )
 
     root_id: Mapped[int] = mapped_column(
-        ForeignKey("BodyDAO.database_id", use_alter=True),
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
@@ -20304,8 +20306,11 @@ class TableDAO(
         use_existing_column=True,
     )
 
-    root: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_id], post_update=True
+    root: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[root_id],
+        post_update=True,
     )
     objects: Mapped[builtins.list[TableDAO_objects_association]] = relationship(
         "TableDAO_objects_association",

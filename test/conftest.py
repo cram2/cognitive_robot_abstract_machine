@@ -26,7 +26,7 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
 )
 from typing_extensions import Type
 
-from krrood.class_diagrams import ClassDiagram
+from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,

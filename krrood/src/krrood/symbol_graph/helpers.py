@@ -1,6 +1,6 @@
 from dataclasses import is_dataclass, fields
 
-from typing_extensions import Optional, Any, Type
+from typing_extensions import Optional, Any, Type, TypeVar
 
 from krrood.symbolic_math.symbolic_math import Scalar as SymbolicScalar
 from krrood.class_diagrams.class_diagram import WrappedClass, ParseError
@@ -18,6 +18,10 @@ def get_field_type_endpoint(owner_class: Type, field_name: str) -> Optional[Type
     """
     if owner_class is None:
         return None
+    if isinstance(owner_class, TypeVar):
+        owner_class = owner_class.__bound__
+        if owner_class is None:
+            return None
     wrapped_field = get_wrapped_field(owner_class, field_name)
     if wrapped_field is None:
         prop = owner_class.__dict__.get(field_name)

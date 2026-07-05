@@ -421,7 +421,7 @@ def get_path_starting_from_latest_encounter_of(
         raise PathMissingRequiredPartsError(should_contain, path)
 
 
-def get_generic_type_params(
+def get_generic_type_parameters(
     cls,
     generic_base: Type,
     include_root_generic_base: bool = True,
@@ -431,7 +431,10 @@ def get_generic_type_params(
     Given a subclass and its generic base, return the concrete type parameter(s).
 
     Example:
-        get_generic_type_params(Employee, Role) -> (<class '__main__.Person'>,)
+        get_generic_type_parameters(Employee, Role) -> [<class '__main__.Person'>]
+
+    Direct parameterizations (e.g. ``class C(B, Generic[U])``) take priority over
+    an inherited binding discovered by recursing into an unparameterized base.
 
     :param cls: The subclass to check.
     :param generic_base: The generic base class to check against.

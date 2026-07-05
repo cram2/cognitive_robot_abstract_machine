@@ -8,7 +8,7 @@ from typing_extensions import ClassVar, Generic, Optional, Type
 from krrood.entity_query_language.verbalization.fragments.base import (
     VerbalizationFragment,
 )
-from krrood.patterns.subclass_safe_generic import AbstractSubClassSafeGeneric
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
     RuleContext,
 )
@@ -20,7 +20,7 @@ from krrood.entity_query_language.verbalization.grammar.framework.planner import
 
 
 @dataclass
-class Assembler(Generic[TSymbolicExpression, TPlan], AbstractSubClassSafeGeneric):
+class Assembler(Generic[TSymbolicExpression, TPlan], SubClassSafeGeneric):
     """
     Realise an EQL *node* into a fragment, planning it first via the paired planner.
 
