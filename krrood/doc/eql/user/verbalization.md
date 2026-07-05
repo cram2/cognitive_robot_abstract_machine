@@ -21,6 +21,24 @@ Verbalization turns any EQL expression into a plain-English sentence. This is us
 - **Explainability** — surface query intent in logs, UIs, or reports.
 - **Testing** — assert on what a query *means* (its intent and structure), not just what it returns. Two queries can return the same rows on a fixture yet express different intent (e.g. `and_` vs `or_`); a verbalization assertion pins the intent regardless of the data.
 
+```{admonition} A few grammar words, in plain English
+:class: note
+
+You don't need any grammar background to read this page. A handful of terms come up now and then — here
+is what each means in plain words, with the technical name in brackets in case you're curious:
+
+- **the "X of Y" form** — *"the battery of a Robot"* (the *possessive* / *genitive*).
+- **a "that …" description** — extra words hung on a noun to describe it, as in *"the Robot **that is
+  assigned to a Mission**"* (a *relative clause*).
+- **the subject** — the thing a sentence is about, or the thing doing the action (*a Robot* in *"a Robot
+  is operational"*).
+- **active vs. passive** — the doer first (*"the Person **who owns** a Book"*) versus the thing it is
+  done to first (*"a Book **is owned by** a Person"*).
+- **"is" vs. "are"** — the verb switches to match one thing versus several (*"its salary **is** …"* vs.
+  *"their salaries **are** …"*).
+- **a "by" relation** — a field like `owned_by`, where the *other* thing does the action (its *agent*).
+```
+
 ## The Quick API
 
 The simplest way to verbalize any EQL expression is `verbalize_expression`. With no extra
@@ -76,14 +94,15 @@ print(verbalize_expression(or_(x > 10, x < 0)))
 print(verbalize_expression(not_(x > 5)))
 ```
 
-Notice the `or_` form coordinates the disjuncts with a plain *"… or …"* (inclusive — it is not
-fronted with *"either"*, which would read as exclusive-or), and chained `and_` conditions separate
-each clause with a comma and the final *"and"*.
+Notice the `or_` form joins the options with a plain *"… or …"* — an *"or"* that allows either one or
+both (an *inclusive or*). It deliberately does **not** start with *"either"*, which would suggest only
+one of them can hold. Chained `and_` conditions are separated by commas with a final *"and"*.
 
 ## Boolean and Indexed Attributes
 
-An attribute whose type is `bool` uses a predicative form — *"<nav-path> is <attribute>"* —
-rather than the possessive form used for non-boolean attributes.
+A `bool` attribute is read as a short *"… is …"* statement — *"the first task of a Worker **is
+completed**"* — instead of the *"X of Y"* form (the *possessive*, e.g. *"the battery of a Robot"*) used
+for other attributes. Grammar calls the *"is <attribute>"* form *predicative*.
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.factories import variable, not_
@@ -94,12 +113,12 @@ print(verbalize_expression(w.tasks[0].completed))
 print(verbalize_expression(not_(w.tasks[0].completed)))
 ```
 
-A numeric index like `[0]` folds into the collection noun as an ordinal, which singularizes
-(*"the first task"*, not *"the first of the tasks"*), and the terminal boolean field maps to
-*"is completed"* / *"is not completed"*.
+A numeric index like `[0]` becomes a position word — *"first"*, *"second"* (an *ordinal*) — and merges
+into the singular noun, so it reads *"the first task"* rather than *"the first of the tasks"*. The final
+yes/no field then reads *"is completed"* / *"is not completed"*.
 
-Comparing a boolean attribute to a boolean **value** folds the value into the verb's polarity,
-rather than tacking on *"is True"*:
+Comparing a yes/no attribute to a yes/no **value** builds the answer into the verb itself, rather than
+tacking on *"is True"*:
 
 ```{code-cell} ipython3
 t = variable(Task, domain=None)
@@ -113,10 +132,11 @@ boolean variable whose domain holds both values reads *"is either completed or n
 
 ## Relational Attributes
 
-When an attribute is named as a *relation* — a past participle plus a preposition, like
-`assigned_to`, `owned_by`, or `written_by` — navigating through it reads as a **relative clause**
-naming the related type, rather than the bare genitive *"the assigned_to of …"*. The preposition
-moves in front of *"which"* (*"to which"*, *"by which"*):
+Some attributes are named like a little action — a verb in its *"-ed"* form plus a small linking word
+(a *past participle* plus a *preposition*), like `assigned_to`, `owned_by`, or `written_by`. Navigating
+through one of these reads as a *"that …"* / *"which …"* description of the related thing (a *relative
+clause*), instead of the plain *"the assigned_to of …"* (the *"X of Y"* / *possessive* form). The
+linking word moves in front of *"which"* (*"to which"*, *"by which"*):
 
 ```{code-cell} ipython3
 m = variable(Mission, domain=None)
@@ -124,19 +144,19 @@ print(verbalize_expression(m.assigned_to))
 print(verbalize_expression(m.assigned_to.operational))
 ```
 
-The head noun (*"the Robot"*) is the attribute's declared type. An **agentive** *by* relation
-(`owned_by`, `written_by`) reads in the active voice with the related type as the verb's subject —
-*"the Person **who owns** a Book"*, *"the Author **who writes** a Document"* — rather than the
-passive *"the Person by which a Book is owned"*. Every other relation keeps the passive relative
-clause, the owner staying the verb's subject. When the owner is the query's subject it
-pronominalises (*"the battery of the Robot **to which it is assigned**"*, *"the Person **who owns
-it**"*). A plain noun attribute is unaffected and keeps the genitive *"the name of the department of
-an Employee"*; a noun that merely ends in a preposition (e.g. `color_in`) is not treated as a
-relation.
+The main noun (*"the Robot"*) is the attribute's declared type. A *"by"* relation (`owned_by`,
+`written_by`) — where the *other* thing does the action (its *agent*) — is read with the doer first (the
+*active* voice): *"the Person **who owns** a Book"*, *"the Author **who writes** a Document"*, rather
+than the thing-it-happens-to first (the *passive*) *"the Person by which a Book is owned"*. Every other
+relation keeps the *"… which … is <verb>"* wording. When the owner is the thing the whole query is about,
+it is referred back to with *"it"* / *"its"* the second time (rather than repeating its name):
+*"the battery of the Robot **to which it is assigned**"*, *"the Person **who owns it**"*. A plain noun
+attribute is untouched and keeps the *"X of Y"* form (*"the name of the department of an Employee"*); a
+noun that merely ends in a preposition (e.g. `color_in`) is not treated as a relation.
 
-When the robot is the **subject** of a clause — a boolean attribute, *"the Robot to which it is
-assigned is operational"* — the attributes that follow read *"its battery … its power"*, uniformly
-(once *"its"* refers to the robot it keeps it as the topic):
+When the robot is the thing the sentence is about (its *subject*) — as with a yes/no attribute, *"the
+Robot to which it is assigned is operational"* — the attributes that follow read *"its battery … its
+power"* consistently (once *"its"* points at the robot, it keeps pointing there):
 
 ```{code-cell} ipython3
 query = an(entity(m).where(
@@ -145,9 +165,9 @@ query = an(entity(m).where(
 print(verbalize_expression(query))
 ```
 
-But when the clause is *about an attribute* — *"the battery of the Robot … is greater than 5"* — the
-battery, not the robot, is its subject, so a following *"its power"* would read as the battery's
-power. To stay unambiguous the owner is spelled out instead:
+But when the sentence is *about an attribute* — *"the battery of the Robot … is greater than 5"* — the
+battery, not the robot, is what it is about, so a following *"its power"* would sound like the battery's
+power. To stay clear, the owner is spelled out instead:
 
 ```{code-cell} ipython3
 query = an(entity(m).where(m.assigned_to.battery > 5, m.assigned_to.power > 10))
@@ -156,12 +176,12 @@ print(verbalize_expression(query))
 
 ### Nesting a Related Entity's Restriction
 
-When a query **binds** a related entity through a relational attribute (``m.assigned_to == r``) and
-separately **restricts** that entity (``r.battery > 50``), the two conditions fold into one relative
-clause on the subject noun — the binding names the entity, and the entity carries its own restriction
-nested onto it — rather than an orphaned *"such that …"* clause repeating *"the Robot"*. A single
-attribute compared with an order operator reads as the compact *"with <attribute> <comparison>"*
-(other shapes keep the *"whose … is …"* form):
+When a query links a related thing through one of these relations (``m.assigned_to == r``) and
+separately puts a condition on that thing (``r.battery > 50``), the two are combined into a single
+*"that …"* description on the main noun — the relation names the thing, and its condition hangs right off
+it — rather than a separate trailing *"such that …"* sentence that repeats *"the Robot"*. A single
+attribute compared with *"greater/less than"* (an *order* comparison) reads as a short *"with <attribute>
+<comparison>"* (other shapes keep the *"whose … is …"* wording):
 
 ```{code-cell} ipython3
 r = variable(Robot, domain=None)
@@ -175,11 +195,10 @@ A comparison to `None` is read as an *absence*, not as a value. The exact wordin
 attribute:
 
 - a plain **noun** attribute reads *"<owner> **has no** <attribute>"* (*"a Pose has no orientation"*);
-- a **relational** attribute — one named as a past participle plus a preposition (`assigned_to`,
-  `owned_by`, `shipped_to`) — reads as a passive verb naming the related type:
-  *"<owner> **has not been** <verb> **any** <Type>"*. The related type is taken automatically from
-  the attribute's declared type;
-- a bare variable (no attribute to name) reads *"<subject> **does not exist"***.
+- an **action-style** attribute (the *"-ed"*-verb-plus-linking-word kind above, like `assigned_to`,
+  `owned_by`, `shipped_to`) reads as *"<owner> **has not been** <verb> **any** <Type>"* — the related
+  type is filled in automatically from the attribute's declared type;
+- a bare variable (nothing to name) reads *"<subject> **does not exist"***.
 
 ```{code-cell} ipython3
 m = variable(Mission, domain=None)
@@ -187,16 +206,17 @@ print(verbalize_expression(m.assigned_to == None))
 print(verbalize_expression(variable(Mission, domain=None) == None))
 ```
 
-Whether an attribute is "relational" is decided morphologically — the part before the preposition
-must be a real past participle — so `assigned_to` (verb) becomes the passive form while a noun that
-merely ends in a preposition (e.g. `color_in`) stays *"has no color_in"*. Inside a query the absence
-is said as its own clause (*"such that the Mission has not been assigned to any Robot"*) — it never
-folds into the *"whose …"* group, because the subject/object flip cannot sit there.
+Whether an attribute counts as *action-style* is decided by the shape of the word — the part before the
+linking word must be a real *"-ed"* verb form (a *past participle*) — so `assigned_to` (a verb) becomes
+the *"has not been assigned to"* form, while a noun that merely ends in a small word (e.g. `color_in`)
+stays *"has no color_in"*. Inside a query this absence is said as its own sentence (*"such that the
+Mission has not been assigned to any Robot"*) — it never joins the *"whose …"* group, because that would
+force the sentence to swap who-does-what, which doesn't fit there.
 
 ## Domain-Constrained Values
 
-When a value-typed variable (an `int`/`float`/`str`/`bool` or an `enum`) carries a small explicit
-domain, the verbalizer lists the candidates as *"one of …"* in value position.
+When a single-value variable (an `int`/`float`/`str`/`bool` or an `enum`) is given a small fixed set of
+allowed values, the verbalizer lists them as *"one of …"* where the value would go.
 
 ```{code-cell} ipython3
 r = variable(Robot, domain=robots)
@@ -204,9 +224,9 @@ print(verbalize_expression(r.battery == variable(int, [10, 50, 90])))
 print(verbalize_expression(r.battery == variable(int, [10, 50])))
 ```
 
-Three or more candidates use the serial comma (*"one of 10, 50, or 90"*); a pair drops it
-(*"one of 10 or 50"*).  An *entity*-typed variable's domain is its inferred population and is never
-listed — it stays *"a Robot"*.
+Three or more values use a comma before *"or"* (the *serial comma*: *"one of 10, 50, or 90"*); a pair
+drops it (*"one of 10 or 50"*).  A variable that stands for a whole object (not a single value) is never
+listed out — it stays *"a Robot"*.
 
 ## Concrete Object Values
 
@@ -227,8 +247,9 @@ specific Robot"*.
 
 ## Factoring Repeated Comparisons
 
-Two comparisons that pair the same attribute across sibling chains fold into one natural clause —
-*"the beginning and end of the period have the same month and year"* — instead of repeating each.
+Two comparisons that check the same fields on two parallel parts of an object — here a period's begin
+and end — fold into one natural sentence, *"the beginning and end of the period have the same month and
+year"*, instead of repeating each.
 
 A field whose attribute name reads awkwardly can register a `display_name` in its
 `GrammarMetadata`; the verbalizer then uses that word wherever the field appears (here `begin`
@@ -259,10 +280,10 @@ print(verbalize_expression(query))
 
 ## Underspecified Constructions (`match` / `underspecified`)
 
-An `underspecified(...)` construction is a *generative* request — *"Generate a … given that …"*.
-Several scalar assignments on one object coordinate into a single *"… respectively"* point (capped
-at three; longer or phrase-valued assignments are said separately, and a `None` becomes a
-*"has no"* point):
+An `underspecified(...)` construction asks the system to *make* something rather than find it —
+*"Generate a … given that …"*. Several single-value settings on one object are combined into one
+*"… respectively"* line (up to three; longer or phrase-length values are said separately, and a `None`
+becomes a *"has no"* line):
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.factories import underspecified
@@ -300,8 +321,8 @@ print(verbalize_expression(eql.max(t.amount_details.amount)))
 print(verbalize_expression(eql.min(t.amount_details.amount)))
 ```
 
-All aggregations use the definite article (*"the number of"*, *"the sum of"*, ...).
-The attribute chain following the aggregation uses a possessive *"of the ..."* path.
+All aggregations start with *"the"* (the *definite article*): *"the number of"*, *"the sum of"*, ….
+The attribute after it uses the *"of the ..."* (*possessive*) form.
 
 When a WHERE condition filters the *very attribute being aggregated*, that attribute is named in
 full once (in the aggregate) and the condition refers back to it as a bare *"the battery"*:
@@ -339,11 +360,10 @@ query = a(
 print(verbalize_expression(query))
 ```
 
-An **ordered** query is also a report — ordering presents *all* the (matching) results in
-sequence, which is a listing, not a hunt for one match. The subject is therefore plural, and a
-filter does not change that (it just narrows the list). A plural subject governs its predicate:
-the restricted attribute pluralises and its copula agrees (*"whose salaries are …"*), and a scalar
-possessive distributes (*"their salaries"*):
+An **ordered** query is also a report — ordering shows *all* the matching results in sequence, a listing
+rather than a hunt for one. So the subject is plural, and a filter doesn't change that (it just shortens
+the list). When there is more than one, the wording matches it: the verb becomes *"are"* (*"whose
+salaries are …"*) and a per-item value spreads to each (*"their salaries"*):
 
 ```{code-cell} ipython3
 print(verbalize_expression(an(entity(employee).ordered_by(employee.salary))))
@@ -353,14 +373,13 @@ print(verbalize_expression(
 ))
 ```
 
-The same agreement applies wherever the subject is plural — including a `limit` ranking of several
+The same matching applies wherever the subject is plural — including a `limit` that ranks several
 (*"the top three Employees … whose salaries are greater than 1000"*).
 
-A `limit` is the exception: it ranks (*"Find the top three …"*), a distinct count-bearing form.
+A `limit` is the exception: it ranks and counts (*"Find the top three …"*).
 
-A grouped query's `having` filter is fronted onto the group key as a *"whose <aggregate> is …"*
-restriction (the aggregate a determiner-less possession of the group), so it is unambiguous which
-group the condition filters:
+A grouped query's `having` filter is attached to the group name as a *"whose <total> is …"* condition
+(the total read as a plain possession of the group), so it is clear which group the condition filters:
 
 ```{code-cell} ipython3
 total = eql.sum(employee.salary)
@@ -370,7 +389,8 @@ print(verbalize_expression(
 ```
 
 A plain (non-aggregating, unordered) `set_of` stays a search and also drops the parentheses.
-Several attributes of the *same* owner fold into a shared genitive rather than repeating the owner:
+Several attributes of the *same* owner fold into one shared *"X of Y"* phrase rather than repeating the
+owner:
 
 ```{code-cell} ipython3
 print(verbalize_expression(a(set_of(employee.department, employee.name))))
@@ -413,10 +433,9 @@ query = an(entity(bt).where(bt.amount_details.amount == sum_val))
 print(verbalize_expression(query))
 ```
 
-The possessive pronoun *"its"* replaces a repeated *"of the BankTransaction"* on the
-outer condition.  The scoped aggregation automatically uses the preposition *"among"*
-and the WHERE conditions inside the sub-query continue to work (date-range folding,
-pronouns, etc.).
+The word *"its"* stands in for a repeated *"of the BankTransaction"* on the outer
+condition.  The scoped aggregation automatically uses *"among"* and the WHERE conditions
+inside the sub-query continue to work (date-range folding, pronouns, etc.).
 
 A maximum-value variant produces a similarly compact form:
 
@@ -530,15 +549,16 @@ query = a(
 print(verbalize_expression(query))
 ```
 
-The HAVING clause is fronted onto the group key as *"For each department whose <aggregate> is
-greater than 30000"* — attaching the filter to the group it restricts, rather than a trailing
-*"having …"* participle that misparses as modifying the reported population.  The GROUP BY clause
-states only the grouping key without restating the full selection tuple.
+The HAVING clause is attached to the group name as *"For each department whose <total> is
+greater than 30000"* — putting the filter on the group it restricts, rather than a trailing
+*"having …"* that would look like it describes the whole list of results.  The GROUP BY part names
+only the grouping key, without repeating the full set of selected columns.
 
 ## Colored Terminal Output
 
 For richer output in a terminal, use `VerbalizationPipeline` with a renderer (`verbalize_expression`
-itself only returns plain text). Each part of the sentence is color-coded by its semantic role.
+itself only returns plain text). Each part of the sentence is color-coded by what kind of thing it is
+(its role).
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.verbalization.pipeline import VerbalizationPipeline
@@ -612,7 +632,7 @@ HTML(VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter())).verbalize(rule
 ```
 
 The hierarchical renderer shows the **If/then** structure with each condition and conclusion
-on its own line, indented under the relevant clause.
+on its own line, indented under the relevant part.
 
 ### Deep Nesting in Hierarchical Mode
 
@@ -644,8 +664,8 @@ drawer_rule = an(entity(inference(Drawer)(
 HTML(VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter())).verbalize(drawer_rule))
 ```
 
-And a cabinet rule that aggregates over multiple drawers — notice the *aggregated* antecedent
-uses *"there are"* and the THEN clause bindings use plural *"are"*:
+And a cabinet rule that aggregates over multiple drawers — notice the *"if"* part (the condition) uses
+*"there are"* and the *"then"* part uses the plural *"are"* to match the several drawers:
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.verbalization.example_domain import Cabinet
