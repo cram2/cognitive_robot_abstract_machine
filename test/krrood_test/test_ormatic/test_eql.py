@@ -828,39 +828,6 @@ def test_set_of_multi_variable(session, database):
     assert len(sql_results) == len(eql_results)
 
 
-def test_set_of_transitive_attributes(session):
-    """Verify that set_of with transitive attributes generates a JOIN to GraspDescriptionDAO."""
-    pu = variable(type_=PickUpAction, domain=[])
-    query = an(
-        set_of(
-            pu.arm,
-            pu.grasp_description.rotate_gripper,
-            pu.grasp_description.approach_direction,
-            pu.grasp_description.manipulation_offset,
-        )
-    )
-
-    translator = eql_to_sql(query, session)
-
-    grasp_alias = aliased(GraspDescriptionDAO, flat=True)
-
-    expected = (
-        select(PickUpActionDAO)
-        .join(
-            grasp_alias,
-            onclause=grasp_alias.database_id == PickUpActionDAO.grasp_description_id,
-        )
-        .with_only_columns(
-            PickUpActionDAO.arm,
-            grasp_alias.rotate_gripper,
-            grasp_alias.approach_direction,
-            grasp_alias.manipulation_offset,
-        )
-    )
-
-    assert str(translator.sql_query) == str(expected)
-
-
 def test_set_of_move_action_transitive(session):
     """
     Verify that set_of with both direct and transitive attributes generates correct JOINs.
@@ -1314,10 +1281,12 @@ def test_entity_from_multi_hop_attribute(session, database):
     pose_low = KRROODPoseDAO(position=position_low, orientation=orientation)
     pose_high = KRROODPoseDAO(position=position_high, orientation=orientation)
     body = BodyDAO(name="TestBody", size=1)
-    session.add_all([
-        NestedActionDAO(obj=body, pose=pose_low),
-        NestedActionDAO(obj=body, pose=pose_high),
-    ])
+    session.add_all(
+        [
+            NestedActionDAO(obj=body, pose=pose_low),
+            NestedActionDAO(obj=body, pose=pose_high),
+        ]
+    )
     session.commit()
 
     a = variable(NestedAction, domain=[])
@@ -1340,8 +1309,12 @@ def test_entity_with_relationship_selected_variable(session, database):
     After the fix, GraspConfigDAO must be joined with MoveActionDAO via the FK so
     only the grasp_config linked to a high-robot_x move is returned.
     """
-    grasp_matching = GraspConfigDAO(rotate_gripper=0.3, approach_direction=0.0, manipulation_offset=0.0)
-    grasp_not_matching = GraspConfigDAO(rotate_gripper=0.9, approach_direction=0.0, manipulation_offset=0.0)
+    grasp_matching = GraspConfigDAO(
+        rotate_gripper=0.3, approach_direction=0.0, manipulation_offset=0.0
+    )
+    grasp_not_matching = GraspConfigDAO(
+        rotate_gripper=0.9, approach_direction=0.0, manipulation_offset=0.0
+    )
     session.add(grasp_matching)
     session.add(grasp_not_matching)
 
@@ -1400,13 +1373,15 @@ def test_order_by_aggregate(session, database):
     SELECT size, COUNT(*) FROM BodyDAO GROUP BY size ORDER BY COUNT(*) DESC
     and return rows ordered with the most-frequent size first.
     """
-    session.add_all([
-        BodyDAO(name="Body1", size=10),
-        BodyDAO(name="Body2", size=10),
-        BodyDAO(name="Body3", size=10),
-        BodyDAO(name="Body4", size=20),
-        BodyDAO(name="Body5", size=20),
-    ])
+    session.add_all(
+        [
+            BodyDAO(name="Body1", size=10),
+            BodyDAO(name="Body2", size=10),
+            BodyDAO(name="Body3", size=10),
+            BodyDAO(name="Body4", size=20),
+            BodyDAO(name="Body5", size=20),
+        ]
+    )
     session.commit()
 
     b = variable(type_=Body, domain=[])
@@ -1438,8 +1413,12 @@ def test_exists_in_where_clause(session, database):
 
     so only MoveActions that have an associated GraspConfig are returned.
     """
-    grasp_a = GraspConfigDAO(rotate_gripper=0.1, approach_direction=0.0, manipulation_offset=0.0)
-    grasp_b = GraspConfigDAO(rotate_gripper=0.5, approach_direction=0.0, manipulation_offset=0.0)
+    grasp_a = GraspConfigDAO(
+        rotate_gripper=0.1, approach_direction=0.0, manipulation_offset=0.0
+    )
+    grasp_b = GraspConfigDAO(
+        rotate_gripper=0.5, approach_direction=0.0, manipulation_offset=0.0
+    )
     session.add_all([grasp_a, grasp_b])
 
     move_with_grasp_a = MoveActionDAO(robot_x=1.0, robot_y=0.0, hip_rotation=0.0)

@@ -230,7 +230,7 @@ class HasRootKinematicStructureEntity(
         return self._world.get_connections_of_branch(self.root)
 
     def _kinematic_structure_entities(
-            self, visited: Set[int]
+        self, visited: Set[int]
     ) -> list[KinematicStructureEntity]:
         if id(self) in visited:
             return []
@@ -252,16 +252,16 @@ class HasRootBody(HasRootKinematicStructureEntity[TBody], ABC):
 
     @classmethod
     def create_with_new_body_in_world(
-            cls,
-            name: PrefixedName,
-            world: World,
-            world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
-            connection_limits: Optional[DegreeOfFreedomLimits] = None,
-            active_axis: Optional[Vector3] = None,
-            connection_multiplier: float = 1.0,
-            connection_offset: float = 0.0,
-            scale: Scale = None,
-            **kwargs,
+        cls,
+        name: PrefixedName,
+        world: World,
+        world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        connection_limits: Optional[DegreeOfFreedomLimits] = None,
+        active_axis: Optional[Vector3] = None,
+        connection_multiplier: float = 1.0,
+        connection_offset: float = 0.0,
+        scale: Scale = None,
+        **kwargs,
     ) -> Self:
         """
         Create a new semantic annotation with a new body in the given world.
@@ -308,15 +308,15 @@ class HasRootRegion(HasRootKinematicStructureEntity[TRegion], ABC):
 
     @classmethod
     def create_with_new_region_in_world(
-            cls,
-            name: PrefixedName,
-            world: World,
-            world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
-            connection_limits: Optional[DegreeOfFreedomLimits] = None,
-            active_axis: Optional[Vector3] = None,
-            connection_multiplier: float = 1.0,
-            connection_offset: float = 0.0,
-            **kwargs,
+        cls,
+        name: PrefixedName,
+        world: World,
+        world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        connection_limits: Optional[DegreeOfFreedomLimits] = None,
+        active_axis: Optional[Vector3] = None,
+        connection_multiplier: float = 1.0,
+        connection_offset: float = 0.0,
+        **kwargs,
     ) -> Self:
         """
         Create a new semantic annotation with a new region in the given world.
@@ -346,7 +346,7 @@ class HasRootRegion(HasRootKinematicStructureEntity[TRegion], ABC):
 
 @lru_cache(maxsize=None)
 def _wrapped_part_whole_relationship_fields(
-        cls: Type[PartWholeRelationship],
+    cls: Type[PartWholeRelationship],
 ) -> list[WrappedField]:
     """
     Filters the fields of cls for all fields marked as a part-whole relationship (by carrying an
@@ -356,9 +356,10 @@ def _wrapped_part_whole_relationship_fields(
         wrapped_part_whole_relationship_field
         for wrapped_part_whole_relationship_field in WrappedClass(cls).fields
         if IsPartWholeRelationship.of_field(
-            wrapped_part_whole_relationship_field.clazz.clazz, wrapped_part_whole_relationship_field.name
+            wrapped_part_whole_relationship_field.clazz.clazz,
+            wrapped_part_whole_relationship_field.name,
         )
-           is not None
+        is not None
     ]
 
 
@@ -383,7 +384,7 @@ class PartWholeRelationship(HasRootKinematicStructureEntity, ABC):
 
     @synchronized_attribute_modification
     def add(
-            self, part: HasRootKinematicStructureEntity, *, field_name: str = ""
+        self, part: HasRootKinematicStructureEntity, *, field_name: str = ""
     ) -> None:
         """
         Add ``part`` as a structural part, routing it to the matching part-whole relationship field
@@ -467,7 +468,7 @@ class HasMechanicalJoint(HasRootBody, PartWholeRelationship, ABC):
     """
 
     def _kinematic_structure_entities(
-            self, visited: Set[int]
+        self, visited: Set[int]
     ) -> list[KinematicStructureEntity]:
         if id(self) in visited:
             return []
@@ -567,7 +568,6 @@ class HasSink(PartWholeRelationship, ABC):
     """
 
 
-
 @dataclass(eq=False)
 class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric, ABC):
     """
@@ -588,7 +588,7 @@ class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric, AB
         self.objects.append(object)
 
     def get_objects_of_type(
-            self, object_type: Type[SemanticAnnotation]
+        self, object_type: Type[SemanticAnnotation]
     ) -> List[HasRootBody]:
         """
         Returns all objects of a given type in the semantic annotation.
@@ -616,10 +616,10 @@ class HasSupportingSurface(IsStorageSpace, ABC):
     """
 
     def calculate_supporting_surface(
-            self,
-            upward_threshold: float = 0.95,
-            clearance_threshold: float = 0.5,
-            min_surface_area: float = 0.0225,  # 15cm x 15cm
+        self,
+        upward_threshold: float = 0.95,
+        clearance_threshold: float = 0.5,
+        min_surface_area: float = 0.0225,  # 15cm x 15cm
     ) -> Optional[Region]:
         """
         Calculate the supporting surface region for the semantic annotation, add it to the world, and set
@@ -744,10 +744,10 @@ class HasSupportingSurface(IsStorageSpace, ABC):
         self.supporting_surface = region
 
     def sample_points_from_surface(
-            self,
-            body_to_sample_for: Optional[HasRootBody] = None,
-            category_of_interest: Optional[Type[SemanticAnnotation]] = None,
-            amount: int = 100,
+        self,
+        body_to_sample_for: Optional[HasRootBody] = None,
+        category_of_interest: Optional[Type[SemanticAnnotation]] = None,
+        amount: int = 100,
     ) -> List[Point3]:
         """
         Samples points from a surface around the semantic annotation. The surface is determined by the supporting
@@ -802,9 +802,9 @@ class HasSupportingSurface(IsStorageSpace, ABC):
         return [Point3(*s, reference_frame=self.supporting_surface) for s in samples]
 
     def _build_surface_sampler(
-            self,
-            category_of_interest: Optional[Type[SemanticAnnotation]] = None,
-            object_bloat: float = 0.1,
+        self,
+        category_of_interest: Optional[Type[SemanticAnnotation]] = None,
+        object_bloat: float = 0.1,
     ):
         """
         Build a probabilistic circuit representing the supporting surface, truncated by the objects on the surface,
@@ -854,10 +854,10 @@ class HasSupportingSurface(IsStorageSpace, ABC):
         return event_2d
 
     def _2d_gaussian_sampler_from_2d_sample_space(
-            self,
-            objects_of_interest: List[HasRootBody],
-            variance: float,
-            sample_space: Event,
+        self,
+        objects_of_interest: List[HasRootBody],
+        variance: float,
+        sample_space: Event,
     ) -> Optional[ProbabilisticCircuit]:
         """
         Create a Gaussian mixture model from a list of points, truncated by an event.
@@ -880,9 +880,9 @@ class HasSupportingSurface(IsStorageSpace, ABC):
         return surface_circuit
 
     def _untruncated_2d_gaussian_sampler(
-            self,
-            objects_of_interest: List[HasRootBody],
-            variance: float,
+        self,
+        objects_of_interest: List[HasRootBody],
+        variance: float,
     ) -> ProbabilisticCircuit:
         """
         Create a Gaussian mixture model from a list of points, without truncation.
@@ -946,17 +946,17 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
 
     @classmethod
     def create_with_new_body_in_world(
-            cls,
-            name: PrefixedName,
-            world: World,
-            world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
-            connection_limits: Optional[DegreeOfFreedomLimits] = None,
-            active_axis: Optional[Vector3] = None,
-            connection_multiplier: float = 1.0,
-            connection_offset: float = 0.0,
-            scale: Scale = Scale(),
-            *,
-            wall_thickness: float = 0.01,
+        cls,
+        name: PrefixedName,
+        world: World,
+        world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        connection_limits: Optional[DegreeOfFreedomLimits] = None,
+        active_axis: Optional[Vector3] = None,
+        connection_multiplier: float = 1.0,
+        connection_offset: float = 0.0,
+        scale: Scale = Scale(),
+        *,
+        wall_thickness: float = 0.01,
     ) -> Self:
         """
         Create a new semantic annotation with a new body in the given world.
@@ -1010,5 +1010,3 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
         container_event = outer_box.as_composite_set() - inner_box.as_composite_set()
 
         return container_event
-
-

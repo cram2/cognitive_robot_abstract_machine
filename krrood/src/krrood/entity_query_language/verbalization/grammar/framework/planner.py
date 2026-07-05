@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing_extensions import Generic, TypeVar
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.patterns.subclass_safe_generic import AbstractSubClassSafeGeneric
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
 TSymbolicExpression = TypeVar("TSymbolicExpression", bound=SymbolicExpression)
 """The EQL node type the assembler realises."""
@@ -16,7 +16,7 @@ TPlan = TypeVar("TPlan")
 
 
 @dataclass
-class Planner(Generic[TSymbolicExpression, TPlan], AbstractSubClassSafeGeneric):
+class Planner(Generic[TSymbolicExpression, TPlan], SubClassSafeGeneric):
     """
     Pure analysis of a single EQL *node* into a plan of type ``P``.
 
