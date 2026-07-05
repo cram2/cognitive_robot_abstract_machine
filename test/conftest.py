@@ -4,6 +4,7 @@ import os
 import sys
 import threading
 import time
+from collections import deque
 from copy import deepcopy
 
 import numpy as np
@@ -143,21 +144,69 @@ def cleanup_after_test():
     class_diagram.clear()
 
 
+def _external_root_of(world: object, max_referrer_scans: int = 500, max_depth: int = 30) -> str:
+    """Best-effort, hard-bounded search for the GC root keeping ``world`` alive.
+
+    Walks up the referrer graph toward the first module-global namespace or closure cell that
+    retains ``world``, exploring non-``semantic_digital_twin`` referrers first so the small external
+    chain is found before the world's own dense (and gc-collectable) internal graph. Capped at
+    ``max_referrer_scans`` ``gc.get_referrers`` calls, so it adds seconds and cannot hang -- unlike
+    ``objgraph.find_backref_chain``, whose unbounded walk is why it must never run here.
+    """
+    module_dicts = {
+        id(module.__dict__): name
+        for name, module in list(sys.modules.items())
+        if module is not None and getattr(module, "__dict__", None) is not None
+    }
+    ignore = {id(module_dicts)}
+    external: deque = deque([(world, (type(world).__qualname__,))])
+    internal: deque = deque()
+    seen = {id(world)}
+    scans = 0
+    while (external or internal) and scans < max_referrer_scans:
+        obj, path = external.popleft() if external else internal.popleft()
+        if len(path) > max_depth:
+            continue
+        scans += 1
+        for referrer in gc.get_referrers(obj):
+            referrer_id = id(referrer)
+            if referrer_id in seen or referrer_id in ignore:
+                continue
+            if referrer is external or referrer is internal or referrer is seen or referrer is path:
+                continue
+            if type(referrer).__name__ == "frame":
+                continue
+            seen.add(referrer_id)
+            if referrer_id in module_dicts:
+                return f"module '{module_dicts[referrer_id]}' globals -> " + " -> ".join(reversed(path))
+            if type(referrer).__name__ in ("function", "cell"):
+                return f"{type(referrer).__name__} -> " + " -> ".join(reversed(path))
+            next_path = path + (type(referrer).__qualname__,)
+            referrer_module = getattr(type(referrer), "__module__", "") or ""
+            target = internal if referrer_module.startswith("semantic_digital_twin") else external
+            target.append((referrer, next_path))
+    return f"no GC-root found within {scans} scans (frontier {len(external) + len(internal)})"
+
+
 def _describe_world_retainers(sample_size: int = 3) -> str:
     """Summarize, by type, the objects that directly reference a sample of live ``World`` objects.
 
-    This is a single-level ``gc.get_referrers`` histogram, so it is bounded and fast. A full
-    back-reference-chain search (``objgraph.find_backref_chain``) must not be used here: on the
-    large, densely connected worlds built in the ROS/physics tests it walks the whole object graph
-    and can run for hours, turning a leak *failure* into a CI *hang*.
+    Also runs a single hard-bounded :func:`_external_root_of` probe on the first leaked world to
+    name the actual GC root behind the leak. The per-world histograms are single-level
+    ``gc.get_referrers`` calls. A full back-reference-chain search (``objgraph.find_backref_chain``)
+    must not be used here: on the large, densely connected worlds built in the ROS/physics tests it
+    walks the whole object graph and can run for hours, turning a leak *failure* into a CI *hang*.
     """
     descriptions = []
-    for world in objgraph.by_type("World")[:sample_size]:
+    worlds = objgraph.by_type("World")
+    for world in worlds[:sample_size]:
         kinds: dict = {}
         for referrer in gc.get_referrers(world):
             key = type(referrer).__qualname__
             kinds[key] = kinds.get(key, 0) + 1
         descriptions.append(f"  {id(world):#x} direct referrers: {kinds}")
+    if worlds:
+        descriptions.append(f"  external root of {id(worlds[0]):#x}: {_external_root_of(worlds[0])}")
     return "\n".join(descriptions)
 
 
