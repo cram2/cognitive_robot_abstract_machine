@@ -60,15 +60,15 @@ def _hierarchical(expression) -> str:
 
 
 def test_match_opens_with_generate():
-    """A match verbalized on its own opens with *"Generate"* — the default no-backend reading is
-    generative (a construction description)."""
+    """A match verbalized on its own (no backend) opens with *"Generate"* — the default reading is
+    generative (a construction description). The query alone no longer encodes find-vs-generate;
+    that is backend-driven (see :mod:`...test_backend_performative`)."""
     assert verbalize_expression(an(Position)(x=1)).startswith("Generate")
 
 
 def test_domain_carrying_match_also_opens_with_generate():
-    """A domain-carrying ``an(...).from_(...)`` still opens with *"Generate"* by default: the query
-    alone no longer encodes find-vs-generate (that becomes backend-driven — a selective backend
-    would read *"Find"* — via a follow-up feature)."""
+    """A domain-carrying ``an(...).from_(...)`` still opens with *"Generate"* by default: the domain
+    does not by itself make it a search — that is the backend's call."""
     search = an(Position)(x=1, y=2).from_([Position(1, 2, 3)])
     assert verbalize_expression(search).startswith("Generate")
 

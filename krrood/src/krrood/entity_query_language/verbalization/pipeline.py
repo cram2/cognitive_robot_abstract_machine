@@ -33,8 +33,34 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.rendering.source_link_resolver import (
         SourceLinkResolver,
     )
+    from krrood.entity_query_language.backends import QueryBackend
+    from krrood.entity_query_language.verbalization.vocabulary.english import Directive
 
 _log = logging.getLogger(__name__)
+
+
+def directive_for_backend(backend: Optional[QueryBackend]) -> Optional[Directive]:
+    """
+    Resolve the opening directive implied by an evaluating backend.
+
+    :param backend: The backend the expression would be evaluated with, or ``None``.
+    :return: ``GENERATE`` for a generative backend, ``FIND`` for a selective one, or ``None`` when
+        no backend is given (keep the query-type default).
+    """
+    if backend is None:
+        return None
+    from krrood.entity_query_language.backends import (
+        GenerativeBackend,
+        SelectiveBackend,
+    )
+    from krrood.entity_query_language.verbalization.vocabulary.english import Directive
+
+    if isinstance(backend, GenerativeBackend):
+        return Directive.GENERATE
+    if isinstance(backend, SelectiveBackend):
+        return Directive.FIND
+    return None
+
 
 _HTML_PAGE_TEMPLATE = Template("""\
 <!DOCTYPE html>
@@ -101,6 +127,7 @@ class VerbalizationPipeline:
         self,
         expression: SymbolicExpression,
         services: Optional[MicroplanningServices] = None,
+        backend: Optional[QueryBackend] = None,
     ) -> str:
         """
         Verbalize *expression* to a string using this pipeline's renderer.
@@ -108,6 +135,9 @@ class VerbalizationPipeline:
         :param expression: Any EQL expression or query.
         :param services: Shared verbalization state; created automatically when omitted.  Pass the
             same services across calls so repeated mentions corefer (a Robot … the Robot).
+        :param backend: The backend the expression would be evaluated with. When given it decides
+            the opening verb (generative → *"Generate"*, selective → *"Find"*); when omitted the
+            verb is derived from the query type as before.
         :return: Formatted natural-language string (plain, ANSI, or HTML, per the renderer).
 
         It runs the full path — build the fragment tree, then render it — whereas
@@ -120,7 +150,9 @@ class VerbalizationPipeline:
             expression.expression.build()
         elif isinstance(expression, Query):
             expression.build()
-        fragment = self._verbalizer.build(expression, services)
+        fragment = self._verbalizer.build(
+            expression, services, performative=directive_for_backend(backend)
+        )
         return self.verbalize_fragment(fragment)
 
     def _is_html_renderer(self) -> bool:
@@ -258,11 +290,16 @@ class VerbalizationPipeline:
 _PLAIN_PIPELINE = VerbalizationPipeline.plain()
 
 
-def verbalize_expression(expression: SymbolicExpression) -> str:
+def verbalize_expression(
+    expression: SymbolicExpression, backend: Optional[QueryBackend] = None
+) -> str:
     """
     Verbalize any EQL expression into a plain-text English phrase.
 
     :param expression: Any EQL expression or query.
+    :param backend: The backend the expression would be evaluated with. When given it decides the
+        opening verb (generative → *"Generate"*, selective → *"Find"*); when omitted the verb is
+        derived from the query type as before.
     :return: Plain-text natural-language string.
 
     >>> verbalize_expression(a(entity(variable(Robot, []))))
@@ -271,4 +308,4 @@ def verbalize_expression(expression: SymbolicExpression) -> str:
     >>> verbalize_expression(a(entity(robot).where(robot.battery > 50)))
     'Find a Robot whose battery is greater than 50'
     """
-    return _PLAIN_PIPELINE.verbalize(expression)
+    return _PLAIN_PIPELINE.verbalize(expression, backend=backend)
