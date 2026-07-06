@@ -12,7 +12,7 @@ from coraplex.datastructures.enums import (
     Arms,
 )
 from coraplex.datastructures.grasp import GraspDescription
-from coraplex.motion_executor import simulated_robot, real_robot
+from coraplex.execution_environment import simulated_robot, real_robot
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.plans.plan_node import MotionNode, ActionNode
 from coraplex.robot_plans import MoveMotion

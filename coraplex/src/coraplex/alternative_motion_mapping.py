@@ -16,7 +16,7 @@ from typing_extensions import (
 from krrood.adapters.json_serializer import list_like_classes
 from krrood.ormatic.data_access_objects.base import HasGeneric
 from .datastructures.enums import ExecutionType
-from .motion_executor import MotionExecutor
+from .plans.executables import GiskardExecutable
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
 if TYPE_CHECKING:
@@ -58,7 +58,7 @@ class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
             if (
                 issubclass(alternative, motion)
                 and alternative.original_class() == robot_view.__class__
-                and MotionExecutor.execution_type
+                and GiskardExecutable.execution_type
                 in (
                     alternative.execution_type
                     if isinstance(alternative.execution_type, list_like_classes)
