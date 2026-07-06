@@ -22,7 +22,8 @@ from krrood.ripple_down_rules.utils import (
     get_types_to_import_from_type_hints,
     extract_function_or_class_from_source,
 )
-from krrood.utils import get_imports_from_types, get_scope_from_imports
+from krrood.code_generation import get_imports_from_types
+from krrood.utils import get_scope_from_imports
 
 
 def detect_available_editor() -> Optional[Editor]:
