@@ -16,6 +16,7 @@ class Person:
         self.name = name
         self.address = address
 
+
 TEST_RESULTS_DIR: str = os.path.join(os.path.dirname(__file__), "test_results")
 CACHE_FILE: str = os.path.join(TEST_RESULTS_DIR, "zoo_dataset.pkl")
 zoo_cases, _ = load_zoo_dataset(cache_file=CACHE_FILE)
@@ -32,9 +33,7 @@ class ObjectDiagramTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.cases, cls.targets = load_zoo_dataset(
-            cache_file=CACHE_FILE
-        )
+        cls.cases, cls.targets = load_zoo_dataset(cache_file=CACHE_FILE)
         cls.cq = CaseQuery(
             cls.cases[0], "species", (Species,), True, _target=cls.targets[0]
         )

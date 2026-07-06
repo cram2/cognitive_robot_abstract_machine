@@ -17,8 +17,9 @@ class RDRDecoratorsTestCase(unittest.TestCase):
 
     def test_select_objects_that_are_parts_of_robots(self):
         self.physical_object._select_parts_rdr.fit = False
-        selected_parts = self.physical_object.select_objects_that_are_parts_of_robot([self.part_3, self.robot,
-                                                                                      *self.robot.parts], self.robot)
+        selected_parts = self.physical_object.select_objects_that_are_parts_of_robot(
+            [self.part_3, self.robot, *self.robot.parts], self.robot
+        )
         for part in selected_parts:
             self.assertIn(part, self.robot.parts)
         self.assertNotIn(self.part_3, selected_parts)

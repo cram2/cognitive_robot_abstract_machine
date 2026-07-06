@@ -188,10 +188,15 @@ def annotation_class_by_label(label: str) -> Optional[type]:
     :param label: The string input from perception (e.g., "bowl_collapsable_yellowgrey").
     :return: The matching class (e.g., Bowl) or None if no match is found.
     """
+    @symbolic_function
+    def class_name_lowercased(semantic_class: type) -> str:
+        """The class's own name, lowercased, for case-insensitive label matching."""
+        return semantic_class.__name__.lower()
+
     semantic_class = variable_from(recursive_subclasses(IsPerceivable))
     matching_class = an(
         entity(semantic_class).where(
-            contains(label.lower(), semantic_class.__name__.lower())
+            contains(label.lower(), class_name_lowercased(semantic_class))
         )
     )
     return next(matching_class.evaluate(), None)

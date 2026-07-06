@@ -8,5 +8,6 @@ rm -rf test_tmp
 mkdir test_tmp
 jupytext --to notebook *.md
 mv *.ipynb test_tmp
+cp _*.py test_tmp/ 2>/dev/null || true
 cd test_tmp
 treon --thread 1 -v

@@ -102,29 +102,33 @@ rt.scene.show("jupyter")
 `add` raised nothing and put each part in the right place, because every part type matched
 exactly one part-whole relationship field of its target.
 
-## Declaring your own part-whole relationship field with `part_whole_relationship_field`
+## Declaring your own part-whole relationship field
 
 To give a custom annotation its own part-whole relationship field, declare it with
-{py:func}`semantic_digital_twin.semantic_annotations.mixins.part_whole_relationship_field` and
-inherit from `PartWholeRelationship`. The marker on the field — not where the field sits in the
-class hierarchy — is what makes it a part-whole relationship field, so a plain `field(...)` on the
-same class is simply *not* one and is ignored by `add`.
+`field(metadata=FieldMetadata(other_metadata=[IsPartWholeRelationship()]).as_dict())` and inherit
+from `PartWholeRelationship`. The `IsPartWholeRelationship` marker in the field's metadata — not
+where the field sits in the class hierarchy — is what makes it a part-whole relationship field, so a
+plain `field(...)` on the same class is simply *not* one and is ignored by `add`.
 
 ```{code-cell} ipython3
 from dataclasses import dataclass, field
 from typing import Optional
 
+from krrood.patterns.field_metadata import FieldMetadata
 from semantic_digital_twin.semantic_annotations.mixins import (
+    IsPartWholeRelationship,
     PartWholeRelationship,
     HasRootBody,
-    part_whole_relationship_field,
 )
 
 @dataclass(eq=False)
 class ControlPanel(HasRootBody, PartWholeRelationship):
     """A custom annotation that can hold a single handle as a structural part."""
 
-    handle: Optional[Handle] = part_whole_relationship_field(default=None)
+    handle: Optional[Handle] = field(
+        default=None,
+        metadata=FieldMetadata(other_metadata=[IsPartWholeRelationship()]).as_dict(),
+    )
     """A part-whole relationship field: parts of type ``Handle`` are routed here by ``add``."""
 
     label: Optional[str] = field(default=None)

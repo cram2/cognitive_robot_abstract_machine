@@ -2,9 +2,6 @@ from typing_extensions import Tuple, Union, List
 
 import numpy as np
 
-from semantic_digital_twin.datastructures.types import AnyMatrix4x4, NpMatrix4x4
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
-
 
 def shortest_angular_distance(from_angle, to_angle):
     """Given 2 angles, this returns the shortest angular

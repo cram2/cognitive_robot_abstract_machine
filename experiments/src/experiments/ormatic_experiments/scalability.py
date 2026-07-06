@@ -26,7 +26,7 @@ from experiments.experiment_definitions import (
     MeanAndStandardDeviation,
     TypstRenderer,
 )
-from krrood.class_diagrams import ClassDiagram
+from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.helper import get_classes_of_ormatic_interface
 from krrood.ormatic.ormatic import ORMatic

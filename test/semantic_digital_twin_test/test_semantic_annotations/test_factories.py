@@ -1,5 +1,5 @@
 import unittest
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
@@ -25,11 +25,12 @@ from semantic_digital_twin.orm.ormatic_interface import *
 from semantic_digital_twin.semantic_annotations.mixins import (
     PartWholeRelationship,
     HasRootBody,
-    part_whole_relationship_field,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasCaseAsRootBody,
+    IsPartWholeRelationship
 )
+from krrood.patterns.field_metadata import FieldMetadata
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     DoubleDoor,
     Floor,
@@ -977,8 +978,14 @@ class _AnnotationWithOverlappingPartWholeRelationshipFields(
     (``Hinge`` is a subclass of ``MechanicalJoint``), so a ``Hinge`` matches both.
     """
 
-    joint: Optional[MechanicalJoint] = part_whole_relationship_field(default=None)
-    specific_joint: Optional[Hinge] = part_whole_relationship_field(default=None)
+    joint: Optional[MechanicalJoint] = field(
+        default=None,
+        metadata=FieldMetadata(other_metadata=[IsPartWholeRelationship()]).as_dict(),
+    )
+    specific_joint: Optional[Hinge] = field(
+        default=None,
+        metadata=FieldMetadata(other_metadata=[IsPartWholeRelationship()]).as_dict(),
+    )
 
 
 def _world_with_root() -> World:

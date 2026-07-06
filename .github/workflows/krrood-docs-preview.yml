@@ -1,0 +1,89 @@
+name: krrood Docs Preview
+
+# Purpose
+# -------
+# Builds ONLY the krrood Jupyter-Book docs and deploys them to this fork's GitHub Pages, so a
+# reviewer can read the *rendered* documentation — executed notebooks, cross-references, the
+# verbalization examples — instead of raw Markdown while reviewing a pull request.
+#
+# Why a separate workflow (not the aggregate `Build Documentation` / build_all_docs.yml):
+#   * It builds krrood's book on its own, so it does NOT pull in the other workspace packages or
+#     their heavy (ROS / container) dependencies — it is fast and self-contained.
+#   * It gives a per-branch live preview URL for doc review, which the aggregate deploy (run on the
+#     default branch) does not provide.
+#
+# Pointing it at your branch
+# --------------------------
+# A krrood PR that adds or changes docs should build *its own* branch. Either:
+#   * trigger a one-off run from the Actions tab (workflow_dispatch) and pick your branch — no file
+#     edit needed; or
+#   * change the branch under `on.push.branches` below to your PR branch.
+#
+# One-time setup: enable Pages on the fork — Settings → Pages → Source: "GitHub Actions".
+# After a successful run the docs are at:
+#   https://<owner>.github.io/cognitive_robot_abstract_machine/
+#   (e.g. the verbalization page at  eql/user/verbalization.html)
+
+on:
+  push:
+    branches:
+      - eql_verbalization
+  workflow_dispatch: {}
+
+# Serialize Pages deployments so concurrent runs do not race.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+
+      - name: Initialize submodules explicitly
+        run: |
+          git config --global --add safe.directory "*"
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install Graphviz
+        run: |
+          sudo apt-get update
+          sudo apt-get install graphviz libgraphviz-dev -y
+
+      - name: Install dependencies
+        run: |
+          # Mirror the reusable doc build: uv resolves the workspace editable and the doc tooling
+          # comes from the root project's "doc" extra; pygraphviz needs the apt headers above.
+          pip install -U pip uv
+          uv sync --extra doc
+          uv pip install pybind11 pygraphviz
+
+      - name: Build the krrood book
+        run: uv run --no-sync jupyter-book build krrood/doc
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: krrood/doc/_build/html
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
