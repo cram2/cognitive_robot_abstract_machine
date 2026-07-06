@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from typing_extensions import TYPE_CHECKING, Optional
+
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.verbalization.microplanning.binding_scope import (
     BindingScope,
 )
+
+if TYPE_CHECKING:
+    from krrood.entity_query_language.verbalization.vocabulary.english import Directive
 from krrood.entity_query_language.verbalization.microplanning.config import (
     RenderConfiguration,
 )
@@ -37,6 +42,13 @@ class MicroplanningServices:
 
     microplan: Microplan = field(default_factory=Microplan)
     """The plan read model — each node's plan computed once and shared (lazy / memoised)."""
+
+    performative_override: Optional[Directive] = None
+    """
+    An explicit opening directive (``Find`` / ``Generate``) chosen by the caller — typically
+    resolved from the evaluating backend (generative → ``Generate``, selective → ``Find``). When
+    set it overrides the query-type default; ``None`` keeps the default derived from the query.
+    """
 
     @classmethod
     def from_expression(cls, expression: SymbolicExpression) -> MicroplanningServices:
