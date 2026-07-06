@@ -32,7 +32,6 @@ from krrood.entity_query_language.factories import (
     variable,
     variable_from,
     flat_variable,
-    match_variable,
     inference,
     for_all,
     exists,
@@ -1322,11 +1321,12 @@ def test_verbalize_nested_rule(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_connection = variable(PrismaticConnection, world.connections)
-    fixed_connection = match_variable(FixedConnection, world.connections)(
+    fixed_connection = an(FixedConnection).from_(world.connections)(
         parent=prismatic_connection.child, child=handle
     )
     drawer_var = inference(Drawer)(
-        container=fixed_connection.parent, handle=fixed_connection.child
+        container=fixed_connection.expression.parent,
+        handle=fixed_connection.expression.child,
     )
     # Wrap in entity() to trigger the if/then rule form
     text = verbalize_expression(entity(drawer_var))
@@ -1355,11 +1355,12 @@ def test_verbalize_inference_rule_golden(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_connection = variable(PrismaticConnection, world.connections)
-    fixed_connection = match_variable(FixedConnection, world.connections)(
+    fixed_connection = an(FixedConnection).from_(world.connections)(
         parent=prismatic_connection.child, child=handle
     )
     drawer_var = inference(Drawer)(
-        container=fixed_connection.parent, handle=fixed_connection.child
+        container=fixed_connection.expression.parent,
+        handle=fixed_connection.expression.child,
     )
     assert verbalize_expression(entity(drawer_var)) == (
         "If there's a FixedConnection whose parent is the child of a PrismaticConnection, "
@@ -1697,11 +1698,12 @@ def test_verbalize_inference_repeated_entity_article(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_connection = variable(PrismaticConnection, world.connections)
-    fixed_connection = match_variable(FixedConnection, world.connections)(
+    fixed_connection = an(FixedConnection).from_(world.connections)(
         parent=prismatic_connection.child, child=handle
     )
     drawer = inference(Drawer)(
-        container=fixed_connection.parent, handle=fixed_connection.child
+        container=fixed_connection.expression.parent,
+        handle=fixed_connection.expression.child,
     )
     text = verbalize_expression(drawer)
 
@@ -1740,11 +1742,12 @@ def test_verbalize_double_nested_constraint_stack(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_connection = variable(PrismaticConnection, world.connections)
-    fixed_connection = match_variable(FixedConnection, world.connections)(
+    fixed_connection = an(FixedConnection).from_(world.connections)(
         parent=prismatic_connection.child, child=handle
     )
     drawer_var = inference(Drawer)(
-        container=fixed_connection.parent, handle=fixed_connection.child
+        container=fixed_connection.expression.parent,
+        handle=fixed_connection.expression.child,
     )
     wrapper_var = inference(Wrapper)(drawer=drawer_var)
     text = verbalize_expression(wrapper_var)
@@ -1774,21 +1777,22 @@ def test_verbalize_double_nested_with_outer_entity(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_connection = variable(PrismaticConnection, world.connections)
-    fixed_connection = match_variable(FixedConnection, world.connections)(
+    fixed_connection = an(FixedConnection).from_(world.connections)(
         parent=prismatic_connection.child, child=handle
     )
     drawer_var = inference(Drawer)(
-        container=fixed_connection.parent, handle=fixed_connection.child
+        container=fixed_connection.expression.parent,
+        handle=fixed_connection.expression.child,
     )
 
     # A second entity used directly by the outer Wrapper
     handle2 = variable(Handle, world.bodies)
     pc2 = variable(PrismaticConnection, world.connections)
-    fc2 = match_variable(FixedConnection, world.connections)(
-        parent=pc2.child, child=handle2
-    )
+    fc2 = an(FixedConnection).from_(world.connections)(parent=pc2.child, child=handle2)
 
-    wrapper_var = inference(Wrapper)(drawer=drawer_var, connection=fc2.parent)
+    wrapper_var = inference(Wrapper)(
+        drawer=drawer_var, connection=fc2.expression.parent
+    )
     text = verbalize_expression(wrapper_var)
 
     assert "a Wrapper" in text

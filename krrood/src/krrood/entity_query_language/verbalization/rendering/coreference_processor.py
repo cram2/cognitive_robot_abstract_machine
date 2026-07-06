@@ -319,7 +319,7 @@ class CoreferenceProcessor(RealizationPass):
         spell-out choice :meth:`_possessive_chain` makes for a navigation chain, but for a coordinated
         attribute list whose owner has no further hops (e.g. a *"predict"* point on the selection).
 
-        >>> verbalize_expression(underspecified(Robot)(name="R2", battery=...))
+        >>> verbalize_expression(an(Robot)(name="R2", battery=...))
         "Generate a Robot and predict its battery value given that its name is 'R2'"
         """
         if self._owner_is_subject(owned):
