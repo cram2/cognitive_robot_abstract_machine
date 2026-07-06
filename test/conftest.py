@@ -151,9 +151,73 @@ def count_worlds():
     gc.collect()
     world_in_mem = objgraph.count("World")
     if world_in_mem > 30:
+        _report_world_leak(world_in_mem)
         raise MemoryError(
             "Something is leaking worlds, there are more than 20 worlds in memory after the test"
         )
+
+
+def _report_world_leak(world_in_mem: int) -> None:
+    """
+    Print diagnostics that pin the object retaining the leaked worlds.
+
+    For a small sample of surviving worlds this walks the reference graph back to the first
+    module/type it can reach — i.e. the process-global holder that keeps the world alive across
+    tests — so the leak can be traced from a single CI run.
+    """
+    import sys
+    import types
+
+    print(
+        f"\n[world-leak] {world_in_mem} World objects survived gc.collect()",
+        file=sys.stderr,
+    )
+
+    worlds = objgraph.by_type("World")
+
+    def owner_description(referrer) -> str:
+        """Describe *referrer*; for a bare container, describe what owns that container."""
+        if isinstance(referrer, types.FrameType):
+            return f"frame:{referrer.f_code.co_qualname}"
+        if not isinstance(referrer, (list, dict, tuple, set)):
+            return type(referrer).__name__
+        for owner in gc.get_referrers(referrer):
+            if owner is worlds or owner is referrer:
+                continue
+            if isinstance(owner, types.FrameType):
+                return f"{type(referrer).__name__} in frame:{owner.f_code.co_qualname}"
+            return f"{type(referrer).__name__} owned by {type(owner).__name__}"
+        return f"{type(referrer).__name__}(unowned)"
+
+    referrer_type_histogram: dict[str, int] = {}
+    for world in worlds:
+        for referrer in gc.get_referrers(world):
+            description = owner_description(referrer)
+            referrer_type_histogram[description] = (
+                referrer_type_histogram.get(description, 0) + 1
+            )
+    print(
+        "[world-leak] who holds the surviving worlds (container owned by):",
+        file=sys.stderr,
+    )
+    for description, count in sorted(
+        referrer_type_histogram.items(), key=lambda item: -item[1]
+    ):
+        print(f"    {count:5d}  {description}", file=sys.stderr)
+
+    def is_global_root(candidate) -> bool:
+        return isinstance(candidate, (types.ModuleType, type))
+
+    for index, world in enumerate(worlds[:3]):
+        chain = objgraph.find_backref_chain(
+            world, is_global_root, max_depth=25
+        )
+        print(f"[world-leak] backref chain for world #{index}:", file=sys.stderr)
+        for link in chain:
+            print(
+                f"    {type(link).__module__}.{type(link).__name__}: {repr(link)[:100]}",
+                file=sys.stderr,
+            )
 
 
 #############################################
