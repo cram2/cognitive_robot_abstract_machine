@@ -774,6 +774,21 @@ class Query(
             return self._expression_._conditions_root_
         return SymbolicExpression._conditions_root_.fget(self)
 
+    @property
+    def _all_expressions_(self) -> Iterator[SymbolicExpression]:
+        """
+        Traverse the whole node tree through the compiled product.
+
+        A spec holds only its selected variables and modifiers; the ``where`` / ``having``
+        conditions (and the variables they introduce) live in the compiled product. Delegating the
+        traversal keeps the spec behaving like its product, so consumers that scan every node — for
+        example verbalization's referent disambiguation — also see condition-only referents.
+        """
+        self.build()
+        if not self._is_compiled_product_:
+            return self._expression_._all_expressions_
+        return SymbolicExpression._all_expressions_.fget(self)
+
     @UnaryExpression._parent_.setter
     def _parent_(self, parent: SymbolicExpression):
         """
