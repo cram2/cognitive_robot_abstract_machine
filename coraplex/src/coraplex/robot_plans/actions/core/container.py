@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from copy import deepcopy
 from dataclasses import dataclass
 
-import numpy as np
 from typing_extensions import Any, Dict
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.factories import and_, ConditionType
+from krrood.entity_query_language.core.variable import Variable
+from krrood.entity_query_language.factories import (
+    and_,
+    or_,
+    variable_from,
+    ConditionType,
+)
 from coraplex.config.action_conf import ActionConfig
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
@@ -16,8 +20,9 @@ from coraplex.datastructures.enums import (
     VerticalAlignment,
 )
 from coraplex.datastructures.grasp import GraspDescription
-from coraplex.locations.pose_validator import IsReachableBy
+from coraplex.locations.pose_validator import IsObjectReachableBy
 from coraplex.plans.factories import sequential
+from coraplex.plans.plan_node import PlanNode
 from coraplex.querying.predicates import GripperIsFree
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.actions.core.pick_up import GraspingAction
@@ -25,9 +30,9 @@ from coraplex.robot_plans.motions.container import OpeningMotion, ClosingMotion
 from coraplex.robot_plans.motions.gripper import MoveGripperMotion
 from coraplex.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.reasoning.predicates import allclose
 from semantic_digital_twin.reasoning.robot_predicates import is_body_in_gripper
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -51,7 +56,8 @@ class OpenAction(ActionDescription):
     The distance in meters the gripper should be at in the x-axis away from the handle.
     """
 
-    def execute(self) -> None:
+    @property
+    def _action_plan(self) -> PlanNode:
         arm = ViewManager.get_arm_view(self.arm, self.robot)
         end_effector = arm.end_effector
 
@@ -61,55 +67,44 @@ class OpenAction(ActionDescription):
             end_effector,
         )
 
-        self.add_subplan(
-            sequential(
-                [
-                    GraspingAction(self.object_designator, self.arm, grasp_description),
-                    OpeningMotion(self.object_designator, self.arm),
-                    MoveGripperMotion(
-                        GripperState.OPEN, self.arm, allow_gripper_collision=True
-                    ),
-                ]
-            )
-        ).perform()
+        return sequential(
+            [
+                GraspingAction(self.object_designator, self.arm, grasp_description),
+                OpeningMotion(self.object_designator, self.arm),
+                MoveGripperMotion(
+                    GripperState.OPEN, self.arm, allow_gripper_collision=True
+                ),
+            ]
+        )
 
     @staticmethod
     def pre_condition(
-        variables, context: Context, kwargs: Dict[str, Any]
+        variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> ConditionType:
         """
         The gripper with which to open the container has to be free and the handle has to be reachable.
         """
-        test_world = deepcopy(context.world)
-        test_robot: AbstractRobot = test_world.get_semantic_annotation_by_id(
-            context.robot.id
+        end_effector = ViewManager.get_end_effector_view(
+            variables["arm"], context.robot
         )
-        end_effector = ViewManager.get_end_effector_view(variables["arm"], test_robot)
-
         return and_(
             GripperIsFree(end_effector),
-            IsReachableBy(
+            IsObjectReachableBy(
                 context=Context(
-                    world=test_world,
-                    robot=test_world.get_semantic_annotations_by_type(
-                        type(context.robot)
-                    )[0],
+                    robot=context.robot,
+                    world=context.world,
                     alternative_motion_mappings=context.alternative_motion_mappings,
                 ),
-                pose=kwargs["object_designator"].global_pose,
-                tip_link=end_effector.tool_frame,
-                grasp_description=GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.NoAlignment,
-                    next(end_effector.evaluate()),
-                ),
+                arm=kwargs["arm"],
+                object_designator=kwargs["object_designator"],
+                as_single_grasp=True,
             ),
         )
 
     @staticmethod
     def post_condition(
-        variables, context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression | bool:
+        variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
+    ) -> ConditionType:
         """
         The handle has to be in the gripper of the robot and the container has to be open.
         """
@@ -117,16 +112,22 @@ class OpenAction(ActionDescription):
         parent_connection = kwargs[
             "object_designator"
         ].get_first_parent_connection_of_type(ActiveConnection1DOF)
-        return (
-            is_body_in_gripper(kwargs["object_designator"], end_effector) > 0.9
-            or np.allclose(
-                kwargs["object_designator"].global_pose.to_position(),
-                ViewManager.get_end_effector_view(
-                    kwargs["arm"], context.robot
-                ).tool_frame.global_pose.to_position(),
-                atol=3e-2,
-            )
-        ) and bool(parent_connection.position > 0.3)
+        return and_(
+            or_(
+                is_body_in_gripper(
+                    variable_from(kwargs["object_designator"]), end_effector
+                )
+                > 0.9,
+                allclose(
+                    variable_from(
+                        kwargs["object_designator"]
+                    ).global_pose.to_position(),
+                    variable_from(end_effector.tool_frame).global_pose.to_position(),
+                    atol=3e-2,
+                ),
+            ),
+            variable_from(parent_connection).position > 0.3,
+        )
 
 
 @dataclass
@@ -148,7 +149,8 @@ class CloseAction(ActionDescription):
     The distance in meters between the gripper and the handle before approaching to grasp.
     """
 
-    def execute(self) -> None:
+    @property
+    def _action_plan(self) -> PlanNode:
         arm = ViewManager.get_arm_view(self.arm, self.robot)
         end_effector = arm.end_effector
 
@@ -158,21 +160,19 @@ class CloseAction(ActionDescription):
             end_effector,
         )
 
-        self.add_subplan(
-            sequential(
-                [
-                    GraspingAction(self.object_designator, self.arm, grasp_description),
-                    ClosingMotion(self.object_designator, self.arm),
-                    MoveGripperMotion(
-                        GripperState.OPEN, self.arm, allow_gripper_collision=True
-                    ),
-                ]
-            )
-        ).perform()
+        return sequential(
+            [
+                GraspingAction(self.object_designator, self.arm, grasp_description),
+                ClosingMotion(self.object_designator, self.arm),
+                MoveGripperMotion(
+                    GripperState.OPEN, self.arm, allow_gripper_collision=True
+                ),
+            ]
+        )
 
     @staticmethod
     def post_condition(
-        variables, context: Context, kwargs: Dict[str, Any]
+        variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> SymbolicExpression | bool:
         """
         The container has to be closed
@@ -181,4 +181,4 @@ class CloseAction(ActionDescription):
             "object_designator"
         ].get_first_parent_connection_of_type(ActiveConnection1DOF)
 
-        return bool(close_connection.position < 0.1)
+        return variable_from(close_connection).position < 0.1

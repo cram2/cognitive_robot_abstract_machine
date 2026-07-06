@@ -29,6 +29,7 @@ from semantic_digital_twin.robots.pr2 import (
     PR2KinectV1,
 )
 from semantic_digital_twin.robots.robot_parts import KinematicChain
+from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.spatial_computations.ik_solver import (
     MaxIterationsException,
@@ -642,6 +643,27 @@ def test_robots_and_validate(supported_abstract_robots):
         world = URDFParser.from_file(abstract_robot.get_ros_file_path()).parse()
         robot = abstract_robot.from_world(world)
         robot.validate()
+
+
+def test_kinematic_chain_approximate_length(pr2_world_state_reset):
+    # Retrieve the PR2 robot from the world
+    robot = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+
+    left_arm_length = robot.left_arm.approximate_length()
+
+    assert 1.0 < left_arm_length <= 1.1
+
+    right_arm_length = robot.right_arm.approximate_length()
+
+    assert 1.0 < right_arm_length <= 1.1
+
+
+def test_kinematic_chain_length_stretch(stretch_apartment_world):
+    robot = stretch_apartment_world.get_semantic_annotations_by_type(Stretch)[0]
+
+    arm_length = robot.get_arms()[0].approximate_length()
+
+    assert arm_length < 1.3
 
 
 def test_pr2_automatic_setup_correctly(pr2_world_state_reset):

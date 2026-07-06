@@ -65,7 +65,7 @@ class GraspDescription:
     The offset between the center of the pose in the grasp sequence
     """
 
-    def _pose_sequence(
+    def pose_sequence(
         self, target_T_grasp_pose: Pose, body: Body = None, reverse: bool = False
     ) -> List[Pose]:
         """
@@ -151,7 +151,7 @@ class GraspDescription:
         :param body: The body of the grasp.
         :return: The pose sequence.
         """
-        return self._pose_sequence(Pose(reference_frame=body), body)
+        return self.pose_sequence(Pose(reference_frame=body), body)
 
     def place_pose_sequence(self, pose: Pose) -> List[Pose]:
         """
@@ -162,7 +162,7 @@ class GraspDescription:
         :return: The pose sequence.
         """
         body = self.end_effector.tool_frame.child_kinematic_structure_entities[0]
-        return self._pose_sequence(pose, body, reverse=True)
+        return self.pose_sequence(pose, body, reverse=True)
 
     def manipulation_axis(self) -> List[float]:
         """

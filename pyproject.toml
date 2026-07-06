@@ -32,7 +32,7 @@ dev = [
     "pytest-asyncio>=0.23.0,<0.24.0",
     "pytest-xdist",
     "objgraph",
-
+    "bokeh",
 ]
 
 # Requirements for building the documentation of all sub-packages.
@@ -59,7 +59,10 @@ doc = [
     "graphviz",
     "polytope",
     "ortools",
-    "cvxopt"
+    "cvxopt",
+    "treon",
+    "jupytext",
+    "jupyterquiz",
 ]
 
 [tool.uv.workspace]

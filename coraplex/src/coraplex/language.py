@@ -7,22 +7,32 @@ import threading
 import time
 from abc import ABC
 from dataclasses import dataclass, field
-from queue import Queue
-
 from typing_extensions import (
     Optional,
     Callable,
     Any,
     List,
     Union,
+    Type,
 )
 
+from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
+from giskardpy.motion_statechart.graph_node import Goal
+from coraplex.language_giskard_templates import TryAll, TryInOrder
+from coraplex.plans.executables import (
+    GiskardExecutable,
+    Executable,
+    ModelChangeExecutable,
+)
 from coraplex.datastructures.enums import TaskStatus, MonitorBehavior
+from coraplex.plans.attachment_nodes import ModelChangeNode
 from coraplex.plans.failures import PlanFailure, AllChildrenFailed
 from coraplex.fluent import Fluent
 from coraplex.plans.plan_node import (
     PlanNode,
+    UnderspecifiedNode,
 )
+from coraplex.utils import split_list_by_type
 
 logger = logging.getLogger(__name__)
 
@@ -35,17 +45,62 @@ class LanguageNode(PlanNode, ABC):
     way.
     """
 
+    motion_state_chart_template: Type[Goal] = field(kw_only=True, default=Sequence)
+    """
+    Giskard template which this language expression translates to
+    """
+
     def simplify(self):
         for child in self.children:
             if type(child) != type(self):
                 continue
 
-            for grand_child in child.children:
-                self.plan.add_edge(
-                    self, grand_child, child.layer_index + grand_child.layer_index
+            self.merge(child)
+
+    def notify(self):
+        for child in self.children:
+            child.notify()
+
+    def parse(self) -> Executable:
+        # Nodes that do not parse into a single motion chart (model changes, and
+        # underspecified nodes that are only grounded during execution) split the
+        # plan into sequential execution groups instead of one merged chart.
+        if any(
+            isinstance(child, (ModelChangeNode, UnderspecifiedNode))
+            for child in self.descendants
+        ):
+            return self.parse_with_non_giskard_executable()
+        child_execs = [child.parse() for child in self.children]
+
+        return GiskardExecutable(
+            motion_mappings=self.merge_motion_mappings(child_execs),
+            context=self.plan.context,
+        )
+
+    def parse_with_non_giskard_executable(self) -> Executable:
+        """
+        Build an executable whose execution list keeps non-giskard executables
+        (model changes, deferred underspecified nodes) as sequential boundaries,
+        merging only the consecutive giskard executables between them.
+        """
+        child_executables = [node.parse() for node in self.children]
+
+        giskard_exec_groups = split_list_by_type(child_executables, GiskardExecutable)
+
+        exec_list = []
+
+        for group in giskard_exec_groups:
+            if isinstance(group[0], GiskardExecutable):
+                exec_list.append(
+                    GiskardExecutable(
+                        motion_mappings=self.merge_motion_mappings(group),
+                        context=self.plan.context,
+                    )
                 )
-            self.plan.plan_graph.remove_edge(self.index, child.index)
-            self.plan.remove_node(child)
+            else:
+                exec_list.extend(group)
+
+        return Executable(execution_list=exec_list, context=self.plan.context)
 
 
 @dataclass
@@ -53,10 +108,6 @@ class ExecutesSequentially(LanguageNode):
     """
     Base class for nodes that execute their children sequentially.
     """
-
-    def _perform(self):
-        result = [child.perform() for child in self.children]
-        return result
 
 
 @dataclass
@@ -74,11 +125,11 @@ class ExecutesInParallel(LanguageNode, ABC):
         """
         threads = []
         for child in nodes:
-            t = threading.Thread(
+            thread = threading.Thread(
                 target=child.perform,
             )
-            t.start()
-            threads.append(t)
+            thread.start()
+            threads.append(thread)
 
         for thread in threads:
             thread.join()
@@ -90,6 +141,8 @@ class SequentialNode(ExecutesSequentially):
     Executes all children sequentially. Any failure is immediately raised.
     """
 
+    motion_state_chart_template = Sequence
+
 
 @dataclass
 class ParallelNode(ExecutesInParallel):
@@ -98,7 +151,9 @@ class ParallelNode(ExecutesInParallel):
     All exceptions are raised after all children have finished.
     """
 
-    def _perform(self):
+    motion_state_chart_template = Parallel
+
+    def notify(self):
         self._perform_parallel(self.children)
         for child in self.children:
             if child.status == TaskStatus.FAILED:
@@ -116,9 +171,9 @@ class RepeatNode(ExecutesSequentially):
     The number of repetitions of the children.
     """
 
-    def _perform(self):
+    def notify(self):
         for _ in range(self.repetitions):
-            super()._perform()
+            super().notify()
 
 
 @dataclass(eq=False)
@@ -147,9 +202,12 @@ class MonitorNode(ExecutesSequentially):
     Thread for the subplan that is monitored.
     """
 
+    kill_event: threading.Event = field(init=False, default_factory=threading.Event)
+    """
+    Event used to stop the monitoring thread once the children have finished.
+    """
+
     def __post_init__(self):
-        self.kill_event = threading.Event()
-        self.exception_queue = Queue()
         if self.behavior == MonitorBehavior.RESUME:
             self.pause()
         if callable(self.condition):
@@ -160,8 +218,8 @@ class MonitorNode(ExecutesSequentially):
         )
         self._monitor_thread.start()
 
-    def _perform(self):
-        super()._perform()
+    def notify(self):
+        super().notify()
         self.kill_event.set()
         self._monitor_thread.join()
 
@@ -187,12 +245,14 @@ class TryInOrderNode(ExecutesSequentially):
     Tries all children in order sequentially and fails if all children fail.
     """
 
-    def _perform(self):
+    motion_state_chart_template = TryInOrder
+
+    def notify(self):
         for child in self.children:
             try:
                 child.perform()
-            except PlanFailure as e:
-                pass
+            except PlanFailure:
+                continue
         failed = all([child.status == TaskStatus.FAILED for child in self.children])
         if failed:
             raise AllChildrenFailed(self)
@@ -205,7 +265,9 @@ class TryAllNode(ExecutesInParallel):
     Only raise a failure if all children fail.
     """
 
-    def _perform(self):
+    motion_state_chart_template = TryAll
+
+    def notify(self):
         self._perform_parallel(self.children)
         failed = all([child.status == TaskStatus.FAILED for child in self.children])
         if failed:
@@ -221,5 +283,5 @@ class CodeNode(LanguageNode):
 
     code: Callable = field(default_factory=lambda: lambda: None, kw_only=True)
 
-    def _perform(self) -> Any:
+    def notify(self) -> Any:
         return self.code()

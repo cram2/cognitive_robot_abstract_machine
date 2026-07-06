@@ -36,11 +36,11 @@ from coraplex.orm.ormatic_interface import *
 coraplex.orm.ormatic_interface.Base.metadata.create_all(engine)
 ```
 
-Next, we will write a simple plan where the robot parks its arms, moves somewhere, picks up an object, navigates somewhere else, and places it. 
+Next, we will write a simple plan where the robot parks its arms, moves somewhere, picks up an object, navigates somewhere else, and places it.
 
 ```python
 from coraplex.robot_plans import *
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.robot_plans.actions.composite.transporting import TransportAction, MoveTorsoAction
 from coraplex.datastructures.enums import Arms, Grasp
 from coraplex.plans.factories import *
@@ -48,23 +48,22 @@ from coraplex.testing import setup_world
 from semantic_digital_twin.robots.pr2 import PR2, TorsoState
 from coraplex.datastructures.dataclasses import Context
 
-
 world = setup_world()
 pr2_view = PR2.from_world(world)
 context = Context(world, pr2_view)
 
 description = TransportAction(world.get_body_by_name("milk.stl"),
-                                         Pose.from_xyz_quaternion(3.1, 2.2, 0.95,
-                                                                0.0, 0.0, 1.0, 0.0, reference_frame=world.root),
-                                         Arms.LEFT)
+                              Pose.from_xyz_quaternion(2.4, 2.8, 1,
+                                                       0.0, 0.0, 0.0, 1.0, reference_frame=world.root),
+                              Arms.LEFT)
 plan = sequential([MoveTorsoAction(TorsoState.HIGH),
-        description], context=context).plan
+                   description], context=context).plan
 with simulated_robot:
     plan.perform()
 ```
 
 The data obtained throughout the plan execution, including robot states, poses, action descriptions and more will be
-logged into the database once we insert the plan .
+logged into the database once we insert the plan.
 
 ```python
 from krrood.ormatic.data_access_objects.helper import to_dao, get_dao_class

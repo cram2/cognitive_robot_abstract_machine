@@ -4,21 +4,17 @@ import numpy as np
 import pytest
 
 import experiments.orm.ormatic_interface  # type: ignore
-from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
-from krrood.entity_query_language.factories import underspecified
-from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from coraplex.datastructures.dataclasses import Context
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.misc import MoveToReach
+from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
+from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.entity_query_language.factories import underspecified
+from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.variable import Continuous
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
-from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wall,
     Door,
@@ -26,8 +22,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Hinge,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Pose2D
-from semantic_digital_twin.spatial_types.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.spatial_types.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -102,9 +98,6 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
     odom_combined.parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
     )
-
-    viz_marker_publisher = VizMarkerPublisher(node=rclpy_node, _world=world)
-    viz_marker_publisher.with_tf_publisher()
 
     context = Context.from_world(world, query_backend=ProbabilisticBackend())
 

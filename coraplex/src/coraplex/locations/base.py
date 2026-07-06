@@ -5,7 +5,7 @@ from abc import abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
 
-from typing_extensions import List, Iterator, Optional, Iterable, Type, TYPE_CHECKING
+from typing_extensions import Callable, List, Iterator, Optional, Iterable, Type, TYPE_CHECKING
 
 from krrood.entity_query_language.predicate import Predicate
 from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
@@ -22,7 +22,9 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
 try:
-    from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
+    from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+        VizMarkerPublisher,
+    )
 except ImportError:
     VizMarkerPublisher = None
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -96,7 +98,7 @@ class Location(Iterable[Pose]):
 
             test_world.collision_manager.clear_temporary_rules()
             test_world.collision_manager.add_temporary_rule(
-                AvoidExternalCollisions(robot=test_robot)
+                AvoidExternalCollisions(robot=test_robot, violated_distance=0.05)
             )
             test_world.collision_manager.add_temporary_rule(
                 AllowSelfCollisions(robot=test_robot)
@@ -130,6 +132,28 @@ class Location(Iterable[Pose]):
 
     def __and__(self, other: Location) -> Location:
         return self.merge(other)
+
+
+@dataclass
+class DeferredLocation(Iterable[Pose]):
+    """
+    Lazily rebuilds a concrete :class:`Location` from current world state on each
+    iteration, so its pose generator and validators reflect the world at the moment the
+    location is consumed (execution time) rather than when the plan was constructed.
+
+    .. warning::
+        :meth:`__iter__` must stay a generator (``yield from``). Returning
+        ``iter(self.location_factory())`` would invoke the factory eagerly, because EQL's
+        ``variable`` wraps the domain in :func:`filter`, which calls :func:`iter` on its
+        argument at plan-construction time. A generator defers the factory call to the
+        first ``next``, which only happens once the underspecified action is grounded.
+    """
+
+    location_factory: Callable[[], Location]
+    """Builds a fresh :class:`Location` from the current world state."""
+
+    def __iter__(self) -> Iterator[Pose]:
+        yield from self.location_factory()
 
 
 @dataclass

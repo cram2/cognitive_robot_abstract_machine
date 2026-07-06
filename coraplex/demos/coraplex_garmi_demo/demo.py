@@ -4,7 +4,7 @@ from pathlib import Path
 from krrood.entity_query_language.factories import entity, an, variable, count
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import Arms
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
