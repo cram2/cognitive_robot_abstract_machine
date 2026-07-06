@@ -175,37 +175,66 @@ def _report_world_leak(world_in_mem: int) -> None:
     emit(f"\n[world-leak] {world_in_mem} World objects survived gc.collect()")
 
     worlds = objgraph.by_type("World")
-
-    # Every leaked world is held by exactly one suspended generator (plus its own kinematic
-    # internals). Identify that generator per world: its function, whether it is still suspended
-    # (holding its frame locals), and what keeps the generator itself alive. Reading gi_code/gi_frame
-    # is free; only gc.get_referrers scans the heap, so this stays hard-capped at six such scans.
     import types as _types_module
 
-    generators_to_trace = []
-    for index, world in reversed(list(enumerate(worlds))[-3:]):
-        referrer_type_counts: dict[str, int] = {}
-        for referrer in gc.get_referrers(world):
-            if referrer is worlds:
-                continue
-            type_name = type(referrer).__name__
-            referrer_type_counts[type_name] = referrer_type_counts.get(type_name, 0) + 1
-            if isinstance(referrer, _types_module.GeneratorType):
-                generators_to_trace.append((index, referrer))
-        emit(f"[world-leak] world #{index} held by (type: count) {referrer_type_counts}")
+    def describe(obj) -> str:
+        """A short label for a node on the retention chain."""
+        if isinstance(obj, _types_module.GeneratorType):
+            return f"generator {obj.gi_code.co_qualname} suspended={obj.gi_frame is not None}"
+        if isinstance(obj, _types_module.FrameType):
+            return f"frame {obj.f_code.co_qualname}"
+        if isinstance(obj, _types_module.ModuleType):
+            return f"module {obj.__name__}"
+        if isinstance(obj, type):
+            return f"type {obj.__name__}"
+        return type(obj).__name__
 
-    for index, generator in generators_to_trace[:3]:
-        is_suspended = generator.gi_frame is not None
-        emit(
-            f"[world-leak]   world #{index} generator {generator.gi_code.co_qualname} "
-            f"suspended={is_suspended}"
+    def on_retention_path(candidate) -> bool:
+        """Prefer holders that reveal the leak root; skip the world's own kinematic internals."""
+        skip = (
+            "Connection", "WorldState", "Manager", "Publisher", "Detector", "Updater",
+            "Body", "Drawer", "Handle", "Spoon", "Milk", "PR2", "Tiago", "Stretch",
+            "HSRB", "Justin", "Armar", "ICub", "Unitree", "MMP", "Robot", "Gripper",
+            "Arm", "Torso", "Neck", "Camera", "Finger", "Thumb", "Kinect", "Drive",
         )
-        holder_types = [
-            type(holder).__name__
-            for holder in gc.get_referrers(generator)
-            if holder is not generators_to_trace and holder is not worlds
+        name = type(candidate).__name__
+        return not any(token in name for token in skip)
+
+    # Walk one representative retention path from a leaked world up to a global root, bounded to six
+    # heap scans. This reveals what keeps the (Variable -> domain generator -> world) graph reachable.
+    seen_ids = set()
+    current = worlds[-1] if worlds else None
+    emit(f"[world-leak] retention chain from newest world #{len(worlds) - 1}:")
+    for _ in range(6):
+        if current is None:
+            break
+        seen_ids.add(id(current))
+        holders = [
+            holder
+            for holder in gc.get_referrers(current)
+            if holder is not worlds
+            and holder is not seen_ids
+            and id(holder) not in seen_ids
         ]
-        emit(f"[world-leak]     generator held by {holder_types[:10]}")
+        interesting = [holder for holder in holders if on_retention_path(holder)]
+        emit(f"    -> {[describe(holder) for holder in interesting][:12]}")
+
+        roots = [
+            holder
+            for holder in interesting
+            if isinstance(holder, (_types_module.ModuleType, type))
+            or type(holder).__name__ == "FixtureDef"
+        ]
+        if roots:
+            emit(f"    reached root: {describe(roots[0])}")
+            break
+        # Prefer a named owning object over a bare container so the walk makes progress.
+        named = [
+            holder
+            for holder in interesting
+            if not isinstance(holder, (list, dict, tuple, set))
+        ]
+        current = (named or interesting or [None])[0]
 
 
 #############################################
