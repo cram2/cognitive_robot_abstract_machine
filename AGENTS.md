@@ -12,6 +12,7 @@
 - Always use a test-driven development approach. For example for bugs, always prove a bug by adding a meaningful, failing test first, before then fixing it
 - When fixing failing tests, never modify the test itself
 - All new features and fixes must be covered by tests
+- Name test classes (and the mimic classes used by tests) after the pattern or behaviour they exercise, not after the concrete external class they happen to stand in for
 
 ## Code Style
 - Do not use abbreviations in variable names, methods, classes, or any other identifiers
@@ -27,10 +28,14 @@
 
 ## Imports
 - Imports should always be absolute
+- Exception: within tests, importing another test module (for example a shared mimic or fixture from the test datasets) must use a relative import
 - Imports should always be global (top of module), except in very special cases (for example ORM interface imports)
 - Use stdlib type hints where possible, and for others use typing_extensions instead of typing
 - Whenever you would wrap types in strings for deferred resolution, use `from __future__ import annotations` instead.
 - use TYPE_CHECKING guard for type-only imports
+- `krrood` must stay self-contained: never import from another workspace package into `krrood` (this includes its tests under `test/krrood_test`). The only permitted exceptions are `random_events` and `probabilistic_model`, because `krrood`'s own source already depends on them. In particular, do not import from `coraplex`, `semantic_digital_twin`, `giskardpy`, `physics_simulators`, `robokudo`, or `experiments` inside `krrood`.
+- When a `krrood` test needs to exercise behaviour that another package triggers, mimic the relevant classes and patterns inside the `krrood` test datasets (`test/krrood_test/dataset`) and test against those mimics. Keep the test in `krrood`; do not move it to another package and do not depend on another package to reproduce the scenario.
+- Mimic classes in the `krrood` test datasets must never import directly from another workspace package either; the only packages they may import from are the ones `krrood`'s source already imports (`random_events`, `probabilistic_model`) plus `krrood` itself.
 
 ## Design Principles
 - Focus on strictly object oriented design

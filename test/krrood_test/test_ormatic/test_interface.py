@@ -940,9 +940,9 @@ def test_selectin_loading_reduces_queries_during_from_dao(session, database):
         sa_event.remove(engine, "after_cursor_execute", _count)
 
     # from_dao() must issue no queries at all in either case.
-    assert queries_without == 0, (
-        f"Expected 0 queries without selectin_loading but got {queries_without}"
-    )
-    assert queries_with == 0, (
-        f"Expected 0 queries with selectin_loading but got {queries_with}"
-    )
+    assert (
+        queries_without == 0
+    ), f"Expected 0 queries without selectin_loading but got {queries_without}"
+    assert (
+        queries_with == 0
+    ), f"Expected 0 queries with selectin_loading but got {queries_with}"

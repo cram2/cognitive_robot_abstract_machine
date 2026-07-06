@@ -1,37 +1,31 @@
 from __future__ import annotations
 
 import logging
-from abc import abstractmethod, ABC
-from dataclasses import dataclass, fields, Field
+from abc import abstractmethod
+from copy import copy
+from dataclasses import dataclass
 from functools import cached_property
 
 from typing_extensions import (
     Any,
-    Callable,
     TypeVar,
     Dict,
-    List,
     Union,
     Iterable,
-    Generator,
     Optional,
 )
 
-from coraplex.exceptions import ContextIsUnavailable, ConditionNotSatisfied
-from coraplex.plans.failures import PlanFailure
-from semantic_digital_twin.world import World
-
-from coraplex.plans.plan_node import PlanNode
+from coraplex.datastructures.dataclasses import Context
+from coraplex.exceptions import ContextIsUnavailable
+from coraplex.plans.condition_nodes import ConditionNode
 from coraplex.plans.designator import Designator
+from coraplex.plans.plan_node import PlanNode, ActionNode
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import (
     variable,
-    a,
-    set_of,
-    evaluate_condition,
 )
-from ...datastructures.dataclasses import Context
+from semantic_digital_twin.world import World
 
 logger = logging.getLogger(__name__)
 
@@ -68,14 +62,61 @@ class ActionDescription(Designator):
 
         return result
 
+    @property
+    def action_plan(self) -> PlanNode:
+
+        sub_plan_root = self._action_plan
+        action_node = ActionNode(designator=copy(self))
+
+        pre_condition_node = ConditionNode(
+            condition=self.pre_condition(
+                self.bound_variables,
+                self.context,
+                self.designator_parameter,
+            ),
+            pre_condition=True,
+            action_node=action_node,
+        )
+
+        sub_plan_root.plan.add_edge(action_node, pre_condition_node)
+
+        sub_plan_root.plan.add_edge(action_node, sub_plan_root)
+
+        post_condition_node = ConditionNode(
+            condition=self.post_condition(
+                self.bound_variables,
+                self.context,
+                self.designator_parameter,
+            ),
+            pre_condition=False,
+            action_node=action_node,
+        )
+
+        sub_plan_root.plan.add_edge(action_node, post_condition_node)
+
+        return action_node
+
+    @property
     @abstractmethod
+    def _action_plan(self) -> PlanNode:
+        """
+        Creates the whole plan for this action.
+
+        :return: The root node of the plan of this action
+        """
+        ...
+
+    def expand(self) -> PlanNode:
+
+        return self.add_subplan(self.action_plan)
+
     def execute(self) -> Any:
         """
         Create the symbolic plan for this action.
         This method should only use Motions or Actions and mount them under itself, such that the plan can manage the
         entire execution.
         """
-        pass
+        self.add_subplan(self.action_plan)
 
     @staticmethod
     def pre_condition(
@@ -107,33 +148,10 @@ class ActionDescription(Designator):
             for f in self.fields
         }
 
-    def evaluate_pre_condition(self) -> bool:
-        condition = self.pre_condition(
-            self.bound_variables,
-            self.context,
-            self.designator_parameter,
-        )
-        evaluation = evaluate_condition(condition)
-        if evaluation:
-            return True
-        raise ConditionNotSatisfied(
-            pre_condition=True, action=self.__class__, condition=condition
-        )
-
-    def evaluate_post_condition(self) -> bool:
-        condition = self.post_condition(
-            self.bound_variables,
-            self.context,
-            self.designator_parameter,
-        )
-        evaluation = evaluate_condition(condition)
-        if evaluation:
-            return True
-        raise ConditionNotSatisfied(False, self.__class__, condition)
-
     def add_subplan(self, subplan_root: PlanNode) -> PlanNode:
         subplan_root = self.plan._migrate_nodes_from_plan(subplan_root.plan)
         self.plan.add_edge(self.plan_node, subplan_root)
+        self.plan.simplify()
         return subplan_root
 
 

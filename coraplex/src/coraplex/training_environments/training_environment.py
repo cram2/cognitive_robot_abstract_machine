@@ -22,10 +22,11 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 )
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.grasp import GraspDescription
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import execute_single
 from coraplex.plans.failures import (
     PlanFailure,
+    EmptyUnderspecified,
 )
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import UnderspecifiedNode
@@ -122,7 +123,11 @@ class TrainingEnvironment(ABC):
             pub.with_tf_publisher()
 
         with simulated_robot:
-            plan.perform()
+            try:
+                plan.perform()
+            except EmptyUnderspecified:
+                # No working solution found in this episode
+                pass
             self.executed_plans.append(plan)
 
         number_of_executed_variants = len(plan.root.children)

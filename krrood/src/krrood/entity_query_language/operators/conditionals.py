@@ -1,6 +1,7 @@
 """
 Conditional EQL operator constructs.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -37,7 +38,7 @@ class CaseWhen(Selectable):
     """The value returned if the condition is false. Defaults to None."""
 
     def __post_init__(self):
-        self._type_ = getattr(self.then_value, '_type_', None)
+        self._type_ = getattr(self.then_value, "_type_", None)
         # Explicitly register children — _update_children_ converts non-SymbolicExpression
         # values (like plain Python ints/strings) to Literal nodes automatically
         if self.else_value is not None:
@@ -87,7 +88,3 @@ class CaseWhen(Selectable):
         if self.else_value is not None:
             return self.else_value._evaluate__(sources)
         return None
-
-
-
-

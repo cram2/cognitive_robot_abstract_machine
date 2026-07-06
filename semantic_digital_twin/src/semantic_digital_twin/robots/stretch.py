@@ -149,7 +149,7 @@ class StretchArm(Arm[StretchGripper]):
         cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "link_mast"),
+            root=robot_root._world.get_body_in_branch_by_name(robot_root, "link_lift"),
             tip=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "link_wrist_roll"
             ),

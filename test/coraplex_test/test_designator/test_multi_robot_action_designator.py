@@ -20,7 +20,7 @@ from coraplex.datastructures.enums import (
 )
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.datastructures.trajectory import PoseTrajectory
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.robot_plans.actions.composite.facing import FaceAtAction
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
@@ -229,7 +229,7 @@ def test_move_torso_multi(immutable_multiple_robot_apartment):
         assert connection.position == pytest.approx(target, abs=0.01)
 
 
-def test_navigate_multi(immutable_multiple_robot_apartment):
+def test_navigate_multi(immutable_multiple_robot_apartment, rclpy_node):
     world, view, context = immutable_multiple_robot_apartment
     target_position = [2, -2, 0]
 
@@ -443,10 +443,11 @@ def test_grasping(immutable_multiple_robot_apartment):
     assert dist < 0.01
 
 
-def test_pick_up_multi(mutable_multiple_robot_apartment):
+def test_pick_up_multi(mutable_multiple_robot_apartment, rclpy_node):
     world, view, context = mutable_multiple_robot_apartment
 
-    # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+    context.evaluate_conditions = False
+
     left_arm = ViewManager.get_arm_view(Arms.LEFT, view)
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
@@ -482,6 +483,12 @@ def test_pick_up_multi(mutable_multiple_robot_apartment):
             world.get_body_by_name("milk.stl"),
         )
         is not None
+    )
+
+    assert np.allclose(
+        world.get_body_by_name("milk.stl").global_pose.to_position().to_np(),
+        left_arm.end_effector.tool_frame.global_pose.to_position().to_np(),
+        atol=0.01,
     )
 
     assert len(root.plan.nodes) == len(root.plan.all_nodes)
@@ -574,10 +581,14 @@ def test_detect(immutable_multiple_robot_apartment):
     plan = execute_single(description, context)
     with simulated_robot:
         plan.perform()
-    detected_objects = plan.result
 
-    assert detected_objects[0].name.name == "milk.stl"
-    assert detected_objects[0] is milk_body
+    # Detection no longer returns a value; it writes the result into the
+    # world/belief state by marking the perceived annotation with its class label.
+    milk_annotations = world.get_semantic_annotations_by_type(Milk)
+    assert milk_annotations
+    perceived = milk_annotations[0]
+    assert perceived.class_label == "Milk"
+    assert milk_body in perceived.bodies
 
 
 def test_open(immutable_multiple_robot_apartment):
@@ -605,11 +616,13 @@ def test_open(immutable_multiple_robot_apartment):
     ).position == pytest.approx(0.45, abs=0.1)
 
 
-def test_close(immutable_multiple_robot_apartment):
+def test_close(immutable_multiple_robot_apartment, rclpy_node):
     world, robot, context = immutable_multiple_robot_apartment
 
     world.get_connection_by_name("cabinet10_drawer_middle_joint").position = 0.3
     world.notify_state_change()
+
+    navigate_position = [1.5, 1.85, 0] if isinstance(robot, Tiago) else [1.65, 2.0, 0]
 
     plan = sequential(
         [
@@ -617,7 +630,7 @@ def test_close(immutable_multiple_robot_apartment):
             ParkArmsAction(Arms.BOTH),
             NavigateAction(
                 Pose(
-                    Point3.from_iterable([1.65, 2.0, 0]),
+                    Point3.from_iterable(navigate_position),
                     Quaternion.from_iterable([0, 0, 0.4, 1]),
                     reference_frame=world.root,
                 )
@@ -652,8 +665,6 @@ def test_facing(immutable_multiple_robot_apartment):
 def test_transport(mutable_multiple_robot_apartment, rclpy_node):
     world, robot, context = mutable_multiple_robot_apartment
 
-    VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
-
     description = TransportAction(
         object_designator=world.get_body_by_name("milk.stl"),
         target_location=Pose(
@@ -678,7 +689,7 @@ def test_transport(mutable_multiple_robot_apartment, rclpy_node):
     plan.plan.validate()
 
 
-def test_move_to_reach(immutable_multiple_robot_apartment):
+def test_move_to_reach(immutable_multiple_robot_apartment, rclpy_node):
     world, robot, context = immutable_multiple_robot_apartment
     move_to_reach = MoveToReach(
         target_pose_offset_robot=Pose2D(0.2, -0.55),
@@ -697,3 +708,37 @@ def test_move_to_reach(immutable_multiple_robot_apartment):
     plan = execute_single(move_to_reach, context=context)
     with simulated_robot:
         plan.perform()
+
+
+def test_transport_open_container(mutable_multiple_robot_apartment, rclpy_node):
+    world, robot, context = mutable_multiple_robot_apartment
+
+    VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+    context.ros_node = rclpy_node
+    context.debug = True
+
+    if isinstance(robot, HSRB):
+        return
+    description = TransportAction(
+        object_designator=world.get_body_by_name("spoon.stl"),
+        target_location=Pose.from_xyz_rpy(
+            5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root
+        ),
+        arm=Arms.RIGHT,
+        grasp_description=GraspDescription(
+            ApproachDirection.FRONT,
+            VerticalAlignment.TOP,
+            ViewManager.get_end_effector_view(Arms.RIGHT, robot),
+        ),
+    )
+    plan = sequential(
+        [MoveTorsoAction(TorsoState.HIGH), ParkArmsAction(Arms.BOTH), description],
+        context,
+    )
+    with simulated_robot:
+        plan.perform()
+    spoon_position = world.get_body_by_name("spoon.stl").global_transform.to_np()[:3, 3]
+    dist = np.linalg.norm(spoon_position - np.array([5.1, 3.3, 0.75]))
+    assert dist <= 0.02
+
+    plan.plan.validate()

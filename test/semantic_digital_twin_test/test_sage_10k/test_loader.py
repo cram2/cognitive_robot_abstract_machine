@@ -1,8 +1,9 @@
+import os
 import time
 
 import numpy as np
-import os
 import pytest
+from huggingface_hub.errors import HfHubHTTPError
 from requests import HTTPError
 
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
@@ -21,27 +22,6 @@ from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
 )
 from semantic_digital_twin.world import World
-
-from semantic_digital_twin.adapters.mesh import STLParser
-
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose,
-)
-
-from coraplex.motion_executor import simulated_robot
-
-from coraplex.plans.factories import execute_single, sequential
-
-from coraplex.robot_plans.actions.core.navigation import NavigateAction
-
-from coraplex.datastructures.dataclasses import Context
-
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-
-from coraplex.robot_plans.actions.core.pick_up import PickUpAction
-
-from semantic_digital_twin.datastructures.definitions import TorsoState
 
 
 def verify_scene(world: World, scene: Sage10kScene):
@@ -79,7 +59,7 @@ def get_sage10k_scene():
     try:
         loader = Sage10kDatasetLoader()
         return loader.create_scene(scene_url=Sage10kDatasetLoader.available_scenes()[0])
-    except HTTPError:
+    except (HTTPError, HfHubHTTPError):
         return None
 
 
