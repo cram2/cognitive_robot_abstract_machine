@@ -11,14 +11,16 @@ from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Goal, Task, NodeArtifacts
 from semantic_digital_twin.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.world_entity import (
-    Body,
     KinematicStructureEntity,
 )
 
 
 @dataclass(eq=False, repr=False)
-class ReachTopTask(Task):
-    """Moves the body's bottom to the pre-grasp point above the hole."""
+class ReachPointTask(Task):
+    """Moves an offset relative to the tool point to a goal point."""
+
+    tip_P_tool: Point3 = field(kw_only=True)
+    """Controlled point, expressed in the tip frame."""
 
     root_link: KinematicStructureEntity = field(kw_only=True)
     """Root link of the kinematic chain."""
@@ -26,41 +28,36 @@ class ReachTopTask(Task):
     tip_link: KinematicStructureEntity = field(kw_only=True)
     """Body that is controlled."""
 
-    root_P_hole: Point3 = field(kw_only=True)
-    """Position of the hole, expressed in the root frame."""
+    root_P_goal: Point3 = field(kw_only=True)
+    """Goal position of the tool point, expressed in the root frame."""
 
-    root_V_up: Vector3 = field(kw_only=True)
-    """Axis pointing out of the hole, expressed in the root frame."""
-
-    pre_grasp_height: float = field(kw_only=True)
-    """Distance above the hole along the up axis at which the body is placed."""
-
-    cylinder_height: float = field(kw_only=True)
-    """Height of the body, used to locate its bottom."""
+    reference_velocity: float = field(default=0.1, kw_only=True)
+    """Reference velocity in m/s used to normalize the constraint."""
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         root_T_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
-        tip_P_cylinder_bottom = -Vector3.Z() * self.cylinder_height / 2
-        root_P_tip = root_T_tip.to_position() + root_T_tip @ tip_P_cylinder_bottom
-        root_P_top = self.root_P_hole + self.root_V_up * self.pre_grasp_height
-        distance_to_top = root_P_tip.euclidean_distance(root_P_top)
+        root_P_tool = root_T_tip @ self.tip_P_tool
+        distance_to_goal = root_P_tool.euclidean_distance(self.root_P_goal)
 
         artifacts = NodeArtifacts()
         artifacts.constraints.add_point_goal_constraints(
-            frame_P_current=root_P_tip,
-            frame_P_goal=root_P_top,
-            reference_velocity=0.1,
+            frame_P_current=root_P_tool,
+            frame_P_goal=self.root_P_goal,
+            reference_velocity=self.reference_velocity,
             quadratic_weight=self.weight,
         )
-        artifacts.observation = distance_to_top < 0.01
+        artifacts.observation = distance_to_goal < 0.01
         return artifacts
 
 
 @dataclass(eq=False, repr=False)
 class SlightlyTiltedTask(Task):
-    """Tilts the body by a fixed angle relative to the up axis."""
+    """Tilts the tip axis by a fixed angle relative to a reference axis."""
+
+    tip_V_axis: Vector3 = field(kw_only=True)
+    """Axis of interest, expressed in the tip frame."""
 
     root_link: KinematicStructureEntity = field(kw_only=True)
     """Root link of the kinematic chain."""
@@ -68,18 +65,18 @@ class SlightlyTiltedTask(Task):
     tip_link: KinematicStructureEntity = field(kw_only=True)
     """Body that is controlled."""
 
-    root_V_up: Vector3 = field(kw_only=True)
-    """Axis pointing out of the hole, expressed in the root frame."""
+    root_V_reference: Vector3 = field(kw_only=True)
+    """Reference axis to tilt against, expressed in the root frame."""
 
     tilt: float = field(kw_only=True)
-    """Target angle in rad between the body's axis and the up axis."""
+    """Target angle in rad between the tip axis and the reference axis."""
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         root_T_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
-        root_V_cylinder_z = root_T_tip @ Vector3.Z()
-        cos_tilt = root_V_cylinder_z.dot(self.root_V_up)
+        root_V_axis = root_T_tip @ self.tip_V_axis
+        cos_tilt = root_V_axis.dot(self.root_V_reference)
         cos_goal = float(np.cos(self.tilt))
 
         artifacts = NodeArtifacts()
@@ -95,7 +92,10 @@ class SlightlyTiltedTask(Task):
 
 @dataclass(eq=False, repr=False)
 class StayOnLineTask(Task):
-    """Keeps the body's bottom on the line between the hole and the pre-grasp point."""
+    """Keeps the tool point on the line between two points."""
+
+    tip_P_tool: Point3 = field(kw_only=True)
+    """Controlled point, expressed in the tip frame."""
 
     root_link: KinematicStructureEntity = field(kw_only=True)
     """Root link of the kinematic chain."""
@@ -103,80 +103,38 @@ class StayOnLineTask(Task):
     tip_link: KinematicStructureEntity = field(kw_only=True)
     """Body that is controlled."""
 
-    root_P_hole: Point3 = field(kw_only=True)
-    """Position of the hole, expressed in the root frame."""
+    root_P_start: Point3 = field(kw_only=True)
+    """Start of the line segment, expressed in the root frame."""
 
-    root_V_up: Vector3 = field(kw_only=True)
-    """Axis pointing out of the hole, expressed in the root frame."""
-
-    pre_grasp_height: float = field(kw_only=True)
-    """Distance above the hole along the up axis at which the line ends."""
-
-    cylinder_height: float = field(kw_only=True)
-    """Height of the body, used to locate its bottom."""
+    root_P_end: Point3 = field(kw_only=True)
+    """End of the line segment, expressed in the root frame."""
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         root_T_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
-        tip_P_cylinder_bottom = -Vector3.Z() * self.cylinder_height / 2
-        root_P_tip = root_T_tip.to_position() + root_T_tip @ tip_P_cylinder_bottom
-        root_P_top = self.root_P_hole + self.root_V_up * self.pre_grasp_height
-        distance_to_line, root_P_on_line = root_P_tip.distance_to_line_segment(
-            self.root_P_hole, root_P_top
+        root_P_tool = root_T_tip @ self.tip_P_tool
+        distance_to_line, root_P_on_line = root_P_tool.distance_to_line_segment(
+            self.root_P_start, self.root_P_end
         )
 
         artifacts = NodeArtifacts()
         artifacts.constraints.add_point_goal_constraints(
-            frame_P_current=root_P_tip,
+            frame_P_current=root_P_tool,
             frame_P_goal=root_P_on_line,
             reference_velocity=0.1,
             quadratic_weight=self.weight,
-            name="pregrasp",
         )
         artifacts.observation = distance_to_line < 0.01
         return artifacts
 
 
 @dataclass(eq=False, repr=False)
-class InsertTask(Task):
-    """Moves the body's bottom down into the hole."""
-
-    root_link: KinematicStructureEntity = field(kw_only=True)
-    """Root link of the kinematic chain."""
-
-    tip_link: KinematicStructureEntity = field(kw_only=True)
-    """Body that is controlled."""
-
-    root_P_hole: Point3 = field(kw_only=True)
-    """Position of the hole, expressed in the root frame."""
-
-    cylinder_height: float = field(kw_only=True)
-    """Height of the body, used to locate its bottom."""
-
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
-        root_T_tip = context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
-        )
-        tip_P_cylinder_bottom = -Vector3.Z() * self.cylinder_height / 2
-        root_P_tip = root_T_tip.to_position() + root_T_tip @ tip_P_cylinder_bottom
-        distance_to_hole = root_P_tip.euclidean_distance(self.root_P_hole)
-
-        artifacts = NodeArtifacts()
-        artifacts.constraints.add_point_goal_constraints(
-            frame_P_current=root_P_tip,
-            frame_P_goal=self.root_P_hole,
-            reference_velocity=0.01,
-            quadratic_weight=self.weight,
-            name="insertion",
-        )
-        artifacts.observation = distance_to_hole < 0.01
-        return artifacts
-
-
-@dataclass(eq=False, repr=False)
 class TiltStraightTask(Task):
-    """Aligns the body's axis with the hole axis."""
+    """Aligns the tip axis with a reference axis."""
+
+    tip_V_axis: Vector3 = field(kw_only=True)
+    """Axis of interest, expressed in the tip frame."""
 
     root_link: KinematicStructureEntity = field(kw_only=True)
     """Root link of the kinematic chain."""
@@ -184,20 +142,20 @@ class TiltStraightTask(Task):
     tip_link: KinematicStructureEntity = field(kw_only=True)
     """Body that is controlled."""
 
-    root_V_up: Vector3 = field(kw_only=True)
-    """Axis pointing out of the hole, expressed in the root frame."""
+    root_V_reference: Vector3 = field(kw_only=True)
+    """Reference axis to align with, expressed in the root frame."""
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         root_T_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
-        root_V_cylinder_z = root_T_tip @ Vector3.Z()
-        tilt_error = root_V_cylinder_z.angle_between(self.root_V_up)
+        root_V_axis = root_T_tip @ self.tip_V_axis
+        tilt_error = root_V_axis.angle_between(self.root_V_reference)
 
         artifacts = NodeArtifacts()
         artifacts.constraints.add_vector_goal_constraints(
-            frame_V_current=root_V_cylinder_z,
-            frame_V_goal=self.root_V_up,
+            frame_V_current=root_V_axis,
+            frame_V_goal=self.root_V_reference,
             reference_velocity=0.025,
             quadratic_weight=self.weight,
         )
@@ -214,16 +172,19 @@ class InsertCylinder(Goal):
     3. Straighten the cylinder so it is aligned with the hole axis.
     """
 
-    cylinder_name: Body = field(kw_only=True)
-    """Cylinder body to insert. Used as the tip link of the kinematic chain."""
+    tip_link: KinematicStructureEntity = field(kw_only=True)
+    """Cylinder body to insert. controlled tip of the kinematic chain."""
+
+    tip_P_tool: Point3 = field(kw_only=True)
+    """Leading insertion point (e.g. the object's tip), expressed in the tip frame."""
 
     hole_point: Point3 = field(kw_only=True)
     """Position of the hole to insert the cylinder into."""
 
-    cylinder_height: Optional[float] = None
-    """Height of the cylinder. If None, it is taken from the cylinder's collision shape."""
+    tip_V_axis: Optional[Vector3] = None
+    """Insertion axis of the object in the tip frame. If None, tip-frame Z is used."""
 
-    up: Optional[Vector3] = None
+    up_axis: Optional[Vector3] = None
     """Axis pointing out of the hole. If None, the world's z-axis is used."""
 
     pre_grasp_height: float = 0.2
@@ -235,66 +196,65 @@ class InsertCylinder(Goal):
     weight: float = DefaultWeights.WEIGHT_ABOVE_CA
     """Task priority relative to other tasks."""
 
-    reach_top: ReachTopTask = field(init=False)
+    reach_top: ReachPointTask = field(init=False)
     tilt_task: SlightlyTiltedTask = field(init=False)
     stay_on_line: StayOnLineTask = field(init=False)
-    insert_task: InsertTask = field(init=False)
+    insert_task: ReachPointTask = field(init=False)
     tilt_straight_task: TiltStraightTask = field(init=False)
 
     def expand(self, context: MotionStatechartContext) -> None:
         root = context.world.root
 
-        if self.cylinder_height is None:
-            self.cylinder_height = self.cylinder_name.collision.shapes[0].height
-
-        if self.up is None:
-            up = Vector3.Z(root)
+        tip_V_axis = self.tip_V_axis if self.tip_V_axis is not None else Vector3.Z()
+        if self.up_axis is None:
+            root_V_up = Vector3.Z(root)
         else:
-            up = self.up
+            root_V_up = context.world.transform(self.up_axis, root)
         root_P_hole = context.world.transform(self.hole_point, root)
-        root_V_up = context.world.transform(up, root)
+        root_P_top = root_P_hole + root_V_up * self.pre_grasp_height
 
-        self.reach_top = ReachTopTask(
+        self.reach_top = ReachPointTask(
             name="Reach Top",
             root_link=root,
-            tip_link=self.cylinder_name,
-            root_P_hole=root_P_hole,
-            root_V_up=root_V_up,
-            pre_grasp_height=self.pre_grasp_height,
-            cylinder_height=self.cylinder_height,
+            tip_link=self.tip_link,
+            tip_P_tool=self.tip_P_tool,
+            root_P_goal=root_P_top,
+            reference_velocity=0.1,
             weight=self.weight,
         )
         self.tilt_task = SlightlyTiltedTask(
             name="Slightly Tilted",
             root_link=root,
-            tip_link=self.cylinder_name,
-            root_V_up=root_V_up,
+            tip_link=self.tip_link,
+            tip_V_axis=tip_V_axis,
+            root_V_reference=root_V_up,
             tilt=self.tilt,
             weight=self.weight,
         )
         self.stay_on_line = StayOnLineTask(
             name="Stay on Straight Line",
             root_link=root,
-            tip_link=self.cylinder_name,
-            root_P_hole=root_P_hole,
-            root_V_up=root_V_up,
-            pre_grasp_height=self.pre_grasp_height,
-            cylinder_height=self.cylinder_height,
+            tip_link=self.tip_link,
+            tip_P_tool=self.tip_P_tool,
+            root_P_start=root_P_hole,
+            root_P_end=root_P_top,
             weight=self.weight,
         )
-        self.insert_task = InsertTask(
+        self.insert_task = ReachPointTask(
             name="Insert",
             root_link=root,
-            tip_link=self.cylinder_name,
-            root_P_hole=root_P_hole,
-            cylinder_height=self.cylinder_height,
+            tip_link=self.tip_link,
+            tip_P_tool=self.tip_P_tool,
+            root_P_goal=root_P_hole,
+            reference_velocity=0.05,
             weight=self.weight,
         )
         self.tilt_straight_task = TiltStraightTask(
             name="Tilt Straight",
             root_link=root,
-            tip_link=self.cylinder_name,
-            root_V_up=root_V_up,
+            tip_link=self.tip_link,
+            tip_V_axis=tip_V_axis,
+            root_V_reference=root_V_up,
             weight=self.weight,
         )
 

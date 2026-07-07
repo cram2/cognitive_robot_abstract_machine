@@ -60,7 +60,8 @@ def test_insert_cylinder():
 
     msc = MotionStatechart()
     goal = InsertCylinder(
-        cylinder_name=cylinder,
+        tip_link=cylinder,
+        tip_P_tool=Point3(0.0, 0.0, -CYLINDER_HEIGHT / 2),
         hole_point=hole_point,
         pre_grasp_height=0.05,
     )
