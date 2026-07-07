@@ -186,14 +186,7 @@ def _report_remaining_world_holders(world_in_mem: int) -> None:
     def keep(candidate) -> bool:
         return not any(token in type(candidate).__name__ for token in world_internal_tokens)
 
-    significant_tokens = (
-        "CachedResultStream", "Plan", "Node", "Designator", "Context", "Entity",
-        "SetOf", "Query", "Match", "Where", "GroupedBy", "Having", "Ordering",
-        "Quantification", "Action", "Location", "Motion", "Backend", "Statement",
-    )
-
-    def is_significant(candidate) -> bool:
-        return any(token in type(candidate).__name__ for token in significant_tokens)
+    container_types = (list, dict, tuple, set, frozenset, types.GeneratorType, types.FrameType)
 
     emit(f"\n[world-leak] {world_in_mem} World objects survived gc.collect()")
     worlds = objgraph.by_type("World")
@@ -208,34 +201,33 @@ def _report_remaining_world_holders(world_in_mem: int) -> None:
     if seed is None:
         return
 
-    # Bounded breadth-first search over referrers to escape the list/tuple maze and surface the
-    # significant named objects (query graph / plan / cache) that keep the suspended nest reachable.
-    emit(f"[world-leak] significant owners of newest world #{len(worlds) - 1}'s nest:")
+    # Bounded breadth-first search over referrers to escape the container maze. Record the type of
+    # every non-container object encountered (the boundary of the container web) so the retaining
+    # object shows up regardless of which type it is; keep traversing through containers.
+    emit(f"[world-leak] non-container owners of newest world #{len(worlds) - 1}'s nest:")
     seen_ids = {id(worlds), id(seed)}
     frontier = [seed]
     reported: dict[str, int] = {}
     scans = 0
-    while frontier and scans < 400:
+    while frontier and scans < 1500:
         next_frontier = []
         for node in frontier:
             scans += 1
-            if scans >= 400:
+            if scans >= 1500:
                 break
             for holder in gc.get_referrers(node):
                 if id(holder) in seen_ids or not keep(holder):
                     continue
                 seen_ids.add(id(holder))
-                if isinstance(holder, (types.ModuleType, type)):
-                    reported[describe(holder)] = reported.get(describe(holder), 0) + 1
-                    continue
-                if is_significant(holder):
+                if not isinstance(holder, container_types):
                     label = describe(holder)
                     reported[label] = reported.get(label, 0) + 1
-                    continue
-                if isinstance(holder, (list, dict, tuple, set, frozenset, types.GeneratorType, types.FrameType)):
+                # Traverse through containers and ordinary objects, but not modules/types (too broad).
+                if not isinstance(holder, (types.ModuleType, type)):
                     next_frontier.append(holder)
         frontier = next_frontier
-    for label, count in sorted(reported.items(), key=lambda item: -item[1])[:20]:
+    emit(f"[world-leak]   (BFS scans={scans})")
+    for label, count in sorted(reported.items(), key=lambda item: -item[1])[:25]:
         emit(f"    {count:4d}  {label}")
 
 
