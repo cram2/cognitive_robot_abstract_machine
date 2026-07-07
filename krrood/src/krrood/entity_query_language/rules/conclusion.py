@@ -10,7 +10,7 @@ from abc import ABC
 from dataclasses import dataclass
 from functools import cached_property
 
-from typing_extensions import Any, List, Iterable
+from typing_extensions import Any, List, Iterable, TypeVar
 
 from krrood.entity_query_language.core.base_expressions import (
     Bindings,
@@ -97,3 +97,7 @@ class Add(Conclusion):
         v = next(self.value._evaluate_(sources)).value
         new_bindings = sources.bindings | {self.variable._id_: v}
         yield OperationResult(new_bindings, False, self, sources)
+
+
+ConclusionType = TypeVar("ConclusionType", bound=Conclusion)
+"""Type variable bound to :class:`Conclusion` for typed conclusion lookups."""

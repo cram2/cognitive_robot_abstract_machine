@@ -8,7 +8,6 @@ Alternative, and Next.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from copy import copy
 from dataclasses import dataclass
 from typing_extensions import Iterable, TYPE_CHECKING, Self, Optional
 
@@ -74,9 +73,9 @@ class ConclusionSelector(TruthValueOperator, ABC):
         alternative after observing a misclassification). Conditions are chained with
         AND; the new branch is spliced in between ``anchor`` and its current parent.
 
-        Any condition already in a tree (has a ``_parent_``) is copied via
-        :meth:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression.__copy__` so
-        splicing it in cannot corrupt the original's ``_parent_``.
+        Any condition already in a tree (has a ``_parent_``) is replaced with the node from
+        :meth:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression._node_for_new_position_`
+        so splicing it in cannot corrupt the original's ``_parent_``.
 
         :param anchor: The existing condition node the new branch connects to.
         :param conditions: Conditions to chain with AND into the new branch.
@@ -85,13 +84,13 @@ class ConclusionSelector(TruthValueOperator, ABC):
         cleaned_conditions = []
         for condition in conditions:
             if isinstance(condition, SymbolicExpression) and condition._parent_ is not None:
-                condition = copy(condition)
+                condition = condition._node_for_new_position_()
             cleaned_conditions.append(condition)
         new_condition = chained_logic(AND, *cleaned_conditions)
         # A single condition returned directly by chained_logic may still carry a parent from the
-        # pre-cleaning step; copy again if needed — the copy is idempotent for a parentless node.
+        # pre-cleaning step; detach again if needed — idempotent for a parentless node.
         if isinstance(new_condition, SymbolicExpression) and new_condition._parent_ is not None:
-            new_condition = copy(new_condition)
+            new_condition = new_condition._node_for_new_position_()
 
         # Splice above the anchor's most recent structural parent — a ConclusionSelector for a node
         # already in a rule tree, or a Filter for a direct WHERE condition — recovered from

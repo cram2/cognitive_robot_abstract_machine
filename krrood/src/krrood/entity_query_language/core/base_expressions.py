@@ -31,7 +31,6 @@ from typing_extensions import (
     TYPE_CHECKING,
     Generic,
     Type, TypeAlias,
-    TypeVar,
 )
 
 from krrood.entity_query_language.evaluation_context import (
@@ -44,12 +43,9 @@ from krrood.entity_query_language.utils import make_list, T, make_set, is_iterab
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 
 if TYPE_CHECKING:
-    from krrood.entity_query_language.rules.conclusion import Conclusion
+    from krrood.entity_query_language.rules.conclusion import Conclusion, ConclusionType
     from krrood.entity_query_language.core.variable import Variable
     from krrood.entity_query_language.query.query import Query
-
-ConclusionType = TypeVar("ConclusionType", bound="Conclusion")
-"""Type variable bound to :class:`Conclusion` for typed conclusion lookups."""
 
 Bindings: TypeAlias = Dict[uuid.UUID, Any]
 """
@@ -116,17 +112,18 @@ class SymbolicExpression(ABC):
     def __post_init__(self):
         self._expression_ = self
 
-    def __copy__(self) -> SymbolicExpression:
+    def _node_for_new_position_(self) -> SymbolicExpression:
         """
-        :return: A clone of this expression that can be reused in a new tree position.
+        :return: The node to wire into a new tree position without corrupting this one.
 
-        The clone gets a fresh identity and none of the original's parents, children, or conclusions,
-        so wiring it into a new position cannot overwrite the original's ``_parent_`` (which its old
-        parent still references) nor leak conclusions back into it. Children are not deep-copied — only
-        this node is cloned.
+        For a normal expression this is a fresh clone: it gets a new identity and none of the
+        original's parents, children, or conclusions, so wiring it into a new position cannot
+        overwrite the original's ``_parent_`` (which its old parent still references) nor leak
+        conclusions back into it. Children are not deep-copied — only this node is cloned.
 
         ..note:: :class:`~krrood.entity_query_language.core.mapped_variable.MappedVariable` nodes are
-            shared-identity singletons and override this to return themselves.
+            shared-identity singletons and override this to return themselves, since sharing them
+            across positions is intended and safe.
         """
         clone = self.__class__.__new__(self.__class__)
         clone.__dict__.update(self.__dict__)
@@ -256,9 +253,12 @@ class SymbolicExpression(ABC):
         """
         :return: The most recently attached parent that is an instance of any of *types*, or ``None``.
 
-        Reads the full ``_parents_`` history rather than ``_parent_``, which tracks only the last parent
-        set and can be clobbered when a shared node is reused in more than one position (for example a
-        ``MappedVariable`` used both as a WHERE condition and inside a sibling condition).
+        A node reused across positions in the DAG has several parents, so its *current* structural
+        position is not a single value — it is the last parent of the wanted type to be attached.
+        The ``_parents_`` list preserves attachment order precisely so that "most recent" is
+        recoverable; the order is load-bearing, not incidental. ``_parent_`` cannot serve here
+        because it holds only the last parent set and is clobbered when a shared node is reused (for
+        example a ``MappedVariable`` used both as a WHERE condition and inside a sibling condition).
         """
         return next(
             (parent for parent in reversed(self._parents_) if isinstance(parent, types)),
