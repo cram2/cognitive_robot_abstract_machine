@@ -186,41 +186,57 @@ def _report_remaining_world_holders(world_in_mem: int) -> None:
     def keep(candidate) -> bool:
         return not any(token in type(candidate).__name__ for token in world_internal_tokens)
 
+    significant_tokens = (
+        "CachedResultStream", "Plan", "Node", "Designator", "Context", "Entity",
+        "SetOf", "Query", "Match", "Where", "GroupedBy", "Having", "Ordering",
+        "Quantification", "Action", "Location", "Motion", "Backend", "Statement",
+    )
+
+    def is_significant(candidate) -> bool:
+        return any(token in type(candidate).__name__ for token in significant_tokens)
+
     emit(f"\n[world-leak] {world_in_mem} World objects survived gc.collect()")
     worlds = objgraph.by_type("World")
     if not worlds:
         return
 
-    current = None
+    seed = None
     for referrer in gc.get_referrers(worlds[-1]):
         if isinstance(referrer, types.GeneratorType):
-            current = referrer
+            seed = referrer
             break
+    if seed is None:
+        return
 
-    seen_ids = {id(worlds)}
-    emit(f"[world-leak] generator nest retaining newest world #{len(worlds) - 1}:")
-    for _ in range(30):
-        if current is None:
-            break
-        seen_ids.add(id(current))
-        holders = [
-            holder
-            for holder in gc.get_referrers(current)
-            if id(holder) not in seen_ids and keep(holder)
-        ]
-        named_owners = [
-            describe(holder)
-            for holder in holders
-            if not isinstance(holder, (list, dict, tuple, set, frozenset))
-        ]
-        emit(f"    {describe(current)}  owners={named_owners[:8]}")
-        next_generator = next(
-            (holder for holder in holders if isinstance(holder, types.GeneratorType)), None
-        )
-        if next_generator is not None:
-            current = next_generator
-            continue
-        current = holders[0] if holders else None
+    # Bounded breadth-first search over referrers to escape the list/tuple maze and surface the
+    # significant named objects (query graph / plan / cache) that keep the suspended nest reachable.
+    emit(f"[world-leak] significant owners of newest world #{len(worlds) - 1}'s nest:")
+    seen_ids = {id(worlds), id(seed)}
+    frontier = [seed]
+    reported: dict[str, int] = {}
+    scans = 0
+    while frontier and scans < 400:
+        next_frontier = []
+        for node in frontier:
+            scans += 1
+            if scans >= 400:
+                break
+            for holder in gc.get_referrers(node):
+                if id(holder) in seen_ids or not keep(holder):
+                    continue
+                seen_ids.add(id(holder))
+                if isinstance(holder, (types.ModuleType, type)):
+                    reported[describe(holder)] = reported.get(describe(holder), 0) + 1
+                    continue
+                if is_significant(holder):
+                    label = describe(holder)
+                    reported[label] = reported.get(label, 0) + 1
+                    continue
+                if isinstance(holder, (list, dict, tuple, set, frozenset, types.GeneratorType, types.FrameType)):
+                    next_frontier.append(holder)
+        frontier = next_frontier
+    for label, count in sorted(reported.items(), key=lambda item: -item[1])[:20]:
+        emit(f"    {count:4d}  {label}")
 
 
 #############################################
