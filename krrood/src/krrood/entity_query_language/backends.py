@@ -4,7 +4,9 @@ from dataclasses import dataclass, field
 from typing import Iterable, TypeVar
 
 from sqlalchemy.orm import sessionmaker
-from typing_extensions import Dict
+from typing_extensions import ClassVar, Dict, Optional
+
+from krrood.entity_query_language.verbalization.vocabulary.english import Directive
 
 from krrood.entity_query_language.core.base_expressions import (
     Selectable,
@@ -39,6 +41,11 @@ class QueryBackend(ABC):
     Query backends are objects that answer queries by different means.
     """
 
+    opening_directive: ClassVar[Optional[Directive]] = None
+    """The opening verb a verbalization uses when this backend evaluates the expression (``None`` keeps
+    the query-type default). A backend declares its own performative so the verbalization layer never
+    inspects concrete backend types."""
+
     @abstractmethod
     def evaluate(self, expression: Evaluable) -> Iterable[T]:
         """
@@ -56,6 +63,9 @@ class SelectiveBackend(QueryBackend, ABC):
     These can take any query as input.
     """
 
+    opening_directive: ClassVar[Optional[Directive]] = Directive.FIND
+    """Selecting from existing data reads as *"Find …"*."""
+
 
 @dataclass
 class GenerativeBackend(QueryBackend, ABC):
@@ -64,6 +74,9 @@ class GenerativeBackend(QueryBackend, ABC):
     Generative backends have to take match expressions as input, since they need to construct new objects, and currently
     {py:class}`~krrood.entity_query_language.query.match.Match` is the only way to do so.
     """
+
+    opening_directive: ClassVar[Optional[Directive]] = Directive.GENERATE
+    """Generating new elements reads as *"Generate …"*."""
 
     def evaluate(self, expression: Evaluable) -> Iterable[T]:
         if not isinstance(expression, Match):

@@ -43,23 +43,14 @@ def directive_for_backend(backend: Optional[QueryBackend]) -> Optional[Directive
     """
     Resolve the opening directive implied by an evaluating backend.
 
+    Each backend declares its own :attr:`~…backends.QueryBackend.opening_directive`, so this stays
+    decoupled from the concrete backend types (no import of the backends module, no ``isinstance``).
+
     :param backend: The backend the expression would be evaluated with, or ``None``.
     :return: ``GENERATE`` for a generative backend, ``FIND`` for a selective one, or ``None`` when
         no backend is given (keep the query-type default).
     """
-    if backend is None:
-        return None
-    from krrood.entity_query_language.backends import (
-        GenerativeBackend,
-        SelectiveBackend,
-    )
-    from krrood.entity_query_language.verbalization.vocabulary.english import Directive
-
-    if isinstance(backend, GenerativeBackend):
-        return Directive.GENERATE
-    if isinstance(backend, SelectiveBackend):
-        return Directive.FIND
-    return None
+    return backend.opening_directive if backend is not None else None
 
 
 _HTML_PAGE_TEMPLATE = Template("""\

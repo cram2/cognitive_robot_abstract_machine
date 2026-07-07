@@ -401,10 +401,19 @@ class Mesh(Shape):
     def to_json(self) -> Dict[str, Any]:
         # Serialize the raw (unscaled, unprocessed) mesh geometry and the scale separately
         base_mesh = trimesh.load_mesh(self.filename, process=False)
+        # Bake materials/textures down to per-vertex colors so the mesh's color
+        # survives serialization (e.g. across the ROS world synchronizer).
+        if isinstance(base_mesh.visual, TextureVisuals):
+            base_mesh.visual = base_mesh.visual.to_color()
+        mesh_dict = base_mesh.to_dict()
+        if base_mesh.visual.kind is not None:
+            mesh_dict["vertex_colors"] = np.asarray(
+                base_mesh.visual.vertex_colors
+            ).tolist()
         file_type = self.filename.split(".")[-1]
         return {
             **super().to_json(),
-            "mesh": base_mesh.to_dict(),
+            "mesh": mesh_dict,
             "scale": to_json(self.scale),
             "file_type": file_type,
         }
@@ -412,20 +421,23 @@ class Mesh(Shape):
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Mesh:
         # Recreate the trimesh without processing to preserve exact topology
+        vertex_colors = data["mesh"].get("vertex_colors")
         mesh = trimesh.Trimesh(
             vertices=data["mesh"]["vertices"],
             faces=data["mesh"]["faces"],
+            vertex_colors=vertex_colors,
             process=False,
         )
         origin = from_json(data["origin"], **kwargs)
         scale = from_json(data["scale"], **kwargs)
         file_type = data["file_type"]
-        color = from_json(data["color"], **kwargs)
-        instance = cls.from_trimesh(
+        # Export colored meshes as OBJ, which preserves per-vertex colors and is
+        # readable by the visualizer and the collision loader.
+        if vertex_colors is not None:
+            file_type = "obj"
+        return cls.from_trimesh(
             mesh=mesh, origin=origin, scale=scale, file_type=file_type
         )
-        instance.color = color
-        return instance
 
     @classmethod
     def add_uv(cls, mesh: trimesh.Trimesh, uv: np.ndarray) -> trimesh.Trimesh:
@@ -470,8 +482,13 @@ class Mesh(Shape):
         """
         mesh = trimesh.load_mesh(self.filename)
         mesh.apply_scale(self.scale.to_np())
-        if not isinstance(mesh.visual, TextureVisuals):
-            mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
+        # Apply the shape's color only when it was explicitly set, so a mesh's own
+        # materials or per-vertex colors (e.g. from a .dae or from serialization)
+        # are preserved by default. dye_shapes still works as it sets a color.
+        if self.color != Color():
+            mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(
+                self.color.to_rgba()
+            )
         return mesh
 
     @classmethod
@@ -535,7 +552,13 @@ class Mesh(Shape):
             visual=trimesh.visual.TextureVisuals(uv=uv_unindexed, image=texture_image),
         )
 
-        return Mesh.from_trimesh(mesh=mesh, origin=origin, scale=scale, file_type="obj", texture_file_path=texture_file_path)
+        return Mesh.from_trimesh(
+            mesh=mesh,
+            origin=origin,
+            scale=scale,
+            file_type="obj",
+            texture_file_path=texture_file_path,
+        )
 
     @classmethod
     def from_trimesh(

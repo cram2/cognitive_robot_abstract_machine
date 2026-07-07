@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import Optional, Tuple, Union, List
+from typing_extensions import Dict, Optional, Tuple, Union, List
 from urdf_parser_py import urdf as urdfpy
+from xacro import process_file
 
 from semantic_digital_twin.adapters.package_resolver import (
     CompositePathResolver,
@@ -151,11 +152,29 @@ class URDFParser:
         return urdf_parser
 
     @classmethod
-    def from_xacro(cls, xacro_path: str, prefix: Optional[str] = None) -> URDFParser:
-        from xacro import process_file
+    def from_xacro(
+        cls,
+        xacro_path: str,
+        prefix: Optional[str] = None,
+        mappings: Optional[Dict[str, str]] = None,
+    ) -> URDFParser:
+        """
+        Creates a parser from a xacro file by expanding it to URDF.
 
+        The xacro file is resolved and processed into a URDF string,
+        applying the given substitution arguments, before constructing
+        the parser.
+
+        :param xacro_path: The path to the xacro file to expand.
+        :param prefix: The prefix for every name used in this world.
+        :param mappings: The xacro substitution arguments to apply
+            during expansion (the ``arg`` values, e.g. ``{"ur_type":
+            "ur5"}``).
+        :return: A parser for the world described by the expanded xacro
+            file.
+        """
         xacro_path = CompositePathResolver().resolve(xacro_path)
-        urdf = process_file(xacro_path).toxml()
+        urdf = process_file(xacro_path, mappings=mappings).toxml()
         return URDFParser(urdf=urdf, prefix=prefix)
 
     def parse(self) -> World:
