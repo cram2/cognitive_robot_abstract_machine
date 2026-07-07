@@ -13,7 +13,7 @@ PACKAGES = [
     "semantic_digital_twin",
 ]
 
-VERSION_FILE = Path(__file__).parent.parent / "VERSION"
+VERSION_FILE = Path(__file__).parents[2] / "VERSION"
 
 
 def test_all_package_versions_match_root_version():
