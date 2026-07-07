@@ -158,34 +158,69 @@ def count_worlds():
 
 
 def _report_remaining_world_holders(world_in_mem: int) -> None:
-    """Print a cheap holder-type histogram (a few gc.get_referrers scans) for the newest surviving
-    worlds, to confirm what still retains them after the domain-iteration fix."""
+    """Walk the generator nest that still retains the newest leaked world up to a named owner, so the
+    remaining retention path is identified after the domain-iteration fix."""
     import sys
+    import types
 
-    print(
-        f"\n[world-leak] {world_in_mem} World objects survived gc.collect()",
-        file=sys.stderr,
-        flush=True,
+    def emit(message: str) -> None:
+        print(message, file=sys.stderr, flush=True)
+
+    def describe(obj) -> str:
+        if isinstance(obj, types.GeneratorType):
+            return f"generator {obj.gi_code.co_qualname} suspended={obj.gi_frame is not None}"
+        if isinstance(obj, types.FrameType):
+            return f"frame {obj.f_code.co_qualname}"
+        if isinstance(obj, types.ModuleType):
+            return f"module {obj.__name__}"
+        if isinstance(obj, type):
+            return f"type {obj.__name__}"
+        return type(obj).__name__
+
+    world_internal_tokens = (
+        "Connection", "WorldState", "Manager", "Body", "Drawer", "Handle", "Spoon",
+        "Milk", "PR2", "Tiago", "Stretch", "Drive", "Robot", "Gripper", "Arm", "Torso",
+        "Neck", "Camera", "Finger", "Thumb", "Kinect", "View", "Detector", "Updater",
     )
+
+    def keep(candidate) -> bool:
+        return not any(token in type(candidate).__name__ for token in world_internal_tokens)
+
+    emit(f"\n[world-leak] {world_in_mem} World objects survived gc.collect()")
     worlds = objgraph.by_type("World")
-    for index, world in reversed(list(enumerate(worlds))[-3:]):
-        holder_type_counts: dict[str, int] = {}
-        for referrer in gc.get_referrers(world):
-            if referrer is worlds:
-                continue
-            type_name = type(referrer).__name__
-            holder_type_counts[type_name] = holder_type_counts.get(type_name, 0) + 1
-        interesting = {
-            type_name: count
-            for type_name, count in holder_type_counts.items()
-            if type_name
-            not in ("list", "dict", "tuple", "set", "frozenset", "cell", "function")
-        }
-        print(
-            f"[world-leak] world #{index} non-container holders: {interesting}",
-            file=sys.stderr,
-            flush=True,
+    if not worlds:
+        return
+
+    current = None
+    for referrer in gc.get_referrers(worlds[-1]):
+        if isinstance(referrer, types.GeneratorType):
+            current = referrer
+            break
+
+    seen_ids = {id(worlds)}
+    emit(f"[world-leak] generator nest retaining newest world #{len(worlds) - 1}:")
+    for _ in range(30):
+        if current is None:
+            break
+        seen_ids.add(id(current))
+        holders = [
+            holder
+            for holder in gc.get_referrers(current)
+            if id(holder) not in seen_ids and keep(holder)
+        ]
+        named_owners = [
+            describe(holder)
+            for holder in holders
+            if not isinstance(holder, (list, dict, tuple, set, frozenset))
+        ]
+        emit(f"    {describe(current)}  owners={named_owners[:8]}")
+        next_generator = next(
+            (holder for holder in holders if isinstance(holder, types.GeneratorType)), None
         )
+        if next_generator is not None:
+            current = next_generator
+            continue
+        current = holders[0] if holders else None
 
 
 #############################################
