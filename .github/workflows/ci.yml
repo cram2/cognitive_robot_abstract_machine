@@ -38,6 +38,7 @@ jobs:
           - lib: physics_simulators
           - lib: robokudo
           - lib: experiments
+          - lib: version
     uses: ./.github/workflows/ci_reusable.yml
     with:
       lib: ${{ matrix.lib }}
