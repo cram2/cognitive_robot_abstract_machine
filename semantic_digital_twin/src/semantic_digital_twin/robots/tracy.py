@@ -108,6 +108,7 @@ class TracyRightGripperLeftFinger(Finger):
             ),
         )
 
+
 @dataclass(eq=False)
 class TracyRightGripperRightFinger(Finger):
 
