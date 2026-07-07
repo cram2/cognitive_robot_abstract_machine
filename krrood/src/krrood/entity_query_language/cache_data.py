@@ -8,6 +8,7 @@ Cache utilities.
 This module provides caching datastructures and utilities.
 """
 from dataclasses import dataclass, field
+from itertools import islice
 from typing_extensions import Dict, Generic, Iterable, Iterator, List, Optional
 
 
@@ -222,8 +223,10 @@ class ReEnterableLazyIterable(Generic[T]):
         if self.iterable is not None:
             return
         recreated_source = (v for v in self._source)
-        for _ in range(len(self.materialized_values)):
-            next(recreated_source, None)
+        skip_count = len(self.materialized_values)
+        # itertools' "consume" recipe: an empty slice starting at skip_count still forces the
+        # underlying iterator to be advanced that many steps, entirely at C speed.
+        next(islice(recreated_source, skip_count, skip_count), None)
         self.iterable = recreated_source
 
     def _release_source(self) -> None:
