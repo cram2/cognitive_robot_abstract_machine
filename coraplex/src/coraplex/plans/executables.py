@@ -455,6 +455,7 @@ class UnderspecifiedExecutable(Executable):
         while self.node.advance():
             try:
                 self.node.current_candidate.parse().execute()
+                self.node.stop_grounding()
                 return
             except PlanFailure:
                 continue

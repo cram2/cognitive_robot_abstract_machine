@@ -418,12 +418,28 @@ class UnderspecifiedNode(PlanNode):
 
         grounded_action = next(self._action_iterator, None)
         if grounded_action is None:
+            self._action_iterator = None
             return None
 
         candidate = ActionNode(designator=grounded_action)
         self.add_child(candidate)
         self.current_candidate = candidate
         return candidate
+
+    def stop_grounding(self) -> None:
+        """
+        Release the action iterator once no further candidate will be requested from it.
+
+        Between candidates the iterator is left suspended (rather than exhausted) so a later
+        retry can resume the search instead of restarting it; a suspended generator keeps every
+        value its frame holds alive, including resources a candidate generator only builds to
+        validate against (for example a location's deep-copied test world). Once a candidate is
+        accepted and no retry will happen, closing the iterator here releases those resources
+        immediately instead of retaining them for this node's whole lifetime.
+        """
+        if self._action_iterator is not None:
+            self._action_iterator.close()
+            self._action_iterator = None
 
     def notify(self):
         # Resolution is deferred to execution time: the underspecified statement can
