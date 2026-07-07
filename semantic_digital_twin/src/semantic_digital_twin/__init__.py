@@ -1,4 +1,5 @@
 import logging
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 
 try:
     from ._version import __version__
@@ -8,13 +9,4 @@ except ImportError:
 logger = logging.getLogger("semantic_digital_twin")
 logger.setLevel(logging.INFO)
 
-
-def _init_symbol_graph():
-    from krrood.symbol_graph.symbol_graph import SymbolGraph
-    SymbolGraph()
-
-
-try:
-    _init_symbol_graph()
-except ModuleNotFoundError:
-    pass
+SymbolGraph()
