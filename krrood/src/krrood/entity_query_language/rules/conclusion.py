@@ -71,6 +71,11 @@ class Conclusion(BinaryExpression, ABC):
         return self.right
 
     @property
+    def unwrapped_value(self) -> Any:
+        """:return: The right-hand value with any :class:`Literal` wrapper removed."""
+        return _unwrap(self.right)
+
+    @property
     def _name_(self) -> str:
         value_str = (
             self.value._type_.__name__

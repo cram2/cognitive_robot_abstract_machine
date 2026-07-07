@@ -31,6 +31,7 @@ from typing_extensions import (
     TYPE_CHECKING,
     Generic,
     Type, TypeAlias,
+    TypeVar,
 )
 
 from krrood.entity_query_language.evaluation_context import (
@@ -46,6 +47,9 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.rules.conclusion import Conclusion
     from krrood.entity_query_language.core.variable import Variable
     from krrood.entity_query_language.query.query import Query
+
+ConclusionType = TypeVar("ConclusionType", bound="Conclusion")
+"""Type variable bound to :class:`Conclusion` for typed conclusion lookups."""
 
 Bindings: TypeAlias = Dict[uuid.UUID, Any]
 """
@@ -390,6 +394,16 @@ class SymbolicExpression(ABC):
                 result=current_result,
             )
         return current_result
+
+    def conclusions_of_type(
+            self, conclusion_type: Type[ConclusionType]
+    ) -> List[ConclusionType]:
+        """:return: The conclusions attached to this expression that are instances of *conclusion_type*."""
+        return [
+            conclusion
+            for conclusion in self._conclusions_
+            if isinstance(conclusion, conclusion_type)
+        ]
 
     @abstractmethod
     def _evaluate__(
