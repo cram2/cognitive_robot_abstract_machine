@@ -42,7 +42,7 @@ class ReachPointTask(Task):
         distance_to_goal = root_P_tool.euclidean_distance(self.root_P_goal)
 
         artifacts = NodeArtifacts()
-        artifacts.constraints.add_point_goal_constraints(
+        artifacts.geometry.add_point_goal_constraints(
             frame_P_current=root_P_tool,
             frame_P_goal=self.root_P_goal,
             reference_velocity=self.reference_velocity,
@@ -80,9 +80,9 @@ class SlightlyTiltedTask(Task):
         cos_goal = float(np.cos(self.tilt))
 
         artifacts = NodeArtifacts()
-        artifacts.constraints.add_position_constraint(
-            expr_current=cos_tilt,
-            expr_goal=cos_goal,
+        artifacts.geometry.add_position_constraint(
+            expression_current=cos_tilt,
+            expression_goal=cos_goal,
             reference_velocity=0.1,
             quadratic_weight=self.weight,
         )
@@ -119,7 +119,7 @@ class StayOnLineTask(Task):
         )
 
         artifacts = NodeArtifacts()
-        artifacts.constraints.add_point_goal_constraints(
+        artifacts.geometry.add_point_goal_constraints(
             frame_P_current=root_P_tool,
             frame_P_goal=root_P_on_line,
             reference_velocity=0.1,
@@ -153,7 +153,7 @@ class TiltStraightTask(Task):
         tilt_error = root_V_axis.angle_between(self.root_V_reference)
 
         artifacts = NodeArtifacts()
-        artifacts.constraints.add_vector_goal_constraints(
+        artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_axis,
             frame_V_goal=self.root_V_reference,
             reference_velocity=0.025,
