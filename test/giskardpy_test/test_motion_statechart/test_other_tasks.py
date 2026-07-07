@@ -777,10 +777,10 @@ class TestOpenClose:
                 active_axis=Vector3.Z(),
             )
 
-            door.add_handle(handle)
-            door.add_hinge(hinge=hinge)
+            door.add(handle)
+            door.add(hinge)
 
-        root_C_hinge = door.hinge.root.parent_connection
+        root_C_hinge = door.mechanical_joint.root.parent_connection
 
         r_tip = pr2_world_copy.get_body_by_name("r_gripper_tool_frame")
         handle = pr2_world_copy.get_semantic_annotations_by_type(Handle)[0].root

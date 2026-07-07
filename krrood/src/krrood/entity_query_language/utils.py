@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import inspect
 import itertools
+import re
 from functools import lru_cache
 
 from typing_extensions import (
@@ -253,3 +254,18 @@ def convert_args_and_kwargs_into_hashable_key(
             v = tuple(v)
         key.append((k, v))
     return tuple(sorted(key))
+
+
+def camel_case_to_words(name: str) -> str:
+    """
+    Convert a CamelCase class name to space-separated lowercase words.
+
+    :param name: CamelCase identifier string.
+    :return: Space-separated lowercase words.
+
+    Examples::
+
+        camel_case_to_words("HasRole")     # → "has role"
+        camel_case_to_words("IsReachable") # → "is reachable"
+    """
+    return re.sub(r"([A-Z])", r" \1", name).strip().lower()

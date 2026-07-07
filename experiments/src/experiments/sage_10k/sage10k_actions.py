@@ -6,6 +6,7 @@ from krrood.entity_query_language.factories import underspecified, variable
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.plans.factories import sequential
+from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.misc import MoveToReach
@@ -25,18 +26,18 @@ class Sage10kOpenDoor(ActionDescription):
     Open a door.
 
     This action creates a Graph of Convex Sets (GCS) navigation map at the door handle.
-    Using this GCS, an underspecified move to reach plan is mounted as subplan followed up by an
-    opening action is executed.
+    Using this GCS, an underspecified move to reach plan is sequenced with an opening action.
     """
 
     door: Door
 
-    def execute(self) -> None:
+    @property
+    def _action_plan(self) -> PlanNode:
         """
-        Execute the action by mounting subplans for reaching and opening the door.
+        Build the plan for reaching the handle and opening the door.
 
-        This method creates a navigation map around the door handle and then
-        performs a sequential plan of reaching the handle and opening the door.
+        A navigation map is created around the door handle and used to constrain an
+        underspecified reach action, which is sequenced with an opening action.
         """
         gcs = navigation_map_at_target(target=self.door.handle.root)
 
@@ -93,4 +94,4 @@ class Sage10kOpenDoor(ActionDescription):
 
         open_action = OpenAction(object_designator=self.door.handle.root, arm=arm)
 
-        self.add_subplan(sequential([reach_action, open_action])).perform()
+        return sequential([reach_action, open_action])

@@ -424,7 +424,7 @@ class MJCFParser:
                         parent_T_connection_expression=parent_body_to_joint_transform,
                         connection_T_child_expression=joint_to_child_body_transform,
                         axis=joint_axis,
-                        dof_id=dof.id,
+                        raw_dof=dof,
                         dynamics=joint_dynamics,
                     )
                 elif mujoco_joint.type == mujoco.mjtJoint.mjJNT_SLIDE:
@@ -435,7 +435,7 @@ class MJCFParser:
                         parent_T_connection_expression=parent_body_to_joint_transform,
                         connection_T_child_expression=joint_to_child_body_transform,
                         axis=joint_axis,
-                        dof_id=dof.id,
+                        raw_dof=dof,
                         dynamics=joint_dynamics,
                     )
                 else:

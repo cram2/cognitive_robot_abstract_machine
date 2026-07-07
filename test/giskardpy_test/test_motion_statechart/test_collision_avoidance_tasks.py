@@ -1,15 +1,9 @@
 import json
+import time
 from copy import deepcopy
 
 import numpy as np
 import pytest
-import time
-
-from semantic_digital_twin.datastructures.definitions import StaticJointState
-from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.collision_checking.collision_rules import (
-    AllowCollisionBetweenGroups,
-)
 from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
@@ -52,14 +46,19 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
+)
+from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidCollisionBetweenGroups,
     AvoidExternalCollisions,
     AvoidAllCollisions,
     AllowAllCollisions,
 )
+from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
+from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -713,8 +712,7 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box):
     kin_sim.tick_until_end(500)
 
 
-def test_hard_constraints_violated(cylinder_bot_world: World, rclpy_node):
-    VizMarkerPublisher(_world=cylinder_bot_world, node=rclpy_node).with_tf_publisher()
+def test_hard_constraints_violated(cylinder_bot_world: World):
     root = cylinder_bot_world.root
     with cylinder_bot_world.modify_world():
         env2 = Body(
@@ -834,11 +832,11 @@ def test_collision_for_robot_with_static_base(tracy_world):
         )
         world.add_connection(
             Connection6DoF.create_with_dofs(
-                world,
-                world.root,
-                obstacle,
-                PrefixedName("obstacle_conn"),
-                HomogeneousTransformationMatrix.from_xyz_rpy(
+                world=world,
+                parent=world.root,
+                child=obstacle,
+                name=PrefixedName("obstacle_conn"),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     0.5, 0.5, 1, reference_frame=world.root
                 ),
             )

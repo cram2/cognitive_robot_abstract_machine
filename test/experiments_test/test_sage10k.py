@@ -4,21 +4,17 @@ import numpy as np
 import pytest
 
 import experiments.orm.ormatic_interface  # type: ignore
-from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
-from krrood.entity_query_language.factories import underspecified
-from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from coraplex.datastructures.dataclasses import Context
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.misc import MoveToReach
+from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
+from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.entity_query_language.factories import underspecified
+from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.variable import Continuous
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
-from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wall,
     Door,
@@ -26,8 +22,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Hinge,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Pose2D
-from semantic_digital_twin.spatial_types.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.spatial_types.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -60,7 +56,7 @@ def wall_door_handle_world():
         door.root.visual.dye_shapes(Color(R=0.55, G=0.27, B=0.07))
 
     with world.modify_world():
-        wall.add_aperture(door.entry_way)
+        wall.add(door.entry_way)
 
     with world.modify_world():
         handle = Handle.create_with_new_body_in_world(
@@ -75,7 +71,7 @@ def wall_door_handle_world():
             scale=Scale(0.05, 0.02, 0.2),
         )
         handle.root.visual.dye_shapes(Color(R=0.8, G=0.8, B=0.1))
-        door.add_handle(handle)
+        door.add(handle)
 
     world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
     with world.modify_world():
@@ -89,7 +85,7 @@ def wall_door_handle_world():
                 upper=DerivativeMap(position=np.pi / 2, velocity=1.0),
             ),
         )
-        door.add_hinge(hinge)
+        door.add(hinge)
 
     return world, wall, door, handle
 
@@ -103,15 +99,14 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
         HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
     )
 
-    viz_marker_publisher = VizMarkerPublisher(node=rclpy_node, _world=world)
-    viz_marker_publisher.with_tf_publisher()
-
     context = Context.from_world(world, query_backend=ProbabilisticBackend())
 
     with simulated_robot:
         execute_single(Sage10kOpenDoor(door), context=context).perform()
 
-    assert np.isclose(door.hinge.root.parent_connection.position, np.pi / 2, atol=2e-2)
+    assert np.isclose(
+        door.mechanical_joint.root.parent_connection.position, np.pi / 2, atol=2e-2
+    )
 
 
 def test_translate_free_space_to_where_condition(wall_door_handle_world):

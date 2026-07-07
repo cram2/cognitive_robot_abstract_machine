@@ -513,6 +513,40 @@ def test_merge_with_connection(world_setup, pr2_world_copy):
     assert np.allclose(actual_fk, expected_fk)
 
 
+def test_merge_world_with_connection_worldless_parent():
+    world1 = World()
+    b1 = Body(name=PrefixedName("b1"))
+
+    world2 = World()
+    b2 = Body(name=PrefixedName("b2"))
+
+    with world2.modify_world():
+        world2.add_body(b2)
+
+    b1_C_b2 = FixedConnection(parent=b1, child=b2)
+    world1.merge_world(world2, b1_C_b2)
+
+    assert b1_C_b2 in world1.connections
+    assert b2 in world1.bodies
+
+
+def test_merge_world_with_connection_worldless_child():
+    world1 = World()
+    b1 = Body(name=PrefixedName("b1"))
+
+    world2 = World()
+    b2 = Body(name=PrefixedName("b2"))
+
+    with world2.modify_world():
+        world2.add_body(b2)
+
+    b2_C_b1 = FixedConnection(parent=b2, child=b1)
+    world1.merge_world(world2, b2_C_b1)
+
+    assert b2_C_b1 in world1.connections
+    assert b2 in world1.bodies
+
+
 def test_merge_with_pose(world_setup, pr2_world_copy):
     world, l1, l2, bf, r1, r2 = world_setup
 
@@ -917,14 +951,8 @@ def test_copy_two_times(pr2_world_state_reset):
 
 
 def test_copy_drawer(apartment_world_copy):
-    handle = Handle(root=apartment_world_copy.get_body_by_name("handle_cab10_t"))
-    drawer = Drawer(
-        root=apartment_world_copy.get_body_by_name("cabinet10_drawer_top"),
-        handle=handle,
-    )
-    with apartment_world_copy.modify_world():
-        apartment_world_copy.add_semantic_annotation(handle)
-        apartment_world_copy.add_semantic_annotation(drawer)
+    [handle] = apartment_world_copy.get_semantic_annotations_by_type(Handle)
+    [drawer] = apartment_world_copy.get_semantic_annotations_by_type(Drawer)
 
     apartment_copy = deepcopy(apartment_world_copy)
     copied_handle = apartment_copy.get_semantic_annotation_by_name(handle.name)
@@ -1042,7 +1070,7 @@ def test_overwrite_dof_limits_mimic(world_setup):
             offset=23,
             multiplier=-2,
             axis=Vector3(0, 0, 1),
-            dof_id=connection.dof_id,
+            raw_dof=connection.raw_dof,
         )
         world.add_body(body)
         world.add_connection(mimic_connection)
@@ -1212,7 +1240,7 @@ def test_world_state_trajectory(world_setup, tmp_path):
     time = 1337.0
 
     connection: PrismaticConnection = world.get_connection(r1, r2)
-    dof_uuid = connection.dof_id
+    dof_uuid = connection.dof.id
 
     traj = WorldStateTrajectory.from_world_state(world.state, time)
     cmd = np.array([100.0, 0, 0, 0, 0, 0, 0, 0])
@@ -1302,6 +1330,155 @@ def test_reattach_child_to_new_parent(world_setup):
     assert l2 not in world.compute_child_kinematic_structure_entities(l1)
     new_child_global_pose = l2.global_transform
     assert np.allclose(old_child_global_pose, new_child_global_pose)
+
+
+def test_move_branch_preserves_connection_type_and_pose():
+    """
+    move_branch re-parents a branch keeping its connection type and global pose. Covers both the
+    FixedConnection branch (which silently passed an invalid ``_world`` kwarg before) and the
+    Connection6DoF branch.
+    """
+    world = World()
+    root = Body(name=PrefixedName("root"))
+    new_parent = Body(name=PrefixedName("new_parent"))
+    fixed_child = Body(name=PrefixedName("fixed_child"))
+    free_child = Body(name=PrefixedName("free_child"))
+    with world.modify_world():
+        for body in [root, new_parent, fixed_child, free_child]:
+            world.add_kinematic_structure_entity(body)
+        world.add_connection(
+            FixedConnection(
+                parent=root,
+                child=new_parent,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=1.0, y=2.0, yaw=0.5
+                ),
+            )
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=root,
+                child=fixed_child,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.3, z=0.4
+                ),
+            )
+        )
+        world.add_connection(
+            Connection6DoF.create_with_dofs(parent=root, child=free_child, world=world)
+        )
+
+    # FixedConnection branch (this is the path the `_world=self` bug used to break).
+    fixed_child_pose = fixed_child.global_transform
+    with world.modify_world():
+        world.move_branch(fixed_child, new_parent)
+    assert fixed_child.parent_kinematic_structure_entity == new_parent
+    assert isinstance(fixed_child.parent_connection, FixedConnection)
+    assert np.allclose(fixed_child.global_transform, fixed_child_pose)
+
+    # Connection6DoF branch: type preserved, pose preserved.
+    free_child_pose = free_child.global_transform
+    with world.modify_world():
+        world.move_branch(free_child, new_parent)
+    assert free_child.parent_kinematic_structure_entity == new_parent
+    assert isinstance(free_child.parent_connection, Connection6DoF)
+    assert np.allclose(free_child.global_transform, free_child_pose)
+
+
+def test_memoization_clears_only_last_modification_block():
+    world = World()
+    b1 = Body(name=PrefixedName("b1"))
+    with world.modify_world():
+        world.add_body(b1)
+
+    b2 = Body(name=PrefixedName("b2"))
+    b1_C_b2 = FixedConnection(parent=b2, child=b1)
+
+    with world.modify_world():
+
+        assert world.root == b1
+
+        with world.modify_world():
+            world.add_body(b2)
+
+        assert world.root == b1
+
+        world.add_connection(b1_C_b2)
+
+    assert world.root == b2
+
+
+def test_move_branch_offline_preserves_connection_type_and_pose():
+    """
+    The offline (enable_unsafe_inside_world_block) path of move_branch must, like the online
+    path, preserve a FixedConnection and a Connection6DoF and keep the global pose. The offline path is
+    what the semantic-annotation mounts use, and it runs inside an already-open modification block.
+    """
+    world = World()
+    root = Body(name=PrefixedName("root"))
+    new_parent = Body(name=PrefixedName("new_parent"))
+    fixed_child = Body(name=PrefixedName("fixed_child"))
+    free_child = Body(name=PrefixedName("free_child"))
+    with world.modify_world():
+        for body in [root, new_parent, fixed_child, free_child]:
+            world.add_kinematic_structure_entity(body)
+        world.add_connection(
+            FixedConnection(
+                parent=root,
+                child=new_parent,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=1.0, y=2.0, yaw=0.5
+                ),
+            )
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=root,
+                child=fixed_child,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.3, z=0.4
+                ),
+            )
+        )
+        world.add_connection(
+            Connection6DoF.create_with_dofs(parent=root, child=free_child, world=world)
+        )
+
+    fixed_child_pose = fixed_child.global_transform
+    free_child_pose = free_child.global_transform
+    with world.modify_world():
+        world.move_branch(
+            fixed_child, new_parent, enable_unsafe_inside_world_block=True
+        )
+        world.move_branch(free_child, new_parent, enable_unsafe_inside_world_block=True)
+
+    assert fixed_child.parent_kinematic_structure_entity == new_parent
+    assert isinstance(fixed_child.parent_connection, FixedConnection)
+    assert np.allclose(fixed_child.global_transform, fixed_child_pose)
+
+    assert free_child.parent_kinematic_structure_entity == new_parent
+    assert isinstance(free_child.parent_connection, Connection6DoF)
+    assert np.allclose(free_child.global_transform, free_child_pose)
+
+
+def test_move_branch_preserves_active_connection(world_setup):
+    """
+    move_branch keeps an active 1-DOF connection (e.g. a RevoluteConnection) intact - same type and
+    same degree of freedom - instead of collapsing it to a FixedConnection, while preserving the pose.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    old_connection = r2.parent_connection
+    assert isinstance(old_connection, RevoluteConnection)
+    old_dof_id = old_connection.dof.id
+    old_pose = r2.global_transform
+
+    with world.modify_world():
+        world.move_branch(r2, bf)
+
+    assert r2.parent_kinematic_structure_entity == bf
+    assert isinstance(r2.parent_connection, RevoluteConnection)
+    assert r2.parent_connection.dof.id == old_dof_id
+    assert np.allclose(r2.global_transform, old_pose)
 
 
 def test_reset_state_context(pr2_world_state_reset):
@@ -1685,3 +1862,9 @@ def test_memoized_queries_match_graph_after_exception():
     graph_names = {b.name.name for b in world.kinematic_structure.nodes()}
     memoized_names = {b.name.name for b in world.bodies}
     assert memoized_names == graph_names
+
+
+def test_is_kinematic_structure_entity_in_world_by_name(world_setup):
+    world, l1, *_ = world_setup
+    assert world.is_kinematic_structure_entity_in_world_by_name("l1")
+    assert not world.is_kinematic_structure_entity_in_world_by_name("nonexistent")

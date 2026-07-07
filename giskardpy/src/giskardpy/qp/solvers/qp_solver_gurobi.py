@@ -6,9 +6,9 @@ from typing import Tuple, Dict
 
 import gurobipy
 import numpy as np
-from gurobipy import GRB, GurobiError
+from gurobipy import GRB
 
-from giskardpy.qp.exceptions import QPSolverException, InfeasibleException
+from giskardpy.qp.exceptions import SolverReturnedFailureError, InfeasibleException
 from giskardpy.qp.qp_data import QPDataExplicit
 from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.utils.math import fast_sparse_diagonal
@@ -87,16 +87,14 @@ class QPSolverGurobi(QPSolver[QPDataExplicit]):
             xQ_R=self.x,
             sense=GRB.MINIMIZE,
         )
-        try:
+        if qp_data.equality_matrix.size != 0:
             self.qpProblem.addMConstr(
                 qp_data.equality_matrix,
                 self.x,
                 gurobipy.GRB.EQUAL,
                 qp_data.equality_bounds,
             )
-        except (GurobiError, ValueError) as e:
-            pass  # no eq constraints
-        try:
+        if qp_data.inequality_matrix.size != 0:
             self.qpProblem.addMConstr(
                 qp_data.inequality_matrix,
                 self.x,
@@ -109,8 +107,6 @@ class QPSolverGurobi(QPSolver[QPDataExplicit]):
                 gurobipy.GRB.LESS_EQUAL,
                 qp_data.inequality_upper_bounds,
             )
-        except (GurobiError, ValueError) as e:
-            pass  # no neq constraints
 
     def print_debug(self):
         gurobipy.setParam(gurobipy.GRB.Param.LogToConsole, True)
@@ -152,7 +148,11 @@ class QPSolverGurobi(QPSolver[QPDataExplicit]):
             gurobipy.GRB.INF_OR_UNBD,
             gurobipy.GRB.NUMERIC,
         }:
-            raise InfeasibleException(self.STATUS_VALUE_DICT[success])
-        raise QPSolverException(self.STATUS_VALUE_DICT[success])
+            raise InfeasibleException(
+                solver_status=str(self.STATUS_VALUE_DICT[success])
+            )
+        raise SolverReturnedFailureError(
+            solver_status=str(self.STATUS_VALUE_DICT[success])
+        )
 
     solver_call = solver_call_explicit_interface

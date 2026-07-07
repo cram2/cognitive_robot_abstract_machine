@@ -31,6 +31,7 @@ from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
     UnificationDict,
 )
+from krrood.entity_query_language.exceptions import SymbolicDunderAccessError
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.utils import (
     T,
@@ -92,6 +93,13 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
         return convert_args_and_kwargs_into_hashable_key(all_kwargs)
 
     def __getattr__(self, name: str) -> CanBehaveLikeAVariable[T]:
+        # Dunder names are never symbolic attribute access. Mapping them would (a) let copy/pickle
+        # and other machinery that probes optional dunder hooks recurse into endless variable
+        # creation, and (b) blur language semantics. Access a dunder-named member symbolically via a
+        # :func:`symbolic_function` instead. SymbolicDunderAccessError is an AttributeError so that
+        # optional-hook probing still treats it as a missing attribute.
+        if name.startswith("__") and name.endswith("__"):
+            raise SymbolicDunderAccessError(name)
         return self._get_mapped_variable_(Attribute, name)
 
     def __getitem__(self, key) -> CanBehaveLikeAVariable[T]:
@@ -187,6 +195,17 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
             result.append(current)
         return result[:-1][::-1]
 
+    @property
+    def _chain_root_(self) -> Any:
+        """
+        :return: The first non-:class:`MappedVariable` expression at the base of this
+            mapping chain (e.g. the ``robot`` variable behind ``robot.arm.joint``).
+        """
+        current = self
+        while isinstance(current, MappedVariable):
+            current = current._child_
+        return current
+
     def _set_external_root_instance_value_(self, instance: Any, value: Any):
         """
         Set the field of the instance at this access path to the given value.
@@ -241,7 +260,7 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
 
 @dataclass(eq=False, repr=False)
-class Attribute(MappedVariable):
+class Attribute(MappedVariable[T]):
     """
     A symbolic attribute that can be used to access attributes of symbolic variables.
 

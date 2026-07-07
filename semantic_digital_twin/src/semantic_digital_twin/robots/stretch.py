@@ -6,7 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from importlib.resources import files
 from pathlib import Path
-from typing import Self, Union, List
+from typing_extensions import Self, Union, List
 
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
@@ -149,7 +149,7 @@ class StretchArm(Arm[StretchGripper]):
         cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "link_mast"),
+            root=robot_root._world.get_body_in_branch_by_name(robot_root, "link_lift"),
             tip=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "link_wrist_roll"
             ),
@@ -371,5 +371,14 @@ class Stretch(AbstractRobot, HasMobileBase[StretchMobileBase]):
         )
 
     def _setup_velocity_limits(self):
-        vel_limits = defaultdict(lambda: 1.0)
+        vel_limits = defaultdict(lambda: 0.1)
+        vel_limits[self._world.get_connection_by_name("joint_gripper_finger_left")] = (
+            0.01
+        )
+        vel_limits[self._world.get_connection_by_name("joint_gripper_finger_right")] = (
+            0.01
+        )
+        vel_limits[self._world.get_connection_by_name("joint_wrist_yaw")] = 0.4
+        vel_limits[self._world.get_connection_by_name("joint_head_tilt")] = 0.5
+        vel_limits[self._world.get_connection_by_name("joint_head_pan")] = 0.5
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)

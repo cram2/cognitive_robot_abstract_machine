@@ -520,7 +520,7 @@ class SymbolicMathType(ABC):
     def __setitem__(
         self,
         key: int | slice | Tuple[int | slice, int | slice],
-        value: ScalarData,
+        value: ScalarData | VectorData | MatrixData,
     ):
         """
         Gives this class the setitem behavior of numpy.
@@ -1209,31 +1209,31 @@ class Matrix(SymbolicMathType):
         for i in range(self.shape[0]):
             yield Vector.from_casadi_sx(self.casadi_sx[i, :])
 
-    def __add__(self, other: Scalar | Vector | Matrix) -> Self:
+    def __add__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
         return Matrix.from_casadi_sx(self.casadi_sx + other_sx)
 
-    def __radd__(self, other: Scalar | Vector | Matrix) -> Self:
+    def __radd__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
         return Matrix.from_casadi_sx(self.casadi_sx + other_sx)
 
-    def __sub__(self, other: Scalar | Vector | Matrix) -> Self:
+    def __sub__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
         return Matrix.from_casadi_sx(self.casadi_sx - other_sx)
 
-    def __rsub__(self, other: Scalar | Vector | Matrix) -> Self:
+    def __rsub__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
         return Matrix.from_casadi_sx(self.casadi_sx - other_sx)
 
-    def __mul__(self, other: Scalar | Vector | Matrix) -> Self:
+    def __mul__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
         return Matrix.from_casadi_sx(self.casadi_sx * other_sx)
 
-    def __rmul__(self, other: Scalar | Vector | Matrix) -> Self:
+    def __rmul__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
         return Matrix.from_casadi_sx(self.casadi_sx * other_sx)
 
-    def __truediv__(self, other: Scalar | Vector | Matrix) -> Self:
+    def __truediv__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
         num = self.casadi_sx
         den = other_sx
@@ -1248,11 +1248,11 @@ class Matrix(SymbolicMathType):
         )
         return Matrix.from_casadi_sx(result)
 
-    def __pow__(self, other: Scalar | Vector | Matrix) -> Self:
+    def __pow__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
         return Matrix.from_casadi_sx(self.casadi_sx**other_sx)
 
-    def __floordiv__(self, other: Scalar | Vector | Matrix) -> Self:
+    def __floordiv__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
         num = self.casadi_sx
         den = other_sx
@@ -1262,7 +1262,7 @@ class Matrix(SymbolicMathType):
         result = ca.if_else(zero_den, ca.SX.zeros(*self.shape), div)
         return Matrix.from_casadi_sx(result)
 
-    def __mod__(self, other: Scalar | Vector | Matrix) -> Self:
+    def __mod__(self, other: ScalarData | Vector | Matrix) -> Self:
         other_sx = self._broadcast_like_self(other)
         num = self.casadi_sx
         den = other_sx
@@ -1288,17 +1288,17 @@ class Matrix(SymbolicMathType):
             return self.to_np() == other.to_np()
         return Matrix.from_casadi_sx(self.casadi_sx.__eq__(other.casadi_sx))
 
-    def __le__(self, other: Scalar | FloatVariable) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__le__(other.casadi_sx))
+    def __le__(self, other: ScalarData | FloatVariable) -> Scalar:
+        return Scalar.from_casadi_sx(self.casadi_sx.__le__(to_sx(other)))
 
-    def __lt__(self, other: Scalar | FloatVariable) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__lt__(other.casadi_sx))
+    def __lt__(self, other: ScalarData | FloatVariable) -> Scalar:
+        return Scalar.from_casadi_sx(self.casadi_sx.__lt__(to_sx(other)))
 
-    def __ge__(self, other: Scalar | FloatVariable) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__ge__(other.casadi_sx))
+    def __ge__(self, other: ScalarData | FloatVariable) -> Scalar:
+        return Scalar.from_casadi_sx(self.casadi_sx.__ge__(to_sx(other)))
 
-    def __gt__(self, other: Scalar | FloatVariable) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__gt__(other.casadi_sx))
+    def __gt__(self, other: ScalarData | FloatVariable) -> Scalar:
+        return Scalar.from_casadi_sx(self.casadi_sx.__gt__(to_sx(other)))
 
     def _broadcast_like_self(self, other: SymbolicMathType) -> ca.SX:
         """
@@ -1527,6 +1527,7 @@ def to_sx(
         | NumericalMatrix
         | Iterable[FloatVariable]
         | SymbolicMathType
+        | SparseData
     ),
 ) -> ca.SX:
     """
@@ -1543,7 +1544,7 @@ def to_sx(
     return array_like_to_casadi_sx(data)
 
 
-def array_like_to_casadi_sx(data: VectorData) -> ca.SX:
+def array_like_to_casadi_sx(data: VectorData | SparseData) -> ca.SX:
     """
     Converts a given array-like data structure into a CasADi SX matrix. The input
     data can be a list, tuple, or numpy array. Based on the structure of the input
@@ -1554,6 +1555,8 @@ def array_like_to_casadi_sx(data: VectorData) -> ca.SX:
         such as a list, tuple, or numpy array.
     :return: A CasADi SX object representation of the input data.
     """
+    if sp.issparse(data):
+        return ca.SX(data)
     x = len(data)
     if x == 0:
         return ca.SX()
@@ -2400,9 +2403,10 @@ NumericalMatrix = np.ndarray | Iterable[Iterable[NumericalScalar]]
 
 SymbolicScalar = FloatVariable | Scalar
 
+SparseData = sp.spmatrix | sp.sparray
 ScalarData = NumericalScalar | SymbolicScalar
 VectorData = NumericalVector | Vector | Iterable[ScalarData]
-MatrixData = NumericalMatrix | Matrix
+MatrixData = NumericalMatrix | Matrix | SparseData
 
 GenericSymbolicType = TypeVar(
     "GenericSymbolicType",

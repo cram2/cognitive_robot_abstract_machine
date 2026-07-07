@@ -2569,13 +2569,13 @@ class MujocoSynchronizer(MultiSimSynchronizer):
         conn_T_child = inverse_frame(parent_T_conn) @ mj_T_world
         dof_xyz, dof_quat_xyzw = self._decompose_pose_matrix(conn_T_child)
 
-        state[connection.x_id].position = float(dof_xyz[0])
-        state[connection.y_id].position = float(dof_xyz[1])
-        state[connection.z_id].position = float(dof_xyz[2])
-        state[connection.qw_id].position = float(dof_quat_xyzw[3])
-        state[connection.qx_id].position = float(dof_quat_xyzw[0])
-        state[connection.qy_id].position = float(dof_quat_xyzw[1])
-        state[connection.qz_id].position = float(dof_quat_xyzw[2])
+        state[connection.x.id].position = float(dof_xyz[0])
+        state[connection.y.id].position = float(dof_xyz[1])
+        state[connection.z.id].position = float(dof_xyz[2])
+        state[connection.qw.id].position = float(dof_quat_xyzw[3])
+        state[connection.qx.id].position = float(dof_quat_xyzw[0])
+        state[connection.qy.id].position = float(dof_quat_xyzw[1])
+        state[connection.qz.id].position = float(dof_quat_xyzw[2])
 
     def _read_1dof_from_qpos(
         self, connection: ActiveConnection1DOF, qpos_adr: int
@@ -2646,13 +2646,13 @@ class MujocoSynchronizer(MultiSimSynchronizer):
         block at ``qpos_adr``. No-op if the DoF values match the previous
         snapshot within tolerance.
         """
-        ix = state_index[connection.x_id]
-        iy = state_index[connection.y_id]
-        iz = state_index[connection.z_id]
-        iqx = state_index[connection.qx_id]
-        iqy = state_index[connection.qy_id]
-        iqz = state_index[connection.qz_id]
-        iqw = state_index[connection.qw_id]
+        ix = state_index[connection.x.id]
+        iy = state_index[connection.y.id]
+        iz = state_index[connection.z.id]
+        iqx = state_index[connection.qx.id]
+        iqy = state_index[connection.qy.id]
+        iqz = state_index[connection.qz.id]
+        iqw = state_index[connection.qw.id]
 
         dof_indices = [ix, iy, iz, iqx, iqy, iqz, iqw]
         if numpy.allclose(

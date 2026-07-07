@@ -1,6 +1,6 @@
 from __future__ import annotations, absolute_import
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, Field
 from typing import Dict, Set, Any
 from uuid import UUID
 
@@ -22,6 +22,7 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
     from semantic_digital_twin.robots.robot_parts import (
         AbstractRobot,
         AbstractRobotPart,
@@ -383,6 +384,134 @@ class MismatchingWorld(UsageError):
             "bring everything into one world first, e.g. with "
             "world.merge_world(other_world) or world.merge_world_at_pose(other_world, pose)."
         )
+
+
+@dataclass
+class CannotBeAPartOf(UsageError):
+    """
+    Raised when ``add`` is called with a part that no part-whole relationship field of the
+    annotation accepts.
+    """
+
+    annotation: SemanticAnnotation
+    """
+    The annotation the part was being added to.
+    """
+
+    part: SemanticAnnotation
+    """
+    The part that could not be added.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.part).__name__} cannot be added as a part of "
+            f"{type(self.annotation).__name__}: no part-whole relationship field accepts it."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Check out the superclasses of {type(self.annotation).__name__}, to find the currently valid part-whole "
+            f"relationships, and if you think its currently incomplete, feel free to adjust it and make a PR for it"
+        )
+
+
+@dataclass
+class AmbiguousPart(UsageError):
+    """
+    Raised when ``add`` is called with a part whose type matches more than one part-whole
+    relationship field of the annotation, so the target field is ambiguous.
+    """
+
+    annotation: SemanticAnnotation
+    """
+    The annotation the part was being added to.
+    """
+
+    part: SemanticAnnotation
+    """
+    The part that could not be unambiguously added.
+    """
+
+    fields: List[Field]
+    """
+    The names of the part-whole relationship fields whose element type accepts the part.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.part).__name__} cannot be unambiguously added as a part of "
+            f"{type(self.annotation).__name__}: it matches multiple part-whole relationship fields "
+            f"({', '.join([field_.name for field_ in self.fields])})."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"consider if its practical to use the 'field_name' keyword argument for the `add` method to"
+            f" disambiguate the matching cases."
+        )
+
+
+@dataclass
+class UnknownPartWholeRelationshipField(UsageError):
+    """
+    Raised when ``add`` is called with a ``field_name`` that is not a part-whole relationship field
+    of the annotation.
+    """
+
+    annotation: HasRootBody
+    """
+    The annotation the part was being added to.
+    """
+
+    field_name: str
+    """
+    The field name that was requested but does not exist as a part-whole relationship field.
+    """
+
+    available_fields: List[str]
+    """
+    The names of the annotation's part-whole relationship fields.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.annotation).__name__} has no part-whole relationship field "
+            f"'{self.field_name}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"the available fields are:"
+            f" {', '.join(self.available_fields) or '(none)'}"
+        )
+
+
+@dataclass
+class MechanicalJointAlreadyMounted(UsageError):
+    """
+    Raised when a mechanical joint that already connects a child is mounted onto a different whole.
+    If you think a single Mechanical Joint should be able to have multiple children, contact @LucaKro.
+    """
+
+    joint: SemanticAnnotation
+    """
+    The mechanical joint being mounted.
+    """
+
+    main_has_root_body_annotation: SemanticAnnotation
+    """
+    The annotation (the whole) the joint was being mounted onto.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.joint).__name__} already connects a child and cannot be mounted onto "
+            f"{type(self.main_has_root_body_annotation).__name__}: a mechanical joint connects exactly one child."
+        )
+
+    def suggest_correction(self) -> str:
+        return f"if you think that you found a case where this error does not apply, please contact @LucaKro"
 
 
 @dataclass

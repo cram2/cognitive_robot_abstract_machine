@@ -8,10 +8,7 @@ from typing_extensions import List, TypeVar, Generic
 
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
 from krrood.entity_query_language.factories import variable
-from krrood.patterns.subclass_safe_generic import (
-    SubClassSafeGeneric,
-    AbstractSubClassSafeGeneric,
-)
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import T
 
 U = TypeVar("U")
@@ -19,7 +16,7 @@ V = TypeVar("V")
 
 
 @dataclass
-class FirstGeneric(SubClassSafeGeneric[T]):
+class FirstGeneric(Generic[T], SubClassSafeGeneric):
     attribute_using_generic: T
     generic_attribute_using_generic: List[T] = field(default_factory=list, kw_only=True)
 
@@ -68,7 +65,7 @@ T2 = TypeVar("T2")
 
 
 @dataclass
-class TwoGenericSubClassSafe(Generic[T, T2], AbstractSubClassSafeGeneric, ABC): ...
+class TwoGenericSubClassSafe(Generic[T, T2], SubClassSafeGeneric, ABC): ...
 
 
 @dataclass
@@ -84,7 +81,7 @@ class TwoGenericContainerBoundToBuiltIns(TwoGenericContainer[int, str]): ...
 
 
 @dataclass(eq=False)
-class GenericListClass(SubClassSafeGeneric[T], ABC):
+class GenericListClass(Generic[T], SubClassSafeGeneric, ABC):
     generic_variable: T = field(default=None)
     generic_list: list[T] = field(default_factory=list)
 
@@ -98,7 +95,7 @@ class CombinedClass(ExampleClass, GenericListClass[str]): ...
 
 
 @dataclass(eq=False)
-class OneGenericSubClassSafe(Generic[T], AbstractSubClassSafeGeneric, ABC):
+class OneGenericSubClassSafe(Generic[T], SubClassSafeGeneric, ABC):
     one_generic_first_argument: T
 
 

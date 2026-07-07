@@ -11,7 +11,7 @@ import types
 from collections import defaultdict
 from copy import deepcopy
 from dataclasses import Field
-from dataclasses import dataclass, field, fields, MISSING
+from dataclasses import fields, MISSING
 from functools import lru_cache, wraps
 from importlib.util import resolve_name
 from inspect import isclass
@@ -28,10 +28,9 @@ from typing_extensions import (
     Optional,
     Callable,
     TypeVarTuple,
-    Unpack,
+    _SpecialForm,
 )
 from typing_extensions import (
-    _SpecialForm,
     Iterable,
     Dict,
     get_origin,
@@ -71,49 +70,6 @@ def get_full_class_name(cls):
     :return: The full name of the class
     """
     return cls.__module__ + "." + cls.__name__
-
-
-@lru_cache
-def inheritance_path_length(child_class: Type, parent_class: Type) -> Optional[int]:
-    """
-    Calculate the inheritance path length between two classes.
-    Every inheritance level that lies between `child_class` and `parent_class` increases the length by one.
-    In case of multiple inheritance, the path length is calculated for each branch and the minimum is returned.
-
-    :param child_class: The child class.
-    :param parent_class: The parent class.
-    :return: The minimum path length between `child_class` and `parent_class` or None if no path exists.
-    """
-    if not (
-        isclass(child_class)
-        and isclass(parent_class)
-        and issubclass(child_class, parent_class)
-    ):
-        return None
-
-    return _inheritance_path_length(child_class, parent_class, 0)
-
-
-def _inheritance_path_length(
-    child_class: Type, parent_class: Type, current_length: int = 0
-) -> int:
-    """
-    Helper function for :func:`inheritance_path_length`.
-
-    :param child_class: The child class.
-    :param parent_class: The parent class.
-    :param current_length: The current length of the inheritance path.
-    :return: The minimum path length between `child_class` and `parent_class`.
-    """
-
-    if child_class == parent_class:
-        return current_length
-    else:
-        return min(
-            _inheritance_path_length(base, parent_class, current_length + 1)
-            for base in child_class.__bases__
-            if issubclass(base, parent_class)
-        )
 
 
 def module_and_class_name(t: Union[Type, _SpecialForm]) -> str:
@@ -427,6 +383,17 @@ def get_method_name(method: Callable) -> str:
     return method.__name__ if hasattr(method, "__name__") else str(method)
 
 
+def get_class_and_attribute_name(class_name: str, attribute_name: str) -> str:
+    """
+    Return the dot-qualified name ``"{class_name}.{attribute_name}"``.
+
+    :param class_name: The owner class name, typically ``SomeClass.__name__``.
+    :param attribute_name: The attribute or variable name to qualify.
+    :return: The qualified name string.
+    """
+    return f"{class_name}.{attribute_name}"
+
+
 def get_method_class_name_if_exists(method: Callable) -> Optional[str]:
     """
     Get the class name of a method if it has one.
@@ -622,7 +589,7 @@ def run_subprocess_on_file(command: List[str]):
         raise SubprocessExecutionError(command, e.returncode, e.stdout, e.stderr) from e
 
 
-def get_generic_type_params(
+def get_generic_type_parameters(
     cls,
     generic_base: Type,
     include_root_generic_base: bool = True,
@@ -632,7 +599,10 @@ def get_generic_type_params(
     Given a subclass and its generic base, return the concrete type parameter(s).
 
     Example:
-        get_generic_type_params(Employee, Role) -> (<class '__main__.Person'>,)
+        get_generic_type_parameters(Employee, Role) -> [<class '__main__.Person'>]
+
+    Direct parameterizations (e.g. ``class C(B, Generic[U])``) take priority over
+    an inherited binding discovered by recursing into an unparameterized base.
 
     :param cls: The subclass to check.
     :param generic_base: The generic base class to check against.

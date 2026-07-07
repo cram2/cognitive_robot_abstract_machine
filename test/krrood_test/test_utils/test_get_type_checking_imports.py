@@ -16,17 +16,19 @@ if TYPE_CHECKING:
 """
     test_file = tmp_path / "test_imports.py"
     test_file.write_text(source)
-    
+
     # Currently it returns a list of libcst nodes, but we want it to return a scope
     scope = get_scope_from_imports(str(test_file))
-    
+
     assert isinstance(scope, dict)
     assert scope["os"] == os
     assert scope["defaultdict"] == defaultdict
     assert "m" in scope
     import math
+
     assert scope["m"] == math
     assert scope["P"] == Path
+
 
 def test_get_type_checking_imports_typing_extensions(tmp_path):
     source = """
@@ -36,16 +38,17 @@ if typing_extensions.TYPE_CHECKING:
 """
     test_file = tmp_path / "test_imports_te.py"
     test_file.write_text(source)
-    
+
     scope = get_scope_from_imports(str(test_file))
-    
+
     assert isinstance(scope, dict)
     assert scope["sys"] == sys
+
 
 def test_get_type_checking_imports_already_in_sys_modules(tmp_path):
     # Ensure a module is in sys.modules
     import json
-    
+
     source = """
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -53,6 +56,6 @@ if TYPE_CHECKING:
 """
     test_file = tmp_path / "test_imports_sys.py"
     test_file.write_text(source)
-    
+
     scope = get_scope_from_imports(str(test_file))
     assert scope["json"] == json

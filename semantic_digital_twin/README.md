@@ -53,11 +53,11 @@ real-time world synchronization.
 Structures can be created, merged, and updated at once, 
 ensuring they are accurately reflected across all connected instances.
 
-🚀 Get started with the [user-guide](https://cram2.github.io/semantic_digital_twin/user_guide.html#user-guide)!
+🚀 Get started with the [user-guide](https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/user_guide.html#user-guide)!
 
-📖 Read the full [documentation](https://cram2.github.io/semantic_digital_twin/intro.html)!
+📖 Read the full [documentation](https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/intro.html)!
 
-🤝 Contribute with the [developer-guide](https://cram2.github.io/semantic_digital_twin/developer_guide.html#developer-guide)!
+🤝 Contribute with the [developer-guide](https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/developer_guide.html#developer-guide)!
 
 
 # User Installation
@@ -74,7 +74,7 @@ pip install -U semantic_digital_twin
 If you are interested in contributing, you can check out the source code from GitHub:
 
 ```bash
-git clone https://github.com/cram2/semantic_digital_twin.git
+git clone https://github.com/cram2/cognitive_robot_abstract_machine.git
 ```
 
 ### Development Dependencies

@@ -16,6 +16,7 @@ from semantic_digital_twin.exceptions import (
     InvalidPlaneDimensions,
     InvalidHingeActiveAxis,
     MissingSemanticAnnotationError,
+    MechanicalJointAlreadyMounted,
 )
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.semantic_annotations.mixins import (
@@ -25,12 +26,13 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasDoors,
     HasHandle,
     HasCaseAsRootBody,
-    HasHinge,
-    HasSlider,
+    HasMechanicalJoint,
     HasApertures,
     IsPerceivable,
     HasRootBody,
-    HasStorageSpace,
+    IsStorageSpace,
+    HasLegs,
+    HasSink,
 )
 from semantic_digital_twin.spatial_types import (
     Point3,
@@ -139,6 +141,10 @@ class Dishwasher(HasCaseAsRootBody, HasDoors, HasDrawers):
     A dishwasher is a kitchen appliance used for cleaning dishes, utensils, and cookware. It typically has a front door that opens to reveal racks for loading dirty items and a control panel for selecting wash cycles.
     """
 
+    @classproperty
+    def hole_direction(self) -> Vector3:
+        return Vector3.NEGATIVE_X()
+
 
 @dataclass(eq=False)
 class Aperture(HasRootRegion):
@@ -193,9 +199,71 @@ class Aperture(HasRootRegion):
             name, world, parent_T_self, scale=body_scale
         )
 
+    def _mount_strategy(self, main_has_root_body_annotation: HasRootBody) -> None:
+        # An aperture cuts its shape out of the whole's geometry, then mounts as a child.
+        self._remove_aperture_geometry_from_parent(main_has_root_body_annotation)
+        super()._mount_strategy(main_has_root_body_annotation)
+
+    def _remove_aperture_geometry_from_parent(self, parent: HasRootBody):
+        """
+        Remove the geometry of the aperture from the parent body's collision and visual geometry.
+
+        :param parent: The parent from which the aperture geometry is removed.
+        """
+
+        world = parent._world
+        world.update_forward_kinematics()
+        hole_event = self.root.area.as_bounding_box_collection_in_frame(
+            parent.root
+        ).event
+        wall_event = parent.root.collision.as_bounding_box_collection_in_frame(
+            parent.root
+        ).event
+        new_wall_event = wall_event - hole_event
+        new_bounding_box_collection = BoundingBoxCollection.from_event(
+            parent.root, new_wall_event
+        ).as_shapes()
+
+        parent.root.collision = new_bounding_box_collection
+        parent.root.visual = new_bounding_box_collection
+
 
 @dataclass(eq=False)
-class Hinge(HasRootBody):
+class MechanicalJoint(HasRootBody):
+    """
+    A mechanical joint is a physical entity that connects two bodies and allows one to move along or around a fixed axis
+    """
+
+    def _mount_strategy(self, main_has_root_body_annotation: HasRootBody) -> None:
+        """
+        Inserts the joint between the whole (``main_has_root_body_annotation``) and the whole's
+        current parent, preserving the whole's ancestry.
+        So
+        whole_parent -(fixed)-> whole
+        becomes
+        whole_parent -(active)-> joint -(fixed)-> whole. The joint keeps its active connection
+        (now anchored at the whole's parent); the whole hangs rigidly off the joint.
+        """
+        if (
+            main_has_root_body_annotation.root.parent_kinematic_structure_entity
+            == self.root
+        ):
+            return
+        # used instead of World.compute_child_kinematic_structure_entities because its memoized
+        if list(self._world.kinematic_structure.successors(self.root.index)):
+            raise MechanicalJointAlreadyMounted(self, main_has_root_body_annotation)
+
+        self._world.move_branch(
+            self.root,
+            main_has_root_body_annotation.root.parent_kinematic_structure_entity,
+        )
+        main_has_root_body_annotation._world.move_branch(
+            main_has_root_body_annotation.root, self.root
+        )
+
+
+@dataclass(eq=False)
+class Hinge(MechanicalJoint):
     """
     A hinge is a physical entity that connects two bodies and allows one to rotate around a fixed axis.
     """
@@ -206,7 +274,7 @@ class Hinge(HasRootBody):
 
 
 @dataclass(eq=False)
-class Slider(HasRootBody):
+class Slider(MechanicalJoint):
     """
     A Slider is a physical entity that connects two bodies and allows one to linearly translate along a fixed axis.
     """
@@ -221,7 +289,7 @@ class EntryWay(Aperture): ...
 
 
 @dataclass(eq=False)
-class Door(HasHandle, HasHinge):
+class Door(HasHandle, HasMechanicalJoint):
     """
     A door is a physical entity that has covers an opening, has a movable body and a handle.
     """
@@ -359,7 +427,7 @@ class DoubleDoor(SemanticAnnotation):
 
 
 @dataclass(eq=False)
-class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasSlider, HasStorageSpace):
+class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMechanicalJoint):
 
     @classproperty
     def hole_direction(self) -> Vector3:
@@ -384,37 +452,37 @@ class Table(Furniture, HasSupportingSurface):
 
 
 @dataclass(eq=False)
-class CounterTop(Furniture, HasSupportingSurface):
+class CounterTop(Furniture, HasSupportingSurface, HasSink):
     """
     A semantic annotation that represents a counter top.
     """
 
 
 @dataclass(eq=False)
-class Cabinet(Furniture, HasCaseAsRootBody, HasHandle):
+class Cabinet(Furniture, HasCaseAsRootBody, HasHandle, HasDoors, HasDrawers):
     @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.NEGATIVE_X()
 
 
 @dataclass(eq=False)
-class Fridge(Cabinet, HasDoors, HasDrawers): ...
+class Fridge(Cabinet): ...
 
 
 @dataclass(eq=False)
-class Oven(HasRootBody): ...
+class Oven(HasRootBody, HasDoors): ...
 
 
 @dataclass(eq=False)
-class Dresser(Cabinet, HasDrawers, HasDoors): ...
+class Dresser(Cabinet): ...
 
 
 @dataclass(eq=False)
-class Cupboard(Cabinet, HasDoors): ...
+class Cupboard(Cabinet): ...
 
 
 @dataclass(eq=False)
-class Wardrobe(Cabinet, HasDrawers, HasDoors): ...
+class Wardrobe(Cabinet): ...
 
 
 @dataclass(eq=False)
@@ -838,7 +906,7 @@ class CoffeeTable(Table):
 
 
 @dataclass(eq=False)
-class DiningTable(Table):
+class DiningTable(Table, HasLegs):
     """
     A dining table.
     """
@@ -852,7 +920,7 @@ class SideTable(Table):
 
 
 @dataclass(eq=False)
-class Desk(Table):
+class Desk(Table, HasLegs):
     """
     A desk.
     """
@@ -1118,3 +1186,16 @@ class DoorWithType(Door):
     """
 
     type_description: Optional[str] = field(kw_only=True, default=None)
+
+@dataclass(eq=False)
+class Leg(HasRootBody):
+    """
+    A leg that supports a piece of furniture.
+    """
+
+
+@dataclass(eq=False)
+class Cooktop(HasRootBody):
+    """
+    A cooktop surface for cooking.
+    """

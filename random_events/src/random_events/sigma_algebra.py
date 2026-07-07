@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field, InitVar
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, Optional
 import random_events_lib as rl
 from typing_extensions import Self, Iterable
 
@@ -133,8 +133,16 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
 
     simple_set_example: AbstractSimpleSet
     """
-    An example of a simple set that is used to create new simple sets. 
+    An example of a simple set that is used to create new simple sets.
     Fields that are python only are read from this instance when reading from cpp.
+    """
+
+    _simple_sets_cache: Optional[tuple] = field(
+        default=None, init=False, repr=False, compare=False
+    )
+    """
+    Lazy cache for simple_sets. Events are immutable after construction, so this
+    is safe. Avoids O(N) Python wrapper creation on every repeated access.
     """
 
     @classmethod
@@ -151,10 +159,12 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
         """
         :return: The simple sets contained in the union described by this set.
         """
-        return tuple(
-            self.simple_set_example._from_cpp(cpp_object)
-            for cpp_object in self.cpp_object.simple_sets
-        )
+        if self._simple_sets_cache is None:
+            self._simple_sets_cache = tuple(
+                self.simple_set_example._from_cpp(cpp_object)
+                for cpp_object in self.cpp_object.simple_sets
+            )
+        return self._simple_sets_cache
 
     def union_with(self, other: Self) -> Self:
         """
@@ -182,6 +192,25 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
         :return: The difference of this set with the other set
         """
         return self._from_cpp(self.cpp_object.difference_with(other.cpp_object))
+
+    def subtract_disjoint(self, other: Self) -> Self:
+        """
+        Subtract other from this via incremental bounded subtraction.
+
+        Equivalent to ``(self & ~other)`` but avoids computing the complement
+        in unbounded ambient space and never calls make_disjoint(), so it is
+        dramatically faster when self is a small bounded set (e.g. a search box)
+        and other has many pieces.
+
+        .. note::
+
+            Self must be a disjoint union (the invariant is maintained
+            throughout the subtraction).
+
+        :param other: The set to subtract.
+        :return: The difference as a disjoint composite set.
+        """
+        return self._from_cpp(self.cpp_object.subtract_disjoint(other.cpp_object))
 
     def __sub__(self, other) -> Self:
         return self.difference_with(other)
@@ -264,7 +293,7 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
         return self.cpp_object == other.cpp_object
 
     def __hash__(self) -> int:
-        return hash(tuple(self.simple_sets))
+        return hash(self.cpp_object)
 
     def __iter__(self) -> Iterable[AbstractSimpleSet]:
         return iter(self.simple_sets)

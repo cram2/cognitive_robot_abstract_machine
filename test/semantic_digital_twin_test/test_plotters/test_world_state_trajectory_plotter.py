@@ -31,11 +31,11 @@ def _build_simple_trajectory(world_setup, duration_s: float = 3.0, dt: float = 0
 
     # Use the prismatic connection r1->r2 for a changing DOF
     prismatic = world.get_connection(r1, r2)
-    dof_change = prismatic.dof_id
+    dof_change = prismatic.dof.id
 
     # Create a second DOF that remains constant to test suppression behavior
     second = world.get_connection(l1, l2)
-    dof_constant = second.dof_id
+    dof_constant = second.dof.id
 
     # Offset initial position of the changing DOF to exercise center_positions
     world.state[dof_change].position = 5.0

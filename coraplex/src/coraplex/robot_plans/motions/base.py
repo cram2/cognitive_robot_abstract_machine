@@ -4,9 +4,7 @@ import logging
 from abc import abstractmethod
 from dataclasses import dataclass
 from inspect import signature
-from typing import Optional
-
-from typing_extensions import TypeVar, Type
+from typing_extensions import TypeVar, Type, Optional
 
 from giskardpy.motion_statechart.graph_node import Task
 from coraplex.plans.designator import Designator
@@ -58,7 +56,9 @@ class BaseMotion(Designator):
         pass
 
     def get_alternative_motion(self) -> Optional[Type[AlternativeMotion]]:
-        return AlternativeMotion.check_for_alternative(self.robot, self.__class__)
+        return AlternativeMotion.check_for_alternative(
+            self.context.alternative_motion_mappings, self.robot, self.__class__
+        )
 
 
 MotionType = TypeVar("MotionType", bound=BaseMotion)

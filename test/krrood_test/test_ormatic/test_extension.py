@@ -1,7 +1,7 @@
 import importlib
 import importlib.util
 import sys
-from krrood.class_diagrams import ClassDiagram
+from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.helper import get_classes_of_ormatic_interface

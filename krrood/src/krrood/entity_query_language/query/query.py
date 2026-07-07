@@ -7,6 +7,7 @@ distinct handling, and quantification over symbolic expressions.
 
 from __future__ import annotations
 
+import uuid
 from abc import ABC
 from copy import copy
 from dataclasses import dataclass, field
@@ -21,6 +22,7 @@ from typing_extensions import (
     Union as TypingUnion,
     TYPE_CHECKING,
     List,
+    Set,
     Tuple,
     Callable,
     Self,
@@ -28,6 +30,7 @@ from typing_extensions import (
 )
 
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
+from krrood.entity_query_language.core.expression_structure import chain_root
 from krrood.entity_query_language.query.builders import (
     WhereBuilder,
     HavingBuilder,
@@ -498,6 +501,19 @@ class Query(
             self._grouped_by_builder_ is not None
         )
 
+    @property
+    def is_constrained_or_grouped(self) -> bool:
+        """
+        :return: ``True`` when this query carries a ``WHERE``, ``HAVING``, or
+            non-empty ``GROUP BY`` clause (i.e. it filters beyond its selection or groups results).
+        """
+        if self._where_expression_ is not None:
+            return True
+        if self._having_expression_ is not None:
+            return True
+        grouped = self._grouped_by_expression_
+        return grouped is not None and bool(grouped.variables_to_group_by)
+
     @cached_property
     def _aggregators_and_non_aggregators_in_selection_(
         self,
@@ -507,19 +523,46 @@ class Query(
         """
         aggregated_variables = []
         non_aggregated_variables = []
-        for variable in self._selected_variables_:
-            if isinstance(variable, Aggregator):
-                aggregated_variables.append(variable)
-            elif isinstance(variable, InstantiatedVariable):
-                non_aggregated_variables.extend(variable._operation_children_)
+
+        def _update_aggregated_and_non_aggregated_variables(
+            variable_: SymbolicExpression,
+        ):
+            """
+            Update the aggregated and non-aggregated variable collections based on the given variable.
+
+            :param variable_: The variable to check.
+            """
+            if isinstance(variable_, Aggregator):
+                aggregated_variables.append(variable_)
+            elif isinstance(variable_, InstantiatedVariable):
+                for child in variable_._operation_children_:
+                    _update_aggregated_and_non_aggregated_variables(child)
             elif (
-                isinstance(variable, ExternallySetVariable)
-                and variable._domain_source_ == DomainSource.DEDUCTION
+                isinstance(variable_, ExternallySetVariable)
+                and variable_._domain_source_ == DomainSource.DEDUCTION
             ):
-                continue
+                pass
             else:
-                non_aggregated_variables.append(variable)
+                non_aggregated_variables.append(variable_)
+
+        for variable in self._selected_variables_:
+            _update_aggregated_and_non_aggregated_variables(variable)
         return aggregated_variables, non_aggregated_variables
+
+    def aggregated_selections(
+        self, group_key_root_ids: Set[uuid.UUID]
+    ) -> List[SymbolicExpression]:
+        """
+        :param group_key_root_ids: The chain-root variable ids of the GROUP BY keys (see
+            :attr:`~krrood.entity_query_language.query.operations.GroupedBy.group_key_root_ids`).
+        :return: The selected expressions aggregated over those keys — i.e. the selections that are
+            not themselves group keys.
+        """
+        return [
+            variable
+            for variable in self._selected_variables_
+            if variable._id_ not in group_key_root_ids
+        ]
 
     def _apply_results_mapping_(
         self, results: Iterator[OperationResult]
@@ -596,3 +639,31 @@ class Entity(Query[T]):
     @property
     def selected_variable(self):
         return self._selected_variables_[0] if self._selected_variables_ else None
+
+    @property
+    def selected_aggregator(self) -> "Optional[Aggregator]":
+        """
+        :return: The :class:`~krrood.entity_query_language.operators.aggregators.Aggregator`
+            this entity selects, or ``None`` when its selection is not an aggregator.
+        """
+        var = self.selected_variable
+        return var if isinstance(var, Aggregator) else None
+
+    def aggregated_selections(
+        self, group_key_root_ids: Set[uuid.UUID]
+    ) -> List[SymbolicExpression]:
+        """
+        When the selection is an :class:`InstantiatedVariable`, its aggregated fields are the child
+        variables not rooted in a group key; otherwise the generic per-selection rule applies.
+
+        :param group_key_root_ids: The chain-root variable ids of the GROUP BY keys.
+        :return: The selected expressions aggregated over those keys.
+        """
+        selected = self.selected_variable
+        if isinstance(selected, InstantiatedVariable):
+            return [
+                child
+                for child in selected._child_vars_.values()
+                if chain_root(child)._id_ not in group_key_root_ids
+            ]
+        return super().aggregated_selections(group_key_root_ids)

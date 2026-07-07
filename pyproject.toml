@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cognitive-robot-abstract-machine"
 version = "0.1.0"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.12,<3.13"
 description = "Meta-package that wires local subprojects together"
 readme = "README.md"
 authors = [{ name = "AICOR Institute", email = "you@example.com" }]
@@ -30,8 +30,39 @@ dependencies = [
 dev = [
     "pytest>=7.0.0,<8.0.0",
     "pytest-asyncio>=0.23.0,<0.24.0",
-    "pytest-xdist"
+    "pytest-xdist",
+    "objgraph",
+    "bokeh",
+]
 
+# Requirements for building the documentation of all sub-packages.
+# Collected from the doc/requirements.txt files of the workspace members
+# (coraplex, krrood, probabilistic_model, random_events, semantic_digital_twin).
+# Workspace packages (e.g. random-events) are omitted since they are core dependencies.
+doc = [
+    "jupyter-book<2.0.0",
+    "jupyter",
+    "ghp-import",
+    "nbconvert",
+    "jupytext",
+    "jupyterquiz",
+    "sphinx-autoapi",
+    "sphinx-proof",
+    "sphinxcontrib-plantuml",
+    "sphinxcontrib-mermaid",
+    "Pygments>=2.15.0",
+    "pylint",
+    "matplotlib",
+    "numpy",
+    "scipy",
+    "pillow",
+    "graphviz",
+    "polytope",
+    "ortools",
+    "cvxopt",
+    "treon",
+    "jupytext",
+    "jupyterquiz",
 ]
 
 [tool.uv.workspace]
@@ -74,3 +105,8 @@ experiments = { path = "experiments", develop = true }
 
 [tool.setuptools]
 packages = []
+
+[tool.docformatter]
+make-summary-multi-line = true
+pre-summary-newline = true
+close-quotes-on-newline = true

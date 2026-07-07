@@ -13,11 +13,18 @@ from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from krrood.symbolic_math.symbolic_math import trinary_logic_and
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     FixedConnection,
+    PrismaticConnection,
+)
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -87,12 +94,10 @@ def mini_world():
 def init_rospy():
 
     rospy.init_node("giskard")
-    rospy.node.get_logger().info("init ros")
 
     try:
         yield None
     finally:
-        print("kill ros")
         # Cleanly reset TF and shutdown ROS2 node/executor
         rospy.shutdown()
 
@@ -160,11 +165,6 @@ def kitchen_setup(giskard_better_pose: GiskardTester) -> GiskardTester:
 
 
 @pytest.fixture()
-def dlr_kitchen_setup(better_pose: GiskardTester) -> GiskardTester:
-    raise NotImplementedError("DLR kitchen setup is not yet implemented")
-
-
-@pytest.fixture()
 def apartment_setup(giskard_better_pose: GiskardTester) -> GiskardTester:
     giskard_better_pose.default_env_name = "iai_apartment"
     kitchen_urdf = load_xacro("package://iai_apartment/urdf/apartment.urdf")
@@ -179,3 +179,61 @@ def apartment_setup(giskard_better_pose: GiskardTester) -> GiskardTester:
         ),
     )
     return giskard_better_pose
+
+
+def _symmetric_prismatic_limits(
+    position: float | None, velocity: float
+) -> DegreeOfFreedomLimits:
+    """
+    Builds symmetric prismatic degree-of-freedom limits with no acceleration or jerk bound.
+    """
+    return DegreeOfFreedomLimits(
+        lower=DerivativeMap(
+            position=None if position is None else -position,
+            velocity=-velocity,
+            acceleration=None,
+            jerk=None,
+        ),
+        upper=DerivativeMap(
+            position=position, velocity=velocity, acceleration=None, jerk=None
+        ),
+    )
+
+
+def _make_prismatic_world(dof_limits: list[DegreeOfFreedomLimits]) -> World:
+    """
+    Builds a world with one Z-axis prismatic connection per given degree-of-freedom limit set.
+    """
+    world = World()
+    with world.modify_world():
+        map_body = Body(name=PrefixedName("map"))
+        for index, limits in enumerate(dof_limits):
+            child = Body(
+                name=PrefixedName("robot" if index == 0 else f"robot{index + 1}")
+            )
+            dof = DegreeOfFreedom(limits=limits, has_hardware_interface=True)
+            world.add_degree_of_freedom(dof)
+            world.add_connection(
+                PrismaticConnection(
+                    parent=map_body, child=child, raw_dof=dof, axis=Vector3.Z()
+                )
+            )
+    MinimalRobot.from_world(world)
+    return world
+
+
+@pytest.fixture()
+def prismatic_bot():
+    return _make_prismatic_world([_symmetric_prismatic_limits(1, 1)])
+
+
+@pytest.fixture()
+def prismatic_bot2():
+    return _make_prismatic_world(
+        [_symmetric_prismatic_limits(1, 1), _symmetric_prismatic_limits(0.5, 0.5)]
+    )
+
+
+@pytest.fixture()
+def prismatic_world_no_position_limits():
+    return _make_prismatic_world([_symmetric_prismatic_limits(None, 1)])
