@@ -253,12 +253,14 @@ class SymbolicExpression(ABC):
         """
         :return: The most recently attached parent that is an instance of any of *types*, or ``None``.
 
-        A node reused across positions in the DAG has several parents, so its *current* structural
-        position is not a single value — it is the last parent of the wanted type to be attached.
-        The ``_parents_`` list preserves attachment order precisely so that "most recent" is
-        recoverable; the order is load-bearing, not incidental. ``_parent_`` cannot serve here
-        because it holds only the last parent set and is clobbered when a shared node is reused (for
-        example a ``MappedVariable`` used both as a WHERE condition and inside a sibling condition).
+        A node reused across the DAG has several parents at once, so there is no single "current"
+        parent. ``_parent_`` holds only the last parent set, and building an unrelated expression
+        over the node (for example ``node == False``) overwrites it with that operand parent,
+        hiding the structural rule-tree parent. This scans the full ``_parents_`` history and
+        returns the most recent parent restricted to the wanted structural *types* (``Filter`` /
+        ``ConclusionSelector``), skipping such incidental operand parents. The type filter is what
+        excludes the clobbering parent; "most recent" only breaks ties between several structural
+        parents, mirroring ``_parent_``'s own last-wins rule.
         """
         return next(
             (parent for parent in reversed(self._parents_) if isinstance(parent, types)),
