@@ -11,7 +11,4 @@ systems using behavior trees. It includes:
 * Common data structures for perception data
 """
 
-try:
-    from ._version import __version__
-except ImportError:
-    __version__ = "0.0.0"
+from ._version import __version__

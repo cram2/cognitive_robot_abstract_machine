@@ -1,10 +1,7 @@
 import os
 import threading
 
-try:
-    from ._version import __version__
-except ImportError:
-    __version__ = "0.0.0"
+from ._version import __version__
 
 
 def preload_matplotlib():
