@@ -1,24 +1,33 @@
 #!/bin/bash
 set -euo pipefail
 
-# Personal-only Claude Code notes for abdelrhmanbassiouny's fork.
+# Generic, opt-in personal Claude Code notes hook.
 #
-# These notes (draft-PR-by-default, bug-fix labeling, etc.) live on the
-# `claude/personal-notes` branch only and must never reach `main`. This hook
-# fetches that branch's file straight from the remote (without checking it out
-# or merging it into the working branch) and writes it to CLAUDE.local.md,
-# which Claude Code loads automatically as project memory but which stays out
-# of git history for every other branch (see .gitignore).
+# Populates CLAUDE.local.md (gitignored, never committed on any branch) from a
+# personal branch on `origin` that each contributor names for themselves via
+# local git config, so this stays a complete no-op for anyone who hasn't opted
+# in, and collision-free for multiple contributors sharing one origin remote
+# (each points at their own branch name instead of one hardcoded literal).
+#
+# Opt in once, locally, per clone (never committed):
+#   git config claude.personalNotesBranch <your-branch-name>
+#   git config claude.personalNotesPath   <path-on-that-branch>   # optional
+#
+# With claude.personalNotesBranch unset, this exits immediately: no fetch, no
+# write, no effect for anyone who hasn't configured it.
 #
 # Safe to re-run: it only ever overwrites CLAUDE.local.md, and does nothing if
-# the personal-notes branch or file isn't reachable (e.g. a fresh clone that
-# doesn't have it, or a fork that never created it).
+# the configured branch or path isn't reachable (e.g. a fresh clone, or a fork
+# that never created it).
 
-NOTES_BRANCH="origin/claude/personal-notes"
-NOTES_PATH=".claude/personal/cram-notes.md"
+NOTES_BRANCH="$(git config --get claude.personalNotesBranch || true)"
+[ -n "${NOTES_BRANCH}" ] || exit 0
 
-git fetch origin claude/personal-notes --quiet 2>/dev/null || exit 0
+NOTES_PATH="$(git config --get claude.personalNotesPath || true)"
+NOTES_PATH="${NOTES_PATH:-.claude/personal/cram-notes.md}"
 
-if git cat-file -e "${NOTES_BRANCH}:${NOTES_PATH}" 2>/dev/null; then
-  git show "${NOTES_BRANCH}:${NOTES_PATH}" > CLAUDE.local.md
+git fetch origin "${NOTES_BRANCH}" --quiet 2>/dev/null || exit 0
+
+if git cat-file -e "origin/${NOTES_BRANCH}:${NOTES_PATH}" 2>/dev/null; then
+  git show "origin/${NOTES_BRANCH}:${NOTES_PATH}" > CLAUDE.local.md
 fi
