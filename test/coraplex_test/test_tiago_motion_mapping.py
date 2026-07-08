@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from control_msgs.action import ParallelGripperCommand
 from coraplex.datastructures.enums import ExecutionType, Arms
+from semantic_digital_twin.datastructures.definitions import GripperState
 from giskardpy.motion_statechart.goals.cartesian_goals import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.ros2_nodes.ros_tasks import (
     RobotiqGripperActionServerTask,
@@ -54,74 +55,76 @@ class TestTiagoGripMotion:
     Unit tests for TiagoGripMotion plan configuration wrapper.
     """
 
-    @pytest.fixture
-    def mock_grip_motion(self):
+    def test_mutual_exclusivity_validation(self):
         """
-        Helper factory fixture to construct TiagoGripMotion and mock out its fields
-        manually, matching constructor signature requirements.
+        Verify instantiation rules reject missing or overloaded parameters.
         """
+        # Neither parameter provided
+        with pytest.raises(ValueError, match="You must specify either 'motion' or 'position'."):
+            TiagoGripMotion(gripper=Arms.LEFT)
 
-        def _create_motion(gripper, target_position=0.0):
-            # Satisfy base constructor requirement by passing mock positional arguments
-            motion = TiagoGripMotion(motion=MagicMock(), gripper=gripper)
+        # Both parameters provided
+        with pytest.raises(ValueError, match="Cannot specify both 'motion' and 'position' at the same time."):
+            TiagoGripMotion(gripper=Arms.LEFT, motion=GripperState.OPEN, position=0.05)
 
-            # Explicitly bind fields that the property method reads for validation
-            motion.gripper = gripper
-            motion.target_position = target_position
-            return motion
-
-        return _create_motion
-
-    def test_motion_chart_left_arm(self, mock_grip_motion):
+    def test_motion_chart_left_arm_semantic_open(self):
         """
-        Verify Left Arm routing configures the proper topic and task.
+        Verify Left Arm discrete open state maps onto the proper topic and target metrics.
         """
-        motion = mock_grip_motion(gripper=Arms.LEFT, target_position=0.045)
+        motion = TiagoGripMotion(gripper=Arms.LEFT, motion=GripperState.OPEN)
         chart = motion._motion_chart
 
         assert isinstance(chart, RobotiqGripperActionServerTask)
-        assert (
-            chart.action_topic == "/left_gripper/robotiq_gripper_controller/gripper_cmd"
-        )
+        assert chart.action_topic == "/left_gripper/robotiq_gripper_controller/gripper_cmd"
         assert chart.message_type == ParallelGripperCommand
-        assert motion.target_position == 0.045
+        assert chart.target_position == 0.0
 
-    def test_motion_chart_right_arm(self, mock_grip_motion):
+    def test_motion_chart_right_arm_semantic_close(self):
         """
-        Verify Right Arm routing configures the proper topic and task.
+        Verify Right Arm discrete close state maps onto the proper topic and target metrics.
         """
-        motion = mock_grip_motion(gripper=Arms.RIGHT, target_position=0.120)
+        motion = TiagoGripMotion(gripper=Arms.RIGHT, motion=GripperState.CLOSE)
         chart = motion._motion_chart
 
         assert isinstance(chart, RobotiqGripperActionServerTask)
-        assert (
-            chart.action_topic
-            == "/right_gripper/robotiq_gripper_controller/gripper_cmd"
-        )
+        assert chart.action_topic == "/right_gripper/robotiq_gripper_controller/gripper_cmd"
         assert chart.message_type == ParallelGripperCommand
-        assert motion.target_position == 0.120
+        assert chart.target_position == 0.7
 
-    def test_motion_chart_missing_gripper_raises_error(self, mock_grip_motion):
+    def test_motion_chart_custom_position(self):
+        """
+        Verify that passing an explicit position overrides the semantic mappings.
+        """
+        custom_position = 0.35
+        motion = TiagoGripMotion(gripper=Arms.LEFT, position=custom_position)
+        chart = motion._motion_chart
+
+        assert isinstance(chart, RobotiqGripperActionServerTask)
+        assert chart.target_position == custom_position
+
+    def test_motion_chart_missing_gripper_raises_error(self):
         """
         An unassigned gripper token must bubble up a ValueError.
         """
-        motion = mock_grip_motion(gripper=None, target_position=0.05)
+        # Explicitly patch or pass None to verify enforcement inside the property block
+        motion = TiagoGripMotion(gripper=Arms.LEFT, motion=GripperState.OPEN)
+        motion.gripper = None
 
         with pytest.raises(ValueError, match="No gripper specified"):
             _ = motion._motion_chart
 
-    def test_motion_chart_unsupported_gripper_raises_error(self, mock_grip_motion):
+    def test_motion_chart_unsupported_gripper_raises_error(self):
         """
         An invalid arm identifier must bubble up a ValueError.
         """
-        motion = mock_grip_motion(gripper="INVALID_ARM_NAME", target_position=0.05)
+        motion = TiagoGripMotion(gripper="INVALID_ARM_NAME", motion=GripperState.OPEN)
 
         with pytest.raises(ValueError, match="Unsupported gripper INVALID_ARM_NAME"):
             _ = motion._motion_chart
 
-    def test_perform_logs_action(self, mock_grip_motion):
+    def test_perform_logs_action(self):
         """
         Ensure perform() executes without throwing unexpected side-effects.
         """
-        motion = mock_grip_motion(gripper=Arms.LEFT, target_position=0.0)
+        motion = TiagoGripMotion(gripper=Arms.LEFT, motion=GripperState.OPEN)
         assert motion.perform() is None

@@ -1,55 +1,45 @@
 import logging
+from dataclasses import dataclass
 from typing import Optional
-from giskardpy.motion_statechart.goals.cartesian_goals import DifferentialDriveBaseGoal
-from coraplex.datastructures.enums import ExecutionType
-from coraplex.robot_plans.motions.base import AlternativeMotion
-from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.datastructures.definitions import GripperState
+
+
 from giskardpy.motion_statechart.ros2_nodes.ros_tasks import (
-    NavigateActionServerTask,
     ActionServerTask,
     RobotiqGripperActionServerTask,
 )
 from control_msgs.action import ParallelGripperCommand
+
+from semantic_digital_twin.robots.tracy import Tracy
 from coraplex.datastructures.enums import ExecutionType, Arms
 from coraplex.view_manager import ViewManager
 from coraplex.robot_plans import (
-    MoveMotion,
+    MoveJointsMotion,
     MoveToolCenterPointMotion,
     LookingMotion,
     MoveGripperMotion,
 )
 
-try:
-    from nav2_msgs.action import NavigateToPose
-except ModuleNotFoundError:
-    NavigateToPose = None
+from coraplex.robot_plans.motions.base import AlternativeMotion
 
 logger = logging.getLogger(__name__)
 
+class TracyJointMotionMapping(MoveJointsMotion,AlternativeMotion[Tracy]):
 
-class TiagoMoveSim(MoveMotion, AlternativeMotion[Tiago]):
-    """
-    Uses a diff drive goal for the tiago base.
-    """
-
-    execution_type = ExecutionType.REAL
+    execution_type =  ExecutionType.REAL
 
     def perform(self):
+        logger.debug(f"performing {self.__class__.__name__}")
         return
 
     @property
     def _motion_chart(self):
+        joint_goal = super()._motion_chart
 
-        world_T_target = self.world.transform(self.target, self.world.root)
-        world_T_target.z = 0
-        return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.01)
+        return joint_goal
 
-
-class TiagoGripMotion(MoveGripperMotion, AlternativeMotion[Tiago]):
-    """
-    Uses RobotiqGripperActionServerTask to move Tiago's gripper.
-    """
+class TracyGripMotion(MoveGripperMotion, AlternativeMotion[Tracy]):
+    execution_type = ExecutionType.REAL
 
     def __init__(
             self,
@@ -89,7 +79,6 @@ class TiagoGripMotion(MoveGripperMotion, AlternativeMotion[Tiago]):
         else:
             raise ValueError(f"Unsupported gripper {self.gripper}")
 
-        # 5. Determine targets based on which mode was provided
         if self.position is not None:
             target_position = self.position
         else:
@@ -105,23 +94,3 @@ class TiagoGripMotion(MoveGripperMotion, AlternativeMotion[Tiago]):
             message_type=ParallelGripperCommand,
             target_position=target_position,
         )
-
-# class TiagoMoveSim(MoveMotion, AlternativeMotion[Tiago]):
-#     """
-#     Uses a Nav2 action server to move the simulated Tiago base.
-#     """
-#
-#     execution_type = ExecutionType.SIMULATED
-#
-#     def perform(self):
-#         return
-#
-#     @property
-#     def _motion_chart(self) -> NavigateActionServerTask:
-#
-#         return NavigateActionServerTask(
-#             target_pose=self.target,
-#             base_link=self.robot.root,
-#             action_topic="/navigate_to_pose",
-#             message_type=NavigateToPose,
-#         )
