@@ -89,7 +89,15 @@ def is_builtin_class(clazz: Type) -> bool:
 
 def is_external_module(module) -> bool:
     """
-    Check if a module is external to the project.
+    Check if a module is external to the project, i.e. one whose source is not searched when
+    resolving a project class's forward references.
+
+    Only the standard library and builtins are treated as external. A module installed under
+    ``site-packages``/``dist-packages`` is *not* external: a pip-installed project package lives
+    there, and excluding it would leave every installed project class unable to resolve its own
+    ``TYPE_CHECKING`` forward references (:func:`resolve_name_in_hierarchy` searches each base's
+    module source). A genuinely third-party ``site-packages`` module simply will not contain the
+    project name being resolved, so searching it is harmless.
 
     :param module: The module to check.
     :return: True if the module is external, False otherwise.
@@ -104,9 +112,6 @@ def is_external_module(module) -> bool:
 
     file_path = module.__file__
     if file_path is None:
-        return True
-
-    if "site-packages" in file_path or "dist-packages" in file_path:
         return True
 
     # Handle standard library modules (this is a bit heuristic)
