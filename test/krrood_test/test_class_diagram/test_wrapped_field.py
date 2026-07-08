@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import fields, Field
+from dataclasses import dataclass, field, fields, Field
 from types import NoneType
 
-from typing_extensions import Type
+from typing_extensions import List, Type, TypeVar
 
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.utils import common_base_class
@@ -113,6 +113,41 @@ def test_is_specialized_generic():
     )
     assert associated_value_not_parametrized_list.is_container
     assert not associated_value_not_parametrized_list.is_instantiation_of_generic_class
+
+
+class TypeVariableBound:
+    """Bound used by the bounded-type-variable mimic below."""
+
+
+_unbounded_type_variable = TypeVar("_unbounded_type_variable")
+_bounded_type_variable = TypeVar("_bounded_type_variable", bound=TypeVariableBound)
+
+
+@dataclass
+class FieldTypedAsUnboundedTypeVariable:
+    items: List[_unbounded_type_variable] = field(default_factory=list)
+
+
+@dataclass
+class FieldTypedAsBoundedTypeVariable:
+    items: List[_bounded_type_variable] = field(default_factory=list)
+
+
+def test_unbounded_type_variable_field_is_underspecified():
+    wrapped_class = WrappedClass(clazz=FieldTypedAsUnboundedTypeVariable)
+    wrapped_field = WrappedField(
+        wrapped_class, get_field_by_name(FieldTypedAsUnboundedTypeVariable, "items")
+    )
+    assert wrapped_field.is_underspecified_generic
+
+
+def test_bounded_type_variable_field_is_specified_to_its_bound():
+    wrapped_class = WrappedClass(clazz=FieldTypedAsBoundedTypeVariable)
+    wrapped_field = WrappedField(
+        wrapped_class, get_field_by_name(FieldTypedAsBoundedTypeVariable, "items")
+    )
+    assert not wrapped_field.is_underspecified_generic
+    assert wrapped_field.type_endpoint is TypeVariableBound
 
 
 def test_common_base_class():

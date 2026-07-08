@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+from typing import List, Any
+
 import pytest
 
 from krrood.parametrization.exceptions import InvalidEllipsis
@@ -12,8 +15,11 @@ from random_events.interval import singleton, reals
 from ..dataset.example_classes import (
     KRROODPosition,
     TestEnum,
+    ListOfEnum,
     EnumAction,
+    ActionWithMissingAggregationsMixin,
 )
+from ..dataset.semantic_world_like_classes import Cabinet, Container, Body, Handle
 
 
 def test_enum_domain():
@@ -84,3 +90,66 @@ def test_union_types():
     parameters = UnderspecifiedParameters(prob_q)
     variables = parameters.variables
     assert variables["KRROODPosition.x"].domain == reals()
+
+
+def test_domain_object_with_exchangeable_parts_but_no_aggregation_mixin_is_skipped():
+    """
+    Prove that a domain object whose class has exchangeable parts but does not inherit
+    from HasExchangeablePartAggregations produces no variables for those parts and
+    raises no exception.
+    """
+    container = Container(name="container")
+    cabinet = Cabinet(container=container)
+    prob_q = underspecified(ActionWithMissingAggregationsMixin)(
+        domain_object=variable(Cabinet, [cabinet])
+    )
+    parameters = UnderspecifiedParameters(prob_q)
+    assert not any("drawers" in name for name in parameters.variables)
+
+
+def test_iterable_of_primitives_produces_indexed_variables():
+    """
+    Each primitive element in a list literal must produce a distinct conditioning
+    variable named ``ClassName.field[index]`` in ``parameters.variables``.
+
+    Regression test for a bug in ``_extract_variables_from_iterable_literal``
+    where the return value of ``_handle_compatible_type_literal`` was discarded,
+    so primitive elements were silently dropped from the returned variable dict.
+
+    A ``List[Any]`` field is used because ``issubclass(Any, compatible_types)``
+    returns ``False``, which bypasses the outer type-mismatch guard and lets the
+    list reach ``_extract_variables_from_iterable_literal`` while still having
+    float elements that satisfy ``isinstance(element, compatible_types)``.
+    """
+    @dataclass
+    class FloatMeasurements:
+        readings: List[Any]
+
+    prob_q = underspecified(FloatMeasurements)(readings=[1.0, 2.0, 3.0])
+    parameters = UnderspecifiedParameters(prob_q)
+
+    assert "FloatMeasurements.readings[0]" in parameters.variables
+    assert "FloatMeasurements.readings[1]" in parameters.variables
+    assert "FloatMeasurements.readings[2]" in parameters.variables
+
+
+def test_list_of_enum_field_produces_indexed_variables():
+    """
+    Assigning a literal list of enum values to a ``List[EnumType]`` field must
+    produce one conditioning variable per element, named ``ClassName.field[index]``.
+
+    Regression test for a bug in the type-mismatch guard in
+    ``_handle_literal_attribute_match``: the guard fired for any value that was
+    not itself in ``compatible_types``, including lists.  Because the EQL system
+    strips the ``List[...]`` container and exposes only the element type as
+    ``_type_``, a ``List[TestEnum]`` field and a bare ``TestEnum`` field were
+    indistinguishable, so assigning a list to the former raised ``TypeError``
+    instead of forwarding to ``_extract_variables_from_iterable_literal``.
+    """
+    prob_q = underspecified(ListOfEnum)(
+        list_of_enum=[TestEnum.OPTION_A, TestEnum.OPTION_B]
+    )
+    parameters = UnderspecifiedParameters(prob_q)
+
+    assert "ListOfEnum.list_of_enum[0]" in parameters.variables
+    assert "ListOfEnum.list_of_enum[1]" in parameters.variables

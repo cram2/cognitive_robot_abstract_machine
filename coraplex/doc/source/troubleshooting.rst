@@ -44,7 +44,7 @@ Error when performing Actions or Motions
 
 If you get an error like this when trying to perform an action or motion designator, then you did not specify how the
 designator should be executed. You can specify how the designator should be performed by using the simulated_robot or
-real_robot environments. This is also explained in the `Action Designator Example <https://coraplex.readthedocs.io/en/latest/notebooks/action_designator.html#Navigate-Action>`_.
+real_robot environments. This is also explained in the `Action Designator Example <https://cram2.github.io/cognitive_robot_abstract_machine/coraplex/notebooks/action_designator.html#Navigate-Action>`_.
 
 .. code-block:: python
 

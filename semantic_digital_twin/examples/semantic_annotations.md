@@ -108,7 +108,7 @@ class ProduceBox(HasCaseAsRootBody):
 ```
  
 This is our first semantic annotation! They need to be dataclasses, because it makes it trivial to create datastructures which can be used 
-by [KRROOD's ORMatic](https://github.com/code-iai/krrood/tree/main/src/krrood/ormatic) to automatically create ORM tables from python classes. 
+by [KRROOD's ORMatic](https://cram2.github.io/cognitive_robot_abstract_machine/krrood/ormatic/intro.html) to automatically create ORM tables from python classes. 
 Furthermore they need to have the `eq=False` flag, because otherwise the hash function defined in the `SemanticAnnotation` base class would be overridden.
 
 ```{code-cell} ipython3

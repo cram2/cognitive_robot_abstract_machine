@@ -6,7 +6,7 @@ from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.action.server import ServerGoalHandle
 from rclpy.timer import Timer
 
-from giskardpy.data_types.exceptions import GiskardException
+from giskardpy.data_types.exceptions import MissingActionResultError
 from giskardpy.utils.decorators import record_time
 from giskardpy.middleware.ros2 import rospy
 
@@ -96,7 +96,7 @@ class ActionServerHandler:
     @property
     def result_msg(self):
         if self._result_msg is None:
-            raise GiskardException("no result message set.")
+            raise MissingActionResultError()
         return self._result_msg
 
     @result_msg.setter

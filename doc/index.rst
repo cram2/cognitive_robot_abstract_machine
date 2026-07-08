@@ -57,8 +57,8 @@ CRAM consists of the following sub-packages:
    Events <https://cram2.github.io/cognitive_robot_abstract_machine/random_events>`__
    is a Python library to provide a simple and flexible way to generate events that are suitable for probabilistic reasoning.
 
-.. mermaid:: img/architecture_diagram.mmd
-    :caption: Architecture Diagram
+.. image:: img/cronut.svg
+    :alt: Architecture Diagram
 
 .. _ref-to-installation:
 
@@ -174,9 +174,9 @@ Research & Publications
   (2025). [Online]. Available: https://github.com/cram2/coraplex
 | [5] T. Schierenbeck, probabilistic_model: A Python package for
   probabilistic models. (Jul. 01, ). [Online]. Available:
-  https://github.com/tomsch420/probabilistic_model
+  https://github.com/cram2/cognitive_robot_abstract_machine
 | [6] T. Schierenbeck, Random-Events. (Apr. 01, 2002). [Online].
-  Available: https://github.com/tomsch420/random-events
+  Available: https://github.com/cram2/cognitive_robot_abstract_machine
 | [7] S. Stelter, “A Robot-Agnostic Kinematic Control Framework: Task
   Composition via Motion Statecharts and Linear Model Predictive
   Control,” Universität Bremen, 2025. doi: 10.26092/ELIB/3743.

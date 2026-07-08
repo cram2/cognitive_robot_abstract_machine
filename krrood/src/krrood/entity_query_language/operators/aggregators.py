@@ -36,6 +36,7 @@ from krrood.entity_query_language.exceptions import (
 )
 from krrood.entity_query_language.utils import T
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
+from random_events.interval import SimpleInterval, Bound
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.query.query import Entity
@@ -116,6 +117,42 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         """
         ...
 
+    @property
+    def _source_root_(self) -> Optional[Any]:
+        """
+        :return: The root :class:`~krrood.entity_query_language.core.variable.Variable`
+            this aggregator aggregates over (e.g. the ``BankTransaction`` behind
+            ``max(t.amount_details.amount)``), or ``None`` when the child is not rooted
+            in a variable.
+        """
+        from krrood.entity_query_language.core.mapped_variable import MappedVariable
+        from krrood.entity_query_language.core.variable import Variable
+
+        child = self._child_
+        root = child._chain_root_ if isinstance(child, MappedVariable) else child
+        return root if isinstance(root, Variable) else None
+
+    @property
+    def _leaf_attribute_(self) -> Optional[Any]:
+        """
+        :return: The leaf :class:`~krrood.entity_query_language.core.mapped_variable.Attribute`
+            of this aggregator's child chain (e.g. the ``amount`` node behind
+            ``max(t.amount_details.amount)``), or ``None`` when the child is not an
+            attribute chain.
+        """
+        from krrood.entity_query_language.core.mapped_variable import (
+            Attribute,
+            MappedVariable,
+        )
+
+        child = self._child_
+        if not isinstance(child, MappedVariable):
+            return None
+        path = child._access_path_
+        if path and isinstance(path[-1], Attribute):
+            return path[-1]
+        return None
+
 
 @dataclass(eq=False, repr=False)
 class Count(Aggregator[T]):
@@ -143,6 +180,61 @@ class CountAll(Count[T]):
     The child expression to be counted which is the GroupedBy Operation, this will count of all results per group.
     It is set later during the query build process.
     """
+
+
+@dataclass(eq=False, repr=False)
+class CountRange(Count[T]):
+    """
+    Count concrete matches and return an ``int`` when there is no uncertainty, or a closed
+    ``SimpleInterval`` when ``...`` (Ellipsis) values exist in the variable's domain.
+
+    If the domain contains no Ellipsis values a plain ``int`` is returned.
+    """
+
+    _original_child_: Optional[Selectable[T]] = field(init=False, default=None)
+
+    def __post_init__(self):
+        self._original_child_ = self._child_
+        super().__post_init__()
+
+    def _apply_aggregation_function_and_get_bindings_(
+        self, child_result: OperationResult
+    ) -> Iterator[Bindings]:
+        """
+        Count concrete matches and yield an ``int`` when the count is certain,
+        or a closed ``SimpleInterval`` when ellipsis values introduce uncertainty.
+
+        :param child_result: The result from the child expression.
+        :return: Bindings containing the count or the uncertainty interval.
+        """
+        values = child_result.value
+        ellipsis_in_result = sum(1 for value in values if value is ...)
+        concrete_count = len(values) - ellipsis_in_result
+        ellipsis_count = ellipsis_in_result or self._count_ellipsis_in_domain_()
+
+        if ellipsis_count == 0:
+            yield {self._id_: concrete_count}
+        else:
+            yield {
+                self._id_: SimpleInterval.from_data(
+                    concrete_count,
+                    concrete_count + ellipsis_count,
+                    Bound.CLOSED,
+                    Bound.CLOSED,
+                )
+            }
+
+    def _count_ellipsis_in_domain_(self) -> int:
+        """
+        Count the number of ellipsis values in the original child expression's domain.
+
+        :return: The number of ellipsis values in the domain, or zero if there is no child.
+        """
+        if self._original_child_ is None:
+            return 0
+        return sum(
+            1 for result in self._original_child_._evaluate_(None) if result.value is ...
+        )
 
 
 @dataclass(eq=False, repr=False)

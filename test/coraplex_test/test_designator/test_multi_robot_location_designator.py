@@ -2,21 +2,30 @@ from copy import deepcopy
 
 import pytest
 import rclpy
-from typing_extensions import Generator, Tuple
+from typing_extensions import Generator, List, Tuple
 
-import coraplex.alternative_motion_mappings.hsrb_motion_mapping  # type: ignore
-import coraplex.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
-import coraplex.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
+from coraplex.alternative_motion_mappings.hsrb_motion_mapping import HSRBMoveMotion
+from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
+    StretchMoveToolCenterPoint,
+    StretchMoveSim,
+    StretchMoveReal,
+    StretchClose,
+)
+from coraplex.alternative_motion_mappings.tiago_motion_mapping import TiagoMoveSim
 from coraplex.datastructures.dataclasses import Context
+
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
+from coraplex.locations.base import DeferredLocation
 from coraplex.locations.factories import (
     reachability_location,
     visibility_location,
     accessing_location,
     giskard_reachability_location,
 )
-from coraplex.motion_executor import simulated_robot
+from krrood.entity_query_language.factories import variable
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 from coraplex.view_manager import ViewManager
@@ -42,6 +51,17 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.world import World
+
+# The alternative motion mappings that should be available to the plans in this test module.
+# Resolution filters by robot type and execution type, so passing the full set is always safe.
+ALTERNATIVE_MOTION_MAPPINGS = [
+    HSRBMoveMotion,
+    StretchMoveToolCenterPoint,
+    StretchMoveSim,
+    StretchMoveReal,
+    StretchClose,
+    TiagoMoveSim,
+]
 
 
 @pytest.fixture(
@@ -137,7 +157,9 @@ def immutable_multiple_robot_simple_apartment(
 ) -> Generator[Tuple[World, AbstractRobot, Context]]:
     world, view = setup_multi_robot_simple_apartment
     state = deepcopy(world.state._data)
-    yield world, view, Context(world, view)
+    yield world, view, Context(
+        world, view, alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS
+    )
     world.state._data[:] = state
     world.notify_state_change()
 
@@ -147,7 +169,59 @@ def mutable_multiple_robot_simple_apartment(setup_multi_robot_simple_apartment):
     world, view = setup_multi_robot_simple_apartment
     copy_world = deepcopy(world)
     copy_view = view.from_world(copy_world)
-    return copy_world, copy_view, Context(copy_world, copy_view)
+    return (
+        copy_world,
+        copy_view,
+        Context(
+            copy_world,
+            copy_view,
+            alternative_motion_mappings=ALTERNATIVE_MOTION_MAPPINGS,
+        ),
+    )
+
+
+def test_deferred_location_factory_runs_at_execution_not_construction():
+    """A :class:`DeferredLocation` must not build its :class:`Location` until the EQL
+    variable domain is actually consumed.
+
+    ``variable`` wraps the domain in :func:`filter`, whose builtin implementation calls
+    :func:`iter` on its argument at construction time. An eagerly-iterating
+    ``DeferredLocation`` would therefore run the factory while the plan is being parsed,
+    reintroducing the stale-pose bug.
+    """
+    factory_calls = []
+
+    def build_poses() -> List[Pose]:
+        factory_calls.append(True)
+        return [Pose.from_xyz_rpy(0.0, 0.0, 0.0)]
+
+    domain_variable = variable(Pose, domain=DeferredLocation(build_poses))
+
+    assert factory_calls == []
+
+    next(iter(domain_variable._re_enterable_domain_generator_), None)
+
+    assert factory_calls == [True]
+
+
+def test_deferred_location_reflects_state_changed_after_construction():
+    """The deferred factory observes the world state as it is when the location is
+    consumed, not as it was when the underspecified action was constructed.
+    """
+    observed_positions = []
+    moving_pose = {"value": Pose.from_xyz_rpy(0.0, 0.0, 0.0)}
+
+    def build_poses() -> List[Pose]:
+        observed_positions.append(moving_pose["value"].to_position().to_list())
+        return [moving_pose["value"]]
+
+    domain_variable = variable(Pose, domain=DeferredLocation(build_poses))
+
+    moving_pose["value"] = Pose.from_xyz_rpy(3.1, 2.2, 0.95)
+
+    next(iter(domain_variable._re_enterable_domain_generator_), None)
+
+    assert observed_positions == [[3.1, 2.2, 0.95, 1.0]]
 
 
 def test_new_reachability_location_pose(
@@ -279,8 +353,8 @@ def test_visibility_reachability_merge(
         context,
     )
 
-    context.debug_mode = True
     context.ros_node = rclpy_node
+    context.debug = True
 
     with simulated_robot:
         plan.perform()

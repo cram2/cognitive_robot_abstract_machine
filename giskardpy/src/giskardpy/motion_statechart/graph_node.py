@@ -5,6 +5,7 @@ import re
 import threading
 from abc import ABC
 from dataclasses import field, dataclass, fields
+from functools import cached_property
 
 import numpy as np
 from typing_extensions import (
@@ -33,6 +34,7 @@ from semantic_digital_twin.spatial_types import (
     Quaternion,
     RotationMatrix,
     HomogeneousTransformationMatrix,
+    Pose,
 )
 from semantic_digital_twin.world_description.geometry import Color
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -51,6 +53,7 @@ from giskardpy.motion_statechart.exceptions import (
     NodeAlreadyBelongsToDifferentNodeError,
 )
 from giskardpy.motion_statechart.plotters.plot_specs import NodePlotSpec
+from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.utils.utils import string_shortener
 
@@ -319,7 +322,9 @@ class DebugExpression:
         | Quaternion
         | RotationMatrix
         | HomogeneousTransformationMatrix
+        | Pose
     )
+    """The tracked expression; spatial types are additionally rendered as RViz markers."""
 
     color: Color = field(default_factory=lambda: Color(1, 0, 0, 1))
     """
@@ -357,6 +362,14 @@ class NodeArtifacts:
     A list of symbolic expressions used for debugging only.
     While in debug mode, you can call .evaluate() on them to get their current value.
     """
+
+    @cached_property
+    def geometry(self) -> GeometricConstraintBuilder:
+        """
+        Builder for high-level geometric constraints (point, vector, and rotation goals, and
+        Cartesian velocity limits) that writes into :attr:`constraints`.
+        """
+        return GeometricConstraintBuilder(self.constraints)
 
 
 @dataclass(repr=False, eq=False)
@@ -456,6 +469,13 @@ class MotionStatechartNode(SubclassJSONSerializer):
         if self.parent_node_index is None:
             return None
         return self._motion_statechart.get_node_by_index(self.parent_node_index)
+
+    @property
+    def debug_expressions(self) -> List[DebugExpression]:
+        """
+        :return: The debug expressions registered by this node during build.
+        """
+        return self._debug_expressions
 
     @property
     def depth(self) -> int:

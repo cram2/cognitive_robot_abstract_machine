@@ -100,7 +100,9 @@ class EvaluationTracker(EvaluationObserver):
         :param evaluated: The live cumulative :class:`OrderedSet` of evaluated expression ids.
         :return: A snapshot :class:`OrderedSet` safe to stamp onto a result.
         """
-        cached = evaluation_context.data.get(EvaluationContextKey.EVALUATED_SNAPSHOT_KEY)
+        cached = evaluation_context.data.get(
+            EvaluationContextKey.EVALUATED_SNAPSHOT_KEY
+        )
         current_length = len(evaluated)
         if cached is None or cached[0] != current_length:
             snapshot = OrderedSet(evaluated)

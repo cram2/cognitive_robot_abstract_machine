@@ -7,7 +7,16 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  to-lowercase:
+    runs-on: ubuntu-latest
+    outputs:
+      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
+    steps:
+      - id: lowercase
+        run: |
+          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
   build-docs:
+    needs: [to-lowercase]
     strategy:
       fail-fast: false
       matrix:
@@ -32,12 +41,17 @@ jobs:
             doc_path: doc
             artifact_name: random-events-doc
             use_container: false
+          - lib: giskardpy
+            doc_path: doc
+            artifact_name: giskardpy-doc
+            use_container: false
     uses: ./.github/workflows/build_doc_reusable.yml
     with:
       lib: ${{ matrix.lib }}
       doc_path: ${{ matrix.doc_path }}
       artifact_name: ${{ matrix.artifact_name }}
       use_container: ${{ matrix.use_container }}
+      repo_lowercase: ${{ needs.to-lowercase.outputs.repo_lowercase }}
 
   deploy-all-docs:
     needs: [build-docs]
@@ -99,6 +113,12 @@ jobs:
         with:
           name: random-events-doc
           path: aggregate/random_events
+
+      - name: Download giskardpy-doc
+        uses: actions/download-artifact@v4
+        with:
+          name: giskardpy-doc
+          path: aggregate/giskardpy
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

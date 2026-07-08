@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass, field
 
-from typing_extensions import Dict, Any
+from typing_extensions import Dict, Any, Generic, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
@@ -87,18 +87,21 @@ class JerkVariable(sm.FloatVariable):
         return self.dof._world.state[self.dof.id].jerk
 
 
+T = TypeVar("T")
+
+
 @dataclass
-class DegreeOfFreedomLimits:
+class DegreeOfFreedomLimits(Generic[T]):
     """
     A class representing the limits of a degree of freedom.
     """
 
-    lower: DerivativeMap[float] = field(default=None)
+    lower: DerivativeMap[T] = field(default=None)
     """
     Lower limits of the degree of freedom.
     """
 
-    upper: DerivativeMap[float] = field(default=None)
+    upper: DerivativeMap[T] = field(default=None)
     """
     Upper limits of the degree of freedom.
     """
@@ -123,7 +126,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     and provides methods to get and set limits for these derivatives.
     """
 
-    limits: DegreeOfFreedomLimits = field(default=None)
+    limits: DegreeOfFreedomLimits[float] = field(default=None)
     """
     Lower and upper bounds for each derivative
     """

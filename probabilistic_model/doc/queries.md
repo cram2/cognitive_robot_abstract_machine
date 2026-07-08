@@ -81,7 +81,7 @@ possible_world = np.array([[Color.BLUE, Shape.CIRCLE]])
 print(f"p({color.name}={possible_world[0, 0]}, {shape.name}={possible_world[0, 1]}) = {distribution.likelihood(possible_world)}")
 ```
 
-In the abstract interface to probabilistic models in this package, the likelihood query is implemented [here](https://probabilistic-model.readthedocs.io/en/latest/autoapi/probabilistic_model/probabilistic_model/index.html#probabilistic_model.probabilistic_model.ProbabilisticModel.likelihood).
+In the abstract interface to probabilistic models in this package, the likelihood query is implemented [here](https://cram2.github.io/cognitive_robot_abstract_machine/probabilistic_model/autoapi/probabilistic_model/probabilistic_model/index.html#probabilistic_model.probabilistic_model.ProbabilisticModel.likelihood).
 
 
 ## Maximum Likelihood Estimate
@@ -195,7 +195,7 @@ While this definition may be a bit weird to think about,
 it essentially says that marginal queries are integrations over axis aligned bounding boxes. 
 Furthermore, marginal queries can also contain (partial) point descriptions, just as in the likelihood. 
 
-[This tutorial](https://random-events.readthedocs.io/en/latest/conceptual_guide.html) dives deeper in the product 
+[This tutorial](https://cram2.github.io/cognitive_robot_abstract_machine/random_events/conceptual_guide.html) dives deeper in the product 
 algebra that is constructed by the marginal query class. 
 
 (chapter:conditionals)=
@@ -217,7 +217,7 @@ zoomed in version of the original distribution.
 The resulting type of distribution is not a Gaussian distribution anymore, but a truncated Gaussian distribution. 
 The probability of the event that the sepal length is between 6 and 7 cm is now $100\%$. 
 Since the truncated Gaussian is a much more complicated object than the ordinary Gaussian distribution, y
-ou can read more about it [here](https://probabilistic-model.readthedocs.io/en/latest/examples/truncated_gaussians.html).
+ou can read more about it [here](https://cram2.github.io/cognitive_robot_abstract_machine/probabilistic_model/truncated_gaussian.html).
 
 ```{code-cell} ipython3
 distribution.probability(event)
@@ -457,7 +457,7 @@ I recommend [this Monte Carlo Integration example](https://en.wikipedia.org/wiki
 ## Practical Example
 
 In practice, probabilities can be used in robotics. 
-Consider the kitchen scenario from the [product algebra notebook](https://random-events.readthedocs.io/en/latest/conceptual_guide.html#application).
+Consider the kitchen scenario from the [product algebra notebook](https://cram2.github.io/cognitive_robot_abstract_machine/random_events/conceptual_guide.html#application).
 
 ```{code-cell} ipython3
 

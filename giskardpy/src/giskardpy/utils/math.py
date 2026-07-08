@@ -246,7 +246,7 @@ def max_velocity_from_horizon_and_jerk(
 
 
 @memoize
-def mpc(
+def model_predictive_control(
     upper_limits: Tuple[Tuple[float, ...], ...],
     lower_limits: Tuple[Tuple[float, ...], ...],
     current_values: Tuple[float, ...],
@@ -306,7 +306,7 @@ def mpc(
     return result
 
 
-def simple_mpc(
+def simple_model_predictive_control(
     vel_limit,
     acc_limit,
     jerk_limit,
@@ -321,7 +321,7 @@ def simple_mpc(
 ):
     upper_limits = ((vel_limit,) * ph, (acc_limit,) * ph, (jerk_limit,) * ph)
     lower_limits = ((-vel_limit,) * ph, (-acc_limit,) * ph, (-jerk_limit,) * ph)
-    return mpc(
+    return model_predictive_control(
         upper_limits=upper_limits,
         lower_limits=lower_limits,
         current_values=(current_vel, current_acc),
@@ -342,7 +342,7 @@ def mpc_velocities(
     ph: int,
     solver_class=None,
 ):
-    return mpc(
+    return model_predictive_control(
         upper_limits,
         lower_limits,
         current_values,

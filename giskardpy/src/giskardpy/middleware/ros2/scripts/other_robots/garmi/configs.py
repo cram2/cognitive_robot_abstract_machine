@@ -5,7 +5,6 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 )
 from giskardpy.model.world_config import WorldWithOmniDriveRobot
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.garmi import Garmi
 
 
