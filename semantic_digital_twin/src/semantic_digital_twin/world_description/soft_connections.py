@@ -60,9 +60,8 @@ class PiecewiseConstantCurvatureConnection(Connection):
         kappa_dof = world.get_degree_of_freedom_by_id(self.kappa_dof_id)
         phi_dof = world.get_degree_of_freedom_by_id(self.phi_dof_id)
 
-        # Use symbolic_math wrappers for CasADi expressions
-        kappa = sm.Scalar.from_casadi_sx(kappa_dof.variables.position.casadi_sx)
-        phi = sm.Scalar.from_casadi_sx(phi_dof.variables.position.casadi_sx)
+        kappa = kappa_dof.variables.position
+        phi = phi_dof.variables.position
         length = self.segment_length
         theta = kappa * length
 
@@ -163,10 +162,10 @@ class CosseratRodConnection(Connection):
         tor = world.get_degree_of_freedom_by_id(self.torsion_dof_id)
         ext = world.get_degree_of_freedom_by_id(self.extension_dof_id)
 
-        ux = sm.Scalar.from_casadi_sx(bx.variables.position.casadi_sx)
-        uy = sm.Scalar.from_casadi_sx(by.variables.position.casadi_sx)
-        uz = sm.Scalar.from_casadi_sx(tor.variables.position.casadi_sx)
-        vz = sm.Scalar.from_casadi_sx(ext.variables.position.casadi_sx)
+        ux = bx.variables.position
+        uy = by.variables.position
+        uz = tor.variables.position
+        vz = ext.variables.position
 
         # xi vector: [bending_x, bending_y, torsion, shear_x, shear_y, extension]
         xi = sm.Vector([ux, uy, uz, 0, 0, vz])
