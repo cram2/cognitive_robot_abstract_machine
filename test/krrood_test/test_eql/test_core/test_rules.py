@@ -12,6 +12,7 @@ from krrood.entity_query_language.factories import (
     deduced_variable,
     add,
 )
+from krrood.entity_query_language.core.base_expressions import OperationResult
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.rules.conclusion import Add
 from ...dataset.eql_rule_tree_doc_example import (
@@ -544,3 +545,44 @@ def test_rule_tree_anchors_when_where_condition_is_reused_in_a_sibling():
         ("Handle1", "Container1"),
         ("Handle2", "Container2"),
     }
+
+
+def test_conclusions_fire_without_an_active_evaluation_context(
+    handles_and_containers_world,
+):
+    """A conclusion must still fire when no ``EvaluationContext`` is active.
+
+    ``_evaluate_conclusions_and_update_bindings_`` is normally only reached from inside
+    ``_evaluate_``, which has already set one up. But real-world callers can drive evaluation
+    from a code path where no context was ever created for the current thread (for example,
+    resuming a query from a thread that does not share the caller's ``contextvars.Context`` --
+    Python's ``ContextVar`` values do not propagate into a plain ``threading.Thread`` by
+    default). This calls the raw, double-underscore ``_evaluate__`` directly (bypassing
+    ``_evaluate_``'s context setup entirely) to prove the conclusion-firing check falls back to
+    a purely structural one instead of assuming a context always exists.
+    """
+    world = handles_and_containers_world
+    container = variable(Container, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+    drawers = variable(Drawer, domain=[])
+    condition = and_(
+        container == fixed_connection.parent,
+        handle == fixed_connection.child,
+    )
+
+    with condition:
+        Add(drawers, inference(Drawer)(handle=handle, container=container))
+
+    assert condition._conditions_root_ is condition
+
+    raw_result = next(
+        result
+        for result in condition._evaluate__(OperationResult({}))
+        if not result.is_false
+    )
+
+    processed_result = condition._evaluate_conclusions_and_update_bindings_(raw_result)
+
+    assert drawers._id_ in processed_result.bindings
+    assert isinstance(processed_result.bindings[drawers._id_], Drawer)
