@@ -1,12 +1,12 @@
 import logging
 from typing import Optional
+from dataclasses import dataclass
 from giskardpy.motion_statechart.goals.cartesian_goals import DifferentialDriveBaseGoal
 from coraplex.datastructures.enums import ExecutionType
 from coraplex.robot_plans.motions.base import AlternativeMotion
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.datastructures.definitions import GripperState
 from giskardpy.motion_statechart.ros2_nodes.ros_tasks import (
-    NavigateActionServerTask,
     ActionServerTask,
     RobotiqGripperActionServerTask,
 )
@@ -20,108 +20,72 @@ from coraplex.robot_plans import (
     MoveGripperMotion,
 )
 
-try:
-    from nav2_msgs.action import NavigateToPose
-except ModuleNotFoundError:
-    NavigateToPose = None
-
 logger = logging.getLogger(__name__)
 
 
-class TiagoMoveSim(MoveMotion, AlternativeMotion[Tiago]):
+@dataclass
+class TiagoMoveMotionInSimulation(MoveMotion, AlternativeMotion[Tiago]):
     """
     Uses a diff drive goal for the tiago base.
     """
 
-    execution_type = ExecutionType.REAL
-
-    def perform(self):
-        return
-
-    @property
-    def _motion_chart(self):
-
-        world_T_target = self.world.transform(self.target, self.world.root)
-        world_T_target.z = 0
-        return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.01)
-
-
-class TiagoGripMotion(MoveGripperMotion, AlternativeMotion[Tiago]):
-    """
-    Uses RobotiqGripperActionServerTask to move Tiago's gripper.
-    """
-
-    def __init__(
-            self,
-            gripper: Arms,
-            motion: Optional[GripperState] = None,
-            position: Optional[float] = None,
-            allow_gripper_collision: Optional[bool] = None
-    ):
-        if motion is None and position is None:
-            raise ValueError("You must specify either 'motion' or 'position'.")
-        if motion is not None and position is not None:
-            raise ValueError("Cannot specify both 'motion' and 'position' at the same time.")
-
-        base_motion_placeholder = motion if motion is not None else GripperState.OPEN
-
-        super().__init__(
-            motion=base_motion_placeholder,
-            gripper=gripper,
-            allow_gripper_collision=allow_gripper_collision
-        )
-
-        self.position = position
+    execution_type = ExecutionType.SIMULATED
 
     def perform(self):
         logger.debug(f"performing {self.__class__.__name__}")
         return
 
     @property
-    def _motion_chart(self) -> RobotiqGripperActionServerTask:
-        if self.gripper is None:
-            raise ValueError("No gripper specified")
+    def _motion_chart(self):
+        world_T_target = self.world.transform(self.target, self.world.root)
+        world_T_target.z = 0
+        return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.01)
 
+
+@dataclass
+class TiagoGripperMotion(MoveGripperMotion, AlternativeMotion[Tiago]):
+    """
+    Uses RobotiqGripperActionServerTask to move Tiago's gripper.
+    """
+
+    execution_type = ExecutionType.REAL
+
+    motion: Optional[GripperState] = None
+    position: Optional[float] = None
+
+    def __post_init__(self):
+        if self.motion is None and self.position is None:
+            raise ValueError("You must specify either 'motion' or 'position'.")
+        if self.motion is not None and self.position is not None:
+            raise ValueError(
+                "Cannot specify both 'motion' and 'position' at the same time."
+            )
+
+    def perform(self):
+        logger.debug(f"Performing {self.__class__.__name__}")
+        return
+
+    @property
+    def _motion_chart(self) -> RobotiqGripperActionServerTask:
         if self.gripper == Arms.LEFT:
             action_topic = "/left_gripper/robotiq_gripper_controller/gripper_cmd"
         elif self.gripper == Arms.RIGHT:
             action_topic = "/right_gripper/robotiq_gripper_controller/gripper_cmd"
         else:
-            raise ValueError(f"Unsupported gripper {self.gripper}")
+            raise ValueError(f"Unsupported gripper: {self.gripper}")
 
-        # 5. Determine targets based on which mode was provided
+        # Determine target position
         if self.position is not None:
             target_position = self.position
+        elif self.motion == GripperState.OPEN:
+            target_position = 0.0
+        elif self.motion == GripperState.CLOSE:
+            target_position = 0.7
         else:
-            if self.motion == GripperState.OPEN:
-                target_position = 0.0
-            elif self.motion == GripperState.CLOSE:
-                target_position = 0.7
-            else:
-                raise ValueError(f"Unsupported motion state: {self.motion}")
+            raise ValueError(f"Unsupported motion state: {self.motion}")
 
         return RobotiqGripperActionServerTask(
             action_topic=action_topic,
             message_type=ParallelGripperCommand,
             target_position=target_position,
         )
-
-# class TiagoMoveSim(MoveMotion, AlternativeMotion[Tiago]):
-#     """
-#     Uses a Nav2 action server to move the simulated Tiago base.
-#     """
-#
-#     execution_type = ExecutionType.SIMULATED
-#
-#     def perform(self):
-#         return
-#
-#     @property
-#     def _motion_chart(self) -> NavigateActionServerTask:
-#
-#         return NavigateActionServerTask(
-#             target_pose=self.target,
-#             base_link=self.robot.root,
-#             action_topic="/navigate_to_pose",
-#             message_type=NavigateToPose,
-#         )
