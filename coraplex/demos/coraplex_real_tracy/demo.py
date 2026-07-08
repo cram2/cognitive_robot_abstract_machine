@@ -57,7 +57,10 @@ thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executo
 thread.start()
 
 if execition_mode == ExecutionType.REAL:
-    world = fetch_world_from_service(node=node)
+    # 300s matches giskardpy's own client (giskardpy/middleware/ros2/python_interface.py), which waits
+    # this long for the same race: this demo's giskard/world-fetcher server is still parsing the URDF
+    # and starting up when the client's default 10s budget would otherwise expire.
+    world = fetch_world_from_service(node=node, timeout_seconds=300)
 
     WorldSynchronizer(_world=world, node=node)
 elif execition_mode == ExecutionType.SIMULATED:

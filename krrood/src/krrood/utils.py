@@ -828,6 +828,31 @@ def _handle_import_node(
         scope[asname] = module
 
 
+@lru_cache(maxsize=None)
+def _warn_about_unresolvable_type_checking_import_once(
+    resolved_module_name: Optional[str], name: str, file_path: Optional[str], error_message: str
+) -> None:
+    """
+    Log, at most once per process for a given ``(resolved_module_name, name, file_path)`` triple,
+    that a name could not be imported while extracting a file's imports.
+
+    A dataclass field annotated under ``if TYPE_CHECKING:`` with a name from a module involved in a
+    circular import can be re-resolved many times while that module is still initializing (once per
+    class needing it, and once per lookup attempt). Every attempt raises the exact same, already
+    self-diagnosing ``AttributeError`` and is otherwise harmless, so repeating the warning for each
+    attempt only floods the log without adding information; the ``lru_cache`` collapses repeats of
+    the identical triple to a single log line.
+
+    :param resolved_module_name: The module the failed import targeted.
+    :param name: The attribute name that could not be found on the module.
+    :param file_path: The path of the file whose imports were being extracted.
+    :param error_message: The message of the ``AttributeError`` that was raised.
+    """
+    logger.warning(
+        f"Could not import {resolved_module_name}: {error_message} while extracting imports from {file_path}"
+    )
+
+
 def _handle_import_from_node(
     node: ast.ImportFrom,
     scope: Dict[str, Any],
@@ -875,8 +900,8 @@ def _handle_import_from_node(
             else:
                 scope[asname] = getattr(module, name)
         except AttributeError as e:
-            logger.warning(
-                f"Could not import {resolved_module_name}: {e} while extracting imports from {file_path}"
+            _warn_about_unresolvable_type_checking_import_once(
+                resolved_module_name, name, file_path, str(e)
             )
 
     return package_name

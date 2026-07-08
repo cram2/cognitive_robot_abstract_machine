@@ -26,6 +26,7 @@ from krrood.entity_query_language.core.variable import (
     Literal,
     ExternallySetVariable,
 )
+from krrood.entity_query_language.cache_data import InstanceFilteredDomain
 from krrood.entity_query_language.enums import DomainSource
 from krrood.entity_query_language.exceptions import UnsupportedExpressionTypeForDistinct
 from krrood.entity_query_language.operators.aggregators import (
@@ -174,7 +175,7 @@ def variable(
     """
     # Determine the domain source
     if is_iterable(domain):
-        domain = filter(lambda x: isinstance(x, type_), domain)
+        domain = InstanceFilteredDomain(type_, domain)
     elif domain is None and issubclass(type_, Symbol):
         domain = SymbolGraph().get_instances_of_type(type_)
     else:
