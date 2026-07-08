@@ -44,6 +44,15 @@ class PlanMapping(AlternativeMapping[Plan]):
 
     @classmethod
     def from_domain_object(cls, obj: Plan):
+        # During execution the context is shared with sub-plans created via the
+        # plan factories, each of which claims the context's `plan` back-reference
+        # for itself. After the sub-plans are migrated into this plan the
+        # back-reference is left dangling at a now-stale (and partially emptied)
+        # sub-plan. Reclaim the context for the plan being serialized so its
+        # `plan` relationship resolves to this plan -- which is already registered
+        # in the conversion memo -- instead of recursing into the stale sub-plan.
+        if obj.context is not None:
+            obj.add_plan_entity(obj.context)
         return cls(
             root=obj.root,
             nodes=obj.nodes,

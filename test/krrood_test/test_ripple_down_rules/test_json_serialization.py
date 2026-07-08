@@ -5,7 +5,7 @@ from unittest import TestCase
 
 from typing_extensions import List
 
-from test.krrood_test.test_ripple_down_rules.datasets import load_zoo_dataset
+from .datasets import load_zoo_dataset
 from krrood.ripple_down_rules.datastructures.dataclasses import Case
 from krrood.ripple_down_rules.rdr import SingleClassRDR, MultiClassRDR, GeneralRDR
 from krrood.ripple_down_rules.utils import (
@@ -15,7 +15,7 @@ from krrood.ripple_down_rules.utils import (
     deserialize_dataclass,
     render_tree,
 )
-from test.krrood_test.test_ripple_down_rules.test_helpers.helpers import (
+from .test_helpers.helpers import (
     get_fit_mcrdr,
     get_fit_scrdr,
     get_fit_grdr,
@@ -32,6 +32,7 @@ class Position:
 class Robot:
     name: str
     position: Position
+
 
 TEST_RESULTS_DIR: str = os.path.join(os.path.dirname(__file__), "test_results")
 CACHE_FILE: str = os.path.join(TEST_RESULTS_DIR, "zoo_dataset.pkl")

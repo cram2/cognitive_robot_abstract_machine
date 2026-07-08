@@ -20,13 +20,17 @@ on:
         required: false
         type: boolean
         default: false
+      repo_lowercase:
+        description: "(optional) fully qualified lowercase container image (e.g. ghcr.io/owner/repo:jazzy). If provided it will be used for container.image"
+        required: false
+        type: string
 
 
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: ${{ inputs.use_container && format('ghcr.io/{0}:jazzy', github.repository) || '' }}
+      image: ${{ inputs.use_container && inputs.repo_lowercase || '' }}
     defaults:
       run:
         shell: ${{ inputs.use_container && 'bash -ieo pipefail {0}' || 'bash' }}
@@ -118,7 +122,7 @@ jobs:
           path: "${{ inputs.lib }}/${{ inputs.doc_path }}/_build/html"
 
       - name: Upload artifact (Container)
-        if: ${{ inputs.use_container && (github.event_name == 'push' || github.event_name == 'workflow_call') }}
+        if: ${{ inputs.use_container && (github.event_name == 'push' || github.event_name == 'workflow_call' || github.event_name == 'workflow_dispatch') }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact_name }}

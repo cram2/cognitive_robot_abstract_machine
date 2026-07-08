@@ -187,7 +187,10 @@ def test_all_bindings_does_not_affect_own_bindings():
     result_with_source = _first_result(var, incoming)
     result_without_source = _first_result(var)
 
-    assert result_with_source.bindings[var._id_] == result_without_source.bindings[var._id_]
+    assert (
+        result_with_source.bindings[var._id_]
+        == result_without_source.bindings[var._id_]
+    )
     assert result_with_source.is_true == result_without_source.is_true
 
 

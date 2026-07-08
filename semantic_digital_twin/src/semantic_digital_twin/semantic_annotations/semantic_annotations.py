@@ -31,6 +31,8 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     IsPerceivable,
     HasRootBody,
     IsStorageSpace,
+    HasLegs,
+    HasSink,
 )
 from semantic_digital_twin.spatial_types import (
     Point3,
@@ -254,10 +256,9 @@ class MechanicalJoint(HasRootBody):
         self._world.move_branch(
             self.root,
             main_has_root_body_annotation.root.parent_kinematic_structure_entity,
-            enable_unsafe_inside_world_block=True,
         )
         main_has_root_body_annotation._world.move_branch(
-            main_has_root_body_annotation.root, self.root, True
+            main_has_root_body_annotation.root, self.root
         )
 
 
@@ -451,37 +452,37 @@ class Table(Furniture, HasSupportingSurface):
 
 
 @dataclass(eq=False)
-class CounterTop(Furniture, HasSupportingSurface):
+class CounterTop(Furniture, HasSupportingSurface, HasSink):
     """
     A semantic annotation that represents a counter top.
     """
 
 
 @dataclass(eq=False)
-class Cabinet(Furniture, HasCaseAsRootBody, HasHandle):
+class Cabinet(Furniture, HasCaseAsRootBody, HasHandle, HasDoors, HasDrawers):
     @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.NEGATIVE_X()
 
 
 @dataclass(eq=False)
-class Fridge(Cabinet, HasDoors, HasDrawers): ...
+class Fridge(Cabinet): ...
 
 
 @dataclass(eq=False)
-class Oven(HasRootBody): ...
+class Oven(HasRootBody, HasDoors): ...
 
 
 @dataclass(eq=False)
-class Dresser(Cabinet, HasDrawers, HasDoors): ...
+class Dresser(Cabinet): ...
 
 
 @dataclass(eq=False)
-class Cupboard(Cabinet, HasDoors): ...
+class Cupboard(Cabinet): ...
 
 
 @dataclass(eq=False)
-class Wardrobe(Cabinet, HasDrawers, HasDoors): ...
+class Wardrobe(Cabinet): ...
 
 
 @dataclass(eq=False)
@@ -905,7 +906,7 @@ class CoffeeTable(Table):
 
 
 @dataclass(eq=False)
-class DiningTable(Table):
+class DiningTable(Table, HasLegs):
     """
     A dining table.
     """
@@ -919,7 +920,7 @@ class SideTable(Table):
 
 
 @dataclass(eq=False)
-class Desk(Table):
+class Desk(Table, HasLegs):
     """
     A desk.
     """
@@ -1185,3 +1186,16 @@ class DoorWithType(Door):
     """
 
     type_description: Optional[str] = field(kw_only=True, default=None)
+
+@dataclass(eq=False)
+class Leg(HasRootBody):
+    """
+    A leg that supports a piece of furniture.
+    """
+
+
+@dataclass(eq=False)
+class Cooktop(HasRootBody):
+    """
+    A cooktop surface for cooking.
+    """

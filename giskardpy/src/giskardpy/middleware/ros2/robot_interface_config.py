@@ -248,10 +248,16 @@ class RobotInterfaceConfig(ABC):
         )
 
     def add_joint_velocity_group_controller(
-        self, cmd_topic: str, connections: List[str]
+        self,
+        cmd_topic: str,
+        connections: List[str],
+        minimum_valid_velocity: float = 0.0,
     ):
         """
         For closed loop mode. Tell Giskard how it can send velocities for a group of connections.
+        :param minimum_valid_velocity: minimum magnitude that small non-prismatic, non-finger
+                                       joint velocities are raised to so the hardware moves.
+                                       ``0.0`` disables clamping.
         """
         controlled_connections: List[Connection] = []
         for i in range(len(connections)):
@@ -261,7 +267,9 @@ class RobotInterfaceConfig(ABC):
                 )
             )
         self.tree.control_loop_branch.send_controls.add_joint_velocity_group_controllers(
-            cmd_topic=cmd_topic, connections=controlled_connections
+            cmd_topic=cmd_topic,
+            connections=controlled_connections,
+            minimum_valid_velocity=minimum_valid_velocity,
         )
 
 

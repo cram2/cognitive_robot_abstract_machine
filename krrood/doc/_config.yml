@@ -40,11 +40,13 @@ sphinx:
       - show-inheritance
       - show-module-summary
     autoapi_add_toctree_entry: True
+    html_css_files:
+      - custom.css
 
 
 # Information about where the book exists on the web
 repository:
-  url: https://github.com/code-iai/krrood  # Online location of your book
+  url: https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html  # Online location of your book
   path_to_book: doc  # Optional path to your book, relative to the repository root
   branch: main  # Which branch of the repository should be used when creating links (optional)
 

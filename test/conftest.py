@@ -24,7 +24,7 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
 )
 from typing_extensions import Type
 
-from krrood.class_diagrams import ClassDiagram
+from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
@@ -55,6 +55,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Carrot,
     Lettuce,
     Banana,
+    Bowl,
+    Spoon,
+    Drawer,
+    Handle,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.utils import rclpy_installed, tracy_installed
@@ -514,6 +518,17 @@ def _apartment_world_setup():
             "breakfast_cereal.stl",
         )
     ).parse()
+    spoon_world = STLParser(
+        os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "coraplex",
+            "resources",
+            "objects",
+            "spoon.stl",
+        )
+    ).parse()
+
     apartment_world.merge_world_at_pose(
         milk_world,
         HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -526,11 +541,31 @@ def _apartment_world_setup():
             2.37, 2.5, 1.05, reference_frame=apartment_world.root
         ),
     )
-    milk_view = Milk(
-        root=apartment_world.get_body_by_name("milk.stl"), _world=apartment_world
+    apartment_world.merge_world(
+        spoon_world,
+        FixedConnection(
+            parent=apartment_world.get_body_by_name("cabinet10_drawer_top"),
+            child=spoon_world.root,
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                -0.05, -0.05, -0.02
+            ),
+        ),
     )
+
     with apartment_world.modify_world():
-        apartment_world.add_semantic_annotation(milk_view)
+
+        apartment_world.add_semantic_annotations(
+            [
+                Milk(root=apartment_world.get_body_by_name("milk.stl")),
+                Spoon(root=apartment_world.get_body_by_name("spoon.stl")),
+            ]
+        )
+        apartment_world.add_semantic_annotation_recursively(
+            Drawer(
+                root=apartment_world.get_body_by_name("cabinet10_drawer_top"),
+                handle=Handle(root=apartment_world.get_body_by_name("handle_cab10_t")),
+            )
+        )
 
     return apartment_world
 

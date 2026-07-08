@@ -78,7 +78,7 @@ class FeatureFunctionGoal(Task, ABC):
             artifacts.debug_expressions.append(dbg)
         elif isinstance(self.controlled_feature, Vector3):
             self.root_V_controlled_feature = root_T_tip @ tip_controlled_feature
-            self.root_V_controlled_feature.vis_frame = (
+            self.root_V_controlled_feature.visualisation_frame = (
                 self.controlled_feature.visualisation_frame
             )
             dbg = DebugExpression(
@@ -98,7 +98,7 @@ class FeatureFunctionGoal(Task, ABC):
             artifacts.debug_expressions.append(dbg)
         elif isinstance(self.reference_feature, Vector3):
             self.root_V_reference_feature = root_reference_feature
-            self.root_V_reference_feature.vis_frame = (
+            self.root_V_reference_feature.visualisation_frame = (
                 self.reference_feature.visualisation_frame
             )
             dbg = DebugExpression(
