@@ -196,11 +196,17 @@ class SymbolicExpression(ABC):
         """
         Remove the parent relationship between this expression and the given parent expression.
 
+        When the removed parent is the primary one, another remaining parent is promoted so a node
+        that still lives elsewhere in the DAG keeps a valid primary parent.
+
         :param parent: The parent expression to remove.
         """
-        self._parents_.remove(parent)
+        if parent in self._parents_:
+            self._parents_.remove(parent)
+        if self._id_ in [child._id_ for child in parent._children_]:
+            parent._children_.remove(self)
         if parent is self._parent__:
-            self._parent_ = None
+            self._parent__ = self._parents_[-1] if self._parents_ else None
 
     def _update_children_(
             self, *children: SymbolicExpression
@@ -353,20 +359,24 @@ class SymbolicExpression(ABC):
         if value is self:
             return
 
-        if value is None and self._parent__ is not None:
-            if self._id_ in [v._id_ for v in self._parent__._children_]:
-                self._parent__._children_.remove(self)
-            if self._parent__ in self._parents_:
-                self._parents_.remove(self._parent__)
+        if value is None:
+            if self._parent__ is not None:
+                self._remove_parent_(self._parent__)
+            return
 
-        self._parent__ = value
-
-        if value is not None and value._id_ not in [v._id_ for v in self._parents_]:
+        if value._id_ not in [v._id_ for v in self._parents_]:
             self._parents_.append(value)
             value._ensure_children_ids_are_cached_(self)
 
-        if value is not None and self._id_ not in [v._id_ for v in value._children_]:
+        if self._id_ not in [v._id_ for v in value._children_]:
             value._children_.append(self)
+
+        # Keep the first structural parent as the primary one: a node reused as an operand
+        # elsewhere in the DAG records the extra parent above but must not have its primary
+        # parent hijacked. Structural re-parenting removes the old parent first (see
+        # ``_replace_child_``), so the promotion in ``_remove_parent_`` re-establishes the primary.
+        if self._parent__ is None:
+            self._parent__ = value
 
     @property
     def _conditions_root_(self) -> Optional[SymbolicExpression]:

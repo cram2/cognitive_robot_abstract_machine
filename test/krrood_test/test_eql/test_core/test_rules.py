@@ -510,3 +510,37 @@ def test_doc_example(rule_tree_doc_example_connections, alternative_code, result
     results = query.tolist()
     assert len(results) == len(result_set)
     assert set(results) == result_set
+
+
+def test_rule_tree_anchors_when_where_condition_is_reused_in_a_sibling():
+    """A node used as the bare WHERE condition and reused inside a sibling branch must still anchor.
+
+    ``drawer.correct`` is a shared node: it is the WHERE condition and also appears in the
+    ``alternative`` condition ``drawer.correct == False``. Building that comparator adds it as an
+    extra parent of the shared node. Its primary ``_parent_`` must stay the structural (WHERE)
+    parent so rule-tree splicing still finds the anchor; when the reuse overwrote ``_parent_``
+    the splice navigated from the comparator instead and failed.
+    """
+    correct_drawer = Drawer(
+        handle=Handle("Handle1"), container=Container("Container1"), correct=True
+    )
+    incorrect_drawer = Drawer(
+        handle=Handle("Handle2"), container=Container("Container2"), correct=False
+    )
+    drawer = variable(Drawer, domain=[correct_drawer, incorrect_drawer])
+    views = deduced_variable(View)
+    query = an(entity(views).where(drawer.correct))
+
+    with query:
+        add(views, inference(Door)(handle=drawer.handle, body=drawer.container))
+        with alternative(drawer.correct == False):
+            add(views, inference(Door)(handle=drawer.handle, body=drawer.container))
+
+    all_solutions = list(query.evaluate())
+    assert (
+        len(all_solutions) == 2
+    ), "The base branch and its reused-condition alternative must both fire."
+    assert {(door.handle.name, door.body.name) for door in all_solutions} == {
+        ("Handle1", "Container1"),
+        ("Handle2", "Container2"),
+    }
