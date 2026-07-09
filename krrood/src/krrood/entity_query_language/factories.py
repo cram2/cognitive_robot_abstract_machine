@@ -55,6 +55,7 @@ from krrood.entity_query_language.predicate import *  # type: ignore
 from krrood.entity_query_language.predicate import (
     NameVerbalized,
     Predicate,
+    RenderedFields,
     SymbolicFunction,
     functional_form,
     symbolic_function,
@@ -830,7 +831,7 @@ node_parents = functional_form(NodeParents)
 
 
 @dataclass(eq=False)
-class IsSubclass(NameVerbalized, Predicate):
+class IsSubclass(Predicate):
     """Whether one class is a subclass of another class (or tuple of classes)."""
 
     subclass: Type
@@ -842,12 +843,35 @@ class IsSubclass(NameVerbalized, Predicate):
     def __call__(self) -> bool:
         return issubclass(self.subclass, self.parent_or_parents)
 
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """:return: the clause *"<subclass> is a subclass of <parent>"* — a custom fragment because
+        the name-based reading lacks the article and preposition (*"subclass holds for …"*).
+        """
+        # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            clause,
+            Copula,
+            Noun,
+        )
+        from krrood.entity_query_language.verbalization.vocabulary.english import (
+            Prepositions,
+        )
+
+        return clause(
+            Noun(fields["subclass"]),
+            Copula(),
+            Noun("subclass"),
+            Prepositions.OF,
+            Noun(fields["parent_or_parents"]),
+        )
+
 
 issubclass_ = functional_form(IsSubclass)
 
 
 @dataclass(eq=False)
-class IsClass(NameVerbalized, Predicate):
+class IsClass(Predicate):
     """Whether an object is a class."""
 
     obj: Any
@@ -855,6 +879,19 @@ class IsClass(NameVerbalized, Predicate):
 
     def __call__(self) -> bool:
         return isclass(self.obj)
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """:return: the clause *"<obj> is a class"* — a custom fragment because the name-based
+        reading drops the complement's article (*"… is class"*)."""
+        # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            clause,
+            Copula,
+            Noun,
+        )
+
+        return clause(Noun(fields["obj"]), Copula(), Noun("class"))
 
 
 is_class = functional_form(IsClass)

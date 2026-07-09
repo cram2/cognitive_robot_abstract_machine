@@ -307,7 +307,7 @@ def predicate_clause(
     A copular complement attaches trailing operands only through a final preposition
     (``is_supported_by`` → *"… is supported by <object>"*). With none, an adjective/noun complement
     cannot take them as objects and naming any single operand the subject would be a false claim, so
-    the condition is stated to *hold for* all operands: *"one month holds for the begin and the end"*.
+    the condition is stated to *hold given* all operands: *"one month holds given the begin and the end"*.
 
     :param name: The predicate's identifier — a class or function name.
     :param subject: The first operand, rendered as the clause's subject.
@@ -331,7 +331,7 @@ def predicate_clause(
     >>> render(predicate_clause("ConnectsTo", Noun("body"), Noun("gripper")))
     'a body connects to a gripper'
     >>> render(predicate_clause("IsOneMonth", Noun.the("begin"), Noun.the("end")))
-    'one month holds for the begin and the end'
+    'one month holds given the begin and the end'
     """
     head, *rest = camel_case_to_words(name).split()
     complement = [WordFragment(text=word) for word in rest]
@@ -347,7 +347,7 @@ def predicate_clause(
         return clause(
             Noun(PhraseFragment(parts=complement)),
             Verb("hold"),
-            WordFragment(text="for"),
+            WordFragment(text="given"),
             operands,
         )
     predicate = (

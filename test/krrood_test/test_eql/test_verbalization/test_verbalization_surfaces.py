@@ -4,7 +4,7 @@ Golden-surface snapshot over every symbolic callable's verbalization.
 Every concrete :class:`~krrood.entity_query_language.predicate.Predicate` /
 :class:`~krrood.entity_query_language.predicate.SymbolicFunction` defined in krrood's source is
 rendered with placeholder operands and compared against the committed snapshot
-(``verbalization_surfaces.snapshot``). A class without a fragment (and without the ``NameVerbalized``
+(``verbalization_surfaces.yaml``, one ``qualified class name: sentence`` entry per class). A class without a fragment (and without the ``NameVerbalized``
 opt-in) is recorded as fragment-less rather than rendered.
 
 The point is review visibility: adding or renaming a symbolic callable, opting into
@@ -16,23 +16,25 @@ To update the snapshot after an intentional change, run::
 
     UPDATE_VERBALIZATION_SURFACES=1 pytest test/krrood_test/test_eql/test_verbalization/test_verbalization_surfaces.py
 
-and commit the regenerated file with the change that caused it.
+and commit the regenerated YAML with the change that caused it.
 """
 
 from __future__ import annotations
 
 import inspect
 import os
-import sys
 from dataclasses import fields
 from pathlib import Path
 
+import yaml
 from typing_extensions import Any, Dict, List, Type
 
 import krrood.entity_query_language.factories
 import krrood.entity_query_language.verbalization.example_domain
 import krrood.inheritance_path_length
 import krrood.patterns.role_predicates
+from krrood.class_diagrams.class_diagram import WrappedClass
+from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.factories import variable
 from krrood.entity_query_language.predicate import (
     SymbolicCallable,
@@ -41,7 +43,7 @@ from krrood.entity_query_language.predicate import (
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 from krrood.utils import recursive_subclasses
 
-SNAPSHOT_PATH = Path(__file__).parent / "verbalization_surfaces.snapshot"
+SNAPSHOT_PATH = Path(__file__).parent / "verbalization_surfaces.yaml"
 """The committed snapshot mapping each symbolic callable to its rendered surface."""
 
 COVERED_MODULES = frozenset(
@@ -106,10 +108,11 @@ def _has_fragment(cls: Type[SymbolicCallable]) -> bool:
 
 def _placeholder_operands(cls: Type[SymbolicCallable]) -> Dict[str, Any]:
     """:return: one placeholder operand per init dataclass field — an override where registered,
-    else a fresh variable of the field's annotated type (``object`` when the annotation is not a
-    plain class — ``Any``, a union, a parametrized generic), so the surface reads the operand as
-    *"a <TypeName>"*."""
+    else a fresh variable of the field's type endpoint as the class diagram resolves it (``object``
+    when the endpoint is not a plain class — ``Any``, a union, a parametrized generic), so the
+    surface reads the operand as *"a <TypeName>"*."""
     overrides = OPERAND_OVERRIDES.get(cls.__name__, {})
+    wrapped_class = WrappedClass(clazz=cls)
     operands: Dict[str, Any] = {}
     for field in fields(cls):
         if not field.init:
@@ -117,27 +120,12 @@ def _placeholder_operands(cls: Type[SymbolicCallable]) -> Dict[str, Any]:
         if field.name in overrides:
             operands[field.name] = overrides[field.name]
             continue
-        hint = _annotation_of(cls, field.name)
+        endpoint = WrappedField(wrapped_class, field).type_endpoint
         placeholder_type = (
-            hint if isinstance(hint, type) and hint is not Any else object
+            endpoint if isinstance(endpoint, type) and endpoint is not Any else object
         )
         operands[field.name] = variable(placeholder_type, [])
     return operands
-
-
-def _annotation_of(cls: Type, field_name: str) -> Any:
-    """:return: *field_name*'s resolved annotation, evaluated in its defining class's module
-    namespace — resolved per field (rather than ``get_type_hints`` over the whole class) so an
-    unrelated ``TYPE_CHECKING``-guarded annotation on a base cannot fail the lookup."""
-    for klass in cls.__mro__:
-        annotations = inspect.get_annotations(klass)
-        if field_name not in annotations:
-            continue
-        annotation = annotations[field_name]
-        if isinstance(annotation, str):
-            return eval(annotation, vars(sys.modules[klass.__module__]))
-        return annotation
-    return object
 
 
 def _surface_of(cls: Type[SymbolicCallable]) -> str:
@@ -147,25 +135,24 @@ def _surface_of(cls: Type[SymbolicCallable]) -> str:
     return verbalize_expression(cls(**_placeholder_operands(cls)))
 
 
-def _render_snapshot() -> str:
-    """:return: the full snapshot text — one ``qualified name: surface`` line per class."""
-    lines = [
-        f"{_qualified_name(cls)}: {_surface_of(cls)}"
-        for cls in _source_symbolic_callables()
-    ]
-    return "\n".join(lines) + "\n"
+def _render_surfaces() -> Dict[str, str]:
+    """:return: the snapshot mapping — ``qualified class name -> rendered surface``."""
+    return {
+        _qualified_name(cls): _surface_of(cls) for cls in _source_symbolic_callables()
+    }
 
 
 def test_every_symbolic_callable_surface_matches_the_snapshot():
     """The rendered surface of every source symbolic callable matches the committed snapshot, so
     any new class or changed wording must be re-approved by regenerating the file (see module
     docstring) and reviewing its diff."""
-    actual = _render_snapshot()
+    actual = _render_surfaces()
     if os.environ.get(UPDATE_ENVIRONMENT_VARIABLE):
-        SNAPSHOT_PATH.write_text(actual)
-    expected = SNAPSHOT_PATH.read_text()
+        SNAPSHOT_PATH.write_text(
+            yaml.safe_dump(actual, sort_keys=True, width=1000, allow_unicode=True)
+        )
+    expected = yaml.safe_load(SNAPSHOT_PATH.read_text())
     assert actual == expected, (
-        "Verbalization surfaces changed. Review the diff below, and if the new wording is "
-        f"intended, regenerate the snapshot with {UPDATE_ENVIRONMENT_VARIABLE}=1 and commit it.\n"
-        f"--- expected ---\n{expected}\n--- actual ---\n{actual}"
+        "Verbalization surfaces changed. Review the differences, and if the new wording is "
+        f"intended, regenerate the snapshot with {UPDATE_ENVIRONMENT_VARIABLE}=1 and commit it."
     )
