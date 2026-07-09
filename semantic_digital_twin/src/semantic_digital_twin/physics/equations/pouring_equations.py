@@ -88,15 +88,6 @@ class PouringEquation(SubclassJSONSerializer, FillEquation):
     outflow_rate_constant: float = field(default=1.0, kw_only=True)
     """Proportionality constant scaling the discharge gap to the normalized drain rate."""
 
-    def symbolic_tilt_floor(self, fill_expression: Scalar) -> Scalar:
-        """
-        Symbolic minimum tilt angle at which flow begins for the given fill level.
-
-        :param fill_expression: Symbolic fill-level position DOF variable.
-        :return: Symbolic tilt floor angle in radians.
-        """
-        return sm.Scalar(0.0)
-
     def symbolic_ode_jacobians(
         self, tilt_expression: Scalar, fill_expression: Scalar
     ) -> Tuple[Scalar, Scalar]:
@@ -157,17 +148,6 @@ class ArticulatedPouringEquation(PouringEquation):
             container_width=data["container_width"],
             outflow_rate_constant=data["outflow_rate_constant"],
         )
-
-    def symbolic_tilt_floor(self, fill_expression: Scalar) -> Scalar:
-        """
-        Returns the geometric tilt offset φ(fill) — the minimum tilt for flow.
-
-        :param fill_expression: Symbolic fill-level position DOF variable.
-        :return: Symbolic φ(fill) in radians.
-        """
-        A = self.container_height
-        r = self.container_width / 2
-        return sm.atan2(A - fill_expression * A, r)
 
     def symbolic_velocity(self, context: FillContext) -> Scalar:
         """

@@ -20,6 +20,11 @@ from dataclasses import dataclass
 from typing import Optional
 
 from krrood.entity_query_language.predicate import Predicate
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    clause,
+    Noun,
+    Verb,
+)
 
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
@@ -100,6 +105,10 @@ class Causes(Predicate):
 
         return (not is_achieved_pre) and is_achieved_post
 
+    @classmethod
+    def _verbalization_fragment_(cls, fields):
+        return clause(Noun(fields["motion"]), Verb("cause"), Noun(fields["effect"]))
+
 
 @dataclass
 class SatisfiesRequest(Predicate):
@@ -115,6 +124,10 @@ class SatisfiesRequest(Predicate):
 
     def __call__(self) -> bool:
         return self.task.goal(self.effect)
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields):
+        return clause(Noun(fields["effect"]), Verb("satisfy"), Noun(fields["task"]))
 
 
 @dataclass
@@ -132,3 +145,7 @@ class CanPerform(Predicate):
 
     @abstractmethod
     def __call__(self) -> bool: ...
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields):
+        return clause(Noun(fields["robot"]), Verb("perform"), Noun(fields["motion"]))

@@ -50,31 +50,6 @@ def _ode_partials(
     return df_dtilt.evaluate()[0], df_dfill.evaluate()[0]
 
 
-def _linear_rollout(
-    fill_level: float,
-    outflow_rate: float,
-    tilt_sensitivity: float,
-    fill_sensitivity: float,
-    tilt_velocity: float,
-) -> float:
-    """
-    Explicit step-by-step rollout of the linearized recursion ``h_{k+1} = λ h_k + c + dt a δα_k``.
-
-    Mirrors the convention used by :class:`LinearizedScalarStateModel`: the tilt deviation starts at zero
-    and grows by ``tilt_velocity·dt`` each step.
-    """
-    fill = fill_level
-    tilt_deviation = 0.0
-    for _ in range(_CONTROL_HORIZON):
-        fill += _TIME_STEP * (
-            outflow_rate
-            + tilt_sensitivity * tilt_deviation
-            + fill_sensitivity * (fill - fill_level)
-        )
-        tilt_deviation += tilt_velocity * _TIME_STEP
-    return fill
-
-
 def _nonlinear_rollout(
     equation: ArticulatedPouringEquation,
     tilt_angle: float,
@@ -113,69 +88,6 @@ class TestLinearizedScalarStateModel:
         predicted = model.free_response().evaluate()[0]
         held_tilt = _nonlinear_rollout(equation, tilt_angle, fill_level, 0.0)
         assert predicted == pytest.approx(held_tilt, abs=1e-3)
-
-    def test_prediction_matches_linear_rollout_exactly(self):
-        """
-        The closed-form terminal prediction must reproduce the explicit linear recursion,
-        validating the geometric-weight algebra independently of any nonlinearity.
-        """
-        equation, tilt_angle, fill_level = _make_flowing_setup()
-        outflow_rate = _ode_value(equation, tilt_angle, fill_level)
-        tilt_sensitivity, fill_sensitivity = _ode_partials(
-            equation, tilt_angle, fill_level
-        )
-        tilt_velocity = 0.02
-
-        model = LinearizedScalarStateModel(
-            state_value=sm.Scalar(fill_level),
-            state_velocity=sm.Scalar(outflow_rate),
-            state_sensitivity=sm.Scalar(fill_sensitivity),
-            time_step=_TIME_STEP,
-            control_horizon=_CONTROL_HORIZON,
-        )
-
-        predicted = model.predict_terminal_state(
-            sm.Scalar(tilt_sensitivity), sm.Scalar(tilt_velocity)
-        ).evaluate()[0]
-        expected = _linear_rollout(
-            fill_level,
-            outflow_rate,
-            tilt_sensitivity,
-            fill_sensitivity,
-            tilt_velocity,
-        )
-        assert predicted == pytest.approx(expected, abs=1e-9)
-
-    def test_prediction_matches_nonlinear_rollout_to_first_order(self):
-        """
-        The linearized prediction must track the true nonlinear rollout, and the error must
-        shrink as the tilt command (and hence the deviation from the operating point) shrinks.
-        """
-        equation, tilt_angle, fill_level = _make_flowing_setup()
-        outflow_rate = _ode_value(equation, tilt_angle, fill_level)
-        tilt_sensitivity, fill_sensitivity = _ode_partials(
-            equation, tilt_angle, fill_level
-        )
-
-        model = LinearizedScalarStateModel(
-            state_value=sm.Scalar(fill_level),
-            state_velocity=sm.Scalar(outflow_rate),
-            state_sensitivity=sm.Scalar(fill_sensitivity),
-            time_step=_TIME_STEP,
-            control_horizon=_CONTROL_HORIZON,
-        )
-
-        def prediction_error(tilt_velocity: float) -> float:
-            predicted = model.predict_terminal_state(
-                sm.Scalar(tilt_sensitivity), sm.Scalar(tilt_velocity)
-            ).evaluate()[0]
-            truth = _nonlinear_rollout(equation, tilt_angle, fill_level, tilt_velocity)
-            return abs(predicted - truth)
-
-        coarse_error = prediction_error(0.04)
-        fine_error = prediction_error(0.02)
-        assert coarse_error < 1e-3
-        assert fine_error < coarse_error
 
     def test_lookahead_weights_decrease_and_vanish_at_horizon_end(self):
         """
@@ -248,18 +160,3 @@ class TestIncreasingFillLinearization:
             fill_level + _CONTROL_HORIZON * _TIME_STEP * inflow_rate
         )
         assert predicted > fill_level
-
-    def test_terminal_prediction_increases_with_pouring(self):
-        """Tilting the source harder (positive tilt sensitivity and velocity) raises the predicted fill."""
-        model = LinearizedScalarStateModel(
-            state_value=sm.Scalar(0.0),
-            state_velocity=sm.Scalar(0.1),
-            state_sensitivity=sm.Scalar(0.0),
-            time_step=_TIME_STEP,
-            control_horizon=_CONTROL_HORIZON,
-        )
-        held = model.free_response().evaluate()[0]
-        poured = model.predict_terminal_state(
-            sm.Scalar(0.5), sm.Scalar(0.2)
-        ).evaluate()[0]
-        assert poured > held

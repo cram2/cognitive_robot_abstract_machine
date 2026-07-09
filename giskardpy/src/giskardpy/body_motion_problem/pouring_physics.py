@@ -27,8 +27,8 @@ class PouringMSCModel(GiskardPhysicsModel):
     MSC to generate a tilt trajectory.
 
     The primary trajectory records the tilt joint positions at each control step.
-    The fill-level trajectory is available as a secondary trajectory via
-    :meth:`build_secondary_trajectories`.
+    The fill-level trajectory is recorded alongside it by
+    :meth:`_build_motion_trajectory`.
     """
 
     fill_equation: PouringEquation

@@ -36,19 +36,8 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     leaf,
 )
 from random_events.product_algebra import Event
-from random_events.set import Set as RandomEventsSets
-from random_events.variable import Symbolic
-from random_events.product_algebra import Event
 from random_events.set import Set as EventSet
 from random_events.variable import Symbolic
-from typing_extensions import (
-    TYPE_CHECKING,
-    List,
-    Optional,
-    Self,
-    Set,
-    Type,
-)
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables

@@ -138,33 +138,6 @@ class LinearizedScalarStateModel:
             for block in range(self.control_horizon)
         ]
 
-    def predict_terminal_state(
-        self, control_sensitivity: Scalar, control_velocity: Scalar
-    ) -> Scalar:
-        """
-        Linearized terminal state under a constant control velocity.
-
-        Combines :meth:`free_response` with the control contribution
-        ``Σ_i a·ω·dt²·G_{M-2-i}`` derived from unrolling the recursion.  This is the analytic
-        sensitivity the relative block weighting reproduces; the strategy deploys it at the
-        reactive scale via :func:`horizon_normalized_weights`.
-
-        :param control_sensitivity: Partial derivative ∂f/∂u at the operating point.
-        :param control_velocity: Constant control velocity applied each step.
-        """
-        time_step = sm.Scalar(self.time_step)
-        forced = sm.Scalar(0.0)
-        for weight in self.lookahead_weights():
-            forced = (
-                forced
-                + control_sensitivity
-                * control_velocity
-                * time_step
-                * time_step
-                * weight
-            )
-        return self.free_response() + forced
-
 
 @dataclass
 class TerminalStatePredictionConstraint(GiskardEqualityConstraint):
@@ -200,8 +173,7 @@ class TerminalStatePredictionStrategy(IntegralStrategy):
     velocity — which keeps the control applied for more of the remaining horizon — affects the
     terminal state more than a later one, and the final block has no effect.  The weights are
     normalized to unit average so the row stays at the well-conditioned scale of the plain reactive
-    integral; the analytic sensitivity they reproduce is validated by
-    :meth:`LinearizedScalarStateModel.predict_terminal_state`.
+    integral.
 
     The bound ``goal − x_free`` supplies the proactive terminal prediction error.  Where the
     control sensitivity ``∂f/∂q → 0`` the whole row vanishes, the QP regularizes velocities to

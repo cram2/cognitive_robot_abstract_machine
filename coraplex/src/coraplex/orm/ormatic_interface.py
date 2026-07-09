@@ -14397,7 +14397,7 @@ class FileUriResolverDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    base_directory: Mapped[builtins.str] = mapped_column(
+    base_directory: Mapped[typing.Optional[builtins.str]] = mapped_column(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
@@ -18169,16 +18169,6 @@ class MissingFillEquationErrorDAO(
         use_existing_column=True,
     )
 
-    source_id: Mapped[int] = mapped_column(
-        ForeignKey("HasRootBodyDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    source: Mapped[HasRootBodyDAO] = relationship(
-        "HasRootBodyDAO", uselist=False, foreign_keys=[source_id], post_update=True
-    )
-
     __mapper_args__ = {
         "polymorphic_identity": "MissingFillEquationErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
@@ -18347,16 +18337,6 @@ class SourceAlreadyCoupledErrorDAO(
         ForeignKey(UsageErrorDAO.database_id),
         primary_key=True,
         use_existing_column=True,
-    )
-
-    source_id: Mapped[int] = mapped_column(
-        ForeignKey("HasRootBodyDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    source: Mapped[HasRootBodyDAO] = relationship(
-        "HasRootBodyDAO", uselist=False, foreign_keys=[source_id], post_update=True
     )
 
     __mapper_args__ = {
@@ -20311,6 +20291,19 @@ class HasRobotPartsDAO(
     }
 
 
+class IsPartWholeRelationshipDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.mixins.IsPartWholeRelationship
+    ],
+):
+    __tablename__ = "IsPartWholeRelationshipDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
 class IsPerceivableDAO(
     Base,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.IsPerceivable],
@@ -21249,27 +21242,6 @@ class OpenedEffectDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "OpenedEffectDAO",
-        "inherit_condition": database_id == MonotoneIncreasingEffectDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class ReceiverFillEffectDAO(
-    MonotoneIncreasingEffectDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.effects.ReceiverFillEffect
-    ],
-):
-    __tablename__ = "ReceiverFillEffectDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(MonotoneIncreasingEffectDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "ReceiverFillEffectDAO",
         "inherit_condition": database_id == MonotoneIncreasingEffectDAO.database_id,
         "polymorphic_load": "selectin",
     }

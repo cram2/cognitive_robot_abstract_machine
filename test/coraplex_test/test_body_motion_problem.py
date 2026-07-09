@@ -11,6 +11,8 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
 from krrood.entity_query_language.factories import an, set_of, variable
+from krrood.entity_query_language.operators.core_logical_operators import Not
+from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 from krrood.ormatic.utils import classproperty
 
 from giskardpy.body_motion_problem.container_physics import (
@@ -29,6 +31,7 @@ from semantic_digital_twin.world_description.motion import Motion, MotionTraject
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.mixins import (
@@ -762,3 +765,73 @@ class TestRobotIntegration:
         results = list(query.evaluate())
         print(len(results))
         assert len(results) >= 1
+
+
+# ---------------------------------------------------------------------------
+# 5. EQL verbalization of the body-motion-problem predicates and law query
+# ---------------------------------------------------------------------------
+
+
+class TestBodyMotionProblemVerbalization:
+    def test_predicate_clauses(self):
+        """Each body-motion-problem predicate verbalizes as its affirmative present-tense clause,
+        and a wrapping ``Not`` negates it inline with do-support."""
+        task = variable(TaskRequest, [])
+        effect = variable(Effect, [])
+        motion = variable(Motion, [])
+        robot = variable(AbstractRobot, [])
+        world = World()
+
+        assert (
+            verbalize_expression(SatisfiesRequest(task=task, effect=effect))
+            == "an Effect satisfies a TaskRequest"
+        )
+        assert (
+            verbalize_expression(Not(SatisfiesRequest(task=task, effect=effect)))
+            == "an Effect does not satisfy a TaskRequest"
+        )
+        assert (
+            verbalize_expression(
+                Causes(effect=effect, motion=motion, environment=world)
+            )
+            == "a Motion causes an Effect"
+        )
+        assert (
+            verbalize_expression(
+                Not(Causes(effect=effect, motion=motion, environment=world))
+            )
+            == "a Motion does not cause an Effect"
+        )
+        assert (
+            verbalize_expression(MotionStatechartCanPerform(motion=motion, robot=robot))
+            == "an AbstractRobot performs a Motion"
+        )
+        assert (
+            verbalize_expression(
+                Not(MotionStatechartCanPerform(motion=motion, robot=robot))
+            )
+            == "an AbstractRobot does not perform a Motion"
+        )
+
+    def test_law_query_reads_as_a_sentence(self):
+        """The full Law of Task-Achieving Body Motion query verbalizes as one readable sentence."""
+        task = variable(TaskRequest, [])
+        effect = variable(Effect, [])
+        motion = variable(Motion, [])
+        robot = variable(AbstractRobot, [])
+        world = World()
+
+        query = an(
+            set_of(motion, effect, task).where(
+                SatisfiesRequest(task=task, effect=effect),
+                Causes(effect=effect, motion=motion, environment=world),
+                MotionStatechartCanPerform(motion=motion, robot=robot),
+            )
+        )
+
+        assert verbalize_expression(query) == (
+            "Find a Motion, an Effect, and a TaskRequest such that "
+            "the Effect satisfies the TaskRequest, "
+            "the Motion causes the Effect, "
+            "and an AbstractRobot performs the Motion"
+        )

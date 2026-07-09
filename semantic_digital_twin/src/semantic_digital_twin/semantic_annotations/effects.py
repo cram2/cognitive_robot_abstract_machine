@@ -37,12 +37,3 @@ class PouringEffect(MonotoneDecreasingEffect):
     """
 
     target_object: HasFillLevel
-
-
-@dataclass(eq=False, kw_only=True)
-class ReceiverFillEffect(MonotoneIncreasingEffect):
-    """
-    Effect achieved when the fill level of a receiver container reaches ``goal_value``.
-    """
-
-    target_object: HasFillLevel
