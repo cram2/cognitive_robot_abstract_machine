@@ -48,27 +48,15 @@ class InheritancePathLength(SymbolicFunction):
         custom fragment because the length is BETWEEN its two operands, a relation the name-based
         *"of X and Y"* genitive cannot express."""
         # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
-        from krrood.entity_query_language.verbalization.fragments.base import (
-            oxford_comma,
-            PhraseFragment,
-        )
         from krrood.entity_query_language.verbalization.vocabulary.english import (
-            Conjunctions,
             Prepositions,
         )
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            Noun,
+            value_phrase,
         )
 
-        return PhraseFragment(
-            parts=[
-                Noun.the("inheritance path length").as_fragment(),
-                Prepositions.BETWEEN.as_fragment(),
-                oxford_comma(
-                    [field.as_fragment() for field in fields.values()],
-                    Conjunctions.AND.as_fragment(),
-                ),
-            ]
+        return value_phrase(
+            "inheritance path length", Prepositions.BETWEEN, *fields.values()
         )
 
 

@@ -285,6 +285,46 @@ def value_function_phrase(
     return possessive_path([PathStep(noun)], owner)
 
 
+def value_phrase(
+    noun: str, relation: ClauseConstituent, *operands: ClauseConstituent
+) -> VerbalizationFragment:
+    """Build *"the <noun> <relation> <operands...>"* — the general value noun phrase for a value
+    whose relation to its operands is not the possessive *"of"* that
+    :func:`value_function_phrase` hardcodes (e.g. a length BETWEEN two things).
+
+    The operands are joined with *"and"*; the relation is any constituent, typically a
+    :class:`~krrood.entity_query_language.verbalization.vocabulary.english.Prepositions` member.
+    This lives here so a predicate's fragment depends only on the part-of-speech vocabulary, never
+    on the lower-level fragment builders.
+
+    :param noun: The value's noun (the definite article is realised by the determiner pass).
+    :param relation: The word relating the value to its operands.
+    :param operands: The already-rendered operands.
+    :return: The value noun phrase.
+
+    >>> from krrood.entity_query_language.verbalization.fragments.base import (
+    ...     flatten_fragment_to_plain_text,
+    ... )
+    >>> from krrood.entity_query_language.verbalization.rendering.realization import (
+    ...     realize_tree,
+    ... )
+    >>> flatten_fragment_to_plain_text(realize_tree(value_phrase(
+    ...     "inheritance path length", Prepositions.BETWEEN, Noun.the("begin"), Noun.the("end")
+    ... )))
+    'the inheritance path length between the begin and the end'
+    """
+    return PhraseFragment(
+        parts=[
+            Noun.the(noun).as_fragment(),
+            relation.as_fragment(),
+            oxford_comma(
+                [operand.as_fragment() for operand in operands],
+                Conjunctions.AND.as_fragment(),
+            ),
+        ]
+    )
+
+
 _COPULA_LEMMA = "be"
 """The lemma a copular predicate name's leading word reduces to (``is`` / ``are`` -> ``be``)."""
 

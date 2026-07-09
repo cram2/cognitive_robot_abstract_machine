@@ -68,11 +68,12 @@ FRAGMENT_LESS_MARKER = (
 """Snapshot entry for a class that made no surface decision yet."""
 
 OPERAND_OVERRIDES: Dict[str, Dict[str, Any]] = {
-    "HasType": {"types_": (int, str)},
+    "HasType": {"types_": int},
     "HasTypes": {"types_": (int, str)},
 }
-"""Concrete operands for classes whose fragments read a field's raw VALUE (a type listing), keyed
-by class name; every other field defaults to a fresh placeholder variable of its annotated type."""
+"""Concrete operands for classes whose fragments read a field's raw VALUE, keyed by class name;
+every other field defaults to a fresh placeholder variable of its annotated type. ``HasType`` gets
+the SINGLE type its contract declares (``types_: Type``) — the tuple form belongs to ``HasTypes``."""
 
 
 def _source_symbolic_callables() -> List[Type[SymbolicCallable]]:

@@ -7,7 +7,7 @@ krrood.entity_query_language.factories.NodeId: the node id of a SymbolicExpressi
 krrood.entity_query_language.factories.NodeParents: the node parents of a SymbolicExpression
 krrood.entity_query_language.factories.NodeType: the node type of a Selectable
 krrood.entity_query_language.factories.RuntimeType: the runtime type of an object
-krrood.entity_query_language.predicate.HasType: an object is of type Integer or Text
+krrood.entity_query_language.predicate.HasType: an object is of type Integer
 krrood.entity_query_language.predicate.HasTypes: an object is one of Integer or Text
 krrood.entity_query_language.predicate.Is: (no fragment -- verbalizing raises PredicateFragmentRequiredError)
 krrood.entity_query_language.predicate.Length: the length of an object
