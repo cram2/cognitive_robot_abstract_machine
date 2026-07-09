@@ -5,11 +5,15 @@ from functools import lru_cache
 from inspect import isclass
 from typing import Type, Optional
 
-from krrood.entity_query_language.predicate import SymbolicFunction, functional_form
+from krrood.entity_query_language.predicate import (
+    NameVerbalized,
+    SymbolicFunction,
+    functional_form,
+)
 
 
 @dataclass(eq=False)
-class InheritancePathLength(SymbolicFunction):
+class InheritancePathLength(NameVerbalized, SymbolicFunction):
     """The inheritance path length between two classes, as a value operation.
 
     Every inheritance level that lies between :attr:`child_class` and :attr:`parent_class` increases

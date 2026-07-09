@@ -81,13 +81,16 @@ def test_symbolic_function_binds_its_computed_value_in_a_query():
     """In a query a value ``SymbolicFunction`` binds what it COMPUTES (constructed AND called),
     exactly like a ``@symbolic_function`` — not the constructed instance."""
     numbers = variable(int, domain=[1, 2, 3])
-    values = sorted(next(iter(row.values())) for row in a(set_of(Doubled(numbers))).tolist())
+    values = sorted(
+        next(iter(row.values())) for row in a(set_of(Doubled(numbers))).tolist()
+    )
     assert values == [2, 4, 6]
 
 
 def test_migrated_length_reads_as_a_noun_phrase_and_keeps_its_value():
     """``length`` is now ``class Length(SymbolicFunction)`` behind a ``functional_form`` wrapper: it
-    reads through the default value surface (*"the length of ..."*) and still computes the length."""
+    reads through the explicit ``NameVerbalized`` surface (*"the length of ..."*) and still computes
+    the length."""
     assert issubclass(Length, SymbolicFunction)
     assert length([1, 2, 3]) == 3
     assert (

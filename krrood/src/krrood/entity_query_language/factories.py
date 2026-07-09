@@ -53,6 +53,7 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 from krrood.entity_query_language.operators.logical_quantifiers import ForAll, Exists
 from krrood.entity_query_language.predicate import *  # type: ignore
 from krrood.entity_query_language.predicate import (
+    NameVerbalized,
     Predicate,
     SymbolicFunction,
     functional_form,
@@ -745,7 +746,7 @@ def evaluate_condition(condition: ConditionType) -> bool:
 
 
 @dataclass(eq=False)
-class NodeId(SymbolicFunction):
+class NodeId(NameVerbalized, SymbolicFunction):
     """The stable identity of an EQL node, as a value operation."""
 
     node: SymbolicExpression
@@ -759,7 +760,7 @@ node_id = functional_form(NodeId)
 
 
 @dataclass(eq=False)
-class NodeDescendants(SymbolicFunction):
+class NodeDescendants(NameVerbalized, SymbolicFunction):
     """The descendants of an EQL node, as a value operation."""
 
     node: SymbolicExpression
@@ -773,7 +774,7 @@ node_descendants = functional_form(NodeDescendants)
 
 
 @dataclass(eq=False)
-class NodeType(SymbolicFunction):
+class NodeType(NameVerbalized, SymbolicFunction):
     """The selectable type of an EQL node, as a value operation."""
 
     node: Selectable
@@ -787,7 +788,7 @@ node_type = functional_form(NodeType)
 
 
 @dataclass(eq=False)
-class NodeChildren(SymbolicFunction):
+class NodeChildren(NameVerbalized, SymbolicFunction):
     """The children of an EQL node, as a value operation."""
 
     node: CanBehaveLikeAVariable
@@ -801,7 +802,7 @@ node_children = functional_form(NodeChildren)
 
 
 @dataclass(eq=False)
-class AttributeOwnerClass(SymbolicFunction):
+class AttributeOwnerClass(NameVerbalized, SymbolicFunction):
     """The class that owns an attribute, as a value operation."""
 
     node: Attribute
@@ -815,7 +816,7 @@ attribute_owner_class = functional_form(AttributeOwnerClass)
 
 
 @dataclass(eq=False)
-class NodeParents(SymbolicFunction):
+class NodeParents(NameVerbalized, SymbolicFunction):
     """The parents of an EQL node, as a value operation."""
 
     node: SymbolicExpression
@@ -829,7 +830,7 @@ node_parents = functional_form(NodeParents)
 
 
 @dataclass(eq=False)
-class IsSubclass(Predicate):
+class IsSubclass(NameVerbalized, Predicate):
     """Whether one class is a subclass of another class (or tuple of classes)."""
 
     subclass: Type
@@ -846,7 +847,7 @@ issubclass_ = functional_form(IsSubclass)
 
 
 @dataclass(eq=False)
-class IsClass(Predicate):
+class IsClass(NameVerbalized, Predicate):
     """Whether an object is a class."""
 
     obj: Any
@@ -860,7 +861,7 @@ is_class = functional_form(IsClass)
 
 
 @dataclass(eq=False)
-class RuntimeType(SymbolicFunction):
+class RuntimeType(NameVerbalized, SymbolicFunction):
     """The runtime class of an object, as a value operation."""
 
     obj: Any

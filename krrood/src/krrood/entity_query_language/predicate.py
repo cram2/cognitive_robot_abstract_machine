@@ -266,25 +266,6 @@ class Predicate(SymbolicCallable, ABC):
         """
         return bool(self.__call__())
 
-    @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
-        """Default boolean surface — a clause read off the class name: copular for an ``Is…`` name
-        (``IsReachable`` → *"<subject> is reachable"*), verb-first otherwise (``ConnectsTo`` →
-        *"<subject> connects to <object>"*). The class-form counterpart of a boolean
-        ``@symbolic_function``'s reading, so a migrated predicate needs no per-class fragment.
-
-        ..warning:: This name-based default is a best guess — correct only when the class name reads as
-            the predicate. When it does not, override this method with a
-            :func:`~…vocabulary.parts_of_speech.clause` built from the part-of-speech vocabulary.
-        """
-        # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
-        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            predicate_clause,
-        )
-
-        subject, *objects = fields.values()
-        return predicate_clause(cls.__name__, subject, *objects)
-
 
 @dataclass(eq=False)
 class SymbolicFunction(SymbolicCallable, ABC):
@@ -292,8 +273,9 @@ class SymbolicFunction(SymbolicCallable, ABC):
 
     Like :class:`Predicate` it is a self-verbalizing symbolic callable, but its :meth:`__call__`
     returns a value (not a truth value), so its :meth:`Verbalizable._verbalization_fragment_` names
-    that value as a NOUN PHRASE rather than a clause. The default reads *"the <name> of <arguments>"*
-    off the class name; override it when that is not the surface you want.
+    that value as a NOUN PHRASE rather than a clause. When the class name itself reads as the value
+    (``Length`` → *"the length of a list"*), mix in :class:`NameVerbalized` instead of writing the
+    fragment by hand.
     """
 
     @classmethod
@@ -303,28 +285,53 @@ class SymbolicFunction(SymbolicCallable, ABC):
         """
         return cls._construct_normally_(**kwargs)()
 
-    @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
-        """Default value surface — the value noun phrase *"the <name> of <arguments>"* read off the
-        class name (a leading ``Get`` dropped). The class-form counterpart of a value
-        ``@symbolic_function``'s reading, so a migrated value function needs no per-class fragment.
-
-        ..warning:: This name-based default is a best guess — correct only when the class name reads as
-            the value. When it does not, override this method with a
-            :func:`~…vocabulary.parts_of_speech.value_function_phrase` (or another noun phrase).
-        """
-        # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
-        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            value_function_phrase,
-        )
-
-        return value_function_phrase(cls.__name__, *fields.values())
-
     @abstractmethod
     def __call__(self) -> Any:
         """
         Compute the value for the supplied arguments.
         """
+
+
+@dataclass(eq=False)
+class NameVerbalized(Verbalizable):
+    """Opt-in mixin declaring that the class NAME is its verbalization surface.
+
+    Mixing this in (``class Length(NameVerbalized, SymbolicFunction)``) is an explicit, greppable
+    choice that the CamelCase / snake_case class name reads as the operation's surface, so no
+    hand-written fragment is needed: a :class:`SymbolicFunction` reads as the value noun phrase
+    *"the <name> of <arguments>"* (``Length`` → *"the length of a list"*) and a :class:`Predicate`
+    as the name-based clause — copular for an ``Is…`` name (``IsReachable`` → *"<subject> is
+    reachable"*), verb-first otherwise (``ConnectsTo`` → *"<subject> connects to <object>"*).
+
+    Keeping :meth:`Verbalizable._verbalization_fragment_` abstract and making the name-based reading
+    an explicit mixin (rather than a silently inherited default) means an author must always *decide*
+    how a new operation is said — a class that decides nothing fails loudly instead of producing an
+    unreviewed sentence.
+
+    ..warning:: Mix it in only after checking the produced sentence — the surface snapshot test
+        (``test_verbalization_surfaces.py``) prints it for every symbolic callable, so it shows up
+        in the PR diff. When the name does not read as the surface, implement
+        :meth:`Verbalizable._verbalization_fragment_` with a
+        :func:`~krrood.entity_query_language.verbalization.vocabulary.parts_of_speech.clause`
+        instead.
+    """
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """:return: the name-based surface — the value noun phrase for a :class:`SymbolicFunction`,
+        the name-based clause (first operand as subject, the rest trailing objects) for a
+        :class:`Predicate`.
+        """
+        # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            predicate_clause,
+            value_function_phrase,
+        )
+
+        if issubclass(cls, SymbolicFunction):
+            return value_function_phrase(cls.__name__, *fields.values())
+        subject, *objects = fields.values()
+        return predicate_clause(cls.__name__, subject, *objects)
 
 
 @dataclass(eq=False)
@@ -471,10 +478,10 @@ class HasTypes(HasType):
 
 
 @dataclass(eq=False)
-class Length(SymbolicFunction):
+class Length(NameVerbalized, SymbolicFunction):
     """The number of items in an iterable, as a value operation.
 
-    Reads through :class:`SymbolicFunction`'s default value surface (*"the length of <iterable>"*).
+    Reads through the explicit :class:`NameVerbalized` surface (*"the length of <iterable>"*).
     """
 
     iterable: Sized
@@ -510,4 +517,3 @@ class Is(Predicate):
 
     def __call__(self) -> bool:
         return self.first_entity is self.second_entity
-

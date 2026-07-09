@@ -1,0 +1,17 @@
+krrood.entity_query_language.factories.AttributeOwnerClass: the attribute owner class of an Attribute
+krrood.entity_query_language.factories.IsClass: an object is class
+krrood.entity_query_language.factories.IsSubclass: subclass holds for object 1 and object 2
+krrood.entity_query_language.factories.NodeChildren: the node children of a CanBehaveLikeAVariable
+krrood.entity_query_language.factories.NodeDescendants: the node descendants of a SymbolicExpression
+krrood.entity_query_language.factories.NodeId: the node id of a SymbolicExpression
+krrood.entity_query_language.factories.NodeParents: the node parents of a SymbolicExpression
+krrood.entity_query_language.factories.NodeType: the node type of a Selectable
+krrood.entity_query_language.factories.RuntimeType: the runtime type of an object
+krrood.entity_query_language.predicate.HasType: an object is of type Integer and Text
+krrood.entity_query_language.predicate.HasTypes: an object is one of Integer or Text
+krrood.entity_query_language.predicate.Is: (no fragment -- verbalizing raises PredicateFragmentRequiredError)
+krrood.entity_query_language.predicate.Length: the length of an object
+krrood.entity_query_language.verbalization.example_domain.IsReachable: an object is reachable
+krrood.entity_query_language.verbalization.example_domain.WorksIn: object 1 works in object 2
+krrood.inheritance_path_length.InheritancePathLength: the inheritance path length of object 1 and object 2
+krrood.patterns.role_predicates.IsSameSemanticEntity: object 1 is a the same entity as object 2
