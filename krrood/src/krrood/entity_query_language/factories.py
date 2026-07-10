@@ -758,10 +758,10 @@ class NodeId(SymbolicFunction):
     @classmethod
     def _verbalization_fragment_(cls, fields):
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            value_function_phrase,
+            function_value_phrase,
         )
 
-        return value_function_phrase(cls.__name__, *fields.values())
+        return function_value_phrase(cls.__name__, *fields.values())
 
 
 node_id = functional_form(NodeId)
@@ -780,10 +780,10 @@ class NodeDescendants(SymbolicFunction):
     @classmethod
     def _verbalization_fragment_(cls, fields):
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            value_function_phrase,
+            function_value_phrase,
         )
 
-        return value_function_phrase(cls.__name__, *fields.values())
+        return function_value_phrase(cls.__name__, *fields.values())
 
 
 node_descendants = functional_form(NodeDescendants)
@@ -802,10 +802,10 @@ class NodeType(SymbolicFunction):
     @classmethod
     def _verbalization_fragment_(cls, fields):
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            value_function_phrase,
+            function_value_phrase,
         )
 
-        return value_function_phrase(cls.__name__, *fields.values())
+        return function_value_phrase(cls.__name__, *fields.values())
 
 
 node_type = functional_form(NodeType)
@@ -824,10 +824,10 @@ class NodeChildren(SymbolicFunction):
     @classmethod
     def _verbalization_fragment_(cls, fields):
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            value_function_phrase,
+            function_value_phrase,
         )
 
-        return value_function_phrase(cls.__name__, *fields.values())
+        return function_value_phrase(cls.__name__, *fields.values())
 
 
 node_children = functional_form(NodeChildren)
@@ -846,10 +846,10 @@ class AttributeOwnerClass(SymbolicFunction):
     @classmethod
     def _verbalization_fragment_(cls, fields):
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            value_function_phrase,
+            function_value_phrase,
         )
 
-        return value_function_phrase(cls.__name__, *fields.values())
+        return function_value_phrase(cls.__name__, *fields.values())
 
 
 attribute_owner_class = functional_form(AttributeOwnerClass)
@@ -868,10 +868,10 @@ class NodeParents(SymbolicFunction):
     @classmethod
     def _verbalization_fragment_(cls, fields):
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            value_function_phrase,
+            function_value_phrase,
         )
 
-        return value_function_phrase(cls.__name__, *fields.values())
+        return function_value_phrase(cls.__name__, *fields.values())
 
 
 node_parents = functional_form(NodeParents)
@@ -957,10 +957,10 @@ class RuntimeType(SymbolicFunction):
     @classmethod
     def _verbalization_fragment_(cls, fields):
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            value_function_phrase,
+            function_value_phrase,
         )
 
-        return value_function_phrase(cls.__name__, *fields.values())
+        return function_value_phrase(cls.__name__, *fields.values())
 
 
 type_ = functional_form(RuntimeType)

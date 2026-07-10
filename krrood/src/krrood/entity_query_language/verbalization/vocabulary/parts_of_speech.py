@@ -180,7 +180,7 @@ class OneOf(ClauseElement):
             else self.members
         )
         listed = one_of(
-            [RoleFragment.for_member(member) for member in members[: MAX_SET_MEMBERS + 1]]
+            [RoleFragment.for_value(member) for member in members[: MAX_SET_MEMBERS + 1]]
         )
         if listed is not None:
             return listed
@@ -203,7 +203,7 @@ class Or(ClauseElement):
     """A disjunctive listing of admissible values — *"A, B, or C"* — over a collection.
 
     The vocabulary-level oxford-comma disjunction over any iterable of members, each rendered by
-    :meth:`~…fragments.base.RoleFragment.for_member` (a class as a linked type reference, any other
+    :meth:`~…fragments.base.RoleFragment.for_value` (a class as a linked type reference, any other
     value as a literal) and joined with *"or"*. An author writes ``Or(field)`` rather than reaching
     for the low-level :func:`~…fragments.base.oxford_comma` / :class:`Conjunctions` builders. A field
     bound to a single (non-iterable) value keeps that value's own rendered fragment.
@@ -230,8 +230,40 @@ class Or(ClauseElement):
         if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
             return Noun(self.members).as_fragment()
         return oxford_comma(
-            [RoleFragment.for_member(member) for member in value],
+            [RoleFragment.for_value(member) for member in value],
             Conjunctions.OR.as_fragment(),
+        )
+
+
+@dataclass(frozen=True)
+class And(ClauseElement):
+    """A conjunctive listing of clause constituents — *"A, B, and C"* — the counterpart of
+    :class:`Or` for constituents that already know how to render themselves.
+
+    Each item is rendered through its ``as_fragment`` and the parts are joined with *"and"* (an
+    oxford comma before the final conjunct). An author writes ``And(operands)`` rather than reaching
+    for the low-level :func:`~…fragments.base.oxford_comma` / :class:`Conjunctions` builders, so the
+    conjunction pattern lives in one place.
+    """
+
+    items: Iterable[ClauseConstituent]
+    """The constituents to conjoin, in order; each must provide ``as_fragment``."""
+
+    def as_fragment(self) -> VerbalizationFragment:
+        """:return: the conjunction phrase *"A, B, and C"*.
+
+        >>> from krrood.entity_query_language.verbalization.fragments.base import (
+        ...     flatten_fragment_to_plain_text,
+        ...     WordFragment,
+        ... )
+        >>> flatten_fragment_to_plain_text(
+        ...     And([WordFragment(text="a"), WordFragment(text="b")]).as_fragment()
+        ... )
+        'a and b'
+        """
+        return oxford_comma(
+            [item.as_fragment() for item in self.items],
+            Conjunctions.AND.as_fragment(),
         )
 
 
@@ -300,16 +332,21 @@ def value_function_noun(name: str) -> str:
     return " ".join(words)
 
 
-def value_function_phrase(
+def function_value_phrase(
     name: str, *operands: ClauseConstituent
 ) -> VerbalizationFragment:
     """Build *"the <noun> of <operands>"* for a value function — the value counterpart of a predicate
     clause, for an operation that computes a value rather than a truth.
 
     The *name* is read as the value's noun (a leading ``get`` dropped) and the operands are read out
-    as a genitive over it. A nullary function is just the noun. This is the default, name-based surface
-    a value :class:`~krrood.entity_query_language.predicate.SymbolicFunction` reuses, so the reading
-    lives in one place rather than being duplicated per class.
+    as a possessive genitive over it. A nullary function is just the noun. This is the default,
+    name-based surface a value :class:`~krrood.entity_query_language.predicate.SymbolicFunction`
+    reuses, so the reading lives in one place rather than being duplicated per class.
+
+    ..note:: Contrast with :func:`value_phrase`: this one takes only a *name* and hardcodes the
+        possessive *"of"* relation (``Length`` → *"the length **of** …"*). Reach for
+        :func:`value_phrase` when the value relates to its operands by some *other* word you pass
+        explicitly (*"the distance **between** …"*).
 
     :param name: The function's identifier (or class name).
     :param operands: The function's already-rendered arguments.
@@ -318,19 +355,17 @@ def value_function_phrase(
     >>> from krrood.entity_query_language.verbalization.fragments.base import (
     ...     flatten_fragment_to_plain_text, WordFragment,
     ... )
-    >>> flatten_fragment_to_plain_text(value_function_phrase("GetQuarter"))
+    >>> flatten_fragment_to_plain_text(function_value_phrase("GetQuarter"))
     'quarter'
     >>> flatten_fragment_to_plain_text(
-    ...     value_function_phrase("RemainingLoad", Noun(WordFragment(text="the capacity")))
+    ...     function_value_phrase("RemainingLoad", Noun(WordFragment(text="the capacity")))
     ... )
     'the remaining load of the capacity'
     """
     noun = value_function_noun(name)
     if not operands:
         return Noun(WordFragment(text=noun)).as_fragment()
-    owner = oxford_comma(
-        [operand.as_fragment() for operand in operands], Conjunctions.AND.as_fragment()
-    )
+    owner = And(operands).as_fragment()
     return possessive_path([PathStep(noun)], owner)
 
 
@@ -339,7 +374,7 @@ def value_phrase(
 ) -> VerbalizationFragment:
     """Build *"the <noun> <relation> <operands...>"* — the general value noun phrase for a value
     whose relation to its operands is not the possessive *"of"* that
-    :func:`value_function_phrase` hardcodes (e.g. a length BETWEEN two things).
+    :func:`function_value_phrase` hardcodes (e.g. a length BETWEEN two things).
 
     The operands are joined with *"and"*; the relation is any constituent, typically a
     :class:`~krrood.entity_query_language.verbalization.vocabulary.english.Prepositions` member.
@@ -366,10 +401,7 @@ def value_phrase(
         parts=[
             Noun.the(noun).as_fragment(),
             relation.as_fragment(),
-            oxford_comma(
-                [operand.as_fragment() for operand in operands],
-                Conjunctions.AND.as_fragment(),
-            ),
+            And(operands).as_fragment(),
         ]
     )
 
@@ -385,7 +417,7 @@ def predicate_clause(
     name: str, subject: ClauseConstituent, *objects: ClauseConstituent
 ) -> Clause:
     """Build a predicate clause from a predicate's *name* and its operands — the boolean counterpart
-    of :func:`value_function_phrase`.
+    of :func:`function_value_phrase`.
 
     The name (CamelCase or snake_case) is read as the predicate. A copular name — its leading word a
     form of *"be"* (``IsReachable``) — uses the copula with the remaining words as the complement
@@ -426,13 +458,9 @@ def predicate_clause(
     complement = [WordFragment(text=word) for word in rest]
     is_copular = morphology.verb_lemma(head) == _COPULA_LEMMA
     if is_copular and objects and (not rest or rest[-1] not in _PREPOSITION_WORDS):
-        operands = oxford_comma(
-            [
-                Noun(subject).as_fragment(),
-                *(Noun(obj).as_fragment() for obj in objects),
-            ],
-            Conjunctions.AND.as_fragment(),
-        )
+        operands = And(
+            [Noun(subject), *(Noun(obj) for obj in objects)]
+        ).as_fragment()
         return clause(
             Noun(PhraseFragment(parts=complement)),
             Verb("hold"),

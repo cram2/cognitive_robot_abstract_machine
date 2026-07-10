@@ -12,17 +12,16 @@ surface builders, makes the affected sentences appear as diff lines in the snaps
 author and every reviewer see — and can object to — the exact wording a class produces, without
 anyone writing a per-class test.
 
-To update the snapshot after an intentional change, run::
+To update the snapshot after an intentional change, set ``UPDATE_SNAPSHOT = True`` (below) and run::
 
-    UPDATE_VERBALIZATION_SURFACES=1 pytest test/krrood_test/test_eql/test_verbalization/test_verbalization_surfaces.py
+    pytest test/krrood_test/test_eql/test_verbalization/test_verbalization_surfaces.py
 
-and commit the regenerated YAML with the change that caused it.
+then restore ``UPDATE_SNAPSHOT = False`` and commit the regenerated YAML with the change that caused it.
 """
 
 from __future__ import annotations
 
 import inspect
-import os
 from dataclasses import fields
 from pathlib import Path
 
@@ -59,8 +58,8 @@ COVERED_MODULES = frozenset(
 population is deterministic regardless of what other tests import. A new module that defines
 symbolic callables is added here (and imported above) to join the snapshot."""
 
-UPDATE_ENVIRONMENT_VARIABLE = "UPDATE_VERBALIZATION_SURFACES"
-"""Set to regenerate the snapshot instead of asserting against it."""
+UPDATE_SNAPSHOT = False
+"""Flip to ``True`` in this file to regenerate the snapshot instead of asserting against it."""
 
 FRAGMENT_LESS_MARKER = (
     "(no fragment -- verbalizing raises PredicateFragmentRequiredError)"
@@ -148,12 +147,12 @@ def test_every_symbolic_callable_surface_matches_the_snapshot():
     any new class or changed wording must be re-approved by regenerating the file (see module
     docstring) and reviewing its diff."""
     actual = _render_surfaces()
-    if os.environ.get(UPDATE_ENVIRONMENT_VARIABLE):
+    if UPDATE_SNAPSHOT:
         SNAPSHOT_PATH.write_text(
             yaml.safe_dump(actual, sort_keys=True, width=1000, allow_unicode=True)
         )
     expected = yaml.safe_load(SNAPSHOT_PATH.read_text())
     assert actual == expected, (
         "Verbalization surfaces changed. Review the differences, and if the new wording is "
-        f"intended, regenerate the snapshot with {UPDATE_ENVIRONMENT_VARIABLE}=1 and commit it."
+        "intended, regenerate the snapshot by setting UPDATE_SNAPSHOT = True in this file and commit it."
     )
