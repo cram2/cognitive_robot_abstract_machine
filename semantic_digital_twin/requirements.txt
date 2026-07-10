@@ -32,3 +32,4 @@ psycopg
 plyfile
 huggingface-hub
 vhacdx
+rerun-sdk[datafusion]

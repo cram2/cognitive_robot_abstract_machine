@@ -6,6 +6,7 @@ from typing_extensions import TYPE_CHECKING, Type, List
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from krrood.entity_query_language.factories import ConditionType, get_false_statements
 from krrood.exceptions import DataclassException
+from coraplex.datastructures.enums import ExecutionType
 from coraplex.plans.failures import PlanFailure
 
 if TYPE_CHECKING:
@@ -88,6 +89,24 @@ class MotionDidNotFinish(PlanFailure):
 
     def error_message(self) -> str:
         return f"Motion did not finish, following motions failed: {self.failed_motions}"
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class UnknownExecutionType(DataclassException):
+    """
+    Raised when an executable is run with an execution type it does not handle.
+    """
+
+    execution_type: ExecutionType
+    """
+    The execution type that is not supported.
+    """
+
+    def error_message(self) -> str:
+        return f"Unknown execution type: {self.execution_type}"
 
     def suggest_correction(self) -> str:
         return ""

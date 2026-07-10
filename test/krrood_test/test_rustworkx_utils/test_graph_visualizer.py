@@ -39,6 +39,7 @@ def test_raising_module_not_found_error_on_missing_libraries_1(missing_viz_libra
 def test_raising_module_not_found_error_on_missing_libraries_2():
     # monkey patch matplotlib, and numpy to None for rustworkx_utils.graph_visualizer
     import krrood.rustworkx_utils.graph_visualizer as gv
+
     original_mpl = gv.mpl
     original_np = gv.np
     gv.mpl = None

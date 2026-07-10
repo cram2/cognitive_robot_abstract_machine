@@ -65,7 +65,8 @@ def init_node(node_name: str) -> None:
     global node, spinner_thread, executor
     if node is not None:
         return
-    rclpy.init()
+    if not rclpy.ok():
+        rclpy.init()
     node = Node(node_name)
     spinner_thread = Thread(
         target=spinner_thread_target, daemon=True, name=f"{node.get_name()} spin"

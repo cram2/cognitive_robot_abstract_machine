@@ -13,21 +13,38 @@ from functools import wraps
 
 from typing_extensions import (
     Callable,
+    Iterator,
     Optional,
     Any,
     Type,
     Tuple,
     ClassVar,
+    Mapping,
     Sized,
+    TYPE_CHECKING,
     Dict,
     Union,
 )
 
+if TYPE_CHECKING:
+    from krrood.entity_query_language.verbalization.fragments.base import (
+        VerbalizationFragment,
+    )
+
 from krrood.entity_query_language.utils import T, merge_args_and_kwargs
-from krrood.entity_query_language.core.variable import Variable, InstantiatedVariable
+from krrood.entity_query_language.core.variable import (
+    Variable,
+    InstantiatedVariable,
+    Literal,
+)
 from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     SymbolicExpression,
+)
+from krrood.entity_query_language.core.base_expressions import Selectable
+from krrood.entity_query_language.utils import camel_case_to_words
+from krrood.patterns.code_parsing_utils import (
+    get_accessed_attribute_name_in_return_statement_of_property,
 )
 from krrood.symbol_graph.symbol_graph import Symbol
 
@@ -59,8 +76,99 @@ def symbolic_function(
     return wrapper
 
 
+@dataclass(frozen=True)
+class VerbalizationField:
+    """One predicate field as ``_verbalization_fragment_`` sees it.
+
+    It carries both the field's already-rendered (and source-linked) :attr:`fragment` and the raw
+    :attr:`value` bound to it (a :class:`Literal`'s value unwrapped). A part-of-speech element takes
+    whichever it needs — :class:`Noun` uses the fragment, :class:`OneOf` uses the value — so the
+    author just passes ``fields[name]`` and the right thing happens, never an explicit accessor.
+    """
+
+    fragment: VerbalizationFragment
+    """The field's rendered, source-linked fragment — what :class:`Noun` uses."""
+
+    value: Any
+    """The raw Python value bound to the field (a literal's value) — what :class:`OneOf` enumerates."""
+
+    def as_fragment(self) -> VerbalizationFragment:
+        """:return: the field's rendered fragment, so a :class:`VerbalizationField` is a clause constituent like
+        the part-of-speech elements — ``clause(field)`` and ``Noun(field)`` both work.
+        """
+        return self.fragment
+
+
+@dataclass(frozen=True)
+class RenderedFields(Mapping):
+    """The arguments passed to :meth:`Verbalizable._verbalization_fragment_`.
+
+    A mapping of *field name → :class:`VerbalizationField`*. Each ``fields["x"]`` carries both the rendered
+    fragment and the raw value, so it can be passed straight to a part-of-speech element — ``Noun``
+    takes the fragment, ``OneOf`` takes the value — without the author choosing between them.
+    """
+
+    fragments: "Mapping[str, VerbalizationFragment]"
+    """The rendered fragment for each field, keyed by field name."""
+
+    raw: "Mapping[str, SymbolicExpression]"
+    """The raw child expression for each field, keyed by field name."""
+
+    def __getitem__(self, field_name: str) -> VerbalizationField:
+        raw = self.raw[field_name]
+        value = raw._value_ if isinstance(raw, Literal) else raw
+        return VerbalizationField(fragment=self.fragments[field_name], value=value)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.fragments)
+
+    def __len__(self) -> int:
+        return len(self.fragments)
+
+
 @dataclass(eq=False)
-class Predicate(Symbol, ABC):
+class Verbalizable(ABC):
+    """
+    A mixin for classes that want to add custom verbalization, such that when a query that is using them is verbalized,
+    the final output text is more correct or intuitivie.
+    """
+
+    @classmethod
+    @abstractmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """
+        Structured verbalization for this predicate — a required clause (no string fallback).
+
+        Build the clause from the typed part-of-speech vocabulary
+        (:func:`~…vocabulary.parts_of_speech.clause` with ``Noun`` / ``Verb`` / ``Copula`` /
+        ``Prepositions`` / ``Adjective``), composing the already-rendered field fragments in *fields*
+        (keyed by field name). State only the **affirmative, present-tense** form: a ``Verb`` is given
+        as its lemma, and the realisation passes inflect it (*"work"* → *"works"*) and agree its
+        number. Returning a typed clause rather than a string keeps the predicate composable — a
+        wrapping ``Not`` negates it automatically (a verb with do-support, *"does not love"*; a copula
+        with suppletion, *"is not reachable"*) and coreference still reduces the operands.
+
+        ..note:: Abstract, so every concrete predicate must supply a clause; a missing implementation
+            fails at (concrete) instantiation rather than only when the predicate is verbalized.
+
+        Example::
+
+            @dataclass(eq=False)
+            class Loves(Predicate):
+                person_1: Person
+                person_2: Person
+
+                @classmethod
+                def _verbalization_fragment_(cls, fields):
+                    return clause(Noun(fields["person_1"]), Verb("love"), Noun(fields["person_2"]))
+
+        :param fields: The rendered fragment for each predicate field, keyed by field name.
+        :return: The predicate's verbalization fragment.
+        """
+
+
+@dataclass(eq=False)
+class Predicate(Symbol, Verbalizable, ABC):
     """
     The super predicate class that represents a filtration operation or asserts a relation.
     """
@@ -82,7 +190,7 @@ class Predicate(Symbol, ABC):
         return super().__new__(cls)
 
     @classmethod
-    def _construct_normally_(cls, **kwargs) -> "Predicate":
+    def _construct_normally_(cls, **kwargs) -> Predicate:
         """
         Construct a concrete predicate instance directly, bypassing the symbolic ``__new__`` check.
 
@@ -116,7 +224,66 @@ class Predicate(Symbol, ABC):
 
 
 @dataclass(eq=False)
-class HasType(Predicate):
+class Triple(Predicate):
+    """
+    A Triple is a type predicate that represents a relation between two entities.
+    To know if your predicate is a Triple or not ask yourself can I say "subject" "predicate_name" "object" and it
+    makes sense? if so then yes. Check the verbalization function below as a reference.
+    """
+
+    @property
+    @abstractmethod
+    def subject(self) -> Any:
+        """
+        The subject of the predicate.
+        """
+
+    @property
+    @abstractmethod
+    def object(self) -> Any:
+        """
+        The object of the predicate.
+        """
+
+    @classmethod
+    def _verbalization_fragment_(
+        cls, fields: Mapping[str, VerbalizationFragment]
+    ) -> VerbalizationFragment:
+        """
+        Verbalization of a Triple is a subject - verb-phrase - object, where the verb phrase is read
+        off the class name (``ConnectsTo`` → *"connects to"*). The leading word is a :class:`Verb`
+        (its lemma), so a wrapping ``Not`` negates with do-support (*"does not connect to"*).
+        """
+        # Imported locally: the verbalization layer depends on the core predicate types, so a
+        # module-level import here would close an import cycle.
+        from krrood.entity_query_language.verbalization import morphology
+        from krrood.entity_query_language.verbalization.fragments.base import (
+            WordFragment,
+        )
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            clause,
+            Noun,
+            Verb,
+        )
+
+        words = camel_case_to_words(cls.__name__).split()
+        subject_name = get_accessed_attribute_name_in_return_statement_of_property(
+            cls.subject, cls
+        )
+        object_name = get_accessed_attribute_name_in_return_statement_of_property(
+            cls.object, cls
+        )
+        particles = [WordFragment(text=word) for word in words[1:]]
+        return clause(
+            Noun(fields[subject_name]),
+            Verb(morphology.verb_lemma(words[0])),
+            *particles,
+            Noun(fields[object_name]),
+        )
+
+
+@dataclass(eq=False)
+class HasType(Triple):
     """
     Represents a predicate to check if a given variable is an instance of a specified type.
 
@@ -137,6 +304,33 @@ class HasType(Predicate):
     def __call__(self) -> bool:
         return isinstance(self.variable, self.types_)
 
+    @property
+    def subject(self):
+        return self.variable
+
+    @property
+    def object(self) -> Any:
+        return self.types_
+
+    @classmethod
+    def _verbalization_fragment_(
+        cls, fields: Mapping[str, VerbalizationFragment]
+    ) -> VerbalizationFragment:
+        # Imported locally to avoid the core → verbalization import cycle (see :class:`Triple`).
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            Adjective,
+            clause,
+            Copula,
+            Noun,
+        )
+
+        return clause(
+            Noun(fields["variable"]),
+            Copula(),
+            Adjective("of type"),
+            Noun(fields["types_"]),
+        )
+
 
 @dataclass(eq=False)
 class HasTypes(HasType):
@@ -155,6 +349,22 @@ class HasTypes(HasType):
     A tuple containing Type objects that are associated with this instance.
     """
 
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """Say membership over the admissible types — *"<variable> is one of A, B, or C"*. The
+        :class:`OneOf` element handles the bounded listing (linking, *"or"*, the count cap), so the
+        types are read from the field's value (an ``isinstance`` over the tuple is membership, not the
+        tuple value an equality would mean)."""
+        # Imported locally to avoid the core → verbalization import cycle (see :class:`Triple`).
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            clause,
+            Copula,
+            Noun,
+            OneOf,
+        )
+
+        return clause(Noun(fields["variable"]), Copula(), OneOf(fields["types_"]))
+
 
 @symbolic_function
 def length(iterable: Sized) -> int:
@@ -171,3 +381,20 @@ def _any_of_the_kwargs_is_a_variable(bindings: Dict[str, Any]) -> bool:
     :return: ``True`` if any value in ``bindings`` is a :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression`, ``False`` otherwise.
     """
     return any(isinstance(binding, SymbolicExpression) for binding in bindings.values())
+
+
+@dataclass(eq=False)
+class Is(Predicate):
+    """
+    Predicate asserting that two operands refer to the same object in memory.
+    """
+
+    first_entity: Any
+    """The first entity"""
+
+    second_entity: Any
+    """The second entity."""
+
+    def __call__(self) -> bool:
+        return self.first_entity is self.second_entity
+

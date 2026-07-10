@@ -14,6 +14,7 @@ from typing_extensions import Iterable, List
 from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
     TruthValueOperator,
+    OperationResult,
 )
 from krrood.entity_query_language.core.mapped_variable import (
     FlatVariable,
@@ -25,6 +26,7 @@ from krrood.entity_query_language.core.variable import (
     Literal,
     ExternallySetVariable,
 )
+from krrood.entity_query_language.cache_data import InstanceFilteredDomain
 from krrood.entity_query_language.enums import DomainSource
 from krrood.entity_query_language.exceptions import UnsupportedExpressionTypeForDistinct
 from krrood.entity_query_language.operators.aggregators import (
@@ -173,7 +175,7 @@ def variable(
     """
     # Determine the domain source
     if is_iterable(domain):
-        domain = filter(lambda x: isinstance(x, type_), domain)
+        domain = InstanceFilteredDomain(type_, domain)
     elif domain is None and issubclass(type_, Symbol):
         domain = SymbolGraph().get_instances_of_type(type_)
     else:
@@ -199,7 +201,9 @@ def deduced_variable(
     return ExternallySetVariable(_type_=type_, _domain_source_=DomainSource.DEDUCTION)
 
 
-def variable_from(domain: Union[Iterable[T], Selectable[T]]) -> Union[T, Selectable[T]]:
+def variable_from(
+    domain: Union[Iterable[T], Selectable[T], T],
+) -> Union[T, Variable[T]]:
     """
     Create a variable from a given domain.
 
@@ -352,10 +356,22 @@ def an(
     return entity_._quantify_(An, quantification_constraint=quantification)
 
 
-a = an
-"""
-This is an alias to accommodate for words not starting with vowels.
-"""
+def a(
+    entity_: Union[T, Query],
+    quantification: Optional[ResultQuantificationConstraint] = None,
+) -> Union[T, Query]:
+    """
+    Select all values satisfying the given entity description.
+
+    This accommodates words not starting with a vowel; it delegates to :func:`an`. It is a real
+    function (not an ``a = an`` alias) so its ``__name__`` is ``"a"``, which lets tools that key a
+    namespace by ``__name__`` (e.g. the doctest harness) expose it under the name ``a``.
+
+    :param entity_: An entity or a set expression to quantify over.
+    :param quantification: Optional quantification constraint.
+    :return: The entity with the applied quantifier.
+    """
+    return an(entity_, quantification=quantification)
 
 
 def the(

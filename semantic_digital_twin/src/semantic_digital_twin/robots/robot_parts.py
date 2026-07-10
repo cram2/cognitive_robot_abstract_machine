@@ -57,6 +57,7 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     WheeledDrive,
     ActiveConnection1DOF,
+    PrismaticConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -352,6 +353,27 @@ class KinematicChain(AbstractRobotPart, ABC):
         if self.root == self.tip:
             return []
         return self._world.compute_chain_of_connections(self.root, self.tip)
+
+    def approximate_length(self) -> float:
+        """
+        Approximates the length of the kinematic chain by adding up  the distance between each body pair along the chain.
+        For Prismatic Connections the upper limit of the connection is used, so the function returns the maximum length.
+
+        :return: the approximate length of the kinematic chain
+        """
+        length = 0
+        for connection in self.connections:
+            parent_pose = connection.parent.global_pose
+            child_pose = connection.child.global_pose
+            dist = (
+                connection.dof.limits.upper.position
+                if isinstance(connection, PrismaticConnection)
+                else parent_pose.to_position().euclidean_distance(
+                    child_pose.to_position()
+                )
+            )
+            length += dist
+        return length
 
 
 @dataclass(eq=False)

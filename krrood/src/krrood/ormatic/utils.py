@@ -73,6 +73,9 @@ def classes_of_package(package: types.ModuleType, recursive=True) -> List[Type]:
     """
     result = classes_of_module(package)
 
+    if not hasattr(package, "__path__"):
+        return result
+
     for loader, modname, ispkg in pkgutil.walk_packages(
         package.__path__, package.__name__ + "."
     ):

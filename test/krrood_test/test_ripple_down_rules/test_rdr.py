@@ -132,9 +132,9 @@ class TestRDR(TestCase):
         assert len(all_rules) == len(all_og_rules)
         for rule, og_rule in zip(all_rules, all_og_rules):
             assert (
-                    rule.conditions.split("conditions_")[1]
-                    == rule.conclusion.split("conclusion_")[1]
-                    == rule.uid
+                rule.conditions.split("conditions_")[1]
+                == rule.conclusion.split("conclusion_")[1]
+                == rule.uid
             )
             assert rule.uid == og_rule.uid
             if not rule.parent:
@@ -163,16 +163,16 @@ class TestRDR(TestCase):
         model_path = os.path.join(save_dir, model_name)
         rules_root = MultiClassRDR.read_rule_tree_from_python(model_path)
         for rule, og_rule in zip(
-                [rules_root] + list(rules_root.descendants),
-                [scrdr_loaded.start_rule] + list(scrdr_loaded.start_rule.descendants),
+            [rules_root] + list(rules_root.descendants),
+            [scrdr_loaded.start_rule] + list(scrdr_loaded.start_rule.descendants),
         ):
             if isinstance(rule, MultiClassStopRule):
                 assert rule.conditions.split("conditions_")[1] == rule.uid
             else:
                 assert (
-                        rule.conditions.split("conditions_")[1]
-                        == rule.conclusion.split("conclusion_")[1]
-                        == rule.uid
+                    rule.conditions.split("conditions_")[1]
+                    == rule.conclusion.split("conclusion_")[1]
+                    == rule.uid
                 )
             assert rule.uid == og_rule.uid
             if not rule.parent:
@@ -245,9 +245,9 @@ class TestRDR(TestCase):
 
     def test_expert_incremental_save(self):
         if not os.path.exists(
-                os.path.join(
-                    self.test_results_dir, "expert_incremental_save", "expert_answers.py"
-                )
+            os.path.join(
+                self.test_results_dir, "expert_incremental_save", "expert_answers.py"
+            )
         ):
             return
             # os.remove(os.path.join(self.test_results_dir, "expert_incremental_save/expert_answers.py"))
@@ -266,9 +266,9 @@ class TestRDR(TestCase):
 
     def test_scrdr_incremental_save_and_load(self):
         if os.path.exists(
-                os.path.join(
-                    self.test_results_dir, "scrdr_incremental_save", "animal_species_scrdr"
-                )
+            os.path.join(
+                self.test_results_dir, "scrdr_incremental_save", "animal_species_scrdr"
+            )
         ):
             scrdr = SingleClassRDR.load(
                 os.path.join(self.test_results_dir, "scrdr_incremental_save"),

@@ -49,7 +49,7 @@ class AlignPlanes(Task):
         root_V_tip_normal = root_R_tip @ tip_V_tip_normal
         root_V_tip_normal.scale(1)
 
-        root_V_tip_normal.vis_frame = self.tip_link
+        root_V_tip_normal.visualisation_frame = self.tip_link
         current_dbg = DebugExpression(
             name=f"{self.name}/current_normal",
             expression=root_V_tip_normal,

@@ -14,9 +14,10 @@ from krrood.parametrization.feature_extraction.exceptions import (
     OutOfDomainValueError,
 )
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Generic
 from random_events.variable import Variable, Symbolic
 from krrood.entity_query_language.factories import variable
-from krrood.utils import T, recursive_subclasses
+from krrood.utils import T, recursive_subclasses, get_generic_type_parameters
 
 logger = logging.getLogger(__name__)
 
@@ -88,13 +89,14 @@ def get_aggregation_class(owner: Type) -> Optional[Type[AggregationStatistic]]:
     subclasses = list(recursive_subclasses(AggregationStatistic))
     for ancestor in owner.__mro__:
         for subclass in subclasses:
-            if subclass.get_generic_type() == ancestor:
+            bound = get_generic_type_parameters(subclass, AggregationStatistic)
+            if bound and bound[0] == ancestor:
                 return subclass
     return None
 
 
 @dataclass
-class AggregationStatistic(SubClassSafeGeneric[T]):
+class AggregationStatistic(Generic[T], SubClassSafeGeneric):
     """
     Base class for aggregation statistics over a domain object's exchangeable-
     part fields.

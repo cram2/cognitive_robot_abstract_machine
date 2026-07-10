@@ -92,3 +92,24 @@ class MockedClassInstantiationError(DataclassException):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class FactoryMethodDecoratorError(DataclassException):
+    """
+    Raised when ``@factory_method`` does not wrap a ``classmethod``.
+
+    The decorator records the factory through Python's ``__set_name__`` descriptor hook, which a
+    ``classmethod`` does not forward to the object it wraps. The marker must therefore be the
+    outermost decorator, applied above ``@classmethod``; any other placement would skip
+    registration silently, so it is rejected here instead.
+    """
+
+    decorated_name: str
+    """The name of the function the marker was applied to."""
+
+    def error_message(self) -> str:
+        return f"@factory_method was applied to {self.decorated_name!r}, which is not a classmethod"
+
+    def suggest_correction(self) -> str:
+        return "Apply @factory_method as the outermost decorator, directly above @classmethod."

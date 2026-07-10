@@ -181,7 +181,7 @@ class GiskardLocationBackend(PoseGeneratorBackend):
         )
 
         test_ee = ViewManager.get_end_effector_view(self.arm, self.robot)
-        target_sequence = self.grasp_description._pose_sequence(target_pose)
+        target_sequence = self.grasp_description.pose_sequence(target_pose)
 
         executor = self.setup_giskard_executor(
             target_sequence, self.world, self.robot, test_ee
