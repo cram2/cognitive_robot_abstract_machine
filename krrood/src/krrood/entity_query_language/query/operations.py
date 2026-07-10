@@ -163,7 +163,7 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
                 group[self.count_occurrences_of_group_keys._id_] = group_key_count[
                     group_key
                 ]
-            for count_all in self.count_all_aggregators:
+            for count_all in self._aggregators_of_type_count_all_:
                 group[count_all._id_] = group_key_count[group_key]
 
         yield from groups.values()
@@ -254,7 +254,7 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         )
 
     @cached_property
-    def count_all_aggregators(self) -> Tuple[CountAll, ...]:
+    def _aggregators_of_type_count_all_(self) -> Tuple[CountAll, ...]:
         """
         :return: The aggregators that count all rows per group.
         """

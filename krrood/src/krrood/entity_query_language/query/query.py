@@ -11,7 +11,7 @@ import uuid
 from abc import ABC
 from copy import copy
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cached_property, wraps
 
 from typing_extensions import (
     Iterable,
@@ -141,6 +141,21 @@ class CachedResultStream:
             index += 1
 
 
+def modifies_query_structure(modifier):
+    """
+    Mark a query modifier so the query is flagged dirty once the modifier has updated its builders,
+    causing the next :meth:`build` to recompile the product.
+    """
+
+    @wraps(modifier)
+    def wrapper(self, *args, **kwargs):
+        result = modifier(self, *args, **kwargs)
+        self._mark_dirty_()
+        return result
+
+    return wrapper
+
+
 @monitored
 @dataclass(eq=False, repr=False)
 class Query(
@@ -253,6 +268,7 @@ class Query(
             return self._expression_.evaluate()
         return MultiArityExpressionThatPerformsACartesianProduct.evaluate(self)
 
+    @modifies_query_structure
     def where(self, *conditions: ConditionType) -> Self:
         """
         Set the conditions that describe the query object. The conditions are chained using AND.
@@ -264,9 +280,9 @@ class Query(
             self._where_builder_ = WhereBuilder(conditions=conditions, query=self)
         else:
             self._where_builder_.conditions += conditions
-        self._mark_dirty_()
         return self
 
+    @modifies_query_structure
     def having(self, *conditions: ConditionType) -> Self:
         """
         Set the conditions that describe the query object. The conditions are chained using AND.
@@ -278,9 +294,9 @@ class Query(
             self._having_builder_ = HavingBuilder(conditions=conditions, query=self)
         else:
             self._having_builder_.conditions += conditions
-        self._mark_dirty_()
         return self
 
+    @modifies_query_structure
     def ordered_by(
         self,
         variable: TypingUnion[Selectable[T], Any],
@@ -297,7 +313,6 @@ class Query(
         self._ordered_by_builder_ = OrderedByBuilder(
             self, variable, descending=descending, key=key
         )
-        self._mark_dirty_()
         return self
 
     def distinct(
@@ -311,11 +326,14 @@ class Query(
         :return: This query.
         """
         self._distinct_on = on if on else self._selected_variables_
+        # Mark dirty here rather than via ``modifies_query_structure`` so the cached
+        # ``_distinct_on_ids_`` is dropped before the seen-set below rebuilds it from the new keys.
         self._mark_dirty_()
         self._seen_results = SeenSet(keys=self._distinct_on_ids_)
         self._results_mapping.append(self._get_distinct_results_)
         return self
 
+    @modifies_query_structure
     def grouped_by(
         self, *variables_to_group_by: TypingUnion[Selectable, Any]
     ) -> TypingUnion[Self, T]:
@@ -326,9 +344,9 @@ class Query(
         :return: This query.
         """
         self._grouped_by_builder_ = GroupedByBuilder(self, variables_to_group_by)
-        self._mark_dirty_()
         return self
 
+    @modifies_query_structure
     def limit(self, n: int) -> Self:
         """
         Limit the number of results to n.
@@ -339,9 +357,9 @@ class Query(
         self._limit_ = n
         if not isinstance(self._limit_, int) or self._limit_ <= 0:
             raise NonPositiveLimitValue(self._limit_)
-        self._mark_dirty_()
         return self
 
+    @modifies_query_structure
     def _quantify_(
         self,
         quantifier_type: Type[ResultQuantifier] = An,
@@ -357,7 +375,6 @@ class Query(
         self._quantifier_builder_ = QuantifierBuilder(
             self, quantifier_type, quantification_constraint
         )
-        self._mark_dirty_()
         return self
 
     def __enter__(self):
@@ -541,7 +558,7 @@ class Query(
     def _result_transformers_(self) -> List[ResultTransformer]:
         """
         :return: The ordered result-pipeline stages applied to this query's produced rows: ordering
-            (when configured), then quantification. Inspectable as :attr:`result_stages`.
+            (when configured), then quantification. Inspectable as :attr:`_result_stages_`.
         """
         transformers: List[ResultTransformer] = []
         if self._ordered_by_builder_ is not None:
@@ -566,7 +583,7 @@ class Query(
         return transformers
 
     @property
-    def result_stages(self) -> List[ResultTransformer]:
+    def _result_stages_(self) -> List[ResultTransformer]:
         """
         :return: The result-pipeline stages of this query's compiled product (ordering,
             quantification), so an inspector can identify how results are ordered and quantified
