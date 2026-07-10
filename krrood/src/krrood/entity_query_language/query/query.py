@@ -132,6 +132,9 @@ class CachedResultStream:
                 continue
             if self._exhausted:
                 return
+            # Sentinel form of next() rather than try/except StopIteration: this method is a
+            # generator, and per PEP 479 a StopIteration raised inside it would surface as a
+            # RuntimeError instead of ending iteration.
             next_item = next(self._source, _STREAM_EXHAUSTED)
             if next_item is _STREAM_EXHAUSTED:
                 self._exhausted = True
