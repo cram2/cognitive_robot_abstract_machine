@@ -457,7 +457,7 @@ class CounterTop(Furniture, HasSupportingSurface):
 
 
 @dataclass(eq=False)
-class Cabinet(Furniture, HasDoors, HasDrawers, HasCaseAsRootBody):
+class Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers):
     @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.NEGATIVE_X()
