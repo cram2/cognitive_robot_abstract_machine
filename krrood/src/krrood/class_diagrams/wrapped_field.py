@@ -218,7 +218,13 @@ class WrappedField:
 
     @cached_property
     def is_type_type(self) -> bool:
-        return get_origin(self.resolved_type) is type
+        """
+        ``True`` for both the parametrized form (``Type[X]``, whose origin is ``type``) and the bare
+        ``type`` / ``typing.Type`` annotation, which has no origin at all.
+        """
+        return (
+            self.resolved_type in (type, Type) or get_origin(self.resolved_type) is type
+        )
 
     @cached_property
     def is_enum(self) -> bool:
@@ -288,7 +294,9 @@ class WrappedField:
             owner = origin
         # The base ``Role`` declares ``role_taker`` as an abstract, unbound-generic slot; only a
         # concrete role subclass binds it to a real taker type.
-        if not (isinstance(owner, type) and issubclass(owner, Role) and owner is not Role):
+        if not (
+            isinstance(owner, type) and issubclass(owner, Role) and owner is not Role
+        ):
             return False
         return self.field.name == Role.role_taker_field_name()
 
