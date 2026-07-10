@@ -14,6 +14,7 @@ from ..dataset.example_classes import (
     KRROODPose,
     KRROODPositions,
     KRROODPositionTypeWrapper,
+    KRROODBarePositionTypeWrapper,
     GenericClassAssociation,
     KRROODCup,
     KRROODBowl,
@@ -82,6 +83,18 @@ def test_is_type_type():
     wrapped_class = WrappedClass(clazz=KRROODPositionTypeWrapper)
     wrapped_field = WrappedField(
         wrapped_class, get_field_by_name(KRROODPositionTypeWrapper, "position_type")
+    )
+    assert wrapped_field.is_type_type
+
+
+def test_is_type_type_for_bare_type_annotation():
+    """A field annotated with the bare builtin ``type`` (not the parametrized ``Type[X]``) is also
+    a type-type field — ``get_origin(type)`` is ``None``, unlike ``get_origin(Type[X])``, so this is
+    a distinct case from :func:`test_is_type_type`."""
+    wrapped_class = WrappedClass(clazz=KRROODBarePositionTypeWrapper)
+    wrapped_field = WrappedField(
+        wrapped_class,
+        get_field_by_name(KRROODBarePositionTypeWrapper, "position_type"),
     )
     assert wrapped_field.is_type_type
 
