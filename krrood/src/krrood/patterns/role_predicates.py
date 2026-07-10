@@ -55,7 +55,7 @@ class IsSameSemanticEntity(Predicate):
         return clause(
             Noun(fields["entity_1"]),
             Copula(),
-            Noun("the same entity"),
+            Noun.the("same entity"),
             Prepositions.AS,
             Noun(fields["entity_2"]),
         )
