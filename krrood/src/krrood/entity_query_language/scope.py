@@ -14,6 +14,7 @@ site-packages — which is "where the query was defined".
 
 from __future__ import annotations
 
+import builtins
 import inspect
 
 from typing_extensions import Any, Dict, Optional
@@ -86,40 +87,36 @@ def capture_caller_scope(
 def eql_factory_namespace() -> Dict[str, Any]:
     """
     :return: A namespace mapping of EQL factory callables for use in an interactive
-        shell or evaluation scope. Provides the verbs needed to author conditions and
-        rule-tree nodes (``entity``, ``an``, ``variable``, ``and_``/``or_``/``not_``,
-        ``contains``, ``exists``, ``for_all``, and the rule-tree builders
-        ``refinement``/``alternative``/``next_rule``/``add`` plus their classes).
+        shell or evaluation scope.
+
+    Automatically includes every public name defined directly in
+    :mod:`krrood.entity_query_language.factories` (``entity``, ``an``, ``variable``,
+    ``and_``/``or_``/``not_``, ``contains``, ``exists``, ``for_all``, the rule-tree
+    builders ``refinement``/``alternative``/``next_rule``/``add``, and so on) — a new
+    public factory becomes available here automatically, without editing this
+    function. Names that would shadow a Python builtin (e.g. ``max``, ``sum``) are
+    left out of the flat namespace; the ``factories`` module itself is included as
+    ``eql`` so those stay reachable as ``eql.max``, ``eql.sum``, etc. The rule-tree
+    node classes (``Add``, ``Refinement``, ``Alternative``, ``Next``) are added
+    explicitly since they're defined outside ``factories``.
     """
-    return {
-        # query construction
-        "entity": eql.entity,
-        "set_of": eql.set_of,
-        "an": eql.an,
-        "the": eql.the,
-        # variable declaration
-        "variable": eql.variable,
-        "variable_from": eql.variable_from,
-        "inference": eql.inference,
-        # logical operators
-        "and_": eql.and_,
-        "or_": eql.or_,
-        "not_": eql.not_,
-        "for_all": eql.for_all,
-        "exists": eql.exists,
-        "contains": eql.contains,
-        "in_": eql.in_,
-        # rule-tree builders (functions)
-        "add": eql.add,
-        "refinement": eql.refinement,
-        "alternative": eql.alternative,
-        "next_rule": eql.next_rule,
-        # rule-tree primitives (classes)
-        "Add": Add,
-        "Refinement": Refinement,
-        "Alternative": Alternative,
-        "Next": Next,
+    namespace = {
+        name: value
+        for name, value in vars(eql).items()
+        if not name.startswith("_")
+        and getattr(value, "__module__", None) == eql.__name__
+        and not hasattr(builtins, name)
     }
+    namespace["eql"] = eql
+    namespace.update(
+        {
+            "Add": Add,
+            "Refinement": Refinement,
+            "Alternative": Alternative,
+            "Next": Next,
+        }
+    )
+    return namespace
 
 
 def attach_definition_scope(obj: Any, scope: Optional[Dict[str, Any]] = None) -> Any:
@@ -163,7 +160,7 @@ def get_definition_scope(
     # synthesises a symbolic attribute for *any* missing name, so ``getattr(.., None)``
     # would never return ``None`` (it returns a bogus expression) for a variable that
     # carries no attached scope — e.g. one rebuilt by ``load_rdr``.
-    attached = getattr(obj, "__dict__", {}).get(_SCOPE_ATTR) if obj is not None else None
+    attached = getattr(obj, "__dict__", {}).get(_SCOPE_ATTRIBUTE) if obj is not None else None
     if attached:
         scope.update(attached)
     else:
