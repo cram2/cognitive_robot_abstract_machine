@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import Iterable, Protocol, Union, runtime_checkable
+from typing_extensions import Iterable, Protocol, Sequence, Union, runtime_checkable
 
 from krrood.entity_query_language.predicate import VerbalizationField
 from krrood.entity_query_language.utils import camel_case_to_words
@@ -332,78 +332,86 @@ def value_function_noun(name: str) -> str:
     return " ".join(words)
 
 
-def function_possessive_phrase(
-    name: str, *operands: ClauseConstituent
-) -> VerbalizationFragment:
-    """Build *"the <noun> of <operands>"* for a value function — the value counterpart of a predicate
-    clause, for an operation that computes a value rather than a truth.
+@dataclass
+class FunctionVerbalizationTemplates:
+    """The name-based surface templates a value
+    :class:`~krrood.entity_query_language.predicate.SymbolicFunction` reuses to verbalize itself:
+    construct it with the function's already-rendered operands, then call the template that matches how
+    the value relates to them. Grouping them here means each reading lives in one place rather than being
+    duplicated per class, so a value function only has to pick a template.
 
-    The *name* is read as the value's noun (a leading ``get`` dropped) and the operands are read out
-    as a possessive genitive over it. A nullary function is just the noun. This is the default,
-    name-based surface a value :class:`~krrood.entity_query_language.predicate.SymbolicFunction`
-    reuses, so the reading lives in one place rather than being duplicated per class.
-
-    ..note:: Contrast with :func:`function_relation_phrase`: this one takes only a *name* and hardcodes the
-        possessive *"of"* relation (``Length`` → *"the length **of** …"*). Reach for
-        :func:`function_relation_phrase` when the value relates to its operands by some *other* word you pass
-        explicitly (*"the distance **between** …"*).
-
-    :param name: The function's identifier (or class name).
-    :param operands: The function's already-rendered arguments.
-    :return: The value noun phrase.
-
-    >>> from krrood.entity_query_language.verbalization.fragments.base import (
-    ...     flatten_fragment_to_plain_text, WordFragment,
-    ... )
-    >>> flatten_fragment_to_plain_text(function_possessive_phrase("GetQuarter"))
-    'quarter'
-    >>> flatten_fragment_to_plain_text(
-    ...     function_possessive_phrase("RemainingLoad", Noun(WordFragment(text="the capacity")))
-    ... )
-    'the remaining load of the capacity'
+    ..note:: These build *noun phrases* — a value is a referring expression. The boolean counterpart for
+        a predicate is :func:`predicate_clause`, which builds a subject-led :class:`Clause`.
     """
-    noun = value_function_noun(name)
-    if not operands:
-        return Noun(WordFragment(text=noun)).as_fragment()
-    owner = And(operands).as_fragment()
-    return possessive_path([PathStep(noun)], owner)
 
+    operands: Sequence[ClauseConstituent]
+    """The function's already-rendered arguments, shared by every template."""
 
-def function_relation_phrase(
-    noun: str, relation: ClauseConstituent, *operands: ClauseConstituent
-) -> VerbalizationFragment:
-    """Build *"the <noun> <relation> <operands...>"* — the general value noun phrase for a value
-    whose relation to its operands is not the possessive *"of"* that
-    :func:`function_possessive_phrase` hardcodes (e.g. a length BETWEEN two things).
+    def __post_init__(self) -> None:
+        self.operands = tuple(self.operands)
 
-    The operands are joined with *"and"*; the relation is any constituent, typically a
-    :class:`~krrood.entity_query_language.verbalization.vocabulary.english.Prepositions` member.
-    This lives here so a predicate's fragment depends only on the part-of-speech vocabulary, never
-    on the lower-level fragment builders.
+    def possessive(self, name: str) -> VerbalizationFragment:
+        """Build *"the <noun> of <operands>"* — the operands read as a possessive genitive over the
+        value's noun. The *name* is read as that noun (a leading ``get`` dropped); a nullary function is
+        just the noun.
 
-    :param noun: The value's noun (the definite article is realised by the determiner pass).
-    :param relation: The word relating the value to its operands.
-    :param operands: The already-rendered operands.
-    :return: The value noun phrase.
+        Reach for this when the value relates to its operands by the possessive *"of"* (``Length`` →
+        *"the length **of** …"*); use :meth:`custom_relation` for any other relating word.
 
-    >>> from krrood.entity_query_language.verbalization.fragments.base import (
-    ...     flatten_fragment_to_plain_text,
-    ... )
-    >>> from krrood.entity_query_language.verbalization.rendering.realization import (
-    ...     realize_tree,
-    ... )
-    >>> flatten_fragment_to_plain_text(realize_tree(function_relation_phrase(
-    ...     "inheritance path length", Prepositions.BETWEEN, Noun.the("begin"), Noun.the("end")
-    ... )))
-    'the inheritance path length between the begin and the end'
-    """
-    return PhraseFragment(
-        parts=[
-            Noun.the(noun).as_fragment(),
-            relation.as_fragment(),
-            And(operands).as_fragment(),
-        ]
-    )
+        :param name: The function's identifier (or class name).
+        :return: The value noun phrase.
+
+        >>> from krrood.entity_query_language.verbalization.fragments.base import (
+        ...     flatten_fragment_to_plain_text, WordFragment,
+        ... )
+        >>> flatten_fragment_to_plain_text(FunctionVerbalizationTemplates(()).possessive("GetQuarter"))
+        'quarter'
+        >>> flatten_fragment_to_plain_text(
+        ...     FunctionVerbalizationTemplates(
+        ...         (Noun(WordFragment(text="the capacity")),)
+        ...     ).possessive("RemainingLoad")
+        ... )
+        'the remaining load of the capacity'
+        """
+        noun = value_function_noun(name)
+        if not self.operands:
+            return Noun(WordFragment(text=noun)).as_fragment()
+        return possessive_path([PathStep(noun)], And(self.operands).as_fragment())
+
+    def custom_relation(
+        self, noun: str, relation: ClauseConstituent
+    ) -> VerbalizationFragment:
+        """Build *"the <noun> <relation> <operands...>"* — the general value noun phrase for a value
+        whose relation to its operands is not the possessive *"of"* that :meth:`possessive` hardcodes
+        (e.g. a length BETWEEN two things).
+
+        The operands are joined with *"and"*; the relation is any constituent, typically a
+        :class:`~krrood.entity_query_language.verbalization.vocabulary.english.Prepositions` member.
+
+        :param noun: The value's noun (the definite article is realised by the determiner pass).
+        :param relation: The word relating the value to its operands.
+        :return: The value noun phrase.
+
+        >>> from krrood.entity_query_language.verbalization.fragments.base import (
+        ...     flatten_fragment_to_plain_text,
+        ... )
+        >>> from krrood.entity_query_language.verbalization.rendering.realization import (
+        ...     realize_tree,
+        ... )
+        >>> flatten_fragment_to_plain_text(realize_tree(
+        ...     FunctionVerbalizationTemplates((Noun.the("begin"), Noun.the("end"))).custom_relation(
+        ...         "inheritance path length", Prepositions.BETWEEN
+        ...     )
+        ... ))
+        'the inheritance path length between the begin and the end'
+        """
+        return PhraseFragment(
+            parts=[
+                Noun.the(noun).as_fragment(),
+                relation.as_fragment(),
+                And(self.operands).as_fragment(),
+            ]
+        )
 
 
 _COPULA_LEMMA = "be"
@@ -417,7 +425,7 @@ def predicate_clause(
     name: str, subject: ClauseConstituent, *objects: ClauseConstituent
 ) -> Clause:
     """Build a predicate clause from a predicate's *name* and its operands — the boolean counterpart
-    of :func:`function_possessive_phrase`.
+    of :meth:`FunctionVerbalizationTemplates.possessive`.
 
     The name (CamelCase or snake_case) is read as the predicate. A copular name — its leading word a
     form of *"be"* (``IsReachable``) — uses the copula with the remaining words as the complement

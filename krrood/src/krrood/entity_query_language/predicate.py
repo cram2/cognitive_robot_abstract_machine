@@ -275,7 +275,7 @@ class SymbolicFunction(SymbolicCallable, ABC):
     returns a value (not a truth value), so its :meth:`Verbalizable._verbalization_fragment_` names
     that value as a NOUN PHRASE rather than a clause. When the class name itself reads as the value
     (``Length`` → *"the length of a list"*), the fragment is a one-liner over
-    :func:`~…vocabulary.parts_of_speech.function_possessive_phrase` read off ``cls.__name__``.
+    :meth:`~…vocabulary.parts_of_speech.FunctionVerbalizationTemplates.possessive` read off ``cls.__name__``.
     """
 
     @classmethod
@@ -444,10 +444,10 @@ class Length(SymbolicFunction):
     def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
         # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            function_possessive_phrase,
+            FunctionVerbalizationTemplates,
         )
 
-        return function_possessive_phrase(cls.__name__, *fields.values())
+        return FunctionVerbalizationTemplates(fields.values()).possessive(cls.__name__)
 
 
 length = functional_form(Length)
