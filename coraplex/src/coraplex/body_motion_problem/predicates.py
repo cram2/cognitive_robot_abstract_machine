@@ -59,7 +59,7 @@ class MotionStatechartCanPerform(CanPerform):
     can follow the full trajectory of world-space poses.
     """
 
-    _timeout: ClassVar[int] = 200
+    _timeout: ClassVar[int] = 2000
     _costmap_samples: ClassVar[int] = 10
     _arm_reach_distance: ClassVar[float] = 0.7
     _external_collision_buffer_distance: ClassVar[float] = 0.01

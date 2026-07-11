@@ -856,7 +856,7 @@ class World(HasSimulatorProperties):
             the current context.
         """
         self._raise_error_if_belongs_to_other_world(semantic_annotation)
-        if self.contains_semantic_annotation(semantic_annotation):
+        if self.is_semantic_annotation_in_world(semantic_annotation):
             return
         introspector = DataclassOnlyIntrospector()
 
