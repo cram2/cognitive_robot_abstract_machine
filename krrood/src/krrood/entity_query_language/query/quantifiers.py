@@ -40,7 +40,7 @@ class ResultQuantificationConstraint(ABC):
         Check if the constraint is satisfied, if not, raise a QuantificationNotSatisfiedError exception.
 
         :param number_of_solutions: The current number of solutions.
-        :param quantified_expression: The query expression being quantified, reported in errors.
+        :param quantified_expression: The query expression being quantified. This will be mentioned in errors.
         :param done: Whether all results have been found.
         :raises: QuantificationNotSatisfiedError: If the constraint is not satisfied.
         """

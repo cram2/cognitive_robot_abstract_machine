@@ -16,7 +16,6 @@ from inspect import ismethod, isfunction, isclass
 from typing import assert_never, Any
 
 import rustworkx as rx
-from inspect import ismethod, isclass, isfunction
 from typing_extensions import (
     Optional,
     Type,
@@ -26,11 +25,8 @@ from typing_extensions import (
     TYPE_CHECKING,
     Self,
     Iterator,
-    get_type_hints,
 )
 
-from krrood.adapters.json_serializer import list_like_classes
-from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.entity_query_language.core.base_expressions import (
     Selectable,
@@ -59,20 +55,6 @@ from krrood.symbol_graph.helpers import get_field_type_endpoint
 if TYPE_CHECKING:
     from krrood.entity_query_language.factories import ConditionType
     from krrood.entity_query_language.query.query import Entity, Query
-
-from typing import get_type_hints
-
-
-import builtins
-import importlib
-from typing import get_type_hints, get_origin, get_args
-from inspect import isclass
-
-
-import builtins
-import importlib
-from typing import get_type_hints, get_origin, get_args
-from inspect import isclass
 
 
 @dataclass
@@ -208,7 +190,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         >>> @dataclass
         >>> class Drawer:
         >>>     body: Body
-        >>> drawer = an(Drawer)(body=an(Body)(name="drawer_1")).from_(world.views)
+        >>> drawer = a(Drawer)(body=a(Body)(name="drawer_1")).from_(world.views)
 
     .. warning::
         Match can take a factory as a mean to construct `T`. If the keyword argument names of the match are not
@@ -259,7 +241,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         elif ismethod(self.factory):
             self.type_ = self.factory.__class__
         elif isfunction(self.factory):
-            type_ = get_type_hints(self.factory)["return"]
+            type_ = get_type_hints_of_object(self.factory)["return"]
             if not isclass(type_):
                 raise MatchTypeCannotBeDetermined(self)
             self.type_ = type_
@@ -485,27 +467,6 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
             return result[0]
         else:
             raise KeyError(f"Multiple variables with name {name}")
-
-
-@dataclass(eq=False)
-class MatchVariable(Match[T]):
-    """
-    Represents a match variable that operates within a specified domain.
-
-    A class designed to create and manage a variable constrained by a defined
-    domain. It provides functionality to add additional constraints via
-    keyword arguments and return an expression representing the resolved
-    constraints. The ``domain`` field is inherited from :class:`Match`.
-    """
-
-    def __call__(self, **kwargs) -> Union[Entity[T], T]:
-        """
-        Add the keyword-argument constraints and return the resolved entity expression.
-        """
-        if not kwargs:
-            raise NoKwargsInMatchVar(self)
-        super().__call__(**kwargs)
-        return self.expression
 
 
 @dataclass(eq=False)

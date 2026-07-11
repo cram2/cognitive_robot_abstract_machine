@@ -1206,7 +1206,7 @@ def test_modifying_built_query_rebuilds(handles_and_containers_world):
     query.where(contains(body.name, "1"))
     results_after = list(query.evaluate())
     assert len(results_after) == 1
-    assert len(results_after) <= len(results_before)
+    assert len(results_after) < len(results_before)
 
 
 def test_chain_evaluate_variables():

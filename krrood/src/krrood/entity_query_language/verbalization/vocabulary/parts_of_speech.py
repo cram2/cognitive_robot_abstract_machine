@@ -14,6 +14,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     PhraseFragment,
     RoleFragment,
     WordFragment,
+    oxford_comma,
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
@@ -25,6 +26,7 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
     one_of,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
+    Conjunctions,
     Copulas,
     Prepositions,
     SetMembership,
@@ -80,6 +82,15 @@ class Noun(ClauseElement):
         <Definiteness.DEFINITE: 'definite'>
         """
         return cls(head, definiteness=Definiteness.DEFINITE)
+
+    @classmethod
+    def bare(cls, head: str) -> "Noun":
+        """:return: a bare literal noun with no article (*"of type"*, not *"of a type"*).
+
+        >>> Noun.bare("type").as_fragment().definiteness
+        <Definiteness.BARE: 'bare'>
+        """
+        return cls(head, definiteness=Definiteness.BARE)
 
 
 @dataclass(frozen=True)
@@ -163,19 +174,59 @@ class OneOf(ClauseElement):
             if isinstance(self.members, VerbalizationField)
             else self.members
         )
+        listed = one_of(
+            [RoleFragment.for_member(member) for member in members[: MAX_SET_MEMBERS + 1]]
+        )
+        if listed is not None:
+            return listed
+        # Past the cap the members are summarised by count; the category noun still distinguishes a
+        # set of types from a set of plain values.
         are_types = bool(members) and all(
             isinstance(member, type) for member in members
         )
-        render = RoleFragment.for_type if are_types else RoleFragment.for_literal
-        listed = one_of([render(member) for member in members[: MAX_SET_MEMBERS + 1]])
-        if listed is not None:
-            return listed
         return PhraseFragment(
             parts=[
                 SetMembership.ONE_OF.as_fragment(),
                 WordFragment(text=morphology.cardinal(len(members))),
                 WordFragment(text="types" if are_types else "values"),
             ]
+        )
+
+
+@dataclass(frozen=True)
+class Or(ClauseElement):
+    """A disjunctive listing of admissible values — *"A, B, or C"* — over a collection.
+
+    The vocabulary-level oxford-comma disjunction over any iterable of members, each rendered by
+    :meth:`~…fragments.base.RoleFragment.for_member` (a class as a linked type reference, any other
+    value as a literal) and joined with *"or"*. An author writes ``Or(field)`` rather than reaching
+    for the low-level :func:`~…fragments.base.oxford_comma` / :class:`Conjunctions` builders. A field
+    bound to a single (non-iterable) value keeps that value's own rendered fragment.
+    """
+
+    members: Union[Iterable, VerbalizationField]
+    """The admissible values — a predicate :class:`~krrood.entity_query_language.predicate.VerbalizationField`
+    bound to an iterable (or a single value), or an iterable directly."""
+
+    def as_fragment(self) -> VerbalizationFragment:
+        """:return: the disjunction phrase *"A, B, or C"*, or a single member's own fragment.
+
+        >>> from krrood.entity_query_language.verbalization.fragments.base import (
+        ...     flatten_fragment_to_plain_text,
+        ... )
+        >>> flatten_fragment_to_plain_text(Or((int, str)).as_fragment())
+        'Integer or Text'
+        """
+        value = (
+            self.members.value
+            if isinstance(self.members, VerbalizationField)
+            else self.members
+        )
+        if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
+            return Noun(self.members).as_fragment()
+        return oxford_comma(
+            [RoleFragment.for_member(member) for member in value],
+            Conjunctions.OR.as_fragment(),
         )
 
 

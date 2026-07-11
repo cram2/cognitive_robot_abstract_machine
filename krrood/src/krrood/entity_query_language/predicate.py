@@ -317,18 +317,26 @@ class HasType(Triple):
         cls, fields: Mapping[str, VerbalizationFragment]
     ) -> VerbalizationFragment:
         # Imported locally to avoid the core → verbalization import cycle (see :class:`Triple`).
+        from krrood.entity_query_language.verbalization.vocabulary.english import (
+            Prepositions,
+        )
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            Adjective,
             clause,
             Copula,
             Noun,
+            Or,
         )
 
+        # "<variable> is of type A, B, or C" -- the admissible types are said DISJUNCTIVELY
+        # (``isinstance`` over a tuple holds for ANY one of them, so "and" would claim an impossible
+        # conjunction). The listing is the vocabulary's :class:`Or` element, not a bespoke tail;
+        # "type" is a bare noun ("of type", not "of a type").
         return clause(
             Noun(fields["variable"]),
             Copula(),
-            Adjective("of type"),
-            Noun(fields["types_"]),
+            Prepositions.OF,
+            Noun.bare("type"),
+            Or(fields["types_"]),
         )
 
 
@@ -348,22 +356,6 @@ class HasTypes(HasType):
     """
     A tuple containing Type objects that are associated with this instance.
     """
-
-    @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
-        """Say membership over the admissible types — *"<variable> is one of A, B, or C"*. The
-        :class:`OneOf` element handles the bounded listing (linking, *"or"*, the count cap), so the
-        types are read from the field's value (an ``isinstance`` over the tuple is membership, not the
-        tuple value an equality would mean)."""
-        # Imported locally to avoid the core → verbalization import cycle (see :class:`Triple`).
-        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            clause,
-            Copula,
-            Noun,
-            OneOf,
-        )
-
-        return clause(Noun(fields["variable"]), Copula(), OneOf(fields["types_"]))
 
 
 @symbolic_function
@@ -397,4 +389,3 @@ class Is(Predicate):
 
     def __call__(self) -> bool:
         return self.first_entity is self.second_entity
-
