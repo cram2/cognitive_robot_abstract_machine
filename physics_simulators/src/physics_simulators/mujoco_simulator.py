@@ -645,7 +645,7 @@ class MujocoSimulator(BaseSimulator):
         :return: A SimulatorCallbackResult with a list of actuator names as the result
         """
         result = [
-            self._mj_model.connection(actuator_id).name
+            self._mj_model.actuator(actuator_id).name
             for actuator_id in range(self._mj_model.nu)
         ]
         return SimulatorCallbackResult(
