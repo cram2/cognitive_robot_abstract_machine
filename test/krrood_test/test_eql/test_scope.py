@@ -102,6 +102,44 @@ def test_eql_factory_namespace_has_core_verbs():
     assert callable(ns["entity"])
 
 
+def test_eql_factory_namespace_picks_up_new_public_factories_automatically():
+    # OCP: any public name defined directly in factories.py is available without
+    # editing eql_factory_namespace() -- exercised here via one that was never
+    # hand-listed (`a`, the `an` alias for words not starting with a vowel).
+    ns = eql_factory_namespace()
+    assert "a" in ns
+    assert callable(ns["a"])
+
+
+def test_eql_factory_namespace_excludes_names_shadowing_builtins():
+    # `max`/`sum`/`min`/... are real public factories.py aggregators, but dumping
+    # them into an interactive shell's flat namespace would shadow the builtins.
+    ns = eql_factory_namespace()
+    assert "max" not in ns
+    assert "sum" not in ns
+
+
+def test_eql_factory_namespace_exposes_module_for_builtin_shadowing_names():
+    # The excluded names above stay reachable via the `eql` module object itself.
+    ns = eql_factory_namespace()
+    assert ns["eql"].__name__ == "krrood.entity_query_language.factories"
+    assert callable(ns["eql"].max)
+    assert callable(ns["eql"].sum)
+
+
+def test_eql_factory_namespace_excludes_private_names():
+    ns = eql_factory_namespace()
+    assert "_quantify_or_build_match" not in ns
+
+
+def test_eql_factory_namespace_excludes_names_imported_into_factories():
+    # Match/Entity/etc. are imported into factories.py for its own use, not
+    # defined there -- they shouldn't leak into the flat verb namespace.
+    ns = eql_factory_namespace()
+    assert "Match" not in ns
+    assert "Entity" not in ns
+
+
 # ---------------------------------------------------------------------------
 # attach / get_definition_scope
 # ---------------------------------------------------------------------------
