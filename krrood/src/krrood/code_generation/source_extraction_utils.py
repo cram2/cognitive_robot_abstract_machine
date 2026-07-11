@@ -16,7 +16,7 @@ import types
 from collections import defaultdict
 from dataclasses import dataclass, field
 from importlib.util import resolve_name
-from typing import Dict, List, Optional, Set, Type, Union
+from typing import Dict, List, Optional, Set, Tuple, Type, Union
 
 from krrood.exceptions import (
     ModuleNotFoundForConvertingImportsToAbsolute,
@@ -99,6 +99,35 @@ def extract_imports_from(
     :returns: A sorted list of import-line strings.
     """
     exclude_libraries = exclude_libraries or []
+    tree, current_module_name = _resolve_import_tree(
+        module, file_path, source, ast_tree, convert_relative_to_absolute
+    )
+    import_modules, from_imports = _collect_imports_from_tree(
+        tree, exclude_libraries, convert_relative_to_absolute, current_module_name
+    )
+    return _format_import_lines(import_modules, from_imports)
+
+
+def _resolve_import_tree(
+    module: Optional[types.ModuleType],
+    file_path: Optional[str],
+    source: Optional[str],
+    ast_tree: Optional[ast.AST],
+    convert_relative_to_absolute: bool,
+) -> Tuple[ast.AST, Optional[str]]:
+    """Resolve the AST to walk and the enclosing module name for relative-import conversion.
+
+    :param module: The module to extract imports from.
+    :param file_path: The file path to extract imports from.
+    :param source: The source code to extract imports from.
+    :param ast_tree: The ast tree to extract imports from.
+    :param convert_relative_to_absolute: Whether relative imports will be converted
+        to absolute, which requires a module or file to anchor them to.
+    :raises NoSourceDataToParseImportsFrom: If no module, file, source, or AST is given.
+    :raises ModuleNotFoundForConvertingImportsToAbsolute: If asked to convert relative
+        imports to absolute without a module or file to anchor them to.
+    :returns: The AST to walk, and the enclosing module name (if resolvable).
+    """
     if module is None and source is None and file_path is None and ast_tree is None:
         raise NoSourceDataToParseImportsFrom(
             module=module, file_path=file_path, ast_tree=ast_tree
@@ -115,51 +144,104 @@ def extract_imports_from(
         raise ModuleNotFoundForConvertingImportsToAbsolute(
             path=file_path, source_code=source
         )
+    return ast_tree or ast.parse(source), current_module_name
 
-    tree = ast_tree or ast.parse(source)
 
+def _collect_imports_from_tree(
+    tree: ast.AST,
+    exclude_libraries: List[str],
+    convert_relative_to_absolute: bool,
+    current_module_name: Optional[str],
+) -> Tuple[Set[str], Dict[str, Set[str]]]:
+    """Walk *tree* and collect plain (``import x``) and ``from``-imports separately.
+
+    :param tree: The AST to walk.
+    :param exclude_libraries: Module names to exclude from the result.
+    :param convert_relative_to_absolute: Whether to resolve relative ``from``-imports
+        to their absolute module name.
+    :param current_module_name: The enclosing module name relative imports resolve against.
+    :returns: The plain-imported module names, and a mapping of ``from``-module name
+        to the names imported from it.
+    """
     import_modules: Set[str] = set()
     from_imports: Dict[str, Set[str]] = defaultdict(set)
 
     for node in ast.walk(tree):
-        # import x
         if isinstance(node, ast.Import):
-            for alias in node.names:
-                name = alias.name
-                if name in exclude_libraries:
-                    continue
-                if alias.asname:
-                    import_modules.add(f"{name} as {alias.asname}")
-                else:
-                    import_modules.add(name)
-
-        # from x import y
+            _collect_plain_import(node, exclude_libraries, import_modules)
         elif isinstance(node, ast.ImportFrom):
-            prefix = "." * node.level
-            module_name = node.module or ""
-            full_module = f"{prefix}{module_name}"
+            _collect_from_import(
+                node,
+                exclude_libraries,
+                convert_relative_to_absolute,
+                current_module_name,
+                from_imports,
+            )
+    return import_modules, from_imports
 
-            if convert_relative_to_absolute and node.level > 0:
-                full_module = resolve_name(full_module, current_module_name)
 
-            if node.module and node.module in exclude_libraries:
-                continue
+def _collect_plain_import(
+    node: ast.Import, exclude_libraries: List[str], import_modules: Set[str]
+) -> None:
+    """Add the module names of an ``import x`` statement to *import_modules*.
 
-            for alias in node.names:
-                if alias.asname:
-                    from_imports[full_module].add(f"{alias.name} as {alias.asname}")
-                else:
-                    from_imports[full_module].add(alias.name)
+    :param node: The ``import`` AST node.
+    :param exclude_libraries: Module names to skip.
+    :param import_modules: The set of collected plain-import module names, updated in place.
+    """
+    for alias in node.names:
+        if alias.name in exclude_libraries:
+            continue
+        if alias.asname:
+            import_modules.add(f"{alias.name} as {alias.asname}")
+        else:
+            import_modules.add(alias.name)
 
+
+def _collect_from_import(
+    node: ast.ImportFrom,
+    exclude_libraries: List[str],
+    convert_relative_to_absolute: bool,
+    current_module_name: Optional[str],
+    from_imports: Dict[str, Set[str]],
+) -> None:
+    """Add the names of a ``from x import y`` statement to *from_imports*, keyed by module.
+
+    :param node: The ``from ... import`` AST node.
+    :param exclude_libraries: Module names to skip.
+    :param convert_relative_to_absolute: Whether to resolve a relative *node.module*
+        to its absolute module name.
+    :param current_module_name: The enclosing module name relative imports resolve against.
+    :param from_imports: The collected ``from``-module to imported-names mapping, updated in place.
+    """
+    if node.module and node.module in exclude_libraries:
+        return
+    prefix = "." * node.level
+    full_module = f"{prefix}{node.module or ''}"
+    if convert_relative_to_absolute and node.level > 0:
+        full_module = resolve_name(full_module, current_module_name)
+    for alias in node.names:
+        if alias.asname:
+            from_imports[full_module].add(f"{alias.name} as {alias.asname}")
+        else:
+            from_imports[full_module].add(alias.name)
+
+
+def _format_import_lines(
+    import_modules: Set[str], from_imports: Dict[str, Set[str]]
+) -> List[str]:
+    """Render collected import data as sorted ``import``/``from ... import`` line strings.
+
+    :param import_modules: The plain-imported module names.
+    :param from_imports: The ``from``-module name to imported-names mapping.
+    :returns: A sorted list of import-line strings.
+    """
     result: Set[str] = set()
-
     for module_name in sorted(import_modules):
         result.add(f"import {module_name}")
-
     for module_name, names in sorted(from_imports.items()):
         joined = ", ".join(sorted(names))
         result.add(f"from {module_name} import {joined}")
-
     return sorted(result)
 
 
