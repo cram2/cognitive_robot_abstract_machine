@@ -8,13 +8,13 @@ circular dependency chain it carries.
 
 from __future__ import annotations
 
+import uuid
 from abc import ABC
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 
-from typing_extensions import Any, Dict, List, Optional, TYPE_CHECKING
-
-from krrood.entity_query_language.enums import EvaluationContextKey
+from ordered_set import OrderedSet
+from typing_extensions import Iterator, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import (
@@ -70,6 +70,69 @@ class EvaluationObserver(ABC):
 
 
 @dataclass
+class ActiveConditionsRoot:
+    """Tracks which node is the active conditions root for the current evaluation pass.
+
+    A node reused as the condition of more than one ``Filter`` has no single correct "root" —
+    the right answer depends on which evaluation is currently running, not on the node's
+    construction history. The first node to claim this during a pass wins; nested evaluations
+    within the same pass never reassign it.
+    """
+
+    _root_id: Optional[uuid.UUID] = field(default=None, init=False)
+    """Identifier of the claimed root, or ``None`` before any node has claimed one this pass."""
+
+    def claim(self, root: SymbolicExpression) -> None:
+        """Claim *root* as the active conditions root for this pass, if none is claimed yet.
+
+        :param root: The node to claim, normally ``self._conditions_root_`` of whichever
+            expression is starting a fresh (context-less) evaluation.
+        """
+        if self._root_id is None:
+            self._root_id = root._id_
+
+    def is_active_root(self, node: SymbolicExpression) -> bool:
+        """:return: ``True`` if *node* is the active conditions root for this pass."""
+        return self._root_id == node._id_
+
+
+@dataclass
+class EvaluatedExpressionIds:
+    """Tracks every expression id evaluated so far during the current evaluation pass.
+
+    Used to distinguish evaluated-from-skipped logical operators (for example, short-circuited
+    OR/AND branches) when building inference explanations.
+    """
+
+    _ids: OrderedSet = field(default_factory=OrderedSet, init=False)
+    """The expression ids recorded as evaluated so far this pass."""
+    _snapshot: Optional[Tuple[int, OrderedSet]] = field(default=None, init=False)
+    """Cached ``(length, snapshot)`` pair. The id set is append-only, so its length is a valid
+    version key: a snapshot taken while the set has a given length is reused instead of copying
+    the whole set again."""
+
+    def record(self, expression_id: uuid.UUID) -> None:
+        """Record *expression_id* as evaluated during the current pass."""
+        self._ids.add(expression_id)
+
+    def merge(self, other: OrderedSet) -> None:
+        """Merge *other* into the recorded ids (for example, ids evaluated by an earlier stage
+        of the same result chain)."""
+        self._ids.update(other)
+
+    def __iter__(self) -> Iterator[uuid.UUID]:
+        return iter(self._ids)
+
+    def snapshot(self) -> OrderedSet:
+        """:return: An immutable snapshot of the ids recorded so far, reusing the cached one
+        when the set has not grown since it was last taken."""
+        current_length = len(self._ids)
+        if self._snapshot is None or self._snapshot[0] != current_length:
+            self._snapshot = (current_length, OrderedSet(self._ids))
+        return self._snapshot[1]
+
+
+@dataclass
 class EvaluationContext:
     """Carries observer state through the evaluation pipeline."""
 
@@ -77,12 +140,16 @@ class EvaluationContext:
     """
     List of observers to notify of evaluation events.
     """
-    data: Dict[EvaluationContextKey, Any] = field(default_factory=dict)
-    """
-    Arbitrary data storage for observers to share information across events during evaluation.
-    Observers should use well-known keys defined in :class:`~krrood.entity_query_language.enums.EvaluationContextKey`
-    to avoid collisions.
-    """
+    active_conditions_root: ActiveConditionsRoot = field(
+        default_factory=ActiveConditionsRoot
+    )
+    """Tracks which node is the active conditions root for the current evaluation pass."""
+    evaluated_expression_ids: EvaluatedExpressionIds = field(
+        default_factory=EvaluatedExpressionIds
+    )
+    """Tracks every expression id evaluated so far during the current evaluation pass."""
+    satisfied_condition_ids: Optional[OrderedSet] = field(default=None)
+    """The satisfied condition-expression ids for the current evaluation iteration, or ``None`` if unset."""
 
     def on_evaluate_enter(
         self,

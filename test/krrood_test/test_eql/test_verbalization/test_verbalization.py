@@ -223,17 +223,18 @@ def test_verbalize_literal_tuple_of_types_is_a_value_not_membership():
 
 
 def test_verbalize_has_types_is_membership():
-    """The type-membership predicate reads as the bounded *"one of A, B, or C"* set — the same
-    surface a domain-constrained variable uses — over its admissible types."""
+    """The type-membership predicate reads through the same *"is of type A or B"* surface as
+    ``HasType``, its admissible types listed disjunctively."""
     subject = variable(Body, [])
     assert (
         verbalize_expression(HasTypes(subject, (Apple, Cabinet)))
-        == "a Body is one of Apple or Cabinet"
+        == "a Body is of type Apple or Cabinet"
     )
 
 
-def test_verbalize_has_types_too_many_is_not_spelled():
-    """Past the membership cap the admissible types are summarised by count, not spelled out."""
+def test_verbalize_has_types_lists_all_admissible_types():
+    """Every admissible type is listed disjunctively -- ``isinstance`` over the tuple holds for ANY of
+    them -- joined by the :class:`Or` element with an oxford comma before the final *"or"*."""
     subject = variable(Body, [])
     many = (
         Apple,
@@ -245,8 +246,10 @@ def test_verbalize_has_types_too_many_is_not_spelled():
         PrismaticConnection,
     )
     text = verbalize_expression(HasTypes(subject, many))
-    assert "Apple" not in text
-    assert text == "a Body is one of seven types"
+    assert text == (
+        "a Body is of type Apple, Cabinet, Container, Drawer, "
+        "FixedConnection, Handle, or PrismaticConnection"
+    )
 
 
 # ── Unit tests: MappedVariable chain ──────────────────────────────────────────
@@ -1436,6 +1439,17 @@ def test_verbalize_has_type_tuple_of_types():
     assert "is of type" in text
     assert "Apple" in text
     assert "Body" in text
+
+
+def test_has_type_lists_a_tuple_of_types_disjunctively():
+    """``isinstance`` over a tuple holds when the value is ANY of the types, so the listing joins
+    with *"or"* — *"is of type Apple or Body"*, never the conjunctive *"and"* (a value cannot be of
+    both types at once)."""
+    fruit = variable(Body, [])
+    assert (
+        verbalize_expression(HasType(fruit, (Apple, Body)))
+        == "a Body is of type Apple or Body"
+    )
 
 
 def test_verbalize_contains_type():

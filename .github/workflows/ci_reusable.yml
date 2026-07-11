@@ -27,6 +27,13 @@ jobs:
           submodules: recursive
 
       - name: Install dependencies
+        env:
+          # Keep uv's cache on the same filesystem as the target venv (/opt/ros/cram-env) so uv can
+          # hardlink packages into site-packages instead of full-copying them. The default cache
+          # (~/.cache/uv under the mounted /github/home volume) is a different filesystem, which
+          # forces a full copy of every wheel and stores each package twice -- exhausting the runner
+          # disk ("No space left on device") during install.
+          UV_CACHE_DIR: /opt/ros/.uv_cache
         run: |
           cd cognitive_robot_abstract_machine
           source /opt/ros/cram-env/bin/activate
