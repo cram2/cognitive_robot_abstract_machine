@@ -31,7 +31,7 @@ class ImportData:
     """The name expression used to reference the symbol after the import."""
 
 
-def generate_callable_import(function: Callable) -> ImportData:
+def generate_import_statement_for_callable(function: Callable) -> ImportData:
     """Return the :class:`ImportData` for *function*.
 
     :param function: The callable to generate an import for.

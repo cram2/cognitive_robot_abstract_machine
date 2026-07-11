@@ -10,7 +10,7 @@ from typing import Callable, Dict, Optional
 from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.code_generation.generator import CodeGenerator
 from krrood.code_generation.imports import (
-    generate_callable_import,
+    generate_import_statement_for_callable,
     get_imports_from_types,
     validate_annotations,
 )
@@ -58,7 +58,7 @@ class FunctionCaseGenerator:
 
         if class_name is None:
             class_name = to_camel_case(function.__name__)
-        callable_import = generate_callable_import(function)
+        callable_import = generate_import_statement_for_callable(function)
 
         base_module, base_class_name = self.base_class_fully_qualified_name.rsplit(
             ".", 1

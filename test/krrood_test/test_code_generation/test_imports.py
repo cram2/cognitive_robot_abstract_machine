@@ -9,7 +9,7 @@ import pytest
 from krrood.code_generation.exceptions import FunctionMissingAnnotationsError
 from krrood.code_generation.imports import (
     ImportData,
-    generate_callable_import,
+    generate_import_statement_for_callable,
     get_imports_from_types,
 )
 from krrood.exceptions import DataclassException
@@ -51,67 +51,67 @@ def method_host_class():
 
 
 class TestGenerateCallableImportModuleLevel:
-    """Guarantees for ``generate_callable_import`` when passed a plain function."""
+    """Guarantees for ``generate_import_statement_for_callable`` when passed a plain function."""
 
     def test_returns_import_data(self, module_level_distance: Callable) -> None:
         """Result is an :class:`ImportData` bundling the import line and access."""
-        result = generate_callable_import(module_level_distance)
+        result = generate_import_statement_for_callable(module_level_distance)
         assert isinstance(result, ImportData)
         assert isinstance(result.import_line, str)
         assert isinstance(result.access_expression, str)
 
     def test_import_line_is_from_import(self, module_level_distance: Callable) -> None:
         """The import line starts with ``from``."""
-        import_line = generate_callable_import(module_level_distance).import_line
+        import_line = generate_import_statement_for_callable(module_level_distance).import_line
         assert import_line.startswith("from ")
 
     def test_import_line_contains_module(self, module_level_distance: Callable) -> None:
         """The import line references the function's module."""
-        import_line = generate_callable_import(module_level_distance).import_line
+        import_line = generate_import_statement_for_callable(module_level_distance).import_line
         assert "my.module" in import_line
 
     def test_import_line_contains_function_name(
         self, module_level_distance: Callable
     ) -> None:
         """The import line names the function directly (not a wrapping class)."""
-        import_line = generate_callable_import(module_level_distance).import_line
+        import_line = generate_import_statement_for_callable(module_level_distance).import_line
         assert "distance" in import_line
 
     def test_access_expression_is_bare_name(
         self, module_level_distance: Callable
     ) -> None:
         """For a module-level function the access expression is the bare name."""
-        access = generate_callable_import(module_level_distance).access_expression
+        access = generate_import_statement_for_callable(module_level_distance).access_expression
         assert access == "distance"
 
 
 class TestGenerateCallableImportMethod:
-    """Guarantees for ``generate_callable_import`` when passed an unbound method."""
+    """Guarantees for ``generate_import_statement_for_callable`` when passed an unbound method."""
 
     def test_import_line_imports_class_not_function(self, method_host_class) -> None:
         """The import line must import ``MyClass``, not ``distance`` directly."""
-        import_line = generate_callable_import(method_host_class.distance).import_line
+        import_line = generate_import_statement_for_callable(method_host_class.distance).import_line
         assert "MyClass" in import_line
         assert import_line.split()[-1] == "MyClass"
 
     def test_access_expression_is_dotted(self, method_host_class) -> None:
         """The access expression for a method is ``ClassName.method_name``."""
-        access = generate_callable_import(method_host_class.distance).access_expression
+        access = generate_import_statement_for_callable(method_host_class.distance).access_expression
         assert "." in access
 
     def test_access_expression_starts_with_class_name(self, method_host_class) -> None:
         """The access expression starts with the class name."""
-        access = generate_callable_import(method_host_class.distance).access_expression
+        access = generate_import_statement_for_callable(method_host_class.distance).access_expression
         assert access.startswith("MyClass")
 
     def test_access_expression_ends_with_method_name(self, method_host_class) -> None:
         """The access expression ends with the method name."""
-        access = generate_callable_import(method_host_class.distance).access_expression
+        access = generate_import_statement_for_callable(method_host_class.distance).access_expression
         assert access.endswith("distance")
 
     def test_import_line_references_module(self, method_host_class) -> None:
         """The import line still references the correct module."""
-        import_line = generate_callable_import(method_host_class.distance).import_line
+        import_line = generate_import_statement_for_callable(method_host_class.distance).import_line
         assert "my.module" in import_line
 
 
