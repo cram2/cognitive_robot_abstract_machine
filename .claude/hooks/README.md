@@ -102,24 +102,67 @@ remote actually served the notes (the resolved one, or the fallback):
 <!--
 Personal notes, synced from 'claude/personal-notes' (.claude/personal/cram-notes.md) on remote
 'origin' by session-start.sh.
-To edit: change the notes below this line, then run
+To edit: change the notes between the markers below, then run
   "$CLAUDE_PROJECT_DIR/.claude/hooks/save-personal-notes.sh"
-to push the change back. This header is regenerated every session from git
-config/environment/default (plus a same-branch-upstream fallback) - editing
-it has no effect.
+to push the change back. This header and the markers are regenerated every
+session from git config/environment/default (plus a same-branch-upstream
+fallback) - editing them has no effect; only content between the markers is
+ever saved.
 -->
-<!-- END-PERSONAL-NOTES-HEADER -->
+<!-- BEGIN-PERSONAL-NOTES -->
+<!-- END-PERSONAL-NOTES -->
 ```
 
-To do it by hand instead: edit `CLAUDE.local.md` below that marker line, then run
+To do it by hand instead: edit `CLAUDE.local.md` between those two marker lines, then run
 
 ```bash
 "$CLAUDE_PROJECT_DIR/.claude/hooks/save-personal-notes.sh"
 ```
 
-It resolves the branch/path exactly like `session-start.sh` does, strips the header back out, and
-pushes only your actual notes content — in a scratch worktree, so your current branch and working
-tree are untouched, and as a no-op if nothing actually changed.
+It resolves the branch/path exactly like `session-start.sh` does, extracts only what's between the
+markers, and pushes just that — in a scratch worktree, so your current branch and working tree are
+untouched, and as a no-op if nothing actually changed.
+
+## Tracking a PR's plan and progress
+
+On any branch with a sensible "current PR" — not the default branch, a detached `HEAD`, or the
+personal-notes branch itself — `CLAUDE.local.md` also gets a second section, keyed to that branch,
+for the plan/progress/next-steps of whatever you're working on. Like the notes above, it's stored
+only on the personal-notes branch (at `.claude/personal/pr-progress/<branch-name>.md`), so it can
+never end up committed to the PR branch, or merged when the PR merges — that's a property of where
+it's stored, not a rule anyone has to remember.
+
+It's always present on a qualifying branch, even before anything's been saved — as a scaffold
+prompting you (or Claude) to initialize it — so the section is there to nudge maintaining it from
+the first session on a new PR, not only once something already exists:
+
+```
+<!--
+PR progress for branch 'my-feature-branch', synced from 'claude/personal-notes'
+(.claude/personal/pr-progress/my-feature-branch.md) on remote 'origin' by
+session-start.sh. Maintain the current plan, what's done, and what's next
+here throughout work on this PR. It is never merged: it lives only on
+'claude/personal-notes', never on this branch. A stale file left behind after the
+PR merges is harmless (just unread from then on) - delete it directly on
+'claude/personal-notes' if you want to tidy it up.
+To edit: change the notes between the markers below, then run
+  "$CLAUDE_PROJECT_DIR/.claude/hooks/save-pr-progress.sh"
+to push the change back. This header and the markers are regenerated every
+session - editing them has no effect; only content between the markers is
+ever saved.
+-->
+<!-- BEGIN-PR-PROGRESS -->
+No progress recorded yet for this branch. Initialize it now: a short plan,
+what's done so far, and what's next. Keep it current as you work.
+<!-- END-PR-PROGRESS -->
+```
+
+Ask Claude to keep it updated the same way as your notes: it edits between the `BEGIN-PR-PROGRESS`/
+`END-PR-PROGRESS` markers, then runs [`save-pr-progress.sh`](./save-pr-progress.sh) — which resolves
+the same remote/branch as everything else, derives the path from whichever branch is currently
+checked out (never configured directly, so one PR's progress can't accidentally get saved under
+another PR's key), extracts only what's between its own markers, and pushes just that. A good anchor
+for *when* to save: whenever the plan changes, and before ending any turn that changed it.
 
 ## Setup: overriding the default remote/branch/path
 
@@ -204,14 +247,19 @@ directly:
 - Never merges anything: the hook only ever *reads* the resolved branch, off `FETCH_HEAD` via `git
   show` (not a `<remote>/<branch>` ref, since a URL-form remote creates no tracking ref for one). It
   never checks the branch out or merges it into your working branch.
-- `create-personal-notes-branch.sh` and `save-personal-notes.sh` never touch your current branch or
-  working tree either — both do their work in a scratch worktree.
+- `create-personal-notes-branch.sh`, `save-personal-notes.sh` and `save-pr-progress.sh` never touch
+  your current branch or working tree either — all three do their work in a scratch worktree.
   `create-personal-notes-branch.sh` refuses to run if the target branch already exists locally, on
-  the resolved remote, or on the upstream-tracking fallback remote (see above);
-  `save-personal-notes.sh` is a no-op if there's nothing new to push.
-- The sync header `session-start.sh` writes is never itself pushed back: `save-personal-notes.sh`
-  strips everything up to and including the `END-PERSONAL-NOTES-HEADER` marker before committing,
-  so only your actual notes content ever lands on the notes branch.
+  the resolved remote, or on the upstream-tracking fallback remote (see above); the two save scripts
+  are each a no-op if there's nothing new to push.
+- The sync headers `session-start.sh` writes are never themselves pushed back: `save-personal-notes.sh`
+  and `save-pr-progress.sh` each extract only the content between their own markers
+  (`BEGIN-PERSONAL-NOTES`/`END-PERSONAL-NOTES` and `BEGIN-PR-PROGRESS`/`END-PR-PROGRESS`
+  respectively) before committing, so neither header, and neither script's section, can ever leak
+  into the other's saved content.
+- PR-progress content is never merged, by construction: it is written only to the branch-keyed path
+  on the personal-notes branch, never to any file tracked on the PR branch itself, so there is no
+  code path by which it could end up in a commit that gets merged.
 - `CLAUDE.local.md` is gitignored, so populated notes can't accidentally end up in a commit on any
   branch, including this one.
 - Safe to re-run: `session-start.sh` only ever overwrites `CLAUDE.local.md`, and does nothing if

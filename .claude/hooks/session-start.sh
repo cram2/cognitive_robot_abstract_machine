@@ -56,8 +56,19 @@ set -euo pipefail
 # (see below) naming the resolved branch/path and pointing at
 # ./save-personal-notes.sh. Since Claude Code loads CLAUDE.local.md as project
 # memory every session, that header is always in context - so asking Claude to
-# "edit my personal notes" needs no other setup: it edits the file below the
-# header, then runs the save script to push the change back.
+# "edit my personal notes" needs no other setup: it edits the notes between
+# the BEGIN-PERSONAL-NOTES/END-PERSONAL-NOTES markers, then runs the save
+# script to push the change back.
+#
+# PR progress: on any branch with a sensible "current PR" (i.e. not the
+# default branch, a detached HEAD, or the personal-notes branch itself - see
+# pr_progress_path in ./resolve-personal-notes-config.sh), CLAUDE.local.md
+# also gets a second section for that branch's plan/progress/next-steps,
+# keyed to the branch name and stored on the personal-notes branch just like
+# the notes above - so it is never committed to the PR branch itself, and
+# survives session restarts automatically. Always present (as a scaffold, if
+# nothing's been saved yet) on such a branch, so the agent is nudged to
+# initialize and maintain it from the start. See ./save-pr-progress.sh.
 #
 # How this script gets invoked (see ../settings.json): Claude Code registers it
 # as a SessionStart hook via `$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh`.
@@ -81,20 +92,63 @@ fetch_personal_notes_branch || exit 0
 # FETCH_HEAD, not "${ACTIVE_NOTES_REMOTE}/${NOTES_BRANCH}": a URL-form remote
 # creates no remote-tracking ref, but FETCH_HEAD always points at what was
 # just fetched, whether the serving remote was a name or a raw URL.
+
+OUTPUT_FILE="$(mktemp)"
+WROTE_ANYTHING=0
+
 if git cat-file -e "FETCH_HEAD:${NOTES_PATH}" 2>/dev/null; then
-  {
-    cat <<HEADER
+  cat <<HEADER >> "${OUTPUT_FILE}"
 <!--
 Personal notes, synced from '${NOTES_BRANCH}' (${NOTES_PATH}) on remote
 '${ACTIVE_NOTES_REMOTE}' by session-start.sh.
-To edit: change the notes below this line, then run
+To edit: change the notes between the markers below, then run
   "\$CLAUDE_PROJECT_DIR/.claude/hooks/save-personal-notes.sh"
-to push the change back. This header is regenerated every session from git
-config/environment/default (plus a same-branch-upstream fallback) - editing
-it has no effect.
+to push the change back. This header and the markers are regenerated every
+session from git config/environment/default (plus a same-branch-upstream
+fallback) - editing them has no effect; only content between the markers is
+ever saved.
 -->
-<!-- END-PERSONAL-NOTES-HEADER -->
+<!-- BEGIN-PERSONAL-NOTES -->
 HEADER
-    git show "FETCH_HEAD:${NOTES_PATH}"
-  } > CLAUDE.local.md
+  git show "FETCH_HEAD:${NOTES_PATH}" >> "${OUTPUT_FILE}"
+  echo "<!-- END-PERSONAL-NOTES -->" >> "${OUTPUT_FILE}"
+  WROTE_ANYTHING=1
+fi
+
+PROGRESS_PATH="$(pr_progress_path || true)"
+if [ -n "${PROGRESS_PATH}" ]; then
+  [ "${WROTE_ANYTHING}" = "1" ] && printf '\n' >> "${OUTPUT_FILE}"
+  cat <<PROGRESS_HEADER >> "${OUTPUT_FILE}"
+<!--
+PR progress for branch '$(git rev-parse --abbrev-ref HEAD)', synced from
+'${NOTES_BRANCH}' (${PROGRESS_PATH}) on remote '${ACTIVE_NOTES_REMOTE}' by
+session-start.sh. Maintain the current plan, what's done, and what's next
+here throughout work on this PR. It is never merged: it lives only on
+'${NOTES_BRANCH}', never on this branch. A stale file left behind after the
+PR merges is harmless (just unread from then on) - delete it directly on
+'${NOTES_BRANCH}' if you want to tidy it up.
+To edit: change the notes between the markers below, then run
+  "\$CLAUDE_PROJECT_DIR/.claude/hooks/save-pr-progress.sh"
+to push the change back. This header and the markers are regenerated every
+session - editing them has no effect; only content between the markers is
+ever saved.
+-->
+<!-- BEGIN-PR-PROGRESS -->
+PROGRESS_HEADER
+  if git cat-file -e "FETCH_HEAD:${PROGRESS_PATH}" 2>/dev/null; then
+    git show "FETCH_HEAD:${PROGRESS_PATH}" >> "${OUTPUT_FILE}"
+  else
+    cat <<'SCAFFOLD' >> "${OUTPUT_FILE}"
+No progress recorded yet for this branch. Initialize it now: a short plan,
+what's done so far, and what's next. Keep it current as you work.
+SCAFFOLD
+  fi
+  echo "<!-- END-PR-PROGRESS -->" >> "${OUTPUT_FILE}"
+  WROTE_ANYTHING=1
+fi
+
+if [ "${WROTE_ANYTHING}" = "1" ]; then
+  mv "${OUTPUT_FILE}" CLAUDE.local.md
+else
+  rm -f "${OUTPUT_FILE}"
 fi

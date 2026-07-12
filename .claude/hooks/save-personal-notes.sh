@@ -19,10 +19,11 @@ set -euo pipefail
 # rather than the resolved one. The remote may be a configured remote's name
 # or a raw git URL - see ./README.md.
 #
-# Strips the auto-generated sync header (everything up to and including the
-# "END-PERSONAL-NOTES-HEADER" marker line) before pushing, so the header
-# itself never ends up committed to the notes branch - only your actual notes
-# content does.
+# Extracts only the content between the BEGIN-PERSONAL-NOTES/END-PERSONAL-NOTES
+# markers before pushing - never the header above them, and never the separate
+# PR-progress section session-start.sh may have appended below them (see
+# ./save-pr-progress.sh for that one) - so only your actual notes content ever
+# ends up committed to the notes branch.
 #
 # Safe to re-run: a no-op if CLAUDE.local.md's content (after stripping the
 # header) already matches what's on the branch. Does its work in a scratch
@@ -53,9 +54,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-CONTENT_START="$(grep -n '^<!-- END-PERSONAL-NOTES-HEADER -->$' CLAUDE.local.md | head -1 | cut -d: -f1)"
-if [ -n "${CONTENT_START}" ]; then
-  tail -n "+$((CONTENT_START + 1))" CLAUDE.local.md > "${CONTENT_FILE}"
+if grep -q '^<!-- BEGIN-PERSONAL-NOTES -->$' CLAUDE.local.md; then
+  awk '/^<!-- BEGIN-PERSONAL-NOTES -->$/{flag=1; next} /^<!-- END-PERSONAL-NOTES -->$/{flag=0} flag' \
+    CLAUDE.local.md > "${CONTENT_FILE}"
 else
   cp CLAUDE.local.md "${CONTENT_FILE}"
 fi

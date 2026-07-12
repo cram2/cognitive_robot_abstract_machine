@@ -70,3 +70,24 @@ fetch_personal_notes_branch() {
 
   return 1
 }
+
+# pr_progress_path: prints the deterministic per-branch PR-progress file path
+# (.claude/personal/pr-progress/<branch>.md) for whichever branch is currently
+# checked out, and returns 0. Returns 1 (prints nothing) if there's no
+# sensible "current PR" to track progress for: detached HEAD, the repo's
+# default branch (main/master), or the personal-notes branch itself. The
+# directory is a fixed convention, independent of NOTES_PATH - PR progress is
+# inherently plural/keyed, unlike the single personal-notes file, so it isn't
+# tied to wherever NOTES_PATH happens to be overridden to.
+#
+# Shared by session-start.sh and save-pr-progress.sh so both agree on exactly
+# the same key for exactly the same branch - there is no other place this
+# path is computed, so it can never drift between reading and writing it.
+pr_progress_path() {
+  local branch
+  branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
+  case "${branch}" in
+    HEAD|main|master|"${NOTES_BRANCH}"|"") return 1 ;;
+  esac
+  printf '.claude/personal/pr-progress/%s.md\n' "${branch}"
+}
