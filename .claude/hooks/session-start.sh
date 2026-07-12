@@ -44,6 +44,14 @@ set -euo pipefail
 # the configured (or default) branch or path isn't reachable (e.g. a fresh
 # clone, or a fork that never created it).
 #
+# Remote fallback: if NOTES_REMOTE doesn't have the branch, this also tries
+# the current branch's own upstream remote (if it has one, and it differs
+# from NOTES_REMOTE) before giving up - see fetch_personal_notes_branch in
+# ./resolve-personal-notes-config.sh. Covers a clone whose checked-out branch
+# already tracks your fork under some other remote name, with no config
+# needed. The written header always names whichever remote actually served
+# the notes, so it's clear which one was used.
+#
 # Editing your notes: the written CLAUDE.local.md starts with a short header
 # (see below) naming the resolved branch/path and pointing at
 # ./save-personal-notes.sh. Since Claude Code loads CLAUDE.local.md as project
@@ -68,20 +76,22 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/resolve-personal-notes-config.sh"
 
-git fetch "${NOTES_REMOTE}" "${NOTES_BRANCH}" --quiet 2>/dev/null || exit 0
+fetch_personal_notes_branch || exit 0
 
-# FETCH_HEAD, not "${NOTES_REMOTE}/${NOTES_BRANCH}": a URL-form NOTES_REMOTE
+# FETCH_HEAD, not "${ACTIVE_NOTES_REMOTE}/${NOTES_BRANCH}": a URL-form remote
 # creates no remote-tracking ref, but FETCH_HEAD always points at what was
-# just fetched, whether NOTES_REMOTE was a remote name or a raw URL.
+# just fetched, whether the serving remote was a name or a raw URL.
 if git cat-file -e "FETCH_HEAD:${NOTES_PATH}" 2>/dev/null; then
   {
     cat <<HEADER
 <!--
-Personal notes, synced from '${NOTES_BRANCH}' (${NOTES_PATH}) by session-start.sh.
+Personal notes, synced from '${NOTES_BRANCH}' (${NOTES_PATH}) on remote
+'${ACTIVE_NOTES_REMOTE}' by session-start.sh.
 To edit: change the notes below this line, then run
   "\$CLAUDE_PROJECT_DIR/.claude/hooks/save-personal-notes.sh"
-to push the change back to '${NOTES_BRANCH}'. This header is regenerated
-every session from git config/environment/default - editing it has no effect.
+to push the change back. This header is regenerated every session from git
+config/environment/default (plus a same-branch-upstream fallback) - editing
+it has no effect.
 -->
 <!-- END-PERSONAL-NOTES-HEADER -->
 HEADER

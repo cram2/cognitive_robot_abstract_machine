@@ -19,9 +19,16 @@ set -euo pipefail
 #     ./.claude/hooks/create-personal-notes-branch.sh
 # See ./README.md for when a remote name vs. a raw URL is the right choice.
 #
-# Safe to re-run: refuses to touch a branch that already exists locally or on
-# the remote, so it never overwrites existing notes. Does its work in a
-# scratch worktree, so it never touches your current branch or working tree.
+# Safe to re-run: refuses to touch a branch that already exists locally, on
+# the resolved remote, or on the current branch's own upstream remote (see
+# current_branch_upstream_remote in ./resolve-personal-notes-config.sh) - so
+# it never overwrites existing notes, and never creates a second, divergent
+# copy of a branch that fetch_personal_notes_branch's fallback would already
+# have found on read. It always creates on the resolved remote specifically,
+# though, never on the fallback one - creation is a deliberate act, so it
+# targets exactly what you configured (or the zero-config default), with no
+# surprises. Does its work in a scratch worktree, so it never touches your
+# current branch or working tree.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/resolve-personal-notes-config.sh"
@@ -33,6 +40,15 @@ fi
 
 if git ls-remote --exit-code --heads "${NOTES_REMOTE}" "${NOTES_BRANCH}" > /dev/null 2>&1; then
   echo "Branch '${NOTES_BRANCH}' already exists on '${NOTES_REMOTE}' - not touching it." >&2
+  exit 1
+fi
+
+UPSTREAM_REMOTE="$(current_branch_upstream_remote)"
+if [ -n "${UPSTREAM_REMOTE}" ] && [ "${UPSTREAM_REMOTE}" != "${NOTES_REMOTE}" ] \
+    && git ls-remote --exit-code --heads "${UPSTREAM_REMOTE}" "${NOTES_BRANCH}" > /dev/null 2>&1; then
+  echo "Branch '${NOTES_BRANCH}' already exists on '${UPSTREAM_REMOTE}' (this branch's upstream" >&2
+  echo "remote) - not creating a second copy on '${NOTES_REMOTE}'. session-start.sh and" >&2
+  echo "save-personal-notes.sh already fall back to '${UPSTREAM_REMOTE}' automatically." >&2
   exit 1
 fi
 

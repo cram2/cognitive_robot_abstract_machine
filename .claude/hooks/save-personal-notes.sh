@@ -12,9 +12,12 @@ set -euo pipefail
 #   "$CLAUDE_PROJECT_DIR/.claude/hooks/save-personal-notes.sh"
 #
 # Resolves the remote/branch/path exactly like session-start.sh (git config >
-# environment variable > the zero-config default), so it always writes back
-# to wherever the notes were read from. The remote may be a configured
-# remote's name or a raw git URL - see ./README.md.
+# environment variable > the zero-config default, plus the same
+# same-branch-upstream fallback - see fetch_personal_notes_branch in
+# ./resolve-personal-notes-config.sh), so it always writes back to wherever
+# the notes were actually read from, even when that was the fallback remote
+# rather than the resolved one. The remote may be a configured remote's name
+# or a raw git URL - see ./README.md.
 #
 # Strips the auto-generated sync header (everything up to and including the
 # "END-PERSONAL-NOTES-HEADER" marker line) before pushing, so the header
@@ -24,8 +27,8 @@ set -euo pipefail
 # Safe to re-run: a no-op if CLAUDE.local.md's content (after stripping the
 # header) already matches what's on the branch. Does its work in a scratch
 # worktree, so it never touches your current branch or working tree. Fails
-# with a clear message if the target branch doesn't exist yet on the remote -
-# run ./create-personal-notes-branch.sh first in that case.
+# with a clear message if the target branch doesn't exist yet on any resolved
+# remote - run ./create-personal-notes-branch.sh first in that case.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/resolve-personal-notes-config.sh"
@@ -35,8 +38,8 @@ if [ ! -f CLAUDE.local.md ]; then
   exit 1
 fi
 
-if ! git fetch "${NOTES_REMOTE}" "${NOTES_BRANCH}" --quiet 2>/dev/null; then
-  echo "Branch '${NOTES_BRANCH}' doesn't exist on '${NOTES_REMOTE}' yet." >&2
+if ! fetch_personal_notes_branch; then
+  echo "Branch '${NOTES_BRANCH}' doesn't exist yet (tried: ${ATTEMPTED_NOTES_REMOTES})." >&2
   echo "Run ./create-personal-notes-branch.sh first, then re-run this script." >&2
   exit 1
 fi
@@ -58,9 +61,9 @@ else
 fi
 
 git branch -D __save-personal-notes-tmp > /dev/null 2>&1 || true
-# FETCH_HEAD, not "${NOTES_REMOTE}/${NOTES_BRANCH}": a URL-form NOTES_REMOTE
+# FETCH_HEAD, not "${ACTIVE_NOTES_REMOTE}/${NOTES_BRANCH}": a URL-form remote
 # creates no remote-tracking ref, but FETCH_HEAD always points at what was
-# just fetched, whether NOTES_REMOTE was a remote name or a raw URL. It's
+# just fetched, whether the serving remote was a name or a raw URL. It's
 # shared across worktrees (unlike HEAD/index), so this scratch worktree sees
 # the fetch above correctly.
 git worktree add -b __save-personal-notes-tmp "${SCRATCH_DIR}" FETCH_HEAD --quiet
@@ -70,11 +73,14 @@ cp "${CONTENT_FILE}" "${SCRATCH_DIR}/${NOTES_PATH}"
 git -C "${SCRATCH_DIR}" add "${NOTES_PATH}"
 
 if git -C "${SCRATCH_DIR}" diff --cached --quiet -- "${NOTES_PATH}"; then
-  echo "No changes to save - '${NOTES_PATH}' on '${NOTES_BRANCH}' is already up to date."
+  echo "No changes to save - '${NOTES_PATH}' on '${NOTES_BRANCH}' (remote '${ACTIVE_NOTES_REMOTE}') is already up to date."
   exit 0
 fi
 
 git -C "${SCRATCH_DIR}" commit --quiet -m "Update personal notes"
-git -C "${SCRATCH_DIR}" push "${NOTES_REMOTE}" "HEAD:${NOTES_BRANCH}"
+# Push back to ACTIVE_NOTES_REMOTE (wherever the branch was actually read
+# from above), not unconditionally to NOTES_REMOTE, so a save always lands on
+# the same remote the notes came from - see fetch_personal_notes_branch.
+git -C "${SCRATCH_DIR}" push "${ACTIVE_NOTES_REMOTE}" "HEAD:${NOTES_BRANCH}"
 
-echo "Saved '${NOTES_PATH}' back to '${NOTES_BRANCH}'."
+echo "Saved '${NOTES_PATH}' back to '${NOTES_BRANCH}' on '${ACTIVE_NOTES_REMOTE}'."

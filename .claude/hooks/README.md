@@ -25,8 +25,28 @@ config, then `CLAUDE_PERSONAL_NOTES_BRANCH` env var, then the default `claude/pe
 so does the path on that branch (`claude.personalNotesPath` git config, then
 `CLAUDE_PERSONAL_NOTES_PATH` env var, then the default `.claude/personal/cram-notes.md`).
 
-The hook is still a no-op in effect for anyone who never creates the branch it resolves to: `git
-fetch` finds nothing, so it exits without writing `CLAUDE.local.md`.
+The hook is still a no-op in effect for anyone who never creates the branch it resolves to on
+*neither* the resolved remote *nor* the fallback below: `git fetch` finds nothing, so it exits
+without writing `CLAUDE.local.md`.
+
+### Fallback: the current branch's own upstream remote
+
+If the resolved remote doesn't have the branch, `session-start.sh` and `save-personal-notes.sh` try
+one more thing before giving up: the remote your *currently checked-out branch* already tracks
+(i.e. what `git rev-parse --abbrev-ref --symbolic-full-name @{upstream}` reports), if it has one and
+it differs from the resolved remote. This covers a very common case with zero configuration at
+all — a clone whose checked-out branch already tracks your own fork under some remote name other
+than `origin` (e.g. a session environment where `origin` is the shared upstream repo and your fork
+is a differently-named remote) — the hook finds your notes there automatically.
+
+This fallback is read-only: it only ever changes where notes are *read* from, never where
+`create-personal-notes-branch.sh` *creates* them (that script still targets exactly the resolved
+remote, so creation stays a deliberate, unambiguous act — though it does refuse to create a second,
+divergent copy if the branch already exists on the fallback remote; see its own comments). When
+`save-personal-notes.sh` reads notes via the fallback, it also *writes* the edit back to that same
+fallback remote, not the resolved one, so a save always lands wherever the notes actually came from.
+The header `session-start.sh` writes always names whichever remote actually served the notes, so
+it's never ambiguous which one was used.
 
 ### When you need to override the remote
 
@@ -75,15 +95,18 @@ at [`save-personal-notes.sh`](./save-personal-notes.sh), so Claude edits the not
 and runs that script to push the change back — deterministically, with no guessing at where notes
 live or how to persist them.
 
-The header looks like this (regenerated every session — editing it has no effect):
+The header looks like this (regenerated every session — editing it has no effect), naming whichever
+remote actually served the notes (the resolved one, or the fallback):
 
 ```
 <!--
-Personal notes, synced from 'claude/personal-notes' (.claude/personal/cram-notes.md) by session-start.sh.
+Personal notes, synced from 'claude/personal-notes' (.claude/personal/cram-notes.md) on remote
+'origin' by session-start.sh.
 To edit: change the notes below this line, then run
   "$CLAUDE_PROJECT_DIR/.claude/hooks/save-personal-notes.sh"
-to push the change back to 'claude/personal-notes'. This header is regenerated
-every session from git config/environment/default - editing it has no effect.
+to push the change back. This header is regenerated every session from git
+config/environment/default (plus a same-branch-upstream fallback) - editing
+it has no effect.
 -->
 <!-- END-PERSONAL-NOTES-HEADER -->
 ```
@@ -176,14 +199,16 @@ directly:
 ## Safety
 
 - No-op in effect for anyone who never creates the `claude/personal-notes` branch (or an override
-  target): `git fetch` finds nothing, so nothing gets written.
+  target) on either the resolved remote or its upstream-tracking fallback: `git fetch` finds
+  nothing on either, so nothing gets written.
 - Never merges anything: the hook only ever *reads* the resolved branch, off `FETCH_HEAD` via `git
   show` (not a `<remote>/<branch>` ref, since a URL-form remote creates no tracking ref for one). It
   never checks the branch out or merges it into your working branch.
 - `create-personal-notes-branch.sh` and `save-personal-notes.sh` never touch your current branch or
   working tree either — both do their work in a scratch worktree.
-  `create-personal-notes-branch.sh` refuses to run if the target branch already exists locally or
-  on the resolved remote; `save-personal-notes.sh` is a no-op if there's nothing new to push.
+  `create-personal-notes-branch.sh` refuses to run if the target branch already exists locally, on
+  the resolved remote, or on the upstream-tracking fallback remote (see above);
+  `save-personal-notes.sh` is a no-op if there's nothing new to push.
 - The sync header `session-start.sh` writes is never itself pushed back: `save-personal-notes.sh`
   strips everything up to and including the `END-PERSONAL-NOTES-HEADER` marker before committing,
   so only your actual notes content ever lands on the notes branch.
