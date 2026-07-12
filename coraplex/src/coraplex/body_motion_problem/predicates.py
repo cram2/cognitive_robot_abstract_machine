@@ -63,9 +63,10 @@ class MotionStatechartCanPerform(CanPerform):
     _costmap_samples: ClassVar[int] = 10
     _arm_reach_distance: ClassVar[float] = 0.7
     _external_collision_buffer_distance: ClassVar[float] = 0.01
+    _max_trajectory_waypoints: ClassVar[int] = 20
+    """Maximum number of trajectory waypoints passed to the CartesianPose sequence."""
 
     def __call__(self) -> bool:
-        gc.collect()
         if (
             self.motion.motion_trajectory is None
             or self.motion.motion_trajectory.is_empty()
@@ -142,7 +143,8 @@ class MotionStatechartCanPerform(CanPerform):
                  Covers the full kinematic chain from the target body up to the world root
                  so the gripper can approach without being blocked by parent links.
         """
-        chain = self._kinematic_chain_to_root(target)
+        world = target._world
+        chain = world.compute_chain_of_kinematic_structure_entities(world.root, target)
         target_collision_bodies = [b for b in chain if b.has_collision()]
         if not target_collision_bodies:
             return []
@@ -152,19 +154,6 @@ class MotionStatechartCanPerform(CanPerform):
                 body_group_b=target_collision_bodies,
             )
         ]
-
-    @staticmethod
-    def _kinematic_chain_to_root(body: Body) -> list[Body]:
-        """
-        :return: All bodies from ``body`` up to (but not including) the world root,
-                 walking via parent_connection.
-        """
-        chain = []
-        current = body
-        while current.parent_connection is not None:
-            chain.append(current)
-            current = current.parent_connection.parent
-        return chain
 
     def _build_temporary_collision_rules(
         self, robot: AbstractRobot, gripper: EndEffector, target: Body
@@ -180,9 +169,6 @@ class MotionStatechartCanPerform(CanPerform):
             ),
             *self._build_collision_rules(gripper, target),
         ]
-
-    _max_trajectory_waypoints: ClassVar[int] = 20
-    """Maximum number of trajectory waypoints passed to the CartesianPose sequence."""
 
     def _subsample_trajectory(self, trajectory: list[Pose]) -> list[Pose]:
         """

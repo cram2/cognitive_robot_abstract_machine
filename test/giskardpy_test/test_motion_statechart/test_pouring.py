@@ -9,6 +9,8 @@ from pathlib import Path
 
 from giskardpy.motion_statechart.goals.templates import Parallel
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.tasks.feature_functions import HeightGoal
+from giskardpy.qp.constraint import LargeNumber
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
@@ -656,7 +658,6 @@ class TestTracyLiquidTransfer:
         from giskardpy.motion_statechart.tasks.pouring import (
             FillByTransferTask,
             KeepProjectileInReceiver,
-            KeepSourceAboveReceiver,
         )
 
         world, source_cup, receiving_cup, left_tool_frame = tracy_transfer_world
@@ -680,10 +681,14 @@ class TestTracyLiquidTransfer:
         no_spill = KeepProjectileInReceiver(receiver=receiving_cup, source=source_cup)
         # Keep the source cup above the receiver so the optimizer never lowers it into the receiver.
         minimum_clearance = 0.05
-        keep_above = KeepSourceAboveReceiver(
-            source=source_cup,
-            receiver=receiving_cup,
-            minimum_clearance=minimum_clearance,
+        keep_above = HeightGoal(
+            root_link=world.root,
+            tip_link=source_cup.root,
+            tip_point=Point3(reference_frame=source_cup.root),
+            reference_point=Point3(reference_frame=receiving_cup.root),
+            lower_limit=minimum_clearance,
+            upper_limit=LargeNumber,
+            weight=DefaultWeights.WEIGHT_ABOVE_CA,
         )
         keep_plane = AlignPlanes(
             root_link=world.root,
@@ -813,7 +818,6 @@ class TestPerceptionCorrectedTransfer:
         from giskardpy.motion_statechart.tasks.pouring import (
             FillByTransferTask,
             KeepProjectileInReceiver,
-            KeepSourceAboveReceiver,
         )
 
         world, source_cup, receiving_cup, left_tool_frame = tracy_transfer_world
@@ -829,10 +833,14 @@ class TestPerceptionCorrectedTransfer:
             reference_velocity=0.03,
         )
         no_spill = KeepProjectileInReceiver(receiver=receiving_cup, source=source_cup)
-        keep_above = KeepSourceAboveReceiver(
-            source=source_cup,
-            receiver=receiving_cup,
-            minimum_clearance=0.05,
+        keep_above = HeightGoal(
+            root_link=world.root,
+            tip_link=source_cup.root,
+            tip_point=Point3(reference_frame=source_cup.root),
+            reference_point=Point3(reference_frame=receiving_cup.root),
+            lower_limit=0.05,
+            upper_limit=LargeNumber,
+            weight=DefaultWeights.WEIGHT_ABOVE_CA,
         )
         keep_plane = AlignPlanes(
             root_link=world.root,

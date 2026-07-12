@@ -8,9 +8,10 @@ from uuid import UUID
 import numpy as np
 from typing_extensions import TYPE_CHECKING, Union, Optional, Dict, Any, Self
 
-from krrood.adapters.json_serializer import from_json, to_json
+from krrood.adapters.json_serializer import from_json, to_json, SubclassJSONSerializer
 from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.physics.equations.pouring_equations import (
+    DEFAULT_POUR_EXIT_SPEED,
     tilt_expression_from_fk,
 )
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
@@ -1090,6 +1091,47 @@ class DifferentialDrive(WheeledDrive):
             pitch=world.get_degree_of_freedom_by_id(self.pitch.id),
             yaw=world.get_degree_of_freedom_by_id(self.yaw.id),
             x_velocity=world.get_degree_of_freedom_by_id(self.x_velocity.id),
+        )
+
+
+@dataclass
+class LiquidTransferCoupling(SubclassJSONSerializer):
+    """
+    Serializable description of a receiver's inflow coupling to a liquid source.
+
+    The symbolic inflow and gate expressions of a transfer are bound to the world they were built
+    in and cannot be serialized. This descriptor captures only the parameters needed to rebuild
+    them, so the coupling survives world synchronization and is reconstructed per-world.
+    """
+
+    source_id: UUID
+    """Id of the source semantic annotation whose gated outflow feeds this receiver."""
+
+    exit_speed: float = field(default=DEFAULT_POUR_EXIT_SPEED)
+    """Horizontal speed of the liquid leaving the source, in metres per second."""
+
+    height_gate_sharpness: float = field(default=80.0)
+    """Logistic steepness of the source-above-receiver gate."""
+
+    overlap_gate_sharpness: float = field(default=80.0)
+    """Logistic steepness of the projectile-landing gate."""
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "source_id": to_json(self.source_id),
+            "exit_speed": self.exit_speed,
+            "height_gate_sharpness": self.height_gate_sharpness,
+            "overlap_gate_sharpness": self.overlap_gate_sharpness,
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> LiquidTransferCoupling:
+        return cls(
+            source_id=from_json(data["source_id"]),
+            exit_speed=data["exit_speed"],
+            height_gate_sharpness=data["height_gate_sharpness"],
+            overlap_gate_sharpness=data["overlap_gate_sharpness"],
         )
 
 

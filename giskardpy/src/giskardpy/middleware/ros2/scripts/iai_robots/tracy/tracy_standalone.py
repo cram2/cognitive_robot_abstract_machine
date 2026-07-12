@@ -24,7 +24,9 @@ def main():
         world_config=WorldWithTracyConfig(urdf=robot_description),
         robot_interface_config=TracyStandAloneRobotInterfaceConfig(),
         behavior_tree_config=StandAloneBTConfig(debug_mode=True),
-        qp_controller_config=QPControllerConfig(target_frequency=80),
+        qp_controller_config=QPControllerConfig(
+            target_frequency=80, prediction_horizon=120
+        ),
     )
     giskard.live()
 

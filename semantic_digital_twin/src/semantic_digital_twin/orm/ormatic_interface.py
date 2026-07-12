@@ -9906,6 +9906,31 @@ class JointDynamicsDAO(
     damping: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
 
+class LiquidTransferCouplingDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.connections.LiquidTransferCoupling
+    ],
+):
+    __tablename__ = "LiquidTransferCouplingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    exit_speed: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    height_gate_sharpness: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    overlap_gate_sharpness: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+
+
 class AccelerationVariableDAO(
     Base,
     DataAccessObject[
@@ -18016,6 +18041,11 @@ class HasFillLevelDAO(
         nullable=True,
         use_existing_column=True,
     )
+    inflow_coupling_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("LiquidTransferCouplingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
 
     fill_connection: Mapped[LiquidConnectionDAO] = relationship(
         "LiquidConnectionDAO",
@@ -18033,6 +18063,12 @@ class HasFillLevelDAO(
         "InflowEquationDAO",
         uselist=False,
         foreign_keys=[inflow_equation_id],
+        post_update=True,
+    )
+    inflow_coupling: Mapped[LiquidTransferCouplingDAO] = relationship(
+        "LiquidTransferCouplingDAO",
+        uselist=False,
+        foreign_keys=[inflow_coupling_id],
         post_update=True,
     )
 

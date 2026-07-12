@@ -453,12 +453,15 @@ class TestContainerManipulationQueries:
             world, include_close=False, half_door_opening=False
         )
 
+        counter = 0
         for drawer in world.get_semantic_annotations_by_type(Drawer):
-            if random.randint(0, 5) == 4:
-                max_position = drawer.root.parent_connection.active_dofs[
-                    0
-                ].limits.upper.position
-                drawer.root.parent_connection.position = max_position
+            counter += 1
+            max_position = drawer.root.parent_connection.active_dofs[
+                0
+            ].limits.upper.position
+            drawer.root.parent_connection.position = max_position
+            if counter == 4:
+                break
 
         task_sym = variable(TaskRequest, domain=[open_task])
         effect_sym = variable(Effect, domain=effects)

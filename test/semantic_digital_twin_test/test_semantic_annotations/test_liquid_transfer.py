@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pytest
 
 import krrood.symbolic_math.symbolic_math as sm
+from krrood.adapters.json_serializer import from_json, to_json
 from krrood.ormatic.utils import classproperty
 
 from semantic_digital_twin.exceptions import (
@@ -411,6 +412,80 @@ class TestReceiveOutflowGuard:
         second_receiver.initialize_fill_level(world=world, initial_fill=0.0)
         with pytest.raises(SourceAlreadyCoupledError):
             second_receiver.receive_outflow_from(source=source, world=world)
+
+
+class TestCouplingReconstruction:
+    """
+    Validates that a transfer coupling is transmitted as a serializable parametric descriptor and
+    rebuilt against the receiving world.
+
+    The gate and inflow of a coupling are symbolic expressions bound to the world they were built
+    in, so they cannot be serialized to another process. ``receive_outflow_from`` therefore records
+    a :class:`~semantic_digital_twin.world_description.connections.LiquidTransferCoupling` descriptor
+    on the fill connection, which survives synchronization and lets the receiving world rebuild the
+    symbolic coupling locally.
+    """
+
+    def _coupled_world(self):
+        return TestTransferGate()._build_world(
+            source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
+        )
+
+    def test_receive_outflow_records_serializable_descriptor(self):
+        """The coupling descriptor names the source and survives a JSON round trip."""
+        world, source, receiver = self._coupled_world()
+        coupling = receiver.inflow_coupling
+        assert coupling is not None
+        assert coupling.source_id == source.id
+
+        restored = from_json(to_json(coupling))
+        assert restored.source_id == source.id
+        assert restored.exit_speed == coupling.exit_speed
+        assert restored.height_gate_sharpness == coupling.height_gate_sharpness
+        assert restored.overlap_gate_sharpness == coupling.overlap_gate_sharpness
+
+    def test_rebuild_reconstructs_inflow_when_symbolic_state_absent(self):
+        """
+        Given the state a synchronized world holds - the descriptor present but the symbolic inflow
+        side effect absent - the receiver rebuilds a working, world-bound inflow equation.
+        """
+        world, source, receiver = self._coupled_world()
+        receiver.fill_connection.inflow_equation = None
+
+        receiver.ensure_inflow_coupling(world)
+
+        inflow_equation = receiver.fill_connection.inflow_equation
+        assert inflow_equation is not None
+        # The gate is a symbolic function of the source's DOF in this world; evaluating it proves
+        # the rebuilt coupling is bound to this world's symbols, not the ones it was first built in.
+        world.set_positions_1DOF_connection({source.root.parent_connection: 0.0})
+        assert inflow_equation.gate.evaluate()[0] == pytest.approx(1.0, abs=1e-2)
+        # The inflow tracks the source's outflow: zero while upright, positive once the source tilts.
+        assert inflow_equation.inflow.evaluate()[0] == pytest.approx(0.0)
+        world.set_positions_1DOF_connection({source.root.parent_connection: 1.0})
+        assert inflow_equation.inflow.evaluate()[0] > 0.0
+
+    def test_rebuild_regates_source_outflow(self):
+        """Rebuilding re-establishes the source's gated outflow, keeping the transfer spill-free."""
+        world, source, receiver = self._coupled_world()
+        receiver.fill_connection.inflow_equation = None
+
+        receiver.ensure_inflow_coupling(world)
+
+        source_outflow = source.fill_connection.outflow_equation
+        assert isinstance(source_outflow, GatedArticulatedPouringEquation)
+        world.set_positions_1DOF_connection({source.root.parent_connection: 0.0})
+        assert source_outflow.gate.evaluate()[0] == pytest.approx(1.0, abs=1e-2)
+
+    def test_rebuild_is_noop_when_inflow_already_present(self):
+        """A receiver already carrying a symbolic inflow equation is left untouched."""
+        world, source, receiver = self._coupled_world()
+        original_inflow = receiver.fill_connection.inflow_equation
+        assert original_inflow is not None
+
+        receiver.ensure_inflow_coupling(world)
+
+        assert receiver.fill_connection.inflow_equation is original_inflow
 
 
 class TestNonCupLiquidSource:

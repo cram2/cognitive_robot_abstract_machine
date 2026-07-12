@@ -57,6 +57,7 @@ from semantic_digital_twin.spatial_types import (
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     LiquidConnection,
+    LiquidTransferCoupling,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -72,6 +73,7 @@ from semantic_digital_twin.world_description.world_entity import (
     Region,
     KinematicStructureEntity,
     Connection,
+    WorldEntityWithID,
 )
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
@@ -1092,6 +1094,20 @@ class HasFillLevel(HasRootBody, LiquidSource):
     inflow_equation: Optional[InflowEquation] = field(default=None)
     """Differential equation governing how this container fills from an external source."""
 
+    inflow_coupling: Optional[LiquidTransferCoupling] = field(default=None)
+    """Serializable description of the transfer coupling. Unlike :attr:`inflow_equation`, whose
+    symbolic expressions cannot cross a process boundary, this survives synchronization and lets
+    :meth:`ensure_inflow_coupling` rebuild the symbolic coupling in another world."""
+
+    @synchronized_attribute_modification
+    def set_inflow_coupling(self, coupling: Optional[LiquidTransferCoupling]) -> None:
+        """
+        Record the serializable inflow coupling descriptor and synchronize it to other worlds.
+
+        :param coupling: The coupling descriptor, or ``None`` to clear it.
+        """
+        self.inflow_coupling = coupling
+
     @synchronized_attribute_modification
     def set_fill_connection(self, connection: Optional[LiquidConnection]) -> None:
         """
@@ -1180,6 +1196,12 @@ class HasFillLevel(HasRootBody, LiquidSource):
         source so it only drains while it is actually pouring into this container: no liquid is
         spilled and the transfer is volume conserving.
 
+        The symbolic gate and inflow cannot be serialized, so a parametric
+        :class:`~semantic_digital_twin.world_description.connections.LiquidTransferCoupling` is
+        recorded on the fill connection whenever the source is a world entity. That descriptor
+        survives synchronization to another world, where :meth:`ensure_inflow_coupling` rebuilds
+        the symbolic coupling locally.
+
         :param source: The liquid source whose outflow pours into this one.
         :param world: The world providing the forward kinematics for the geometric gate.
         :param exit_speed: Horizontal speed of the liquid leaving the source, in m/s.
@@ -1189,6 +1211,39 @@ class HasFillLevel(HasRootBody, LiquidSource):
         ..warning:: This mutates the source via :meth:`LiquidSource.couple_drain_to_gate`.
         """
         source.validate_can_pour()
+        if isinstance(source, WorldEntityWithID):
+            coupling = LiquidTransferCoupling(
+                source_id=source.id,
+                exit_speed=exit_speed,
+                height_gate_sharpness=height_gate_sharpness,
+                overlap_gate_sharpness=overlap_gate_sharpness,
+            )
+            with world.modify_world():
+                self.set_inflow_coupling(coupling)
+        self._establish_inflow_coupling(
+            source, world, exit_speed, height_gate_sharpness, overlap_gate_sharpness
+        )
+
+    def _establish_inflow_coupling(
+        self,
+        source: LiquidSource,
+        world: World,
+        exit_speed: float,
+        height_gate_sharpness: float,
+        overlap_gate_sharpness: float,
+    ) -> None:
+        """
+        Build the symbolic inflow equation and the source's gated outflow against ``world``.
+
+        The symbolic expressions are bound to ``world`` and are local to it, so the changes are not
+        published: they are reconstructed independently in every world that holds the coupling.
+
+        :param source: The liquid source whose outflow pours into this one.
+        :param world: The world providing the forward kinematics for the geometric gate.
+        :param exit_speed: Horizontal speed of the liquid leaving the source, in m/s.
+        :param height_gate_sharpness: Logistic steepness of the source-above-receiver gate.
+        :param overlap_gate_sharpness: Logistic steepness of the projectile-landing gate.
+        """
         source_volume_rate = source.outflow_volume_rate(world)
         landing_point = self.projectile_landing_point(source, world, exit_speed)
         gate = self._geometric_transfer_gate(
@@ -1202,9 +1257,50 @@ class HasFillLevel(HasRootBody, LiquidSource):
             source_tilt_expression=source.pour_tilt_expression,
             exit_speed=exit_speed,
         )
-        with world.modify_world():
+        with world.modify_world(publish_changes=False):
             self.add_inflow_equation(inflow_equation)
             source.couple_drain_to_gate(gate, world)
+
+    def ensure_inflow_coupling(self, world: World) -> None:
+        """
+        Rebuild the symbolic inflow coupling from the stored descriptor if it is missing.
+
+        A world synchronized from another process carries the coupling descriptor but not the
+        symbolic inflow equation, which cannot be serialized. This reconstructs the symbolic
+        coupling against ``world`` so a transfer task can read it. It is a no-op when the symbolic
+        inflow equation is already present or no coupling descriptor was recorded.
+
+        :param world: The world the coupling must be rebuilt against.
+        """
+        coupling = self.inflow_coupling
+        if coupling is None or self.fill_connection.inflow_equation is not None:
+            return
+        source = world.get_semantic_annotation_by_id(coupling.source_id)
+        self._reattach_fill_connection(world)
+        source._reattach_fill_connection(world)
+        self._establish_inflow_coupling(
+            source,
+            world,
+            coupling.exit_speed,
+            coupling.height_gate_sharpness,
+            coupling.overlap_gate_sharpness,
+        )
+
+    def _reattach_fill_connection(self, world: World) -> None:
+        """
+        Point :attr:`fill_connection` at the connection resident in ``world``.
+
+        Synchronizing an annotation to another world deserializes its fill connection by value, so
+        the reference is a detached copy with no world. Re-resolving it against ``world`` restores a
+        connection whose forward kinematics and physics equations can be evaluated.
+
+        :param world: The world whose resident fill connection this annotation must track.
+        """
+        if self.fill_connection._world is world:
+            return
+        self.fill_connection = world.get_connection(
+            self.fill_connection.parent, self.fill_connection.child
+        )
 
     def outflow_volume_rate(self, world: World) -> sm.Scalar:
         """

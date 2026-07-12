@@ -11529,44 +11529,6 @@ class KeepProjectileInReceiverDAO(
     }
 
 
-class KeepSourceAboveReceiverDAO(
-    TaskDAO,
-    DataAccessObject[giskardpy.motion_statechart.tasks.pouring.KeepSourceAboveReceiver],
-):
-    __tablename__ = "KeepSourceAboveReceiverDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(TaskDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    minimum_clearance: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    maximum_velocity: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-    source_id: Mapped[int] = mapped_column(
-        ForeignKey("HasFillLevelDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    receiver_id: Mapped[int] = mapped_column(
-        ForeignKey("HasFillLevelDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    source: Mapped[HasFillLevelDAO] = relationship(
-        "HasFillLevelDAO", uselist=False, foreign_keys=[source_id], post_update=True
-    )
-    receiver: Mapped[HasFillLevelDAO] = relationship(
-        "HasFillLevelDAO", uselist=False, foreign_keys=[receiver_id], post_update=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "KeepSourceAboveReceiverDAO",
-        "inherit_condition": database_id == TaskDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
 class TerminalFillConstraintTaskDAO(
     TaskDAO,
     DataAccessObject[
@@ -20985,6 +20947,31 @@ class JointDynamicsDAO(
     damping: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
 
+class LiquidTransferCouplingDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.connections.LiquidTransferCoupling
+    ],
+):
+    __tablename__ = "LiquidTransferCouplingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    exit_speed: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    height_gate_sharpness: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    overlap_gate_sharpness: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+
+
 class AccelerationVariableDAO(
     Base,
     DataAccessObject[
@@ -29095,6 +29082,11 @@ class HasFillLevelDAO(
         nullable=True,
         use_existing_column=True,
     )
+    inflow_coupling_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("LiquidTransferCouplingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
 
     fill_connection: Mapped[LiquidConnectionDAO] = relationship(
         "LiquidConnectionDAO",
@@ -29112,6 +29104,12 @@ class HasFillLevelDAO(
         "InflowEquationDAO",
         uselist=False,
         foreign_keys=[inflow_equation_id],
+        post_update=True,
+    )
+    inflow_coupling: Mapped[LiquidTransferCouplingDAO] = relationship(
+        "LiquidTransferCouplingDAO",
+        uselist=False,
+        foreign_keys=[inflow_coupling_id],
         post_update=True,
     )
 

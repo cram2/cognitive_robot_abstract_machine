@@ -13,7 +13,6 @@ from giskardpy.motion_statechart.data_types import (
 )
 from giskardpy.motion_statechart.exceptions import NodeInitializationError
 from giskardpy.motion_statechart.graph_node import NodeArtifacts, Task
-from giskardpy.qp.constraint import LargeNumber
 from semantic_digital_twin.physics.equations.pouring_equations import (
     PouringEquation,
     SymbolicFillContext,
@@ -195,6 +194,7 @@ class FillByTransferTask(TerminalFillConstraintTask):
         :raises NodeInitializationError: if the receiver has no inflow equation, meaning
             ``receive_outflow_from`` was not called to couple it to a source.
         """
+        self.receiver.ensure_inflow_coupling(context.world)
         fill_connection = context.world.get_connection(
             self.receiver.fill_connection.parent, self.receiver.fill_connection.child
         )
@@ -245,6 +245,7 @@ class KeepProjectileInReceiver(Task):
         :return: The generated task artifacts.
         """
         artifacts = NodeArtifacts()
+        self.receiver.ensure_inflow_coupling(context.world)
         inflow_equation = self.receiver.fill_connection.inflow_equation
         if inflow_equation is None:
             raise NodeInitializationError(
@@ -266,63 +267,4 @@ class KeepProjectileInReceiver(Task):
         artifacts.observation = (
             receiver_opening.euclidean_distance(landing_point) < self.threshold
         )
-        return artifacts
-
-
-@dataclass(eq=False, repr=False)
-class KeepSourceAboveReceiver(Task):
-    """
-    Keeps the pouring source cup above the receiving cup by at least a minimum clearance.
-
-    Complements :class:`KeepProjectileInReceiver`, which only aims the pour horizontally, by
-    preventing the optimizer from lowering the source into or below the receiver while it pours.
-    """
-
-    source: HasFillLevel
-    """The container being poured from."""
-
-    receiver: HasFillLevel
-    """The container being poured into."""
-
-    minimum_clearance: float = field(default=0.05, kw_only=True)
-    """Minimum height of the source above the receiver, in metres."""
-
-    maximum_velocity: float = field(default=0.2, kw_only=True)
-    """Reference velocity for normalization in m/s."""
-
-    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
-    """QP constraint weight for the clearance constraint."""
-
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
-        """
-        Creates the inequality constraint that keeps the source above the receiver.
-
-        :param context: The build context.
-        :return: The generated task artifacts.
-        """
-        artifacts = NodeArtifacts()
-        source_height = (
-            context.world.compose_forward_kinematics_expression(
-                context.world.root, self.source.root
-            )
-            .to_position()
-            .z
-        )
-        receiver_height = (
-            context.world.compose_forward_kinematics_expression(
-                context.world.root, self.receiver.root
-            )
-            .to_position()
-            .z
-        )
-        clearance = source_height - receiver_height
-        artifacts.constraints.add_inequality_constraint(
-            name=f"{self.source.root.name}_above_{self.receiver.root.name}",
-            reference_velocity=self.maximum_velocity,
-            lower_error=self.minimum_clearance - clearance,
-            upper_error=LargeNumber - clearance,
-            quadratic_weight=self.weight,
-            task_expression=clearance,
-        )
-        artifacts.observation = self.minimum_clearance < clearance
         return artifacts
