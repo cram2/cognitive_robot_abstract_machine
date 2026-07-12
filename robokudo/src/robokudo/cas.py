@@ -90,12 +90,12 @@ class CASViews(StrEnum):
     CAMERA_FRAME = "camera_frame"
     """Name of the camera frame."""
 
-    VIEWPOINT_CAMERA_TO_WORLD = "viewpoint_camera_to_world"
+    VIEWPOINT_CAMERA_TO_WORLD = "viewpoint_cam_to_world"
     """Deprecated: Use CAM_TO_WORLD_TRANSFORM instead.
     Camera to world transform.
     Type: robokudo.types.tf.StampedTransform"""
 
-    CAMERA_TO_WORLD_TRANSFORM = "camera_to_world_transform"
+    CAMERA_TO_WORLD_TRANSFORM = "cam_to_world_transform"
     """Camera to world. 
     Type: semantic_digital_twin.spatial_types.spatial_types.HomogeneousTransformationMatrix"""
 
