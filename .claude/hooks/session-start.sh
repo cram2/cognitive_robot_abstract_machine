@@ -9,27 +9,30 @@ set -euo pipefail
 # in, and collision-free for multiple contributors sharing one origin remote
 # (each points at their own branch name instead of one hardcoded literal).
 #
-# Opt in once, locally, per clone (never committed):
+# Works out of the box, zero config: it looks for a branch named
+# `claude/personal-notes` on `origin` and, if found, reads
+# `.claude/personal/cram-notes.md` off it into CLAUDE.local.md.
+# ./create-personal-notes-branch.sh creates that branch (with an empty notes
+# file) for anyone who doesn't have it yet.
+#
+# Override the branch/path per clone, locally (never committed):
 #   git config claude.personalNotesBranch <your-branch-name>
 #   git config claude.personalNotesPath   <path-on-that-branch>   # optional
 #
 # git config is per-clone, so it's the wrong mechanism anywhere sessions start
 # from a fresh clone every time (e.g. cloud/web sessions) - there's no
-# persistent .git/config for it to live in. For that case, opt in via
+# persistent .git/config for it to live in. For that case, override via
 # persistent environment variables instead (configured once at the environment
 # level, outside the repo, so they survive every fresh clone):
 #   CLAUDE_PERSONAL_NOTES_BRANCH=<your-branch-name>
 #   CLAUDE_PERSONAL_NOTES_PATH=<path-on-that-branch>   # optional
 # See ./README.md for exactly how to wire these into a cloud environment.
-# git config wins when both are set, so a local override always takes
-# precedence over an environment-level default.
-#
-# With neither set, this exits immediately: no fetch, no write, no effect for
-# anyone who hasn't configured it.
+# Precedence: git config > environment variable > the `claude/personal-notes`
+# default, so a local or environment-level override always wins over it.
 #
 # Safe to re-run: it only ever overwrites CLAUDE.local.md, and does nothing if
-# the configured branch or path isn't reachable (e.g. a fresh clone, or a fork
-# that never created it).
+# the configured (or default) branch or path isn't reachable (e.g. a fresh
+# clone, or a fork that never created it).
 #
 # How this script gets invoked (see ../settings.json): Claude Code registers it
 # as a SessionStart hook via `$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh`.
@@ -46,8 +49,7 @@ set -euo pipefail
 # this explanation lives here instead of there.
 
 NOTES_BRANCH="$(git config --get claude.personalNotesBranch || true)"
-NOTES_BRANCH="${NOTES_BRANCH:-${CLAUDE_PERSONAL_NOTES_BRANCH:-}}"
-[ -n "${NOTES_BRANCH}" ] || exit 0
+NOTES_BRANCH="${NOTES_BRANCH:-${CLAUDE_PERSONAL_NOTES_BRANCH:-claude/personal-notes}}"
 
 NOTES_PATH="$(git config --get claude.personalNotesPath || true)"
 NOTES_PATH="${NOTES_PATH:-${CLAUDE_PERSONAL_NOTES_PATH:-.claude/personal/cram-notes.md}}"

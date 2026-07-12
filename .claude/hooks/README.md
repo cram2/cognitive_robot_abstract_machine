@@ -6,9 +6,11 @@ yourself on `origin`, so your own workflow preferences ("always open my PRs as d
 touch branch X directly," etc.) persist across sessions without ever being committed to a shared
 branch.
 
-It is a complete no-op until you opt in, and collision-free for multiple contributors sharing one
-`origin` remote, because each contributor points at their own branch name via their own config
-rather than one hardcoded literal.
+It works out of the box with no config at all: it reads from a branch named `claude/personal-notes`
+on `origin` unless you tell it otherwise. Run [`create-personal-notes-branch.sh`](./create-personal-notes-branch.sh)
+once to create that branch with an empty notes file, and every session from then on picks it up
+automatically. It is collision-free for multiple contributors sharing one `origin` remote if you
+each override the branch name via your own config instead of relying on the shared default.
 
 ## How it decides what to read
 
@@ -16,23 +18,53 @@ rather than one hardcoded literal.
 
 1. **`git config claude.personalNotesBranch`** — local to one clone's `.git/config`.
 2. **`CLAUDE_PERSONAL_NOTES_BRANCH` environment variable** — used only if the git config isn't set.
+3. **`claude/personal-notes`** — the zero-config default, used if neither of the above is set.
 
 The path on that branch follows the same precedence (`claude.personalNotesPath` git config, then
 `CLAUDE_PERSONAL_NOTES_PATH` env var, then the default `.claude/personal/cram-notes.md`).
 
-If neither the git config nor the environment variable is set, the hook exits immediately: no
-fetch, no write, no effect.
+The hook is still a no-op in effect for anyone who never creates the branch it resolves to: `git
+fetch` finds nothing, so it exits without writing `CLAUDE.local.md`.
 
-Which one you need depends on how your sessions start:
+Whether you need to override the default branch name depends on how your sessions start:
 
-- **A persistent local clone** (you `git clone` once and keep working in it) → use git config. It's
-  set once and stays in that clone's `.git/config` forever.
+- **A persistent local clone** (you `git clone` once and keep working in it) → the default just
+  works once you've run the setup script below. Only set git config if you want a different
+  branch/path than the shared default (e.g. to keep your notes separate from other contributors').
 - **A fresh clone every session** (e.g. a cloud/web session environment that clones the repo from
-  scratch each time) → git config **will not work**: `.git/config` is part of the fresh clone, so
-  whatever you set there is gone by the next session. Use the environment variable instead,
-  configured once at the environment level (outside the repo), so it survives every fresh clone.
+  scratch each time) → the default still just works, since it needs no `.git/config` entry to
+  survive. Only set the environment variable if you want to override it — see Option A below.
 
-## Setup: persistent local clone
+## Setup: quick start (works for both persistent and fresh-clone sessions)
+
+Once, from any clone with push access to `origin`:
+
+```bash
+"$CLAUDE_PROJECT_DIR/.claude/hooks/create-personal-notes-branch.sh"
+```
+
+This creates `claude/personal-notes` on `origin` with a single empty
+`.claude/personal/cram-notes.md`, without touching your current branch or working tree. Then edit
+that file (see below) to add your own notes. Every new Claude Code session — local or fresh-clone —
+now runs the hook automatically and writes `CLAUDE.local.md` from that branch, with no further
+configuration needed.
+
+To edit your notes after the branch exists:
+
+```bash
+git fetch origin claude/personal-notes
+git worktree add /tmp/personal-notes origin/claude/personal-notes
+$EDITOR /tmp/personal-notes/.claude/personal/cram-notes.md
+git -C /tmp/personal-notes commit -am "update personal notes"
+git -C /tmp/personal-notes push origin HEAD:claude/personal-notes
+git worktree remove /tmp/personal-notes
+```
+
+## Setup: overriding the default branch/path
+
+Skip this section if the zero-config default above is all you need.
+
+### Persistent local clone
 
 Once per clone, never committed:
 
@@ -43,22 +75,14 @@ git config claude.personalNotesPath   <path-on-that-branch>   # optional, defaul
 ```
 
 Push your notes file to that branch on `origin` (any branch name, any path — it never merges
-anywhere):
+anywhere), e.g. by running the branch-creation script with overrides:
 
 ```bash
-git checkout --orphan <your-branch-name>
-git rm -rf --cached .
-mkdir -p .claude/personal
-echo "- your notes here" > .claude/personal/cram-notes.md
-git add .claude/personal/cram-notes.md
-git commit -m "personal notes"
-git push origin <your-branch-name>
+CLAUDE_PERSONAL_NOTES_BRANCH=<your-branch-name> CLAUDE_PERSONAL_NOTES_PATH=<path-on-that-branch> \
+  "$CLAUDE_PROJECT_DIR/.claude/hooks/create-personal-notes-branch.sh"
 ```
 
-Every new Claude Code session in this clone now runs the hook automatically and writes
-`CLAUDE.local.md` from that branch.
-
-## Setup: cloud/web sessions (fresh clone every time)
+### Cloud/web sessions (fresh clone every time)
 
 Push your notes file to `origin` exactly as above first. Then wire the environment variable into
 your session environment's configuration — which of the two options below applies depends on what
@@ -107,14 +131,18 @@ directly:
 
 ## Safety
 
-- No-op by default: nothing happens for anyone who hasn't configured either the git config or the
-  environment variable.
-- Never merges anything: the hook only ever *reads* the configured branch via `git show`. It never
+- No-op in effect for anyone who never creates the `claude/personal-notes` branch (or an override
+  target): `git fetch` finds nothing, so nothing gets written.
+- Never merges anything: the hook only ever *reads* the resolved branch via `git show`. It never
   checks it out or merges it into your working branch.
+- `create-personal-notes-branch.sh` never touches your current branch or working tree either — it
+  does its work in a scratch worktree and refuses to run if the target branch already exists
+  locally or on `origin`.
 - `CLAUDE.local.md` is gitignored, so populated notes can't accidentally end up in a commit on any
   branch, including this one.
-- Safe to re-run: it only ever overwrites `CLAUDE.local.md`, and does nothing if the configured
-  branch or path isn't reachable (e.g. a fresh clone, or a fork that never created it).
+- Safe to re-run: `session-start.sh` only ever overwrites `CLAUDE.local.md`, and does nothing if
+  the resolved branch or path isn't reachable (e.g. a fresh clone, or a fork that never created
+  it).
 - Coexists with your own hooks: Claude Code merges `SessionStart` hook arrays across all settings
   layers by concatenation, not override, so this hook runs alongside — never instead of — any
   `SessionStart` hook you already have configured for yourself.
