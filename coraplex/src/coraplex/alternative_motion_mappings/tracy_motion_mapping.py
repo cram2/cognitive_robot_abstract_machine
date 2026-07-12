@@ -37,7 +37,7 @@ class TracyJointMotionMapping(MoveJointsMotion, AlternativeMotion[Tracy]):
         return joint_goal
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TracyGripperMotion(MoveGripperMotion, AlternativeMotion[Tracy]):
     """
     Uses RobotiqGripperActionServerTask to move Tracy's gripper.
