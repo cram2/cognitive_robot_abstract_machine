@@ -14,7 +14,7 @@ from semantic_digital_twin.physics.equations.differential_equation import (
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 
-DEFAULT_POUR_EXIT_SPEED: float = 0.2
+DEFAULT_POUR_EXIT_SPEED: float = 0.05
 """Default horizontal speed of liquid leaving a fully tilted cup, in metres per second."""
 
 STANDARD_GRAVITY: float = 9.81

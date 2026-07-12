@@ -53,6 +53,12 @@ _JEROEN_CUP_SCALE = Scale(1, 1, 1)
 _TABLE_SURFACE_Z = 0.9
 IS_SIM = False
 
+# START_FILL = 0.8
+# GOAL_FILL_CONST = 0.7
+# START_YAW = 0.8
+START_FILL = 1.0
+GOAL_FILL_CONST = 0.7
+START_YAW = 0.1
 
 def _spawn_jeroen_cup_body(name: str) -> Body:
     """Create a Body with the Jeroen cup mesh geometry."""
@@ -118,26 +124,26 @@ park_state = JointState.from_mapping(
         )
     }
 )
-msc_park = MotionStatechart()
-park_task = JointPositionList(goal_state=park_state)
-msc_park.add_node(park_task)
-msc_park.add_node(EndMotion.when_true(park_task))
-giskard.execute(msc_park)
+# msc_park = MotionStatechart()
+# park_task = JointPositionList(goal_state=park_state)
+# msc_park.add_node(park_task)
+# msc_park.add_node(EndMotion.when_true(park_task))
+# giskard.execute(msc_park)
 
 # ------ Move the left gripper to the upright carry pose ----
 left_tool_frame = world.get_body_by_name("l_gripper_tool_frame")
 
 root_T_upright_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
     pos_x=1,
-    pos_y=0.2,
-    pos_z=_TABLE_SURFACE_Z + 0.3,
+    pos_y=0.3,
+    pos_z=_TABLE_SURFACE_Z + 0.15,
     quat_z=0.5,
     quat_x=0.5,
     quat_y=0.5,
     quat_w=0.5,
     reference_frame=world.root,
 )
-upright_pose_T_rotated = HomogeneousTransformationMatrix.from_xyz_rpy(yaw=0.1)
+upright_pose_T_rotated = HomogeneousTransformationMatrix.from_xyz_rpy(yaw=START_YAW)
 upright_pose = (root_T_upright_pose @ upright_pose_T_rotated).to_pose()
 
 msc_cartesian = MotionStatechart()
@@ -170,7 +176,7 @@ if cups_already_present:
         )
     with world.modify_world():
         world.set_positions_1DOF_connection(
-            {source_cup.fill_connection: 1.0, receiving_cup.fill_connection: 0.0}
+            {source_cup.fill_connection: START_FILL, receiving_cup.fill_connection: 0.0}
         )
     # Give the reset fill state time to propagate to the Giskard process before the transfer goal.
     time.sleep(0.5)
@@ -199,7 +205,7 @@ else:
     with world.modify_world():
         world.add_semantic_annotation(source_cup)
     source_cup.initialize_fill_level(
-        world=world, initial_fill=1.0, outflow_rate_constant=1.0
+        world=world, initial_fill=START_FILL, outflow_rate_constant=0.8
     )
 
     # ----- Place the receiving cup on the table -----
@@ -229,11 +235,13 @@ else:
     # ----- Couple the receiver's inflow to the source's gated outflow -----
     receiving_cup.receive_outflow_from(source=source_cup, world=world)
 
-assert source_cup.fill_level == 1.0
+time.sleep(0.2)
+
+assert source_cup.fill_level == START_FILL
 assert receiving_cup.fill_level == 0.0
 
 # ----- Transfer -----
-goal_fill = 0.7
+goal_fill = GOAL_FILL_CONST
 tolerance = 0.05
 
 transfer_task = FillByTransferTask(
@@ -246,7 +254,7 @@ transfer_task = FillByTransferTask(
 # upstream as the source tilts and the arc reaches forward.
 no_spill = KeepProjectileInReceiver(receiver=receiving_cup, source=source_cup)
 # Keep the source cup above the receiver so the optimizer never lowers it into the receiver.
-minimum_clearance = 0.22
+minimum_clearance = 0.2
 keep_above = HeightGoal(
     root_link=world.root,
     tip_link=source_cup.root,
@@ -288,3 +296,16 @@ while time.time() < settle_deadline:
 
 print(f"receiving cup fill level: {receiving_cup.fill_level}")
 print(f"source cup fill level: {source_cup.fill_level}")
+
+
+msc_cartesian = MotionStatechart()
+cartesian_task = CartesianPose(
+    root_link=world.root,
+    tip_link=left_tool_frame,
+    goal_pose=upright_pose,
+)
+msc_cartesian.add_node(cartesian_task)
+msc_cartesian.add_node(min_reached := LocalMinimumReached())
+msc_cartesian.add_node(EndMotion.when_true(min_reached))
+
+giskard.execute(msc_cartesian)
