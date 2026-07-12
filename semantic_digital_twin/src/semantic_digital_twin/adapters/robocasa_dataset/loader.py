@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from typing_extensions import TYPE_CHECKING, Any, Dict, Optional
+from typing_extensions import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Tuple
 
 if TYPE_CHECKING:
     import numpy
@@ -46,7 +46,6 @@ try:
     import yaml
     from robocasa.models.scenes.kitchen_arena import KitchenArena
     from robocasa.models.scenes import scene_builder, scene_registry
-    from robocasa.models.scenes.scene_builder import FIXTURES
     from robosuite.models.tasks import ManipulationTask
 except ImportError:
     logger.warning(
@@ -55,6 +54,22 @@ except ImportError:
         "('pip install -e .' from a clone of https://github.com/robocasa/robocasa), then run "
         "'python -m robocasa.scripts.download_kitchen_assets' to fetch the fixture/object assets."
     )
+
+
+class RoboCasaApplianceNotFoundError(LookupError):
+    """
+    Raised when no configured RoboCasa fixture matching a requested appliance category can be found
+    in any kitchen layout.
+    """
+
+    def __init__(self, category: RoboCasaKitchenApplianceCategory):
+        self.category = category
+        """
+        The appliance category that could not be found in any layout.
+        """
+        super().__init__(
+            f"No RoboCasa fixture for appliance category '{category}' was found in any kitchen layout."
+        )
 
 
 def _mjcf_document_from_element_copy(element: ET.Element) -> str:
@@ -128,6 +143,14 @@ class RoboCasaDatasetLoader:
     Resolver mapping RoboCasa object category names to SemanticAnnotation subclasses.
     """
 
+    self_contained_object_groups: ClassVar[Tuple[str, ...]] = ("objaverse", "lightwheel")
+    """
+    RoboCasa object asset groups (subdirectories of ``objects``) whose ``model.xml`` files reference
+    their textures and meshes by relative paths and can therefore be parsed on any machine. The
+    ``aigen_objs`` group is deliberately excluded: in the published assets its models reference
+    textures by absolute paths from the dataset author's machine, so they fail to load elsewhere.
+    """
+
     def load_kitchen(
         self,
         layout_id: LayoutType,
@@ -167,28 +190,81 @@ class RoboCasaDatasetLoader:
         return world
 
     def load_kitchen_appliance(
-        self, category: RoboCasaKitchenApplianceCategory, **kitchen_appliance_kwargs
+        self,
+        category: RoboCasaKitchenApplianceCategory,
+        style_id: Optional[StyleType] = None,
     ) -> World:
         """
         Load a single RoboCasa kitchen appliance (for example a cabinet or a microwave) as a
         standalone world.
 
-        :param category: The appliance category, a key of
-            ``robocasa.models.scenes.scene_builder.FIXTURES``.
-        :param kitchen_appliance_kwargs: Extra keyword arguments forwarded to the appliance's
-            (RoboCasa ``Fixture`` subclass) constructor.
-        :return: The loaded world, with a SemanticAnnotation attached to the appliance's root body.
-        """
-        kitchen_appliance_class = FIXTURES[category]
-        kitchen_appliance = kitchen_appliance_class(
-            name=category, **kitchen_appliance_kwargs
-        )
+        The appliance is taken from a composed kitchen so that it carries the size, model, and
+        texture configuration RoboCasa authored for it: the first fixture whose category matches
+        ``category`` across the available kitchen layouts is used. RoboCasa realises a single
+        semantic category with several concrete fixture variants (for example a cabinet as a hinged,
+        single, open, panel, or housing cabinet); any of them satisfies the request.
 
-        world = MJCFParser.from_xml_string(
-            _mjcf_document_from_element_copy(kitchen_appliance._obj)
-        ).parse()
-        self._apply_kitchen_appliance_semantics(world, {category: kitchen_appliance})
+        :param category: The appliance category to load.
+        :param style_id: The visual style to compose the source kitchen with. Defaults to RoboCasa's
+            first style.
+        :return: The loaded world, with a SemanticAnnotation attached to the appliance's root body.
+        :raises RoboCasaApplianceNotFoundError: if no layout contains a fixture of ``category``.
+        """
+        appliance = self._find_configured_appliance(category, style_id)
+        world = MJCFParser.from_xml_string(appliance.get_xml()).parse()
+        self._apply_kitchen_appliance_semantics(world, {appliance.name: appliance})
         return world
+
+    def _find_configured_appliance(
+        self,
+        category: RoboCasaKitchenApplianceCategory,
+        style_id: Optional[StyleType],
+    ) -> Any:
+        """
+        Search the RoboCasa kitchen layouts for the first fully configured fixture whose category
+        matches ``category``. Composing a kitchen is what gives each fixture the size, model, and
+        texture configuration that standalone fixture construction lacks.
+
+        :param category: The appliance category to search for.
+        :param style_id: The visual style to compose candidate kitchens with, or None for the
+            default.
+        :return: The matching RoboCasa fixture instance.
+        :raises RoboCasaApplianceNotFoundError: if no layout contains a matching fixture.
+        """
+        target_annotation_class = self.kitchen_appliance_annotator.category_to_annotation_class[
+            category
+        ]
+        style = style_id if style_id is not None else next(iter(scene_registry.StyleType))
+        with open(scene_registry.get_style_path(style)) as style_file:
+            style_config = yaml.safe_load(style_file)
+
+        for layout in self._kitchen_layouts():
+            with open(scene_registry.get_layout_path(layout)) as layout_file:
+                layout_config = yaml.safe_load(layout_file)
+            for appliance in scene_builder.create_fixtures(
+                layout_config, style_config
+            ).values():
+                appliance_category = _category_from_class_name(type(appliance).__name__)
+                if (
+                    self.kitchen_appliance_annotator.resolve(appliance_category)
+                    is target_annotation_class
+                ):
+                    return appliance
+        raise RoboCasaApplianceNotFoundError(category)
+
+    @staticmethod
+    def _kitchen_layouts() -> List[LayoutType]:
+        """
+        Return the concrete RoboCasa kitchen layouts, excluding the aggregate selectors (such as
+        ``ALL`` or ``TRAIN``) that do not denote a single kitchen.
+
+        :return: The concrete layouts, in registry order.
+        """
+        return [
+            layout
+            for layout in scene_registry.LayoutType
+            if layout.name.startswith("LAYOUT")
+        ]
 
     def load_object(
         self, category: RoboCasaObjectCategory, instance_index: int = 0
@@ -197,22 +273,29 @@ class RoboCasaDatasetLoader:
         Load a single RoboCasa object as a standalone world.
 
         :param category: The object category, a key of
-            ``robocasa.models.objects.kitchen_objects.OBJ_CATEGORIES``.
+            ``robocasa.models.objects.kitchen_objects.OBJ_CATEGORIES``. RoboCasa groups its object
+            assets by source (for example ``objaverse``); only the self-contained groups listed in
+            :attr:`self_contained_object_groups` are searched.
         :param instance_index: Which of the category's downloaded asset instances to load.
         :return: The loaded world, with a SemanticAnnotation attached to the object's root body.
         """
-        model_files = sorted((self.directory / "objects" / category).glob("**/model.xml"))
+        objects_directory = self.directory / "objects"
+        model_files = sorted(
+            model_file
+            for group in self.self_contained_object_groups
+            for model_file in (objects_directory / group).glob(f"{category}/**/model.xml")
+        )
         if not model_files:
             raise FileNotFoundError(
-                f"No downloaded assets found for object category '{category}' in "
-                f"{self.directory / 'objects' / category}. "
+                f"No downloaded assets found for object category '{category}' in groups "
+                f"{list(self.self_contained_object_groups)} under {objects_directory}. "
                 "Run 'python -m robocasa.scripts.download_kitchen_assets' first."
             )
         if instance_index >= len(model_files):
             raise IndexError(
                 f"Requested instance_index {instance_index} for object category '{category}', "
                 f"but only {len(model_files)} downloaded instance(s) were found in "
-                f"{self.directory / 'objects' / category}."
+                f"groups {list(self.self_contained_object_groups)} under {objects_directory}."
             )
 
         world = MJCFParser(str(model_files[instance_index])).parse()

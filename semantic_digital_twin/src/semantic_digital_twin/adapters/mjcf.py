@@ -477,9 +477,9 @@ class MJCFParser:
                 )
             else:
                 lower_limits = DerivativeMap()
-                lower_limits.position = mujoco_joint.range[0]
+                lower_limits.position = float(mujoco_joint.range[0])
                 upper_limits = DerivativeMap()
-                upper_limits.position = mujoco_joint.range[1]
+                upper_limits.position = float(mujoco_joint.range[1])
                 dof = DegreeOfFreedom(
                     name=PrefixedName(dof_name),
                     limits=DegreeOfFreedomLimits(
