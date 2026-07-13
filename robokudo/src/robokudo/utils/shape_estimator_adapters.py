@@ -81,6 +81,94 @@ ShapeFitParameters = Union[
 ]
 
 
+@dataclass(frozen=True)
+class ShapeFitSummary(ABC):
+    """Shared compact metrics for one fitted shape candidate."""
+
+    score: float
+    """Fit quality score."""
+
+    inlier_ratio: float
+    """Ratio of input points explained by the fitted shape."""
+
+    root_mean_square_error: float
+    """Root mean square distance error of inlier points."""
+
+    @property
+    @abstractmethod
+    def shape_name(self) -> str:
+        """Name of the fitted shape."""
+
+    @abstractmethod
+    def shape_specific_fields(self) -> tuple[tuple[str, object, str | None], ...]:
+        """Return fields that only apply to this fitted shape."""
+
+    def __str__(self) -> str:
+        """Return the compact log representation."""
+        common_fields = (
+            ("score", self.score, ".3f"),
+            ("inlier_ratio", self.inlier_ratio, ".3f"),
+            ("rmse", self.root_mean_square_error, ".4f"),
+        )
+        fields = common_fields + self.shape_specific_fields()
+        formatted_fields = [
+            f"{name}={_format_summary_value(value, format_spec)}"
+            for name, value, format_spec in fields
+        ]
+        return f"{self.shape_name}({', '.join(formatted_fields)})"
+
+
+@dataclass(frozen=True)
+class SphereFitSummary(ShapeFitSummary):
+    """Compact metrics for one fitted sphere candidate."""
+
+    radius: float
+    """Fitted sphere radius."""
+
+    @property
+    def shape_name(self) -> str:
+        return "Sphere"
+
+    def shape_specific_fields(self) -> tuple[tuple[str, object, str | None], ...]:
+        return (("radius", self.radius, ".3f"),)
+
+
+@dataclass(frozen=True)
+class CylinderFitSummary(ShapeFitSummary):
+    """Compact metrics for one fitted cylinder candidate."""
+
+    radius: float
+    """Fitted cylinder radius."""
+
+    height: float
+    """Fitted cylinder height."""
+
+    @property
+    def shape_name(self) -> str:
+        return "Cylinder"
+
+    def shape_specific_fields(self) -> tuple[tuple[str, object, str | None], ...]:
+        return (
+            ("radius", self.radius, ".3f"),
+            ("height", self.height, ".3f"),
+        )
+
+
+@dataclass(frozen=True)
+class CuboidFitSummary(ShapeFitSummary):
+    """Compact metrics for one fitted cuboid candidate."""
+
+    extents: list[float]
+    """Fitted cuboid side lengths."""
+
+    @property
+    def shape_name(self) -> str:
+        return "Cuboid"
+
+    def shape_specific_fields(self) -> tuple[tuple[str, object, str | None], ...]:
+        return (("extents", self.extents, None),)
+
+
 class ShapeFitAdapter(ABC):
     """Shape-specific behavior for one fitted primitive type."""
 
@@ -109,8 +197,8 @@ class ShapeFitAdapter(ABC):
         """Create a coordinate frame located at the fitted primitive center."""
 
     @abstractmethod
-    def summary(self, fit_result: FittedShape) -> str:
-        """Return a compact summary string for one fitted candidate."""
+    def summary(self, fit_result: FittedShape) -> ShapeFitSummary:
+        """Return compact metrics for one fitted candidate."""
 
 
 class SphereFitAdapter(ShapeFitAdapter):
@@ -181,14 +269,14 @@ class SphereFitAdapter(ShapeFitAdapter):
             frame_size=frame_size,
         )
 
-    def summary(self, fit_result: FittedShape) -> str:
-        """Return a compact summary string for one sphere fit."""
+    def summary(self, fit_result: FittedShape) -> SphereFitSummary:
+        """Return compact metrics for one sphere fit."""
         sphere_fit = _as_sphere_fit(fit_result)
-        return (
-            f"Sphere(score={sphere_fit.score:.3f}, "
-            f"inlier_ratio={sphere_fit.inlier_ratio:.3f}, "
-            f"rmse={sphere_fit.root_mean_square_error:.4f}, "
-            f"radius={sphere_fit.radius:.3f})"
+        return SphereFitSummary(
+            score=float(sphere_fit.score),
+            inlier_ratio=float(sphere_fit.inlier_ratio),
+            root_mean_square_error=float(sphere_fit.root_mean_square_error),
+            radius=float(sphere_fit.radius),
         )
 
 
@@ -272,15 +360,15 @@ class CylinderFitAdapter(ShapeFitAdapter):
             frame_size=frame_size,
         )
 
-    def summary(self, fit_result: FittedShape) -> str:
-        """Return a compact summary string for one cylinder fit."""
+    def summary(self, fit_result: FittedShape) -> CylinderFitSummary:
+        """Return compact metrics for one cylinder fit."""
         cylinder_fit = _as_cylinder_fit(fit_result)
-        return (
-            f"Cylinder(score={cylinder_fit.score:.3f}, "
-            f"inlier_ratio={cylinder_fit.inlier_ratio:.3f}, "
-            f"rmse={cylinder_fit.root_mean_square_error:.4f}, "
-            f"radius={cylinder_fit.radius:.3f}, "
-            f"height={cylinder_fit.height:.3f})"
+        return CylinderFitSummary(
+            score=float(cylinder_fit.score),
+            inlier_ratio=float(cylinder_fit.inlier_ratio),
+            root_mean_square_error=float(cylinder_fit.root_mean_square_error),
+            radius=float(cylinder_fit.radius),
+            height=float(cylinder_fit.height),
         )
 
 
@@ -351,14 +439,14 @@ class CuboidFitAdapter(ShapeFitAdapter):
             frame_size=frame_size,
         )
 
-    def summary(self, fit_result: FittedShape) -> str:
-        """Return a compact summary string for one cuboid fit."""
+    def summary(self, fit_result: FittedShape) -> CuboidFitSummary:
+        """Return compact metrics for one cuboid fit."""
         cuboid_fit = _as_cuboid_fit(fit_result)
-        return (
-            f"Cuboid(score={cuboid_fit.score:.3f}, "
-            f"inlier_ratio={cuboid_fit.inlier_ratio:.3f}, "
-            f"rmse={cuboid_fit.root_mean_square_error:.4f}, "
-            f"extents={np.round(cuboid_fit.extents, 3).tolist()})"
+        return CuboidFitSummary(
+            score=float(cuboid_fit.score),
+            inlier_ratio=float(cuboid_fit.inlier_ratio),
+            root_mean_square_error=float(cuboid_fit.root_mean_square_error),
+            extents=np.round(cuboid_fit.extents, 3).tolist(),
         )
 
 
@@ -404,6 +492,13 @@ def rotation_matrix_from_axis(axis_direction: np.ndarray) -> np.ndarray:
     rotation_matrix[:, 1] = y_axis
     rotation_matrix[:, 2] = normalized_axis
     return rotation_matrix
+
+
+def _format_summary_value(value: object, format_spec: str | None) -> str:
+    """Format one summary value for compact log output."""
+    if format_spec is None:
+        return str(value)
+    return f"{value:{format_spec}}"
 
 
 def _coordinate_frame(
