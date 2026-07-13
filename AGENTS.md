@@ -67,6 +67,7 @@
 - Keep docstrings short and concise
 - Use Sphinx directives (for example `..note::`, `..warning::`, and `:func:`) where appropriate
 - Do not create type information for docstrings (type hints already convey this)
+- Always run `docformatter` on modified files
 
 ## Domain-Specific Conventions
 - When dealing with spatial types and connections, adhere to the style guide documented in `semantic_digital_twin/doc/style_guide.md`
