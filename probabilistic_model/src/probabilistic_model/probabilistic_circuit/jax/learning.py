@@ -72,52 +72,6 @@ def calculate_edge_flows(
     return flows_per_sum_layer
 
 
-def _duplicate_child_columns(
-    log_weights: BCOO,
-    old_number_of_child_nodes: int,
-) -> BCOO:
-    """
-    Duplicate child node connections in a sparse weight matrix.
-    """
-
-    cloned_weights = copy_bcoo(log_weights)
-
-    duplicated_indices = cloned_weights.indices.copy()
-
-    duplicated_indices = duplicated_indices.at[:, 1].add(old_number_of_child_nodes)
-
-    new_indices = jnp.concatenate(
-        [
-            cloned_weights.indices,
-            duplicated_indices,
-        ],
-        axis=0,
-    )
-
-    new_data = jnp.concatenate(
-        [
-            cloned_weights.data,
-            cloned_weights.data,
-        ],
-        axis=0,
-    )
-
-    expanded_bcoo = BCOO(
-        (
-            new_data,
-            new_indices,
-        ),
-        shape=(
-            cloned_weights.shape[0],
-            cloned_weights.shape[1] * 2,
-        ),
-        indices_sorted=False,
-        unique_indices=True,
-    )
-
-    return expanded_bcoo.sort_indices()
-
-
 def _duplicate_parent_rows(
     log_weights: BCOO,
     key: jax.Array,
