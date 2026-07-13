@@ -33,6 +33,7 @@ from semantic_digital_twin.utils import IDGenerator
 if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import (
         KinematicStructureEntity,
+        Body,
     )
 
 if TYPE_CHECKING:

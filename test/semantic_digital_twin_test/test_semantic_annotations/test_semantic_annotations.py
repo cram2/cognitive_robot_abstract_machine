@@ -193,6 +193,33 @@ def test_semantic_annotation_hash(apartment_world_copy):
     assert semantic_annotation1 == semantic_annotation2
 
 
+def test_add_semantic_annotation_deduplicates_equal_instances():
+    """Adding a second annotation equal to one already present must not store it twice.
+
+    :meth:`World.add_semantic_annotation` skips an annotation that already exists, and
+    equality is defined by type and kinematic bodies. Two :class:`Handle` annotations built
+    separately over the same body are therefore equal, so the world must hold exactly one.
+
+    This is reproduced on a hand-built minimal world, independently of any inferred or
+    fixture world, proving the duplication is a world-level deduplication issue and not an
+    artifact of a specific test world setup.
+    """
+    world = World()
+    root = Body(name=PrefixedName("root"))
+    handle_body = Body(name=PrefixedName("handle_body"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(handle_body)
+        world.add_connection(FixedConnection(parent=root, child=handle_body))
+        first_handle = Handle(root=handle_body)
+        second_handle = Handle(root=handle_body)
+        world.add_semantic_annotation(first_handle)
+        world.add_semantic_annotation(second_handle)
+
+    assert first_handle == second_handle
+    assert len(world.get_semantic_annotations_by_type(Handle)) == 1
+
+
 def test_handle_semantic_annotation_eql(apartment_world_copy):
     body = variable(type_=Body, domain=apartment_world_copy.bodies)
     query = an(

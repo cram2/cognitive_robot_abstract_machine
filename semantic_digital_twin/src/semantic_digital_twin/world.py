@@ -840,7 +840,7 @@ class World(HasSimulatorProperties):
 
         """
         self._raise_error_if_belongs_to_other_world(semantic_annotation)
-        if self.is_semantic_annotation_in_world(semantic_annotation):
+        if self.contains_semantic_annotation(semantic_annotation):
             return
         self._add_semantic_annotation(semantic_annotation)
 
@@ -1368,6 +1368,19 @@ class World(HasSimulatorProperties):
             semantic_annotation._world == self
             and semantic_annotation in self.semantic_annotations
         )
+
+    def contains_semantic_annotation(
+        self, semantic_annotation: SemanticAnnotation
+    ) -> bool:
+        """
+        :return: Whether a semantic annotation equal to the given one is already stored.
+
+        Equality is defined by :meth:`SemanticAnnotation.__eq__` (annotation type and kinematic
+        bodies), so a freshly built annotation matches an already-stored one describing the same
+        bodies even though it is a different instance. This is the check the add paths need to
+        deduplicate, independently of whether the given annotation has been bound to a world yet.
+        """
+        return semantic_annotation in self.semantic_annotations
 
     def is_body_in_world(self, body: Body) -> bool:
         return self._is_world_entity_with_hash_in_world_from_iterable(hash(body))
@@ -2256,6 +2269,14 @@ class World(HasSimulatorProperties):
             applied.
         """
         self.state._apply_control_commands(commands, dt, derivative)
+        self.step_physics(dt=dt)
+
+    def step_physics(self, dt: float) -> None:
+        """
+        Step all HasUpdateState connections forward by dt.
+
+        :param dt: Time elapsed since the previous step, in seconds.
+        """
         for connection in self.connections:
             match connection:
                 case HasUpdateState():

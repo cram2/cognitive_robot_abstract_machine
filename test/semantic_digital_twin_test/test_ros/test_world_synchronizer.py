@@ -2698,5 +2698,92 @@ def test_combined_update_model_and_state_applied_atomically(rclpy_node):
     )
 
 
+def test_liquid_transfer_coupling_synchronizes_and_rebuilds(rclpy_node):
+    """
+    A cup-to-cup transfer coupling established in one world is reconstructable in a second,
+    synchronized world.
+
+    The coupling's symbolic inflow and gate expressions are bound to the world they were built in
+    and cannot be serialized, so only a parametric descriptor crosses the boundary. The receiving
+    world must rebuild the symbolic coupling locally from that descriptor - the exact situation a
+    Giskard process faces when a client couples cups and sends a transfer goal.
+    """
+    from ..test_semantic_annotations.test_liquid_transfer import _TiltingContainer
+    from semantic_digital_twin.spatial_types import (
+        HomogeneousTransformationMatrix,
+        Vector3,
+    )
+    from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+    from semantic_digital_twin.world_description.degree_of_freedom import (
+        DegreeOfFreedomLimits,
+    )
+    from semantic_digital_twin.world_description.geometry import Scale
+
+    client_world = World(name="client")
+    giskard_world = World(name="giskard")
+    sync_client = WorldSynchronizer(node=rclpy_node, _world=client_world)
+    sync_giskard = WorldSynchronizer(node=rclpy_node, _world=giskard_world)
+    time.sleep(0.2)
+
+    wide_limits = DegreeOfFreedomLimits(
+        lower=DerivativeMap(position=-2.0, velocity=-1.0),
+        upper=DerivativeMap(position=2.0, velocity=1.0),
+    )
+    with client_world.modify_world():
+        client_world.add_body(Body(name=PrefixedName("map")))
+    with client_world.modify_world():
+        receiver = _TiltingContainer.create_with_new_body_in_world(
+            name=PrefixedName("receiver"),
+            world=client_world,
+            active_axis=Vector3(1, 0, 0),
+            connection_limits=wide_limits,
+            scale=Scale(0.1, 0.1, 0.2),
+        )
+        source = _TiltingContainer.create_with_new_body_in_world(
+            name=PrefixedName("source"),
+            world=client_world,
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=0.3),
+            active_axis=Vector3(0, 1, 0),
+            connection_limits=wide_limits,
+            scale=Scale(0.1, 0.1, 0.2),
+        )
+    receiver.initialize_fill_level(world=client_world, initial_fill=0.0)
+    source.initialize_fill_level(world=client_world, initial_fill=1.0)
+    receiver.receive_outflow_from(source=source, world=client_world)
+
+    try:
+        assert wait_for_condition(
+            lambda: len(giskard_world.semantic_annotations)
+            == len(client_world.semantic_annotations)
+            and len(giskard_world.connections) == len(client_world.connections)
+        )
+        time.sleep(0.5)
+
+        receiver_giskard = giskard_world.get_semantic_annotation_by_id(receiver.id)
+
+        # The symbolic inflow equation is not serializable, so it did not cross the boundary.
+        synced_connection = giskard_world.get_connection(
+            receiver_giskard.fill_connection.parent,
+            receiver_giskard.fill_connection.child,
+        )
+        assert synced_connection.inflow_equation is None
+        # The parametric descriptor did cross and names the source.
+        assert receiver_giskard.inflow_coupling is not None
+        assert receiver_giskard.inflow_coupling.source_id == source.id
+
+        # The receiving world rebuilds the symbolic coupling against its own entities.
+        receiver_giskard.ensure_inflow_coupling(giskard_world)
+        rebuilt_inflow = synced_connection.inflow_equation
+        assert rebuilt_inflow is not None
+        source_giskard = giskard_world.get_semantic_annotation_by_id(source.id)
+        giskard_world.set_positions_1DOF_connection(
+            {source_giskard.root.parent_connection: 0.0}
+        )
+        assert rebuilt_inflow.gate.evaluate()[0] == pytest.approx(1.0, abs=1e-2)
+    finally:
+        sync_client.close()
+        sync_giskard.close()
+
+
 if __name__ == "__main__":
     unittest.main()

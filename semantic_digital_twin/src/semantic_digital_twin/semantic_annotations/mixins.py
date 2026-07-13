@@ -36,25 +36,16 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     leaf,
 )
 from random_events.product_algebra import Event
-from random_events.set import Set as RandomEventsSets
-from random_events.variable import Symbolic
-from random_events.product_algebra import Event
 from random_events.set import Set as EventSet
 from random_events.variable import Symbolic
-from typing_extensions import (
-    TYPE_CHECKING,
-    List,
-    Optional,
-    Self,
-    Set,
-    Type,
-)
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
     AmbiguousPart,
     CannotBeAPartOf,
+    MissingFillEquationError,
+    SourceAlreadyCoupledError,
     UnknownPartWholeRelationshipField,
 )
 from semantic_digital_twin.reasoning.predicates import is_supported_by
@@ -65,10 +56,13 @@ from semantic_digital_twin.spatial_types import (
 )
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
+    LiquidConnection,
+    LiquidTransferCoupling,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
@@ -79,10 +73,22 @@ from semantic_digital_twin.world_description.world_entity import (
     Region,
     KinematicStructureEntity,
     Connection,
+    WorldEntityWithID,
 )
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
 )
+from semantic_digital_twin.physics.equations.pouring_equations import (
+    ArticulatedPouringEquation,
+    DEFAULT_POUR_EXIT_SPEED,
+    GatedArticulatedPouringEquation,
+    GatedInflowEquation,
+    MINIMUM_DROP_HEIGHT,
+    PouringEquation,
+    InflowEquation,
+    STANDARD_GRAVITY,
+)
+import krrood.symbolic_math.symbolic_math as sm
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
@@ -1010,3 +1016,465 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
         container_event = outer_box.as_composite_set() - inner_box.as_composite_set()
 
         return container_event
+
+
+class LiquidSource(ABC):
+    """
+    A source of liquid that can pour into a container.
+
+    Decouples :meth:`HasFillLevel.receive_outflow_from` from any particular kind of source: a
+    tilting cup and a static faucet differ only in how they answer these questions.
+    """
+
+    @abstractmethod
+    def outflow_volume_rate(self, world: World) -> sm.Scalar:
+        """
+        Symbolic volume rate of liquid leaving the source, before gating.
+
+        :param world: The world providing the forward kinematics.
+        :return: Symbolic outflow volume rate, positive while pouring.
+        """
+
+    @abstractmethod
+    def liquid_exit_point(self, world: World) -> Point3:
+        """
+        World-frame point at which liquid departs the source.
+
+        :param world: The world providing the forward kinematics.
+        :return: Symbolic exit point in the world frame.
+        """
+
+    @abstractmethod
+    def liquid_exit_direction(self, world: World) -> Vector3:
+        """
+        World-frame direction the departing liquid initially travels in.
+
+        :param world: The world providing the forward kinematics.
+        :return: Symbolic exit direction in the world frame.
+        """
+
+    @property
+    @abstractmethod
+    def pour_tilt_expression(self) -> sm.Scalar:
+        """Symbolic tilt angle of the source while pouring; zero for a non-tilting source."""
+
+    @abstractmethod
+    def couple_drain_to_gate(self, gate: sm.Scalar, world: World) -> None:
+        """
+        Make the source drain only while ``gate`` is open, conserving the transferred volume.
+
+        :param gate: The shared transfer gate in ``[0, 1]``.
+        :param world: The world the source lives in.
+        """
+
+    @abstractmethod
+    def validate_can_pour(self) -> None:
+        """Raise if the source cannot currently pour, e.g. uninitialized or already coupled."""
+
+
+@dataclass(eq=False)
+class HasFillLevel(HasRootBody, LiquidSource):
+    """
+    Mixin that adds a virtual fill-level DOF to any semantic annotation.
+
+    The fill level is represented as a virtual :class:`LiquidConnection` whose
+    position encodes fill in the range ``[0, 1]``. Call :meth:`initialize_fill_level`
+    explicitly after the collision geometry has been set.
+
+    A filled container is itself a :class:`LiquidSource`: it can pour its contents into another
+    container by tilting.
+    """
+
+    fill_connection: Optional[LiquidConnection] = field(default=None)
+    """The virtual connection whose position encodes fill level in [0, 1]."""
+
+    fill_equation: Optional[PouringEquation] = field(default=None)
+    """Differential equation governing how this container drains when tilted."""
+
+    inflow_equation: Optional[InflowEquation] = field(default=None)
+    """Differential equation governing how this container fills from an external source."""
+
+    inflow_coupling: Optional[LiquidTransferCoupling] = field(default=None)
+    """Serializable description of the transfer coupling. Unlike :attr:`inflow_equation`, whose
+    symbolic expressions cannot cross a process boundary, this survives synchronization and lets
+    :meth:`ensure_inflow_coupling` rebuild the symbolic coupling in another world."""
+
+    @synchronized_attribute_modification
+    def set_inflow_coupling(self, coupling: Optional[LiquidTransferCoupling]) -> None:
+        """
+        Record the serializable inflow coupling descriptor and synchronize it to other worlds.
+
+        :param coupling: The coupling descriptor, or ``None`` to clear it.
+        """
+        self.inflow_coupling = coupling
+
+    @synchronized_attribute_modification
+    def set_fill_connection(self, connection: Optional[LiquidConnection]) -> None:
+        """
+        Set the fill-level connection.
+
+        :param connection: The LiquidConnection to track as the fill-level DOF.
+        """
+        self.fill_connection = connection
+
+    @synchronized_attribute_modification
+    def add_fill_equation(self, fill_equation: Optional[PouringEquation]) -> None:
+        """
+        Add a fill equation to the semantic annotation.
+
+        :param fill_equation: The fill equation to add.
+        """
+        self.fill_equation = fill_equation
+        if self.fill_connection is not None:
+            self.fill_connection.outflow_equation = fill_equation
+
+    @synchronized_attribute_modification
+    def add_inflow_equation(self, inflow_equation: Optional[InflowEquation]) -> None:
+        """
+        Add an inflow equation to the semantic annotation.
+
+        :param inflow_equation: The inflow equation to add.
+        """
+        self.inflow_equation = inflow_equation
+        if self.fill_connection is not None:
+            self.fill_connection.inflow_equation = inflow_equation
+
+    def initialize_fill_level(
+        self,
+        world,
+        initial_fill: float = 1.0,
+        outflow_rate_constant: float = 1.0,
+    ) -> None:
+        """
+        Create the virtual fill-level DOF, attach it to the world, and wire up the pouring equation.
+
+        Must be called after the annotation's collision geometry is set.
+
+        :param world: The world to add the fill-level DOF to.
+        :param initial_fill: Starting fill level in [0, 1].
+        :param outflow_rate_constant: Outflow rate constant for the articulated pouring equation.
+        """
+        fill_equation = ArticulatedPouringEquation(
+            container_width=self.root.collision.width,
+            container_height=self.root.collision.height,
+            outflow_rate_constant=outflow_rate_constant,
+        )
+        phantom = Body(name=PrefixedName(f"{self.root.name.name}_fill_level_phantom"))
+        with world.modify_world():
+            world.add_body(phantom)
+            connection = LiquidConnection.create_with_dofs(
+                world=world,
+                parent=self.root,
+                child=phantom,
+                axis=Vector3.Z(),
+                dof_limits=DegreeOfFreedomLimits(
+                    lower=DerivativeMap(position=0.0, velocity=-1.0),
+                    upper=DerivativeMap(position=1.0, velocity=1.0),
+                ),
+            )
+            connection.outflow_equation = fill_equation
+            world.add_connection(connection)
+            self.set_fill_connection(connection)
+            self.add_fill_equation(fill_equation)
+
+        with world.modify_world():
+            world.set_positions_1DOF_connection({connection: initial_fill})
+
+    def receive_outflow_from(
+        self,
+        source: LiquidSource,
+        world: World,
+        exit_speed: float = DEFAULT_POUR_EXIT_SPEED,
+        height_gate_sharpness: float = 80.0,
+        overlap_gate_sharpness: float = 80.0,
+    ) -> None:
+        """
+        Couple this container's inflow to the outflow of a liquid source.
+
+        The source's outflow volume rate is gated by geometry so liquid only enters this container
+        while the liquid's projectile lands in its opening.  The same gate is handed back to the
+        source so it only drains while it is actually pouring into this container: no liquid is
+        spilled and the transfer is volume conserving.
+
+        The symbolic gate and inflow cannot be serialized, so a parametric
+        :class:`~semantic_digital_twin.world_description.connections.LiquidTransferCoupling` is
+        recorded on the fill connection whenever the source is a world entity. That descriptor
+        survives synchronization to another world, where :meth:`ensure_inflow_coupling` rebuilds
+        the symbolic coupling locally.
+
+        :param source: The liquid source whose outflow pours into this one.
+        :param world: The world providing the forward kinematics for the geometric gate.
+        :param exit_speed: Horizontal speed of the liquid leaving the source, in m/s.
+        :param height_gate_sharpness: Logistic steepness of the source-above-receiver gate.
+        :param overlap_gate_sharpness: Logistic steepness of the projectile-landing gate.
+
+        ..warning:: This mutates the source via :meth:`LiquidSource.couple_drain_to_gate`.
+        """
+        source.validate_can_pour()
+        if isinstance(source, WorldEntityWithID):
+            coupling = LiquidTransferCoupling(
+                source_id=source.id,
+                exit_speed=exit_speed,
+                height_gate_sharpness=height_gate_sharpness,
+                overlap_gate_sharpness=overlap_gate_sharpness,
+            )
+            with world.modify_world():
+                self.set_inflow_coupling(coupling)
+        self._establish_inflow_coupling(
+            source, world, exit_speed, height_gate_sharpness, overlap_gate_sharpness
+        )
+
+    def _establish_inflow_coupling(
+        self,
+        source: LiquidSource,
+        world: World,
+        exit_speed: float,
+        height_gate_sharpness: float,
+        overlap_gate_sharpness: float,
+    ) -> None:
+        """
+        Build the symbolic inflow equation and the source's gated outflow against ``world``.
+
+        The symbolic expressions are bound to ``world`` and are local to it, so the changes are not
+        published: they are reconstructed independently in every world that holds the coupling.
+
+        :param source: The liquid source whose outflow pours into this one.
+        :param world: The world providing the forward kinematics for the geometric gate.
+        :param exit_speed: Horizontal speed of the liquid leaving the source, in m/s.
+        :param height_gate_sharpness: Logistic steepness of the source-above-receiver gate.
+        :param overlap_gate_sharpness: Logistic steepness of the projectile-landing gate.
+        """
+        source_volume_rate = source.outflow_volume_rate(world)
+        landing_point = self.projectile_landing_point(source, world, exit_speed)
+        gate = self._geometric_transfer_gate(
+            source, world, landing_point, height_gate_sharpness, overlap_gate_sharpness
+        )
+        inflow_equation = GatedInflowEquation(
+            container_height=self.root.collision.height,
+            container_width=self.root.collision.width,
+            inflow=source_volume_rate,
+            gate=gate,
+            source_tilt_expression=source.pour_tilt_expression,
+            exit_speed=exit_speed,
+        )
+        with world.modify_world(publish_changes=False):
+            self.add_inflow_equation(inflow_equation)
+            source.couple_drain_to_gate(gate, world)
+
+    def ensure_inflow_coupling(self, world: World) -> None:
+        """
+        Rebuild the symbolic inflow coupling from the stored descriptor if it is missing.
+
+        A world synchronized from another process carries the coupling descriptor but not the
+        symbolic inflow equation, which cannot be serialized. This reconstructs the symbolic
+        coupling against ``world`` so a transfer task can read it. It is a no-op when the symbolic
+        inflow equation is already present or no coupling descriptor was recorded.
+
+        :param world: The world the coupling must be rebuilt against.
+        """
+        coupling = self.inflow_coupling
+        if coupling is None or self.fill_connection.inflow_equation is not None:
+            return
+        source = world.get_semantic_annotation_by_id(coupling.source_id)
+        self._reattach_fill_connection(world)
+        source._reattach_fill_connection(world)
+        self._establish_inflow_coupling(
+            source,
+            world,
+            coupling.exit_speed,
+            coupling.height_gate_sharpness,
+            coupling.overlap_gate_sharpness,
+        )
+
+    def _reattach_fill_connection(self, world: World) -> None:
+        """
+        Point :attr:`fill_connection` at the connection resident in ``world``.
+
+        Synchronizing an annotation to another world deserializes its fill connection by value, so
+        the reference is a detached copy with no world. Re-resolving it against ``world`` restores a
+        connection whose forward kinematics and physics equations can be evaluated.
+
+        :param world: The world whose resident fill connection this annotation must track.
+        """
+        if self.fill_connection._world is world:
+            return
+        self.fill_connection = world.get_connection(
+            self.fill_connection.parent, self.fill_connection.child
+        )
+
+    def outflow_volume_rate(self, world: World) -> sm.Scalar:
+        """
+        Volume rate leaving this cup as it tilts, converting its normalised drain to a volume rate.
+
+        :param world: The world providing the forward kinematics.
+        :return: Symbolic outflow volume rate, positive while pouring.
+        """
+        normalised_drain = self.fill_equation.symbolic_velocity(self.fill_connection)
+        return -normalised_drain * self.fill_equation.cross_section_volume
+
+    def liquid_exit_point(self, world: World) -> Point3:
+        """
+        The cup's rim centre in the world frame, where liquid leaves while pouring.
+
+        :param world: The world providing the forward kinematics.
+        :return: Symbolic exit point in the world frame.
+        """
+        return (
+            world.compose_forward_kinematics_expression(world.root, self.root)
+            @ self.rim_point()
+        )
+
+    def liquid_exit_direction(self, world: World) -> Vector3:
+        """
+        The direction the tilted opening faces in the world frame.
+
+        :param world: The world providing the forward kinematics.
+        :return: Symbolic exit direction in the world frame.
+        """
+        rotation = world.compose_forward_kinematics_expression(
+            world.root, self.root
+        ).to_rotation_matrix()
+        return rotation @ Vector3.Z()
+
+    @property
+    def pour_tilt_expression(self) -> sm.Scalar:
+        """Symbolic tilt angle of this cup, taken from its fill connection."""
+        return self.fill_connection.tilt_expression
+
+    def couple_drain_to_gate(self, gate: sm.Scalar, world: World) -> None:
+        """
+        Gate this cup's own outflow so it drains only while ``gate`` is open.
+
+        :param gate: The shared transfer gate in ``[0, 1]``.
+        :param world: The world the cup lives in.
+        """
+        self.add_fill_equation(
+            GatedArticulatedPouringEquation(
+                container_height=self.fill_equation.container_height,
+                container_width=self.fill_equation.container_width,
+                outflow_rate_constant=self.fill_equation.outflow_rate_constant,
+                gate=gate,
+            )
+        )
+
+    def validate_can_pour(self) -> None:
+        """
+        :raises MissingFillEquationError: if this cup was never initialized with a fill level.
+        :raises SourceAlreadyCoupledError: if this cup's outflow is already gated onto a receiver.
+        """
+        if self.fill_equation is None or self.fill_connection is None:
+            raise MissingFillEquationError(source=self)
+        if isinstance(self.fill_equation, GatedArticulatedPouringEquation):
+            raise SourceAlreadyCoupledError(source=self)
+
+    def projectile_landing_point(
+        self,
+        source: LiquidSource,
+        world: World,
+        exit_speed: float,
+        gravity: float = STANDARD_GRAVITY,
+    ) -> Point3:
+        """
+        Where liquid poured from the source lands on this container's opening plane.
+
+        The liquid leaves the source's exit point horizontally in the source's exit direction and
+        then follows projectile motion under gravity; the returned point is where that arc crosses
+        this container's opening plane, taken at the container's origin height.
+
+        :param source: The pouring liquid source.
+        :param world: The world providing the forward kinematics.
+        :param exit_speed: Horizontal speed of the liquid leaving the source, in m/s.
+        :param gravity: Gravitational acceleration in metres per second squared.
+        :return: The symbolic landing point in the world frame, on this container's opening plane.
+        """
+        exit_point = source.liquid_exit_point(world)
+        exit_direction = source.liquid_exit_direction(world)
+        plane_height = (
+            world.compose_forward_kinematics_expression(world.root, self.root)
+            .to_position()
+            .z
+        )
+        drop_height = exit_point.z - plane_height
+        flight_time = sm.sqrt(
+            2 * sm.max(sm.Scalar(MINIMUM_DROP_HEIGHT), drop_height) / gravity
+        )
+        return Point3(
+            x=exit_point.x + exit_speed * exit_direction.x * flight_time,
+            y=exit_point.y + exit_speed * exit_direction.y * flight_time,
+            z=plane_height,
+            reference_frame=world.root,
+        )
+
+    def _geometric_transfer_gate(
+        self,
+        source: LiquidSource,
+        world: World,
+        landing_point: Point3,
+        height_gate_sharpness: float,
+        overlap_gate_sharpness: float,
+    ) -> sm.Scalar:
+        """
+        Build the differentiable gate that is open only while the source pours into this container.
+
+        The gate multiplies a vertical term (source exit point above this container's opening) and
+        a horizontal term (the liquid's projectile lands within this container's opening radius),
+        each a smooth logistic so the optimizer sees a non-zero gradient when aiming the pour.
+        Because the landing point moves forward as the source tilts, the optimizer must position
+        the source upstream and tilt it so the arc lands in this container.
+
+        :param source: The pouring liquid source.
+        :param world: The world providing the forward kinematics.
+        :param landing_point: The projectile landing point on this container's opening plane.
+        :param height_gate_sharpness: Logistic steepness of the vertical term.
+        :param overlap_gate_sharpness: Logistic steepness of the landing-in-opening term.
+        :return: Symbolic gate factor in ``[0, 1]``.
+        """
+        source_exit = source.liquid_exit_point(world)
+        receiver_position = world.compose_forward_kinematics_expression(
+            world.root, self.root
+        ).to_position()
+
+        height_gate = self._logistic(
+            source_exit.z - receiver_position.z, height_gate_sharpness
+        )
+        landing_distance = sm.sqrt(
+            (landing_point.x - receiver_position.x) ** 2
+            + (landing_point.y - receiver_position.y) ** 2
+        )
+        receiver_radius = self.root.collision.width / 2
+        overlap_gate = self._logistic(
+            (receiver_radius - landing_distance) / receiver_radius,
+            overlap_gate_sharpness,
+        )
+        return height_gate * overlap_gate
+
+    def rim_point(self) -> Point3:
+        """
+        The centre of this container's opening, expressed in the container's own frame.
+
+        :return: A point at the horizontal centre and top of the collision bounding box.
+        """
+        lower = self.root.collision.min_point
+        upper = self.root.collision.max_point
+        return Point3(
+            x=(lower.x + upper.x) / 2,
+            y=(lower.y + upper.y) / 2,
+            z=upper.z,
+            reference_frame=self.root,
+        )
+
+    @staticmethod
+    def _logistic(value: sm.Scalar, sharpness: float) -> sm.Scalar:
+        """
+        Smooth ``[0, 1]`` step that approaches ``1`` as ``value`` grows positive.
+
+        :param value: The symbolic margin being gated.
+        :param sharpness: Steepness of the transition around ``value == 0``.
+        :return: Symbolic logistic of ``sharpness * value``.
+        """
+        return sm.Scalar(1.0) / (sm.Scalar(1.0) + sm.exp(-sharpness * value))
+
+    @property
+    def fill_level(self) -> float:
+        """Current fill level in ``[0, 1]``."""
+        return float(self.fill_connection.position)
