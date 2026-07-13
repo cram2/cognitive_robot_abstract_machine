@@ -13,8 +13,7 @@ from threading import RLock
 from segmind.datastructures.event_plotter import EventPlotter
 from segmind.datastructures.events import DetectionEvent, EventWithTrackedObjects
 from segmind.datastructures.object_tracker import ObjectTrackerFactory
-from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import List, Optional, Dict, Type, Callable, Tuple
+from typing_extensions import List, Optional, Type, Callable, Tuple
 from typing import ClassVar
 
 logger = logging.getLogger(__name__)
@@ -85,10 +84,6 @@ class EventLogger:
     """
     A thread for annotating events.
     """
-    timeline_per_thread: Dict[str, List[DetectionEvent]] = field(default_factory=dict, init=False)
-    """
-    A mapping from thread identifier to the events logged on that thread.
-    """
 
     def __post_init__(self):
         """
@@ -104,7 +99,6 @@ class EventLogger:
     def reset(self):
         self.timeline = []
         self.event_queue = queue.Queue()
-        self.timeline_per_thread = {}
         for obj_tracker in ObjectTrackerFactory.get_all_trackers():
             obj_tracker.reset()
 
@@ -121,8 +115,16 @@ class EventLogger:
             self.event_callbacks[event_type] = [(condition, callback)]
 
     def log_event(self, event: DetectionEvent, factory: ObjectTrackerFactory):
-        if self.is_event_in_timeline(event):
-            return
+        """
+        Log an event, ignoring it if it is already in the timeline.
+
+        :param event: The event to log.
+        :param factory: The object tracker factory.
+        """
+        with self.timeline_lock:
+            if event in self.timeline:
+                return
+            self.timeline.append(event)
         self.update_object_trackers_with_event(event, factory)
         self.event_queue.put(event)
         self.annotate_scene_with_event(event)
@@ -164,28 +166,6 @@ class EventLogger:
         if isinstance(event, EventWithTrackedObjects):
             event.update_object_trackers_with_event(factory)
 
-    def add_event_to_timeline_of_thread(self, event: DetectionEvent):
-        """
-        Add an event to the timeline of the detector thread.
-
-        :param event: The event to add.
-        """
-        self.timeline.append(event)
-
-    def is_event_in_timeline(self, event: DetectionEvent) -> bool:
-        """
-        Check if an event is already in the timeline.
-
-        :param event: The event to check.
-        :return: True if the event is in the timeline, False otherwise.
-        """
-        with self.timeline_lock:
-            if event in self.timeline:
-                return True
-            else:
-                self.add_event_to_timeline_of_thread(event)
-
-
     def plot_events(self, show: bool = True, save_path: Optional[str] = None):
         """
         Plot all events that have been logged in a timeline.
@@ -200,14 +180,6 @@ class EventLogger:
         logger.debug("Events:")
         logger.debug(self.__str__())
 
-    def get_events_per_thread(self) -> Dict[str, List[DetectionEvent]]:
-        """
-        Get all events that have been logged.
-        """
-        with self.timeline_lock:
-            events = self.timeline_per_thread.copy()
-        return events
-
     def get_events(self) -> List[DetectionEvent]:
         """
         Get all events that have been logged.
@@ -215,67 +187,6 @@ class EventLogger:
         with self.timeline_lock:
             events = self.timeline.copy()
         return events
-
-    def get_latest_event_of_detector_for_object(self, detector_prefix: str, obj: Body) -> Optional[DetectionEvent]:
-        """
-        Get the latest of event of the thread that has the given prefix and object name in its id.
-
-        :param detector_prefix: The prefix of the thread id.
-        :param obj: The object that should have its name in the thread id.
-        """
-        thread_id = self.find_thread_with_prefix_and_object(detector_prefix, obj.name)
-        return self.get_latest_event_of_thread(thread_id)
-
-    def get_nearest_event_of_detector_for_object(self, detector_prefix: str, obj: Body,
-                                                 timestamp: float) -> Optional[DetectionEvent]:
-        """
-        Get the nearest event of the thread that has the given prefix and object name in its id.
-
-        :param detector_prefix: The prefix of the thread id.
-        :param obj: The object that should have its name in the thread id.
-        :param timestamp: The timestamp of the event.
-        """
-        thread_id = self.find_thread_with_prefix_and_object(detector_prefix, obj.name)
-        return self.get_nearest_event_of_thread(thread_id, timestamp)
-
-    def find_thread_with_prefix_and_object(self, prefix: str, object_name: str) -> Optional[str]:
-        """
-        Find the thread id that has the given prefix and object name in its id.
-
-        :param prefix: The prefix of the thread id.
-        :param object_name: The object name that should be in the thread id.
-        :return: The id of the thread or None if no such thread
-        """
-        with self.timeline_lock:
-            thread_id = [thread_id for thread_id in self.timeline_per_thread.keys() if thread_id.startswith(prefix) and
-                         object_name in thread_id]
-        return None if len(thread_id) == 0 else thread_id[0]
-
-    def get_nearest_event_of_thread(self, thread_id: str, timestamp: float) -> Optional[DetectionEvent]:
-        """
-        Get the nearest event of the thread with the given id.
-
-        :param thread_id: The id of the thread.
-        :param timestamp: The timestamp of the event.
-        :return: The nearest event of the thread or None if no such thread.
-        """
-        with self.timeline_lock:
-            if thread_id not in self.timeline_per_thread:
-                return None
-            all_event_timestamps = [(event, event.timestamp) for event in self.timeline_per_thread[thread_id]]
-            return min(all_event_timestamps, key=lambda x: abs(x[1] - timestamp))[0]
-
-    def get_latest_event_of_thread(self, thread_id: str) -> Optional[DetectionEvent]:
-        """
-        Get the latest event of the thread with the given id.
-
-        :param thread_id: The id of the thread.
-        :return: The latest event of the thread or None if no such thread.
-        """
-        with self.timeline_lock:
-            if thread_id not in self.timeline_per_thread:
-                return None
-            return self.timeline_per_thread[thread_id][-1]
 
     def get_next_event(self):
         """
