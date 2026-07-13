@@ -43,8 +43,6 @@ def calculate_edge_flows(
         Mean flow for every edge of every sparse sum layer.
     """
 
-    all_layers = list(circuit.root.all_layers())
-
     node_log_likelihoods = _compute_node_log_likelihoods(
         circuit,
         data,
@@ -72,6 +70,109 @@ def calculate_edge_flows(
                 flows_per_sum_layer.append(mean_edge_flows)
 
     return flows_per_sum_layer
+
+
+def _duplicate_child_columns(
+    log_weights: BCOO,
+    old_number_of_child_nodes: int,
+) -> BCOO:
+    """
+    Duplicate child node connections in a sparse weight matrix.
+    """
+
+    cloned_weights = copy_bcoo(log_weights)
+
+    duplicated_indices = cloned_weights.indices.copy()
+
+    duplicated_indices = duplicated_indices.at[:, 1].add(old_number_of_child_nodes)
+
+    new_indices = jnp.concatenate(
+        [
+            cloned_weights.indices,
+            duplicated_indices,
+        ],
+        axis=0,
+    )
+
+    new_data = jnp.concatenate(
+        [
+            cloned_weights.data,
+            cloned_weights.data,
+        ],
+        axis=0,
+    )
+
+    expanded_bcoo = BCOO(
+        (
+            new_data,
+            new_indices,
+        ),
+        shape=(
+            cloned_weights.shape[0],
+            cloned_weights.shape[1] * 2,
+        ),
+        indices_sorted=False,
+        unique_indices=True,
+    )
+
+    return expanded_bcoo.sort_indices()
+
+
+def _duplicate_parent_rows(
+    log_weights: BCOO,
+    key: jax.Array,
+    noise_scale: float,
+) -> BCOO:
+    """
+    Duplicate parent nodes in a sparse weight matrix.
+    """
+
+    cloned_weights = copy_bcoo(log_weights)
+
+    number_of_parent_nodes = cloned_weights.shape[0]
+
+    duplicated_indices = cloned_weights.indices.copy()
+
+    duplicated_indices = duplicated_indices.at[:, 0].add(number_of_parent_nodes)
+
+    new_indices = jnp.concatenate(
+        [
+            cloned_weights.indices,
+            duplicated_indices,
+        ],
+        axis=0,
+    )
+
+    noise = (
+        jax.random.normal(
+            key,
+            shape=cloned_weights.data.shape,
+        )
+        * noise_scale
+    )
+
+    new_data = jnp.concatenate(
+        [
+            cloned_weights.data,
+            cloned_weights.data + noise,
+        ],
+        axis=0,
+    )
+
+    expanded_bcoo = BCOO(
+        (
+            new_data,
+            new_indices,
+        ),
+        shape=(
+            cloned_weights.shape[0] * 2,
+            cloned_weights.shape[1],
+        ),
+        indices_sorted=False,
+        unique_indices=True,
+    )
+
+    return expanded_bcoo.sort_indices()
 
 
 def prune_circuit_eflow(
@@ -185,58 +286,13 @@ def grow_circuit(
             new_log_weights_list = []
 
             for log_weights in layer.log_weights:
-                cloned_weights = copy_bcoo(log_weights)
-
-                number_of_original_edges = cloned_weights.data.shape[0]
-
-                duplicated_indices = cloned_weights.indices.copy()
-
-                number_of_nodes = cloned_weights.shape[0]
-
-                duplicated_indices = duplicated_indices.at[:, 0].add(number_of_nodes)
-
-                new_indices = jnp.concatenate(
-                    [
-                        cloned_weights.indices,
-                        duplicated_indices,
-                    ],
-                    axis=0,
-                )
-
                 noise_key, current_key = jax.random.split(current_key)
 
-                noise = (
-                    jax.random.normal(
-                        noise_key,
-                        shape=(number_of_original_edges,),
-                    )
-                    * noise_scale
+                expanded_bcoo = _duplicate_parent_rows(
+                    log_weights,
+                    noise_key,
+                    noise_scale,
                 )
-
-                new_log_weight_values = jnp.concatenate(
-                    [
-                        cloned_weights.data,
-                        cloned_weights.data + noise,
-                    ],
-                    axis=0,
-                )
-
-                new_shape = (
-                    cloned_weights.shape[0] * 2,
-                    cloned_weights.shape[1],
-                )
-
-                expanded_bcoo = BCOO(
-                    (
-                        new_log_weight_values,
-                        new_indices,
-                    ),
-                    shape=new_shape,
-                    indices_sorted=False,
-                    unique_indices=True,
-                )
-
-                expanded_bcoo = expanded_bcoo.sort_indices()
 
                 new_log_weights_list.append(expanded_bcoo)
 
