@@ -1,6 +1,11 @@
 import numpy as np
+import pytest
 
-from semantic_digital_twin.spatial_computations.raytracer import RayTracer
+from semantic_digital_twin.exceptions import InvalidCameraResolutionError
+from semantic_digital_twin.spatial_computations.raytracer import (
+    CameraResolution,
+    RayTracer,
+)
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
 )
@@ -62,6 +67,74 @@ def test_create_depth_map(ray_test_world):
     assert depth_map.shape == (512, 512)
     assert depth_map.max() <= 2.5
     assert depth_map[depth_map > 0].min() >= 2.375
+
+
+def test_create_camera_rays_with_rectangular_resolution(ray_test_world):
+    world, *_ = ray_test_world
+    ray_tracer = RayTracer(world)
+
+    camera_pose = np.eye(4, dtype=float)
+    camera_pose[:3, 3] = [-2.5, 0.0, 0.0]
+
+    resolution = CameraResolution(width=128, height=64)
+    ray_origins, ray_directions, pixels = ray_tracer.create_camera_rays(
+        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        resolution=resolution,
+    )
+
+    assert ray_origins.shape == (resolution.width * resolution.height, 3)
+    assert ray_directions.shape == (resolution.width * resolution.height, 3)
+    assert pixels.shape == (resolution.width * resolution.height, 2)
+    assert set(pixels[:, 0]) == set(range(resolution.width))
+    assert set(pixels[:, 1]) == set(range(resolution.height))
+
+
+def test_create_segmentation_mask_with_rectangular_resolution(ray_test_world):
+    world, *_ = ray_test_world
+    ray_tracer = RayTracer(world)
+
+    camera_pose = np.array(
+        [
+            [1.0, 0.0, 0.0, -2.5],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.2],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+
+    segmentation_mask = ray_tracer.create_segmentation_mask(
+        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        resolution=(128, 64),
+    )
+
+    assert segmentation_mask.shape == (128, 64)
+
+
+def test_create_depth_map_with_rectangular_resolution(ray_test_world):
+    world, *_ = ray_test_world
+    ray_tracer = RayTracer(world)
+
+    camera_pose = np.array(
+        [
+            [1.0, 0.0, 0.0, -2.5],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+
+    depth_map = ray_tracer.create_depth_map(
+        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        resolution=(128, 64),
+    )
+
+    assert depth_map.shape == (128, 64)
+
+
+@pytest.mark.parametrize("resolution", [0, (128,), (128.0, 64), "128x64"])
+def test_invalid_camera_resolution_raises_domain_exception(resolution):
+    with pytest.raises(InvalidCameraResolutionError):
+        CameraResolution.from_value(resolution)
 
 
 def test_ray_test(ray_test_world):
