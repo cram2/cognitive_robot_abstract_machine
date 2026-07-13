@@ -168,15 +168,18 @@ class Verbalizable(ABC):
 
 
 @dataclass(eq=False)
-class Predicate(Symbol, Verbalizable, ABC):
-    """
-    The super predicate class that represents a filtration operation or asserts a relation.
+class SymbolicCallable(Symbol, Verbalizable, ABC):
+    """A user-defined, self-verbalizing symbolic operation.
+
+    It is called with arguments, is represented as an :class:`InstantiatedVariable` in a query when
+    any argument is symbolic, and renders itself through its required
+    :meth:`Verbalizable._verbalization_fragment_`. :class:`Predicate` (a boolean operation) and
+    :class:`SymbolicFunction` (a value operation) are its two concrete kinds, so the
+    symbolic-construction machinery lives here once rather than being duplicated in each.
     """
 
     _cache_instances_: ClassVar[bool] = False
-    """
-    Predicates should not be cached for now as they are not persisting.
-    """
+    """Instances are not cached -- they do not persist."""
 
     def __new__(cls, *args, **kwargs):
         all_kwargs = merge_args_and_kwargs(
@@ -190,25 +193,38 @@ class Predicate(Symbol, Verbalizable, ABC):
         return super().__new__(cls)
 
     @classmethod
-    def _construct_normally_(cls, **kwargs) -> Predicate:
+    def _construct_normally_(cls, **kwargs) -> SymbolicCallable:
         """
-        Construct a concrete predicate instance directly, bypassing the symbolic ``__new__`` check.
+        Construct a concrete instance directly, bypassing the symbolic ``__new__`` redirect.
 
         Normally, calling ``cls(**kwargs)`` when any kwarg is a :class:`Selectable` redirects
         construction to an :class:`~krrood.entity_query_language.core.variable.InstantiatedVariable`
         so the call can be represented as a symbolic expression in a query graph.  During evaluation,
         however, the bound values themselves may be :class:`Selectable` objects (e.g. in a
         meta-query that reasons about EQL nodes).  In that case the redirect is wrong — we want the
-        real predicate instance so its :meth:`__call__` can be evaluated immediately.
+        real instance so its :meth:`__call__` can be evaluated immediately.
 
         :meth:`_construct_normally_` is the escape hatch for that situation.  It calls
         ``object.__new__`` directly (skipping ``__new__`` entirely) and then ``__init__``, so the
-        caller always receives a fully initialised concrete predicate regardless of what the kwargs
+        caller always receives a fully initialised concrete instance regardless of what the kwargs
         contain.
         """
         instance = object.__new__(cls)
         instance.__init__(**kwargs)
         return instance
+
+    @abstractmethod
+    def __call__(self) -> Any:
+        """
+        Evaluate the operation for the supplied values.
+        """
+
+
+@dataclass(eq=False)
+class Predicate(SymbolicCallable, ABC):
+    """
+    The super predicate class that represents a filtration operation or asserts a relation.
+    """
 
     @abstractmethod
     def __call__(self) -> bool:
@@ -221,6 +237,24 @@ class Predicate(Symbol, Verbalizable, ABC):
         Bool casting a predicate evaluates it.
         """
         return bool(self.__call__())
+
+
+@dataclass(eq=False)
+class SymbolicFunction(SymbolicCallable, ABC):
+    """A user-defined operation that computes a value, with its own verbalization.
+
+    Like :class:`Predicate` it is a self-verbalizing symbolic callable, but its :meth:`__call__`
+    returns a value (not a truth value), so its :meth:`Verbalizable._verbalization_fragment_` names
+    that value as a noun phrase rather than a clause. Subclass it when the default
+    *"the <name> of <arguments>"* reading produced by the :func:`symbolic_function` decorator is not
+    the surface you want; for a plain value function the decorator remains the simplest form.
+    """
+
+    @abstractmethod
+    def __call__(self) -> Any:
+        """
+        Compute the value for the supplied arguments.
+        """
 
 
 @dataclass(eq=False)
