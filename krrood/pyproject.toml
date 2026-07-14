@@ -38,6 +38,11 @@ classifiers = [
 dev = [
     "pytest>=7.0.0,<8.0.0",
 ]
+visualization = [
+    "dash",
+    "plotly",
+    "flask",
+]
 
 [project.urls]
 Homepage = "https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html"

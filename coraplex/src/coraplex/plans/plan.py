@@ -23,6 +23,15 @@ from coraplex.plans.plan_node import (
     ActionNode,
     DesignatorNode,
 )
+from krrood.rustworkx_utils.cytoscape_graph_visualizer import CytoscapeGraphVisualizer
+from krrood.rustworkx_utils.graph_visualizer_base import (
+    GraphLayout,
+    GraphVisualizerBackend,
+    GraphVisualizerBase,
+)
+from krrood.rustworkx_utils.interactive_graph_visualizer import (
+    InteractiveGraphVisualizer,
+)
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 
@@ -295,6 +304,52 @@ class Plan:
                 node.simplify()
 
         self.root.simplify()
+
+    _visualizer_classes = {
+        GraphVisualizerBackend.PLOTLY: InteractiveGraphVisualizer,
+        GraphVisualizerBackend.CYTOSCAPE: CytoscapeGraphVisualizer,
+    }
+    """The visualizer to use for each rendering backend."""
+
+    def visualize(
+        self,
+        backend: GraphVisualizerBackend = GraphVisualizerBackend.CYTOSCAPE,
+        layout: GraphLayout = GraphLayout.PHYSICS,
+    ) -> GraphVisualizerBase:
+        """
+        Open an interactive, real-time visualization of the plan graph.
+
+        Nodes appear as the plan is built, are labelled by their type, coloured by execution
+        status and reveal their status and timing when clicked. With the default physics layout
+        the nodes self-organize and bounce as the plan grows.
+
+        :param backend: The rendering technology to use.
+        :param layout: The algorithm used to place the nodes.
+        :return: The running visualizer.
+        """
+        visualizer = self._visualizer_classes[backend](
+            graph=self.plan_graph,
+            label_getter=lambda node: node.__class__.__name__,
+            info_getter=self._node_details,
+            color_getter=lambda node: node.status.color.replace("-", ""),
+            layout=layout,
+            title=repr(self),
+        )
+        visualizer.run()
+        return visualizer
+
+    def _node_details(self, node: PlanNode) -> List[str]:
+        """
+        :param node: The node to describe.
+        :return: The status, timing and outcome of the node as detail lines.
+        """
+        return [
+            f"status: {node.status.name}",
+            f"start: {node.start_time}",
+            f"end: {node.end_time}",
+            f"result: {node.result}",
+            f"reason: {node.reason}",
+        ]
 
     def __repr__(self):
         return f"Plan with {len(self.all_nodes)} nodes"
