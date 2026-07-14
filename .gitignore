@@ -156,3 +156,7 @@ class_diagram.pdf
 *_evaluated_tree.svg
 *_rdr.dot
 *_rdr.svg
+
+# Personal, per-user Claude Code memory (populated by .claude/hooks/session-start.sh
+# from the claude/personal-notes branch). Never committed on any branch.
+CLAUDE.local.md
