@@ -586,7 +586,7 @@ class Garmi(AbstractRobot, HasMobileBase[GarmiMobileBase]):
         """
         Returns the ROS file path for the GARMI robot description.
         """
-        raise NotImplementedError("We dont have the ROS Package yet")
+        return "package://garmi_description/urdf/garmi.urdf"
 
     @classmethod
     def _get_root_body_name(cls) -> str:

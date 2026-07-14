@@ -240,6 +240,11 @@ def main():
             "iai_tiago_description",
         ),
         Repository(
+            "https://github.com/geriatronics/garmi_description.git",
+            "main",
+            "garmi_description",
+        ),
+        Repository(
             "https://github.com/pal-robotics/pmb2_robot.git",
             "humble-devel",
             "pmb2_robot",

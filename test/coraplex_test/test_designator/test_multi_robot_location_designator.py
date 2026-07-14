@@ -67,14 +67,13 @@ ALTERNATIVE_MOTION_MAPPINGS = [
 @pytest.fixture(
     scope="module",
     params=[
-        # TODO Garmi commented out until we get access to the robot description in CI
-        # pytest.param(
-        #     "garmi",
-        #     marks=pytest.mark.skipif(
-        #         Garmi is None,
-        #         reason="GARMI semantic annotation not installed",
-        #     ),
-        # ),
+        pytest.param(
+            "garmi",
+            marks=pytest.mark.skipif(
+                Garmi is None,
+                reason="GARMI semantic annotation not installed",
+            ),
+        ),
         "hsrb",
         "stretch",
         "tiago",
@@ -139,7 +138,7 @@ def setup_multi_robot_simple_apartment(
     elif request.param == "garmi":
         if Garmi is None:
             pytest.skip("GARMI semantic annotation not installed")
-        garmi_world_setup = request.getfixturevalue("garmi_world_setup")
+        garmi_world_setup = request.getfixturevalue("_garmi_world_setup")
         garmi_copy = deepcopy(garmi_world_setup)
         apartment_copy.merge_world(
             garmi_copy,
