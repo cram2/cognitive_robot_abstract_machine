@@ -32,6 +32,7 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
 )
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
+from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.entity_query_language.cache_data import ReEnterableLazyIterable
 from krrood.entity_query_language.enums import DomainSource
 from krrood.entity_query_language.exceptions import NoChildToReplace
@@ -248,11 +249,16 @@ class InstantiatedVariable(
                 for id_, v in child_result.bindings.items()
                 if id_ in self._child_var_id_name_map_
             }
-            # A callable class (Predicate / SymbolicFunction) exposes _bound_value_ -- it binds the
+            # A callable class (Predicate / SymbolicFunction) implements HasBoundValue -- it binds the
             # constructed instance, or, for a value operation, its constructed-and-called value -- the
-            # class-form counterpart of a @symbolic_function being called. A plain function/type binds
-            # the direct call result.
-            bind = getattr(self._type_, "_bound_value_", self._type_)
+            # class-form counterpart of a @symbolic_function being called. A plain function/type does
+            # not, so it binds the direct call result.
+            bind = (
+                self._type_._bound_value_
+                if isinstance(self._type_, type)
+                and issubclass(self._type_, HasBoundValue)
+                else self._type_
+            )
             instance = bind(**kwargs)
 
             bindings = {self._id_: instance} | child_result.bindings

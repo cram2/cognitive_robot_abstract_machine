@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from krrood.entity_query_language.factories import a, set_of, variable
+from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.entity_query_language.predicate import (
     Length,
     Predicate,
@@ -94,3 +95,15 @@ def test_migrated_length_reads_as_a_noun_phrase_and_keeps_its_value():
         verbalize_expression(a(set_of(length(variable(list, [])))))
         == "Find the length of a list"
     )
+
+
+def test_symbolic_callables_implement_the_bound_value_contract():
+    """The evaluator dispatches on the :class:`HasBoundValue` contract rather than probing for the
+    method by name: every symbolic callable implements it, while a plain type does not (so it is
+    called directly). A value function's bound value is what it COMPUTES, not the constructed
+    instance."""
+    assert issubclass(SymbolicCallable, HasBoundValue)
+    assert issubclass(Predicate, HasBoundValue)
+    assert issubclass(SymbolicFunction, HasBoundValue)
+    assert not issubclass(int, HasBoundValue)
+    assert Length._bound_value_(iterable=[1, 2, 3]) == 3
