@@ -10,7 +10,7 @@ from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.misc import MoveToReach
 from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
 from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import an
+from krrood.entity_query_language.factories import a, an
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.variable import Continuous
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -122,10 +122,8 @@ def test_translate_free_space_to_where_condition(wall_door_handle_world):
 
     # Create a variable for the robot
 
-    query = an(MoveToReach)(
-        target_pose_offset_robot=an(Pose2D)(
-            x=..., y=..., yaw=..., reference_frame=None
-        ),
+    query = a(MoveToReach)(
+        target_pose_offset_robot=a(Pose2D)(x=..., y=..., yaw=..., reference_frame=None),
     )
 
     # Translate free space to where condition

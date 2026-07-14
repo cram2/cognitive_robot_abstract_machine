@@ -221,7 +221,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         >>> @dataclass
         >>> class Drawer:
         >>>     body: Body
-        >>> drawer = an(Drawer)(body=an(Body)(name="drawer_1")).from_(world.views)
+        >>> drawer = a(Drawer)(body=a(Body)(name="drawer_1")).from_(world.views)
 
     .. warning::
         Match can take a factory as a mean to construct `T`. If the keyword argument names of the match are not

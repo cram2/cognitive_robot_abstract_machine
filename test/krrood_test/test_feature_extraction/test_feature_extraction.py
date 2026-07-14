@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import an
+from krrood.entity_query_language.factories import a, an
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
 from krrood.parametrization.model_registries import DictRegistry
@@ -53,10 +53,10 @@ def scenario():
 
 
 def test_features_extraction():
-    action = an(NestedAction)(
-        pose=an(KRROODPose)(
-            position=an(KRROODPosition)(x=2.0, y=..., z=...),
-            orientation=an(KRROODOrientation)(x=..., y=..., z=..., w=...),
+    action = a(NestedAction)(
+        pose=a(KRROODPose)(
+            position=a(KRROODPosition)(x=2.0, y=..., z=...),
+            orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
         ),
         obj=Body(name="body"),
     )
@@ -91,10 +91,10 @@ def test_feature_extraction_with_aggregations(scenario):
     rpc = RelationalProbabilisticCircuit(SceneRoom)
     rpc.fit([room_dao, room2_dao])
 
-    room_query = an(SceneRoom)(
-        position=an(KRROODPosition)(x=..., y=..., z=...),
-        orientation=an(KRROODOrientation)(x=..., y=..., z=..., w=...),
-        objects=[an(SceneObject)(type=...) for _ in range(4)],
+    room_query = a(SceneRoom)(
+        position=a(KRROODPosition)(x=..., y=..., z=...),
+        orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
+        objects=[a(SceneObject)(type=...) for _ in range(4)],
     )
     room_query.resolve()
     model = rpc.ground(room_query)
@@ -144,9 +144,9 @@ def test_feature_extractor_on_non_compatible_attribute_types():
 
 
 def test_iterable_literal_with_enum_feature_uses_symbolic_variable():
-    query = an(SceneRoom)(
-        position=an(KRROODPosition)(x=..., y=..., z=...),
-        orientation=an(KRROODOrientation)(x=..., y=..., z=..., w=...),
+    query = a(SceneRoom)(
+        position=a(KRROODPosition)(x=..., y=..., z=...),
+        orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
         objects=[SceneObject(type=SceneObjectType.TABLE)],
     )
     parameters = UnderspecifiedParameters(query)

@@ -36,7 +36,7 @@ robot_pattern = an(ExampleRobot)(name="R2D2")
 Chaining `.from_(domain)` after the call binds the match to a specific set of candidate objects.
 
 ```python
-from krrood.entity_query_language.factories import an
+from krrood.entity_query_language.factories import an, a
 
 # Create a variable for any 'Robot' in the 'world.robots' domain that matches the pattern
 r = an(ExampleRobot)(name="R2D2").from_(world.robots)
@@ -54,7 +54,7 @@ The real power of the match API comes from nesting. You can describe deeply nest
 
 ```python
 # Match a connection whose parent is a ExampleContainer named 'C1' and child is a ExampleHandle named 'H1'
-fixed_connection = an(FixedConnection)(
+fixed_connection = a(FixedConnection)(
     parent=an(ExampleContainer)(name="C1"),
     child=an(ExampleHandle)(name="H1")
 ).from_(world.connections)

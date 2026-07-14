@@ -73,7 +73,7 @@ class AttributeGroup:
         """:return: The assignments with a concrete value (the *"given that …"* part).
 
         >>> from krrood.entity_query_language.verbalization.grammar.match.planner import MatchPlanner
-        >>> plan = MatchPlanner(an(Robot)(name="R2", battery=...)).plan()
+        >>> plan = MatchPlanner(a(Robot)(name="R2", battery=...)).plan()
         >>> len(plan.groups[0].concrete)
         1
         """
@@ -84,7 +84,7 @@ class AttributeGroup:
         """:return: The Ellipsis assignments (the *"predict …"* part).
 
         >>> from krrood.entity_query_language.verbalization.grammar.match.planner import MatchPlanner
-        >>> plan = MatchPlanner(an(Robot)(name="R2", battery=...)).plan()
+        >>> plan = MatchPlanner(a(Robot)(name="R2", battery=...)).plan()
         >>> len(plan.groups[0].predicted)
         1
         """
@@ -140,7 +140,7 @@ class MatchPlanner(Planner[Match, MatchPlan]):
 
     Reference: :cite:t:`reiter2000building` — content determination + aggregation (microplanning).
 
-    >>> plan = MatchPlanner(an(Robot)(name="R2", battery=80)).plan()
+    >>> plan = MatchPlanner(a(Robot)(name="R2", battery=80)).plan()
     >>> len(plan.groups), len(plan.groups[0].assignments)
     (1, 2)
     """
@@ -148,7 +148,7 @@ class MatchPlanner(Planner[Match, MatchPlan]):
     def plan(self) -> MatchPlan:
         """:return: The match plan.
 
-        >>> plan = MatchPlanner(an(Robot)(name="R2", battery=80)).plan()
+        >>> plan = MatchPlanner(a(Robot)(name="R2", battery=80)).plan()
         >>> (type(plan.selection).__name__, len(plan.groups))
         ('Variable', 1)
         """

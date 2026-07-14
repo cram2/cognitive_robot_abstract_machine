@@ -7,6 +7,7 @@ from typing import List
 from typing_extensions import Optional, Any
 
 from krrood.entity_query_language.factories import (
+    a,
     an,
     entity,
     variable,
@@ -36,27 +37,28 @@ from semantic_digital_twin.world_description.world_entity import Body
 @dataclass
 class TransportAction(ActionDescription):
     """
-    Transports an object to a position using an arm
+    Transports an object to a position using an arm.
     """
 
     object_designator: Body = field(repr=False)
     """
-    Object designator_description describing the object that should be transported.
+    Object designator_description describing the object that should be
+    transported.
     """
 
     target_location: Pose
     """
-    Target Location to which the object should be transported
+    Target Location to which the object should be transported.
     """
 
     arm: Arms
     """
-    Arm that should be used
+    Arm that should be used.
     """
 
     grasp_description: Optional[GraspDescription] = None
     """
-    Grasp Description that should be used for picking up the object
+    Grasp Description that should be used for picking up the object.
     """
 
     def inside_container(self) -> List[Body]:
@@ -84,7 +86,7 @@ class TransportAction(ActionDescription):
         handle = drawer_annotation[0].handle.root
 
         return [
-            an(NavigateAction)(
+            a(NavigateAction)(
                 target_location=variable(
                     Pose,
                     domain=reachability_location(
@@ -112,7 +114,7 @@ class TransportAction(ActionDescription):
             [
                 ParkArmsAction(Arms.BOTH),
                 # Tries to find a pick-up position for the robot that uses the given arm
-                an(NavigateAction)(
+                a(NavigateAction)(
                     target_location=variable(
                         Pose,
                         domain=DeferredLocation(
@@ -126,7 +128,7 @@ class TransportAction(ActionDescription):
                     ),
                     keep_joint_states=True,
                 ),
-                an(PickUpAction)(
+                a(PickUpAction)(
                     object_designator=self.object_designator,
                     arm=self.arm,
                     grasp_description=self.grasp_description,
@@ -134,7 +136,7 @@ class TransportAction(ActionDescription):
                 ParkArmsAction(Arms.BOTH),
                 MoveTorsoAction(TorsoState.HIGH),
                 self._make_navigate_action_for_placing(self.grasp_description),
-                an(PlaceAction)(
+                a(PlaceAction)(
                     object_designator=self.object_designator,
                     target_location=self.target_location,
                     arm=self.arm,
@@ -150,7 +152,7 @@ class TransportAction(ActionDescription):
         :param grasp_description: The grasp description that should be used for placing the object.
         :return: The navigate action that will be used to place the object.
         """
-        return an(NavigateAction)(
+        return a(NavigateAction)(
             target_location=variable(
                 Pose,
                 domain=reachability_location(
@@ -164,24 +166,28 @@ class TransportAction(ActionDescription):
 @dataclass
 class PickAndPlaceAction(ActionDescription):
     """
-    Transports an object to a position using an arm without moving the base of the robot
+    Transports an object to a position using an arm without moving the base of
+    the robot.
     """
 
     object_designator: Body
     """
-    Object designator_description describing the object that should be transported.
+    Object designator_description describing the object that should be
+    transported.
     """
+
     target_location: Pose
     """
-    Target Location to which the object should be transported
+    Target Location to which the object should be transported.
     """
+
     arm: Arms
     """
-    Arm that should be used
+    Arm that should be used.
     """
     grasp_description: GraspDescription
     """
-    Description of the grasp to pick up the target
+    Description of the grasp to pick up the target.
     """
 
     @property
@@ -204,27 +210,25 @@ class PickAndPlaceAction(ActionDescription):
 @dataclass
 class MoveAndPlaceAction(ActionDescription):
     """
-    Navigate to `standing_position`, then turn towards the target and place the object.
+    Navigate to `standing_position`, then turn towards the target and place the
+    object.
     """
 
     standing_position: Pose
     """
-    The pose to stand before trying to pick up the object
+    The pose to stand before trying to pick up the object.
     """
-
     object_designator: Body
     """
-    The object to pick up
+    The object to pick up.
     """
-
     target_location: Pose
     """
     The location to place the object.
     """
-
     arm: Arms
     """
-    The arm to use
+    The arm to use.
     """
 
     keep_joint_states: bool = ActionConfig.navigate_keep_joint_states
@@ -246,27 +250,25 @@ class MoveAndPlaceAction(ActionDescription):
 @dataclass
 class MoveAndPickUpAction(ActionDescription):
     """
-    Navigate to `standing_position`, then turn towards the object and pick it up.
+    Navigate to `standing_position`, then turn towards the object and pick it
+    up.
     """
 
     standing_position: Pose
     """
-    The pose to stand before trying to pick up the object
+    The pose to stand before trying to pick up the object.
     """
-
     object_designator: Body
     """
-    The object to pick up
+    The object to pick up.
     """
-
     arm: Arms
     """
-    The arm to use
+    The arm to use.
     """
-
     grasp_description: GraspDescription
     """
-    The grasp to use
+    The grasp to use.
     """
 
     keep_joint_states: bool = ActionConfig.navigate_keep_joint_states
