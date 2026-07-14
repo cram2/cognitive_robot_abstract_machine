@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.backends import QueryBackend
     from krrood.entity_query_language.verbalization.vocabulary.english import Directive
 
-_log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def directive_for_backend(backend: Optional[QueryBackend]) -> Optional[Directive]:
@@ -239,7 +239,7 @@ class VerbalizationPipeline:
         """
         formatter = ANSIFormatter()
         if link_resolver is not None and not detect_osc8_support():
-            _log.warning(
+            logger.warning(
                 "The current terminal does not appear to support OSC 8 hyperlinks "
                 "(VTE_VERSION / TERM_PROGRAM / TERM not recognised). "
                 "link_resolver will be ignored for ANSI output."
@@ -277,10 +277,6 @@ class VerbalizationPipeline:
         return cls(renderer)
 
 
-#: Shared, stateless plain-text pipeline.
-_PLAIN_PIPELINE = VerbalizationPipeline.plain()
-
-
 def verbalize_expression(
     expression: SymbolicExpression, backend: Optional[QueryBackend] = None
 ) -> str:
@@ -299,4 +295,4 @@ def verbalize_expression(
     >>> verbalize_expression(a(entity(robot).where(robot.battery > 50)))
     'Find a Robot whose battery is greater than 50'
     """
-    return _PLAIN_PIPELINE.verbalize(expression, backend=backend)
+    return VerbalizationPipeline.plain().verbalize(expression, backend=backend)
