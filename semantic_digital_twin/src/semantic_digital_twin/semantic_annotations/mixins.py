@@ -9,6 +9,7 @@ import numpy as np
 import trimesh
 from typing_extensions import (
     TYPE_CHECKING,
+    ClassVar,
     Generic,
     List,
     Optional,
@@ -1058,6 +1059,18 @@ class LiquidSource(ABC):
     def pour_tilt_expression(self) -> sm.Scalar:
         """Symbolic tilt angle of the source while pouring; zero for a non-tilting source."""
 
+    def current_outflow_velocity(self, world: World) -> Optional[sm.Scalar]:
+        """
+        Live horizontal speed of the liquid leaving the source, in m/s, or ``None`` if unavailable.
+
+        A source whose pour dynamics expose a head can report the current exit speed; sources
+        without such a model return ``None`` so callers fall back to a nominal speed.
+
+        :param world: The world providing the forward kinematics.
+        :return: Symbolic exit speed, or ``None``.
+        """
+        return None
+
     @abstractmethod
     def couple_drain_to_gate(self, gate: sm.Scalar, world: World) -> None:
         """
@@ -1083,6 +1096,15 @@ class HasFillLevel(HasRootBody, LiquidSource):
 
     A filled container is itself a :class:`LiquidSource`: it can pour its contents into another
     container by tilting.
+    """
+
+    RIM_EXIT_TILT_EPSILON: ClassVar[float] = 1e-2
+    """
+    Softening term for normalizing the pour direction, in units of horizontal tilt magnitude.
+
+    Blended into the normalization as ``sqrt(tilt**2 + epsilon**2)`` so the exit point moves
+    smoothly from the rim centre (upright) to the rim edge (tilted) without a kink or a division
+    by zero at the near-vertical configuration, which keeps the predictive controller stable.
     """
 
     fill_connection: Optional[LiquidConnection] = field(default=None)
@@ -1245,7 +1267,12 @@ class HasFillLevel(HasRootBody, LiquidSource):
         :param overlap_gate_sharpness: Logistic steepness of the projectile-landing gate.
         """
         source_volume_rate = source.outflow_volume_rate(world)
-        landing_point = self.projectile_landing_point(source, world, exit_speed)
+        effective_exit_speed = source.current_outflow_velocity(world)
+        if effective_exit_speed is None:
+            effective_exit_speed = exit_speed
+        landing_point = self.projectile_landing_point(
+            source, world, effective_exit_speed
+        )
         gate = self._geometric_transfer_gate(
             source, world, landing_point, height_gate_sharpness, overlap_gate_sharpness
         )
@@ -1312,16 +1339,74 @@ class HasFillLevel(HasRootBody, LiquidSource):
         normalised_drain = self.fill_equation.symbolic_velocity(self.fill_connection)
         return -normalised_drain * self.fill_equation.cross_section_volume
 
+    def current_outflow_velocity(self, world: World) -> Optional[sm.Scalar]:
+        """
+        Torricelli exit speed from the current pour head, or ``None`` without a head model.
+
+        The liquid leaves the lip at ``sqrt(2 g h_head)``, where ``h_head`` is the height of the
+        liquid surface above the pouring lip, so a fuller or more tilted cup pours faster.  The
+        speed is floored at the nominal :data:`DEFAULT_POUR_EXIT_SPEED`, both to give a sensible
+        value while barely pouring and to bound the square-root gradient at zero head.
+
+        :param world: The world providing the forward kinematics.
+        :return: Symbolic exit speed, or ``None`` if the fill equation exposes no pour head.
+        """
+        if not isinstance(self.fill_equation, ArticulatedPouringEquation):
+            return None
+        head = self.fill_equation.head_above_lip(self.fill_connection)
+        return sm.sqrt(
+            sm.max(
+                sm.Scalar(DEFAULT_POUR_EXIT_SPEED**2),
+                2 * STANDARD_GRAVITY * head,
+            )
+        )
+
     def liquid_exit_point(self, world: World) -> Point3:
         """
-        The cup's rim centre in the world frame, where liquid leaves while pouring.
+        The point on the rim over which liquid pours, in the world frame.
+
+        While the cup is upright the exit point coincides with the rim centre; as it tilts the exit
+        point moves to the rim edge on the pour side, which is where the liquid actually spills.
 
         :param world: The world providing the forward kinematics.
         :return: Symbolic exit point in the world frame.
         """
-        return (
-            world.compose_forward_kinematics_expression(world.root, self.root)
-            @ self.rim_point()
+        return world.compose_forward_kinematics_expression(
+            world.root, self.root
+        ) @ self._rim_exit_point(world)
+
+    def _rim_exit_point(self, world: World) -> Point3:
+        """
+        The rim exit point in the cup frame: the rim edge along the horizontal pour direction.
+
+        The pour spills over the lowest rim edge, which lies in the direction opposite the
+        horizontal component of the world-up axis as seen from the cup.  The centre-to-edge offset
+        follows the rim's half-extents, so a wider cup exits farther from its centre.
+
+        :param world: The world providing the forward kinematics.
+        :return: Symbolic exit point in the cup frame.
+        """
+        collision = self.root.collision
+        lower = collision.min_point
+        upper = collision.max_point
+        cup_rotation_world = world.compose_forward_kinematics_expression(
+            self.root, world.root
+        ).to_rotation_matrix()
+        world_up_in_cup = cup_rotation_world @ Vector3.Z()
+        tilt_magnitude_squared = (
+            world_up_in_cup.x * world_up_in_cup.x
+            + world_up_in_cup.y * world_up_in_cup.y
+        )
+        normalization = sm.sqrt(tilt_magnitude_squared + self.RIM_EXIT_TILT_EPSILON**2)
+        half_extent_x = (upper.x - lower.x) / 2
+        half_extent_y = (upper.y - lower.y) / 2
+        return Point3(
+            x=(lower.x + upper.x) / 2
+            - world_up_in_cup.x / normalization * half_extent_x,
+            y=(lower.y + upper.y) / 2
+            - world_up_in_cup.y / normalization * half_extent_y,
+            z=upper.z,
+            reference_frame=self.root,
         )
 
     def liquid_exit_direction(self, world: World) -> Vector3:
@@ -1371,7 +1456,7 @@ class HasFillLevel(HasRootBody, LiquidSource):
         self,
         source: LiquidSource,
         world: World,
-        exit_speed: float,
+        exit_speed: sm.ScalarData,
         gravity: float = STANDARD_GRAVITY,
     ) -> Point3:
         """

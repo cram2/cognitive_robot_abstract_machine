@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import pytest
@@ -14,9 +15,11 @@ from semantic_digital_twin.exceptions import (
 )
 from semantic_digital_twin.physics.equations.pouring_equations import (
     ArticulatedPouringEquation,
+    DEFAULT_POUR_EXIT_SPEED,
     GatedArticulatedPouringEquation,
     GatedInflowEquation,
     InflowEquation,
+    STANDARD_GRAVITY,
     SymbolicFillContext,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel, LiquidSource
@@ -315,6 +318,107 @@ class TestTransferGate:
         assert upright_gate > 0.9
         assert tilted_gate < upright_gate
         assert tilted_gate < 0.5
+
+
+class TestCurrentOutflowVelocity:
+    """Validates the Torricelli exit speed derived from the live pour head."""
+
+    def _tilted_source(self, tilt: float) -> tuple[World, HasFillLevel]:
+        gate_world = TestTransferGate()
+        world, source, _ = gate_world._build_world(
+            source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
+        )
+        gate_world._set_source_offset(world, source, tilt)
+        return world, source
+
+    def test_matches_torricelli_of_pour_head(self):
+        """The exit speed is ``sqrt(2 g h_head)`` for the current head above the pouring lip."""
+        world, source = self._tilted_source(1.2)
+        head = source.fill_equation.head_above_lip(source.fill_connection).evaluate()[0]
+        velocity = source.current_outflow_velocity(world)
+        assert velocity is not None
+        assert velocity.evaluate()[0] == pytest.approx(
+            math.sqrt(2 * STANDARD_GRAVITY * head)
+        )
+        assert velocity.evaluate()[0] > 0
+
+    def test_more_tilt_pours_faster(self):
+        """A steeper tilt lifts more liquid above the lip, so the exit speed grows."""
+        gentle_world, gentle = self._tilted_source(0.6)
+        steep_world, steep = self._tilted_source(1.2)
+        assert (
+            steep.current_outflow_velocity(steep_world).evaluate()[0]
+            > gentle.current_outflow_velocity(gentle_world).evaluate()[0]
+        )
+
+    def test_floors_at_nominal_speed_when_barely_pouring(self):
+        """With no head above the lip the speed floors at the nominal default, not zero."""
+        world, source = self._tilted_source(0.0)
+        assert source.current_outflow_velocity(world).evaluate()[0] == pytest.approx(
+            DEFAULT_POUR_EXIT_SPEED
+        )
+
+    def test_source_without_pour_head_has_no_velocity(self):
+        """A source whose dynamics expose no head reports no exit speed."""
+        source = _StaticLiquidSource(exit_point=Point3(), volume_rate=0.01)
+        assert source.current_outflow_velocity(world=None) is None
+
+
+class TestLiquidExitPoint:
+    """Validates that liquid leaves from the rim edge on the pour side, not the rim centre."""
+
+    def _horizontal_half_extent(self, source: HasFillLevel) -> float:
+        collision = source.root.collision
+        return (collision.max_point.x - collision.min_point.x) / 2
+
+    def _rim_center_world(self, world: World, source: HasFillLevel) -> Point3:
+        return (
+            world.compose_forward_kinematics_expression(world.root, source.root)
+            @ source.rim_point()
+        )
+
+    def test_exit_point_at_rim_centre_when_upright(self):
+        """An upright cup has no pour direction, so the exit point stays at the rim centre."""
+        gate_world = TestTransferGate()
+        world, source, _ = gate_world._build_world(
+            source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
+        )
+        gate_world._set_source_offset(world, source, 0.0)
+
+        exit_point = source.liquid_exit_point(world)
+        rim_center = self._rim_center_world(world, source)
+
+        assert exit_point.x.evaluate()[0] == pytest.approx(
+            rim_center.x.evaluate()[0], abs=1e-3
+        )
+        assert exit_point.y.evaluate()[0] == pytest.approx(
+            rim_center.y.evaluate()[0], abs=1e-3
+        )
+
+    def test_exit_point_at_rim_edge_along_pour_direction_when_tilted(self):
+        """A tilted cup pours over the rim edge on the pour side, a full rim radius from centre."""
+        gate_world = TestTransferGate()
+        world, source, _ = gate_world._build_world(
+            source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
+        )
+        gate_world._set_source_offset(world, source, 1.2)
+
+        exit_point = source.liquid_exit_point(world)
+        rim_center = self._rim_center_world(world, source)
+        offset = exit_point - rim_center
+        offset_x = offset.x.evaluate()[0]
+        offset_y = offset.y.evaluate()[0]
+        offset_z = offset.z.evaluate()[0]
+
+        distance = math.sqrt(offset_x**2 + offset_y**2 + offset_z**2)
+        assert distance == pytest.approx(self._horizontal_half_extent(source), abs=1e-3)
+
+        pour_direction = source.liquid_exit_direction(world)
+        horizontal_alignment = (
+            offset_x * pour_direction.x.evaluate()[0]
+            + offset_y * pour_direction.y.evaluate()[0]
+        )
+        assert horizontal_alignment > 0
 
 
 class TestProjectileLandingPoint:

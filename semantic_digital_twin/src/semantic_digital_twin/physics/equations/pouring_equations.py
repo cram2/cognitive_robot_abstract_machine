@@ -14,7 +14,7 @@ from semantic_digital_twin.physics.equations.differential_equation import (
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 
-DEFAULT_POUR_EXIT_SPEED: float = 0.05
+DEFAULT_POUR_EXIT_SPEED: float = 0.2
 """Default horizontal speed of liquid leaving a fully tilted cup, in metres per second."""
 
 STANDARD_GRAVITY: float = 9.81
@@ -149,21 +149,36 @@ class ArticulatedPouringEquation(PouringEquation):
             outflow_rate_constant=data["outflow_rate_constant"],
         )
 
-    def symbolic_velocity(self, context: FillContext) -> Scalar:
+    def head_above_lip(self, context: FillContext) -> Scalar:
         """
+        Height of the liquid surface above the pouring lip, in metres.
+
+        Positive only while the tilt lifts the liquid past the lip, so it is zero whenever the
+        container is not spilling.  This is the head that drives the pour.
+
         :param context: Kinematic context providing the tilt and fill symbols.
-        :return: Symbolic d(fill_normalized)/dt as a CasADi expression.
+        :return: Symbolic head above the lip.
         """
         A = self.container_height
         r = self.container_width / 2
         h_sym = context.fill_position * A
         L_sym = sm.sqrt((A - h_sym) ** 2 + r**2)
         phi_sym = sm.atan2(A - h_sym, r)
-        gap_sym = sm.max(
+        return sm.max(
             sm.Scalar(0.0),
             L_sym * sm.sin(context.tilt_expression - phi_sym),
         )
-        return -self.outflow_rate_constant * gap_sym / A
+
+    def symbolic_velocity(self, context: FillContext) -> Scalar:
+        """
+        :param context: Kinematic context providing the tilt and fill symbols.
+        :return: Symbolic d(fill_normalized)/dt as a CasADi expression.
+        """
+        return (
+            -self.outflow_rate_constant
+            * self.head_above_lip(context)
+            / self.container_height
+        )
 
     @property
     def cross_section_volume(self) -> float:

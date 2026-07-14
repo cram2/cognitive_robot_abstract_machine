@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import ClassVar, Optional
 
 from krrood.symbolic_math.symbolic_math import Scalar
 
@@ -12,14 +12,20 @@ from giskardpy.motion_statechart.data_types import (
     ObservationStateValues,
 )
 from giskardpy.motion_statechart.exceptions import NodeInitializationError
-from giskardpy.motion_statechart.graph_node import NodeArtifacts, Task
+from giskardpy.motion_statechart.graph_node import (
+    DebugExpression,
+    NodeArtifacts,
+    Task,
+)
 from semantic_digital_twin.physics.equations.pouring_equations import (
     PouringEquation,
     SymbolicFillContext,
     tilt_expression_from_fk,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel, LiquidSource
+from semantic_digital_twin.spatial_types.spatial_types import Point3
 from semantic_digital_twin.world_description.connections import LiquidConnection
+from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -237,6 +243,12 @@ class KeepProjectileInReceiver(Task):
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
     """QP constraint weight for the landing-point goal."""
 
+    EXIT_POINT_COLOR: ClassVar[Color] = Color(R=0.0, G=0.6, B=1.0, A=1.0)
+    """Color of the exit-point marker (blue)."""
+
+    LANDING_POINT_COLOR: ClassVar[Color] = Color(R=1.0, G=0.0, B=0.0, A=1.0)
+    """Color of the landing-point marker (red)."""
+
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
         Creates the constraint driving the pour's projectile landing point to the receiver opening.
@@ -251,8 +263,11 @@ class KeepProjectileInReceiver(Task):
             raise NodeInitializationError(
                 self, "receiver has no inflow equation; call receive_outflow_from first"
             )
+        exit_speed = self.source.current_outflow_velocity(context.world)
+        if exit_speed is None:
+            exit_speed = inflow_equation.exit_speed
         landing_point = self.receiver.projectile_landing_point(
-            self.source, context.world, inflow_equation.exit_speed
+            self.source, context.world, exit_speed
         )
         receiver_opening = context.world.compose_forward_kinematics_expression(
             context.world.root, self.receiver.root
@@ -264,7 +279,30 @@ class KeepProjectileInReceiver(Task):
             reference_velocity=self.reference_velocity,
             quadratic_weight=self.weight,
         )
+        artifacts.debug_expressions.extend(
+            self._build_visualization_debug_expressions(context, landing_point)
+        )
         artifacts.observation = (
             receiver_opening.euclidean_distance(landing_point) < self.threshold
         )
         return artifacts
+
+    def _build_visualization_debug_expressions(
+        self, context: MotionStatechartContext, landing_point: Point3
+    ) -> list[DebugExpression]:
+        """
+        Build the debug expressions that visualize where the pour leaves and where it lands.
+
+        :param context: The build context.
+        :param landing_point: The projectile landing point on the receiver's opening plane.
+        :return: Debug expressions for the exit point and the landing point.
+        """
+        exit_point = self.source.liquid_exit_point(context.world)
+        return [
+            DebugExpression(
+                name="exit", expression=exit_point, color=self.EXIT_POINT_COLOR
+            ),
+            DebugExpression(
+                name="landing", expression=landing_point, color=self.LANDING_POINT_COLOR
+            ),
+        ]

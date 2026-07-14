@@ -95,6 +95,7 @@ class Giskard:
                     qp_controller_config=self.qp_controller_config,
                 ),
                 pacer=SimulationPacer(real_time_factor=real_time_factor),
+                publish_debug_expressions=self.behavior_tree_config.add_debug_marker_publisher,
             )
 
             self.behavior_tree_config.setup()

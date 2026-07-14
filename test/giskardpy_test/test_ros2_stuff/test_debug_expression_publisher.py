@@ -1,4 +1,5 @@
 import krrood.symbolic_math.symbolic_math as sm
+import numpy as np
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.debug_expression_publisher import (
@@ -10,6 +11,7 @@ from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.ros_executor import Ros2Executor
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import RevoluteConnection
 
 
 def align_planes_statechart(world: World) -> MotionStatechart:
@@ -85,6 +87,32 @@ def test_vector_with_reference_frame_is_transformed_to_visualisation_frame(
     request = publisher._to_request(DebugExpression(name="vector", expression=vector))
 
     assert request.spatial_type.reference_frame is bot
+
+
+def test_anchored_vector_tracks_moving_visualisation_frame(rclpy_node, mini_world):
+    """
+    A vector anchored to a moving visualisation frame stays correct as that frame moves.
+
+    A frame's own axis, expressed in the world and then anchored back into that frame, is the
+    constant local axis at every joint configuration; a stale (snapshot) anchoring transform
+    would instead let the value drift as the frame rotates.
+    """
+    tip = mini_world.get_body_by_name("tip")
+    joint = mini_world.get_connections_by_type(RevoluteConnection)[0]
+    root_rotation_tip = mini_world.compose_forward_kinematics_expression(
+        mini_world.root, tip
+    ).to_rotation_matrix()
+    tip_axis_in_world = root_rotation_tip @ Vector3.X(reference_frame=tip)
+    tip_axis_in_world.reference_frame = mini_world.root
+    tip_axis_in_world.visualisation_frame = tip
+
+    publisher = DebugExpressionPublisher(world=mini_world, node=rclpy_node)
+    anchored = publisher._anchored_expression(tip_axis_in_world)
+    mini_world.set_positions_1DOF_connection({joint: 1.0})
+
+    np.testing.assert_allclose(
+        anchored.evaluate().flatten()[:3], [1.0, 0.0, 0.0], atol=1e-6
+    )
 
 
 def test_attach_publisher_tracks_state_changes(rclpy_node, cylinder_bot_world):
