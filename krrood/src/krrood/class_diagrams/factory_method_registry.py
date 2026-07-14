@@ -25,7 +25,9 @@ class FactoryMethodRegistry(metaclass=SingletonMeta):
     names_by_owner: WeakKeyDictionary[Type, Set[str]] = field(
         default_factory=WeakKeyDictionary
     )
-    """Maps each declaring class to the factory-method names marked on its own body."""
+    """
+    Maps each declaring class to the factory-method names marked on its own body.
+    """
 
     def register(self, owner: Type, name: str) -> None:
         """

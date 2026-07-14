@@ -28,25 +28,37 @@ class DebugExpressionTrajectoryPlotter:
     """
 
     debug_expression_trajectory: DebugExpressionTrajectory = field(init=False)
-    """The recorded debug expression time series to plot."""
+    """
+    The recorded debug expression time series to plot.
+    """
 
     subplot_height_in_cm: float = 6.0
-    """Height of each debug expression subplot in cm."""
+    """
+    Height of each debug expression subplot in cm.
+    """
 
     second_width_in_cm: float = 2.0
-    """Width of a second in cm."""
+    """
+    Width of a second in cm.
+    """
 
     legend: bool = True
-    """If True, a legend is added to each subplot."""
+    """
+    If True, a legend is added to each subplot.
+    """
 
     def reset(self, debug_expressions: List[DebugExpression]) -> None:
-        """Prepare to record the given debug expressions, discarding any previous data."""
+        """
+        Prepare to record the given debug expressions, discarding any previous data.
+        """
         self.debug_expression_trajectory = (
             DebugExpressionTrajectory.from_debug_expressions(debug_expressions)
         )
 
     def _seconds_to_inches(self, seconds: float) -> float:
-        """Convert a duration in seconds to the drawable width in inches."""
+        """
+        Convert a duration in seconds to the drawable width in inches.
+        """
         return max(0.0, float(seconds)) * (self.second_width_in_cm / 2.54)
 
     def _build_figure(

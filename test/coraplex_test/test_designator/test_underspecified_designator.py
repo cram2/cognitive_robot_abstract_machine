@@ -22,9 +22,11 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 def test_underspecified_action(apartment_world_pr2_copy_with_context):
     """
-    Test that an underspecified action resolves to a concrete candidate and parses
-    into an executable. Execution is deferred to parse().execute(), so performing the
-    node only expands it; the resolved candidate is not performed here.
+    Test that an underspecified action resolves to a concrete candidate and parses into
+    an executable.
+
+    Execution is deferred to parse().execute(), so performing the node only expands it;
+    the resolved candidate is not performed here.
     """
     world, robot, context = apartment_world_pr2_copy_with_context
     action = underspecified(NavigateAction)(
@@ -55,8 +57,10 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
 def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_context):
     """
     Test that an underspecified action resolves and parses when a factory for a spatial
-    type is used with ellipsis. Execution is deferred to parse().execute(), so performing
-    the node only expands it; the resolved candidate is not performed here.
+    type is used with ellipsis.
+
+    Execution is deferred to parse().execute(), so performing the node only expands it;
+    the resolved candidate is not performed here.
     """
     world, robot, context = apartment_world_pr2_copy_with_context
     context.query_backend = ProbabilisticBackend()
@@ -85,7 +89,7 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
 
 def test_underspecified_language(apartment_world_pr2_copy_with_context):
     """
-    Test that entire plans can be underspecified
+    Test that entire plans can be underspecified.
     """
     world, robot, context = apartment_world_pr2_copy_with_context
     grasp_description = GraspDescription(

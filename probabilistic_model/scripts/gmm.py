@@ -62,6 +62,7 @@ variables = [Continuous(f"x_{i}") for i in range(number_of_variables)]
 def generate_gaussian_component(mean, variance):
     """
     Generate a Gaussian component for the GMM.
+
     :param mean: The mean of the Gaussian component.
     :param variance: The variance of the Gaussian component.
     :return: The generated Gaussian component.
@@ -120,6 +121,7 @@ jax.config.update("jax_traceback_filtering", "off")
 def loss(model, x):
     """
     Calculate the average negative log likelihood of the data given the model.
+
     :param model: The model to calculate the loss for.
     :param x: The data to calculate the loss for.
     :return: The average negative log likelihood of the data given the model.

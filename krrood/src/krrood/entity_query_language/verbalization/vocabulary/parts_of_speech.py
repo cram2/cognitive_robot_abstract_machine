@@ -34,12 +34,14 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 
 
 class ClauseElement(ABC):
-    """One typed part-of-speech constituent of a predicate clause.
+    """
+    One typed part-of-speech constituent of a predicate clause.
 
-    A predicate's ``_verbalization_fragment_`` builds its clause from these elements rather than raw
-    fragments, so the author writes the affirmative, present-tense form once and the realisation
-    passes inflect it (verb agreement, copula suppletion) and negate it (do-support). The element
-    only declares *what part of speech* a word is; how it is realised is the morphology pass's job.
+    A predicate's ``_verbalization_fragment_`` builds its clause from these elements
+    rather than raw fragments, so the author writes the affirmative, present-tense form
+    once and the realisation passes inflect it (verb agreement, copula suppletion) and
+    negate it (do-support). The element only declares *what part of speech* a word is;
+    how it is realised is the morphology pass's job.
     """
 
     @abstractmethod
@@ -49,16 +51,26 @@ class ClauseElement(ABC):
 
 @dataclass(frozen=True)
 class Noun(ClauseElement):
-    """A noun constituent — a predicate :class:`~krrood.entity_query_language.predicate.VerbalizationField`, an
-    already-rendered fragment, or a literal noun given by its *head word only*."""
+    """
+    A noun constituent — a predicate
+    :class:`~krrood.entity_query_language.predicate.VerbalizationField`, an already-
+    rendered fragment, or a literal noun given by its *head word only*.
+    """
 
     content: Union[str, "ClauseConstituent"]
-    """A literal noun *head* (the article is a feature, not part of the text — write ``"instance"``,
-    not ``"an instance"``), or any constituent (a field, a rendered fragment) rendered as-is."""
+    """
+    A literal noun *head* (the article is a feature, not part of the text — write
+    ``"instance"``, not ``"an instance"``), or any constituent (a field, a rendered
+    fragment) rendered as-is.
+    """
 
     definiteness: Definiteness = Definiteness.INDEFINITE
-    """For a literal-head noun, the article to realise — *"an instance"* (indefinite, the default) vs
-    *"the instance"*. Ignored when *content* is already a rendered constituent."""
+    """
+    For a literal-head noun, the article to realise — *"an instance"* (indefinite, the
+    default) vs *"the instance"*.
+
+    Ignored when *content* is already a rendered constituent.
+    """
 
     def as_fragment(self) -> VerbalizationFragment:
         """:return: an indefinite (or definite) noun phrase for a literal head — so the article is
@@ -95,15 +107,23 @@ class Noun(ClauseElement):
 
 @dataclass(frozen=True)
 class Verb(ClauseElement):
-    """A lexical verb given as its lemma. The morphology pass realises it present-tense
-    (*"work"* → *"works"*) and negates it with do-support (*"does not work"*)."""
+    """
+    A lexical verb given as its lemma.
+
+    The morphology pass realises it present-tense (*"work"* → *"works"*) and negates it
+    with do-support (*"does not work"*).
+    """
 
     lemma: str
-    """The verb's base form (*"work"*, *"contain"*, *"love"*)."""
+    """
+    The verb's base form (*"work"*, *"contain"*, *"love"*).
+    """
 
     number: GrammaticalNumber = GrammaticalNumber.SINGULAR
-    """The subject number the verb agrees with — ``PLURAL`` reads the bare *"work"* / *"have"* for a
-    coordinated or plural subject."""
+    """
+    The subject number the verb agrees with — ``PLURAL`` reads the bare *"work"* /
+    *"have"* for a coordinated or plural subject.
+    """
 
     def as_fragment(self) -> RoleFragment:
         """:return: a ``VERB``-role leaf carrying the lemma for the morphology pass to inflect.
@@ -116,10 +136,14 @@ class Verb(ClauseElement):
 
 @dataclass(frozen=True)
 class Adjective(ClauseElement):
-    """A predicative adjective complement after a copula (*"is **reachable**"*)."""
+    """
+    A predicative adjective complement after a copula (*"is **reachable**"*).
+    """
 
     word: str
-    """The adjective's surface word."""
+    """
+    The adjective's surface word.
+    """
 
     def as_fragment(self) -> WordFragment:
         """:return: a plain word leaf for the adjective.
@@ -132,8 +156,10 @@ class Adjective(ClauseElement):
 
 @dataclass(frozen=True)
 class Copula(ClauseElement):
-    """The copula *"is"* of a predicative clause — realised for number (*"is"* / *"are"*) and
-    negation (*"is not"*) by the morphology pass."""
+    """
+    The copula *"is"* of a predicative clause — realised for number (*"is"* / *"are"*)
+    and negation (*"is not"*) by the morphology pass.
+    """
 
     def as_fragment(self) -> RoleFragment:
         """:return: the affirmative singular copula leaf the morphology pass inflects.
@@ -146,19 +172,26 @@ class Copula(ClauseElement):
 
 @dataclass(frozen=True)
 class OneOf(ClauseElement):
-    """A bounded membership set — *"one of A, B, or C"* — over a collection of admissible values.
+    """
+    A bounded membership set — *"one of A, B, or C"* — over a collection of admissible
+    values.
 
-    This is the high-level element for a "the subject is one of these" clause (a tuple of admissible
-    types, a small value domain), so an author never re-implements the listing: each member renders
-    as a linked type reference when it is a class, else as a literal value, and a set larger than the
-    cap is summarised by count (*"one of seven types"*) rather than spelled out — the same bounded
-    surface a domain-constrained variable uses.
+    This is the high-level element for a "the subject is one of these" clause (a tuple
+    of admissible types, a small value domain), so an author never re-implements the
+    listing: each member renders as a linked type reference when it is a class, else as
+    a literal value, and a set larger than the cap is summarised by count (*"one of
+    seven types"*) rather than spelled out — the same bounded surface a domain-
+    constrained variable uses.
     """
 
     members: Union[Iterable, VerbalizationField]
-    """The admissible values — a predicate :class:`~krrood.entity_query_language.predicate.VerbalizationField`
-    bound to a collection, or a collection directly. Classes render as linked type references, other
-    values as literals."""
+    """
+    The admissible values — a predicate
+    :class:`~krrood.entity_query_language.predicate.VerbalizationField` bound to a
+    collection, or a collection directly.
+
+    Classes render as linked type references, other values as literals.
+    """
 
     def as_fragment(self) -> VerbalizationFragment:
         """:return: the membership phrase, or a count summary past the cap.
@@ -175,7 +208,10 @@ class OneOf(ClauseElement):
             else self.members
         )
         listed = one_of(
-            [RoleFragment.for_member(member) for member in members[: MAX_SET_MEMBERS + 1]]
+            [
+                RoleFragment.for_member(member)
+                for member in members[: MAX_SET_MEMBERS + 1]
+            ]
         )
         if listed is not None:
             return listed
@@ -195,18 +231,23 @@ class OneOf(ClauseElement):
 
 @dataclass(frozen=True)
 class Or(ClauseElement):
-    """A disjunctive listing of admissible values — *"A, B, or C"* — over a collection.
+    """
+    A disjunctive listing of admissible values — *"A, B, or C"* — over a collection.
 
-    The vocabulary-level oxford-comma disjunction over any iterable of members, each rendered by
-    :meth:`~…fragments.base.RoleFragment.for_member` (a class as a linked type reference, any other
-    value as a literal) and joined with *"or"*. An author writes ``Or(field)`` rather than reaching
-    for the low-level :func:`~…fragments.base.oxford_comma` / :class:`Conjunctions` builders. A field
+    The vocabulary-level oxford-comma disjunction over any iterable of members, each
+    rendered by :meth:`~…fragments.base.RoleFragment.for_member` (a class as a linked
+    type reference, any other value as a literal) and joined with *"or"*. An author
+    writes ``Or(field)`` rather than reaching for the low-level
+    :func:`~…fragments.base.oxford_comma` / :class:`Conjunctions` builders. A field
     bound to a single (non-iterable) value keeps that value's own rendered fragment.
     """
 
     members: Union[Iterable, VerbalizationField]
-    """The admissible values — a predicate :class:`~krrood.entity_query_language.predicate.VerbalizationField`
-    bound to an iterable (or a single value), or an iterable directly."""
+    """
+    The admissible values — a predicate
+    :class:`~krrood.entity_query_language.predicate.VerbalizationField` bound to an
+    iterable (or a single value), or an iterable directly.
+    """
 
     def as_fragment(self) -> VerbalizationFragment:
         """:return: the disjunction phrase *"A, B, or C"*, or a single member's own fragment.
@@ -232,7 +273,9 @@ class Or(ClauseElement):
 
 @runtime_checkable
 class ClauseConstituent(Protocol):
-    """The one contract every clause constituent satisfies: it renders itself to a :class:`VerbalizationFragment`.
+    """
+    The one contract every clause constituent satisfies: it renders itself to a
+    :class:`VerbalizationFragment`.
 
     A typed part-of-speech element (:class:`ClauseElement` — :class:`Noun` / :class:`Verb` / …), a
     :class:`~krrood.entity_query_language.verbalization.vocabulary.english.Prepositions` member, a

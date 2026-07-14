@@ -1,5 +1,7 @@
-"""General methods to access the current World. Reasoning about alternate world states is done in the corresponding
-Annotators.
+"""
+General methods to access the current World.
+
+Reasoning about alternate world states is done in the corresponding Annotators.
 """
 
 import sys
@@ -15,17 +17,24 @@ from semantic_digital_twin.world_description.connections import Connection6DoF
 this = sys.modules[__name__]
 
 this.world = None
-"""RoboKudo's central world state."""
+"""
+RoboKudo's central world state.
+"""
 
 this.world_entity_tracker = None
-"""RoboKudo's central entity tracker."""
+"""
+RoboKudo's central entity tracker.
+"""
 
 _rk_world_lock = Lock()
-"""Lock for safe creation of the central SemDT World and entity tracker."""
+"""
+Lock for safe creation of the central SemDT World and entity tracker.
+"""
 
 
 def get_world_entity_tracker() -> WorldEntityWithIDKwargsTracker:
-    """Get the entity tracker instance of for the current world.
+    """
+    Get the entity tracker instance of for the current world.
 
     :return: The current entity tracker instance.
     """
@@ -33,7 +42,8 @@ def get_world_entity_tracker() -> WorldEntityWithIDKwargsTracker:
 
 
 def init_world_with_entity_tracker() -> WorldEntityWithIDKwargsTracker:
-    """Initialize the world and entity tracker and return the entity tracker.
+    """
+    Initialize the world and entity tracker and return the entity tracker.
 
     :return: The newly created entity tracker instance.
     """
@@ -47,7 +57,8 @@ def init_world_with_entity_tracker() -> WorldEntityWithIDKwargsTracker:
 def init_world_entity_tracker_from_world(
     world: World,
 ) -> WorldEntityWithIDKwargsTracker:
-    """Initialize the entity tracker from the given world and return the entity tracker.
+    """
+    Initialize the entity tracker from the given world and return the entity tracker.
 
     :return: The newly created entity tracker instance.
     """
@@ -57,7 +68,8 @@ def init_world_entity_tracker_from_world(
 
 
 def world_instance() -> World:
-    """Return the world state for the currently running perception pipeline.
+    """
+    Return the world state for the currently running perception pipeline.
 
     .. warning::
     This is NOT necessarily the belief state World based on the previous analysis results.
@@ -76,7 +88,8 @@ def world_instance() -> World:
 
 
 def set_world(world: World) -> None:
-    """Clear the world state safely by overwriting it with the given instance.
+    """
+    Clear the world state safely by overwriting it with the given instance.
 
     :param world: The new world state.
     """
@@ -85,7 +98,8 @@ def set_world(world: World) -> None:
 
 
 def unsafe_set_world(world: World) -> None:
-    """Unsafely set the world state without acquiring the lock.
+    """
+    Unsafely set the world state without acquiring the lock.
 
     .. warning::
         Always acquire the lock manually before calling this method. Take a look at `this.set_world()` or
@@ -97,13 +111,16 @@ def unsafe_set_world(world: World) -> None:
 
 
 def clear_world() -> None:
-    """Clear the world state by instantiating a new World."""
+    """
+    Clear the world state by instantiating a new World.
+    """
     with _rk_world_lock:
         this.unsafe_clear_world()
 
 
 def unsafe_clear_world() -> None:
-    """Unsafely clear the world state without acquiring the lock.
+    """
+    Unsafely clear the world state without acquiring the lock.
 
     .. warning::
         Always acquire the lock manually before calling this method. Take a look at `this.clear_world()` or
@@ -113,7 +130,8 @@ def unsafe_clear_world() -> None:
 
 
 def world_has_body_by_name(world: World, body_name: str) -> bool:
-    """Check whether a body with a given name exists in the given world.
+    """
+    Check whether a body with a given name exists in the given world.
 
     :param world: The world to check in.
     :param body_name: The body name to search for.
@@ -131,7 +149,8 @@ def world_has_body_by_name(world: World, body_name: str) -> bool:
 
 
 def setup_world_for_camera_frame(world_frame: str, camera_frame: str) -> None:
-    """Set up the world and camera frames if they do not exist yet.
+    """
+    Set up the world and camera frames if they do not exist yet.
 
     :param world_frame: The name of the world frame.
     :param camera_frame: The name of the camera frame.

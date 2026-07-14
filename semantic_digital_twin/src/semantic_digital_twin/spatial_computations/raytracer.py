@@ -20,6 +20,7 @@ class RayTracer:
     """
     The world to use for ray tracing.
     """
+
     _last_world_model: int
     """
     Last model version of the world to which the ray tracer was updated.
@@ -28,6 +29,7 @@ class RayTracer:
     """
     Last state version of the world to which the ray tracer was updated.
     """
+
     index_to_body: dict
     """
     Maps the index of a body to the body itself.
@@ -36,6 +38,7 @@ class RayTracer:
     """
     Maps the index in the trimesh scene to the index of the body in the world.
     """
+
     scene: Scene
     """
     The trimesh scene used for ray tracing which mirrors the world.
@@ -59,7 +62,9 @@ class RayTracer:
     def update_scene(self):
         """
         Updates the ray tracer scene with the current state of the world.
-        This method should be called whenever the world changes to ensure the ray tracer has the latest information.
+
+        This method should be called whenever the world changes to ensure the ray tracer
+        has the latest information.
         """
         if self._last_world_model != self.world.get_world_model_manager().version:
             self.add_missing_bodies()
@@ -70,7 +75,8 @@ class RayTracer:
 
     def add_missing_bodies(self):
         """
-        Adds all bodies from the world to the ray tracer scene that are not already present.
+        Adds all bodies from the world to the ray tracer scene that are not already
+        present.
         """
         # Bodies are added to the scene with their name as the node name plus a suffix for collision geometries.
         # We check if a body is not in the complete list of all node names in the scene graph.
@@ -97,7 +103,9 @@ class RayTracer:
     def update_transforms(self):
         """
         Updates the transforms of all bodies in the ray tracer scene.
-        This is necessary to ensure that the ray tracing uses the correct positions and orientations.
+
+        This is necessary to ensure that the ray tracing uses the correct positions and
+        orientations.
         """
         for body in self.world.bodies:
             for i, collision in enumerate(body.collision):
@@ -115,8 +123,11 @@ class RayTracer:
         max_distance: float = np.inf,
     ) -> np.ndarray:
         """
-        Creates a segmentation mask for the ray tracer scene from the camera position to the target position. Each pixel
-        in the mask corresponds to the index of a body in the scene or -1 if no body is hit at that pixel.
+        Creates a segmentation mask for the ray tracer scene from the camera position to
+        the target position.
+
+        Each pixel in the mask corresponds to the index of a body in the scene or -1 if
+        no body is hit at that pixel.
 
         :param camera_pose: The position of the camera.
         :param resolution: The resolution of the segmentation mask.
@@ -163,9 +174,11 @@ class RayTracer:
         max_distance: float = np.inf,
     ) -> np.ndarray:
         """
-        Creates a depth map for the ray tracer scene from the camera position to the target position. Each pixel in the
-        depth map corresponds to the distance from the camera to the closest point on the surface of the scene or -1 if
-        no point is hit.
+        Creates a depth map for the ray tracer scene from the camera position to the
+        target position.
+
+        Each pixel in the depth map corresponds to the distance from the camera to the
+        closest point on the surface of the scene or -1 if no point is hit.
 
         :param camera_pose: The position of the camera.
         :param resolution: The resolution of the depth map.
@@ -214,13 +227,17 @@ class RayTracer:
         self, camera_pose: GenericSpatialType, resolution: int = 512, fov=90
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Creates camera rays for the ray tracer scene from the camera position to the target position. Places the camera
-        at the given position and orientation view of the camera is along the x-axis.
+        Creates camera rays for the ray tracer scene from the camera position to the
+        target position.
+
+        Places the camera at the given position and orientation view of the camera is
+        along the x-axis.
 
         :param camera_pose: The position of the camera as a 4x4 transformation matrix.
         :param resolution: The resolution of the camera rays.
         :param fov: The field of view of the camera in degrees.
-        :return: The origin points of the rays, the direction vectors of the rays, and the pixel coordinates.
+        :return: The origin points of the rays, the direction vectors of the rays, and
+            the pixel coordinates.
         """
         camera_pose = camera_pose.to_np()
         self.update_scene()
@@ -248,14 +265,16 @@ class RayTracer:
         max_distance: float = np.inf,
     ) -> Tuple[np.ndarray, np.ndarray, List[Body]]:
         """
-        Performs a ray test from the origin point to the target point in the ray tracer scene.
+        Performs a ray test from the origin point to the target point in the ray tracer
+        scene.
 
         :param origin_points: The starting point of the ray.
         :param target_points: The end point of the ray.
         :param multiple_hits: Whether to return multiple hits or not.
         :param min_distance: The minimum distance of a body to be considered a hit.
         :param max_distance: The maximum distance of a body to be considered a hit.
-        :return: A tuple containing the points where the ray intersects and the indices of rays that hit the scene as well as the bodies that were.
+        :return: A tuple containing the points where the ray intersects and the indices
+            of rays that hit the scene as well as the bodies that were.
         """
         origin_points = np.array(origin_points)
         target_points = np.array(target_points)

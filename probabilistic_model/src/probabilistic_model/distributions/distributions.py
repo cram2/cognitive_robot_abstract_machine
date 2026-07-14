@@ -79,6 +79,7 @@ class UnivariateDistribution(ProbabilisticModel):
     def composite_set_from_event(self, event: Event) -> AbstractCompositeSet:
         """
         Extract the composite set from the event that is relevant for this distribution.
+
         :param event: The event
         :return: The composite set
         """
@@ -105,6 +106,7 @@ class ContinuousDistribution(UnivariateDistribution):
     def cumulative_distribution_function(self, x: npt.NDArray) -> npt.NDArray:
         """
         Calculate the cumulative distribution function at x.
+
         :param x: The data
         :return: The cumulative distribution function at x
         """
@@ -157,7 +159,8 @@ class ContinuousDistribution(UnivariateDistribution):
         Calculate the truncated distribution given a simple interval.
 
         :param interval: The simple interval
-        :param singleton_allowed: Whether the simple interval is allowed to be a singleton.
+        :param singleton_allowed: Whether the simple interval is allowed to be a
+            singleton.
         :return: The truncated distribution and the log-probability of the interval.
         """
         if singleton_allowed and interval.is_singleton():
@@ -181,7 +184,8 @@ class ContinuousDistribution(UnivariateDistribution):
         self, interval: SimpleInterval
     ) -> Tuple[Optional[ContinuousDistribution], float]:
         """
-        Calculate the truncated distribution given a simple interval that is not a singleton.
+        Calculate the truncated distribution given a simple interval that is not a
+        singleton.
 
         :param interval: The simple interval
         :return: The truncated distribution and the log-probability of the interval.
@@ -214,6 +218,7 @@ class ContinuousDistributionWithFiniteSupport(ContinuousDistribution):
     def left_included_condition(self, x: npt.NDArray) -> npt.NDArray:
         """
         Check if x is included in the left bound of the interval.
+
         :param x: The data
         :return: A boolean array
         """
@@ -226,6 +231,7 @@ class ContinuousDistributionWithFiniteSupport(ContinuousDistribution):
     def right_included_condition(self, x: npt.NDArray) -> npt.NDArray:
         """
         Check if x is included in the right bound of the interval.
+
         :param x: The data
         :return: A boolean array
         """
@@ -238,6 +244,7 @@ class ContinuousDistributionWithFiniteSupport(ContinuousDistribution):
     def included_condition(self, x: npt.NDArray) -> npt.NDArray:
         """
         Check if x is included in interval.
+
         :param x: The data
         :return: A boolean array
         """
@@ -255,7 +262,9 @@ class ContinuousDistributionWithFiniteSupport(ContinuousDistribution):
     @abstractmethod
     def log_likelihood_without_bounds_check(self, x: npt.NDArray) -> npt.NDArray:
         """
-        Evaluate the logarithmic likelihood function at `x` without checking the inclusion into the interval.
+        Evaluate the logarithmic likelihood function at `x` without checking the
+        inclusion into the interval.
+
         :param x: x where p(x) > 0
         :return: log(p(x))
         """
@@ -308,8 +317,9 @@ class DiscreteDistribution(UnivariateDistribution):
         """
         Fit the distribution to the data.
 
-        The probabilities are set equal to the frequencies in the data.
-        The data contains the indices of the domain elements (if symbolic) or the values (if integer).
+        The probabilities are set equal to the frequencies in the data. The data
+        contains the indices of the domain elements (if symbolic) or the values (if
+        integer).
 
         :param data: The data.
         :return: The fitted distribution
@@ -497,7 +507,9 @@ class SymbolicDistribution(DiscreteDistribution):
 
     def fit_from_indices(self, data: npt.NDArray) -> Self:
         """
-        Fit the distribution to the data, where the data contains the indices of the domain elements.
+        Fit the distribution to the data, where the data contains the indices of the
+        domain elements.
+
         :param data: The data.
         :return: The fitted distribution
         """
@@ -513,8 +525,9 @@ class SymbolicDistribution(DiscreteDistribution):
 @dataclass
 class IntegerDistribution(ContinuousDistribution, DiscreteDistribution):
     """
-    Abstract base class for integer distributions. Integer distributions also implement the methods of continuous
-    distributions.
+    Abstract base class for integer distributions.
+
+    Integer distributions also implement the methods of continuous distributions.
     """
 
     variable: Integer = field(kw_only=True)
@@ -604,6 +617,7 @@ class IntegerDistribution(ContinuousDistribution, DiscreteDistribution):
 class DiracDeltaDistribution(ContinuousDistribution):
     """
     Class for Dirac delta distributions.
+
     The Dirac measure is used whenever evidence is given as a singleton instance.
 
     https://en.wikipedia.org/wiki/Dirac_delta_function
@@ -619,12 +633,14 @@ class DiracDeltaDistribution(ContinuousDistribution):
     density_cap: float = field(default=np.inf)
     """
     The density cap of the Dirac delta distribution.
+
     This value will be used to replace infinity in likelihood.
     """
 
     tolerance: float = field(default=1e-6, compare=False)
     """
     The tolerance of deviations of the `location` of the Dirac delta distribution.
+
     This is used during calculations to take precision problems into account.
     """
 

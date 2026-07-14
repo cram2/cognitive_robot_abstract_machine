@@ -21,9 +21,11 @@ if TYPE_CHECKING:
 @dataclass
 class ContextIsUnavailable(DataclassException):
     """
-    Raised when an instance that tries to access the context of a plan has no reference to the plan.
+    Raised when an instance that tries to access the context of a plan has no reference
+    to the plan.
 
-    Most likely raised when an action created a subplan without calling `ActionDescription.add_subplan`
+    Most likely raised when an action created a subplan without calling
+    `ActionDescription.add_subplan`
     """
 
     instance: Designator
@@ -43,8 +45,8 @@ class ContextIsUnavailable(DataclassException):
 @dataclass
 class TipLinkDoesNotMatchAnyArm(DataclassException):
     """
-    Raised when a reachability validator's tip link is not the tool frame of any arm of the robot,
-    so no arm can be selected to reach the requested pose.
+    Raised when a reachability validator's tip link is not the tool frame of any arm of
+    the robot, so no arm can be selected to reach the requested pose.
     """
 
     tip_link: KinematicStructureEntity

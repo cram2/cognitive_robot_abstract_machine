@@ -40,6 +40,7 @@ class GoalValidator:
     """
     Whether to raise an error if the goal is not achieved.
     """
+
     total_wait_time: Optional[timedelta] = None
     """
     The total wait time that was spent waiting for the goal to be achieved.
@@ -55,10 +56,11 @@ class GoalValidator:
         Initialize the goal validator.
 
         :param error_checker: The error checker.
-        :param current_value_getter: The current value getter function which takes an optional input and returns the
-        current value.
-        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal achieved, if given, will be
-        used to check if this percentage is achieved instead of the complete goal.
+        :param current_value_getter: The current value getter function which takes an
+            optional input and returns the current value.
+        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal
+            achieved, if given, will be used to check if this percentage is achieved
+            instead of the complete goal.
         """
         self.error_checker: ErrorChecker = error_checker
         self.current_value_getter: Callable[[Optional[Any]], Any] = current_value_getter
@@ -82,7 +84,8 @@ class GoalValidator:
         Register the goal value and wait until the target is reached.
 
         :param goal_value: The goal value.
-        :param current_value_getter_input: The values that are used as input to the current value getter.
+        :param current_value_getter_input: The values that are used as input to the
+            current value getter.
         :param initial_value: The initial value.
         :param acceptable_error: The acceptable error.
         :param max_wait_time: The maximum time to wait.
@@ -173,7 +176,8 @@ class GoalValidator:
         Register the goal value.
 
         :param goal_value: The goal value.
-        :param current_value_getter_input: The values that are used as input to the current value getter.
+        :param current_value_getter_input: The values that are used as input to the
+            current value getter.
         :param initial_value: The initial value.
         :param acceptable_error: The acceptable error.
         """
@@ -281,8 +285,8 @@ class GoalValidator:
         self, error: Any, threshold: Optional[float] = 1e-3
     ) -> np.ndarray:
         """
-        Get the relative error by comparing the error with the acceptable error and filtering out the errors that are
-        less than the threshold.
+        Get the relative error by comparing the error with the acceptable error and
+        filtering out the errors that are less than the threshold.
 
         :param error: The error.
         :param threshold: The threshold.
@@ -342,10 +346,11 @@ class PoseGoalValidator(GoalValidator):
         """
         Initialize the pose goal validator.
 
-        :param current_pose_getter: The current pose getter function which takes an optional input and returns the
-        current pose.
+        :param current_pose_getter: The current pose getter function which takes an
+            optional input and returns the current pose.
         :param acceptable_error: The acceptable error.
-        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal achieved.
+        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal
+            achieved.
         """
         super().__init__(
             PoseErrorChecker(acceptable_error, is_iterable=is_iterable),
@@ -371,10 +376,11 @@ class MultiPoseGoalValidator(PoseGoalValidator):
         """
         Initialize the multi-pose goal validator.
 
-        :param current_poses_getter: The current poses getter function which takes an optional input and returns the
-        current poses.
+        :param current_poses_getter: The current poses getter function which takes an
+            optional input and returns the current poses.
         :param acceptable_error: The acceptable error.
-        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal achieved.
+        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal
+            achieved.
         """
         super().__init__(
             current_poses_getter,
@@ -399,10 +405,11 @@ class PositionGoalValidator(GoalValidator):
         """
         Initialize the position goal validator.
 
-        :param current_position_getter: The current position getter function which takes an optional input and
-         returns the current position.
+        :param current_position_getter: The current position getter function which takes
+            an optional input and returns the current position.
         :param acceptable_error: The acceptable error.
-        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal achieved.
+        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal
+            achieved.
         :param is_iterable: Whether it is a sequence of position vectors.
         """
         super().__init__(
@@ -414,7 +421,8 @@ class PositionGoalValidator(GoalValidator):
 
 class MultiPositionGoalValidator(PositionGoalValidator):
     """
-    A class to validate the multi-position goal by tracking the goal achievement progress.
+    A class to validate the multi-position goal by tracking the goal achievement
+    progress.
     """
 
     def __init__(
@@ -426,10 +434,11 @@ class MultiPositionGoalValidator(PositionGoalValidator):
         """
         Initialize the multi-position goal validator.
 
-        :param current_positions_getter: The current positions getter function which takes an optional input and
-         returns the current positions.
+        :param current_positions_getter: The current positions getter function which
+            takes an optional input and returns the current positions.
         :param acceptable_error: The acceptable error.
-        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal achieved.
+        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal
+            achieved.
         """
         super().__init__(
             current_positions_getter,
@@ -454,10 +463,11 @@ class OrientationGoalValidator(GoalValidator):
         """
         Initialize the orientation goal validator.
 
-        :param current_orientation_getter: The current orientation getter function which takes an optional input and
-         returns the current orientation.
+        :param current_orientation_getter: The current orientation getter function which
+            takes an optional input and returns the current orientation.
         :param acceptable_error: The acceptable error.
-        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal achieved.
+        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal
+            achieved.
         :param is_iterable: Whether it is a sequence of quaternions.
         """
         super().__init__(
@@ -469,7 +479,8 @@ class OrientationGoalValidator(GoalValidator):
 
 class MultiOrientationGoalValidator(OrientationGoalValidator):
     """
-    A class to validate the multi-orientation goal by tracking the goal achievement progress.
+    A class to validate the multi-orientation goal by tracking the goal achievement
+    progress.
     """
 
     def __init__(
@@ -481,10 +492,11 @@ class MultiOrientationGoalValidator(OrientationGoalValidator):
         """
         Initialize the multi-orientation goal validator.
 
-        :param current_orientations_getter: The current orientations getter function which takes an optional input and
-         returns the current orientations.
+        :param current_orientations_getter: The current orientations getter function
+            which takes an optional input and returns the current orientations.
         :param acceptable_error: The acceptable error.
-        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal achieved.
+        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal
+            achieved.
         """
         super().__init__(
             current_orientations_getter,
@@ -496,7 +508,8 @@ class MultiOrientationGoalValidator(OrientationGoalValidator):
 
 class JointPositionGoalValidator(GoalValidator):
     """
-    A class to validate the joint position goal by tracking the goal achievement progress.
+    A class to validate the joint position goal by tracking the goal achievement
+    progress.
     """
 
     def __init__(
@@ -511,12 +524,14 @@ class JointPositionGoalValidator(GoalValidator):
         """
         Initialize the joint position goal validator.
 
-        :param current_position_getter: The current position getter function which takes an optional input and returns
-         the current position.
+        :param current_position_getter: The current position getter function which takes
+            an optional input and returns the current position.
         :param acceptable_error: The acceptable error.
-        :param acceptable_revolute_joint_position_error: The acceptable orientation error.
+        :param acceptable_revolute_joint_position_error: The acceptable orientation
+            error.
         :param acceptable_prismatic_joint_position_error: The acceptable position error.
-        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal achieved.
+        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal
+            achieved.
         :param is_iterable: Whether it is a sequence of joint positions.
         """
         super().__init__(
@@ -540,7 +555,8 @@ class JointPositionGoalValidator(GoalValidator):
 
         :param goal_value: The goal value.
         :param joint_type: The joint type (e.g. REVOLUTE, PRISMATIC).
-        :param current_value_getter_input: The values that are used as input to the current value getter.
+        :param current_value_getter_input: The values that are used as input to the
+            current value getter.
         :param initial_value: The initial value.
         :param acceptable_error: The acceptable error.
         """
@@ -557,7 +573,8 @@ class JointPositionGoalValidator(GoalValidator):
 
 class MultiJointPositionGoalValidator(GoalValidator):
     """
-    A class to validate the multi-joint position goal by tracking the goal achievement progress.
+    A class to validate the multi-joint position goal by tracking the goal achievement
+    progress.
     """
 
     def __init__(
@@ -571,12 +588,14 @@ class MultiJointPositionGoalValidator(GoalValidator):
         """
         Initialize the multi-joint position goal validator.
 
-        :param current_positions_getter: The current positions getter function which takes an optional input and
-         returns the current positions.
+        :param current_positions_getter: The current positions getter function which
+            takes an optional input and returns the current positions.
         :param acceptable_error: The acceptable error.
-        :param acceptable_revolute_joint_position_error: The acceptable orientation error.
+        :param acceptable_revolute_joint_position_error: The acceptable orientation
+            error.
         :param acceptable_prismatic_joint_position_error: The acceptable position error.
-        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal achieved.
+        :param acceptable_percentage_of_goal_achieved: The acceptable percentage of goal
+            achieved.
         """
         super().__init__(
             SingleValueErrorChecker(acceptable_error, is_iterable=True),
@@ -702,10 +721,11 @@ def validate_joint_position(position_setter_func):
 
 def validate_multiple_joint_positions(position_setter_func):
     """
-    A decorator to validate the joint positions, this function does not validate the virtual joints,
-    as in multiverse the virtual joints take command velocities and not positions, so after their goals
-    are set, they are zeroed thus can't be validated. (They are actually validated by the robot pose in case
-    of virtual mobile base joints)
+    A decorator to validate the joint positions, this function does not validate the
+    virtual joints, as in multiverse the virtual joints take command velocities and not
+    positions, so after their goals are set, they are zeroed thus can't be validated.
+    (They are actually validated by the robot pose in case of virtual mobile base
+    joints)
 
     :param position_setter_func: The function to set the joint positions.
     """

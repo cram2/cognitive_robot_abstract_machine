@@ -45,8 +45,10 @@ logger = logging.getLogger(__name__)
 
 class AlternativelyMaps(ClassRelation):
     """
-    Edge type that says that the source alternativly maps the target, e. g.
-    `AlternativeMaps(source=PointMapping, target=Point)` means that PointMapping is the mapping for Point.
+    Edge type that says that the source alternativly maps the target, e.
+
+    g. `AlternativeMaps(source=PointMapping, target=Point)` means that PointMapping is
+    the mapping for Point.
     """
 
 
@@ -69,6 +71,7 @@ class ORMatic:
     type_mappings: TypeDict = field(default_factory=TypeDict)
     """
     A dict that maps classes to custom types that should be used to save the classes.
+
     They keys of the type mappings must be disjoint with the classes given..
     """
 
@@ -94,7 +97,9 @@ class ORMatic:
 
     inheritance_graph: rx.PyDiGraph[int] = field(default=None, init=False)
     """
-    A graph that represents the inheritance structure of the classes. Extracted from the class dependency graph.
+    A graph that represents the inheritance structure of the classes.
+
+    Extracted from the class dependency graph.
     """
 
     wrapped_tables: Dict[WrappedClass, WrappedTable] = field(
@@ -124,7 +129,7 @@ class ORMatic:
 
     def _fill_type_mappings(self):
         """
-        Fill the type mappings of this with needed defaults
+        Fill the type mappings of this with needed defaults.
         """
         self.type_mappings[Type] = TypeType
         self.type_mappings[type] = TypeType
@@ -188,14 +193,12 @@ class ORMatic:
         self, wrapped_class: WrappedClass
     ) -> Optional[WrappedClass]:
         """
-        Finds and returns an alternative mapping for the given wrapped class,
-        if one exists, based on the relations specified in
-        `alternatively_maps_relations`.
+        Finds and returns an alternative mapping for the given wrapped class, if one
+        exists, based on the relations specified in `alternatively_maps_relations`.
 
-        :param wrapped_class: The wrapped class for which an alternative
-            mapping is to be searched.
-        :return: An alternate mapping of the type WrappedClass if found,
-            otherwise None.
+        :param wrapped_class: The wrapped class for which an alternative mapping is to
+            be searched.
+        :return: An alternate mapping of the type WrappedClass if found, otherwise None.
         """
         for rel in self.alternatively_maps_relations:
             if rel.target == wrapped_class:
@@ -268,7 +271,8 @@ class ORMatic:
 
     def to_sqlalchemy_file(self, file: TextIO):
         """
-        Generate a Python file with SQLAlchemy declarative mappings from the ORMatic models.
+        Generate a Python file with SQLAlchemy declarative mappings from the ORMatic
+        models.
 
         :param file: The file to write to
         """
@@ -287,16 +291,14 @@ class ORMatic:
         """
         Create an instance from a list of packages, dependencies, and ignored classes.
 
-
         :param packages: The packages that should be scanned for dataclasses.
         :param ormatic_interface_dependencies: The dependent ormatic_interfaces.
         :param ignored_classes: The classes that should be ignored.
         :param type_mappings: The type mappings that should be used.
-        :param ignore_krrood_test_classes: Rather to ignore classes from the krrood test package.
-
+        :param ignore_krrood_test_classes: Rather to ignore classes from the krrood test
+            package.
         :return: The ORMatic instance.
         """
-
         all_classes, all_alternative_mappings, all_type_mappings = set(), set(), {}
 
         # import classes from the existing interface

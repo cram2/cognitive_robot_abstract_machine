@@ -19,36 +19,52 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
 
 @dataclass(frozen=True)
 class AttributeAssignment:
-    """One ``object.attribute == value`` equality from a match's construction pattern."""
+    """
+    One ``object.attribute == value`` equality from a match's construction pattern.
+    """
 
     attribute: Attribute
-    """The matched attribute (``position.x``)."""
+    """
+    The matched attribute (``position.x``).
+    """
 
     value: SymbolicExpression
-    """The value the attribute is equated to."""
+    """
+    The value the attribute is equated to.
+    """
 
     is_predicted: bool
-    """``True`` when the value is ``...`` (Ellipsis) — the attribute is to be generated, verbalised
-    as *"predict …"* rather than an equality."""
+    """
+    ``True`` when the value is ``...`` (Ellipsis) — the attribute is to be generated,
+    verbalised as *"predict …"* rather than an equality.
+    """
 
     comparator: Comparator
-    """The source ``attribute == value`` equality, so an ungrouped concrete assignment can be said
-    through the shared comparator-predicate path (and pronominalised by coreference) rather than a
-    hand-built genitive."""
+    """
+    The source ``attribute == value`` equality, so an ungrouped concrete assignment can
+    be said through the shared comparator-predicate path (and pronominalised by
+    coreference) rather than a hand-built genitive.
+    """
 
 
 @dataclass(frozen=True)
 class AttributeGroup:
-    """The equality assignments that share one object — e.g. the *x*, *y*, *z* of one position —
-    so they can be aggregated into *"x, y, and z of the position are 1, 2, and 3 respectively"*.
+    """
+    The equality assignments that share one object — e.g. the *x*, *y*, *z* of one
+    position — so they can be aggregated into *"x, y, and z of the position are 1, 2,
+    and 3 respectively"*.
     """
 
     object: SymbolicExpression
-    """The object whose attributes these are — the selection itself for a direct attribute, or a
-    sub-object chain (``pose.position``) for a nested match's attributes."""
+    """
+    The object whose attributes these are — the selection itself for a direct attribute,
+    or a sub-object chain (``pose.position``) for a nested match's attributes.
+    """
 
     assignments: List[AttributeAssignment]
-    """The attribute assignments on *object*, in construction order."""
+    """
+    The attribute assignments on *object*, in construction order.
+    """
 
     @property
     def concrete(self) -> List[AttributeAssignment]:
@@ -75,34 +91,51 @@ class AttributeGroup:
 
 @dataclass(frozen=True)
 class MatchPlan:
-    """The *what to say* decomposition of a match: whether it is generative, what it selects, the
-    grouped construction-pattern equalities, and the free ``where`` conditions."""
+    """
+    The *what to say* decomposition of a match: whether it is generative, what it
+    selects, the grouped construction-pattern equalities, and the free ``where``
+    conditions.
+    """
 
     underspecified: bool
-    """``True`` ⇒ a generative request (*"Generate"*); ``False`` ⇒ a domain search (*"Find"*)."""
+    """
+    ``True`` ⇒ a generative request (*"Generate"*); ``False`` ⇒ a domain search
+    (*"Find"*).
+    """
 
     selection: SymbolicExpression
-    """The variable the match constructs/selects."""
+    """
+    The variable the match constructs/selects.
+    """
 
     groups: List[AttributeGroup]
-    """Single-hop construction equalities, grouped by their object."""
+    """
+    Single-hop construction equalities, grouped by their object.
+    """
 
     other_conditions: List[SymbolicExpression]
-    """Construction conditions that don't group (multi-hop chains, type filters); rendered as
-    individual *"given that"* points."""
+    """
+    Construction conditions that don't group (multi-hop chains, type filters); rendered
+    as individual *"given that"* points.
+    """
 
     where_conditions: List[SymbolicExpression]
-    """The conditions added via ``.where(...)``. The plan only classifies them as the ``where``
-    part; deciding how to say a list of conditions (including folding bound pairs into a *between*)
-    belongs to the condition verbalizer, not here."""
+    """
+    The conditions added via ``.where(...)``.
+
+    The plan only classifies them as the ``where`` part; deciding how to say a list of
+    conditions (including folding bound pairs into a *between*) belongs to the condition
+    verbalizer, not here.
+    """
 
 
 @dataclass
 class MatchPlanner(Planner[Match, MatchPlan]):
     """
-    Decompose a ``Match`` into a ``MatchPlan``: split the construction-pattern equalities (which
-    become *"given that"*) from the ``where`` conditions, and aggregate the single-hop equalities by
-    their object so related attributes (a position's x/y/z) verbalise together.
+    Decompose a ``Match`` into a ``MatchPlan``: split the construction-pattern
+    equalities (which become *"given that"*) from the ``where`` conditions, and
+    aggregate the single-hop equalities by their object so related attributes (a
+    position's x/y/z) verbalise together.
 
     Reference: :cite:t:`reiter2000building` — content determination + aggregation (microplanning).
 

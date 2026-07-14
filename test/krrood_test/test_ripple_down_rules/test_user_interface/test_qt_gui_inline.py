@@ -24,7 +24,9 @@ from ..test_object_diagram import Person, Address
     "and they need visual inspection by a user and cannot be run automatically.",
 )
 class GUITestCase(unittest.TestCase):
-    """Test case for the GUI components of the ripple down rules package."""
+    """
+    Test case for the GUI components of the ripple down rules package.
+    """
 
     viewer: RDRCaseViewer
     cq: CaseQuery

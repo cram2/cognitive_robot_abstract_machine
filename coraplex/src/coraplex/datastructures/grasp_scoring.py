@@ -20,28 +20,30 @@ class ScoredGrasp:
     """
     Represents a grasp candidate that has been evaluated and scored.
     """
+
     pose: Pose
     """A 4x4 transformation matrix representing the grasp pose."""
-    
+
     score: float
     """The calculated quality score for this grasp."""
-    
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     """A unique identifier for the grasp."""
+
 
 @dataclass
 class GraspScorer:
     """Evaluates and ranks grasp poses using geometric checks and heuristics."""
-    
+
     weight_normal: float = 15.0
     """Weight assigned to well-aligned opposing normals."""
-    
+
     weight_distance: float = 5.0
     """Weight assigned to the magnitude of grip distance between contacts."""
-    
+
     weight_clearance: float = 10.0
     """Weight for maintaining safe clearance above the ground plane."""
-    
+
     penalty_collision: float = -1000.0
     """Penalty applied when the gripper collides with the object mesh."""
 
@@ -52,16 +54,16 @@ class GraspScorer:
         registers as zero-depth contact. Without a tolerance such valid grasps would be
         wrongly penalized as collisions.
     """
-    
+
     penalty_clearance: float = -1000.0
     """Penalty applied when the gripper hits or dips below the ground plane."""
-    
+
     penalty_unstable: float = -500.0
     """Penalty applied when an unstable (e.g. fewer than 2) contact points are found."""
-    
+
     score_partial_contact: float = 5.0
     """Constant score applied when only a single contact point is identified."""
-    
+
     ground_plane_z: float = 0.0
     """The predefined absolute Z-axis bounds considered as the ground."""
 
@@ -69,7 +71,7 @@ class GraspScorer:
     def _trimesh_to_cgal_triangles(mesh: trimesh.Trimesh) -> List[Triangle_3]:
         """
         Converts a Trimesh object into a list of CGAL Triangle_3 objects.
-        
+
         :param mesh: A trimesh.Trimesh object to be converted.
         :return: A list containing CGAL Triangle_3 objects representing the mesh faces.
         """
@@ -83,7 +85,9 @@ class GraspScorer:
         return triangles
 
     @staticmethod
-    def _penetration_depth(gripper_mesh: trimesh.Trimesh, object_mesh: trimesh.Trimesh) -> float:
+    def _penetration_depth(
+        gripper_mesh: trimesh.Trimesh, object_mesh: trimesh.Trimesh
+    ) -> float:
         """
         Computes the deepest interpenetration between the gripper and the object.
 
@@ -96,22 +100,24 @@ class GraspScorer:
         """
         collision_manager = CollisionManager()
         collision_manager.add_object("object", object_mesh)
-        is_colliding, contacts = collision_manager.in_collision_single(gripper_mesh, return_data=True)
+        is_colliding, contacts = collision_manager.in_collision_single(
+            gripper_mesh, return_data=True
+        )
         if not is_colliding:
             return 0.0
         return max(contact.depth for contact in contacts)
 
     def calculate_grasp_score(
-            self,
-            grasp_pose: Pose,
-            gripper_mesh: trimesh.Trimesh,
-            object_mesh: trimesh.Trimesh,
-            object_tree: AABB_tree_Triangle_3_soup
+        self,
+        grasp_pose: Pose,
+        gripper_mesh: trimesh.Trimesh,
+        object_mesh: trimesh.Trimesh,
+        object_tree: AABB_tree_Triangle_3_soup,
     ) -> float:
         """
         Calculates a quality score for a given grasp pose using geometric heuristics.
         Applies penalties for collisions and clearance, and bonuses for stability.
-        
+
         :param grasp_pose: A semantic_digital_twin Pose representing the gripper pose.
         :param gripper_mesh: The 3D mesh of the gripper.
         :param object_mesh: The 3D mesh of the target object.
@@ -120,7 +126,7 @@ class GraspScorer:
         """
         total_score = 0.0
         grasp_pose_matrix = grasp_pose.to_homogeneous_matrix().to_np()
-        
+
         gripper_at_pose = gripper_mesh.copy()
         gripper_at_pose.apply_transform(grasp_pose_matrix)
 
@@ -129,8 +135,14 @@ class GraspScorer:
         # Narrow phase: only a penetration deeper than the tolerance counts as a real collision,
         # so the flush finger contact of a valid grasp is not mistaken for one.
         gripper_cgal_triangles = self._trimesh_to_cgal_triangles(gripper_at_pose)
-        potentially_colliding = any(object_tree.do_intersect(triangle) for triangle in gripper_cgal_triangles)
-        if potentially_colliding and self._penetration_depth(gripper_at_pose, object_mesh) > self.collision_tolerance:
+        potentially_colliding = any(
+            object_tree.do_intersect(triangle) for triangle in gripper_cgal_triangles
+        )
+        if (
+            potentially_colliding
+            and self._penetration_depth(gripper_at_pose, object_mesh)
+            > self.collision_tolerance
+        ):
             total_score += self.penalty_collision
 
         # --- 2. Clearance Check ---
@@ -146,20 +158,26 @@ class GraspScorer:
         ray_origins_local = np.array([[0.0, 0.06, 0.0], [0.0, -0.06, 0.0]])
         ray_directions_local = np.array([[0.0, -1.0, 0.0], [0.0, 1.0, 0.0]])
 
-        ray_origins_world = trimesh.transform_points(ray_origins_local, grasp_pose_matrix)
-        ray_directions_world = trimesh.transform_points(ray_directions_local, grasp_pose_matrix, translate=False)
+        ray_origins_world = trimesh.transform_points(
+            ray_origins_local, grasp_pose_matrix
+        )
+        ray_directions_world = trimesh.transform_points(
+            ray_directions_local, grasp_pose_matrix, translate=False
+        )
 
         # Keep only the nearest hit per ray; otherwise a ray crossing the object also
         # reports its exit face, yielding two hits per finger instead of one contact.
         locations, index_ray, index_triangle = object_mesh.ray.intersects_location(
-            ray_origins=ray_origins_world, ray_directions=ray_directions_world, multiple_hits=False
+            ray_origins=ray_origins_world,
+            ray_directions=ray_directions_world,
+            multiple_hits=False,
         )
 
         contact_points = []
         contact_normals = []
-        
+
         for i in range(len(ray_origins_world)):
-            mask = (index_ray == i)
+            mask = index_ray == i
             if np.any(mask):
                 locs = locations[mask]
                 tris = index_triangle[mask]
@@ -178,7 +196,11 @@ class GraspScorer:
             distance_score = np.linalg.norm(contact_p1 - contact_p2)
             clearance_score = min_gripper_z
 
-            positive_score = (self.weight_normal * normal_score) + (self.weight_distance * distance_score) + (self.weight_clearance * clearance_score)
+            positive_score = (
+                (self.weight_normal * normal_score)
+                + (self.weight_distance * distance_score)
+                + (self.weight_clearance * clearance_score)
+            )
             total_score += positive_score
 
         elif len(contact_points) == 1:
@@ -191,15 +213,15 @@ class GraspScorer:
         return total_score
 
     def rank_grasps(
-            self,
-            grasp_poses: List[Pose],
-            gripper_mesh: trimesh.Trimesh,
-            object_mesh: trimesh.Trimesh
+        self,
+        grasp_poses: List[Pose],
+        gripper_mesh: trimesh.Trimesh,
+        object_mesh: trimesh.Trimesh,
     ) -> List[ScoredGrasp]:
         """
-        Evaluates a list of grasp poses and returns a sorted list of ScoredGrasp objects 
+        Evaluates a list of grasp poses and returns a sorted list of ScoredGrasp objects
         (best grasps first).
-        
+
         :param grasp_poses: A list of Pose objects representing candidate poses.
         :param gripper_mesh: The 3D mesh of the gripper.
         :param object_mesh: The 3D mesh of the target object.
@@ -214,7 +236,7 @@ class GraspScorer:
                 grasp_pose=grasp_pose,
                 gripper_mesh=gripper_mesh,
                 object_mesh=object_mesh,
-                object_tree=tree_object
+                object_tree=tree_object,
             )
             ranked_grasps.append(ScoredGrasp(pose=grasp_pose, score=score))
 
@@ -222,10 +244,13 @@ class GraspScorer:
         ranked_grasps.sort(key=lambda x: x.score, reverse=True)
         return ranked_grasps
 
-def load_successful_grasps_from_dataset(dataset_path: str, gripper_name: str, object_uuid: uuid.UUID) -> List[Pose]:
+
+def load_successful_grasps_from_dataset(
+    dataset_path: str, gripper_name: str, object_uuid: uuid.UUID
+) -> List[Pose]:
     """
     Helper to read dataset and return a list of successful grasp poses using ormatic.
-    
+
     :param dataset_path: The database path or root directory path containing the dataset SQLite database.
     :param gripper_name: The name of the gripper used in the dataset.
     :param object_uuid: The unique identifier for the target object.
@@ -233,7 +258,6 @@ def load_successful_grasps_from_dataset(dataset_path: str, gripper_name: str, ob
     """
     from coraplex.orm.ormatic_interface import GrasPoseMappingDAO
     from semantic_digital_twin.orm.ormatic_interface import BodyDAO
-
 
     if not dataset_path.startswith("sqlite"):
         if os.path.isdir(dataset_path):
@@ -250,6 +274,6 @@ def load_successful_grasps_from_dataset(dataset_path: str, gripper_name: str, ob
             .join(BodyDAO, GrasPoseMappingDAO.reference_frame_id == BodyDAO.database_id)
             .where(BodyDAO.id == object_uuid)
         )
-        
+
         grasp_daos = session.scalars(query).all()
         return [dao.from_dao() for dao in grasp_daos]

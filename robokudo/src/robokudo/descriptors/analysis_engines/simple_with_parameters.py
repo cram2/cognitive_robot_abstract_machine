@@ -1,4 +1,5 @@
-"""Analysis engine demonstrating parameter configuration.
+"""
+Analysis engine demonstrating parameter configuration.
 
 This module provides an analysis engine that demonstrates how to configure
 and use parameters in a pipeline. It implements a simple pipeline that uses
@@ -26,7 +27,8 @@ from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine demonstrating parameter configuration.
+    """
+    Analysis engine demonstrating parameter configuration.
 
     This class implements a pipeline that shows how to configure annotator
     parameters using descriptors. It uses a custom depth truncation value
@@ -45,7 +47,8 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """

@@ -29,14 +29,18 @@ class JointPositionList(Task):
     """
     The goal joint state.
     """
+
     threshold: float = field(default=0.01, kw_only=True)
     """
-    If all joint position errors are smaller than this threshold, the task's observation state is true.
+    If all joint position errors are smaller than this threshold, the task's observation
+    state is true.
     """
+
     weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
     """
     The weight of this task.
     """
+
     max_velocity: float = field(default=1.0, kw_only=True)
     """
     The maximum velocity of the joints.

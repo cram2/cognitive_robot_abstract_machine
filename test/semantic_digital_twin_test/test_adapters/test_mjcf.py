@@ -92,8 +92,9 @@ HINGED_BODY_MJCF = """
 
 def test_joint_position_limits_are_python_floats():
     """
-    Parsed joint position limits must be plain Python floats. MuJoCo reports them as numpy scalars,
-    which do not interoperate with the symbolic-math layer (``numpy_scalar - symbol`` makes numpy
+    Parsed joint position limits must be plain Python floats.
+
+    MuJoCo reports them as numpy scalars, which do not interoperate with the symbolic-math layer (``numpy_scalar - symbol`` makes numpy
     try to arrayify the symbol) and break motion planning on the joint.
     """
     world = MJCFParser.from_xml_string(HINGED_BODY_MJCF).parse()

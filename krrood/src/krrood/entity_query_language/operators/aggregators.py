@@ -233,7 +233,9 @@ class CountRange(Count[T]):
         if self._original_child_ is None:
             return 0
         return sum(
-            1 for result in self._original_child_._evaluate_(None) if result.value is ...
+            1
+            for result in self._original_child_._evaluate_(None)
+            if result.value is ...
         )
 
 

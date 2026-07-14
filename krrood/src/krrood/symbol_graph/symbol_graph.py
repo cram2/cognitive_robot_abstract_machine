@@ -43,6 +43,7 @@ class GraphType(StrEnum):
     """
     Graph type for symbol graphs.
     """
+
     CLASS = "class"
     """
     Refers to the class diagram graph.

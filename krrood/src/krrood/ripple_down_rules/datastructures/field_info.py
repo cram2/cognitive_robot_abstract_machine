@@ -18,10 +18,12 @@ from krrood.ripple_down_rules.utils import make_tuple
 
 class ParseError(TypeError):
     """
-    Error that will be raised when the parser encounters something that can/should not be parsed.
+    Error that will be raised when the parser encounters something that can/should not
+    be parsed.
 
     For instance, Union types
     """
+
     pass
 
 
@@ -53,7 +55,9 @@ class FieldInfo:
 
     container: Optional[Type]
     """
-    The type of the container if it is one (list, set, tuple, etc.). If there is no container this is None
+    The type of the container if it is one (list, set, tuple, etc.).
+
+    If there is no container this is None
     """
 
     is_type_field: bool = False
@@ -100,11 +104,11 @@ class FieldInfo:
 
     @property
     def is_builtin_class(self) -> bool:
-        return not self.container and all(t.__module__ == 'builtins' for t in self.type)
+        return not self.container and all(t.__module__ == "builtins" for t in self.type)
 
     @property
     def is_container_of_builtin(self) -> bool:
-        return self.container and all(t.__module__ == 'builtins' for t in self.type)
+        return self.container and all(t.__module__ == "builtins" for t in self.type)
 
     @property
     def is_type_type(self) -> bool:
@@ -131,15 +135,14 @@ def is_container(clazz: Type) -> bool:
 
 def manually_search_for_class_name(target_class_name: str) -> Type:
     """
-    Searches for a class with the specified name in the current module's `globals()` dictionary
-    and all loaded modules present in `sys.modules`. This function attempts to find and resolve
-    the first class that matches the given name. If multiple classes are found with the same
-    name, a warning is logged, and the first one is returned. If no matching class is found,
-    an exception is raised.
+    Searches for a class with the specified name in the current module's `globals()`
+    dictionary and all loaded modules present in `sys.modules`. This function attempts
+    to find and resolve the first class that matches the given name. If multiple classes
+    are found with the same name, a warning is logged, and the first one is returned. If
+    no matching class is found, an exception is raised.
 
     :param target_class_name: Name of the class to search for.
     :return: The resolved class with the matching name.
-
     :raises ValueError: Raised when no class with the specified name can be found.
     """
     found_classes = []
@@ -151,7 +154,7 @@ def manually_search_for_class_name(target_class_name: str) -> Type:
 
     # Search 2: In all loaded modules (via sys.modules)
     for module_name, module in sys.modules.items():
-        if module is None or not hasattr(module, '__dict__'):
+        if module is None or not hasattr(module, "__dict__"):
             continue  # Skip built-in modules or modules without a __dict__
 
         for name, obj in module.__dict__.items():
@@ -162,7 +165,9 @@ def manually_search_for_class_name(target_class_name: str) -> Type:
 
     # If you wanted to "resolve" the forward ref based on this
     if len(found_classes) == 0:
-        raise ValueError(f"Could not find any class with name {target_class_name} in globals or sys.modules.")
+        raise ValueError(
+            f"Could not find any class with name {target_class_name} in globals or sys.modules."
+        )
     elif len(found_classes) == 1:
         resolved_class = found_classes[0]
     else:
@@ -174,4 +179,6 @@ def manually_search_for_class_name(target_class_name: str) -> Type:
 
 @memoize
 def warn_multiple_classes(target_class_name, found_classes):
-    logging.warning(f"Found multiple classes with name {target_class_name}. Found classes: {found_classes} ")
+    logging.warning(
+        f"Found multiple classes with name {target_class_name}. Found classes: {found_classes} "
+    )

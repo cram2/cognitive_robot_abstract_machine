@@ -37,20 +37,26 @@ Processing steps:
 
 
 class SizeBBAnnotator(BaseAnnotator):
-    """A class to analyze 3D point clouds and compute oriented bounding box sizes.
+    """
+    A class to analyze 3D point clouds and compute oriented bounding box sizes.
 
-    This annotator processes object hypotheses by computing their oriented 3D bounding boxes
-    and storing size information as annotations. It performs coordinate transformations and
-    uses minimum area rectangles to determine object dimensions.
+    This annotator processes object hypotheses by computing their oriented 3D bounding
+    boxes and storing size information as annotations. It performs coordinate
+    transformations and uses minimum area rectangles to determine object dimensions.
     """
 
     def __init__(self, name: str = "SizeBBAnnotator") -> None:
-        """Default construction. Minimal one-time init!"""
+        """
+        Default construction.
+
+        Minimal one-time init!
+        """
         super().__init__(name)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
-        """Process object hypotheses to compute and annotate their 3D bounding box sizes.
+        """
+        Process object hypotheses to compute and annotate their 3D bounding box sizes.
 
         For each object hypothesis with sufficient points:
 

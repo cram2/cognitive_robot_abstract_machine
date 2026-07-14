@@ -34,8 +34,12 @@ class TestGUIComponents(unittest.TestCase):
 
         # Mock marginals
         self.dist1 = UniformDistribution(variable=self.v1, interval=closed(0, 1))
-        self.dist2 = SymbolicDistribution(variable= self.v2, probabilities=
-            {self.v2.domain.simple_sets[0]: 0.5, self.v2.domain.simple_sets[1]: 0.5},
+        self.dist2 = SymbolicDistribution(
+            variable=self.v2,
+            probabilities={
+                self.v2.domain.simple_sets[0]: 0.5,
+                self.v2.domain.simple_sets[1]: 0.5,
+            },
         )
 
         def mock_marginal(vars):

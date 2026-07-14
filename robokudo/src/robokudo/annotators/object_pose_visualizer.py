@@ -1,7 +1,8 @@
-"""Object pose visualization for RoboKudo.
+"""
+Object pose visualization for RoboKudo.
 
-This module provides an annotator for visualizing the poses of detected objects
-in both 2D (image overlays) and 3D (coordinate frames) representations.
+This module provides an annotator for visualizing the poses of detected objects in both
+2D (image overlays) and 3D (coordinate frames) representations.
 """
 
 from timeit import default_timer
@@ -19,7 +20,8 @@ from robokudo.utils.transform import get_transform_matrix_from_q
 
 
 class ObjectPoseVisualizer(BaseAnnotator):
-    """Annotator for visualizing object poses in the CAS.
+    """
+    Annotator for visualizing object poses in the CAS.
 
     This annotator creates visualizations of object poses by:
 
@@ -29,7 +31,8 @@ class ObjectPoseVisualizer(BaseAnnotator):
     """
 
     def __init__(self, name: str = "ObjectPoseVisualizer"):
-        """Initialize the object pose visualizer.
+        """
+        Initialize the object pose visualizer.
 
         :param name: Name of the annotator instance, defaults to "ObjectPoseVisualizer"
         """
@@ -38,7 +41,8 @@ class ObjectPoseVisualizer(BaseAnnotator):
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:
-        """Update the visualization with current object poses.
+        """
+        Update the visualization with current object poses.
 
         Creates visualizations containing:
 

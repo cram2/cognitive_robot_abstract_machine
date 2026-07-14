@@ -71,7 +71,8 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 
 
 class ComparatorRule(PhraseRule):
-    """``<left> <operator> <right>`` — e.g. *"is greater than 50"*.
+    """
+    ``<left> <operator> <right>`` — e.g. *"is greater than 50"*.
 
     >>> verbalize_expression(variable(Robot, []).battery > 50)
     'the battery of a Robot is greater than 50'
@@ -80,7 +81,8 @@ class ComparatorRule(PhraseRule):
     construct = Comparator
 
     def build(self, node: Comparator, context: RuleContext) -> VerbalizationFragment:
-        """Say the comparator as a standalone predicate.
+        """
+        Say the comparator as a standalone predicate.
 
         Delegating to the predicate assembler is what produces the whole *the battery of a Robot is
         greater than 50* sentence; this rule contributes the dispatch from a :class:`Comparator` node
@@ -166,8 +168,10 @@ class RangeFoldRule(PhraseRule):
 
 
 class CoindexedFoldRule(PhraseRule):
-    """A group of co-indexed comparators (``p.begin.X == p.end.X`` for several ``X``) reduced by
-    :func:`fold_coindexed_groups` → one factored clause that says the shared structure once.
+    """
+    A group of co-indexed comparators (``p.begin.X == p.end.X`` for several ``X``)
+    reduced by :func:`fold_coindexed_groups` → one factored clause that says the shared
+    structure once.
 
     Two surface forms, chosen here (recognition stays pure):
 
@@ -264,11 +268,14 @@ class SharedSubjectComparisonsRule(PhraseRule):
     def build(
         self, node: SharedSubjectComparisons, context: RuleContext
     ) -> VerbalizationFragment:
-        """Say the factored disjunction — subject and copula once, tails coordinated under a plain *or*.
+        """
+        Say the factored disjunction — subject and copula once, tails coordinated under
+        a plain *or*.
 
-        It owns the *is … or …* framing: the shared subject and its copula are stated once and
-        each comparator contributes only its copula-less operator-and-value tail (*greater than 50*),
-        so the disjuncts read as one clause rather than repeating the subject per disjunct.
+        It owns the *is … or …* framing: the shared subject and its copula are stated
+        once and each comparator contributes only its copula-less operator-and-value
+        tail (*greater than 50*), so the disjuncts read as one clause rather than
+        repeating the subject per disjunct.
         """
         tails = [self._tail(comparator, context) for comparator in node.comparators]
         return PhraseFragment(
@@ -389,12 +396,14 @@ class OrRule(PhraseRule):
     construct = OR
 
     def build(self, node: OR, context: RuleContext) -> VerbalizationFragment:
-        """Say the flattened disjuncts as *"a, b, or c"*, or the factored *"… is … or …"* when they
-        share a subject.
+        """
+        Say the flattened disjuncts as *"a, b, or c"*, or the factored *"… is … or …"*
+        when they share a subject.
 
-        It owns the *…, or …* framing around the disjuncts of the class example — the comma-*or*
-        before the last — while the disjunct clauses come from the recursion; a shared-subject
-        disjunction is delegated to the :class:`SharedSubjectComparisons` fold instead.
+        It owns the *…, or …* framing around the disjuncts of the class example — the
+        comma-*or* before the last — while the disjunct clauses come from the recursion;
+        a shared-subject disjunction is delegated to the
+        :class:`SharedSubjectComparisons` fold instead.
         """
         operands = flatten_operands(node, OR)
         shared_subject = fold_shared_subject_comparisons(operands)
@@ -427,10 +436,11 @@ class NotRule(PhraseRule):
     construct = Not
 
     def build(self, node: Not, context: RuleContext) -> VerbalizationFragment:
-        """Wrap the child in *"not (<child>)"* via the orthography pass.
+        """
+        Wrap the child in *"not (<child>)"* via the orthography pass.
 
-        It owns the *not (…)* wrapper of the class example — the leading *not* and the parentheses —
-        around the disjunction child the recursion renders.
+        It owns the *not (…)* wrapper of the class example — the leading *not* and the
+        parentheses — around the disjunction child the recursion renders.
         """
         return _negation_wrap(context.child(node._child_))
 
@@ -469,22 +479,26 @@ class NotVerbalizablePredicateRule(PhraseRule):
     construct = Not
 
     def when(self, node: Not, context: RuleContext) -> bool:
-        """Fires when the negation wraps a predicate that builds its own verbalization fragment.
+        """
+        Fires when the negation wraps a predicate that builds its own verbalization
+        fragment.
 
-        Detecting a verbalizable-predicate child is the gate that selects this rule over the generic
-        :class:`NotRule`, so the class example negates the predicate's head verb / copula in place
-        instead of wrapping it in *not (…)*.
+        Detecting a verbalizable-predicate child is the gate that selects this rule over
+        the generic :class:`NotRule`, so the class example negates the predicate's head
+        verb / copula in place instead of wrapping it in *not (…)*.
         """
         return isinstance(
             node._child_, InstantiatedVariable
         ) and InstantiatedPlanner.has_fragment(node._child_)
 
     def build(self, node: Not, context: RuleContext) -> VerbalizationFragment:
-        """Say the predicate with its head verb / copula negated, or wrap it when it has neither.
+        """
+        Say the predicate with its head verb / copula negated, or wrap it when it has
+        neither.
 
-        Marking the clause's verb or copula negated is what yields the inline *does not work in* /
-        *is not reachable*; a clause with no such head has nothing to negate, so it falls back to the
-        *not (…)* wrapper.
+        Marking the clause's verb or copula negated is what yields the inline *does not
+        work in* / *is not reachable*; a clause with no such head has nothing to negate,
+        so it falls back to the *not (…)* wrapper.
         """
         clause = context.child(node._child_)
         negated = negate_clause(clause)
@@ -492,7 +506,8 @@ class NotVerbalizablePredicateRule(PhraseRule):
 
 
 class NotComparatorRule(PhraseRule):
-    """Inline negated comparator *"a is not greater than b"* (Not over a Comparator).
+    """
+    Inline negated comparator *"a is not greater than b"* (Not over a Comparator).
 
     >>> verbalize_expression(Not(variable(Robot, []).battery > 50))
     'the battery of a Robot is not greater than 50'
@@ -501,7 +516,8 @@ class NotComparatorRule(PhraseRule):
     construct = Not
 
     def when(self, node: Not, context: RuleContext) -> bool:
-        """Fires when the negation wraps a comparator.
+        """
+        Fires when the negation wraps a comparator.
 
         Detecting that the negation wraps a :class:`Comparator` is the gate that selects this rule
         over the generic :class:`NotRule`, which is why the example reads the inline *is not greater
@@ -513,7 +529,8 @@ class NotComparatorRule(PhraseRule):
         return isinstance(node._child_, Comparator)
 
     def build(self, node: Not, context: RuleContext) -> VerbalizationFragment:
-        """Say the inner comparator with the negation folded into the operator.
+        """
+        Say the inner comparator with the negation folded into the operator.
 
         Pushing the negation into the predicate is what yields the inline *is not greater than 50*
         operator span, leaving no outer *not (…)* wrapper.
@@ -525,7 +542,9 @@ class NotComparatorRule(PhraseRule):
 
 
 class NotBooleanAttributeRule(PhraseRule):
-    """Negated boolean attribute chain *"<nav> is not <attribute>"* (Not over a bool-attribute chain).
+    """
+    Negated boolean attribute chain *"<nav> is not <attribute>"* (Not over a bool-
+    attribute chain).
 
     >>> verbalize_expression(Not(variable(Task, []).completed))
     'a Task is not completed'
@@ -534,7 +553,8 @@ class NotBooleanAttributeRule(PhraseRule):
     construct = Not
 
     def when(self, node: Not, context: RuleContext) -> bool:
-        """Fires when the negation wraps a boolean-attribute chain.
+        """
+        Fires when the negation wraps a boolean-attribute chain.
 
         Detecting a negated boolean-attribute chain is the gate that selects this rule over the
         generic :class:`NotRule`, which is why the example reads the predicative *is not completed*
@@ -546,7 +566,8 @@ class NotBooleanAttributeRule(PhraseRule):
         return is_boolean_attribute_chain(node._child_)
 
     def build(self, node: Not, context: RuleContext) -> VerbalizationFragment:
-        """Say the negated predicative *"<nav> is not <attribute>"*.
+        """
+        Say the negated predicative *"<nav> is not <attribute>"*.
 
         It owns the *is not completed* span, emitting the boolean attribute as a negated predicative
         rather than appending a *not (…)* wrapper.

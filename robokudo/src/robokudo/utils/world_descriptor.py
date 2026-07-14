@@ -1,4 +1,6 @@
-"""World descriptor utilities for Robokudo."""
+"""
+World descriptor utilities for Robokudo.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +14,9 @@ if TYPE_CHECKING:
 
 
 def load_world_descriptor(annotator: BaseAnnotator) -> BaseWorldDescriptor:
-    """Load world descriptor from annotator parameters."""
+    """
+    Load world descriptor from annotator parameters.
+    """
     loader = module_loader.ModuleLoader()
     return loader.load_world_descriptor(
         annotator.descriptor.parameters.world_descriptor_ros_package,

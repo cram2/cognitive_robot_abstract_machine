@@ -79,7 +79,8 @@ class HasFingers(
 
     def validate(self):
         """
-        Validation method that checks that there is exactly one thumb in the fingers list.
+        Validation method that checks that there is exactly one thumb in the fingers
+        list.
         """
         assert (
             len(self.fingers) >= 3
@@ -104,7 +105,8 @@ class HasTwoFingers(
     ABC,
 ):
     """
-    Mixin class for robots or robot parts that have exactly two fingers, one of which is a thumb.
+    Mixin class for robots or robot parts that have exactly two fingers, one of which is
+    a thumb.
     """
 
     def validate(self):
@@ -129,7 +131,7 @@ class HasSensors(
     Generic[Unpack[TGenericSensors]], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
     """
-    Mixin class for robots or robot parts that have sensors
+    Mixin class for robots or robot parts that have sensors.
     """
 
     sensors: list[Union[Unpack[TGenericSensors]]] = field(
@@ -148,7 +150,8 @@ class HasEndEffector(
     Generic[TGenericEndEffector], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
     """
-    Mixin class for robots or robot parts that have an end effector as their direct child.
+    Mixin class for robots or robot parts that have an end effector as their direct
+    child.
     """
 
     end_effector: TGenericEndEffector = field(default=None, kw_only=True)
@@ -161,9 +164,7 @@ class HasEndEffector(
 
 
 @dataclass(eq=False)
-class HasArms(
-    Generic[Unpack[TGenericArms]], SubClassSafeGeneric, RobotPartMixin, ABC
-):
+class HasArms(Generic[Unpack[TGenericArms]], SubClassSafeGeneric, RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have arms as their direct children.
     """
@@ -202,7 +203,8 @@ class HasLeftRightArm(
     ABC,
 ):
     """
-    Mixin class for robots or robot parts that have two arms and can specify which is the left and which is the right arm.
+    Mixin class for robots or robot parts that have two arms and can specify which is
+    the left and which is the right arm.
     """
 
     def validate(self):
@@ -224,8 +226,11 @@ class HasLeftRightArm(
         self, relation: Type[Union[LeftOf, RightOf]]
     ) -> Union[TGenericLeftArm, TGenericRightArm]:
         """
-        Assigns the left and right arms based on their position relative to the robot's root body.
-        :param relation: The relation to use for determining left or right (LeftOf or RightOf).
+        Assigns the left and right arms based on their position relative to the robot's
+        root body.
+
+        :param relation: The relation to use for determining left or right (LeftOf or
+            RightOf).
         :return: The arm that is on the left or right side of the robot.
         """
         assert (
@@ -266,9 +271,7 @@ class HasMobileBase(
 
 
 @dataclass(eq=False)
-class HasTorso(
-    Generic[TGenericTorso], SubClassSafeGeneric, RobotPartMixin, ABC
-):
+class HasTorso(Generic[TGenericTorso], SubClassSafeGeneric, RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have a torso as their direct child.
     """

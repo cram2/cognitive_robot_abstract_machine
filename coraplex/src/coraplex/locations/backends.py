@@ -34,8 +34,8 @@ from semantic_digital_twin.world_description.world_entity import Body
 @dataclass
 class GiskardLocationBackend(PoseGeneratorBackend):
     """
-    Pose generator backend that uses full-body control to steer the robot to a base pose from which the target should be
-    reachable.
+    Pose generator backend that uses full-body control to steer the robot to a base pose
+    from which the target should be reachable.
 
     .. warning:: This backend uses collision avoidance, so if you use the global_pose of a body instead of the body itself
     the backend will fail because the collision avoidance will keep the gripper and body apart.
@@ -48,7 +48,7 @@ class GiskardLocationBackend(PoseGeneratorBackend):
 
     arm: Arms
     """
-    Arm of the which should be used 
+    Arm of the which should be used.
     """
 
     grasp_description: GraspDescription
@@ -58,7 +58,7 @@ class GiskardLocationBackend(PoseGeneratorBackend):
 
     robot: AbstractRobot
     """
-    Robot for which base poses should be found  
+    Robot for which base poses should be found.
     """
 
     world: World
@@ -68,7 +68,8 @@ class GiskardLocationBackend(PoseGeneratorBackend):
 
     distance_to_obstacle: float = 0.1
     """
-    Distance by which the obstacles should be inflated, is set to the radius of the mobile base by default
+    Distance by which the obstacles should be inflated, is set to the radius of the
+    mobile base by default.
     """
 
     def __post_init__(self):
@@ -118,7 +119,8 @@ class GiskardLocationBackend(PoseGeneratorBackend):
 
         :param pose_sequence: The pose sequence which the end_effector should follow
         :param world: The world in which the pose sequence should be executed
-        :param robot: The robot view of the robot which should be used for the execution, needs to fit the world
+        :param robot: The robot view of the robot which should be used for the
+            execution, needs to fit the world
         :param end_effector: The end effector which should be controlled by Giskard
         :return: The Giskard executor for the pose sequence
         """
@@ -201,22 +203,23 @@ class GiskardLocationBackend(PoseGeneratorBackend):
 @dataclass
 class GraspPoseGenerator(PoseGeneratorBackend):
     """
-    A PoseGeneratorBackend that wraps another backend and creates GraspPoses from the samples poses of the backend.
+    A PoseGeneratorBackend that wraps another backend and creates GraspPoses from the
+    samples poses of the backend.
     """
 
     generator: PoseGeneratorBackend
     """
-    Pose generator from which to sample
+    Pose generator from which to sample.
     """
 
     arm: Arms
     """
-    Arm that should be used for the GraspPose
+    Arm that should be used for the GraspPose.
     """
 
     grasp_description: GraspDescription
     """
-    Grasp Description that should be used for the GraspPose
+    Grasp Description that should be used for the GraspPose.
     """
 
     def __iter__(self) -> Iterable[GraspPose]:

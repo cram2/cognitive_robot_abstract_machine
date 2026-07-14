@@ -66,13 +66,13 @@ class TestSemanticAnnotation(SemanticAnnotation):
 def test_aggregate_bodies(kitchen_world):
     """
     Tests that SemanticAnnotation.kinematic_structure_entities aggregates:
+
     -  public direct kinematic structure entity fields
     - public list fields containing kinematic structure entities
     - public nested semantic annotations' kinematic structure entities
     but nothing from private fields
     The exact order is not specified by the contract, so we check set membership.
     """
-
     # Arrange: pick some existing bodies from the world fixture
     b0, b1, b2, b3 = kitchen_world.bodies[:4]
 
@@ -386,7 +386,9 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
 
     @dataclass(eq=False)
     class ReviewKinematicChain(KinematicChain):
-        """Minimal concrete KinematicChain for chain tests."""
+        """
+        Minimal concrete KinematicChain for chain tests.
+        """
 
         def setup_hardware_interfaces(self):
             pass

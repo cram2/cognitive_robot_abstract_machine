@@ -32,9 +32,9 @@ def test_mesh_color_survives_serialization(tmp_path):
     """
     Per-vertex mesh color survives the to_json/from_json round-trip.
 
-    Color travels inside the serialized geometry (re-exported as OBJ,
-    which the collision loader and visualizer can read), so a receiver
-    renders it without needing the original mesh file.
+    Color travels inside the serialized geometry (re-exported as OBJ, which the
+    collision loader and visualizer can read), so a receiver renders it without needing
+    the original mesh file.
     """
     source = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
     source.visual.vertex_colors = np.tile([200, 50, 50, 255], (len(source.vertices), 1))

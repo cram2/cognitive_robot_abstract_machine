@@ -217,7 +217,6 @@ class CollectionReaderAnnotator(BaseAnnotator):
         )
 
 
-"""ROS1 TO ROS2 
-The setup method in the ROS2 version has three parameters (timeout, node, visitor) 
-n the ROS2 version, STATUS are referenced as py_trees.common.Status.RUNNING and py_trees.common.Status.SUCCESS
-"""
+# ROS1 TO ROS2
+# The setup method in the ROS2 version has three parameters (timeout, node, visitor)
+# n the ROS2 version, STATUS are referenced as py_trees.common.Status.RUNNING and py_trees.common.Status.SUCCESS

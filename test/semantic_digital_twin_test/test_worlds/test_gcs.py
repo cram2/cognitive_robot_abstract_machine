@@ -175,8 +175,8 @@ def test_navigation_map_from_world(table_world: World):
 
 def test_from_world_with_rotated_box():
     """
-    Verify if a path can be found in a world with two boxes, where one is rotated and a gcs is calculated for the
-    rotated box.
+    Verify if a path can be found in a world with two boxes, where one is rotated and a
+    gcs is calculated for the rotated box.
     """
     world = World()
     with world.modify_world():

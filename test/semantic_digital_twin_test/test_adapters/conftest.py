@@ -5,7 +5,10 @@ import pytest
 
 @pytest.fixture(scope="session", autouse=True)
 def unique_mujoco_scene_file(tmp_path_factory):
-    """Give each xdist worker its own MuJoCo scene file to prevent /tmp/scene.xml race conditions."""
+    """
+    Give each xdist worker its own MuJoCo scene file to prevent /tmp/scene.xml race
+    conditions.
+    """
     try:
         from semantic_digital_twin.adapters.multi_sim import MujocoSim
 

@@ -73,7 +73,9 @@ class _Task:
 
 
 def _collect_roles(fragment: VerbalizationFragment) -> list[SemanticRole]:
-    """Recursively collect all SemanticRole values from a fragment tree."""
+    """
+    Recursively collect all SemanticRole values from a fragment tree.
+    """
     match fragment:
         case RoleFragment(role=role):
             return [role]
@@ -89,7 +91,9 @@ def _collect_roles(fragment: VerbalizationFragment) -> list[SemanticRole]:
 def _collect_role_texts(
     fragment: VerbalizationFragment, role: SemanticRole
 ) -> list[str]:
-    """Return all text values in the tree that carry *role*."""
+    """
+    Return all text values in the tree that carry *role*.
+    """
     match fragment:
         case RoleFragment(text=text, role=r) if r == role:
             return [text]
@@ -175,7 +179,9 @@ def test_literal_carries_literal_role():
 
 
 def test_where_clause_condition_preserves_semantic_roles():
-    """Regression: where-clause condition must keep RoleFragment roles in the fragment tree.
+    """
+    Regression: where-clause condition must keep RoleFragment roles in the fragment
+    tree.
 
     _verbalize_query_body_ was calling delegate.verbalize() (which flattens to plain string)
     then re-wrapping the result in _word() — stripping all OPERATOR/ATTRIBUTE/LITERAL roles
@@ -404,7 +410,9 @@ def test_paragraph_renderer_block_no_header():
 
 
 def test_paragraph_html_formatter_uses_nbsp_in_block_header_join():
-    """ParagraphRenderer uses formatter.space to join the header to its prose."""
+    """
+    ParagraphRenderer uses formatter.space to join the header to its prose.
+    """
     r = ParagraphRenderer(HTMLFormatter())
     block = BlockFragment(
         header=RoleFragment("Find", SemanticRole.PLAIN),
@@ -501,7 +509,9 @@ def test_hierarchical_indent_four_spaces_indents_items_by_four():
 
 
 def test_hierarchical_html_formatter_joins_with_br():
-    """HTMLFormatter.newline drives line separation — no hardcoded \\n."""
+    """
+    HTMLFormatter.newline drives line separation — no hardcoded \\n.
+    """
     r = HierarchicalRenderer(HTMLFormatter())
     block = BlockFragment(header=None, items=[WordFragment("a"), WordFragment("b")])
     result = r.render(block)
@@ -517,7 +527,9 @@ def test_hierarchical_ansi_formatter_joins_with_newline_not_br():
 
 
 def test_hierarchical_custom_formatter_newline_controls_line_separation():
-    """Proves no isinstance coupling: any Formatter subclass controls the separator."""
+    """
+    Proves no isinstance coupling: any Formatter subclass controls the separator.
+    """
 
     class PipeFormatter(PlainFormatter):
         @property
@@ -594,7 +606,9 @@ def test_hierarchical_plain_rule_structure(doors_and_drawers_world):
 def _find_block_with_keyword(
     fragment: VerbalizationFragment, keyword: str
 ) -> BlockFragment | None:
-    """Return the first BlockFragment whose header text contains keyword."""
+    """
+    Return the first BlockFragment whose header text contains keyword.
+    """
     if not isinstance(fragment, BlockFragment):
         return None
     if fragment.header is not None and keyword in flatten_fragment_to_plain_text(
@@ -640,9 +654,11 @@ def test_attribute_chain_owner_carries_variable_role(doors_and_drawers_world):
 
 
 def test_rule_if_antecedent_repeats_whose_per_condition(doors_and_drawers_world):
-    """An antecedent renders as one phrase — the existential intro woven with its conditions, each
-    condition prefixed with its own *"whose"* and joined *"whose …, and whose …"* (the query
-    restriction form)."""
+    """
+    An antecedent renders as one phrase — the existential intro woven with its
+    conditions, each condition prefixed with its own *"whose"* and joined *"whose …, and
+    whose …"* (the query restriction form).
+    """
     frag = _drawer_rule_fragment(doors_and_drawers_world)
     if_block = _find_block_with_keyword(frag, "If")
     assert if_block is not None
@@ -656,8 +672,10 @@ def test_rule_if_antecedent_repeats_whose_per_condition(doors_and_drawers_world)
 
 
 def test_rule_then_consequent_repeats_whose_per_binding(doors_and_drawers_world):
-    """The THEN clause is a single consequent phrase: the existential intro with each field binding
-    prefixed by its own *"whose"* and joined *"whose …, and whose …"*."""
+    """
+    The THEN clause is a single consequent phrase: the existential intro with each field
+    binding prefixed by its own *"whose"* and joined *"whose …, and whose …"*.
+    """
     frag = _drawer_rule_fragment(doors_and_drawers_world)
     then_block = _find_block_with_keyword(frag, "then")
     assert then_block is not None

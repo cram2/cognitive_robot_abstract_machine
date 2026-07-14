@@ -6,8 +6,11 @@ from dataclasses import dataclass
 @dataclass
 class UnMonitoredContainerTypeForDescriptor(Exception):
     """
-    Raised when a descriptor is used on a field with a container type that is not monitored (i.e., is not a subclass of
-    MonitoredContainer). This happens when your type hint of the field is using a container type that is not supported.
+    Raised when a descriptor is used on a field with a container type that is not
+    monitored (i.e., is not a subclass of MonitoredContainer).
+
+    This happens when your type hint of the field is using a container type that is not
+    supported.
     """
 
     clazz: type

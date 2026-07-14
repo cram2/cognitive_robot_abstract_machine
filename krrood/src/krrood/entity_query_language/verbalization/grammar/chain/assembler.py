@@ -35,7 +35,8 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 
 
 class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
-    """Render a ``MappedVariable`` chain into one of its surface forms.
+    """
+    Render a ``MappedVariable`` chain into one of its surface forms.
 
     The :class:`ChainPlanner` decides the chain's content — its root, display path-parts, and
     whether it ends in a boolean attribute. *Which* surface form to use is no longer decided here:

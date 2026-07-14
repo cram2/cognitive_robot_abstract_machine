@@ -4,7 +4,8 @@ import datetime
 
 class Time:
     """
-    Class to abstract the ROS2 Time, to make it more consistent with the ROS1 Time class.
+    Class to abstract the ROS2 Time, to make it more consistent with the ROS1 Time
+    class.
     """
 
     def __init__(self, time=0.0, nsec=0.0):

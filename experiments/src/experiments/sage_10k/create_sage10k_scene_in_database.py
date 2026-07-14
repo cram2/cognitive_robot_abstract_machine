@@ -12,7 +12,9 @@ from semantic_digital_twin.orm.ormatic_interface import *
 def main():
     """
     Drop the entire Sage10k database and recreate it with one loaded scene in it.
-    Loading this scene from the database is ~ 5 times faster than loading it from the files.
+
+    Loading this scene from the database is ~ 5 times faster than loading it from the
+    files.
     """
     current_time = time.time()
     print("creating database")

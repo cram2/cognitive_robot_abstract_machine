@@ -1,4 +1,5 @@
-"""Camera viewpoint visualization for RoboKudo.
+"""
+Camera viewpoint visualization for RoboKudo.
 
 This module provides an annotator for visualizing camera viewpoints and reference frames
 in 3D space using Open3D.
@@ -14,25 +15,30 @@ from robokudo.cas import CASViews
 
 
 class CameraViewpointVisualizer(BaseAnnotator):
-    """Annotator for visualizing camera viewpoints and reference frames.
+    """
+    Annotator for visualizing camera viewpoints and reference frames.
 
     This annotator displays the reference frame set in the viewpoint (e.g., /map frame)
     along with the point cloud data. It creates a 3D visualization showing the
     coordinate frame and the point cloud in the same space.
 
-    The annotator will fail if the required viewpoint transform cannot be found in the CAS.
+    The annotator will fail if the required viewpoint transform cannot be found in the
+    CAS.
     """
 
     def __init__(self, name: str = "CameraViewpointVisualizer") -> None:
-        """Initialize the camera viewpoint visualizer.
+        """
+        Initialize the camera viewpoint visualizer.
 
-        :param name: Name of the annotator instance, defaults to "CameraViewpointVisualizer"
+        :param name: Name of the annotator instance, defaults to
+            "CameraViewpointVisualizer"
         """
         super().__init__(name)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
-        """Update the visualization with the current viewpoint and point cloud data.
+        """
+        Update the visualization with the current viewpoint and point cloud data.
 
         Creates a visualization containing:
 

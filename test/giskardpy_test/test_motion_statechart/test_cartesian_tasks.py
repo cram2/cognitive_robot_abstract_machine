@@ -79,7 +79,8 @@ class TestCartesianPositionTrajectory:
 
     def _points_to_np(self, positions: list[Point3] | np.ndarray) -> np.ndarray:
         """
-        Convert a sequence of `Point3` or an `ndarray` of shape (N, 3) into an `ndarray` of shape (N, 3).
+        Convert a sequence of `Point3` or an `ndarray` of shape (N, 3) into an `ndarray`
+        of shape (N, 3).
         """
         if isinstance(positions, np.ndarray):
             if positions.ndim != 2 or positions.shape[1] != 3:
@@ -105,16 +106,19 @@ class TestCartesianPositionTrajectory:
         """
         Compare an executed Cartesian path against a reference list of positions.
 
-        The executed path is reconstructed from the `world_state_trajectory` by computing
-        forward kinematics for `tip_link` in the `root_link` frame at each recorded state.
-        For each executed point, the minimum Euclidean distance to the reference path is
-        computed and asserted to be within `tolerance`.
+        The executed path is reconstructed from the `world_state_trajectory` by
+        computing forward kinematics for `tip_link` in the `root_link` frame at each
+        recorded state. For each executed point, the minimum Euclidean distance to the
+        reference path is computed and asserted to be within `tolerance`.
 
-        :param positions: Reference path as `Point3` iterable or an array of shape (N, 3). All points are with respect to root_link
-        :param world_state_trajectory: Recorded joint-space trajectory with access to the world.
+        :param positions: Reference path as `Point3` iterable or an array of shape (N,
+            3). All points are with respect to root_link
+        :param world_state_trajectory: Recorded joint-space trajectory with access to
+            the world.
         :param root_link: Root kinematic frame for forward kinematics.
         :param tip_link: Tip kinematic frame for forward kinematics.
-        :param tolerance: Maximum allowed distance to the reference path for all samples.
+        :param tolerance: Maximum allowed distance to the reference path for all
+            samples.
         """
         ref_np = self._points_to_np(positions)
 
@@ -283,7 +287,9 @@ class TestCartesianPositionTrajectory:
 
 
 class TestCartesianTasks:
-    """Test suite for all Cartesian motion tasks."""
+    """
+    Test suite for all Cartesian motion tasks.
+    """
 
     def test_simple_cartesian_pose(self, cylinder_bot_world: World):
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
@@ -399,7 +405,9 @@ class TestCartesianTasks:
         )
 
     def test_front_facing_orientation(self, _hsr_world_setup: World):
-        """Test combined position and orientation control in parallel."""
+        """
+        Test combined position and orientation control in parallel.
+        """
         with _hsr_world_setup.modify_world():
             box = Body(
                 name=PrefixedName("muh"),
@@ -555,7 +563,9 @@ class TestCartesianTasks:
         assert np.allclose(forward_kinematics, expected, atol=cart_goal2.threshold)
 
     def test_CartesianOrientation(self, pr2_world_state_reset: World):
-        """Test basic CartesianOrientation goal."""
+        """
+        Test basic CartesianOrientation goal.
+        """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "base_footprint"
         )
@@ -895,7 +905,9 @@ class TestCartesianTasks:
         assert cart_straight.observation_state == ObservationStateValues.TRUE
 
     def test_cartesian_pose_straight(self, pr2_world_state_reset: World):
-        """Test CartesianPositionStraight basic functionality."""
+        """
+        Test CartesianPositionStraight basic functionality.
+        """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "base_footprint"
         )
@@ -992,8 +1004,8 @@ class TestVelocityTasks:
 
     def _compile_msc_and_run_until_end(self, world: World, goal_node, limit_node):
         """
-        Build the MSC (no extra nodes), compile into an Executor,
-        run until end and return (control_cycles, executor)
+        Build the MSC (no extra nodes), compile into an Executor, run until end and
+        return (control_cycles, executor)
         """
         motion_statechart = self._build_msc(goal_node=goal_node, limit_node=limit_node)
         executor = Executor(MotionStatechartContext(world=world))
@@ -1015,8 +1027,8 @@ class TestVelocityTasks:
         self, pr2_world_state_reset: World, goal_type: str, limit_cls: type
     ):
         """
-        Tests that velocity limit's observation variable can trigger a CancelMotion
-        when the optimizer chooses to violate the limit.
+        Tests that velocity limit's observation variable can trigger a CancelMotion when
+        the optimizer chooses to violate the limit.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "base_footprint"
@@ -1147,8 +1159,8 @@ class TestVelocityTasks:
 
 class TestDebugExpressions:
     """
-    Cartesian tasks register a goal and a current debug expression, named with the
-    task name and colored green (goal) and red (current).
+    Cartesian tasks register a goal and a current debug expression, named with the task
+    name and colored green (goal) and red (current).
     """
 
     def test_cartesian_position(self, cylinder_bot_world: World):

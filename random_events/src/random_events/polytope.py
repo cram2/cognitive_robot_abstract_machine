@@ -22,8 +22,9 @@ class Polytope(polytope.Polytope):
     """
     Extension of the polytope class from the polytope library.
 
-    This class enables conversion to simple events and provides the inner box and outer box approximation
-    from https://cse.lab.imtlucca.it/~bemporad/publications/papers/compgeom-boxes.pdf.
+    This class enables conversion to simple events and provides the inner box and outer
+    box approximation from
+    https://cse.lab.imtlucca.it/~bemporad/publications/papers/compgeom-boxes.pdf.
     """
 
     @classmethod
@@ -38,12 +39,11 @@ class Polytope(polytope.Polytope):
     @classmethod
     def from_2d_points(cls, points: np.ndarray) -> Self:
         """
-        Create a polytope from a set of 2D points, by computing the convex hull of the points and then creating the
-        linear inequalities from the convex hull.
+        Create a polytope from a set of 2D points, by computing the convex hull of the
+        points and then creating the linear inequalities from the convex hull.
 
         :param points: A numpy array with shape (n, 2) containing the points.
         """
-
         # create the convexhull
         convex_hull = ConvexHull(points)
         hull_points = np.vstack(
@@ -69,9 +69,9 @@ class Polytope(polytope.Polytope):
 
         Similar to algorithm 5.
 
-        :param minimum_volume: The minimum volume (epsilon) for the approximation.
-        If a box is created in the induction with lower volume than epsilon, it will not be split further.
-
+        :param minimum_volume: The minimum volume (epsilon) for the approximation. If a
+            box is created in the induction with lower volume than epsilon, it will not
+            be split further.
         :return: The inner box approximation of the polytope as a random event.
         """
         # initialize a queue with polytopes that need to be approximated
@@ -113,7 +113,6 @@ class Polytope(polytope.Polytope):
 
         :param axis: The axis to split on.
         :param value: The value to split on.
-
         :return: The left and right split of the polytope.
         """
         a_vector = np.zeros((1, self.A.shape[1]))
@@ -177,11 +176,11 @@ class Polytope(polytope.Polytope):
         """
         Compute the maximum single inner box approximation of the polytope.
 
-        This implements Algorithm 2 in https://cse.lab.imtlucca.it/~bemporad/publications/papers/compgeom-boxes.pdf
+        This implements Algorithm 2 in
+        https://cse.lab.imtlucca.it/~bemporad/publications/papers/compgeom-boxes.pdf
 
         :return: The maximum inner box of the polytope.
         """
-
         # calculate bounding box
         minima, maxima = self.bounding_box
         minima = minima.flatten()

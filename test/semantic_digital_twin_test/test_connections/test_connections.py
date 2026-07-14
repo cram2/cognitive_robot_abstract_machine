@@ -14,7 +14,9 @@ from semantic_digital_twin.world_description.connections import (
 
 
 def _add_drive(world_with_two_bodies, drive_type):
-    """Creates a drive connection of ``drive_type`` and adds it to the world."""
+    """
+    Creates a drive connection of ``drive_type`` and adds it to the world.
+    """
     world, parent, child = world_with_two_bodies
     with world.modify_world():
         connection = drive_type.create_with_dofs(world, parent, child)

@@ -112,15 +112,16 @@ def test_iterable_of_primitives_produces_indexed_variables():
     Each primitive element in a list literal must produce a distinct conditioning
     variable named ``ClassName.field[index]`` in ``parameters.variables``.
 
-    Regression test for a bug in ``_extract_variables_from_iterable_literal``
-    where the return value of ``_handle_compatible_type_literal`` was discarded,
-    so primitive elements were silently dropped from the returned variable dict.
+    Regression test for a bug in ``_extract_variables_from_iterable_literal`` where the
+    return value of ``_handle_compatible_type_literal`` was discarded, so primitive
+    elements were silently dropped from the returned variable dict.
 
-    A ``List[Any]`` field is used because ``issubclass(Any, compatible_types)``
-    returns ``False``, which bypasses the outer type-mismatch guard and lets the
-    list reach ``_extract_variables_from_iterable_literal`` while still having
-    float elements that satisfy ``isinstance(element, compatible_types)``.
+    A ``List[Any]`` field is used because ``issubclass(Any, compatible_types)`` returns
+    ``False``, which bypasses the outer type-mismatch guard and lets the list reach
+    ``_extract_variables_from_iterable_literal`` while still having float elements that
+    satisfy ``isinstance(element, compatible_types)``.
     """
+
     @dataclass
     class FloatMeasurements:
         readings: List[Any]
@@ -135,16 +136,16 @@ def test_iterable_of_primitives_produces_indexed_variables():
 
 def test_list_of_enum_field_produces_indexed_variables():
     """
-    Assigning a literal list of enum values to a ``List[EnumType]`` field must
-    produce one conditioning variable per element, named ``ClassName.field[index]``.
+    Assigning a literal list of enum values to a ``List[EnumType]`` field must produce
+    one conditioning variable per element, named ``ClassName.field[index]``.
 
     Regression test for a bug in the type-mismatch guard in
-    ``_handle_literal_attribute_match``: the guard fired for any value that was
-    not itself in ``compatible_types``, including lists.  Because the EQL system
-    strips the ``List[...]`` container and exposes only the element type as
-    ``_type_``, a ``List[TestEnum]`` field and a bare ``TestEnum`` field were
-    indistinguishable, so assigning a list to the former raised ``TypeError``
-    instead of forwarding to ``_extract_variables_from_iterable_literal``.
+    ``_handle_literal_attribute_match``: the guard fired for any value that was not
+    itself in ``compatible_types``, including lists.  Because the EQL system strips the
+    ``List[...]`` container and exposes only the element type as ``_type_``, a
+    ``List[TestEnum]`` field and a bare ``TestEnum`` field were indistinguishable, so
+    assigning a list to the former raised ``TypeError`` instead of forwarding to
+    ``_extract_variables_from_iterable_literal``.
     """
     prob_q = underspecified(ListOfEnum)(
         list_of_enum=[TestEnum.OPTION_A, TestEnum.OPTION_B]

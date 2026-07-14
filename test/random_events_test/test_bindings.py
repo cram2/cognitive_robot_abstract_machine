@@ -11,7 +11,7 @@ class BindingsTestCase(unittest.TestCase):
 
     def test_intervals_with_bindings_but_in_old_class(self):
         """
-        Using bindings, but in the old structure
+        Using bindings, but in the old structure.
         """
         from random_events.interval import SimpleInterval, Bound, Interval
 
@@ -33,7 +33,7 @@ class BindingsTestCase(unittest.TestCase):
 
     def test_with_bindings_but_call_bindings_directly(self):
         """
-        Only using bindings
+        Only using bindings.
         """
         from random_events.interval import Bound
 
@@ -55,7 +55,7 @@ class BindingsTestCase(unittest.TestCase):
 
     def test_intervals_old(self):
         """
-        No bindings, only python
+        No bindings, only python.
         """
         from random_events.before_bindings.interval_old import (
             SimpleInterval,

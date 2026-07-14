@@ -1,4 +1,5 @@
-"""Analysis engine for TIAGo robot perception pipeline.
+"""
+Analysis engine for TIAGo robot perception pipeline.
 
 This module provides an analysis engine that demonstrates perception capabilities
 using the TIAGo robot's camera system. It implements a query-based pipeline for
@@ -32,7 +33,8 @@ from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for TIAGo robot perception.
+    """
+    Analysis engine for TIAGo robot perception.
 
     This class implements a pipeline that processes camera data from the TIAGo
     robot to perform tabletop segmentation and object pose estimation. It uses
@@ -53,14 +55,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "demo"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline for TIAGo robot perception.
+        """
+        Create a pipeline for TIAGo robot perception.
 
         This method constructs a processing pipeline that handles perception
         tasks for the TIAGo robot. The pipeline processes camera data to

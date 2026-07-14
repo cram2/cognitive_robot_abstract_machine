@@ -49,13 +49,14 @@ def test_load_kitchen_appliance(robocasa_loader):
 
 
 def test_load_kitchen_appliance_attaches_matching_annotation(robocasa_loader):
-    """The loaded appliance is annotated with the semantic type of the requested category."""
+    """
+    The loaded appliance is annotated with the semantic type of the requested category.
+    """
     world = robocasa_loader.load_kitchen_appliance(
         RoboCasaKitchenApplianceCategory.DISHWASHER
     )
     assert any(
-        isinstance(annotation, Dishwasher)
-        for annotation in world.semantic_annotations
+        isinstance(annotation, Dishwasher) for annotation in world.semantic_annotations
     )
 
 
@@ -68,13 +69,18 @@ def test_load_object(robocasa_loader):
 
 
 def test_load_object_from_group_without_objaverse_assets(robocasa_loader):
-    """A category with no objaverse assets still loads from another self-contained group."""
+    """
+    A category with no objaverse assets still loads from another self-contained group.
+    """
     world = robocasa_loader.load_object(RoboCasaObjectCategory.POT)
     assert len(world.bodies) > 0
 
 
 def test_load_task_binds_instruction_and_world(robocasa_loader):
-    """The loaded task carries its natural-language instruction bound to the scene it plays out in."""
+    """
+    The loaded task carries its natural-language instruction bound to the scene it plays
+    out in.
+    """
     from robocasa.models.scenes.scene_registry import LayoutType, StyleType
 
     task = robocasa_loader.load_task(
@@ -88,7 +94,9 @@ def test_load_task_binds_instruction_and_world(robocasa_loader):
 
 
 def test_load_task_omits_robot(robocasa_loader):
-    """The task world contains no robot, since semantic_digital_twin owns the robot."""
+    """
+    The task world contains no robot, since semantic_digital_twin owns the robot.
+    """
     from robocasa.models.scenes.scene_registry import LayoutType, StyleType
 
     task = robocasa_loader.load_task(
@@ -103,7 +111,9 @@ def test_load_task_omits_robot(robocasa_loader):
 
 
 def test_load_task_manipulated_objects_are_in_world(robocasa_loader):
-    """The task's manipulated objects are resolved to bodies present in the task world."""
+    """
+    The task's manipulated objects are resolved to bodies present in the task world.
+    """
     from robocasa.models.scenes.scene_registry import LayoutType, StyleType
 
     task = robocasa_loader.load_task(
@@ -117,7 +127,9 @@ def test_load_task_manipulated_objects_are_in_world(robocasa_loader):
 
 
 def test_load_task_unknown_name_raises(robocasa_loader):
-    """Requesting a task that is not registered raises a descriptive error."""
+    """
+    Requesting a task that is not registered raises a descriptive error.
+    """
     from robocasa.models.scenes.scene_registry import LayoutType, StyleType
 
     with pytest.raises(RoboCasaTaskNotFoundError):

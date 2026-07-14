@@ -76,14 +76,12 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AnnotatedBody:
     """
-    One semantic annotation the loader attached to the kitchen, described for
-    display.
+    One semantic annotation the loader attached to the kitchen, described for display.
     """
 
     annotation_type: str
     """
-    Name of the :class:`SemanticAnnotation` subclass (for example
-    ``"HingeCabinet"``).
+    Name of the :class:`SemanticAnnotation` subclass (for example ``"HingeCabinet"``).
     """
 
     body_name: str
@@ -169,24 +167,20 @@ def _start_rviz_publisher(
     marker_period_seconds: float = 2.0,
 ) -> Optional[threading.Thread]:
     """
-    Start publishing the world to RViz on a background thread and return
-    immediately, so the caller can keep driving the world (for example while a
-    robot performs a plan) and have that motion show up live rather than only
-    the final state.
+    Start publishing the world to RViz on a background thread and return immediately, so
+    the caller can keep driving the world (for example while a robot performs a plan)
+    and have that motion show up live rather than only the final state.
 
-    The tf tree is re-published frequently and the marker array less
-    often, both on timers. A world that stops changing would otherwise
-    have its tf tree published only once and expire from RViz's tf
-    buffer (or be missed entirely if RViz connects later), leaving the
-    markers unplaceable. The tf tree is cheap to publish; rebuilding the
-    markers is not, hence the two rates.
+    The tf tree is re-published frequently and the marker array less often, both on
+    timers. A world that stops changing would otherwise have its tf tree published only
+    once and expire from RViz's tf buffer (or be missed entirely if RViz connects
+    later), leaving the markers unplaceable. The tf tree is cheap to publish; rebuilding
+    the markers is not, hence the two rates.
 
     :param world: The world to visualize.
     :param tf_period_seconds: How often to re-publish the tf tree.
-    :param marker_period_seconds: How often to re-publish the marker
-        array.
-    :return: The background spinner thread, or None if ROS 2 is
-        unavailable.
+    :param marker_period_seconds: How often to re-publish the marker array.
+    :return: The background spinner thread, or None if ROS 2 is unavailable.
     """
     if rclpy is None:
         logger.warning("ROS 2 (rclpy) not available; skipping RViz visualization.")
@@ -217,8 +211,8 @@ def _start_rviz_publisher(
 @dataclass
 class CounterSurface:
     """
-    The horizontal top surface of a kitchen counter, expressed in the world
-    frame, that an object can be placed on.
+    The horizontal top surface of a kitchen counter, expressed in the world frame, that
+    an object can be placed on.
     """
 
     top_z: float
@@ -228,8 +222,8 @@ class CounterSurface:
 
     accessible_edge_y: float
     """
-    The ``y`` coordinate of the counter edge that faces the open floor, where
-    the robot stands.
+    The ``y`` coordinate of the counter edge that faces the open floor, where the robot
+    stands.
     """
 
     min_x: float
@@ -268,8 +262,8 @@ def _counter_top_surface(world: World, counter: CounterTop) -> CounterSurface:
 
 def _largest_counter_top(world: World) -> CounterTop:
     """
-    Return the counter with the largest footprint, the most convenient one to
-    place an object on.
+    Return the counter with the largest footprint, the most convenient one to place an
+    object on.
 
     :param world: The kitchen world to search.
     :return: The counter annotation with the largest footprint.
@@ -304,8 +298,8 @@ def _spawn_robot_and_prepare_pick_up(
     edge_inset: float = 0.15,
 ) -> Callable[[], None]:
     """
-    Spawn a PR2 at a kitchen counter with an apple resting on the counter
-    surface, and return a callable that performs the pick-up.
+    Spawn a PR2 at a kitchen counter with an apple resting on the counter surface, and
+    return a callable that performs the pick-up.
 
     Splitting spawning from performing lets the caller start the RViz publisher in between: the
     robot and object are added to the world first (a one-off topology change), then the returned
@@ -412,8 +406,7 @@ def load_kitchen(layout: LayoutType, style: StyleType) -> World:
 
     :param layout: The RoboCasa layout to compose.
     :param style: The RoboCasa visual style to compose.
-    :return: The loaded world, with semantic annotations attached by the
-        adapter.
+    :return: The loaded world, with semantic annotations attached by the adapter.
     """
     loader = RoboCasaDatasetLoader()
     if not loader.directory.exists():
@@ -426,8 +419,8 @@ def load_kitchen(layout: LayoutType, style: StyleType) -> World:
 
 def _parse_arguments() -> argparse.Namespace:
     """
-    Parse command-line arguments selecting the kitchen layout, style, and
-    whether to visualize.
+    Parse command-line arguments selecting the kitchen layout, style, and whether to
+    visualize.
 
     :return: The parsed arguments.
     """
@@ -459,9 +452,9 @@ def _parse_arguments() -> argparse.Namespace:
 
 def main() -> None:
     """
-    Load a RoboCasa kitchen, report a summary of its bodies and semantic
-    annotations, optionally spawn a PR2 that picks up an apple off a counter,
-    and optionally publish the scene to RViz.
+    Load a RoboCasa kitchen, report a summary of its bodies and semantic annotations,
+    optionally spawn a PR2 that picks up an apple off a counter, and optionally publish
+    the scene to RViz.
     """
     logging.basicConfig(level=logging.INFO)
     arguments = _parse_arguments()

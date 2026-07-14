@@ -26,7 +26,8 @@ class Sage10kOpenDoor(ActionDescription):
     Open a door.
 
     This action creates a Graph of Convex Sets (GCS) navigation map at the door handle.
-    Using this GCS, an underspecified move to reach plan is sequenced with an opening action.
+    Using this GCS, an underspecified move to reach plan is sequenced with an opening
+    action.
     """
 
     door: Door

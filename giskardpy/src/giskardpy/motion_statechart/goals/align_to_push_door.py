@@ -29,7 +29,7 @@ class AlignToPushDoor(Goal):
 
     def __post_init__(self):
         """
-        The objective is to reach an intermediate point before pushing the door
+        The objective is to reach an intermediate point before pushing the door.
         """
         self.root = self.root_link
         self.tip = self.tip_link

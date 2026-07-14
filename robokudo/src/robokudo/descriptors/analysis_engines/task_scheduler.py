@@ -16,7 +16,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     def implementation(self) -> Pipeline:
         """
-        Create a pipeline which can schedule different perception tasks in a basic way
+        Create a pipeline which can schedule different perception tasks in a basic way.
         """
         kinect_config = CrDescriptorFactory.create_descriptor("kinect")
 

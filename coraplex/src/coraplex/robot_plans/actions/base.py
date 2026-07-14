@@ -36,9 +36,10 @@ T = TypeVar("T")
 class ActionDescription(Designator):
     """
     Abstract base class for all actions.
-    Actions are like builders for plans.
-    An action has a set of parameters (its fields) from which it builds a symbolic plan and hence can be viewed as
-    an easy abstraction of concrete low-level behavior that makes sense in certain contexts.
+
+    Actions are like builders for plans. An action has a set of parameters (its fields)
+    from which it builds a symbolic plan and hence can be viewed as an easy abstraction
+    of concrete low-level behavior that makes sense in certain contexts.
     """
 
     @property
@@ -113,8 +114,9 @@ class ActionDescription(Designator):
     def execute(self) -> Any:
         """
         Create the symbolic plan for this action.
-        This method should only use Motions or Actions and mount them under itself, such that the plan can manage the
-        entire execution.
+
+        This method should only use Motions or Actions and mount them under itself, such
+        that the plan can manage the entire execution.
         """
         self.add_subplan(self.action_plan)
 
@@ -136,7 +138,7 @@ class ActionDescription(Designator):
 
     def _create_variables(self) -> Dict[str, Variable[T] | T]:
         """
-        Creates krrood variables for all parameter of this action
+        Creates krrood variables for all parameter of this action.
 
         :return: A dict with action parameters as keys and variables as values.
         """

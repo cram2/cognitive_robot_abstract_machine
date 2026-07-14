@@ -18,6 +18,7 @@ from krrood.ormatic.data_access_objects.alternative_mappings import (
 class SymbolGraphMapping(AlternativeMapping[SymbolGraph]):
     """
     Mapping specific for SymbolGraph.
+
     Import this class when you want to persist SymbolGraph.
     """
 

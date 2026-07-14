@@ -37,7 +37,6 @@ def _get_object_in_hand(
     :param arm: The arm that is holding something
     :returns: The body that the robot is holding in the given arm or None
     """
-
     manipulator = ViewManager.get_end_effector_view(
         arm,
         test_robot,
@@ -53,7 +52,7 @@ def _get_object_in_hand(
 
 def occupancy_location(target_pose: Pose, context: Context) -> Location:
     """
-    Factory that creates a Location for robot base poses, does not have any validators
+    Factory that creates a Location for robot base poses, does not have any validators.
 
     :param target_pose: Target pose around which robot base poses should be sampled
     :param context: Context of the plan in which the location should be created
@@ -71,7 +70,8 @@ def reachability_location(
     grasp_description: GraspDescription = None,
 ) -> Location:
     """
-    Factory method that creates a Location for robot poses from which the target can be picked up or placed.
+    Factory method that creates a Location for robot poses from which the target can be
+    picked up or placed.
 
     :param target: Target pose or body that should be reached by the robot
     :param context: The context in which to create the location
@@ -126,7 +126,8 @@ def accessing_location(
     container: Union[Drawer, Cabinet], context: Context, arm: Arms
 ) -> Location:
     """
-    Factory that creates a location for robot base poses for opening and closing container.
+    Factory that creates a location for robot base poses for opening and closing
+    container.
 
     :param container: The container that should be accessed
     :param context: Plan context in which to create the location
@@ -147,7 +148,8 @@ def accessing_location(
 
 def visibility_location(target: Union[Pose, Body], context: Context) -> Location:
     """
-    Factory that creates a location for robot base poses from which the target is visible.
+    Factory that creates a location for robot base poses from which the target is
+    visible.
 
     :param target: Target pose or body that should be visible
     :param context: Plan context in which to create the location
@@ -192,14 +194,15 @@ def giskard_reachability_location(
     grasp_description: GraspDescription = None,
 ) -> Location:
     """
-    Factory method that creates a location with a Giskard backend, the giskard backend uses the Giskard full-body control
-    to find a robot pose.
+    Factory method that creates a location with a Giskard backend, the giskard backend
+    uses the Giskard full-body control to find a robot pose.
 
     :param target: Target pose or body that should be reachable
     :param context: Plan context in which to create the location
     :param arm: Arm to use for reachability estimation
     :param grasp_description: Grap that should be used for reachability estimation
-    :returns: A location that is reachable from the target pose, using Giskard for reachability estimation.
+    :returns: A location that is reachable from the target pose, using Giskard for
+        reachability estimation.
     """
     target_pose, target_body = (
         (target.global_pose, target) if isinstance(target, Body) else (target, None)

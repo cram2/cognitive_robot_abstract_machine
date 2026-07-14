@@ -97,7 +97,8 @@ class DeterminerProcessor(RewritePass):
     def _tag_number(
         head: VerbalizationFragment, number: GrammaticalNumber
     ) -> VerbalizationFragment:
-        """Tag the head leaf with the phrase's number.
+        """
+        Tag the head leaf with the phrase's number.
 
         >>> DeterminerProcessor._tag_number(WordFragment(text="Robot"), GrammaticalNumber.PLURAL).number
         <GrammaticalNumber.PLURAL: 'plural'>

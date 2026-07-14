@@ -114,8 +114,10 @@ class BankTransaction:
 
 
 def test_all_rules_registry_is_populated():
-    """RULES must be non-empty after import — otherwise every expression falls back to
-    its name string and verbalization is silently broken."""
+    """
+    RULES must be non-empty after import — otherwise every expression falls back to its
+    name string and verbalization is silently broken.
+    """
     from krrood.entity_query_language.verbalization.grammar.framework.registry import (
         RULES,
     )
@@ -127,8 +129,10 @@ def test_all_rules_registry_is_populated():
 
 
 def test_uncovered_construct_raises_instead_of_degrading():
-    """A construct with no grammar rule (e.g. Concatenation) must raise, not silently
-    render its bare class name."""
+    """
+    A construct with no grammar rule (e.g. Concatenation) must raise, not silently
+    render its bare class name.
+    """
     from krrood.entity_query_language.factories import concatenation
     from krrood.entity_query_language.verbalization.exceptions import (
         UnverbalizableExpressionError,
@@ -140,8 +144,10 @@ def test_uncovered_construct_raises_instead_of_degrading():
 
 
 def test_verbalization_produces_natural_language_not_repr():
-    """Smoke test: verbalizing a simple query must produce English prose,
-    not fall back to the expression's repr string like '(EntityType)'."""
+    """
+    Smoke test: verbalizing a simple query must produce English prose, not fall back to
+    the expression's repr string like '(EntityType)'.
+    """
 
     @dataclass(unsafe_hash=True)
     class _Smoke:
@@ -212,9 +218,13 @@ def test_verbalize_literal_type_object():
 
 
 def test_verbalize_literal_tuple_of_types_is_a_value_not_membership():
-    """A bare tuple literal is a *value* — its classes are listed and joined, not read as *"one of"*
-    (which would mean membership). Membership is the consuming predicate's call, so an equality with
-    a tuple is never mis-read as membership."""
+    """
+    A bare tuple literal is a *value* — its classes are listed and joined, not read as
+    *"one of"* (which would mean membership).
+
+    Membership is the consuming predicate's call, so an equality with a tuple is never
+    mis-read as membership.
+    """
     assert verbalize_expression(Literal(_value_=(Apple, Body))) == "Apple and Body"
     assert (
         verbalize_expression(variable(_Robot, []).name == (Apple, Body))
@@ -223,8 +233,10 @@ def test_verbalize_literal_tuple_of_types_is_a_value_not_membership():
 
 
 def test_verbalize_has_types_is_membership():
-    """The type-membership predicate reads through the same *"is of type A or B"* surface as
-    ``HasType``, its admissible types listed disjunctively."""
+    """
+    The type-membership predicate reads through the same *"is of type A or B"* surface
+    as ``HasType``, its admissible types listed disjunctively.
+    """
     subject = variable(Body, [])
     assert (
         verbalize_expression(HasTypes(subject, (Apple, Cabinet)))
@@ -234,7 +246,8 @@ def test_verbalize_has_types_is_membership():
 
 def test_verbalize_has_types_lists_all_admissible_types():
     """Every admissible type is listed disjunctively -- ``isinstance`` over the tuple holds for ANY of
-    them -- joined by the :class:`Or` element with an oxford comma before the final *"or"*."""
+    them -- joined by the :class:`Or` element with an oxford comma before the final *"or"*.
+    """
     subject = variable(Body, [])
     many = (
         Apple,
@@ -444,8 +457,10 @@ class _NavEmp:
 
 
 def test_relational_navigation_reads_as_relative_clause():
-    """A relational hop before a boolean terminal reads *"the <Type> which <owner> is <verb>"*,
-    using the field's type as the head and dropping the genitive *of*."""
+    """
+    A relational hop before a boolean terminal reads *"the <Type> which <owner> is
+    <verb>"*, using the field's type as the head and dropping the genitive *of*.
+    """
     m = variable(_NavMission, [])
     text = verbalize_expression(m.assigned_to.operational)
     assert text == "the _NavRobot to which a _NavMission is assigned is operational"
@@ -461,9 +476,11 @@ def test_relational_navigation_standalone():
 
 
 def test_relational_navigation_agentive_by_reads_active():
-    """An agentive *by* relation reads in the active voice with the related type as the verb's
-    subject (*"the Person who owns a Book"*), including for an irregular participle
-    (*"written"* → *"writes"*)."""
+    """
+    An agentive *by* relation reads in the active voice with the related type as the
+    verb's subject (*"the Person who owns a Book"*), including for an irregular
+    participle (*"written"* → *"writes"*).
+    """
     assert (
         verbalize_expression(variable(_NavBook, []).owned_by)
         == "the _NavPerson who owns a _NavBook"
@@ -475,16 +492,20 @@ def test_relational_navigation_agentive_by_reads_active():
 
 
 def test_relational_navigation_agentive_by_pronominalises_owner():
-    """When the owner is the query subject, the active-voice agentive clause pronominalises it
-    (*"the Person who owns it"*)."""
+    """
+    When the owner is the query subject, the active-voice agentive clause pronominalises
+    it (*"the Person who owns it"*).
+    """
     book = variable(_NavBook, [])
     text = verbalize_expression(an(entity(book).where(book.owned_by.name == "Bob")))
     assert "the name of the _NavPerson who owns it is 'Bob'" in text
 
 
 def test_relational_navigation_goal_relation_stays_passive():
-    """A non-agentive *to* relation keeps the passive relative clause (only *by* relations go
-    active)."""
+    """
+    A non-agentive *to* relation keeps the passive relative clause (only *by* relations
+    go active).
+    """
     assert (
         verbalize_expression(variable(_NavParcel, []).sent_to)
         == "the _NavAddress to which a _NavParcel is sent"
@@ -492,7 +513,10 @@ def test_relational_navigation_goal_relation_stays_passive():
 
 
 def test_relational_navigation_irregular_participle():
-    """The participle check is morphological, so an irregular participle (*sent*) is recognised."""
+    """
+    The participle check is morphological, so an irregular participle (*sent*) is
+    recognised.
+    """
     assert (
         verbalize_expression(variable(_NavParcel, []).sent_to)
         == "the _NavAddress to which a _NavParcel is sent"
@@ -500,7 +524,9 @@ def test_relational_navigation_irregular_participle():
 
 
 def test_relational_navigation_multi_hop_outer_genitive():
-    """A plain hop after a relational one keeps the genitive, wrapping the relative clause."""
+    """
+    A plain hop after a relational one keeps the genitive, wrapping the relative clause.
+    """
     m = variable(_NavMission, [])
     assert (
         verbalize_expression(m.assigned_to.battery)
@@ -509,15 +535,19 @@ def test_relational_navigation_multi_hop_outer_genitive():
 
 
 def test_noun_hop_ending_in_preposition_is_not_relativized():
-    """A hop whose name merely ends in a preposition (*color_in*) is not a participle, so it stays
-    the genitive form."""
+    """
+    A hop whose name merely ends in a preposition (*color_in*) is not a participle, so
+    it stays the genitive form.
+    """
     text = verbalize_expression(variable(_NavGadget, []).color_in.lit)
     assert text == "the color_in of a _NavGadget is lit"
     assert "which" not in text
 
 
 def test_non_relational_navigation_unchanged():
-    """A purely noun chain renders the familiar genitive path, unchanged."""
+    """
+    A purely noun chain renders the familiar genitive path, unchanged.
+    """
     assert (
         verbalize_expression(variable(_NavEmp, []).department.name)
         == "the name of the department of a _NavEmp"
@@ -540,8 +570,10 @@ class _Holder:
 
 
 def test_genitive_omits_article_before_an_uncountable_noun():
-    """A mass noun in a genitive chain takes no article — *"the amount of money"*, never *"the
-    amount of the money"* — while its countable neighbours keep *"the"*."""
+    """
+    A mass noun in a genitive chain takes no article — *"the amount of money"*, never
+    *"the amount of the money"* — while its countable neighbours keep *"the"*.
+    """
     assert (
         verbalize_expression(variable(_Holder, []).wallet.money.amount)
         == "the amount of money of the wallet of a _Holder"
@@ -552,8 +584,10 @@ def test_genitive_omits_article_before_an_uncountable_noun():
 
 
 def test_relational_navigation_pronominalises_the_subject():
-    """When the chain root is the query subject, a deferred relational chain pronominalises the
-    owner to the nominative *it* inside the relative clause."""
+    """
+    When the chain root is the query subject, a deferred relational chain pronominalises
+    the owner to the nominative *it* inside the relative clause.
+    """
     m = variable(_NavMission, [])
     text = verbalize_expression(an(entity(m).where(m.assigned_to.battery > 5)))
     assert (
@@ -565,10 +599,14 @@ def test_relational_navigation_pronominalises_the_subject():
 
 
 def test_genitive_then_genitive_does_not_pronominalise_the_owner():
-    """Two attributes of the relational referent in a row do *not* read *"its power"*: the first
-    clause's subject is *the battery* (the head of its subject phrase), not the robot, so *"its"*
-    would bind to the battery. The owner is spelled out instead — *"the power of the Robot"* (the
-    robot reduced, already named)."""
+    """
+    Two attributes of the relational referent in a row do *not* read *"its power"*: the
+    first clause's subject is *the battery* (the head of its subject phrase), not the
+    robot, so *"its"* would bind to the battery.
+
+    The owner is spelled out instead — *"the power of the Robot"* (the robot reduced,
+    already named).
+    """
     m = variable(_NavMission, [])
     text = verbalize_expression(
         an(entity(m).where(m.assigned_to.battery > 5, m.assigned_to.power > 10))
@@ -583,9 +621,12 @@ def test_genitive_then_genitive_does_not_pronominalise_the_owner():
 
 
 def test_aggregation_where_on_measured_quantity_reduces_to_the_attribute():
-    """When the WHERE filters the very attribute being aggregated, the relative clause is spelled
-    out once (in the measure) and the repeat reduces to a bare *"the battery"* — not the whole
-    possessive, and not *"its battery"* (which would re-introduce the owner)."""
+    """
+    When the WHERE filters the very attribute being aggregated, the relative clause is
+    spelled out once (in the measure) and the repeat reduces to a bare *"the battery"* —
+    not the whole possessive, and not *"its battery"* (which would re-introduce the
+    owner).
+    """
     m = variable(_NavMission, [])
     nested = an(
         entity(eql.average(m.assigned_to.battery)).where(m.assigned_to.battery > 5)
@@ -599,9 +640,11 @@ def test_aggregation_where_on_measured_quantity_reduces_to_the_attribute():
 
 
 def test_aggregation_where_on_other_attribute_spells_out_the_owner():
-    """The aggregation foregrounds the measured quantity (the battery), not its owner, so a WHERE on
-    a *different* attribute of that owner is **not** *"its power"* (which would misread as the
-    battery's power) — it spells out *"the power of the Robot"*."""
+    """
+    The aggregation foregrounds the measured quantity (the battery), not its owner, so a
+    WHERE on a *different* attribute of that owner is **not** *"its power"* (which would
+    misread as the battery's power) — it spells out *"the power of the Robot"*.
+    """
     m = variable(_NavMission, [])
     nested = an(
         entity(eql.average(m.assigned_to.battery)).where(m.assigned_to.power > 5)
@@ -612,9 +655,12 @@ def test_aggregation_where_on_other_attribute_spells_out_the_owner():
 
 
 def test_boolean_predicative_pronominalises_relational_navigation():
-    """A boolean-terminal chain on the subject's relational navigation reads *"the <Type> to which
-    it is <verb> is <attribute>"* — the navigation prefix is recursed through the standard grammar,
-    so it pronominalises to the subject just like a deferred possessive chain."""
+    """
+    A boolean-terminal chain on the subject's relational navigation reads *"the <Type>
+    to which it is <verb> is <attribute>"* — the navigation prefix is recursed through
+    the standard grammar, so it pronominalises to the subject just like a deferred
+    possessive chain.
+    """
     m = variable(_NavMission, [])
     text = verbalize_expression(an(entity(m).where(m.assigned_to.operational)))
     assert "the _NavRobot to which it is assigned is operational" in text
@@ -622,8 +668,10 @@ def test_boolean_predicative_pronominalises_relational_navigation():
 
 
 def test_boolean_predicative_standalone_navigation_unchanged():
-    """Outside a subject scope the same predicative keeps the full relative clause (no subject to
-    pronominalise to)."""
+    """
+    Outside a subject scope the same predicative keeps the full relative clause (no
+    subject to pronominalise to).
+    """
     m = variable(_NavMission, [])
     assert (
         verbalize_expression(m.assigned_to.operational)
@@ -632,8 +680,11 @@ def test_boolean_predicative_standalone_navigation_unchanged():
 
 
 def test_attribute_through_relational_referent_pronominalises():
-    """An attribute reached through the local centre reads as *"its <attribute>"* — a boolean
-    predicative makes its relational referent the centre just as a possessive does."""
+    """
+    An attribute reached through the local centre reads as *"its <attribute>"* — a
+    boolean predicative makes its relational referent the centre just as a possessive
+    does.
+    """
     m = variable(_NavMission, [])
     text = verbalize_expression(
         an(entity(m).where(m.assigned_to.operational, m.assigned_to.battery > 5))
@@ -645,10 +696,13 @@ def test_attribute_through_relational_referent_pronominalises():
 
 
 def test_its_continues_uniformly_once_the_subject_licenses_it():
-    """A boolean predicative makes the robot the subject, so the attributes that follow read
-    *"its battery … its power"* — uniformly pronominal. Once *"its"* refers to the robot it keeps it
-    as the topic (a centering CONTINUE), so the run never mixes *"its battery"* with a re-named
-    *"the power of the Robot"*."""
+    """
+    A boolean predicative makes the robot the subject, so the attributes that follow
+    read *"its battery … its power"* — uniformly pronominal.
+
+    Once *"its"* refers to the robot it keeps it as the topic (a centering CONTINUE), so
+    the run never mixes *"its battery"* with a re-named *"the power of the Robot"*.
+    """
     m = variable(_NavMission, [])
     text = verbalize_expression(
         an(
@@ -666,10 +720,14 @@ def test_its_continues_uniformly_once_the_subject_licenses_it():
 
 
 def test_two_distinct_relational_referents_are_numbered():
-    """Two distinct relational referents of the same type are numbered *"Robot 1"* / *"Robot 2"*
-    (bare, matching the variable convention) to tell them apart. A following attribute spells the
-    numbered owner out (*"the power of Robot 1"*) rather than *"its power"* — the first clause's
-    subject was the battery, not the robot."""
+    """
+    Two distinct relational referents of the same type are numbered *"Robot 1"* /
+    *"Robot 2"* (bare, matching the variable convention) to tell them apart.
+
+    A following attribute spells the numbered owner out (*"the power of Robot 1"*)
+    rather than *"its power"* — the first clause's subject was the battery, not the
+    robot.
+    """
     p = variable(_NavPair, [])
     text = verbalize_expression(
         an(
@@ -688,7 +746,9 @@ def test_two_distinct_relational_referents_are_numbered():
 
 
 def test_single_relational_referent_is_not_numbered():
-    """A lone relational referent (no same-type collision) keeps the plain definite form."""
+    """
+    A lone relational referent (no same-type collision) keeps the plain definite form.
+    """
     m = variable(_NavMission, [])
     text = verbalize_expression(an(entity(m).where(m.assigned_to.battery > 5)))
     assert "_NavRobot 1" not in text
@@ -696,8 +756,10 @@ def test_single_relational_referent_is_not_numbered():
 
 
 def test_pronominal_relative_clause_agrees_with_subject_number():
-    """The relative-clause copula agrees with the subject: *it is* (singular) / *they are*
-    (plural) — exercised directly on the pronominal path."""
+    """
+    The relative-clause copula agrees with the subject: *it is* (singular) / *they are*
+    (plural) — exercised directly on the pronominal path.
+    """
     from krrood.entity_query_language.verbalization.navigation_path import (
         PathStep,
         RelationStep,
@@ -873,42 +935,54 @@ def test_verbalize_max_min():
 
 
 def test_aggregation_article_count_first_mention():
-    """COUNT produces 'the number of …' even on first mention."""
+    """
+    COUNT produces 'the number of …' even on first mention.
+    """
     x = variable(int, [1, 2])
     text = verbalize_expression(eql.count(x))
     assert text.startswith("the number of"), f"Got: {text!r}"
 
 
 def test_aggregation_article_sum_first_mention():
-    """SUM produces 'the sum of …' even on first mention."""
+    """
+    SUM produces 'the sum of …' even on first mention.
+    """
     x = variable(int, [1, 2])
     text = verbalize_expression(eql.sum(x))
     assert text.startswith("the sum of"), f"Got: {text!r}"
 
 
 def test_aggregation_article_average_first_mention():
-    """AVERAGE produces 'the average of …' even on first mention."""
+    """
+    AVERAGE produces 'the average of …' even on first mention.
+    """
     x = variable(int, [1, 2])
     text = verbalize_expression(eql.average(x))
     assert text.startswith("the average of"), f"Got: {text!r}"
 
 
 def test_aggregation_article_max_first_mention():
-    """MAX produces 'the maximum of …' even on first mention."""
+    """
+    MAX produces 'the maximum of …' even on first mention.
+    """
     x = variable(int, [1, 2])
     text = verbalize_expression(eql.max(x))
     assert text.startswith("the maximum of"), f"Got: {text!r}"
 
 
 def test_aggregation_article_min_first_mention():
-    """MIN produces 'the minimum of …' even on first mention."""
+    """
+    MIN produces 'the minimum of …' even on first mention.
+    """
     x = variable(int, [1, 2])
     text = verbalize_expression(eql.min(x))
     assert text.startswith("the minimum of"), f"Got: {text!r}"
 
 
 def test_max_single_attribute_chain():
-    """MAX on a single-level attribute: 'the maximum of the <attr> of a <Type>'."""
+    """
+    MAX on a single-level attribute: 'the maximum of the <attr> of a <Type>'.
+    """
     t = variable(BankTransaction, domain=None)
     text = verbalize_expression(an(entity(eql.max(t.amount_details))))
     assert (
@@ -917,7 +991,9 @@ def test_max_single_attribute_chain():
 
 
 def test_min_single_attribute_chain():
-    """MIN on a single-level attribute: 'the minimum of the <attr> of a <Type>'."""
+    """
+    MIN on a single-level attribute: 'the minimum of the <attr> of a <Type>'.
+    """
     t = variable(BankTransaction, domain=None)
     text = verbalize_expression(an(entity(eql.min(t.amount_details))))
     assert (
@@ -926,7 +1002,10 @@ def test_min_single_attribute_chain():
 
 
 def test_max_multi_level_attribute_chain():
-    """MAX on a multi-level chain: article before agg word, 'of' separator, no leading article on child."""
+    """
+    MAX on a multi-level chain: article before agg word, 'of' separator, no leading
+    article on child.
+    """
     t = variable(BankTransaction, domain=None)
     query = an(entity(eql.max(t.amount_details.amount)))
     text = verbalize_expression(query)
@@ -936,7 +1015,9 @@ def test_max_multi_level_attribute_chain():
 
 
 def test_min_multi_level_attribute_chain():
-    """MIN on a multi-level chain: mirrors MAX behaviour."""
+    """
+    MIN on a multi-level chain: mirrors MAX behaviour.
+    """
     t = variable(BankTransaction, domain=None)
     query = an(entity(eql.min(t.amount_details.amount)))
     text = verbalize_expression(query)
@@ -946,8 +1027,10 @@ def test_min_multi_level_attribute_chain():
 
 
 def test_grouped_having_on_max_fronts_onto_group_key():
-    """A MAX HAVING fronts onto the group key as a determiner-less possession (*"whose maximum of …"*);
-    the reported column restates it in full (*"the maximum of …"*)."""
+    """
+    A MAX HAVING fronts onto the group key as a determiner-less possession (*"whose
+    maximum of …"*); the reported column restates it in full (*"the maximum of …"*).
+    """
     t = variable(BankTransaction, domain=None)
     max_amount = eql.max(t.amount_details.amount)
     query = a(set_of(max_amount).grouped_by(t.amount_details).having(max_amount > 100))
@@ -960,7 +1043,9 @@ def test_grouped_having_on_max_fronts_onto_group_key():
 
 
 def test_nested_unconstrained_aggregation_no_second_find():
-    """An aggregation sub-query used as a comparison value must not emit a second 'Find'."""
+    """
+    An aggregation sub-query used as a comparison value must not emit a second 'Find'.
+    """
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
@@ -974,7 +1059,10 @@ def test_nested_unconstrained_aggregation_no_second_find():
 
 
 def test_nested_non_aggregation_entity_no_second_find():
-    """A nested non-aggregation entity sub-query renders as a noun phrase, not a second 'Find'."""
+    """
+    A nested non-aggregation entity sub-query renders as a noun phrase, not a second
+    'Find'.
+    """
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
@@ -986,7 +1074,9 @@ def test_nested_non_aggregation_entity_no_second_find():
 
 
 def test_nested_constrained_aggregation_preserves_filter():
-    """A constrained aggregation sub-query keeps its filter when verbalized."""
+    """
+    A constrained aggregation sub-query keeps its filter when verbalized.
+    """
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
@@ -1005,11 +1095,15 @@ def test_nested_constrained_aggregation_preserves_filter():
 
 
 def test_deeply_nested_subqueries_golden():
-    """Nesting has no depth limit: three levels of constrained aggregation sub-queries render
-    with exactly one top-level 'Find' and every deeper query as a noun phrase.  Each level's
+    """
+    Nesting has no depth limit: three levels of constrained aggregation sub-queries
+    render with exactly one top-level 'Find' and every deeper query as a noun phrase.
+
+    Each level's
     subject is differentiated: the unique top-level subject pronominalises to 'its', the
     level-2 population to 'their' (never the ambiguous singular 'the BankTransaction'), and
-    the level-3 condition folds into 'whose'."""
+    the level-3 condition folds into 'whose'.
+    """
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     t3 = variable(BankTransaction, domain=None)
@@ -1036,9 +1130,11 @@ def test_deeply_nested_subqueries_golden():
 
 
 def test_superlative_fold_max_and_min():
-    """``subject.<chain> == max/min(<same-type>.<same chain>)`` folds to the superlative
-    *"with the maximum/minimum <leaf>"* — meaning-preserving (the superlative *is* "equal to the
-    extreme over the whole population"), not an optimisation."""
+    """
+    ``subject.<chain> == max/min(<same-type>.<same chain>)`` folds to the superlative
+    *"with the maximum/minimum <leaf>"* — meaning-preserving (the superlative *is*
+    "equal to the extreme over the whole population"), not an optimisation.
+    """
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     max_query = eql.the(
@@ -1064,8 +1160,10 @@ def test_superlative_fold_max_and_min():
 
 
 def test_superlative_fold_declines_when_aggregation_is_constrained_or_grouped():
-    """The fold is strict: a *constrained* extreme sub-query is load-bearing, so it stays the
-    explicit *"such that … is equal to the maximum amount among … whose …"* form."""
+    """
+    The fold is strict: a *constrained* extreme sub-query is load-bearing, so it stays
+    the explicit *"such that … is equal to the maximum amount among … whose …"* form.
+    """
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
@@ -1084,7 +1182,9 @@ def test_superlative_fold_declines_when_aggregation_is_constrained_or_grouped():
 
 
 def test_superlative_fold_declines_for_non_extreme_aggregation():
-    """Only Max/Min are superlatives — SUM stays *"is equal to the sum of amounts"*."""
+    """
+    Only Max/Min are superlatives — SUM stays *"is equal to the sum of amounts"*.
+    """
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
@@ -1096,8 +1196,10 @@ def test_superlative_fold_declines_for_non_extreme_aggregation():
 
 
 def test_superlative_fold_declines_on_different_chain():
-    """The fold requires the *same* attribute chain on both sides — comparing one attribute to
-    the maximum of a *different* one is not a superlative and must not fold."""
+    """
+    The fold requires the *same* attribute chain on both sides — comparing one attribute
+    to the maximum of a *different* one is not a superlative and must not fold.
+    """
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
@@ -1111,7 +1213,9 @@ def test_superlative_fold_declines_on_different_chain():
 
 
 def test_nested_aggregation_sum_uses_plural_leaf():
-    """SUM (a '… of' aggregation) collapses with a plural leaf: 'the sum of amounts'."""
+    """
+    SUM (a '… of' aggregation) collapses with a plural leaf: 'the sum of amounts'.
+    """
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
@@ -1124,7 +1228,10 @@ def test_nested_aggregation_sum_uses_plural_leaf():
 
 
 def test_nested_constrained_aggregation_no_second_find():
-    """A constrained aggregation sub-query keeps its filter via 'among … such that …', no second 'Find'."""
+    """
+    A constrained aggregation sub-query keeps its filter via 'among … such that …', no
+    second 'Find'.
+    """
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
@@ -1144,7 +1251,10 @@ def test_nested_constrained_aggregation_no_second_find():
 
 
 def test_nested_aggregation_source_not_numbered_on_outer_subject():
-    """The aggregation source is a population, not a numbered entity: the outer subject stays unnumbered."""
+    """
+    The aggregation source is a population, not a numbered entity: the outer subject
+    stays unnumbered.
+    """
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
@@ -1159,7 +1269,10 @@ def test_nested_aggregation_source_not_numbered_on_outer_subject():
 
 
 def test_nested_constrained_aggregation_scope_is_plural_unnumbered():
-    """A constrained aggregation scope reads 'among BankTransactions', not 'among BankTransaction 2'."""
+    """
+    A constrained aggregation scope reads 'among BankTransactions', not 'among
+    BankTransaction 2'.
+    """
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
@@ -1178,7 +1291,10 @@ def test_nested_constrained_aggregation_scope_is_plural_unnumbered():
 
 
 def test_nested_non_aggregation_entity_keeps_numbering():
-    """A genuine (non-aggregation) entity sub-query is a specific entity and keeps its disambiguation number."""
+    """
+    A genuine (non-aggregation) entity sub-query is a specific entity and keeps its
+    disambiguation number.
+    """
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
@@ -1284,8 +1400,10 @@ def test_verbalize_complex_having(departments_and_employees_fixture):
 
 
 def test_grouped_having_fronts_aggregate_onto_group_key():
-    """A grouped HAVING fronts onto the group key as *"For each department whose <aggregate> is …"* —
-    the aggregate a determiner-less possession of the group — then the report restates it in full.
+    """
+    A grouped HAVING fronts onto the group key as *"For each department whose
+    <aggregate> is …"* — the aggregate a determiner-less possession of the group — then
+    the report restates it in full.
     """
     employee = variable(Employee, domain=None)
     total = eql.sum(employee.salary)
@@ -1302,8 +1420,10 @@ def test_grouped_having_fronts_aggregate_onto_group_key():
 
 
 def test_grouped_selection_equal_to_key_reports_distinct():
-    """A grouped query whose selection IS the group key reports the distinct keys, fronted —
-    never a trailing 'grouped by'."""
+    """
+    A grouped query whose selection IS the group key reports the distinct keys, fronted
+    — never a trailing 'grouped by'.
+    """
     employee = variable(Employee, domain=None)
     text = verbalize_expression(
         a(set_of(employee.department).grouped_by(employee.department))
@@ -1313,8 +1433,10 @@ def test_grouped_selection_equal_to_key_reports_distinct():
 
 
 def test_grouped_selection_other_than_key_fronts_for_each_all():
-    """A grouped query with a non-key selection fronts the grouping as 'For each <key>' and lists
-    the per-group population with 'all'."""
+    """
+    A grouped query with a non-key selection fronts the grouping as 'For each <key>' and
+    lists the per-group population with 'all'.
+    """
     employee = variable(Employee, domain=None)
     text = verbalize_expression(an(entity(employee).grouped_by(employee.department)))
     assert text == "For each department, report all Employees"
@@ -1352,9 +1474,12 @@ def test_verbalize_nested_rule(doors_and_drawers_world):
 
 
 def test_verbalize_inference_rule_golden(doors_and_drawers_world):
-    """Exact IF/THEN surface for a sub-query inference rule (pins the whole sentence:
-    antecedent intro, ``whose`` conditions, the ``, then`` join, and consequent bindings —
-    including the FixedConnection reading ``a`` first then ``the`` via coreference)."""
+    """
+    Exact IF/THEN surface for a sub-query inference rule (pins the whole sentence:
+
+    antecedent intro, ``whose`` conditions, the ``, then`` join, and consequent bindings
+    — including the FixedConnection reading ``a`` first then ``the`` via coreference).
+    """
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_connection = variable(PrismaticConnection, world.connections)
@@ -1373,7 +1498,8 @@ def test_verbalize_inference_rule_golden(doors_and_drawers_world):
 
 
 def test_verbalize_inference_no_sub_query_golden(doors_and_drawers_world):
-    """Exact surface for a plain-binding inference rule (no antecedent sub-query): a noun
+    """
+    Exact surface for a plain-binding inference rule (no antecedent sub-query): a noun
     phrase with appositive ``, where …`` bindings, no IF/THEN block, no ``such that``.
     """
     world = doors_and_drawers_world
@@ -1442,9 +1568,11 @@ def test_verbalize_has_type_tuple_of_types():
 
 
 def test_has_type_lists_a_tuple_of_types_disjunctively():
-    """``isinstance`` over a tuple holds when the value is ANY of the types, so the listing joins
-    with *"or"* — *"is of type Apple or Body"*, never the conjunctive *"and"* (a value cannot be of
-    both types at once)."""
+    """
+    ``isinstance`` over a tuple holds when the value is ANY of the types, so the listing
+    joins with *"or"* — *"is of type Apple or Body"*, never the conjunctive *"and"* (a
+    value cannot be of both types at once).
+    """
     fruit = variable(Body, [])
     assert (
         verbalize_expression(HasType(fruit, (Apple, Body)))
@@ -1509,8 +1637,10 @@ def test_verbalize_custom_predicate_employee_domain():
 
 
 def test_verbalize_predicate_without_fragment_raises():
-    """A predicate that supplies no verbalization fragment is an error — there is no name-based
-    string fallback; fragments are required."""
+    """
+    A predicate that supplies no verbalization fragment is an error — there is no name-
+    based string fallback; fragments are required.
+    """
 
     @dataclass(eq=False)
     class HasHighSalary(Predicate):
@@ -1544,7 +1674,9 @@ def test_verbalize_predicate_without_fragment_no_args_raises():
 def test_aggregator_coreference_second_mention_is_the(
     departments_and_employees_fixture,
 ):
-    """Same aggregator expression in set_of and having → both mentions include 'the'."""
+    """
+    Same aggregator expression in set_of and having → both mentions include 'the'.
+    """
     _, _ = departments_and_employees_fixture
     employee = variable(Employee, domain=None)
     avg_salary = eql.average(employee.salary)
@@ -1557,9 +1689,12 @@ def test_aggregator_coreference_second_mention_is_the(
 
 
 def test_grouped_having_fronts_onto_group_key(departments_and_employees_fixture):
-    """A grouped HAVING is woven onto the group key as a *"For each department whose <aggregate> is
-    <op> <value>"* filter, so the group condition is unambiguous rather than the bare *"having the sum
-    greater than …"* that misparses as modifying the reported population."""
+    """
+    A grouped HAVING is woven onto the group key as a *"For each department whose
+    <aggregate> is <op> <value>"* filter, so the group condition is unambiguous rather
+    than the bare *"having the sum greater than …"* that misparses as modifying the
+    reported population.
+    """
     _, _ = departments_and_employees_fixture
     employee = variable(Employee, domain=None)
     avg_salary = eql.average(employee.salary)
@@ -1576,7 +1711,10 @@ def test_grouped_having_fronts_onto_group_key(departments_and_employees_fixture)
 
 
 def test_where_keeps_is_copula(departments_and_employees_fixture):
-    """A single-hop subject predicate groups under 'whose' but keeps the full 'is greater than' form."""
+    """
+    A single-hop subject predicate groups under 'whose' but keeps the full 'is greater
+    than' form.
+    """
     _, _ = departments_and_employees_fixture
     employee = variable(Employee, domain=None)
     query = a(entity(employee).where(employee.salary > 30000))
@@ -1589,7 +1727,10 @@ def test_where_keeps_is_copula(departments_and_employees_fixture):
 def test_having_compound_condition_renders_full_clauses(
     departments_and_employees_fixture,
 ):
-    """AND/OR inside the fronted HAVING *whose* clause: every comparator reads as a full *"is <op> …"* clause."""
+    """
+    AND/OR inside the fronted HAVING *whose* clause: every comparator reads as a full
+    *"is <op> …"* clause.
+    """
     _, _ = departments_and_employees_fixture
     employee = variable(Employee, domain=None)
     avg_salary = eql.average(employee.salary)
@@ -1609,7 +1750,10 @@ def test_having_compound_condition_renders_full_clauses(
 def test_having_negated_comparator_renders_full_clause(
     departments_and_employees_fixture,
 ):
-    """NOT over a comparator inside the fronted HAVING *whose* clause reads as *"is not <op> …"*."""
+    """
+    NOT over a comparator inside the fronted HAVING *whose* clause reads as *"is not
+    <op> …"*.
+    """
     _, _ = departments_and_employees_fixture
     employee = variable(Employee, domain=None)
     avg_salary = eql.average(employee.salary)
@@ -1627,8 +1771,10 @@ def test_having_negated_comparator_renders_full_clause(
 def test_set_of_grouped_by_reports_without_restating_the_key(
     departments_and_employees_fixture,
 ):
-    """A grouped aggregation reads as a single fronted report — no double header, no trailing
-    'grouped by', and the group key named once (in 'For each …'), not restated as a column.
+    """
+    A grouped aggregation reads as a single fronted report — no double header, no
+    trailing 'grouped by', and the group key named once (in 'For each …'), not restated
+    as a column.
     """
     _, _ = departments_and_employees_fixture
     employee = variable(Employee, domain=None)
@@ -1672,9 +1818,10 @@ def test_verbalize_not_comparator_ne():
 
 
 def test_verbalize_having_eq_uses_is_copula():
-    """The fronted HAVING *whose* clause renders ``==`` with the copula like any other clause —
-    *"whose number of Employees is equal to 2"* — not the copula-less *"equals"* the old compact
-    HAVING form used.
+    """
+    The fronted HAVING *whose* clause renders ``==`` with the copula like any other
+    clause — *"whose number of Employees is equal to 2"* — not the copula-less
+    *"equals"* the old compact HAVING form used.
     """
     employee = variable(Employee, domain=None)
     count_emp = eql.count(employee)
@@ -1692,7 +1839,9 @@ def test_verbalize_having_eq_uses_is_copula():
 
 
 def test_verbalize_inference_no_sub_query(doors_and_drawers_world):
-    """inference(...) with plain variable bindings: 'where' clause, no 'such that'."""
+    """
+    inference(...) with plain variable bindings: 'where' clause, no 'such that'.
+    """
     world = doors_and_drawers_world
     handle_variable = variable(Handle, world.bodies)
     container_variable = variable(Container, world.bodies)
@@ -1707,7 +1856,9 @@ def test_verbalize_inference_no_sub_query(doors_and_drawers_world):
 
 
 def test_verbalize_inference_repeated_entity_article(doors_and_drawers_world):
-    """Same inner entity used for two fields: first mention 'a', second 'the'."""
+    """
+    Same inner entity used for two fields: first mention 'a', second 'the'.
+    """
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_connection = variable(PrismaticConnection, world.connections)
@@ -1726,7 +1877,9 @@ def test_verbalize_inference_repeated_entity_article(doors_and_drawers_world):
 
 
 def test_verbalize_inference_literal_field(doors_and_drawers_world):
-    """A child var that is a Python literal value is rendered inside the binding."""
+    """
+    A child var that is a Python literal value is rendered inside the binding.
+    """
     world = doors_and_drawers_world
     handle_variable = variable(Handle, world.bodies)
     container_variable = variable(Container, world.bodies)
@@ -1743,8 +1896,10 @@ def test_verbalize_inference_literal_field(doors_and_drawers_world):
 def test_verbalize_double_nested_constraint_stack(doors_and_drawers_world):
     """
     InstantiatedVariable whose binding value is itself an InstantiatedVariable with
-    Entity sub-query constraints.  The inner 'such that' must not leak into the outer
-    verbalization — each level keeps its own constraint frame.
+    Entity sub-query constraints.
+
+    The inner 'such that' must not leak into the outer verbalization — each level keeps
+    its own constraint frame.
     """
 
     @dataclass
@@ -1776,8 +1931,10 @@ def test_verbalize_double_nested_constraint_stack(doors_and_drawers_world):
 
 def test_verbalize_double_nested_with_outer_entity(doors_and_drawers_world):
     """
-    Wrapper has both an inner InstantiatedVariable (Drawer) and its own direct
-    Entity binding.  The inner and outer constraint frames must remain separate.
+    Wrapper has both an inner InstantiatedVariable (Drawer) and its own direct Entity
+    binding.
+
+    The inner and outer constraint frames must remain separate.
     """
 
     @dataclass
@@ -1844,8 +2001,10 @@ def test_verbalize_triple():
 
 
 def test_verbalize_1arg_predicate_without_fragment_raises():
-    """A 1-arg predicate without a verbalization fragment is an error — fragments are required, with
-    no generic name-based fallback."""
+    """
+    A 1-arg predicate without a verbalization fragment is an error — fragments are
+    required, with no generic name-based fallback.
+    """
 
     @dataclass(eq=False)
     class IsActive(Predicate):
@@ -1863,7 +2022,8 @@ def test_verbalize_1arg_predicate_without_fragment_raises():
 
 
 def test_two_same_type_variables_are_disambiguated():
-    """Two distinct variables of the same type must get numbered labels to tell them apart.
+    """
+    Two distinct variables of the same type must get numbered labels to tell them apart.
 
     Currently both variables produce 'an Employee', making the output ambiguous:
     'an Employee's salary is greater than an Employee's salary'
@@ -1878,7 +2038,9 @@ def test_two_same_type_variables_are_disambiguated():
 
 
 def test_two_same_type_variables_in_query_are_disambiguated():
-    """Two same-type variables inside a query must each get distinct numbered labels."""
+    """
+    Two same-type variables inside a query must each get distinct numbered labels.
+    """
     employee1 = variable(Employee, [])
     employee2 = variable(Employee, [])
     query = an(entity(employee1).where(employee1.salary > employee2.salary))
@@ -1888,7 +2050,9 @@ def test_two_same_type_variables_in_query_are_disambiguated():
 
 
 def test_three_same_type_variables_are_disambiguated():
-    """Three variables of the same type each get distinct numbered labels."""
+    """
+    Three variables of the same type each get distinct numbered labels.
+    """
     employee1 = variable(Employee, [])
     employee2 = variable(Employee, [])
     emp3 = variable(Employee, [])
@@ -1904,7 +2068,9 @@ def test_three_same_type_variables_are_disambiguated():
 
 
 def test_single_type_variable_not_numbered():
-    """A single variable of a type must keep the plain 'an Employee' form — no numbering."""
+    """
+    A single variable of a type must keep the plain 'an Employee' form — no numbering.
+    """
     employee = variable(Employee, [])
     text = verbalize_expression(employee)
     assert "an Employee" in text, f"Expected 'an Employee' in: {text!r}"
@@ -1938,7 +2104,9 @@ def test_search_by_booking_date_and_aggregate():
 
 
 def test_cabinet_rule_verbalization(handles_and_containers_world):
-    """if/then form: aggregated antecedents plural, group-key binding uses 'common'."""
+    """
+    If/then form: aggregated antecedents plural, group-key binding uses 'common'.
+    """
     drawer = variable(Drawer, handles_and_containers_world.views)
     prismatic_connection = variable(
         PrismaticConnection, handles_and_containers_world.connections
@@ -1979,7 +2147,10 @@ def test_cabinet_rule_verbalization(handles_and_containers_world):
 def test_inference_planner_decomposes_rule_without_rendering(
     handles_and_containers_world,
 ):
-    """The InferencePlanner produces the RuleStructure as pure data — no fragments rendered."""
+    """
+    The InferencePlanner produces the RuleStructure as pure data — no fragments
+    rendered.
+    """
     from krrood.entity_query_language.verbalization.grammar.inference.planner import (
         AggregationStatus,
         InferencePlanner,
@@ -2034,8 +2205,10 @@ def test_inference_planner_decomposes_rule_without_rendering(
 
 
 def test_query_planner_collects_subject_restriction_without_placing():
-    """The QueryPlanner only flattens the WHERE into conjuncts — range-folding and choosing each
-    conjunct's surface form/slot are the condition-form registry's concern, not the plan's.
+    """
+    The QueryPlanner only flattens the WHERE into conjuncts — range-folding and choosing
+    each conjunct's surface form/slot are the condition-form registry's concern, not the
+    plan's.
     """
     from krrood.entity_query_language.verbalization.grammar.query.planner import (
         QueryPlanner,
@@ -2073,7 +2246,9 @@ def test_query_planner_collects_subject_restriction_without_placing():
 def test_instantiated_planner_decomposes_bindings_without_rendering(
     handles_and_containers_world,
 ):
-    """The InstantiatedPlanner records type + per-field number as pure data — no fragments."""
+    """
+    The InstantiatedPlanner records type + per-field number as pure data — no fragments.
+    """
     from krrood.entity_query_language.verbalization.grammar.instantiated.planner import (
         InstantiatedPlanner,
     )
@@ -2090,7 +2265,9 @@ def test_instantiated_planner_decomposes_bindings_without_rendering(
 def test_grouped_by_planner_extracts_keys_without_rendering(
     handles_and_containers_world,
 ):
-    """The GroupedByPlanner reads the GROUP BY keys as pure data — no fragments rendered."""
+    """
+    The GroupedByPlanner reads the GROUP BY keys as pure data — no fragments rendered.
+    """
     from krrood.entity_query_language.verbalization.grammar.clauses.planner import (
         GroupedByPlanner,
     )
@@ -2107,7 +2284,10 @@ def test_grouped_by_planner_extracts_keys_without_rendering(
 
 
 def test_plural_field_binding_uses_are(handles_and_containers_world):
-    """A plural field name in an InstantiatedVariable binding uses 'are <Plural>' not 'is <Article> <Singular>'."""
+    """
+    A plural field name in an InstantiatedVariable binding uses 'are <Plural>' not 'is
+    <Article> <Singular>'.
+    """
     drawer = variable(Drawer, handles_and_containers_world.views)
     cabinet = inference(Cabinet)(drawers=drawer)
     text = verbalize_expression(cabinet)
@@ -2118,8 +2298,10 @@ def test_plural_field_binding_uses_are(handles_and_containers_world):
 
 
 def test_grouped_by_without_instantiated_variable(handles_and_containers_world):
-    """grouped_by where the selection IS the group key renders a fronted distinct listing
-    (never a trailing 'grouped by')."""
+    """
+    grouped_by where the selection IS the group key renders a fronted distinct listing
+    (never a trailing 'grouped by').
+    """
     cabinet = variable(Cabinet, handles_and_containers_world.views)
     drawer = flat_variable(cabinet.drawers)
     query = an(
@@ -2150,7 +2332,10 @@ def departments_and_employees_fixture():
 
 
 def test_example_sum_between_full_sentence():
-    """Motivating example 1: pronoun + calc-equality + 'whose … between' in the aggregation scope."""
+    """
+    Motivating example 1: pronoun + calc-equality + 'whose … between' in the aggregation
+    scope.
+    """
     bank_transaction = variable(BankTransaction, domain=None)
     bt_sum = variable(BankTransaction, domain=None)
     start_date = datetime.datetime(2026, 5, 15)
@@ -2174,10 +2359,12 @@ def test_example_sum_between_full_sentence():
 
 
 def test_example_max_full_sentence():
-    """Motivating example 2: pronoun + calc-equality, multi-hop residual keeps 'such that'.
+    """
+    Motivating example 2: pronoun + calc-equality, multi-hop residual keeps 'such that'.
 
-    Uses a *constrained* max (which does not fold to a superlative) so the calc-equality residual
-    survives as the full *"such that … is equal to the maximum amount among … whose …"* sentence.
+    Uses a *constrained* max (which does not fold to a superlative) so the calc-equality
+    residual survives as the full *"such that … is equal to the maximum amount among …
+    whose …"* sentence.
     """
     bank_transaction = variable(BankTransaction, domain=None)
     bt2 = variable(BankTransaction, domain=None)
@@ -2197,10 +2384,13 @@ def test_example_max_full_sentence():
 
 
 def test_pronoun_multi_hop_chain_elides_subject():
-    """A multi-hop chain rooted at the subject becomes 'the amount of its amount_details'.
+    """
+    A multi-hop chain rooted at the subject becomes 'the amount of its amount_details'.
 
-    Uses a *constrained* max so the chain stays a residual comparison (an unconstrained max would
-    fold to the superlative 'with the maximum amount', eliding the chain entirely)."""
+    Uses a *constrained* max so the chain stays a residual comparison (an unconstrained
+    max would fold to the superlative 'with the maximum amount', eliding the chain
+    entirely).
+    """
     bank_transaction = variable(BankTransaction, domain=None)
     bt2 = variable(BankTransaction, domain=None)
     query = eql.the(
@@ -2219,7 +2409,9 @@ def test_pronoun_multi_hop_chain_elides_subject():
 
 
 def test_pronoun_single_hop_in_residual_or():
-    """A single-hop subject chain that stays residual (inside OR) uses 'its booking_date'."""
+    """
+    A single-hop subject chain that stays residual (inside OR) uses 'its booking_date'.
+    """
     bank_transaction = variable(BankTransaction, domain=None)
     lower_bound = datetime.datetime(2026, 1, 1)
     upper_bound = datetime.datetime(2026, 12, 31)
@@ -2237,7 +2429,10 @@ def test_pronoun_single_hop_in_residual_or():
 
 
 def test_pronoun_not_used_for_non_subject_variable():
-    """Only the subject is pronominalised; another variable in the condition stays explicit."""
+    """
+    Only the subject is pronominalised; another variable in the condition stays
+    explicit.
+    """
     bank_transaction = variable(BankTransaction, domain=None)
     employee = variable(Employee, domain=None)
     query = an(
@@ -2255,7 +2450,10 @@ def test_pronoun_not_used_for_non_subject_variable():
 
 
 def test_whose_grouping_top_level_between():
-    """A >=/<= pair on a single-hop subject attribute folds into 'whose … is between … and …'."""
+    """
+    A >=/<= pair on a single-hop subject attribute folds into 'whose … is between … and
+    …'.
+    """
     bank_transaction = variable(BankTransaction, domain=None)
     lower_bound = datetime.datetime(2026, 5, 15)
     upper_bound = datetime.datetime(2026, 5, 30)
@@ -2271,7 +2469,10 @@ def test_whose_grouping_top_level_between():
 
 
 def test_whose_grouping_mixed_groupable_and_residual():
-    """Groupable single-hop predicates go under 'whose'; multi-hop ones stay in 'such that'."""
+    """
+    Groupable single-hop predicates go under 'whose'; multi-hop ones stay in 'such
+    that'.
+    """
     bank_transaction = variable(BankTransaction, domain=None)
     bt2 = variable(BankTransaction, domain=None)
     lower_bound = datetime.datetime(2026, 5, 15)
@@ -2299,7 +2500,10 @@ def test_whose_grouping_mixed_groupable_and_residual():
 
 
 def test_top_level_aggregation_max_whose():
-    """A top-level max selection ends with its source variable, so its WHERE folds into 'whose'."""
+    """
+    A top-level max selection ends with its source variable, so its WHERE folds into
+    'whose'.
+    """
     bank_transaction = variable(BankTransaction, domain=None)
     query = an(
         entity(eql.max(bank_transaction, key=lambda t: t.amount_details.amount)).where(
@@ -2312,7 +2516,10 @@ def test_top_level_aggregation_max_whose():
 
 
 def test_top_level_aggregation_average_between_whose():
-    """A top-level average selection folds a >=/<= subject-attribute pair into 'whose … between'."""
+    """
+    A top-level average selection folds a >=/<= subject-attribute pair into 'whose …
+    between'.
+    """
     bank_transaction = variable(BankTransaction, domain=None)
     query = an(
         entity(eql.average(bank_transaction.amount_details.amount)).where(
@@ -2327,7 +2534,10 @@ def test_top_level_aggregation_average_between_whose():
 
 
 def test_top_level_aggregation_mixed_groupable_and_residual():
-    """For an aggregation subject, single-hop predicates fold to 'whose'; multi-hop stay 'such that'."""
+    """
+    For an aggregation subject, single-hop predicates fold to 'whose'; multi-hop stay
+    'such that'.
+    """
     bank_transaction = variable(BankTransaction, domain=None)
     query = an(
         entity(eql.average(bank_transaction.amount_details.amount)).where(
@@ -2342,7 +2552,9 @@ def test_top_level_aggregation_mixed_groupable_and_residual():
 
 
 def test_second_domain_top_level_aggregation_whose():
-    """Aggregation whose-grouping generalises to a second domain (Employee)."""
+    """
+    Aggregation whose-grouping generalises to a second domain (Employee).
+    """
     employee = variable(Employee, domain=None)
     query = an(
         entity(eql.average(employee.salary)).where(employee.starting_salary > 20000)
@@ -2353,7 +2565,9 @@ def test_second_domain_top_level_aggregation_whose():
 
 
 def test_calc_equality_uses_is_equal_to():
-    """== against a calculation reads 'is equal to'."""
+    """
+    == against a calculation reads 'is equal to'.
+    """
     bank_transaction = variable(BankTransaction, domain=None)
     bt2 = variable(BankTransaction, domain=None)
     query = an(
@@ -2366,7 +2580,9 @@ def test_calc_equality_uses_is_equal_to():
 
 
 def test_object_equality_keeps_is():
-    """== against a plain value keeps the bare 'is'."""
+    """
+    == against a plain value keeps the bare 'is'.
+    """
     bank_transaction = variable(BankTransaction, domain=None)
     query = an(
         entity(bank_transaction).where(bank_transaction.amount_details.amount == 3.5)
@@ -2377,7 +2593,9 @@ def test_object_equality_keeps_is():
 
 
 def test_not_calc_equality_uses_is_not_equal_to():
-    """not(== calculation) reads 'is not equal to'."""
+    """
+    Not(== calculation) reads 'is not equal to'.
+    """
     bank_transaction = variable(BankTransaction, domain=None)
     bt2 = variable(BankTransaction, domain=None)
     query = an(
@@ -2392,7 +2610,10 @@ def test_not_calc_equality_uses_is_not_equal_to():
 
 
 def test_range_fold_without_subject_has_no_whose():
-    """A bare AND of bound comparisons folds to 'between' with the full chain (no subject → no 'whose')."""
+    """
+    A bare AND of bound comparisons folds to 'between' with the full chain (no subject →
+    no 'whose').
+    """
     bank_transaction = variable(BankTransaction, domain=None)
     lower_bound = datetime.datetime(2026, 5, 15)
     upper_bound = datetime.datetime(2026, 5, 30)
@@ -2530,7 +2751,9 @@ def test_pr_example():
 
 
 def test_verbalize_expression_no_renderer_backward_compatible():
-    """Calling verbalize_expression matches pipeline plain output."""
+    """
+    Calling verbalize_expression matches pipeline plain output.
+    """
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
     plain = VerbalizationPipeline.plain().verbalize(q)
@@ -2538,7 +2761,9 @@ def test_verbalize_expression_no_renderer_backward_compatible():
 
 
 def test_verbalize_expression_explicit_plain_paragraph():
-    """Explicit pipeline verbalize produces same output as verbalize_expression."""
+    """
+    Explicit pipeline verbalize produces same output as verbalize_expression.
+    """
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
     result = VerbalizationPipeline.plain().verbalize(q)
@@ -2549,7 +2774,9 @@ def test_verbalize_expression_explicit_plain_paragraph():
 
 
 def test_verbalize_expression_ansi_paragraph():
-    """ANSI formatter + paragraph renderer produces escape codes, no added newlines."""
+    """
+    ANSI formatter + paragraph renderer produces escape codes, no added newlines.
+    """
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
     result = VerbalizationPipeline(ParagraphRenderer(ANSIFormatter())).verbalize(q)
@@ -2558,7 +2785,9 @@ def test_verbalize_expression_ansi_paragraph():
 
 
 def test_verbalize_expression_ansi_hierarchical():
-    """ANSI formatter + hierarchical renderer produces escape codes and newlines."""
+    """
+    ANSI formatter + hierarchical renderer produces escape codes and newlines.
+    """
     r = variable(_Robot, [])
     q = an(entity(r).where(or_(r.battery > 50, r.battery < 10)))
     result = VerbalizationPipeline(HierarchicalRenderer(ANSIFormatter())).verbalize(q)
@@ -2567,7 +2796,9 @@ def test_verbalize_expression_ansi_hierarchical():
 
 
 def test_verbalize_expression_html_paragraph():
-    """HTML formatter + paragraph renderer produces spans and the dark wrapper div."""
+    """
+    HTML formatter + paragraph renderer produces spans and the dark wrapper div.
+    """
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
     result = VerbalizationPipeline(ParagraphRenderer(HTMLFormatter())).verbalize(q)
@@ -2577,7 +2808,9 @@ def test_verbalize_expression_html_paragraph():
 
 
 def test_verbalize_expression_html_hierarchical():
-    """HTML formatter + hierarchical renderer produces spans and br tags."""
+    """
+    HTML formatter + hierarchical renderer produces spans and br tags.
+    """
     r = variable(_Robot, [])
     q = an(entity(r).where(or_(r.battery > 50, r.battery < 10)))
     result = VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter())).verbalize(q)
@@ -2597,7 +2830,9 @@ def test_verbalize_expression_html_hierarchical():
     ],
 )
 def test_verbalize_expression_all_combos_produce_non_empty(renderer_factory):
-    """Every formatter × renderer combination produces a non-empty string."""
+    """
+    Every formatter × renderer combination produces a non-empty string.
+    """
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
     result = VerbalizationPipeline(renderer_factory()).verbalize(q)
@@ -2607,7 +2842,9 @@ def test_verbalize_expression_all_combos_produce_non_empty(renderer_factory):
 
 
 def test_verbalize_expression_equivalence_to_pipeline():
-    """Every renderer in VerbalizationPipeline produces a non-empty string."""
+    """
+    Every renderer in VerbalizationPipeline produces a non-empty string.
+    """
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
 
@@ -2630,7 +2867,9 @@ def test_verbalize_expression_equivalence_to_pipeline():
 def test_verbalize_expression_html_hierarchical_handles_constrained_aggregation(
     departments_and_employees_fixture,
 ):
-    """A constrained aggregation query works end-to-end with HTML hierarchical output."""
+    """
+    A constrained aggregation query works end-to-end with HTML hierarchical output.
+    """
     _, _ = departments_and_employees_fixture
     employee = variable(Employee, domain=None)
     avg_salary = eql.average(employee.salary)

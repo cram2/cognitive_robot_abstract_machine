@@ -514,13 +514,16 @@ def test_doc_example(rule_tree_doc_example_connections, alternative_code, result
 
 
 def test_rule_tree_anchors_when_where_condition_is_reused_in_a_sibling():
-    """A node used as the bare WHERE condition and reused inside a sibling branch must still anchor.
+    """
+    A node used as the bare WHERE condition and reused inside a sibling branch must
+    still anchor.
 
-    ``drawer.correct`` is a shared node: it is the WHERE condition and also appears in the
-    ``alternative`` condition ``drawer.correct == False``. Building that comparator adds it as an
-    extra parent of the shared node. Its primary ``_parent_`` must stay the structural (WHERE)
-    parent so rule-tree splicing still finds the anchor; when the reuse overwrote ``_parent_``
-    the splice navigated from the comparator instead and failed.
+    ``drawer.correct`` is a shared node: it is the WHERE condition and also appears in
+    the ``alternative`` condition ``drawer.correct == False``. Building that comparator
+    adds it as an extra parent of the shared node. Its primary ``_parent_`` must stay
+    the structural (WHERE) parent so rule-tree splicing still finds the anchor; when the
+    reuse overwrote ``_parent_`` the splice navigated from the comparator instead and
+    failed.
     """
     correct_drawer = Drawer(
         handle=Handle("Handle1"), container=Container("Container1"), correct=True
@@ -550,16 +553,18 @@ def test_rule_tree_anchors_when_where_condition_is_reused_in_a_sibling():
 def test_conclusions_fire_without_an_active_evaluation_context(
     handles_and_containers_world,
 ):
-    """A conclusion must still fire when no ``EvaluationContext`` is active.
+    """
+    A conclusion must still fire when no ``EvaluationContext`` is active.
 
     ``_evaluate_conclusions_and_update_bindings_`` is normally only reached from inside
-    ``_evaluate_``, which has already set one up. But real-world callers can drive evaluation
-    from a code path where no context was ever created for the current thread (for example,
-    resuming a query from a thread that does not share the caller's ``contextvars.Context`` --
-    Python's ``ContextVar`` values do not propagate into a plain ``threading.Thread`` by
-    default). This calls the raw, double-underscore ``_evaluate__`` directly (bypassing
-    ``_evaluate_``'s context setup entirely) to prove the conclusion-firing check falls back to
-    a purely structural one instead of assuming a context always exists.
+    ``_evaluate_``, which has already set one up. But real-world callers can drive
+    evaluation from a code path where no context was ever created for the current thread
+    (for example, resuming a query from a thread that does not share the caller's
+    ``contextvars.Context`` -- Python's ``ContextVar`` values do not propagate into a
+    plain ``threading.Thread`` by default). This calls the raw, double-underscore
+    ``_evaluate__`` directly (bypassing ``_evaluate_``'s context setup entirely) to
+    prove the conclusion-firing check falls back to a purely structural one instead of
+    assuming a context always exists.
     """
     world = handles_and_containers_world
     container = variable(Container, domain=world.bodies)

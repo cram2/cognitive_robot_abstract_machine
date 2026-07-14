@@ -18,10 +18,13 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointState
 @dataclass(eq=False, repr=False)
 class SetSeedConfiguration(MotionStatechartNode):
     """
-    Overwrite the configuration of the world to allow starting the planning from a different state.
+    Overwrite the configuration of the world to allow starting the planning from a
+    different state.
+
     CAUTION! don't use this to overwrite the robot's state outside standalone mode!
     :param seed_configuration: maps joint name to float
-    :param group_name: if joint names are not unique, it will search in this group for matches.
+    :param group_name: if joint names are not unique, it will search in this group for
+        matches.
     """
 
     seed_configuration: JointState = field(kw_only=True)
@@ -42,12 +45,17 @@ class SetOdometry(MotionStatechartNode):
     """
 
     base_pose: HomogeneousTransformationMatrix = field(kw_only=True)
-    """The pose of the robot base."""
+    """
+    The pose of the robot base.
+    """
+
     odom_connection: Optional[OmniDrive] = field(default=None, kw_only=True)
     """
-    The odometry connection to use. 
+    The odometry connection to use.
+
     If it is None and there is only one drive in the world, it will be used.
     """
+
     _odom_joints: Tuple[Type[Connection], ...] = field(default=(OmniDrive,), init=False)
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:

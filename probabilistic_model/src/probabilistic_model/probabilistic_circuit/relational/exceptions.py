@@ -34,8 +34,8 @@ class CircuitNotFittedError(DataclassException):
 @dataclass
 class InvalidMonteCarloSampleCountError(DataclassException):
     """
-    Raised when grounding must integrate out undetermined aggregation statistics
-    but the configured Monte-Carlo sample count is not positive.
+    Raised when grounding must integrate out undetermined aggregation statistics but the
+    configured Monte-Carlo sample count is not positive.
     """
 
     sample_count: int

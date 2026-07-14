@@ -19,7 +19,8 @@ class TiagoCameraConfig(
     StableViewpointComponent,
     WorldDescriptorComponent,
 ):
-    """Configuration class for the TIAGo robot's Xtion camera.
+    """
+    Configuration class for the TIAGo robot's Xtion camera.
 
     This class defines the configuration parameters for the Xtion RGB-D camera
     mounted on the TIAGo robot. It includes settings for camera interface,

@@ -30,10 +30,11 @@ class Derivatives(IntEnum):
 @dataclass
 class DerivativeMap(Generic[T]):
     """
-    A container class that maps derivatives (position, velocity, acceleration, jerk) to values of type T.
+    A container class that maps derivatives (position, velocity, acceleration, jerk) to
+    values of type T.
 
-    This class provides a structured way to store and access different orders of derivatives.
-    Each derivative order can hold a value of type T or None.
+    This class provides a structured way to store and access different orders of
+    derivatives. Each derivative order can hold a value of type T or None.
     """
 
     position: Optional[T] = None
@@ -53,7 +54,8 @@ class DerivativeMap(Generic[T]):
 
     def _broadcast_callable(self, operand: Callable[[Optional[T]], T]) -> Self:
         """
-        Apply a callable to each derivative value and return a new instance with the resulting values.
+        Apply a callable to each derivative value and return a new instance with the
+        resulting values.
 
         :param operand: The callable to apply. Make sure it can deal with None values.
         :return: The new instance with the resulting values.

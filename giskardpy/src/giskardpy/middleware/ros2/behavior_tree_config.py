@@ -40,7 +40,9 @@ class BehaviorTreeConfig:
 
     def setup(self):
         """
-        Implement this method to configure the behavior tree using it's self. methods.
+        Implement this method to configure the behavior tree using it's self.
+
+        methods.
         """
         GiskardBlackboard().tree_config = self
         self.tree = GiskardBT()
@@ -56,16 +58,22 @@ class BehaviorTreeConfig:
                 self._add_qp_data_publisher(publish_config=self.add_qp_data_publisher)
 
     def switch_to_projection_mode(self):
-        """Override this method to define projection mode behavior for each config type."""
+        """
+        Override this method to define projection mode behavior for each config type.
+        """
         raise NotImplementedError()
 
     def switch_to_execution_mode(self):
-        """Override this method to define execution mode behavior for each config type."""
+        """
+        Override this method to define execution mode behavior for each config type.
+        """
         raise NotImplementedError()
 
     def _add_qp_data_publisher(self, publish_config: QPDataPublisherConfig):
         """
-        QP data is streamed and can be visualized in e.g. plotjuggler. Useful for debugging.
+        QP data is streamed and can be visualized in e.g. plotjuggler.
+
+        Useful for debugging.
         """
         self.add_evaluate_debug_expressions()
         if GiskardBlackboard().tree_config.is_open_loop():
@@ -82,6 +90,7 @@ class BehaviorTreeConfig:
     ):
         """
         Plots the generated trajectories.
+
         :param normalize_position: Positions are centered around zero.
         :param wait: True: Behavior tree waits for this plotter to finish.
                      False: Plot is generated in a separate thread to not slow down Giskard.
@@ -129,7 +138,9 @@ class BehaviorTreeConfig:
 @dataclass
 class StandAloneBTConfig(BehaviorTreeConfig):
     """
-    The default behavior tree for Giskard in standalone mode. Make sure to set up the robot interface accordingly.
+    The default behavior tree for Giskard in standalone mode.
+
+    Make sure to set up the robot interface accordingly.
     :param publish_world_state: publish current world state.
     :param publish_tf: publish all link poses in tf.
     """
@@ -160,9 +171,11 @@ class StandAloneBTConfig(BehaviorTreeConfig):
 @dataclass
 class OpenLoopBTConfig(BehaviorTreeConfig):
     """
-    The default behavior tree for Giskard in open-loop mode. It will first plan the trajectory in simulation mode
-    and then publish it to connected joint trajectory followers. The base trajectory is tracked with a closed-loop
-    controller.
+    The default behavior tree for Giskard in open-loop mode.
+
+    It will first plan the trajectory in simulation mode and then publish it to
+    connected joint trajectory followers. The base trajectory is tracked with a closed-
+    loop controller.
     """
 
     def setup(self):
@@ -183,7 +196,9 @@ class OpenLoopBTConfig(BehaviorTreeConfig):
 @dataclass
 class ClosedLoopBTConfig(BehaviorTreeConfig):
     """
-    The default configuration for Giskard in closed loop mode. Make use to set up the robot interface accordingly.
+    The default configuration for Giskard in closed loop mode.
+
+    Make use to set up the robot interface accordingly.
     """
 
     def setup(self):

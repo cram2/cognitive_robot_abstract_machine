@@ -56,18 +56,25 @@ class PersonInRoleAndOntology(HasName, Symbol):
 
     @classmethod
     def from_name(cls, name: str) -> Self:
-        """A factory classmethod detected via its ``-> Self`` return annotation."""
+        """
+        A factory classmethod detected via its ``-> Self`` return annotation.
+        """
         return cls(name=name)
 
     @factory_method
     @classmethod
     def spawn(cls):
-        """A factory classmethod detected only via the ``@factory_method`` marker."""
+        """
+        A factory classmethod detected only via the ``@factory_method`` marker.
+        """
         return cls(name="spawned")
 
     @classmethod
     def describe(cls) -> str:
-        """An ordinary classmethod that is not a factory (its return type is not the class)."""
+        """
+        An ordinary classmethod that is not a factory (its return type is not the
+        class).
+        """
         return cls.__name__
 
 
@@ -91,7 +98,9 @@ class CEOThatOverridesFactory(Role[TPersonInRoleAndOntology], Symbol):
 
     @classmethod
     def from_name(cls, name: str) -> Self:
-        """Overrides the taker factory so the role is preserved instead of being dropped."""
+        """
+        Overrides the taker factory so the role is preserved instead of being dropped.
+        """
         return cls(role_taker=PersonInRoleAndOntology(name=name))
 
 
