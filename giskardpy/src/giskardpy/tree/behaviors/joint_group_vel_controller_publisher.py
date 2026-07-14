@@ -3,6 +3,7 @@ from typing import List
 import numpy as np
 from py_trees.common import Status
 from std_msgs.msg import Float64MultiArray
+from control_msgs.msg import MultiDOFCommand
 
 from giskardpy.utils.decorators import record_time
 from giskardpy.middleware.ros2 import rospy
@@ -31,9 +32,7 @@ class JointGroupVelController(GiskardBehavior):
     ):
         super().__init__()
         self.cmd_topic = cmd_topic
-        self.cmd_pub = rospy.node.create_publisher(
-            Float64MultiArray, self.cmd_topic, 10
-        )
+        self.cmd_pub = rospy.node.create_publisher(MultiDOFCommand, self.cmd_topic, 10)
 
         self.connections = connections
         self.minimum_valid_velocity = minimum_valid_velocity
@@ -47,7 +46,7 @@ class JointGroupVelController(GiskardBehavior):
     @catch_and_raise_to_blackboard
     @record_time
     def update(self):
-        msg = Float64MultiArray()
+        msg = MultiDOFCommand()
         low_velocity = 0.0
         for i, connection in enumerate(self.connections):
             velocity = connection.velocity
@@ -59,13 +58,13 @@ class JointGroupVelController(GiskardBehavior):
                 and low_velocity < abs_velocity < self.minimum_valid_velocity
             ):
                 velocity = self.minimum_valid_velocity * vel_sign
-            msg.data.append(velocity)
+            msg.values.append(velocity)
         self.cmd_pub.publish(msg)
         return Status.RUNNING
 
     def terminate(self, new_status):
-        msg = Float64MultiArray()
+        msg = MultiDOFCommand()
         for _ in self.connections:
-            msg.data.append(0.0)
+            msg.values.append(0.0)
         self.cmd_pub.publish(msg)
         super().terminate(new_status)

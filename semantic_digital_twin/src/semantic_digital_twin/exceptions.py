@@ -4,7 +4,6 @@ from dataclasses import dataclass, field, Field
 from typing import Dict, Set, Any
 from uuid import UUID
 
-import mujoco
 from typing_extensions import (
     Optional,
     List,
@@ -22,6 +21,7 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
+    import mujoco
     from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
     from semantic_digital_twin.robots.robot_parts import (
         AbstractRobot,

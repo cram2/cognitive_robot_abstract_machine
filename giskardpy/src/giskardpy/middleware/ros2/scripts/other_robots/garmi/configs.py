@@ -15,24 +15,24 @@ from semantic_digital_twin.world_description.connections import (
 )
 
 GARMI_LEFT_ARM_JOINTS = [
-    "arm_0_fr3_joint1",
-    "arm_0_fr3_joint2",
-    "arm_0_fr3_joint3",
-    "arm_0_fr3_joint4",
-    "arm_0_fr3_joint5",
-    "arm_0_fr3_joint6",
-    "arm_0_fr3_joint7",
+    "left_fr3_joint1",
+    "left_fr3_joint2",
+    "left_fr3_joint3",
+    "left_fr3_joint4",
+    "left_fr3_joint5",
+    "left_fr3_joint6",
+    "left_fr3_joint7",
 ]
 """Names of the seven left FR3 arm joints, ordered from base to tip."""
 
 GARMI_RIGHT_ARM_JOINTS = [
-    "arm_1_fr3_joint1",
-    "arm_1_fr3_joint2",
-    "arm_1_fr3_joint3",
-    "arm_1_fr3_joint4",
-    "arm_1_fr3_joint5",
-    "arm_1_fr3_joint6",
-    "arm_1_fr3_joint7",
+    "right_fr3_joint1",
+    "right_fr3_joint2",
+    "right_fr3_joint3",
+    "right_fr3_joint4",
+    "right_fr3_joint5",
+    "right_fr3_joint6",
+    "right_fr3_joint7",
 ]
 """Names of the seven right FR3 arm joints, ordered from base to tip."""
 
@@ -110,16 +110,17 @@ class GarmiVelocityInterface(RobotInterfaceConfig):
         #    cmd_vel_topic="/placeholder/base/cmd_vel", joint=omni_drive
         # )
 
-        self.sync_joint_state_topic("/placeholder/joint_states")
+        self.sync_joint_state_topic("/garmi/arms/joint_states")
 
         self.add_joint_velocity_group_controller(
-            cmd_topic="/placeholder/left_arm/velocity_controller/commands",
+            cmd_topic="/garmi/arms/left_arm_joint_velocity_controller/reference",
             connections=GARMI_LEFT_ARM_JOINTS,
         )
-        # self.add_joint_velocity_group_controller(
-        #    cmd_topic="/placeholder/right_arm/velocity_controller/commands",
-        #    connections=GARMI_RIGHT_ARM_JOINTS,
-        # )
+        self.add_joint_velocity_group_controller(
+            cmd_topic="/garmi/arms/right_arm_joint_velocity_controller/reference",
+            connections=GARMI_RIGHT_ARM_JOINTS,
+        )
+
         # self.add_joint_velocity_group_controller(
         #    cmd_topic="/placeholder/head/velocity_controller/commands",
         #    connections=GARMI_HEAD_JOINTS,

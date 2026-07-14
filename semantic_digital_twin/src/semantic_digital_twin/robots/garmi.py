@@ -385,7 +385,7 @@ class GarmiLeftArm(Arm[GarmiLeftGripper]):
         """
         for joint_index in range(1, 8):
             self._world.get_connection_by_name(
-                f"arm_0_fr3_joint{joint_index}"
+                f"left_fr3_joint{joint_index}"
             ).has_hardware_interface = True
 
     def setup_joint_states(self) -> List[JointState]:
@@ -444,7 +444,7 @@ class GarmiRightArm(Arm[GarmiRightGripper]):
         """
         for joint_index in range(1, 8):
             self._world.get_connection_by_name(
-                f"arm_1_fr3_joint{joint_index}"
+                f"right_fr3_joint{joint_index}"
             ).has_hardware_interface = True
 
     def setup_joint_states(self) -> List[JointState]:
