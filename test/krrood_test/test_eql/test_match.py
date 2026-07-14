@@ -247,6 +247,22 @@ def test_an_raises_when_callable_type_cannot_be_determined():
         an(make_position)
 
 
+def test_a_infers_target_type_from_annotated_callable():
+    def make_position(x: float = 1.0, y: float = 2.0, z: float = 3.0) -> KRROODPosition:
+        return KRROODPosition(x, y, z)
+
+    match = a(make_position)
+    assert match.type is KRROODPosition
+
+
+def test_a_uses_explicit_target_type_for_unannotated_callable():
+    def make_position(x, y, z):
+        return KRROODPosition(x, y, z)
+
+    match = a(make_position, target_type=KRROODPosition)
+    assert match.type is KRROODPosition
+
+
 # ── Match.has_ellipsis_attributes ─────────────────────────────────────────────
 
 

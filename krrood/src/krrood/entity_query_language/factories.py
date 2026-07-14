@@ -382,22 +382,52 @@ def an(
     )
 
 
+@overload
 def a(
-    entity_: Union[T, Query],
-    quantification: Optional[ResultQuantificationConstraint] = None,
-) -> Union[T, Query]:
+    entity_: Type[T],
+    quantification: None = ...,
+    *,
+    target_type: None = ...,
+) -> Match[T]: ...
+
+
+@overload
+def a(
+    entity_: Callable[..., T],
+    quantification: None = ...,
+    *,
+    target_type: Type[T] = ...,
+) -> Match[T]: ...
+
+
+@overload
+def a(
+    entity_: T,
+    quantification: Optional[ResultQuantificationConstraint] = ...,
+    *,
+    target_type: None = ...,
+) -> T: ...
+
+
+def a(
+    entity_,
+    quantification=None,
+    *,
+    target_type=None,
+):
     """
-    Select all values satisfying the given entity description.
+    Select all values satisfying the given description.
 
     This accommodates words not starting with a vowel; it delegates to :func:`an`. It is a real
     function (not an ``a = an`` alias) so its ``__name__`` is ``"a"``, which lets tools that key a
     namespace by ``__name__`` (e.g. the doctest harness) expose it under the name ``a``.
 
-    :param entity_: An entity or a set expression to quantify over.
-    :param quantification: Optional quantification constraint.
-    :return: The entity with the applied quantifier.
+    :param entity_: An entity/set/variable/attribute to quantify, or a type/callable to match.
+    :param quantification: Optional quantification constraint (quantify path only).
+    :param target_type: Optional explicit type for callable factories (match path only).
+    :return: The applied quantifier or the constructed match.
     """
-    return an(entity_, quantification=quantification)
+    return an(entity_, quantification, target_type=target_type)
 
 
 @overload
