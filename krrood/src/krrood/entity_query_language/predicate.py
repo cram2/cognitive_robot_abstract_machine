@@ -77,13 +77,15 @@ def symbolic_function(
     return wrapper
 
 
-def functional_form(symbolic_callable: Type[T]) -> Callable[..., Any]:
+def symbolic_callable_to_function(
+    symbolic_callable: Type[SymbolicCallable],
+) -> Callable[..., Any]:
     """:return: a function that calls *symbolic_callable* -- the class-form counterpart of the
     :func:`symbolic_function` decorator.
 
     It returns a symbolic expression when any argument is a variable (so it composes in a query) and
     the directly computed value otherwise. Binding an existing function name to
-    ``functional_form(TheClass)`` lets a migration to the class form keep that name's call behaviour
+    ``symbolic_callable_to_function(TheClass)`` lets a migration to the class form keep that name's call behaviour
     unchanged -- the logic moves into the class's :meth:`__call__` and the name just constructs it.
     """
 
@@ -448,7 +450,7 @@ class Length(SymbolicFunction):
         return value_function_phrase(cls.__name__, *fields.values())
 
 
-length = functional_form(Length)
+length = symbolic_callable_to_function(Length)
 """Backward-compatible functional form of :class:`Length` (keeps the ``length(iterable)`` call)."""
 
 
