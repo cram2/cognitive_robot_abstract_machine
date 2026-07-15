@@ -95,7 +95,8 @@ class DifferentialDriveBaseGoal(Sequence):
                 tip_link=tip,
                 goal_pose=root_T_goal2,
                 weight=self.weight,
-                threshold=self.threshold,
+                linear_threshold=self.threshold,
+                angular_threshold=self.threshold,
             ),
             CartesianPose(
                 name=f"{self.name}/step3",
@@ -103,7 +104,8 @@ class DifferentialDriveBaseGoal(Sequence):
                 tip_link=tip,
                 goal_pose=root_T_goal,
                 weight=self.weight,
-                threshold=self.threshold,
+                linear_threshold=self.threshold,
+                angular_threshold=self.threshold,
             ),
         ]
         super().expand(context)
