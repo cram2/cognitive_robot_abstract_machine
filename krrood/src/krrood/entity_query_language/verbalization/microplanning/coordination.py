@@ -72,22 +72,32 @@ COINDEXED_OPERATORS: Tuple[Callable, ...] = (
 
 @dataclass
 class RangeFold:
-    """A folded lower/upper bound pair on one attribute chain."""
+    """
+    A folded lower/upper bound pair on one attribute chain.
+    """
 
     chain_expression: SymbolicExpression
-    """The shared attribute chain (e.g. ``t.booking_date``)."""
+    """
+    The shared attribute chain (e.g. ``t.booking_date``).
+    """
 
     lower_expression: SymbolicExpression
-    """The lower-bound value expression (the ``>=`` / ``>`` right operand)."""
+    """
+    The lower-bound value expression (the ``>=`` / ``>`` right operand).
+    """
 
     upper_expression: SymbolicExpression
-    """The upper-bound value expression (the ``<=`` / ``<`` right operand)."""
+    """
+    The upper-bound value expression (the ``<=`` / ``<`` right operand).
+    """
 
 
 @dataclass
 class CoindexedFold:
-    """A group of comparators that compare the *same* leaf attributes across two shared prefixes —
-    e.g. ``p.begin.month == p.end.month`` and ``p.begin.year == p.end.year`` — reduced to one node.
+    """
+    A group of comparators that compare the *same* leaf attributes across two shared
+    prefixes — e.g. ``p.begin.month == p.end.month`` and ``p.begin.year == p.end.year``
+    — reduced to one node.
 
     This is conjunction reduction over co-indexed comparisons: the two prefixes (``p.begin`` /
     ``p.end``) and the operator are shared, and only the terminal attribute varies, so the shared
@@ -95,26 +105,37 @@ class CoindexedFold:
     """
 
     operation: Callable
-    """The shared comparison operator (e.g. ``operator.eq``)."""
+    """
+    The shared comparison operator (e.g. ``operator.eq``).
+    """
 
     terminals: List[Tuple[str, type]]
-    """The *distinct* co-indexed terminal attributes ``(name, owner)``, in first-occurrence order —
-    the *"month and year"* the comparators range over. A leaf compared more than once is one
-    attribute, so it is listed once (*"have the same name"*, never *"… name and name"*)."""
+    """
+    The *distinct* co-indexed terminal attributes ``(name, owner)``, in first-occurrence
+    order — the *"month and year"* the comparators range over.
+
+    A leaf compared more than once is one attribute, so it is listed once (*"have the
+    same name"*, never *"… name and name"*).
+    """
 
     left_prefix_expression: SymbolicExpression
-    """An exemplar of the left chain minus its terminal hop (e.g. ``p.begin``)."""
+    """
+    An exemplar of the left chain minus its terminal hop (e.g. ``p.begin``).
+    """
 
     right_prefix_expression: SymbolicExpression
-    """An exemplar of the right chain minus its terminal hop (e.g. ``p.end``)."""
+    """
+    An exemplar of the right chain minus its terminal hop (e.g. ``p.end``).
+    """
 
 
 @dataclass
 class SharedSubjectComparisons:
-    """Two or more value comparators on the *same* subject chain, factored so the subject and its
-    copula are said once and only the predicate tails are coordinated — *"the battery of a Robot is
-    greater than 50 or less than 10"* instead of repeating *"the battery of … is …"* per
-    disjunct.
+    """
+    Two or more value comparators on the *same* subject chain, factored so the subject
+    and its copula are said once and only the predicate tails are coordinated — *"the
+    battery of a Robot is greater than 50 or less than 10"* instead of repeating *"the
+    battery of … is …"* per disjunct.
 
     This is coordination reduction over a shared subject: the disjunctive analogue of
     :class:`RangeFold` (which is itself the special case of two complementary bounds folded to
@@ -122,63 +143,87 @@ class SharedSubjectComparisons:
     """
 
     subject_expression: SymbolicExpression
-    """The shared left-hand attribute chain (e.g. ``robot.battery``), rendered once via the normal
-    recursion."""
+    """
+    The shared left-hand attribute chain (e.g. ``robot.battery``), rendered once via the
+    normal recursion.
+    """
 
     comparators: List[Comparator]
-    """The comparators in source order; each contributes its operator-and-value tail (*"greater than
-    50"*), coordinated under the shared subject."""
+    """
+    The comparators in source order; each contributes its operator-and-value tail
+    (*"greater than 50"*), coordinated under the shared subject.
+    """
 
 
 @dataclass
 class SharedSubjectConjunction:
-    """The conjunctive analogue of :class:`SharedSubjectComparisons`: two or more value comparisons
-    on the *same bare variable*, said once as one shared-subject main clause — *"an Integer is
-    between 1 and 10 and not 5"* — rather than repeating the subject per conjunct.
+    """
+    The conjunctive analogue of :class:`SharedSubjectComparisons`: two or more value
+    comparisons on the *same bare variable*, said once as one shared-subject main clause
+    — *"an Integer is between 1 and 10 and not 5"* — rather than repeating the subject
+    per conjunct.
 
-    Scoped to a *bare variable* subject (not an attribute chain), so the shared subject and copula
-    lead a single clause; an attribute-chain conjunction (*"the battery of a Robot"*) names a
-    different subject per conjunct and so keeps its per-clause surface.
+    Scoped to a *bare variable* subject (not an attribute chain), so the shared subject
+    and copula lead a single clause; an attribute-chain conjunction (*"the battery of a
+    Robot"*) names a different subject per conjunct and so keeps its per-clause surface.
     """
 
     subject_expression: SymbolicExpression
-    """The shared bare variable, rendered once via the normal recursion (*"an Integer"*)."""
+    """
+    The shared bare variable, rendered once via the normal recursion (*"an Integer"*).
+    """
 
     tails: List[Union[Comparator, RangeFold]]
-    """The predicate tails in source order — a value :class:`Comparator` (its operator-and-value
-    tail, *"not 5"*) or a folded :class:`RangeFold` (a *"between low and high"* tail), so a
-    complementary bound pair reads *"between 1 and 10"* within the clause."""
+    """
+    The predicate tails in source order — a value :class:`Comparator` (its operator-and-
+    value tail, *"not 5"*) or a folded :class:`RangeFold` (a *"between low and high"*
+    tail), so a complementary bound pair reads *"between 1 and 10"* within the clause.
+    """
 
 
 @dataclass(frozen=True)
 class CoindexedNaturalParts:
-    """The pieces of the natural *"the <a> and <b> of <shared> have the same …"* rendering."""
+    """
+    The pieces of the natural *"the <a> and <b> of <shared> have the same …"* rendering.
+    """
 
     shared_prefix_expression: SymbolicExpression
-    """The chain the two prefixes share (e.g. ``p.period``), rendered via the normal recursion."""
+    """
+    The chain the two prefixes share (e.g. ``p.period``), rendered via the normal
+    recursion.
+    """
 
     left_hop: Tuple[str, type]
-    """The left prefix's distinguishing final hop ``(name, owner)`` (e.g. ``begin``)."""
+    """
+    The left prefix's distinguishing final hop ``(name, owner)`` (e.g. ``begin``).
+    """
 
     right_hop: Tuple[str, type]
-    """The right prefix's distinguishing final hop ``(name, owner)`` (e.g. ``end``)."""
+    """
+    The right prefix's distinguishing final hop ``(name, owner)`` (e.g. ``end``).
+    """
 
 
 # %% the conjunct-reduction pass (high-level entry)
 
 FoldNode: TypeAlias = Union[SymbolicExpression, RangeFold, CoindexedFold]
-"""A node the verbalization fold dispatches over: either a real EQL expression or a synthetic
-coordination artifact (:class:`RangeFold` / :class:`CoindexedFold`) produced by conjunct reduction."""
+"""
+A node the verbalization fold dispatches over: either a real EQL expression or a
+synthetic coordination artifact (:class:`RangeFold` / :class:`CoindexedFold`) produced
+by conjunct reduction.
+"""
 
 ConjunctList: TypeAlias = List[FoldNode]
 
 
 class ConjunctFold(ABC):
-    """One coordination fold: recognise a foldable group within a list of sibling conjuncts and
-    collapse it to a single fold artifact, leaving everything else (and its order) intact.
+    """
+    One coordination fold: recognise a foldable group within a list of sibling conjuncts
+    and collapse it to a single fold artifact, leaving everything else (and its order)
+    intact.
 
-    A fold is order-preserving and idempotent on already-folded items, so the reducer can apply its
-    folds in sequence without interference.
+    A fold is order-preserving and idempotent on already-folded items, so the reducer
+    can apply its folds in sequence without interference.
     """
 
     @abstractmethod
@@ -189,8 +234,10 @@ class ConjunctFold(ABC):
 
 
 class RangeBoundFold(ConjunctFold):
-    """Fold a complementary lower/upper bound pair on one chain into a :class:`RangeFold`
-    (*"x is between low and high"*)."""
+    """
+    Fold a complementary lower/upper bound pair on one chain into a :class:`RangeFold`
+    (*"x is between low and high"*).
+    """
 
     def apply(self, conjuncts: ConjunctList) -> ConjunctList:
         """:return: *conjuncts* with each complementary bound pair folded to a :class:`RangeFold`.
@@ -203,8 +250,10 @@ class RangeBoundFold(ConjunctFold):
 
 
 class CoindexedComparisonFold(ConjunctFold):
-    """Fold a group of co-indexed comparisons across two shared prefixes into a
-    :class:`CoindexedFold` (*"the begin and end … have the same month and year"*)."""
+    """
+    Fold a group of co-indexed comparisons across two shared prefixes into a
+    :class:`CoindexedFold` (*"the begin and end … have the same month and year"*).
+    """
 
     def apply(self, conjuncts: ConjunctList) -> ConjunctList:
         """:return: *conjuncts* with each co-indexed comparison group folded to a
@@ -223,15 +272,21 @@ class CoindexedComparisonFold(ConjunctFold):
 
 @dataclass
 class ConjunctReducer:
-    """The single home of WHERE-conjunct simplification: applies its ordered :class:`ConjunctFold`
-    registry to a flat conjunct list. The default registry folds range pairs, then co-indexed
-    groups; the two operate on disjoint patterns, so the order only fixes a stable result.
+    """
+    The single home of WHERE-conjunct simplification: applies its ordered
+    :class:`ConjunctFold` registry to a flat conjunct list.
+
+    The default registry folds range pairs, then co-indexed groups; the two operate on
+    disjoint patterns, so the order only fixes a stable result.
     """
 
     folds: List[ConjunctFold] = field(
         default_factory=lambda: [RangeBoundFold(), CoindexedComparisonFold()]
     )
-    """The folds applied, in order — the open/closed registry (append a strategy to extend)."""
+    """
+    The folds applied, in order — the open/closed registry (append a strategy to
+    extend).
+    """
 
     def reduce(self, conjuncts: List[SymbolicExpression]) -> ConjunctList:
         """:param conjuncts: A flat conjunct list (e.g. an ``AND``'s operands).
@@ -266,7 +321,9 @@ def reduce_conjuncts(conjuncts: List[SymbolicExpression]) -> ConjunctList:
 
 
 class _RangeBound(Enum):
-    """Internal marker for the direction of a bound comparison in range folding."""
+    """
+    Internal marker for the direction of a bound comparison in range folding.
+    """
 
     LOWER = auto()
     UPPER = auto()
@@ -543,15 +600,21 @@ OwnerClassifier: TypeAlias = Callable[
 
 @dataclass(frozen=True)
 class OwnerGroup:
-    """A group of sibling items that share one owner — the unit of owner-based aggregation, shared
-    by the match construction-pattern grouping (a position's x/y/z) and the ``set_of`` selection
-    grouping (the department and salary of one Employee)."""
+    """
+    A group of sibling items that share one owner — the unit of owner-based aggregation,
+    shared by the match construction-pattern grouping (a position's x/y/z) and the
+    ``set_of`` selection grouping (the department and salary of one Employee).
+    """
 
     owner: SymbolicExpression
-    """The shared owner expression (the position, the selected variable)."""
+    """
+    The shared owner expression (the position, the selected variable).
+    """
 
     items: List[object]
-    """The grouped payloads, in source order (attribute assignments, terminal hops, …)."""
+    """
+    The grouped payloads, in source order (attribute assignments, terminal hops, …).
+    """
 
 
 def group_by_owner(
@@ -702,7 +765,8 @@ def build_between(
     number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
 ) -> VerbalizationFragment:
     """
-    Build *"<left> is between <low> and <high>"* (or copula-less *"<left> between …"* when *compact*).
+    Build *"<left> is between <low> and <high>"* (or copula-less *"<left> between …"*
+    when *compact*).
 
     :param left_fragment: The already-rendered left side (a full chain, or a bare attribute).
     :param lower_fragment: Rendered lower-bound value.
@@ -736,9 +800,10 @@ def between_phrase(
     number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
 ) -> VerbalizationFragment:
     """
-    Build the subject-less range predicate *"is between <low> and <high>"* (or the copula-less
-    *"between <low> and <high>"* when *compact*) — the part of a *between* clause after the subject,
-    shared by :func:`build_between` and the shared-subject conjunction's range tail.
+    Build the subject-less range predicate *"is between <low> and <high>"* (or the
+    copula-less *"between <low> and <high>"* when *compact*) — the part of a *between*
+    clause after the subject, shared by :func:`build_between` and the shared-subject
+    conjunction's range tail.
 
     :param lower_fragment: Rendered lower-bound value.
     :param upper_fragment: Rendered upper-bound value.

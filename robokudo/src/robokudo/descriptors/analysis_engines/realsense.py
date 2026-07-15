@@ -15,7 +15,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     def implementation(self) -> Pipeline:
         """
-        Create a basic pipeline that does tabletop segmentation
+        Create a basic pipeline that does tabletop segmentation.
         """
         kinect_config = CrDescriptorFactory.create_descriptor("realsense")
 

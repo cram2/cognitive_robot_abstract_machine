@@ -2,13 +2,14 @@
 ORMatic-specific check that ``frozen=True`` dataclasses are supported.
 
 ORMatic reconstructs a domain object with ``cls.__new__(cls)`` followed by
-``object.__setattr__`` (see ``from_dao``/``dao``), which bypasses a frozen dataclass's blocked
-``__setattr__``.  This test builds an ORMatic interface for a small frozen object graph (flat,
-nested relationship, list field, and a set collection) and round-trips an instance through the
-database to prove the whole to_dao → persist → from_dao path works on frozen classes.
+``object.__setattr__`` (see ``from_dao``/``dao``), which bypasses a frozen dataclass's
+blocked ``__setattr__``.  This test builds an ORMatic interface for a small frozen
+object graph (flat, nested relationship, list field, and a set collection) and round-
+trips an instance through the database to prove the whole to_dao → persist → from_dao
+path works on frozen classes.
 
-If this passes, the verbalization layer's frozen value objects (plans, PathStep, SourceReference,
-the lexicon words, …) are safe to keep frozen.
+If this passes, the verbalization layer's frozen value objects (plans, PathStep,
+SourceReference, the lexicon words, …) are safe to keep frozen.
 """
 
 from __future__ import annotations
@@ -28,7 +29,9 @@ from ..dataset.frozen_classes import FrozenInner, FrozenOuter
 
 
 def _generate_interface(tmp_path):
-    """Generate and import an ORMatic SQLAlchemy interface for the frozen classes."""
+    """
+    Generate and import an ORMatic SQLAlchemy interface for the frozen classes.
+    """
     class_diagram = ClassDiagram([FrozenOuter, FrozenInner])
     instance = ORMatic(class_diagram)
     instance.make_all_tables()

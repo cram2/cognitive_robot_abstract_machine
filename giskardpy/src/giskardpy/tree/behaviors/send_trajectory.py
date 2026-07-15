@@ -153,9 +153,9 @@ class SendFollowJointTrajectory(GiskardBehavior):
     @record_time
     def update(self):
         """
-        Check only to see whether the underlying action server has
-        succeeded, is running, or has cancelled/aborted for some reason and
-        map these to the usual behaviour return states.
+        Check only to see whether the underlying action server has succeeded, is
+        running, or has cancelled/aborted for some reason and map these to the usual
+        behaviour return states.
 
         overriding this shit because of the fucking prints
         """

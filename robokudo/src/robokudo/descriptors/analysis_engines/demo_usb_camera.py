@@ -1,4 +1,5 @@
-"""Analysis engine for demonstrating USB camera integration.
+"""
+Analysis engine for demonstrating USB camera integration.
 
 This module provides an analysis engine that demonstrates how to read and process
 video data from various sources using OpenCV, including:
@@ -26,7 +27,8 @@ from robokudo.descriptors import CrDescriptorFactory
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for basic video capture and visualization.
+    """
+    Analysis engine for basic video capture and visualization.
 
     This class implements a simple pipeline for reading video data from various
     sources and visualizing it. It supports multiple input sources through OpenCV's
@@ -44,7 +46,8 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """

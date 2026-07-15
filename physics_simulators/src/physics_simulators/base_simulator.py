@@ -11,7 +11,9 @@ from typing import Optional, List, Any, Callable, Union, ClassVar
 
 
 class SimulatorState(Enum):
-    """Simulator State Enum"""
+    """
+    Simulator State Enum.
+    """
 
     STOPPED = 0
     PAUSED = 1
@@ -19,7 +21,9 @@ class SimulatorState(Enum):
 
 
 class SimulatorStopReason(Enum):
-    """Simulator Stop Reason"""
+    """
+    Simulator Stop Reason.
+    """
 
     STOP = 0
     MAX_REAL_TIME = 1
@@ -38,7 +42,9 @@ class SimulatorConstraints:
 
 @dataclass
 class SimulatorRenderer:
-    """Base class for Renderer"""
+    """
+    Base class for Renderer.
+    """
 
     _is_running: bool = False
 
@@ -53,15 +59,21 @@ class SimulatorRenderer:
         self.close()
 
     def is_running(self) -> bool:
-        """Check if the renderer is running"""
+        """
+        Check if the renderer is running.
+        """
         return self._is_running
 
     def sync(self):
-        """Update the renderer"""
+        """
+        Update the renderer.
+        """
         pass
 
     def close(self):
-        """Close the renderer"""
+        """
+        Close the renderer.
+        """
         atexit.unregister(self.close)
         self._is_running = False
 
@@ -74,7 +86,7 @@ class SimulatorCallbackResult:
 
     class OutputType(str, Enum):
         """
-        Output type for SimulatorCallbackResult
+        Output type for SimulatorCallbackResult.
         """
 
         MUJOCO = "mujoco"
@@ -83,7 +95,7 @@ class SimulatorCallbackResult:
 
     class ResultType(Enum):
         """
-        Result type for SimulatorCallbackResult
+        Result type for SimulatorCallbackResult.
         """
 
         SUCCESS_WITHOUT_EXECUTION = 0
@@ -96,11 +108,19 @@ class SimulatorCallbackResult:
         FAILURE_AFTER_EXECUTION_ON_DATA = 7
 
     type: ResultType
-    """Result type"""
+    """
+    Result type.
+    """
+
     info: str = None
-    """Information about the result"""
+    """
+    Information about the result.
+    """
+
     result: Any = None
-    """Result of the callback"""
+    """
+    Result of the callback.
+    """
 
     def __call__(self):
         self.result = self.result()
@@ -109,11 +129,13 @@ class SimulatorCallbackResult:
 
 @dataclass
 class SimulatorCallback:
-    """Base class for Simulator Callback"""
+    """
+    Base class for Simulator Callback.
+    """
 
     def __init__(self, callback: Callable):
         """
-        Initialize the function with the callback
+        Initialize the function with the callback.
 
         :param callback: callback function
         """
@@ -122,12 +144,13 @@ class SimulatorCallback:
 
     def __call__(self, *args, render: bool = True, **kwargs) -> SimulatorCallbackResult:
         """
-        Call the callback function and return the result,
-        it also checks if the result is of type SimulatorCallbackResult and if the first argument is of type BaseSimulator.
+        Call the callback function and return the result, it also checks if the result
+        is of type SimulatorCallbackResult and if the first argument is of type
+        BaseSimulator.
 
-        :param render: Whether to trigger rendering, used for modification on the simulator.
+        :param render: Whether to trigger rendering, used for modification on the
+            simulator.
         :param kwargs: Additional keyword arguments for the callback function.
-
         :return: The result of the callback function.
         """
         result = self._call(*args, **kwargs)
@@ -140,13 +163,15 @@ class SimulatorCallback:
             simulator.renderer.sync()
         return result
 
+
 @dataclass
 class BaseSimulator:
     """
-    Base class for Base Simulator
+    Base class for Base Simulator.
 
-    This class is intended as an abstract foundation for all specific simulators in your project.
-    You do not use BaseSimulator directly to run a concrete physics engine; instead, you subclass it and implement engine-specific logic.
+    This class is intended as an abstract foundation for all specific simulators in your
+    project. You do not use BaseSimulator directly to run a concrete physics engine;
+    instead, you subclass it and implement engine-specific logic.
     """
 
     _headless: bool = field(repr=False)
@@ -156,46 +181,82 @@ class BaseSimulator:
     _callbacks: List[SimulatorCallback] = field(default_factory=list, repr=False)
 
     config: dict = field(default_factory=dict)
-    """Configuration for the simulator, it can be used to store any information that is needed for the simulator"""
+    """
+    Configuration for the simulator, it can be used to store any information that is
+    needed for the simulator.
+    """
 
     name: ClassVar[str] = "Base Simulation"
-    """Name of the simulator"""
+    """
+    Name of the simulator.
+    """
 
     ext: ClassVar[str] = ""
-    """Extension of the simulator description file"""
+    """
+    Extension of the simulator description file.
+    """
 
     logger: ClassVar[logging.Logger] = logging.getLogger(__name__)
-    """Logger for the simulator"""
+    """
+    Logger for the simulator.
+    """
 
     simulation_thread: Optional[Thread] = field(init=False, default=None)
-    """Simulation thread, run step() method in this thread"""
+    """
+    Simulation thread, run step() method in this thread.
+    """
 
     render_thread: Optional[Thread] = field(init=False, default=None)
-    """Render thread, run render() method in this thread"""
+    """
+    Render thread, run render() method in this thread.
+    """
 
     class_level_callbacks: ClassVar[List[SimulatorCallback]] = []
-    """Class level callback functions"""
+    """
+    Class level callback functions.
+    """
 
-    instance_level_callbacks: List[SimulatorCallback] = field(init=False, default_factory=list)
-    """Instance level callback functions"""
+    instance_level_callbacks: List[SimulatorCallback] = field(
+        init=False, default_factory=list
+    )
+    """
+    Instance level callback functions.
+    """
 
     _current_number_of_steps: int = field(init=False, default=0, repr=False)
-    """Current number of steps in the simulation"""
+    """
+    Current number of steps in the simulation.
+    """
 
     _start_real_time: float = field(init=False, repr=False)
-    """Real time when the simulation starts, used for calculating the elapsed real time during the simulation"""
+    """
+    Real time when the simulation starts, used for calculating the elapsed real time
+    during the simulation.
+    """
 
     _current_render_time: float = field(init=False, repr=False)
-    """Real time when the renderer is last updated, used for calculating the elapsed real time during rendering"""
+    """
+    Real time when the renderer is last updated, used for calculating the elapsed real
+    time during rendering.
+    """
 
     _state: SimulatorState = field(init=False, repr=False)
-    """Current state of the simulator"""
+    """
+    Current state of the simulator.
+    """
 
-    _stop_reason: Optional[SimulatorStopReason] = field(init=False, default=None, repr=False)
-    """Reason for stopping the simulator"""
+    _stop_reason: Optional[SimulatorStopReason] = field(
+        init=False, default=None, repr=False
+    )
+    """
+    Reason for stopping the simulator.
+    """
 
     _renderer: SimulatorRenderer = field(init=False, repr=False)
-    """Renderer for the simulator, it can be used to render the simulation in real time, and it can also be used to check if the renderer is still running or not."""
+    """
+    Renderer for the simulator, it can be used to render the simulation in real time,
+    and it can also be used to check if the renderer is still running or not.
+    """
 
     def __post_init__(self):
         self._start_real_time = self.current_real_time
@@ -226,7 +287,8 @@ class BaseSimulator:
         time_out_in_seconds: float = 10.0,
     ):
         """
-        Start the simulator, if run_in_thread is True, run the simulator in a thread until the constraints are met
+        Start the simulator, if run_in_thread is True, run the simulator in a thread
+        until the constraints are met.
 
         :param constraints: constraints for stopping the simulator
         :param simulate_in_thread: True to simulate the simulator in a thread
@@ -253,6 +315,7 @@ class BaseSimulator:
             self.simulation_thread = Thread(target=self.run, args=(constraints,))
             self.simulation_thread.start()
         if not self.headless and render_in_thread:
+
             def render():
                 with self.renderer:
                     while self.renderer.is_running():
@@ -296,9 +359,11 @@ class BaseSimulator:
 
     def step(self):
         """
-        Step the simulator. It reads the data from the viewer and writes the data to the simulator,
-        then it reads the data from the simulator and writes the data to the viewer.
-        It also increments the current simulation time and the current number of steps.
+        Step the simulator.
+
+        It reads the data from the viewer and writes the data to the simulator, then it
+        reads the data from the simulator and writes the data to the viewer. It also
+        increments the current simulation time and the current number of steps.
         """
         self.pre_step_callback()
         self.write_data_to_simulator()
@@ -319,7 +384,8 @@ class BaseSimulator:
 
     def stop(self):
         """
-        Stop the simulator, close the renderer and join the simulation thread if it exists and is alive.
+        Stop the simulator, close the renderer and join the simulation thread if it
+        exists and is alive.
         """
         atexit.unregister(self.stop)
         if self.renderer.is_running():
@@ -333,7 +399,9 @@ class BaseSimulator:
 
     def pause(self):
         """
-        Pause the simulator. It doesn't pause the renderer.
+        Pause the simulator.
+
+        It doesn't pause the renderer.
         """
         if self.state != SimulatorState.RUNNING:
             self.log_warning("Cannot pause when the simulator is not running")
@@ -352,8 +420,9 @@ class BaseSimulator:
 
     def reset(self):
         """
-        Reset the simulator, set the start_real_time to current_real_time, current_simulate_time to 0.0,
-        current_number_of_steps to 0, and run the simulator
+        Reset the simulator, set the start_real_time to current_real_time,
+        current_simulate_time to 0.0, current_number_of_steps to 0, and run the
+        simulator.
         """
         self.reset_callback()
         self._current_number_of_steps = 0
@@ -366,7 +435,6 @@ class BaseSimulator:
         Check if the simulator should stop based on the constraints.
 
         :param constraints: constraints for stopping the simulator
-
         :return: bool, True if the simulator should stop, False otherwise
         """
         if constraints is None:
@@ -400,7 +468,9 @@ class BaseSimulator:
 
     def start_callback(self):
         """
-        This function is called when the simulator starts. It initializes the current simulation time and the renderer.
+        This function is called when the simulator starts.
+
+        It initializes the current simulation time and the renderer.
         """
         self._current_simulation_time = 0.0
         self._renderer = SimulatorRenderer()
@@ -414,6 +484,7 @@ class BaseSimulator:
     def step_callback(self):
         """
         This function is called after the step function.
+
         It increments the current simulation time and the current number of steps.
         """
         if self.state == SimulatorState.RUNNING:
@@ -423,6 +494,7 @@ class BaseSimulator:
     def stop_callback(self):
         """
         This function is called when the simulator stops.
+
         It closes the renderer.
         """
         if self.renderer.is_running():
@@ -431,6 +503,7 @@ class BaseSimulator:
     def pause_callback(self):
         """
         This function is called when the simulator is paused.
+
         It updates the start_real_time to current_real_time - current_simulation_time.
         """
         self._start_real_time += (
@@ -446,6 +519,7 @@ class BaseSimulator:
     def reset_callback(self):
         """
         This function is called when the simulator is reset.
+
         It sets the current simulation time to 0.0.
         """
         self._current_simulation_time = 0.0
@@ -453,7 +527,9 @@ class BaseSimulator:
     def should_stop_callback(self) -> Optional[SimulatorStopReason]:
         """
         This function is called when the simulator should stop.
-        It returns None if the renderer is running, otherwise it returns SimulatorStopReason.VIEWER_IS_CLOSED.
+
+        It returns None if the renderer is running, otherwise it returns
+        SimulatorStopReason.VIEWER_IS_CLOSED.
         """
         return (
             None if self.renderer.is_running() else SimulatorStopReason.VIEWER_IS_CLOSED

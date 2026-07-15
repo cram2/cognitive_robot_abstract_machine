@@ -29,19 +29,28 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 class DifferentialDriveBaseGoal(Sequence):
     """
     A sequence that moves the robot to a goal pose using a differential drive.
+
     1. Orient to goal position
     2. Drive to goal position
     3. Orient to goal orientation
     """
 
     diff_drive_connection: DifferentialDrive | None = field(kw_only=True, default=None)
-    """Drive connection to use. If it is None and there is only one diff drive in the world, it will be used."""
+    """
+    Drive connection to use.
+
+    If it is None and there is only one diff drive in the world, it will be used.
+    """
 
     goal_pose: Pose = field(kw_only=True)
-    """Pose to reach."""
+    """
+    Pose to reach.
+    """
 
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
-    """Task priority relative to other tasks."""
+    """
+    Task priority relative to other tasks.
+    """
 
     nodes: list[MotionStatechartNode] = field(default_factory=list, init=False)
 
@@ -112,25 +121,38 @@ class DifferentialDriveBaseGoal(Sequence):
 @dataclass(eq=False, repr=False)
 class CartesianPoseStraight(Parallel):
     """
-    Like CartesianPose, but constrains the tip link to move in a straight line towards the goal.
+    Like CartesianPose, but constrains the tip link to move in a straight line towards
+    the goal.
     """
 
     root_link: KinematicStructureEntity = field(kw_only=True)
-    """Name of the root link of the kin chain."""
+    """
+    Name of the root link of the kin chain.
+    """
 
     tip_link: KinematicStructureEntity = field(kw_only=True)
-    """Name of the tip link of the kin chain."""
+    """
+    Name of the tip link of the kin chain.
+    """
 
     goal_pose: Pose = field(kw_only=True)
-    """The goal pose."""
+    """
+    The goal pose.
+    """
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_CA
-    """Task priority relative to other tasks."""
+    """
+    Task priority relative to other tasks.
+    """
 
     binding_policy: GoalBindingPolicy = field(
         default=GoalBindingPolicy.Bind_at_build, kw_only=True
     )
-    """Describes when the goal is computed. See GoalBindingPolicy for more information."""
+    """
+    Describes when the goal is computed.
+
+    See GoalBindingPolicy for more information.
+    """
 
     nodes: list[MotionStatechartNode] = field(default_factory=list, init=False)
 

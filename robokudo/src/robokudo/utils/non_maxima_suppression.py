@@ -1,13 +1,12 @@
-"""Non-Maxima-Suppression (NMS) implementation for object detection.
+"""
+Non-Maxima-Suppression (NMS) implementation for object detection.
 
 This module provides NMS implementations for filtering overlapping bounding boxes.
 
-:module: non_maxima_suppression
-:synopsis: Non-Maxima-Suppression for object detection
+:module: non_maxima_suppression :synopsis: Non-Maxima-Suppression for object detection
 :moduleauthor: Lennart Heinbokel
 
-:Created:
-    2023-02-02
+:Created:     2023-02-02
 """
 
 from typing_extensions import Tuple, List

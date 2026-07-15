@@ -253,7 +253,9 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         >>> RoleFragment.for_member(42).text
         '42'
         """
-        return cls.for_type(value) if isinstance(value, type) else cls.for_literal(value)
+        return (
+            cls.for_type(value) if isinstance(value, type) else cls.for_literal(value)
+        )
 
     @classmethod
     def for_operator(cls, label: str) -> RoleFragment:

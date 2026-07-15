@@ -12,7 +12,8 @@ from giskardpy.qp.solvers.qp_solver_piqp import QPSolverPIQP
 @pytest.fixture()
 def simple_inequality_qp() -> tuple[QPData, np.ndarray]:
     """
-    min_{x1, x2} x1^2 + x2^2
+    min_{x1, x2} x1^2 + x2^2.
+
     s.t.
         -inf <= x1 <= inf
         -inf <= x2 <= inf
@@ -39,7 +40,8 @@ def simple_inequality_qp() -> tuple[QPData, np.ndarray]:
 @pytest.fixture()
 def simple_eq_as_inequality_qp() -> tuple[QPData, np.ndarray]:
     """
-    min_{x1, x2} x1^2 + x2^2
+    min_{x1, x2} x1^2 + x2^2.
+
     s.t.
         -inf <= x1 <= inf
         -inf <= x2 <= inf
@@ -94,6 +96,7 @@ def simple_equality_qp() -> tuple[QPData, np.ndarray]:
 def box_constraints_qp() -> tuple[QPData, np.ndarray]:
     """
     min_{x1, x2} 0.5 * (2*x1^2 + 2*x2^2)
+
     s.t.
         -1.0 <= x1 <= 1.0
         0.5 <= x2 <= 2.0

@@ -7,12 +7,33 @@ from dataclasses import dataclass, field
 from colorama import Fore, Style
 from omegaconf import MISSING
 from sqlalchemy.orm import DeclarativeBase as SQLTable
-from typing_extensions import Any, Optional, Dict, Type, Tuple, Union, List, Set, Callable, TYPE_CHECKING
+from typing_extensions import (
+    Any,
+    Optional,
+    Dict,
+    Type,
+    Tuple,
+    Union,
+    List,
+    Set,
+    Callable,
+    TYPE_CHECKING,
+)
 
-from krrood.ripple_down_rules.datastructures.callable_expression import CallableExpression
+from krrood.ripple_down_rules.datastructures.callable_expression import (
+    CallableExpression,
+)
 from krrood.ripple_down_rules.datastructures.case import create_case, Case
-from krrood.ripple_down_rules.utils import copy_case, make_list, make_set, get_origin_and_args_from_type_hint, render_tree, \
-    get_function_representation, get_method_object_from_pytest_request, typing_to_python_type
+from krrood.ripple_down_rules.utils import (
+    copy_case,
+    make_list,
+    make_set,
+    get_origin_and_args_from_type_hint,
+    render_tree,
+    get_function_representation,
+    get_method_object_from_pytest_request,
+    typing_to_python_type,
+)
 
 if TYPE_CHECKING:
     from ..rdr import RippleDownRules
@@ -26,6 +47,7 @@ class CaseQuery:
     not provided, it will be inferred from the attribute itself or from the attribute type or from the target value,
     depending on what is provided.
     """
+
     original_case: Any
     """
     The case that the attribute belongs to.
@@ -73,7 +95,9 @@ class CaseQuery:
     """
     The default value of the attribute. This is used when the target value is not provided.
     """
-    scope: Optional[Dict[str, Any]] = field(default_factory=lambda: inspect.currentframe().f_back.f_back.f_globals)
+    scope: Optional[Dict[str, Any]] = field(
+        default_factory=lambda: inspect.currentframe().f_back.f_back.f_globals
+    )
     """
     The global scope of the case query. This is used to evaluate the conditions and prediction, and is what is available
     to the user when they are prompted for input. If it is not provided, it will be set to the global scope of the
@@ -108,13 +132,17 @@ class CaseQuery:
     def render_rule_tree(self, filepath: Optional[str] = None, view: bool = False):
         if self.rdr is None:
             return
-        render_tree(self.rdr.start_rule, use_dot_exporter=True, filename=filepath, view=view)
+        render_tree(
+            self.rdr.start_rule, use_dot_exporter=True, filename=filepath, view=view
+        )
 
     @property
     def current_value_str(self):
-        return (f"{Fore.MAGENTA}Current value of {Fore.CYAN}{self.name}{Fore.MAGENTA} of type(s) "
-                f"{Fore.CYAN}({self.core_attribute_type_str}){Fore.MAGENTA}: "
-                f"{Fore.WHITE}{self.current_value}{Style.RESET_ALL}")
+        return (
+            f"{Fore.MAGENTA}Current value of {Fore.CYAN}{self.name}{Fore.MAGENTA} of type(s) "
+            f"{Fore.CYAN}({self.core_attribute_type_str}){Fore.MAGENTA}: "
+            f"{Fore.WHITE}{self.current_value}{Style.RESET_ALL}"
+        )
 
     @property
     def current_value(self) -> Any:
@@ -131,7 +159,13 @@ class CaseQuery:
         elif self.mutually_exclusive:
             return attr_value
         else:
-            return list({v for v in make_list(attr_value) if isinstance(v, self.core_attribute_type)})
+            return list(
+                {
+                    v
+                    for v in make_list(attr_value)
+                    if isinstance(v, self.core_attribute_type)
+                }
+            )
 
     @property
     def case_type(self) -> Type:
@@ -140,13 +174,21 @@ class CaseQuery:
         """
         if self.is_function:
             if self.function_args_type_hints is not None:
-                func_args = [arg for name, arg in self.function_args_type_hints.items() if name != 'return']
+                func_args = [
+                    arg
+                    for name, arg in self.function_args_type_hints.items()
+                    if name != "return"
+                ]
                 case_type_args = Union[tuple(func_args)]
             else:
                 case_type_args = Any
             return Dict[str, case_type_args]
         else:
-            return self.original_case._obj_type if isinstance(self.original_case, Case) else type(self.original_case)
+            return (
+                self.original_case._obj_type
+                if isinstance(self.original_case, Case)
+                else type(self.original_case)
+            )
 
     @property
     def case(self) -> Any:
@@ -176,7 +218,9 @@ class CaseQuery:
         :return: The type hint of the attribute as a typing object.
         """
         if len(self.core_attribute_type) > 1:
-            attribute_types_str = f"Union[{', '.join([t.__name__ for t in self.core_attribute_type])}]"
+            attribute_types_str = (
+                f"Union[{', '.join([t.__name__ for t in self.core_attribute_type])}]"
+            )
         else:
             attribute_types_str = self.core_attribute_type[0].__name__
         if not self.mutually_exclusive:
@@ -189,7 +233,7 @@ class CaseQuery:
         """
         :return: The names of the core types of the attribute.
         """
-        return ','.join([t.__name__ for t in self.core_attribute_type])
+        return ",".join([t.__name__ for t in self.core_attribute_type])
 
     @property
     def core_attribute_type(self) -> Tuple[Type, ...]:
@@ -220,7 +264,9 @@ class CaseQuery:
                 att_types.add(typing_to_python_type(att_type))
         self._attribute_types = tuple(att_types)
         if not self.mutually_exclusive and (list not in self._attribute_types):
-            self._attribute_types = tuple(make_list(self._attribute_types) + [set, list])
+            self._attribute_types = tuple(
+                make_list(self._attribute_types) + [set, list]
+            )
         return self._attribute_types
 
     @attribute_type.setter
@@ -242,16 +288,26 @@ class CaseQuery:
         """
         :return: The name of the case.
         """
-        return self.case._name if isinstance(self.case, Case) else self.case.__class__.__name__
+        return (
+            self.case._name
+            if isinstance(self.case, Case)
+            else self.case.__class__.__name__
+        )
 
     @property
     def target(self) -> Optional[CallableExpression]:
         """
         :return: The target expression of the attribute.
         """
-        if (self._target is not None) and (not isinstance(self._target, CallableExpression)):
-            self._target = CallableExpression(conclusion=self._target, conclusion_type=self.attribute_type,
-                                              scope=self.scope, mutually_exclusive=self.mutually_exclusive)
+        if (self._target is not None) and (
+            not isinstance(self._target, CallableExpression)
+        ):
+            self._target = CallableExpression(
+                conclusion=self._target,
+                conclusion_type=self.attribute_type,
+                scope=self.scope,
+                mutually_exclusive=self.mutually_exclusive,
+            )
         return self._target
 
     @target.setter
@@ -284,21 +340,37 @@ class CaseQuery:
 
     def __str__(self):
         header = f"CaseQuery: {self.name}"
-        target = f"Target: {self.name} |= {self.target if self.target is not None else '?'}"
-        conditions = f"Conditions: {self.conditions if self.conditions is not None else '?'}"
+        target = (
+            f"Target: {self.name} |= {self.target if self.target is not None else '?'}"
+        )
+        conditions = (
+            f"Conditions: {self.conditions if self.conditions is not None else '?'}"
+        )
         return "\n".join([header, target, conditions])
 
     def __repr__(self):
         return self.__str__()
 
     def __copy__(self):
-        return CaseQuery(self.original_case, self.attribute_name, self.attribute_type,
-                         self.mutually_exclusive, _target=self.target, default_value=self.default_value,
-                         scope=self.scope, _case=copy_case(self.case), _target_value=self.target_value,
-                         conditions=self.conditions, is_function=self.is_function,
-                         function_args_type_hints=self.function_args_type_hints,
-                         case_factory=self.case_factory, case_factory_idx=self.case_factory_idx,
-                         case_conf=self.case_conf, scenario=self.scenario, rdr=self.rdr)
+        return CaseQuery(
+            self.original_case,
+            self.attribute_name,
+            self.attribute_type,
+            self.mutually_exclusive,
+            _target=self.target,
+            default_value=self.default_value,
+            scope=self.scope,
+            _case=copy_case(self.case),
+            _target_value=self.target_value,
+            conditions=self.conditions,
+            is_function=self.is_function,
+            function_args_type_hints=self.function_args_type_hints,
+            case_factory=self.case_factory,
+            case_factory_idx=self.case_factory_idx,
+            case_conf=self.case_conf,
+            scenario=self.scenario,
+            rdr=self.rdr,
+        )
 
 
 @dataclass
@@ -324,8 +396,12 @@ class CaseFactoryMetaData:
 
     @classmethod
     def from_case_query(cls, case_query: CaseQuery) -> CaseFactoryMetaData:
-        return cls(factory_method=case_query.case_factory, factory_idx=case_query.case_factory_idx,
-                   case_conf=case_query.case_conf, scenario=case_query.scenario)
+        return cls(
+            factory_method=case_query.case_factory,
+            factory_idx=case_query.case_factory_idx,
+            case_conf=case_query.case_conf,
+            scenario=case_query.scenario,
+        )
 
     def __repr__(self):
         factory_method_repr = None
@@ -334,12 +410,14 @@ class CaseFactoryMetaData:
             factory_method_repr = get_function_representation(self.factory_method)
         if self.scenario is not None:
             scenario_repr = get_function_representation(self.scenario)
-        return (f"CaseFactoryMetaData("
-                f"factory_method={factory_method_repr}, "
-                f"factory_idx={self.factory_idx}, "
-                f"case_conf={self.case_conf}, "
-                f"scenario={scenario_repr}, "
-                f"this_case_target_value={self.this_case_target_value})")
+        return (
+            f"CaseFactoryMetaData("
+            f"factory_method={factory_method_repr}, "
+            f"factory_idx={self.factory_idx}, "
+            f"case_conf={self.case_conf}, "
+            f"scenario={scenario_repr}, "
+            f"this_case_target_value={self.this_case_target_value})"
+        )
 
     def __str__(self):
         return self.__repr__()
@@ -351,6 +429,7 @@ class RDRConclusion:
     This dataclass represents a conclusion of a Ripple Down Rule.
     It contains the conclusion expression, the type of the conclusion, and the scope in which it is evaluated.
     """
+
     _conclusion: Any
     """
     The conclusion value.
@@ -371,8 +450,9 @@ class RDRConclusion:
     """
     The unique identifier of the conclusion.
     """
+
     def __getattribute__(self, name: str) -> Any:
-        if name.startswith('_'):
+        if name.startswith("_"):
             return object.__getattribute__(self, name)
         else:
             conclusion = object.__getattribute__(self, "_conclusion")
@@ -384,7 +464,7 @@ class RDRConclusion:
             return value
 
     def __setattr__(self, name, value):
-        if name.startswith('_'):
+        if name.startswith("_"):
             object.__setattr__(self, name, value)
         else:
             setattr(self._wrapped, name, value)
@@ -395,9 +475,9 @@ class RDRConclusion:
             func_name = frame_info.function
             local_self = frame_info.frame.f_locals.get("self", None)
             if (
-                    func_name == "__call__" and
-                    local_self is not None and
-                    type(local_self) is CallableExpression
+                func_name == "__call__"
+                and local_self is not None
+                and type(local_self) is CallableExpression
             ):
                 self._used_in_tracker = True
                 print("RDRConclusion used inside CallableExpression")

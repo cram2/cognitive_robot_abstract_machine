@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.factories import a, an
 from krrood.ormatic.data_access_objects.helper import to_dao
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     CircuitNotFittedError,
@@ -52,10 +52,10 @@ def rpc(scenario):
 
 @pytest.fixture
 def room_query_4():
-    query = underspecified(SceneRoom)(
-        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
-        orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
-        objects=[underspecified(SceneObject)(type=...) for _ in range(4)],
+    query = a(SceneRoom)(
+        position=a(KRROODPosition)(x=..., y=..., z=...),
+        orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
+        objects=[a(SceneObject)(type=...) for _ in range(4)],
     )
     query.resolve()
     return query
@@ -127,9 +127,11 @@ def test_ground_preserves_room_scalar_variables(rpc, room_query_4):
 
 
 def test_ground_integrates_out_unavailable_aggregates(rpc, room_query_4):
-    """``chair_count`` and ``table_count`` cannot be determined from the
-    underspecified query, so the Monte-Carlo path must integrate them out: they
-    must not survive as variables, while the object-type variables remain."""
+    """
+    ``chair_count`` and ``table_count`` cannot be determined from the underspecified
+    query, so the Monte-Carlo path must integrate them out: they must not survive as
+    variables, while the object-type variables remain.
+    """
     model = rpc.ground(room_query_4)
     names = {v.name for v in model.variables}
     assert "SceneRoomAggregations.chair_count()" not in names
@@ -144,16 +146,20 @@ def test_ground_with_unavailable_aggregate_is_valid(rpc, room_query_4):
 
 
 def test_non_positive_sample_count_raises_when_integration_needed(rpc, room_query_4):
-    """Monte-Carlo integration cannot be disabled: a non-positive sample count is
-    rejected when undetermined aggregates must be integrated out."""
+    """
+    Monte-Carlo integration cannot be disabled: a non-positive sample count is rejected
+    when undetermined aggregates must be integrated out.
+    """
     rpc.monte_carlo_sample_count = 0
     with pytest.raises(InvalidMonteCarloSampleCountError):
         rpc.ground(room_query_4)
 
 
 def test_monte_carlo_sample_count_controls_mixture_size(rpc, room_query_4):
-    """Drawing more samples discovers more distinct aggregate values, each adding
-    an exchangeable-distribution instance (and its sum units) to the mixture."""
+    """
+    Drawing more samples discovers more distinct aggregate values, each adding an
+    exchangeable-distribution instance (and its sum units) to the mixture.
+    """
     np.random.seed(0)
     rpc.monte_carlo_sample_count = 1
     single = sum(1 for n in rpc.ground(room_query_4).nodes() if isinstance(n, SumUnit))
@@ -164,16 +170,16 @@ def test_monte_carlo_sample_count_controls_mixture_size(rpc, room_query_4):
 
 
 def test_ground_variable_count_scales_with_query_size(rpc):
-    query_2 = underspecified(SceneRoom)(
-        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
-        orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
-        objects=[underspecified(SceneObject)(type=...) for _ in range(2)],
+    query_2 = a(SceneRoom)(
+        position=a(KRROODPosition)(x=..., y=..., z=...),
+        orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
+        objects=[a(SceneObject)(type=...) for _ in range(2)],
     )
     query_2.resolve()
-    query_4 = underspecified(SceneRoom)(
-        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
-        orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
-        objects=[underspecified(SceneObject)(type=...) for _ in range(4)],
+    query_4 = a(SceneRoom)(
+        position=a(KRROODPosition)(x=..., y=..., z=...),
+        orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
+        objects=[a(SceneObject)(type=...) for _ in range(4)],
     )
     query_4.resolve()
     assert len(rpc.ground(query_4).variables) > len(rpc.ground(query_2).variables)

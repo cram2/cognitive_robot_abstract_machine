@@ -1,7 +1,7 @@
 """
-Standalone unit tests for the grammar dispatch primitive (``select``) and the
-EQL-tree fold (``engine.fold``) — exercised with synthetic constructs/rules so
-the dispatch mechanics are validated independently of the real grammar.
+Standalone unit tests for the grammar dispatch primitive (``select``) and the EQL-tree
+fold (``engine.fold``) — exercised with synthetic constructs/rules so the dispatch
+mechanics are validated independently of the real grammar.
 """
 
 from __future__ import annotations
@@ -47,14 +47,19 @@ class Other:
 
 
 def _rule_context():
-    """A RuleContext for dispatch tests (no recursion needed by select)."""
+    """
+    A RuleContext for dispatch tests (no recursion needed by select).
+    """
     return RuleContext(
         recurse=lambda node, options: node, services=MicroplanningServices()
     )
 
 
 def _custom(construct, name, build_fn, *, guard=None, base=PhraseRule):
-    """Build a PhraseRule subclass instance for testing (subclass *base* to test specificity)."""
+    """
+    Build a PhraseRule subclass instance for testing (subclass *base* to test
+    specificity).
+    """
     namespace = {
         "construct": construct,
         "build": lambda self, node, context: build_fn(node, context),
@@ -65,7 +70,9 @@ def _custom(construct, name, build_fn, *, guard=None, base=PhraseRule):
 
 
 def _rule(construct, name, **kw):
-    """A rule whose build just emits its own name."""
+    """
+    A rule whose build just emits its own name.
+    """
     return _custom(construct, name, lambda node, context: WordFragment(name), **kw)
 
 
@@ -153,8 +160,10 @@ def test_fold_raises_when_no_rule_covers_the_node():
 
 
 def test_enters_query_scope_wraps_build_but_not_when():
-    """A rule declaring ``enters_query_scope`` builds at depth+1 (children see > 0), while its
-    ``when`` guard still sees the rule's own (outer) depth — and the depth is restored after.
+    """
+    A rule declaring ``enters_query_scope`` builds at depth+1 (children see > 0), while
+    its ``when`` guard still sees the rule's own (outer) depth — and the depth is
+    restored after.
     """
     observed = {}
 

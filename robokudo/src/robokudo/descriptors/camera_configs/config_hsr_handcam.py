@@ -19,7 +19,9 @@ class HsrHandCameraConfig(
     StableViewpointComponent,
     WorldDescriptorComponent,
 ):
-    """Camera config for the camera-in-hand on the Toyota HSR robot."""
+    """
+    Camera config for the camera-in-hand on the Toyota HSR robot.
+    """
 
     registry_name: ClassVar[str] = "hsr_handcam"
 

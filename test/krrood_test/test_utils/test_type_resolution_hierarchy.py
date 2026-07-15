@@ -7,29 +7,35 @@ from krrood.class_diagrams.utils import get_type_hints_of_object
 def test_reproduce_name_error_in_hierarchy(tmp_path: Path):
     # Create module_a.py
     module_a_path = tmp_path / "module_a.py"
-    module_a_path.write_text("""
+    module_a_path.write_text(
+        """
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from module_target import Target
 
 class Base:
     target: 'Target'
-""")
+"""
+    )
 
     # Create module_target.py
     module_target_path = tmp_path / "module_target.py"
-    module_target_path.write_text("""
+    module_target_path.write_text(
+        """
 class Target:
     pass
-""")
+"""
+    )
 
     # Create module_b.py
     module_b_path = tmp_path / "module_b.py"
-    module_b_path.write_text("""
+    module_b_path.write_text(
+        """
 from module_a import Base
 class Child(Base):
     pass
-""")
+"""
+    )
 
     # Add tmp_path to sys.path
     sys.path.insert(0, str(tmp_path))
@@ -53,30 +59,38 @@ class Child(Base):
                 del sys.modules[mod]
 
 
-def test_resolves_forward_reference_for_class_installed_in_site_packages(tmp_path: Path):
+def test_resolves_forward_reference_for_class_installed_in_site_packages(
+    tmp_path: Path,
+):
     # A class whose module lives under ``site-packages`` (i.e. a pip-installed project package)
     # must still resolve its own ``TYPE_CHECKING`` forward references. Regression for installed
     # builds failing to resolve ``Symbol._inference_explanation_: Optional[InferenceExplanation]``.
     site_packages = tmp_path / "site-packages"
     site_packages.mkdir()
 
-    (site_packages / "installed_base.py").write_text("""
+    (site_packages / "installed_base.py").write_text(
+        """
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from installed_target import Target
 
 class Base:
     target: 'Target'
-""")
-    (site_packages / "installed_target.py").write_text("""
+"""
+    )
+    (site_packages / "installed_target.py").write_text(
+        """
 class Target:
     pass
-""")
-    (site_packages / "installed_child.py").write_text("""
+"""
+    )
+    (site_packages / "installed_child.py").write_text(
+        """
 from installed_base import Base
 class Child(Base):
     pass
-""")
+"""
+    )
 
     sys.path.insert(0, str(site_packages))
     try:
@@ -95,23 +109,28 @@ class Child(Base):
 
 def test_hierarchy_resolution_prioritizes_closest_match(tmp_path: Path):
     # Create module_a.py with Base referring to Target (intended to be TargetA)
-    (tmp_path / "module_a.py").write_text("""
+    (tmp_path / "module_a.py").write_text(
+        """
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from module_target_a import Target
 
 class Base:
     target: 'Target'
-""")
+"""
+    )
 
     # Create module_target_a.py
-    (tmp_path / "module_target_a.py").write_text("""
+    (tmp_path / "module_target_a.py").write_text(
+        """
 class Target:
     pass
-""")
+"""
+    )
 
     # Create module_b.py with Parent(Base) and its own Target (TargetB)
-    (tmp_path / "module_b.py").write_text("""
+    (tmp_path / "module_b.py").write_text(
+        """
 from module_a import Base
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -119,20 +138,25 @@ if TYPE_CHECKING:
 
 class Parent(Base):
     pass
-""")
+"""
+    )
 
     # Create module_target_b.py
-    (tmp_path / "module_target_b.py").write_text("""
+    (tmp_path / "module_target_b.py").write_text(
+        """
 class Target:
     pass
-""")
+"""
+    )
 
     # Create module_c.py with Child(Parent)
-    (tmp_path / "module_c.py").write_text("""
+    (tmp_path / "module_c.py").write_text(
+        """
 from module_b import Parent
 class Child(Parent):
     pass
-""")
+"""
+    )
 
     sys.path.insert(0, str(tmp_path))
     try:

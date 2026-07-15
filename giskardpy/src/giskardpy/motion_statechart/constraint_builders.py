@@ -15,8 +15,8 @@ from semantic_digital_twin.spatial_types import Point3, Vector3, RotationMatrix
 @dataclass
 class GeometricConstraintBuilder:
     """
-    Builds high-level geometric constraints (point, vector, and rotation goals, and Cartesian
-    velocity limits) by translating them into the primitive constraints of a
+    Builds high-level geometric constraints (point, vector, and rotation goals, and
+    Cartesian velocity limits) by translating them into the primitive constraints of a
     :class:`ConstraintCollection`.
     """
 
@@ -28,7 +28,8 @@ class GeometricConstraintBuilder:
     @staticmethod
     def _indexed_constraint_name(name: Optional[str], index: int) -> Optional[str]:
         """
-        Builds a per-axis constraint name, or None so the collection assigns an index-based name.
+        Builds a per-axis constraint name, or None so the collection assigns an index-
+        based name.
         """
         if name is None:
             return None
@@ -44,12 +45,13 @@ class GeometricConstraintBuilder:
     ) -> None:
         """
         Adds three constraints to move frame_P_current to frame_P_goal.
+
         Make sure that both points are expressed relative to the same frame!
-        :param frame_P_current: a vector describing a 3D point. It should depend on active dofs.
+        :param frame_P_current: a vector describing a 3D point. It should depend on
+            active dofs.
         :param frame_P_goal: a vector describing a 3D point
         :param reference_velocity: m/s
         """
-
         frame_V_error = frame_P_goal - frame_P_current
         for i in range(3):
             self.collection.add_equality_constraint(
@@ -69,13 +71,15 @@ class GeometricConstraintBuilder:
         name: Optional[str] = None,
     ) -> None:
         """
-        A wrapper around add_constraint. Will add a constraint that tries to move expr_current to expr_goal.
-        :param expression_current: a symbolic expression describing a 3D point. It should depend on active dofs.
+        A wrapper around add_constraint.
+
+        Will add a constraint that tries to move expr_current to expr_goal.
+        :param expression_current: a symbolic expression describing a 3D point. It
+            should depend on active dofs.
         :param expression_goal: a symbolic expression describing a 3D point
         :param reference_velocity: value used for normalization m/s
         :param quadratic_weight: name relative to other constraints
         """
-
         error = expression_goal - expression_current
         self.collection.add_equality_constraint(
             reference_velocity=reference_velocity,
@@ -94,13 +98,15 @@ class GeometricConstraintBuilder:
         name: Optional[str] = None,
     ) -> None:
         """
-        Adds constraints to align frame_V_current with frame_V_goal. Make sure that both vectors are expressed
-        relative to the same frame and are normalized to a length of 1.
-        :param frame_V_current: a vector describing a 3D vector. It should depend on active dofs.
+        Adds constraints to align frame_V_current with frame_V_goal.
+
+        Make sure that both vectors are expressed relative to the same frame and are
+        normalized to a length of 1.
+        :param frame_V_current: a vector describing a 3D vector. It should depend on
+            active dofs.
         :param frame_V_goal: a vector describing a 3D vector
         :param reference_velocity: value used for normalization rad/s
         """
-
         angle = sm.safe_acos(frame_V_current.dot(frame_V_goal))
         # avoid singularity by staying away from pi
         angle_limited = sm.min(sm.max(angle, -reference_velocity), reference_velocity)
@@ -128,13 +134,14 @@ class GeometricConstraintBuilder:
         name: Optional[str] = None,
     ) -> None:
         """
-        Adds constraints to move frame_R_current to frame_R_goal. Make sure that both are expressed relative to the same
-        frame.
-        :param frame_R_current: current rotation as rotation matrix. It should depend on active dofs.
+        Adds constraints to move frame_R_current to frame_R_goal.
+
+        Make sure that both are expressed relative to the same frame.
+        :param frame_R_current: current rotation as rotation matrix. It should depend on
+            active dofs.
         :param frame_R_goal: goal rotation as rotation matrix
         :param reference_velocity: value used for normalization rad/s
         """
-
         # avoid singularity
         # the sign determines in which direction the robot moves when in singularity.
         # -0.0001 preserves the old behavior from before this goal was refactored
@@ -164,12 +171,13 @@ class GeometricConstraintBuilder:
         name: Optional[str] = None,
     ) -> None:
         """
-        Adds constraints to limit the translational velocity of frame_P_current. Be aware that the velocity is relative
-        to frame.
-        :param frame_P_current: a vector describing a 3D point. It should depend on active dofs.
+        Adds constraints to limit the translational velocity of frame_P_current.
+
+        Be aware that the velocity is relative to frame.
+        :param frame_P_current: a vector describing a 3D point. It should depend on
+            active dofs.
         :param max_violation: m/s
         """
-
         translation_error = frame_P_current.norm()
         translation_error = sm.if_eq_zero(
             translation_error, sm.Scalar(0.01), translation_error
@@ -194,12 +202,13 @@ class GeometricConstraintBuilder:
         name: Optional[str] = None,
     ) -> None:
         """
-        Add velocity constraints to limit the velocity of frame_R_current. Be aware that the velocity is relative to
-        frame.
-        :param frame_R_current: Rotation matrix describing the current rotation. It should depend on active dofs.
+        Add velocity constraints to limit the velocity of frame_R_current.
+
+        Be aware that the velocity is relative to frame.
+        :param frame_R_current: Rotation matrix describing the current rotation. It
+            should depend on active dofs.
         :param max_velocity: rad/s
         """
-
         root_Q_tipCurrent = frame_R_current.to_quaternion()
         angle_error = root_Q_tipCurrent.to_axis_angle()[1]
         self.collection.add_velocity_constraint(

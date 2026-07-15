@@ -1,9 +1,8 @@
 """
 Standalone unit tests for the microplanning services and the coordination module.
 
-Each service is exercised in isolation (no verbalizer pipeline) so that the
-single-responsibility behaviour split out of the former god-context is pinned
-directly.
+Each service is exercised in isolation (no verbalizer pipeline) so that the single-
+responsibility behaviour split out of the former god-context is pinned directly.
 """
 
 from __future__ import annotations
@@ -41,7 +40,9 @@ from krrood.entity_query_language.verbalization.vocabulary.english import RangeP
 
 
 class Robot:
-    """Minimal type used to give test variables a clean type name."""
+    """
+    Minimal type used to give test variables a clean type name.
+    """
 
 
 # ── ReferringExpressions ─────────────────────────────────────────────────────

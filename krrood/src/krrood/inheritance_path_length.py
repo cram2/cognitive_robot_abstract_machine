@@ -12,12 +12,15 @@ from krrood.entity_query_language.predicate import symbolic_function
 def inheritance_path_length(child_class: Type, parent_class: Type) -> Optional[int]:
     """
     Calculate the inheritance path length between two classes.
-    Every inheritance level that lies between `child_class` and `parent_class` increases the length by one.
-    In case of multiple inheritance, the path length is calculated for each branch and the minimum is returned.
+
+    Every inheritance level that lies between `child_class` and `parent_class` increases
+    the length by one. In case of multiple inheritance, the path length is calculated
+    for each branch and the minimum is returned.
 
     :param child_class: The child class.
     :param parent_class: The parent class.
-    :return: The minimum path length between `child_class` and `parent_class` or None if no path exists.
+    :return: The minimum path length between `child_class` and `parent_class` or None if
+        no path exists.
     """
     if not (
         isclass(child_class)
@@ -40,7 +43,6 @@ def _inheritance_path_length(
     :param current_length: The current length of the inheritance path.
     :return: The minimum path length between `child_class` and `parent_class`.
     """
-
     if child_class == parent_class:
         return current_length
     else:

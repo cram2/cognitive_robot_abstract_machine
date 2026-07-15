@@ -1,4 +1,5 @@
-"""Regression tests proving threaded ROS publishers are not retained after they stop.
+"""
+Regression tests proving threaded ROS publishers are not retained after they stop.
 
 The publishers spawn a background thread and previously registered a bound method with
 ``atexit``. That registration is a process-global strong reference to the publisher (and, through
@@ -24,11 +25,12 @@ from coraplex.ros_utils.joint_state_publisher import JointStatePublisher
 
 
 def _weakref_to_stopped_publisher(construct: Callable) -> weakref.ref:
-    """Construct a publisher, stop its thread, and return only a weakref to it.
+    """
+    Construct a publisher, stop its thread, and return only a weakref to it.
 
-    The publisher is built and released entirely within this frame so the caller keeps no strong
-    reference; whether it survives a following ``gc.collect()`` then depends solely on process-global
-    anchors such as an ``atexit`` registration.
+    The publisher is built and released entirely within this frame so the caller keeps
+    no strong reference; whether it survives a following ``gc.collect()`` then depends
+    solely on process-global anchors such as an ``atexit`` registration.
     """
     publisher = construct()
     publisher._stop_publishing()

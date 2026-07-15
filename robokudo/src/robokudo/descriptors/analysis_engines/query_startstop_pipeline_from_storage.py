@@ -1,4 +1,5 @@
-"""Analysis engine for continuous perception with start/stop control.
+"""
+Analysis engine for continuous perception with start/stop control.
 
 This module provides an analysis engine that demonstrates how to implement a
 continuous perception pipeline with external start/stop control through an
@@ -47,7 +48,8 @@ from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for continuous perception with external control.
+    """
+    Analysis engine for continuous perception with external control.
 
     This class implements a pipeline that runs continuous perception tasks
     while allowing external control through an action server. The pipeline
@@ -69,14 +71,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "query_startstop_pipeline_from_storage"
 
     def implementation(self) -> Pipeline:
-        """Create a continuous perception pipeline with external control.
+        """
+        Create a continuous perception pipeline with external control.
 
         This method constructs a processing pipeline that runs continuously
         until stopped or preempted. The pipeline processes stored camera data

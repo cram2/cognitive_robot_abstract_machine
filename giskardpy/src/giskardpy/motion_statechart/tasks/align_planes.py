@@ -14,18 +14,29 @@ from semantic_digital_twin.world_description.world_entity import (
 class AlignPlanes(Task):
     """
     Will orient the tip plane to align with the goal plane.
+
     The planes are represented as normal vectors.
     """
 
     root_link: KinematicStructureEntity = field(kw_only=True)
-    """root link of the kinematic chain."""
+    """
+    Root link of the kinematic chain.
+    """
+
     tip_link: KinematicStructureEntity = field(kw_only=True)
-    """tip link of the kinematic chain."""
+    """
+    Tip link of the kinematic chain.
+    """
 
     goal_normal: Vector3 = field(kw_only=True)
-    """normal vector of the goal plane."""
+    """
+    Normal vector of the goal plane.
+    """
+
     tip_normal: Vector3 = field(kw_only=True)
-    """normal vector of the tip plane."""
+    """
+    Normal vector of the tip plane.
+    """
 
     threshold: float = field(default=0.01, kw_only=True)
     reference_velocity: float = field(default=0.5, kw_only=True)

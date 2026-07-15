@@ -102,7 +102,7 @@ class GrasPoseMapping(PoseMapping, AlternativeMapping[GraspPose]):
 
 class NumpyType(TypeDecorator):
     """
-    Type that casts field which are of numpy nd array type
+    Type that casts field which are of numpy nd array type.
     """
 
     impl = types.LargeBinary(4 * 1024 * 1024 * 1024 - 1)  # 4 GB max

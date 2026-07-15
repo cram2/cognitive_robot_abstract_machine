@@ -45,7 +45,9 @@ class TestUtilsAnnotatorHelper(object):
 
     @pytest.fixture()
     def identity_cas(self) -> CAS:
-        """Creates a CAS containing an identify cam to world transform."""
+        """
+        Creates a CAS containing an identify cam to world transform.
+        """
         cas = robokudo.cas.CAS()
 
         # cam_to_world = robokudo.types.tf.StampedTransform()
@@ -72,7 +74,9 @@ class TestUtilsAnnotatorHelper(object):
 
     @pytest.fixture()
     def cam_to_world_cas(self) -> CAS:
-        """Creates a CAS containing a valid non-identity cam to world transform."""
+        """
+        Creates a CAS containing a valid non-identity cam to world transform.
+        """
         cas = CAS()
 
         # Create a fake cam to world transform
@@ -103,7 +107,9 @@ class TestUtilsAnnotatorHelper(object):
     ######################
 
     def test_pose_transform_helper(self, cam_to_world_cas: CAS):
-        """Test pose transform round trip."""
+        """
+        Test pose transform round trip.
+        """
         pos = PoseAnnotation()
         pos.source = "test"
         pos.translation.insert(0, 1)
@@ -122,7 +128,9 @@ class TestUtilsAnnotatorHelper(object):
         np.testing.assert_array_almost_equal(pos.rotation, pose_back.rotation)
 
     def test_pose_transform_helper_identy_tf(self, identity_cas: CAS):
-        """Test pose transform with identity transform."""
+        """
+        Test pose transform with identity transform.
+        """
         pos = PoseAnnotation()
         pos.source = "test"
         pos.translation.insert(0, 1)
@@ -165,7 +173,9 @@ class TestUtilsAnnotatorHelper(object):
     ######################
 
     def test_cloud_transform_helper(self, cam_to_world_cas: CAS):
-        """Test cloud transform round trip."""
+        """
+        Test cloud transform round trip.
+        """
         x = np.linspace(-10, 10, 20)
         y = np.linspace(-10, 10, 20)
         z = np.linspace(-10, 10, 20)
@@ -182,7 +192,9 @@ class TestUtilsAnnotatorHelper(object):
         assert np.all(np.asarray(dists) < 1.0e-6)
 
     def test_cloud_transform_helper_in_place(self, cam_to_world_cas: CAS):
-        """Test cloud transform round trip."""
+        """
+        Test cloud transform round trip.
+        """
         x = np.linspace(-10, 10, 20)
         y = np.linspace(-10, 10, 20)
         z = np.linspace(-10, 10, 20)
@@ -211,7 +223,9 @@ class TestUtilsAnnotatorHelper(object):
         assert np.all(np.asarray(dists) < 1.0e-6)
 
     def test_cloud_transform_helper_identy_tf(self, identity_cas: CAS):
-        """Test cloud transform with identity transform."""
+        """
+        Test cloud transform with identity transform.
+        """
         points = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
         cloud = o3d.geometry.PointCloud()
         cloud.points = o3d.utility.Vector3dVector(points)

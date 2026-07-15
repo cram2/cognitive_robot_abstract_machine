@@ -1,4 +1,5 @@
-"""Transformation utilities for RoboKudo.
+"""
+Transformation utilities for RoboKudo.
 
 This module provides conversion methods for common transformation calculations.
 It operates on ROS types and NumPy data structures, independent of RK Annotation Types.
@@ -33,7 +34,8 @@ if TYPE_CHECKING:
 
 
 def get_pose_from_transform_matrix(transform: npt.NDArray) -> Pose:
-    """Get a ROS geometry_msgs Pose from a 4x4 transformation matrix.
+    """
+    Get a ROS geometry_msgs Pose from a 4x4 transformation matrix.
 
     :param transform: 4x4 transformation matrix
     :return: Equivalent pose
@@ -57,7 +59,8 @@ def get_pose_from_transform_matrix(transform: npt.NDArray) -> Pose:
 
 
 def get_transform_matrix_from_pose(pose: Pose) -> npt.NDArray:
-    """Get a 4x4 transformation matrix from a ROS geometry_msgs Pose.
+    """
+    Get a 4x4 transformation matrix from a ROS geometry_msgs Pose.
 
     :param pose: Equivalent pose
     :return: 4x4 transformation matrix
@@ -87,7 +90,8 @@ def get_transform_matrix_from_pose(pose: Pose) -> npt.NDArray:
 
 
 def get_transform_matrix(rotation: Iterable, translation: Iterable) -> npt.NDArray:
-    """Create a 4x4 transformation matrix from rotation and translation.
+    """
+    Create a 4x4 transformation matrix from rotation and translation.
 
     :param rotation: 3x3 rotation matrix
     :param translation: 3D translation vector
@@ -100,7 +104,8 @@ def get_transform_matrix(rotation: Iterable, translation: Iterable) -> npt.NDArr
 
 
 def get_transform_matrix_from_translation(translation: npt.NDArray) -> npt.NDArray:
-    """Create a 4x4 transformation matrix from translation only.
+    """
+    Create a 4x4 transformation matrix from translation only.
 
     :param translation: 3D translation vector
     :return: 4x4 homogeneous transformation matrix with identity rotation
@@ -111,7 +116,8 @@ def get_transform_matrix_from_translation(translation: npt.NDArray) -> npt.NDArr
 
 
 def quaternion_about_axis(angle: float, axis: Tuple[int, int, int]) -> npt.NDArray:
-    """Create a 4x4 transformation matrix for rotation around an axis.
+    """
+    Create a 4x4 transformation matrix for rotation around an axis.
 
     :param angle: Rotation angle in radians
     :param axis: 3D vector defining rotation axis
@@ -125,7 +131,8 @@ def quaternion_about_axis(angle: float, axis: Tuple[int, int, int]) -> npt.NDArr
 def get_transform_matrix_for_rotation_around_axis(
     angle: float, axis: Tuple[int, int, int]
 ) -> npt.NDArray:
-    """Create 4x4 transformation matrix for rotation around arbitrary axis.
+    """
+    Create 4x4 transformation matrix for rotation around arbitrary axis.
 
     :param angle: Rotation angle in radians
     :param axis: 3D vector defining rotation axis
@@ -139,7 +146,8 @@ def get_transform_matrix_from_q(
     quaternion: Union[npt.NDArray, List[float], Tuple[float, float, float, float]],
     translation: Union[npt.NDArray, List[float], Tuple[float, float, float]],
 ) -> npt.NDArray:
-    """Create a 4x4 transformation matrix from quaternion and translation.
+    """
+    Create a 4x4 transformation matrix from quaternion and translation.
 
     :param quaternion: Rotation quaternion [x,y,z,w]
     :param translation: 3D translation vector
@@ -154,7 +162,8 @@ def get_transform_matrix_from_q(
 
 
 def get_rotation_matrix_from_euler_angles(x: float, y: float, z: float) -> npt.NDArray:
-    """Create a 3x3 rotation matrix from Euler angles.
+    """
+    Create a 3x3 rotation matrix from Euler angles.
 
     :param x: Rotation around X axis in radians
     :param y: Rotation around Y axis in radians
@@ -168,7 +177,8 @@ def get_rotation_matrix_from_euler_angles(x: float, y: float, z: float) -> npt.N
 
 
 def get_rotation_matrix_from_q(quaternion: npt.NDArray) -> npt.NDArray:
-    """Create a 3x3 rotation matrix from quaternion.
+    """
+    Create a 3x3 rotation matrix from quaternion.
 
     :param quaternion: Rotation quaternion [x,y,z,w]
     :return: 3x3 rotation matrix
@@ -177,12 +187,12 @@ def get_rotation_matrix_from_q(quaternion: npt.NDArray) -> npt.NDArray:
 
 
 def get_quaternion_from_rotation_matrix(rotation_matrix: npt.NDArray) -> npt.NDArray:
-    """Convert a 3x3 rotation matrix to quaternion.
+    """
+    Convert a 3x3 rotation matrix to quaternion.
 
     :param rotation_matrix: 3x3 rotation matrix
     :return: Rotation quaternion [x,y,z,w]
     """
-
     # the input of quaternion_from_matrix is 3x3
     T = np.eye(3)
     T[:3, :3] = rotation_matrix
@@ -191,7 +201,8 @@ def get_quaternion_from_rotation_matrix(rotation_matrix: npt.NDArray) -> npt.NDA
 
 
 def get_quaternion_from_transform_matrix(transform_matrix: npt.NDArray) -> npt.NDArray:
-    """Extract quaternion from 4x4 transformation matrix.
+    """
+    Extract quaternion from 4x4 transformation matrix.
 
     :param transform_matrix: 4x4 homogeneous transformation matrix
     :return: Rotation quaternion [x,y,z,w]
@@ -200,7 +211,8 @@ def get_quaternion_from_transform_matrix(transform_matrix: npt.NDArray) -> npt.N
 
 
 def get_translation_from_transform_matrix(transform_matrix: npt.NDArray) -> npt.NDArray:
-    """Extract translation from 4x4 transformation matrix.
+    """
+    Extract translation from 4x4 transformation matrix.
 
     :param transform_matrix: 4x4 homogeneous transformation matrix
     :return: 3D translation vector [x,y,z]
@@ -209,7 +221,8 @@ def get_translation_from_transform_matrix(transform_matrix: npt.NDArray) -> npt.
 
 
 def get_rotation_from_transform_matrix(transform_matrix: npt.NDArray) -> npt.NDArray:
-    """Extract rotation matrix from 4x4 transformation matrix.
+    """
+    Extract rotation matrix from 4x4 transformation matrix.
 
     :param transform_matrix: 4x4 homogeneous transformation matrix
     :return: 3x3 rotation matrix
@@ -260,7 +273,8 @@ def get_transform_from_plane_equation(plane_equation: npt.NDArray) -> npt.NDArra
 def construct_rotation_matrix(
     pose_orientation: npt.NDArray, axis_order: Tuple[int, int, int]
 ) -> npt.NDArray:
-    """Construct rotation matrix with reordered axes.
+    """
+    Construct rotation matrix with reordered axes.
 
     Creates a rotation matrix by reordering the axes from an input orientation.
     Useful for switching coordinate axes, e.g. exchanging Z with X axis.
@@ -299,6 +313,7 @@ def get_rotation_matrix_from_direction_vector(
 ) -> npt.NDArray:
     """
     Construct a rotation matrix whose x-axis points along the given direction.
+
     The y and z axes are constructed using an up vector hint.
 
     :param direction: A 3D vector representing the direction.

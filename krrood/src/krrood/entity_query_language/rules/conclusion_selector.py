@@ -1,8 +1,8 @@
 """
 Conclusion selection operators for the Entity Query Language.
 
-This module provides operators that control which conclusions from operands propagate, such as ExceptIf,
-Alternative, and Next.
+This module provides operators that control which conclusions from operands propagate,
+such as ExceptIf, Alternative, and Next.
 """
 
 from __future__ import annotations
@@ -34,7 +34,8 @@ if TYPE_CHECKING:
 @dataclass(eq=False)
 class ConclusionSelector(TruthValueOperator, ABC):
     """
-    Base class for operators that selects the conclusions to pass through from it's operands' conclusions.
+    Base class for operators that selects the conclusions to pass through from it's
+    operands' conclusions.
     """
 
     @classmethod
@@ -43,13 +44,17 @@ class ConclusionSelector(TruthValueOperator, ABC):
         *conditions: ConditionType,
     ) -> Self:
         """
-        Create a new RDR rule (e.g., Refinement, Alternative, Next) and add it to the current rule tree.
+        Create a new RDR rule (e.g., Refinement, Alternative, Next) and add it to the
+        current rule tree.
 
         Each provided condition is chained with AND, and the resulting branch is
-        connected via ElseIf/Next to the current node, representing an alternative/next path.
+        connected via ElseIf/Next to the current node, representing an alternative/next
+        path.
 
-        :param conditions: Conditions to chain with AND to create the new condition expression.
-        :returns: The conditions root after attaching the new condition to the rule tree.
+        :param conditions: Conditions to chain with AND to create the new condition
+            expression.
+        :returns: The conditions root after attaching the new condition to the rule
+            tree.
         """
         new_condition = chained_logic(AND, *conditions)
 
@@ -97,8 +102,8 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
     """
     Conditional branch that yields left unless the right side produces values.
 
-    This encodes an "except if" behavior: when the right condition matches,
-    the left branch's conclusions/outputs are excluded; otherwise, left flows through.
+    This encodes an "except if" behavior: when the right condition matches, the left
+    branch's conclusions/outputs are excluded; otherwise, left flows through.
     """
 
     right_yielded: bool = False
@@ -124,10 +129,13 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
 
     def evaluate_right(self, left_value: OperationResult) -> Iterable[OperationResult]:
         """
-        Evaluate the right branch of the ExceptIf condition and yield the results. In addition, update the right_yielded
-         flag and the conclusion if the right branch is True.
+        Evaluate the right branch of the ExceptIf condition and yield the results.
 
-        :param left_value: The OperationResult from the left evaluation to evaluate the right branch with.
+        In addition, update the right_yielded flag and the conclusion if the right
+        branch is True.
+
+        :param left_value: The OperationResult from the left evaluation to evaluate the
+            right branch with.
         :return: The results of evaluating the right branch.
         """
         self.right_yielded = False
@@ -158,7 +166,8 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
         new_condition: LogicalOperator,
     ) -> Self:
         """
-        Constructs a new rule from the provided rule type and the current conditions root.
+        Constructs a new rule from the provided rule type and the current conditions
+        root.
 
         :param current_condition: The current conditions root in the expression tree.
         :param new_condition: The new condition to be added to the rule tree.
@@ -169,8 +178,8 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
 @dataclass(eq=False)
 class Alternative(OR, ConclusionSelector):
     """
-    A conditional branch that behaves like an "else if" clause where the left branch
-    is selected if it is true, otherwise the right branch is selected if it is true else
+    A conditional branch that behaves like an "else if" clause where the left branch is
+    selected if it is true, otherwise the right branch is selected if it is true else
     none of the branches are selected.
     """
 
@@ -211,7 +220,8 @@ class Alternative(OR, ConclusionSelector):
 @dataclass(eq=False)
 class Next(EQLUnion, ConclusionSelector):
     """
-    A Union conclusion selector that always evaluates all its operands and combines their results.
+    A Union conclusion selector that always evaluates all its operands and combines
+    their results.
     """
 
     def _evaluate__(

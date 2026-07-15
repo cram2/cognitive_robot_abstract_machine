@@ -56,13 +56,17 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 
 @dataclass
 class Robot:
-    """An example autonomous robot."""
+    """
+    An example autonomous robot.
+    """
 
     name: str
     """The robot's identifier string."""
 
     battery: int
-    """Charge level from 0 to 100."""
+    """
+    Charge level from 0 to 100.
+    """
 
     operational: bool
     """Whether the robot is operational (a boolean terminal for predicative chains)."""
@@ -70,13 +74,17 @@ class Robot:
 
 @dataclass
 class Mission:
-    """A task assigned to a :class:`Robot`, with a numeric priority."""
+    """
+    A task assigned to a :class:`Robot`, with a numeric priority.
+    """
 
     assigned_to: Robot
     """The robot the mission is assigned to."""
 
     priority: int
-    """Priority rank (higher is more urgent)."""
+    """
+    Priority rank (higher is more urgent).
+    """
 
 
 # %% Boolean & list attributes (predicative / indexed-attribute examples)
@@ -84,24 +92,32 @@ class Mission:
 
 @dataclass
 class Task:
-    """A unit of work with a boolean completion flag."""
+    """
+    A unit of work with a boolean completion flag.
+    """
 
     name: str
     """The task's name."""
 
     completed: bool
-    """Whether the task is finished — drives the predicative *"is completed"* form."""
+    """
+    Whether the task is finished — drives the predicative *"is completed"* form.
+    """
 
 
 @dataclass
 class Worker:
-    """A worker holding an ordered list of :class:`Task` objects."""
+    """
+    A worker holding an ordered list of :class:`Task` objects.
+    """
 
     name: str
     """The worker's name."""
 
     tasks: List[Task]
-    """The worker's tasks (indexable, e.g. ``tasks[0]``)."""
+    """
+    The worker's tasks (indexable, e.g. ``tasks[0]``).
+    """
 
 
 # %% Money (aggregation, nested-attribute, and date-range examples)
@@ -109,7 +125,9 @@ class Worker:
 
 @dataclass
 class AmountDetails:
-    """A monetary amount, nested inside a :class:`BankTransaction`."""
+    """
+    A monetary amount, nested inside a :class:`BankTransaction`.
+    """
 
     amount: float
     """The amount of money."""
@@ -117,13 +135,17 @@ class AmountDetails:
 
 @dataclass
 class BankTransaction:
-    """A bank transaction with a nested amount and a booking date."""
+    """
+    A bank transaction with a nested amount and a booking date.
+    """
 
     amount_details: AmountDetails
     """The transaction's amount (a nested attribute chain)."""
 
     booking_date: datetime.datetime
-    """When the transaction was booked (used for *"between … and …"* date folding)."""
+    """
+    When the transaction was booked (used for *"between … and …"* date folding).
+    """
 
 
 # %% Employees (same-type disambiguation, grouping, having examples)
@@ -131,19 +153,25 @@ class BankTransaction:
 
 @dataclass
 class Employee:
-    """An employee record with numeric salary fields used in grouping examples."""
+    """
+    An employee record with numeric salary fields used in grouping examples.
+    """
 
     name: str
     """The employee's name."""
 
     department: str
-    """The employee's department name (a grouping key)."""
+    """
+    The employee's department name (a grouping key).
+    """
 
     salary: int
     """Current salary."""
 
     starting_salary: int
-    """Salary at hiring time."""
+    """
+    Salary at hiring time.
+    """
 
 
 # %% Custom predicates (fragment-built verbalization examples)
@@ -151,18 +179,26 @@ class Employee:
 
 @dataclass(eq=False)
 class Location:
-    """A named place, used as the body of the :class:`IsReachable` predicate."""
+    """
+    A named place, used as the body of the :class:`IsReachable` predicate.
+    """
 
     name: str
-    """The location's name."""
+    """
+    The location's name.
+    """
 
 
 @dataclass(eq=False)
 class IsReachable(Predicate):
-    """Single-field custom predicate: *"<body> is reachable"*."""
+    """
+    Single-field custom predicate: *"<body> is reachable"*.
+    """
 
     body: object
-    """The thing whose reachability is asserted."""
+    """
+    The thing whose reachability is asserted.
+    """
 
     def __call__(self):
         return True
@@ -176,32 +212,48 @@ class IsReachable(Predicate):
 
 @dataclass(eq=False)
 class Department:
-    """A department, used as the second field of :class:`WorksIn`."""
+    """
+    A department, used as the second field of :class:`WorksIn`.
+    """
 
     name: str
-    """The department's name."""
+    """
+    The department's name.
+    """
 
 
 @dataclass(eq=False)
 class StaffMember:
-    """A staff member belonging to a :class:`Department`."""
+    """
+    A staff member belonging to a :class:`Department`.
+    """
 
     name: str
-    """The staff member's name."""
+    """
+    The staff member's name.
+    """
 
     department: Department
-    """The department the staff member works in."""
+    """
+    The department the staff member works in.
+    """
 
 
 @dataclass(eq=False)
 class WorksIn(Predicate):
-    """Multi-field custom predicate: *"<employee> works in <department>"*."""
+    """
+    Multi-field custom predicate: *"<employee> works in <department>"*.
+    """
 
     employee: object
-    """The employee (first positional field of the predicate)."""
+    """
+    The employee (first positional field of the predicate).
+    """
 
     department: object
-    """The department (second positional field of the predicate)."""
+    """
+    The department (second positional field of the predicate).
+    """
 
     def __call__(self):
         return True
@@ -223,42 +275,62 @@ class WorksIn(Predicate):
 
 @dataclass
 class Bird:
-    """An example bird."""
+    """
+    An example bird.
+    """
 
     name: str
-    """The bird's name."""
+    """
+    The bird's name.
+    """
 
 
 @dataclass
 class LoveBirds:
-    """A pair of :class:`Bird` objects with a strength-of-bond flag."""
+    """
+    A pair of :class:`Bird` objects with a strength-of-bond flag.
+    """
 
     bird_1: Bird
-    """The first bird of the pair."""
+    """
+    The first bird of the pair.
+    """
 
     bird_2: Bird
-    """The second bird of the pair."""
+    """
+    The second bird of the pair.
+    """
 
     strong_love: bool
-    """Whether the two birds share a strong bond."""
+    """
+    Whether the two birds share a strong bond.
+    """
 
 
 @dataclass
 class BirdView(Symbol):
-    """A perceived view over a :class:`Bird` (the base of the inferred bird symbols)."""
+    """
+    A perceived view over a :class:`Bird` (the base of the inferred bird symbols).
+    """
 
     bird: Bird
-    """The bird this view is about."""
+    """
+    The bird this view is about.
+    """
 
 
 @dataclass
 class StrongLoveBird(BirdView):
-    """A bird inferred to be in a strong-love pairing."""
+    """
+    A bird inferred to be in a strong-love pairing.
+    """
 
 
 @dataclass
 class WeakLoveBird(BirdView):
-    """A bird inferred to be in a weak-love pairing."""
+    """
+    A bird inferred to be in a weak-love pairing.
+    """
 
 
 # %% Furniture (deeply nested chains + aggregated-antecedent rule examples)
@@ -266,59 +338,91 @@ class WeakLoveBird(BirdView):
 
 @dataclass
 class Handle:
-    """A handle attached to a container."""
+    """
+    A handle attached to a container.
+    """
 
     name: str
-    """The handle's name."""
+    """
+    The handle's name.
+    """
 
 
 @dataclass
 class Container:
-    """A container that may hold handles and nest inside other containers."""
+    """
+    A container that may hold handles and nest inside other containers.
+    """
 
     name: str
-    """The container's name."""
+    """
+    The container's name.
+    """
 
 
 @dataclass
 class FixedConnection:
-    """A rigid connection between a container and a handle."""
+    """
+    A rigid connection between a container and a handle.
+    """
 
     parent: Container
-    """The container side of the connection."""
+    """
+    The container side of the connection.
+    """
 
     child: Handle
-    """The handle side of the connection."""
+    """
+    The handle side of the connection.
+    """
 
 
 @dataclass
 class PrismaticConnection:
-    """A sliding connection between two containers (a drawer-in-cabinet joint)."""
+    """
+    A sliding connection between two containers (a drawer-in-cabinet joint).
+    """
 
     parent: Container
-    """The outer container."""
+    """
+    The outer container.
+    """
 
     child: Container
-    """The inner (sliding) container."""
+    """
+    The inner (sliding) container.
+    """
 
 
 @dataclass
 class Drawer:
-    """A drawer inferred from a container plus a handle."""
+    """
+    A drawer inferred from a container plus a handle.
+    """
 
     container: Container
-    """The drawer's container."""
+    """
+    The drawer's container.
+    """
 
     handle: Handle
-    """The drawer's handle."""
+    """
+    The drawer's handle.
+    """
 
 
 @dataclass
 class Cabinet:
-    """A cabinet inferred from a container plus a set of drawers."""
+    """
+    A cabinet inferred from a container plus a set of drawers.
+    """
 
     container: Container
-    """The cabinet's container."""
+    """
+    The cabinet's container.
+    """
 
     drawers: list
-    """The cabinet's drawers (aggregated antecedent → plural *"there are … drawers"*)."""
+    """
+    The cabinet's drawers (aggregated antecedent → plural *"there are … drawers"*).
+    """

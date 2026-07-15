@@ -56,9 +56,7 @@ factories = [
     eql.exists,  # quantified conditionals
     eql.not_,  # negation
     eql.inference,  # rule-tree inference queries
-    eql.match,
-    eql.match_variable,  # construction-pattern matches
-    eql.underspecified,  # generative (underspecified) requests
+    eql.an,  # structural / generative matches
 ]
 _GLOBS = {factory.__name__: factory for factory in factories}
 _GLOBS.update(
@@ -100,7 +98,9 @@ _MODULE_NAMES = _verbalization_modules_with_doctests()
 
 @pytest.mark.parametrize("module_name", _MODULE_NAMES)
 def test_rule_docstring_examples_execute(module_name):
-    """Each rule/form docstring's ``>>>`` example produces exactly the documented output."""
+    """
+    Each rule/form docstring's ``>>>`` example produces exactly the documented output.
+    """
     module = importlib.import_module(module_name)
     finder = doctest.DocTestFinder()
     failures: list[str] = []
@@ -115,8 +115,9 @@ def test_rule_docstring_examples_execute(module_name):
 
 def test_doctest_discovery_includes_previously_uncovered_modules():
     """
-    The auto-discovery must execute doctests the old hand-maintained list silently dropped — in
-    particular ``grammar.conditions.placement`` — and must still cover the originally-curated modules.
+    The auto-discovery must execute doctests the old hand-maintained list silently
+    dropped — in particular ``grammar.conditions.placement`` — and must still cover the
+    originally-curated modules.
     """
     previously_curated = {
         "grammar.terms.rules",

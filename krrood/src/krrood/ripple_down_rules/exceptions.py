@@ -26,9 +26,7 @@ class RDRLoadError(DataclassException):
     """
 
     def error_message(self) -> str:
-        return (
-            f"Could not load the rdr model {self.model_name} from {self.model_path}"
-        )
+        return f"Could not load the rdr model {self.model_name} from {self.model_path}"
 
     def suggest_correction(self) -> str:
         return ""

@@ -219,7 +219,10 @@ class MotionStatechartGraphviz:
         print(f"Saved task graph at {file_name}.")
 
     def _is_visible_in_hierarchy(self, node: MotionStatechartNode) -> bool:
-        """Return False if the node or any of its ancestors is marked invisible in plot specs."""
+        """
+        Return False if the node or any of its ancestors is marked invisible in plot
+        specs.
+        """
         current = node
         while current is not None:
             if not current.plot_specs.visible:

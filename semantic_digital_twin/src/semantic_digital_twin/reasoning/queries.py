@@ -41,8 +41,10 @@ def semantic_annotations_on_surfaces(
     supporting_surfaces: List[HasSupportingSurface], world: World
 ) -> List[HasRootBody]:
     """
-    Queries a list of Semantic annotations that are on top of a given list of other annotations (ex. Tables).
-    param: supporting_surfaces: List of SemanticAnnotations that are supporting other annotations.
+    Queries a list of Semantic annotations that are on top of a given list of other
+    annotations (ex.
+
+    Tables). param: supporting_surfaces: List of SemanticAnnotations that are supporting other annotations.
     :param world: World object that contains the supporting_surfaces.
     return: List of SemanticAnnotations that are supported by the given supporting_surfaces.
     """
@@ -61,16 +63,16 @@ def get_next_object_using_planar_distance(
     ignore_dimension,
 ) -> Entity[SemanticAnnotation]:
     """
-    Queries the next object based on Euclidean distance in x and y coordinates
-    relative to the given main body and supporting surface. This function utilizes
-    semantic annotations of objects and orders them by their Euclidean distances
-    to the main body.
+    Queries the next object based on Euclidean distance in x and y coordinates relative
+    to the given main body and supporting surface. This function utilizes semantic
+    annotations of objects and orders them by their Euclidean distances to the main
+    body.
 
     :param main_body: The main body to which the Euclidean distance is computed.
-    :param supporting_surface: The surface on which the semantic annotations
-        of interest are queried.
-    :return: A `QueryObjectDescriptor` containing semantic annotations ordered
-        by Euclidean distance to the main body.
+    :param supporting_surface: The surface on which the semantic annotations of interest
+        are queried.
+    :return: A `QueryObjectDescriptor` containing semantic annotations ordered by
+        Euclidean distance to the main body.
     """
     # if supporting_surface is None:
     #     return []
@@ -94,15 +96,17 @@ def goal_surface_of_object(
     """
     Finds the most similar object to a given semantic annotation among a list of tables
     based on the inheritance path length. If the similarity does not meet the provided
-    threshold, the method attempts to return the table that is not supporting any object.
-    The similarity metric leverages the class hierarchy to compute distances.
+    threshold, the method attempts to return the table that is not supporting any
+    object. The similarity metric leverages the class hierarchy to compute distances.
 
     :param object_of_interest: The semantic annotation to compare.
-    :param supporting_surfaces: A list of supporting surfaces semantic annotations to search on top of them for similar objects to the object_of_interest.
+    :param supporting_surfaces: A list of supporting surfaces semantic annotations to
+        search on top of them for similar objects to the object_of_interest.
     :param threshold: The maximum acceptable inheritance path length to classify objects
-                      as similar. Defaults to 1.
+        as similar. Defaults to 1.
     :return: The semantic annotation of the most appropriate surface based on similarity
-             metrics or the non-supporting table when no viable candidate is found, or None if there are no supporting surfaces.
+        metrics or the non-supporting table when no viable candidate is found, or None
+        if there are no supporting surfaces.
     """
     if not supporting_surfaces:
         return None
@@ -147,14 +151,13 @@ def filter_annotations_by_color(
     color: Color, objects: list[SemanticAnnotation]
 ) -> Entity[SemanticAnnotation]:
     """
-    Queries and retrieves a list of annotations from another one that match
-    the specified color based on their visual properties.
+    Queries and retrieves a list of annotations from another one that match the
+    specified color based on their visual properties.
 
     :param color: The color to filter annotations by.
     :param objects: The list of the unfiltered annotations.
-
-    :return: A list of annotations from the world whose primary shape's
-    visual color matches the specified color.
+    :return: A list of annotations from the world whose primary shape's visual color
+        matches the specified color.
     """
     if len(objects) == 0:
         return entity(variable_from(objects))
@@ -183,14 +186,19 @@ def filter_annotations_by_color(
 def annotation_class_by_label(label: str) -> Optional[type]:
     """
     Finds the class whose name is contained within the given label.
+
     It searches through all subclasses of IsPerceivable.
 
-    :param label: The string input from perception (e.g., "bowl_collapsable_yellowgrey").
+    :param label: The string input from perception (e.g.,
+        "bowl_collapsable_yellowgrey").
     :return: The matching class (e.g., Bowl) or None if no match is found.
     """
+
     @symbolic_function
     def class_name_lowercased(semantic_class: type) -> str:
-        """The class's own name, lowercased, for case-insensitive label matching."""
+        """
+        The class's own name, lowercased, for case-insensitive label matching.
+        """
         return semantic_class.__name__.lower()
 
     semantic_class = variable_from(recursive_subclasses(IsPerceivable))
@@ -206,8 +214,9 @@ def sort_annotations_by_volume(
     annotations: List[HasRootBody], order: Optional[bool] = True
 ) -> List[HasRootBody]:
     """
-    Sorts a list of SemanticAnnotations by volume in descending order (largest to smallest).
-    Volume is calculated by multiplying the scale dimensions (x * y * z) of the object's shape.
+    Sorts a list of SemanticAnnotations by volume in descending order (largest to
+    smallest). Volume is calculated by multiplying the scale dimensions (x * y * z) of
+    the object's shape.
 
     :param annotations: List of annotations of type HasRootBody to sort.
     :param order: Whether to sort in ascending or descending order (default is True).
@@ -217,7 +226,9 @@ def sort_annotations_by_volume(
 
     @symbolic_function
     def get_volume(annotation: SemanticAnnotation) -> float:
-        """Calculate volume from the annotation's body scale."""
+        """
+        Calculate volume from the annotation's body scale.
+        """
         body = annotation.bodies[0]
 
         # Get shapes from collision if available, otherwise from visual

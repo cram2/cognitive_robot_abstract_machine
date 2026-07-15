@@ -77,16 +77,18 @@ from robokudo_msgs.action import Query
 
 
 class QueryAnnotator(BaseAnnotator):
-    """Handle external queries through ROS action server.
+    """
+    Handle external queries through ROS action server.
 
-    This Annotator spawns an Action Server that listens for Queries from external ROS nodes.
-    It will then annotate the CAS and put the Query into CASViews.QUERY.
-    The Annotator and the Actionserver are type-agnostic, which means that you are not bound
+    This Annotator spawns an Action Server that listens for Queries from external ROS
+    nodes. It will then annotate the CAS and put the Query into CASViews.QUERY. The
+    Annotator and the Actionserver are type-agnostic, which means that you are not bound
     to a specific type of query. You can pass these from your AE to this QueryAnnotator.
     """
 
     def __init__(self, name: str = "QueryAnnotator") -> None:
-        """Initialize the query annotator.
+        """
+        Initialize the query annotator.
 
         :param name: Annotator name, defaults to "QueryAnnotator"
         """
@@ -96,17 +98,22 @@ class QueryAnnotator(BaseAnnotator):
         self.result_instance = Query.Result()
 
         self.action_server = None
-        """Action server placeholder."""
+        """
+        Action server placeholder.
+        """
 
     def setup(self, **kwargs: Any) -> None:
-        """Ensure that the Query Server is spawned early on, directly after PPT creation."""
+        """
+        Ensure that the Query Server is spawned early on, directly after PPT creation.
+        """
         self.initialise()
 
     def initialise(self) -> None:
-        """Initialize query handling.
+        """
+        Initialize query handling.
 
-        Sets up the action server if not already initialized.
-        Stores server instance on blackboard for access by other nodes.
+        Sets up the action server if not already initialized. Stores server instance on
+        blackboard for access by other nodes.
         """
         self.rk_logger.debug(f"{self.__class__.__name__}.initialise()")
         blackboard = Blackboard()
@@ -119,10 +126,11 @@ class QueryAnnotator(BaseAnnotator):
         self.action_server = blackboard.get(BBIdentifier.QUERY_SERVER)
 
     def update(self) -> Status:
-        """Process new queries and update CAS.
+        """
+        Process new queries and update CAS.
 
-        Checks for new queries from action server and updates CAS if found.
-        Provides feedback about query status.
+        Checks for new queries from action server and updates CAS if found. Provides
+        feedback about query status.
 
         :return: SUCCESS if query processed, RUNNING if waiting
         """
@@ -147,10 +155,13 @@ class QueryAnnotator(BaseAnnotator):
 
 
 class QueryFeedback(BaseAnnotator):
-    """A test class which simply generates a fixed-string feedback."""
+    """
+    A test class which simply generates a fixed-string feedback.
+    """
 
     def __init__(self, name: str = "QueryFeedback", feedback_str: str = "") -> None:
-        """Initialize query feedback generator.
+        """
+        Initialize query feedback generator.
 
         :param name: Annotator name
         :param feedback_str: Feedback string to send to the client
@@ -158,7 +169,9 @@ class QueryFeedback(BaseAnnotator):
         super().__init__(name=name)
 
         self.feedback_str = feedback_str
-        """Feedback string to send to the client."""
+        """
+        Feedback string to send to the client.
+        """
 
     def update(self) -> Status:
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
@@ -168,7 +181,11 @@ class QueryFeedback(BaseAnnotator):
 
 
 class QueryFeedbackAndCount(BaseAnnotator):
-    """A test class which simply counts up until a fixed number. Until this number is reached, a pre-defined status is returned."""
+    """
+    A test class which simply counts up until a fixed number.
+
+    Until this number is reached, a pre-defined status is returned.
+    """
 
     def __init__(
         self,
@@ -176,7 +193,8 @@ class QueryFeedbackAndCount(BaseAnnotator):
         count_until: int = 20,
         return_code: Status = Status.RUNNING,
     ) -> None:
-        """Initialize query feedback generator.
+        """
+        Initialize query feedback generator.
 
         :param name: Annotator name
         :param count_until: Number until which to count before stopping
@@ -185,13 +203,17 @@ class QueryFeedbackAndCount(BaseAnnotator):
         super().__init__(name=name)
 
         self.i = 0
-        """The current count"""
-
+        """
+        The current count.
+        """
         self.count_until = count_until
-        """The number until which to count"""
-
+        """
+        The number until which to count.
+        """
         self.return_code = return_code
-        """The return code to return while still counting"""
+        """
+        The return code to return while still counting.
+        """
 
     def update(self) -> Status:
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
@@ -205,23 +227,30 @@ class QueryFeedbackAndCount(BaseAnnotator):
 
 
 class QueryReply(BaseAnnotator):
-    """A test class which simply generates an empty Query Answer to check if the Action server can reply properly.
+    """
+    A test class which simply generates an empty Query Answer to check if the Action
+    server can reply properly.
+
     Create a single, empty Object Designator that will be sent to the caller.
     """
 
     def __init__(self, name: str = "QueryReply"):
-        """Initialize query reply generator.
+        """
+        Initialize query reply generator.
 
         :param name: Annotator name, defaults to "QueryReply"
         """
         super().__init__(name=name)
 
     def initialise(self) -> None:
-        """Initialize reply generator."""
+        """
+        Initialize reply generator.
+        """
         self.rk_logger.debug(f"{self.__class__.__name__}.initialise()")
 
     def update(self) -> Status:
-        """Generate test query response.
+        """
+        Generate test query response.
 
         Creates an empty ObjectDesignator with a test pose and adds it to blackboard.
 
@@ -253,14 +282,16 @@ class QueryReply(BaseAnnotator):
 
 class GenerateQueryResult(BaseAnnotator):
     """
-    This class reads in the annotations done by the previous Annotators
-    and generates Object Designators from them.
-    These will be placed into the Blackboard so that a running Query Action Server can pick the information
-    up and send it as a query reply.
+    This class reads in the annotations done by the previous Annotators and generates
+    Object Designators from them.
+
+    These will be placed into the Blackboard so that a running Query Action Server can
+    pick the information up and send it as a query reply.
     """
 
     def __init__(self, name: str = "GenerateQueryResult"):
-        """Initialize query result generator.
+        """
+        Initialize query result generator.
 
         :param name: Annotator name, defaults to "GenerateQueryResult"
         """
@@ -298,7 +329,8 @@ class GenerateQueryResult(BaseAnnotator):
         super().__init__(name=name)
 
     def update(self) -> Status:
-        """Generate query result from current CAS annotations.
+        """
+        Generate query result from current CAS annotations.
 
         For each ObjectHypothesis in CAS:
         * Creates ObjectDesignator
@@ -357,10 +389,11 @@ class GenerateQueryResult(BaseAnnotator):
 
 
 class QueryActionServer(Node):
-    """ROS action server for handling perception queries.
+    """
+    ROS action server for handling perception queries.
 
-    Action server that listens for queries and executes them by checking blackboard
-    for results generated by QueryAnnotator and QueryReply.
+    Action server that listens for queries and executes them by checking blackboard for
+    results generated by QueryAnnotator and QueryReply.
     """
 
     def __init__(
@@ -372,8 +405,9 @@ class QueryActionServer(Node):
     ) -> None:
         super().__init__(name, namespace="robokudo")
         self._action_name = name
-        """Name of the ROS action"""
-
+        """
+        Name of the ROS action.
+        """
         self._as = ActionServer(
             self,
             action_type,
@@ -382,29 +416,36 @@ class QueryActionServer(Node):
             goal_callback=self.goal_cb,
             cancel_callback=self.cancel_cb,
         )
-        """Action server instance"""
-
+        """
+        Action server instance.
+        """
         self.feedback_instance: Query.Feedback = feedback_instance or Query.Feedback()
-        """Latest feedback message"""
-
+        """
+        Latest feedback message.
+        """
         self.result_instance: Query.Result = result_instance or Query.Result()
-        """Latest result message"""
-
+        """
+        Latest result message.
+        """
         self.new_query: Optional[Query.Goal] = None
-        """Latest received query"""
-
+        """
+        Latest received query.
+        """
         self.query: Optional[Query.Goal] = None
-        """Currently processing query"""
-
+        """
+        Currently processing query.
+        """
         self.reset_bookkeeping_vars()
 
         self.query_processed_event: Event = Event()
-        """Event to signal query processing completion"""
-
+        """
+        Event to signal query processing completion.
+        """
         self.logger = logging.getLogger(LOGGING_IDENTIFIER_QUERY)
 
     def reset_bookkeeping_vars(self) -> None:
-        """Reset internal state variables.
+        """
+        Reset internal state variables.
 
         Clears query state and blackboard variables.
         """
@@ -425,22 +466,26 @@ class QueryActionServer(Node):
         return CancelResponse.ACCEPT
 
     def start_processing(self) -> None:
-        """Start processing new query.
+        """
+        Start processing new query.
 
-        Tell the ActionServer that we are now starting the execution and it can start the monitoring/response process.
+        Tell the ActionServer that we are now starting the execution and it can start
+        the monitoring/response process.
         """
         self.logger.info("start_processing called, setting new_query to None.")
         self.new_query = None
 
     def is_active(self) -> bool:
-        """Check if query is being processed.
+        """
+        Check if query is being processed.
 
         :return: True if query active, False otherwise
         """
         return self.query is not None
 
     async def execute_cb(self, goal_handle: ServerGoalHandle) -> Optional[Query.Result]:
-        """Action server execution callback.
+        """
+        Action server execution callback.
 
         Handles:
         * Query reception and validation

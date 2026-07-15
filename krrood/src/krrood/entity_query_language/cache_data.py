@@ -17,9 +17,9 @@ class SeenSet:
     """
     Coverage index for previously seen partial assignments.
 
-    This replaces the linear scan with a trie-based index using a fixed key order.
-    An assignment A is considered covered if there exists a stored constraint C
-    such that C.items() is a subset of A.items().
+    This replaces the linear scan with a trie-based index using a fixed key order. An
+    assignment A is considered covered if there exists a stored constraint C such that
+    C.items() is a subset of A.items().
     """
 
     keys: tuple = field(default_factory=tuple, repr=False)
@@ -52,6 +52,7 @@ class SeenSet:
     def check(self, assignment: Dict) -> bool:
         """
         Return True if any stored constraint is a subset of the given assignment.
+
         Mirrors previous semantics: encountering an empty assignment flips all_seen
         but returns False the first time to allow population.
         """
@@ -79,8 +80,9 @@ class SeenSet:
     def exact_contains(self, assignment: Dict) -> bool:
         """
         Return True if the assignment contains all cache keys and the exact key tuple
-        exists in the cache. This is an O(1) membership test and does not consult
-        the coverage trie.
+        exists in the cache.
+
+        This is an O(1) membership test and does not consult the coverage trie.
         """
         t = tuple(ensure_hashable(assignment[k]) for k in self.keys)
         if t in self.exact:
@@ -96,19 +98,23 @@ class SeenSet:
 @dataclass
 class InstanceFilteredDomain(Generic[T]):
     """
-    A re-iterable view over a domain that yields only the elements that are instances of a type.
+    A re-iterable view over a domain that yields only the elements that are instances of
+    a type.
 
-    Unlike :func:`filter`, which is a one-shot iterator that eagerly holds ``iter(domain)`` for its
-    whole lifetime, this creates a fresh underlying iterator on every iteration and holds none
-    between them. That keeps :class:`ReEnterableLazyIterable` able to release and recreate its
-    source, so a domain whose iterator only holds a heavy object in its suspended frame (for example
-    a location generator that deep-copied the world) is not pinned for the variable's whole life.
+    Unlike :func:`filter`, which is a one-shot iterator that eagerly holds
+    ``iter(domain)`` for its whole lifetime, this creates a fresh underlying iterator on
+    every iteration and holds none between them. That keeps
+    :class:`ReEnterableLazyIterable` able to release and recreate its source, so a
+    domain whose iterator only holds a heavy object in its suspended frame (for example
+    a location generator that deep-copied the world) is not pinned for the variable's
+    whole life.
     """
 
     type_: type
     """
     The type each yielded element must be an instance of.
     """
+
     domain: Iterable[T]
     """
     The underlying domain to filter.
@@ -127,29 +133,40 @@ class ReEnterableLazyIterable(Generic[T]):
 
     iterable: Optional[Iterator[T]] = field(default=None)
     """
-    The live source iterator currently feeding new values, or ``None`` when it has been released. It
-    is recreated on demand from :attr:`_source` so releasing it never loses values still to come.
+    The live source iterator currently feeding new values, or ``None`` when it has been
+    released.
+
+    It is recreated on demand from :attr:`_source` so releasing it never loses values
+    still to come.
     """
+
     materialized_values: List[T] = field(default_factory=list)
     """
     The materialized values of the iterable.
     """
+
     _source: Optional[Iterable[T]] = field(default=None, init=False, repr=False)
     """
-    The original iterable, kept so a released source iterator can be recreated for a later iteration.
+    The original iterable, kept so a released source iterator can be recreated for a
+    later iteration.
     """
+
     _source_is_re_iterable: bool = field(default=False, init=False)
     """
-    Whether iterating :attr:`_source` yields a fresh iterator each time; only then can the live source
-    be released early and recreated without losing values.
+    Whether iterating :attr:`_source` yields a fresh iterator each time; only then can
+    the live source be released early and recreated without losing values.
     """
+
     _source_exhausted: bool = field(default=False, init=False)
     """
-    Whether the source has been fully materialized; once true, iterations serve only from the buffer.
+    Whether the source has been fully materialized; once true, iterations serve only
+    from the buffer.
     """
+
     _active_iteration_count: int = field(default=0, init=False, repr=False)
     """
-    How many iterations are currently in flight, so the source is only released when none remain.
+    How many iterations are currently in flight, so the source is only released when
+    none remain.
     """
 
     def set_iterable(self, iterable):
@@ -171,12 +188,16 @@ class ReEnterableLazyIterable(Generic[T]):
 
     def __iter__(self):
         """
-        Iterate over the values, materializing them as they are iterated over. This allows multiple iterations over
-        the iterable simultaneously, and it also allows for efficient access to previously materialized values.
+        Iterate over the values, materializing them as they are iterated over.
 
-        When a re-iterable source has no iteration left in flight its live iterator is released, so a source that only
-        holds a heavy object in its suspended frame (for example a location generator that deep-copied the world)
-        does not keep it alive; a later iteration recreates the source and skips the already-materialized values.
+        This allows multiple iterations over the iterable simultaneously, and it also
+        allows for efficient access to previously materialized values.
+
+        When a re-iterable source has no iteration left in flight its live iterator is
+        released, so a source that only holds a heavy object in its suspended frame (for
+        example a location generator that deep-copied the world) does not keep it alive;
+        a later iteration recreates the source and skips the already-materialized
+        values.
 
         :return: An iterator over the values.
         """
@@ -206,8 +227,9 @@ class ReEnterableLazyIterable(Generic[T]):
 
     def _release_source_if_idle(self) -> None:
         """
-        Release the live source once nothing is iterating it, but only when it can be recreated
-        without losing values (a re-iterable source that is not yet exhausted).
+        Release the live source once nothing is iterating it, but only when it can be
+        recreated without losing values (a re-iterable source that is not yet
+        exhausted).
         """
         if (
             self._active_iteration_count == 0
@@ -218,7 +240,8 @@ class ReEnterableLazyIterable(Generic[T]):
 
     def _ensure_source(self) -> None:
         """
-        Recreate the live source iterator if it was released, skipping the values already materialized.
+        Recreate the live source iterator if it was released, skipping the values
+        already materialized.
         """
         if self.iterable is not None:
             return
@@ -231,7 +254,8 @@ class ReEnterableLazyIterable(Generic[T]):
 
     def _release_source(self) -> None:
         """
-        Close and drop the live source iterator so its suspended frame (and anything it holds) is freed.
+        Close and drop the live source iterator so its suspended frame (and anything it
+        holds) is freed.
         """
         released_source = self.iterable
         self.iterable = None

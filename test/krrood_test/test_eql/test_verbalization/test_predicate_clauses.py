@@ -1,10 +1,10 @@
 """
 Tests for the typed predicate-clause vocabulary and its automatic negation.
 
-A predicate states only the affirmative, present-tense clause from typed part-of-speech elements
-(``Noun`` / ``Verb`` / ``Copula`` / ``Prepositions`` / ``Adjective``); the morphology pass inflects
-the verb (agreement) and a wrapping ``Not`` negates it automatically — a verb with do-support, a
-copula with suppletion.
+A predicate states only the affirmative, present-tense clause from typed part-of-speech
+elements (``Noun`` / ``Verb`` / ``Copula`` / ``Prepositions`` / ``Adjective``); the
+morphology pass inflects the verb (agreement) and a wrapping ``Not`` negates it
+automatically — a verb with do-support, a copula with suppletion.
 """
 
 from __future__ import annotations
@@ -168,7 +168,10 @@ def test_verb_predicate_affirmative_and_negated_with_do_support():
 
 
 def test_clause_subject_pronominalises_in_singular_scope():
-    """A predicate whose subject is the singular discourse subject reads *"it"*, not *"the …"*."""
+    """
+    A predicate whose subject is the singular discourse subject reads *"it"*, not *"the
+    …"*.
+    """
     location = variable(Location, [])
     assert verbalize_expression(an(entity(location).where(IsReachable(location)))) == (
         "Find a Location such that it is reachable"
@@ -176,7 +179,9 @@ def test_clause_subject_pronominalises_in_singular_scope():
 
 
 def test_clause_subject_pronominalises_and_copula_agrees_with_plural_population():
-    """Under ``for_all`` the subject is a plural population — *"they"* and *"are"*."""
+    """
+    Under ``for_all`` the subject is a plural population — *"they"* and *"are"*.
+    """
     location = variable(Location, [])
     assert verbalize_expression(for_all(location, IsReachable(location))) == (
         "for all Locations, they are reachable"
@@ -184,7 +189,9 @@ def test_clause_subject_pronominalises_and_copula_agrees_with_plural_population(
 
 
 def test_clause_verb_agrees_with_plural_population():
-    """A lexical verb (not a copula) likewise agrees with the plural population — *"work"*."""
+    """
+    A lexical verb (not a copula) likewise agrees with the plural population — *"work"*.
+    """
     employee, department = variable(StaffMember, []), variable(Department, [])
     assert verbalize_expression(for_all(employee, WorksIn(employee, department))) == (
         "for all StaffMembers, they work in a Department"
@@ -192,7 +199,10 @@ def test_clause_verb_agrees_with_plural_population():
 
 
 def test_clause_subject_keeps_noun_phrase_outside_a_subject_scope():
-    """A plain predicate (no enclosing subject) keeps its first-mention noun phrase — *"a Location"*."""
+    """
+    A plain predicate (no enclosing subject) keeps its first-mention noun phrase — *"a
+    Location"*.
+    """
     assert verbalize_expression(IsReachable(variable(Location, []))) == (
         "a Location is reachable"
     )
@@ -202,7 +212,10 @@ def test_clause_subject_keeps_noun_phrase_outside_a_subject_scope():
 
 
 def test_predicate_returning_a_string_template_is_rejected():
-    """A hook returning a string (an old-style template) rather than a VerbalizationFragment is an error."""
+    """
+    A hook returning a string (an old-style template) rather than a
+    VerbalizationFragment is an error.
+    """
 
     @dataclass(eq=False)
     class SaysHello(Predicate):

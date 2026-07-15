@@ -15,7 +15,9 @@ from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFr
 
 @dataclass
 class FakeMarkerPublisher:
-    """Captures published marker arrays so tests can assert without a live RViz."""
+    """
+    Captures published marker arrays so tests can assert without a live RViz.
+    """
 
     published: list[MarkerArray] = field(default_factory=list)
 

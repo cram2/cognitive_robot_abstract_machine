@@ -28,6 +28,7 @@ from random_events.product_algebra import Event, SimpleEvent
 class WhereExpressionToRandomEventTranslator:
     """
     Class that translates a query into a random event.
+
     Requires that the query is in disjunctive normal form.
 
     Check the documentation of `is_disjunctive_normal_form` for more information.
@@ -74,7 +75,6 @@ class WhereExpressionToRandomEventTranslator:
         """
         :return: The random event that corresponds to the query.
         """
-
         simple_events = []
 
         # Traverse the logical tree starting from the conditions root
@@ -107,6 +107,7 @@ class WhereExpressionToRandomEventTranslator:
     def _translate_conjunction(self, expression: AND) -> SimpleEvent:
         """
         Translate a conjunction expression into a random event.
+
         The conjunction must not contain any disjunctions anymore.
 
         :param expression: The conjunction expression to translate.
@@ -128,10 +129,11 @@ class WhereExpressionToRandomEventTranslator:
         """
         Group comparators by their variable given an expression.
 
-        :param expression: The expression where all comparators in the descendents should be grouped by variables.
-        :return: A dictionary mapping ObjectAccessVariables to lists of their corresponding comparators.
+        :param expression: The expression where all comparators in the descendents
+            should be grouped by variables.
+        :return: A dictionary mapping ObjectAccessVariables to lists of their
+            corresponding comparators.
         """
-
         # Collect all Comparator descendants and group them by their accessed variable
         grouped: Dict[random_events.variable.Variable, List[Comparator]] = {}
         for expr in expression._descendants_:
@@ -155,7 +157,6 @@ class WhereExpressionToRandomEventTranslator:
         :param result: The random event to update in-place.
         :return: None
         """
-
         result[variable] = variable.domain
         for comparator in comparators:
 
@@ -263,7 +264,6 @@ def is_disjunctive_normal_form(condition_root: ConditionType) -> bool:
     :param condition_root: The condition root of the query to check
     :return: True if the query is disjunctive normal form, False otherwise
     """
-
     return (
         is_disjunction_of_conjunction_of_literal_comparators(condition_root)
         or is_conjunction_of_literal_comparators(condition_root)
@@ -273,10 +273,12 @@ def is_disjunctive_normal_form(condition_root: ConditionType) -> bool:
 
 def is_disjunction_of_conjunction_of_literal_comparators(expression: OR) -> bool:
     """
-    Checks if the given expression is a disjunction of conjunctions of literal comparators.
+    Checks if the given expression is a disjunction of conjunctions of literal
+    comparators.
 
     :param expression: The expression to check.
-    :return: True if the expression is a disjunction of conjunctions of literal comparators, False otherwise.
+    :return: True if the expression is a disjunction of conjunctions of literal
+        comparators, False otherwise.
     """
     if not isinstance(expression, OR):
         return False
@@ -295,7 +297,8 @@ def is_conjunction_of_literal_comparators(expression: AND) -> bool:
     Checks if the given expression is a conjunction of literal comparators.
 
     :param expression: The expression to check.
-    :return: True if the expression is a conjunction of literal comparators, False otherwise.
+    :return: True if the expression is a conjunction of literal comparators, False
+        otherwise.
     """
     if not isinstance(expression, AND):
         return False

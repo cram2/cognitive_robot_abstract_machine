@@ -15,7 +15,9 @@ class TestVisGeometryMaps(object):
         return SharedMemoryManager()
 
     def test_point_cloud_maps(self, write_manager: SharedMemoryManager) -> None:
-        """Test writing and reading point clouds with the shared memory manager."""
+        """
+        Test writing and reading point clouds with the shared memory manager.
+        """
         iterations = 3
         read_idx = 0
 
@@ -66,7 +68,9 @@ class TestVisGeometryMaps(object):
             )
 
     def test_mesh_base_maps(self, write_manager: SharedMemoryManager) -> None:
-        """Test writing and reading base meshes with the shared memory manager."""
+        """
+        Test writing and reading base meshes with the shared memory manager.
+        """
         iterations = 3
         read_idx = 0
 
@@ -119,7 +123,9 @@ class TestVisGeometryMaps(object):
             )
 
     def test_triangle_mesh_maps(self, write_manager: SharedMemoryManager) -> None:
-        """Test writing and reading triangle meshes with the shared memory manager."""
+        """
+        Test writing and reading triangle meshes with the shared memory manager.
+        """
         iterations = 3
         read_idx = 0
 
@@ -223,7 +229,9 @@ class TestVisGeometryMaps(object):
                 )
 
     def test_tetra_mesh_maps(self, write_manager: SharedMemoryManager) -> None:
-        """Test writing and reading base meshes with the shared memory manager."""
+        """
+        Test writing and reading base meshes with the shared memory manager.
+        """
         iterations = 3
         read_idx = 0
 
@@ -283,7 +291,9 @@ class TestVisGeometryMaps(object):
             )
 
     def test_half_edge_mesh_maps(self, write_manager: SharedMemoryManager) -> None:
-        """Test writing and reading triangle meshes with the shared memory manager."""
+        """
+        Test writing and reading triangle meshes with the shared memory manager.
+        """
         iterations = 3
         read_idx = 0
 
@@ -375,7 +385,9 @@ class TestVisGeometryMaps(object):
     def test_oriented_bounding_box_maps(
         self, write_manager: SharedMemoryManager
     ) -> None:
-        """Test writing and reading oriented bounding boxes with the shared memory manager."""
+        """
+        Test writing and reading oriented bounding boxes with the shared memory manager.
+        """
         iterations = 3
         read_idx = 0
         write_idx = 0
@@ -420,7 +432,10 @@ class TestVisGeometryMaps(object):
     def test_axis_aligned_bounding_box_maps(
         self, write_manager: SharedMemoryManager
     ) -> None:
-        """Test writing and reading axis aligned bounding boxes with the shared memory manager."""
+        """
+        Test writing and reading axis aligned bounding boxes with the shared memory
+        manager.
+        """
         iterations = 3
         read_idx = 0
 
@@ -464,7 +479,9 @@ class TestVisGeometryMaps(object):
             )
 
     def test_line_set_maps(self, write_manager: SharedMemoryManager) -> None:
-        """Test writing and reading line sets with the shared memory manager."""
+        """
+        Test writing and reading line sets with the shared memory manager.
+        """
         iterations = 3
         read_idx = 0
 

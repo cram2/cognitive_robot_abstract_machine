@@ -47,12 +47,14 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 
 
 class TestFeatureFunctions:
-    """Test suite for feature function tasks (HeightGoal, DistanceGoal, etc.)."""
+    """
+    Test suite for feature function tasks (HeightGoal, DistanceGoal, etc.).
+    """
 
     def test_height_goal_within_bounds(self, pr2_world_state_reset: World):
         """
-        Test that HeightGoal successfully constrains the vertical distance
-        between tip and reference points within specified bounds.
+        Test that HeightGoal successfully constrains the vertical distance between tip
+        and reference points within specified bounds.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
@@ -148,8 +150,8 @@ class TestFeatureFunctions:
 
     def test_distance_goal_within_bounds(self, pr2_world_state_reset: World):
         """
-        Test that DistanceGoal successfully constrains the horizontal distance
-        (in x-y plane) between tip and reference points within specified bounds.
+        Test that DistanceGoal successfully constrains the horizontal distance (in x-y
+        plane) between tip and reference points within specified bounds.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
@@ -199,7 +201,8 @@ class TestFeatureFunctions:
 
     def test_distance_goal_zero_distance(self, pr2_world_state_reset: World):
         """
-        Test DistanceGoal with bounds that include zero (tip and reference at same x-y position).
+        Test DistanceGoal with bounds that include zero (tip and reference at same x-y
+        position).
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
@@ -250,6 +253,7 @@ class TestFeatureFunctions:
     def test_distance_goal_ignores_z_axis(self, pr2_world_state_reset: World):
         """
         Test that DistanceGoal only considers x-y plane distance and ignores z-axis.
+
         Even with large z difference, if x-y distance is within bounds, goal succeeds.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
@@ -301,8 +305,8 @@ class TestFeatureFunctions:
 
     def test_height_and_distance_combined(self, pr2_world_state_reset: World):
         """
-        Test combining HeightGoal and DistanceGoal in parallel to constrain
-        both vertical and horizontal distances simultaneously.
+        Test combining HeightGoal and DistanceGoal in parallel to constrain both
+        vertical and horizontal distances simultaneously.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
@@ -373,9 +377,9 @@ class TestFeatureFunctions:
         self, pr2_world_state_reset: World
     ):
         """
-        Test combining DistanceGoal, HeightGoal, and AlignPerpendicular
-        to constrain horizontal distance, vertical distance, and perpendicular
-        alignment simultaneously.
+        Test combining DistanceGoal, HeightGoal, and AlignPerpendicular to constrain
+        horizontal distance, vertical distance, and perpendicular alignment
+        simultaneously.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
@@ -675,8 +679,8 @@ def test_align_perpendicular(pr2_world_state_reset: World):
 
 def test_angle_goal(pr2_world_state_reset: World):
     """
-    Ensure AngleGoal drives the angle between tip_vector and reference_vector
-    into the interval [lower_angle, upper_angle].
+    Ensure AngleGoal drives the angle between tip_vector and reference_vector into the
+    interval [lower_angle, upper_angle].
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"

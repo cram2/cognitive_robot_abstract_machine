@@ -53,7 +53,8 @@ def directive_for_backend(backend: Optional[QueryBackend]) -> Optional[Directive
     return backend.opening_directive if backend is not None else None
 
 
-_HTML_PAGE_TEMPLATE = Template("""\
+_HTML_PAGE_TEMPLATE = Template(
+    """\
 <!DOCTYPE html>
 <html>
 <head>
@@ -72,7 +73,8 @@ _HTML_PAGE_TEMPLATE = Template("""\
 </head>
 <body>{{ body }}</body>
 </html>
-""")
+"""
+)
 """Standalone dark page for browser display; the rendered markup fills ``body``."""
 
 _HTML_CELL_WRAPPER = Template(

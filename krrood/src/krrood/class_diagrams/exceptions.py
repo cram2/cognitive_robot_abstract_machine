@@ -27,6 +27,7 @@ class ClassIsUnMappedInClassDiagram(DataclassException):
 class MissingContainedTypeOfContainer(DataclassException):
     """
     Raised when a container type is missing its contained type.
+
     For example, List without a specified type.
     """
 
@@ -38,6 +39,7 @@ class MissingContainedTypeOfContainer(DataclassException):
     """
     The name of the field that is missing the contained type.
     """
+
     container_type: Type
     """
     The container type that is missing its contained type.
@@ -67,15 +69,14 @@ class CouldNotResolveType(DataclassException):
     """
     The exception that was raised when resolving the type.
     """
+
     extra_information: str = ""
     """
     Additional information about the error.
     """
 
     def error_message(self) -> str:
-        return (
-            f"Could not resolve type {self.type_name}.\n{self.extra_information}"
-        )
+        return f"Could not resolve type {self.type_name}.\n{self.extra_information}"
 
     def suggest_correction(self) -> str:
         return ""
@@ -99,14 +100,16 @@ class FactoryMethodDecoratorError(DataclassException):
     """
     Raised when ``@factory_method`` does not wrap a ``classmethod``.
 
-    The decorator records the factory through Python's ``__set_name__`` descriptor hook, which a
-    ``classmethod`` does not forward to the object it wraps. The marker must therefore be the
-    outermost decorator, applied above ``@classmethod``; any other placement would skip
-    registration silently, so it is rejected here instead.
+    The decorator records the factory through Python's ``__set_name__`` descriptor hook,
+    which a ``classmethod`` does not forward to the object it wraps. The marker must
+    therefore be the outermost decorator, applied above ``@classmethod``; any other
+    placement would skip registration silently, so it is rejected here instead.
     """
 
     decorated_name: str
-    """The name of the function the marker was applied to."""
+    """
+    The name of the function the marker was applied to.
+    """
 
     def error_message(self) -> str:
         return f"@factory_method was applied to {self.decorated_name!r}, which is not a classmethod"

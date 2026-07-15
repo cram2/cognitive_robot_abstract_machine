@@ -16,29 +16,41 @@ from krrood.class_diagrams.method_classifier import (
 
 @dataclass
 class ClassWithMarkedFactory:
-    """Mimics a class whose factory is declared with the explicit ``@factory_method`` marker."""
+    """
+    Mimics a class whose factory is declared with the explicit ``@factory_method``
+    marker.
+    """
 
     value: str = ""
 
     @factory_method
     @classmethod
     def make(cls) -> ClassWithMarkedFactory:
-        """A factory recognised only through the ``@factory_method`` marker."""
+        """
+        A factory recognised only through the ``@factory_method`` marker.
+        """
         return cls(value="made")
 
     @classmethod
     def from_value(cls, value: str) -> Self:
-        """A factory recognised through its ``-> Self`` return annotation, without a marker."""
+        """
+        A factory recognised through its ``-> Self`` return annotation, without a
+        marker.
+        """
         return cls(value=value)
 
     @classmethod
     def describe(cls) -> str:
-        """An ordinary classmethod that is not a factory."""
+        """
+        An ordinary classmethod that is not a factory.
+        """
         return cls.__name__
 
 
 class SubclassInheritingFactory(ClassWithMarkedFactory):
-    """Mimics a subclass that inherits a marked factory without redeclaring it."""
+    """
+    Mimics a subclass that inherits a marked factory without redeclaring it.
+    """
 
 
 def test_descriptor_registers_marked_factory_at_definition():
@@ -50,7 +62,9 @@ def test_registration_is_inherited_by_subclasses():
 
 
 def test_unmarked_classmethod_is_not_registered():
-    assert not FactoryMethodRegistry().is_registered(ClassWithMarkedFactory, "from_value")
+    assert not FactoryMethodRegistry().is_registered(
+        ClassWithMarkedFactory, "from_value"
+    )
 
 
 def test_registry_is_a_singleton():

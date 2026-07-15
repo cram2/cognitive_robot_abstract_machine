@@ -22,8 +22,9 @@ from semantic_digital_twin.adapters.ros.utils import is_ros2_message_class
 class Ros2MessageJSONSerializer(ExternalClassJSONSerializer[None]):
     """
     Json serializer for ROS2 messages.
-    Since there is no common superclass for ROS2 messages, we need to rely on checking class fields instead.
-    That's also why T is set to None.
+
+    Since there is no common superclass for ROS2 messages, we need to rely on checking
+    class fields instead. That's also why T is set to None.
     """
 
     @classmethod
@@ -46,7 +47,9 @@ class Ros2MessageJSONSerializer(ExternalClassJSONSerializer[None]):
 class QoSProfileJSONSerializer(ExternalClassJSONSerializer[QoSProfile]):
     """
     A serializer class for converting a QoSProfile instance to and from JSON format.
-    All fields of the QoSProfile are saved in its `__slots__` attribute with a `_` prefix.
+
+    All fields of the QoSProfile are saved in its `__slots__` attribute with a `_`
+    prefix.
     """
 
     @classmethod

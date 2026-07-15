@@ -36,8 +36,8 @@ def run_demo(demo: Sage10kAbstractDemoHSRB):
     """
     Runs a single Sage10k demo.
 
-    This function initializes a ROS 2 node, sets up the simulation world,
-    starts a visualization marker publisher, and performs the robot's plan.
+    This function initializes a ROS 2 node, sets up the simulation world, starts a
+    visualization marker publisher, and performs the robot's plan.
 
     :param demo: The demo instance to run.
     """

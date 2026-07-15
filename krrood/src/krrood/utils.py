@@ -82,7 +82,6 @@ def get_default_value(dataclass_type, field_name):
 
     :param dataclass_type: The dataclass type to get the default value for.
     :param field_name: The name of the field to get the default value for.
-
     :return: The default value for the field.
     """
     for f in fields(dataclass_type):
@@ -100,10 +99,10 @@ def get_default_value(dataclass_type, field_name):
 def get_default_values_for_dataclass(dataclass_type):
     """
     Return a dict mapping field names to their default values.
+
     Only includes fields that actually define a default.
 
     :param dataclass_type: The dataclass type to get the default values for.
-
     :return: A dict mapping field names to their default values.
     """
     defaults = {}
@@ -126,14 +125,16 @@ def extract_imports_from(
     convert_relative_to_absolute: bool = False,
 ) -> List[str]:
     """
-    Extract imports from a module or source code or a file path or an ast and returns them as a list of strings.
+    Extract imports from a module or source code or a file path or an ast and returns
+    them as a list of strings.
 
     :param module: The module to extract imports from.
     :param file_path: The file path to extract imports from.
     :param source: The source code to extract imports from.
     :param ast_tree: The ast tree to extract imports from.
     :param exclude_libraries: A list of libraries to exclude from the imports.
-    :param convert_relative_to_absolute: Whether to convert relative imports to absolute imports.
+    :param convert_relative_to_absolute: Whether to convert relative imports to absolute
+        imports.
     """
     exclude_libraries = exclude_libraries or []
     if module is None and source is None and file_path is None and ast_tree is None:
@@ -214,7 +215,6 @@ def generate_relative_import(
     :param target_module: The module to import.
     :param symbol: The symbol (e.g., a class, a method, ..., etc.) to import (optional).
     """
-
     # Compute absolute module name as Python would resolve it
     absolute = resolve_name(target_module, from_module)
 
@@ -486,9 +486,11 @@ def get_path_starting_from_latest_encounter_of(
     :param path: The full path to the file.
     :param package_name: The name of the package to start from.
     :param should_contain: The names of the files or directories to look for.
-    :return: The path starting from the package name that contains all the names in should_contain, otherwise raise an error.
+    :return: The path starting from the package name that contains all the names in
+        should_contain, otherwise raise an error.
     :raise PackageNameNotFoundError: If the package name could not be found in the path.
-    :raise PathMissingRequiredComponentsError: If the path does not contain all the names in should_contain.
+    :raise PathMissingRequiredComponentsError: If the path does not contain all the
+        names in should_contain.
     """
     path_parts = path.split(os.path.sep)
     if package_name not in path_parts:
@@ -558,7 +560,7 @@ def get_imports_from_types(
 
 def run_black_on_file(filename: str):
     """
-    Format the file with black
+    Format the file with black.
 
     :param filename: The name of the file to format.
     """
@@ -568,7 +570,7 @@ def run_black_on_file(filename: str):
 
 def run_ruff_on_file(filename: str):
     """
-    Format the file with ruff
+    Format the file with ruff.
 
     :param filename: The name of the file to format.
     """
@@ -687,8 +689,10 @@ def get_scope_from_imports(
     :param file_path: The path to the Python file to extract imports from.
     :param tree: An AST tree to extract imports from. If provided, file_path is ignored.
     :param package_name: The name of the package to use for relative imports.
-    :param source: The source code to extract imports from. If provided, file_path and tree are ignored.
-    :return: A dictionary representing the scope with imported modules and their attributes.
+    :param source: The source code to extract imports from. If provided, file_path and
+        tree are ignored.
+    :return: A dictionary representing the scope with imported modules and their
+        attributes.
     """
     if tree is None and file_path is None and source is None:
         raise SourceDataNotProvided(file_path, tree, source)
@@ -723,10 +727,12 @@ def get_and_import_module(
     module_name: str, package_name: Optional[str]
 ) -> types.ModuleType:
     """
-    Attempt to import a module with an optional package context and return the module or raise.
+    Attempt to import a module with an optional package context and return the module or
+    raise.
 
     :param module_name: The name of the module to import.
-    :param package_name: The package name to use for relative imports, or None for absolute imports.
+    :param package_name: The package name to use for relative imports, or None for
+        absolute imports.
     :return: The imported module.
     :raises ModuleNotFoundError: If the module cannot be found.
     """
@@ -774,7 +780,8 @@ def _resolve_relative_import(
     package_name: Optional[str],
 ) -> tuple[Optional[str], Optional[str]]:
     """
-    Resolve relative import context and possibly adjust module and package names based on file location.
+    Resolve relative import context and possibly adjust module and package names based
+    on file location.
 
     :param file_path: The path to the file containing the import statement.
     :param node: The import from node to process.
@@ -830,18 +837,23 @@ def _handle_import_node(
 
 @lru_cache(maxsize=None)
 def _warn_about_unresolvable_type_checking_import_once(
-    resolved_module_name: Optional[str], name: str, file_path: Optional[str], error_message: str
+    resolved_module_name: Optional[str],
+    name: str,
+    file_path: Optional[str],
+    error_message: str,
 ) -> None:
     """
-    Log, at most once per process for a given ``(resolved_module_name, name, file_path)`` triple,
-    that a name could not be imported while extracting a file's imports.
+    Log, at most once per process for a given ``(resolved_module_name, name,
+    file_path)`` triple, that a name could not be imported while extracting a file's
+    imports.
 
-    A dataclass field annotated under ``if TYPE_CHECKING:`` with a name from a module involved in a
-    circular import can be re-resolved many times while that module is still initializing (once per
-    class needing it, and once per lookup attempt). Every attempt raises the exact same, already
-    self-diagnosing ``AttributeError`` and is otherwise harmless, so repeating the warning for each
-    attempt only floods the log without adding information; the ``lru_cache`` collapses repeats of
-    the identical triple to a single log line.
+    A dataclass field annotated under ``if TYPE_CHECKING:`` with a name from a module
+    involved in a circular import can be re-resolved many times while that module is
+    still initializing (once per class needing it, and once per lookup attempt). Every
+    attempt raises the exact same, already self-diagnosing ``AttributeError`` and is
+    otherwise harmless, so repeating the warning for each attempt only floods the log
+    without adding information; the ``lru_cache`` collapses repeats of the identical
+    triple to a single log line.
 
     :param resolved_module_name: The module the failed import targeted.
     :param name: The attribute name that could not be found on the module.
@@ -934,7 +946,8 @@ def memoize(function: TCallable) -> TCallable:
 
 def copy_memoize(function: TCallable) -> TCallable:
     """
-    Caches the return value of a function call at the instance level but returns a deepcopy of the value.
+    Caches the return value of a function call at the instance level but returns a
+    deepcopy of the value.
     """
 
     @wraps(function)
@@ -966,9 +979,9 @@ def is_dynamic_class(cls: Type) -> bool:
     """
     Check if a class is dynamically created.
 
-    This is done by checking if the class is actually registered in that module under its own name
-    Normal classes will be found; classes created with  for instance make_dataclass  usually won't be
-    unless manually assigned.
+    This is done by checking if the class is actually registered in that module under
+    its own name Normal classes will be found; classes created with  for instance
+    make_dataclass  usually won't be unless manually assigned.
     :param cls: The class to check.
     :return: True if the class is dynamically created, False otherwise.
     """

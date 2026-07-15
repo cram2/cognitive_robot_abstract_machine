@@ -24,7 +24,9 @@ zoo_cases, _ = load_zoo_dataset(cache_file=CACHE_FILE)
 
 @unittest.skipIf(len(zoo_cases) == 0, "Failed to load dataset")
 class ObjectDiagramTestCase(unittest.TestCase):
-    """Test case for generating object diagrams of the ripple down rules package."""
+    """
+    Test case for generating object diagrams of the ripple down rules package.
+    """
 
     cases: list
     targets: list

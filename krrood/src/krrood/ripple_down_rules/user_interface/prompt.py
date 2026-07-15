@@ -61,7 +61,8 @@ class UserPrompt:
         :param case_query: The case query to prompt the user for.
         :param prompt_for: The type of information ask user about.
         :param prompt_str: The prompt string to display to the user.
-        :return: A callable expression that takes a case and executes user expression on it.
+        :return: A callable expression that takes a case and executes user expression on
+            it.
         """
         with self.shell_lock:
             prev_user_input: Optional[str] = None
@@ -128,10 +129,13 @@ class UserPrompt:
         Prompt the user for input.
 
         :param case_query: The case query to prompt the user for.
-        :param prompt_for: The type of information the user should provide for the given case.
+        :param prompt_for: The type of information the user should provide for the given
+            case.
         :param prompt_str: The prompt string to display to the user.
-        :param code_to_modify: The code to modify. If given will be used as a start for user to modify.
-        :return: The user input, and the executable expression that was parsed from the user input.
+        :param code_to_modify: The code to modify. If given will be used as a start for
+            user to modify.
+        :return: The user input, and the executable expression that was parsed from the
+            user input.
         """
         logger.debug("Entered shell")
         initial_prompt_str = f"{prompt_str}\n" if prompt_str is not None else ""
@@ -199,7 +203,8 @@ class UserPrompt:
         Construct the prompt string for the shell.
 
         :param case_query: The case query to prompt the user for.
-        :param prompt_for: The type of information the user should provide for the given case.
+        :param prompt_for: The type of information the user should provide for the given
+            case.
         :param prompt_str: The prompt string to display to the user.
         """
         prompt_str += "\n" + case_query.current_value_str
@@ -221,7 +226,8 @@ class UserPrompt:
         Prompt the user for input.
 
         :param shell: The Ipython shell to use for prompting the user.
-        :param user_input: The user input to use. If given, the user input will be used instead of prompting the user.
+        :param user_input: The user input to use. If given, the user input will be used
+            instead of prompting the user.
         :return: The user input and the AST tree.
         """
         while True:

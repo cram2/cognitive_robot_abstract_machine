@@ -31,6 +31,7 @@ from .example_classes import Position
 class MixinWithForwardRef(ABC):
     """
     A mixin class that has a field with a forward reference type.
+
     The type is imported only under TYPE_CHECKING, so it's not available at runtime.
     """
 
@@ -39,6 +40,7 @@ class MixinWithForwardRef(ABC):
     def method_with_forward_ref_param(self, position: Position) -> None:
         """
         Method with a parameter that uses a forward reference type.
+
         Due to `from __future__ import annotations`, this is also a forward reference.
         """
         pass
@@ -46,7 +48,9 @@ class MixinWithForwardRef(ABC):
 
 @dataclass
 class AnotherMixinWithForwardRef(ABC):
-    """Another mixin with a different forward reference."""
+    """
+    Another mixin with a different forward reference.
+    """
 
     type_b_ref: Optional[ForwardRefTypeB] = None
 

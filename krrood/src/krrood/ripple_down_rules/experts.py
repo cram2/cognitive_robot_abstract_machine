@@ -18,7 +18,10 @@ from krrood.ripple_down_rules.datastructures.callable_expression import (
 from krrood.ripple_down_rules.datastructures.case import show_current_and_corner_cases
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 from krrood.ripple_down_rules.datastructures.enums import PromptFor
-from krrood.ripple_down_rules.exceptions import NoSavePathFoundForExpertAnswers, NoLoadPathFoundForExpertAnswers
+from krrood.ripple_down_rules.exceptions import (
+    NoSavePathFoundForExpertAnswers,
+    NoLoadPathFoundForExpertAnswers,
+)
 from krrood.ripple_down_rules.user_interface.template_file_creator import (
     TemplateFileCreator,
 )
@@ -42,15 +45,18 @@ if TYPE_CHECKING:
 class Expert(ABC):
     """
     The Abstract Expert class, all experts should inherit from this class.
-    An expert is a class that can provide differentiating features and conclusions for a case when asked.
-    The expert can compare a case with a corner case and provide the differentiating features and can also
-    provide one or multiple conclusions for a case.
+
+    An expert is a class that can provide differentiating features and conclusions for a
+    case when asked. The expert can compare a case with a corner case and provide the
+    differentiating features and can also provide one or multiple conclusions for a
+    case.
     """
 
     all_expert_answers: Optional[List] = None
     """
     A list of all expert answers, used for testing purposes.
     """
+
     use_loaded_answers: bool = False
     """
     A flag to indicate if the expert should use loaded answers or not.
@@ -77,10 +83,11 @@ class Expert(ABC):
         self, case_query: CaseQuery, last_evaluated_rule: Optional[Rule] = None
     ) -> CallableExpression:
         """
-        Ask the expert to provide the differentiating features between two cases or unique features for a case
-        that doesn't have a corner case to compare to.
+        Ask the expert to provide the differentiating features between two cases or
+        unique features for a case that doesn't have a corner case to compare to.
 
-        :param case_query: The case query containing the case to classify and the required target.
+        :param case_query: The case query containing the case to classify and the
+            required target.
         :param last_evaluated_rule: The last evaluated rule.
         :return: The differentiating features as new rule conditions.
         """
@@ -92,15 +99,16 @@ class Expert(ABC):
         Ask the expert to provide a relational conclusion for the case.
 
         :param case_query: The case query containing the case to find a conclusion for.
-        :return: A callable expression that can be called with a new case as an argument.
+        :return: A callable expression that can be called with a new case as an
+            argument.
         """
 
     def clear_answers(self, path: Optional[str] = None):
         """
         Clear the expert answers.
 
-        :param path: The path to clear the answers from. If None, the answers will be cleared from the
-                     answers_save_path attribute.
+        :param path: The path to clear the answers from. If None, the answers will be
+            cleared from the answers_save_path attribute.
         """
         if path is None and self.answers_save_path is None:
             raise ValueError(
@@ -233,7 +241,8 @@ class Expert(ABC):
 
 class AI(Expert):
     """
-    The AI Expert class, an expert that uses AI to provide differentiating features and conclusions.
+    The AI Expert class, an expert that uses AI to provide differentiating features and
+    conclusions.
     """
 
     def __init__(self, **kwargs):
@@ -325,7 +334,8 @@ class AI(Expert):
 
 class Human(Expert):
     """
-    The Human Expert class, an expert that asks the human to provide differentiating features and conclusions.
+    The Human Expert class, an expert that asks the human to provide differentiating
+    features and conclusions.
     """
 
     def __init__(self, **kwargs):
@@ -353,8 +363,8 @@ class Human(Expert):
         self, case_query: CaseQuery, data_to_show: Optional[str] = None
     ) -> CallableExpression:
         """
-        Ask the expert to provide the differentiating features between two cases or unique features for a case
-        that doesn't have a corner case to compare to.
+        Ask the expert to provide the differentiating features between two cases or
+        unique features for a case that doesn't have a corner case to compare to.
 
         :param case_query: The case query containing the case to classify.
         :return: The differentiating features as new rule conditions.
@@ -399,8 +409,10 @@ class Human(Expert):
         prompt_for: PromptFor,
     ):
         """
-        Convert a JSON answer to a Python answer and save it. This is used for backward compatibility for answers that
-        were saved as JSON but need to be converted to Python code.
+        Convert a JSON answer to a Python answer and save it.
+
+        This is used for backward compatibility for answers that were saved as JSON but
+        need to be converted to Python code.
 
         :param case_query: The case query containing the case to classify.
         :param user_input: The user input to convert.

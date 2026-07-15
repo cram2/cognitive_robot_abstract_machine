@@ -13,8 +13,8 @@ class ProbabilisticModelWrapper(mlflow.pyfunc.PythonModel):
     """
     Wrapper for a probabilistic model to be used with MLflow.
 
-    The wrapper requires the artifact "model_path" to contain a path to a file that can be parsed using
-    the SubclassJSONSerializer.
+    The wrapper requires the artifact "model_path" to contain a path to a file that can
+    be parsed using the SubclassJSONSerializer.
     """
 
     model: Optional[ProbabilisticModel] = None
@@ -35,6 +35,7 @@ class ProbabilisticModelWrapper(mlflow.pyfunc.PythonModel):
 def infer_signature(model: ProbabilisticModel) -> ModelSignature:
     """
     Infer the signature of a probabilistic model.
+
     :param model: The model to infer the signature from.
     :return: The inferred signature.
     """

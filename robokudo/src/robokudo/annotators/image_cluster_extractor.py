@@ -1,4 +1,5 @@
-"""Image-based object cluster extraction.
+"""
+Image-based object cluster extraction.
 
 This module provides functionality for extracting object clusters from color images using HSV color segmentation.
 The main class :class:`ImageClusterExtractor` implements color-based segmentation and contour detection to identify
@@ -35,7 +36,8 @@ if TYPE_CHECKING:
 
 
 class ImageClusterExtractor(BaseAnnotator):
-    """Extract object clusters from images using color segmentation.
+    """
+    Extract object clusters from images using color segmentation.
 
     This annotator performs the following steps:
 
@@ -50,16 +52,23 @@ class ImageClusterExtractor(BaseAnnotator):
     """
 
     class ViewMode:
-        """Visualization modes for the annotator output."""
+        """
+        Visualization modes for the annotator output.
+        """
 
         masked_object: int = 1
-        """Show masked RGB image of detected objects"""
+        """
+        Show masked RGB image of detected objects.
+        """
 
         depth_mask: int = 2
-        """Show depth mask of detected objects"""
+        """
+        Show depth mask of detected objects.
+        """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for ImageClusterExtractor.
+        """
+        Configuration descriptor for ImageClusterExtractor.
 
         Parameters:
 
@@ -71,10 +80,14 @@ class ImageClusterExtractor(BaseAnnotator):
         """
 
         class Parameters:
-            """Parameter class containing all configurable settings."""
+            """
+            Parameter class containing all configurable settings.
+            """
 
             def __init__(self) -> None:
-                """Initialize default parameter values."""
+                """
+                Initialize default parameter values.
+                """
                 self.hsv_min: Tuple[int, int, int] = (150, 130, 85)
                 self.hsv_max: Tuple[int, int, int] = (200, 255, 255)
                 self.erosion_iterations: int = 2
@@ -160,7 +173,8 @@ class ImageClusterExtractor(BaseAnnotator):
         self.display_mode = self.ViewMode.masked_object
 
     def adjust_hsv_threshold_to_query(self) -> None:
-        """Adjust HSV thresholds based on color query.
+        """
+        Adjust HSV thresholds based on color query.
 
         Checks for a color query in the CAS and updates the HSV thresholding parameters
         if a matching color is found in the color_name_to_hsv_range mapping.
@@ -189,7 +203,8 @@ class ImageClusterExtractor(BaseAnnotator):
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:
-        """Process input images to detect and annotate object clusters.
+        """
+        Process input images to detect and annotate object clusters.
 
         The method:
 
@@ -388,7 +403,8 @@ class ImageClusterExtractor(BaseAnnotator):
         return Status.SUCCESS
 
     def key_callback(self, key: int) -> None:
-        """Handle keyboard input to change visualization mode.
+        """
+        Handle keyboard input to change visualization mode.
 
         :param key: ASCII value of pressed key
         """

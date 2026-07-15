@@ -46,18 +46,22 @@ logger = logging.getLogger(__name__)
 class Giskard:
     """
     The main Class of Giskard.
+
     Instantiate it with appropriate configs for you setup and then call giskard.live()
-    :param world_config: A world configuration. Use a predefined one or implement your own WorldConfig class.
-    :param robot_interface_config: How Giskard talk to the robot. You probably have to implement your own RobotInterfaceConfig.
-    :param collision_avoidance_config: default is no collision avoidance or implement your own collision_avoidance_config.
+    :param world_config: A world configuration. Use a predefined one or implement your
+        own WorldConfig class.
+    :param robot_interface_config: How Giskard talk to the robot. You probably have to
+        implement your own RobotInterfaceConfig.
+    :param collision_avoidance_config: default is no collision avoidance or implement
+        your own collision_avoidance_config.
     :param behavior_tree_config: default is open loop mode
     :param qp_controller_config: default is good for almost all cases
-    :param additional_goal_package_paths: specify paths that Giskard needs to import to find your custom Goals.
-                                          Giskard will run 'from <additional path> import *' for each additional
-                                          path in the list.
-    :param additional_monitor_package_paths: specify paths that Giskard needs to import to find your custom Monitors.
-                                          Giskard will run 'from <additional path> import *' for each additional
-                                          path in the list.
+    :param additional_goal_package_paths: specify paths that Giskard needs to import to
+        find your custom Goals. Giskard will run 'from <additional path> import *' for
+        each additional path in the list.
+    :param additional_monitor_package_paths: specify paths that Giskard needs to import
+        to find your custom Monitors. Giskard will run 'from <additional path> import *'
+        for each additional path in the list.
     """
 
     world_config: WorldConfig
@@ -79,7 +83,9 @@ class Giskard:
 
     def setup(self):
         """
-        Initialize the behavior tree and world. You usually don't need to call this.
+        Initialize the behavior tree and world.
+
+        You usually don't need to call this.
         """
         with self.world_config.world.modify_world():
             self.world_config.setup_world()

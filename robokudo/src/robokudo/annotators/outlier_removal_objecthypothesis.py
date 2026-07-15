@@ -193,10 +193,8 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
                         print_progress=True,
                     )
                 )
-            """
-            We pick the biggest cluster, assuming that its point cloud represents
-            an actual object and not noise
-            """
+            # We pick the biggest cluster, assuming that its point cloud represents
+            # an actual object and not noise
             try:
                 cluster_sizes = []
                 max_label = labels.max()

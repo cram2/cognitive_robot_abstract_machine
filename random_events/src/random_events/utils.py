@@ -20,7 +20,8 @@ class CPPWrapper(ABC):
         """
         Create a new instance of this class from a C++ object.
 
-        This method should also add fields that are python only to the instance that is created.
-        This cannot be a class method since the values of the python-only fields are instance-specific.
+        This method should also add fields that are python only to the instance that is
+        created. This cannot be a class method since the values of the python-only
+        fields are instance-specific.
         """
         raise NotImplementedError

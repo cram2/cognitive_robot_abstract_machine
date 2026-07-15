@@ -110,3 +110,4 @@ packages = []
 make-summary-multi-line = true
 pre-summary-newline = true
 close-quotes-on-newline = true
+black = true

@@ -88,9 +88,11 @@ def test_is_type_type():
 
 
 def test_is_type_type_for_bare_type_annotation():
-    """A field annotated with the bare builtin ``type`` (not the parametrized ``Type[X]``) is also
-    a type-type field — ``get_origin(type)`` is ``None``, unlike ``get_origin(Type[X])``, so this is
-    a distinct case from :func:`test_is_type_type`."""
+    """
+    A field annotated with the bare builtin ``type`` (not the parametrized ``Type[X]``)
+    is also a type-type field — ``get_origin(type)`` is ``None``, unlike
+    ``get_origin(Type[X])``, so this is a distinct case from :func:`test_is_type_type`.
+    """
     wrapped_class = WrappedClass(clazz=KRROODBarePositionTypeWrapper)
     wrapped_field = WrappedField(
         wrapped_class,
@@ -129,7 +131,9 @@ def test_is_specialized_generic():
 
 
 class TypeVariableBound:
-    """Bound used by the bounded-type-variable mimic below."""
+    """
+    Bound used by the bounded-type-variable mimic below.
+    """
 
 
 _unbounded_type_variable = TypeVar("_unbounded_type_variable")

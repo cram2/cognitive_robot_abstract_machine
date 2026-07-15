@@ -6,8 +6,9 @@ class RunningSelector(py_trees.composites.Selector):
 
     def tick(self):
         """
-        Run the tick behaviour for this selector. Note that the status
-        of the tick is always determined by its children, not
+        Run the tick behaviour for this selector.
+
+        Note that the status of the tick is always determined by its children, not
         by the user customised update function.
 
         Yields:

@@ -19,21 +19,30 @@ from typing_extensions import Callable
 @dataclass(frozen=True)
 class MathOperatorSpecification:
     """
-    The symbol and callable that make up one :class:`MathOperator`. Mixed into ``MathOperator`` itself
-    (an Enum mix-in type), so each member's ``symbol``/``function`` are its own attributes directly,
-    with no separate value object to forward through.
+    The symbol and callable that make up one :class:`MathOperator`.
+
+    Mixed into ``MathOperator`` itself (an Enum mix-in type), so each member's
+    ``symbol``/``function`` are its own attributes directly, with no separate value
+    object to forward through.
     """
 
     symbol: str
-    """The mathematical symbol used when rendering the operator."""
+    """
+    The mathematical symbol used when rendering the operator.
+    """
+
     function: Callable[..., numbers.Number]
-    """The callable that performs the operation over already-resolved operand values."""
+    """
+    The callable that performs the operation over already-resolved operand values.
+    """
 
 
 class MathOperator(MathOperatorSpecification, Enum):
     """
-    An arithmetic operator usable inside a query. Each member carries the symbol it renders as and the
-    callable that computes it over already-resolved operand values.
+    An arithmetic operator usable inside a query.
+
+    Each member carries the symbol it renders as and the callable that computes it over
+    already-resolved operand values.
     """
 
     ADD = ("+", operator.add)

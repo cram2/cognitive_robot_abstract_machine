@@ -150,7 +150,8 @@ class FrozenIndexBox:
 
     def intersection_volume_vox(self, other: FrozenIndexBox) -> int:
         """
-        Calculate the intersection volume of this index-based box with another index based box in voxels.
+        Calculate the intersection volume of this index-based box with another index
+        based box in voxels.
 
         :param other: The second box.
         :return: The intersection volume.
@@ -412,6 +413,7 @@ def _detect_boards_along_axis(
 def _get_slab(occupancy: np.ndarray, axis: int, start: int, stop: int) -> np.ndarray:
     """
     Extract a slab from the occupancy grid along the given axis.
+
     A slab is a 2D slice along the given axis.
 
     :param occupancy: The 3D occupancy grid.
@@ -550,45 +552,49 @@ class BoxDecomposer(MeshDecomposer):
     """
     Decompose a mesh into boxes using voxelization.
 
-    This is very efficient and works well for blocky furniture.
-    Blocky furniture is furniture that has many box-shaped parts, e.g. IKEA shelves.
+    This is very efficient and works well for blocky furniture. Blocky furniture is
+    furniture that has many box-shaped parts, e.g. IKEA shelves.
 
     This works poorly for non-blocky furniture.
 
-    A board in this context is something like a board (the supporting surfaces that hold books) in a bookshelf.
+    A board in this context is something like a board (the supporting surfaces that hold
+    books) in a bookshelf.
 
     The algorithm works by first voxelizing the mesh and removing thin voxel cracks.
     Next, it detects planar boards and then for each axis (X, Y, Z):
 
-        Extract thin slabs (1–N voxels thick)
-        Deduplicate boards
-        Remove overlapping duplicates, preferring thinner boards.
-        Merge leftovers
+    Extract thin slabs (1–N voxels thick) Deduplicate boards Remove overlapping
+    duplicates, preferring thinner boards. Merge leftovers
 
-    The results are that large planar structures (shelves, walls) become clean single boxes,
-    while smaller details are handled separately.
+    The results are that large planar structures (shelves, walls) become clean single
+    boxes, while smaller details are handled separately.
     """
 
     voxel_size: float = 0.02
     """
     Voxel size in mesh units.
     """
+
     fill_thin_holes: bool = True
     """
-    Whether to fill 1-voxel cracks/voids or not
+    Whether to fill 1-voxel cracks/voids or not.
     """
+
     max_thickness_vox: int = 2
     """
     Maximum board thickness in voxels.
     """
+
     min_span_vox: int = 3
     """
     Threshold for keeping boards.
     """
+
     min_fill_ratio: float = 0.75
     """
     Minimum ratio of occupied voxels to bounding box area.
     """
+
     overlap_threshold: float = 0.8
     """
     Overlap threshold at which two boards are merged into one.

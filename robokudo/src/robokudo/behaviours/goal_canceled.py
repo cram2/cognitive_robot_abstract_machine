@@ -42,8 +42,8 @@ class GoalCanceled(Behaviour):
         """
         Initialize the behavior.
 
-        This method is called when the behavior is first ticked.
-        No initialization is needed for this behavior.
+        This method is called when the behavior is first ticked. No initialization is
+        needed for this behavior.
         """
         # self.rk_logger.debug("%s.initialise()" % self.__class__.__name__)
         pass

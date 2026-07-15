@@ -1,7 +1,9 @@
 """
-Generality tests for the conjunct-reduction pass — the single home of WHERE-conjunct simplification
-(range-bound and co-indexed folds). They exercise the :class:`ConjunctReducer` registry directly and
-its individual folds, on cases the golden end-to-end tests do not isolate.
+Generality tests for the conjunct-reduction pass — the single home of WHERE-conjunct
+simplification (range-bound and co-indexed folds).
+
+They exercise the :class:`ConjunctReducer` registry directly and its individual folds,
+on cases the golden end-to-end tests do not isolate.
 """
 
 from __future__ import annotations
@@ -26,8 +28,11 @@ from krrood.entity_query_language.verbalization.example_domain import (
 
 
 def _sibling_pair_type() -> type:
-    """A two-attribute sibling structure — ``Pair(left, right)`` where each side has ``low`` and
-    ``high`` — so a co-indexed fold can range over more than one distinct leaf."""
+    """
+    A two-attribute sibling structure — ``Pair(left, right)`` where each side has
+    ``low`` and ``high`` — so a co-indexed fold can range over more than one distinct
+    leaf.
+    """
     side = dataclasses.make_dataclass("Span", [("low", int), ("high", int)])
     return dataclasses.make_dataclass("Pair", [("left", side), ("right", side)])
 
@@ -45,7 +50,10 @@ def _bounded_transaction():
 
 
 def test_reducer_default_pipeline_is_range_then_coindexed():
-    """The pass applies its folds in order; the default registry is range-bound then co-indexed."""
+    """
+    The pass applies its folds in order; the default registry is range-bound then co-
+    indexed.
+    """
     reducer = ConjunctReducer()
     assert [type(fold) for fold in reducer.folds] == [
         RangeBoundFold,
@@ -85,7 +93,10 @@ def test_bounds_on_distinct_chains_do_not_fold():
 
 
 def test_three_bounds_fold_one_pair_and_leave_the_remainder():
-    """A lone third bound with no complement on its chain stays unfolded beside the folded pair."""
+    """
+    A lone third bound with no complement on its chain stays unfolded beside the folded
+    pair.
+    """
     transaction, low, high = _bounded_transaction()
     extra_low = datetime.datetime(2026, 5, 10)
     reduced = reduce_conjuncts(
@@ -100,7 +111,10 @@ def test_three_bounds_fold_one_pair_and_leave_the_remainder():
 
 
 def test_lone_coindexed_comparison_is_not_folded():
-    """A co-indexed fold needs at least two co-indexed comparisons; a single one says itself."""
+    """
+    A co-indexed fold needs at least two co-indexed comparisons; a single one says
+    itself.
+    """
     reduced = CoindexedComparisonFold().apply(
         reduce_conjuncts([])  # empty → empty, exercises the empty path too
     )
@@ -115,8 +129,10 @@ def test_a_non_comparator_conjunct_passes_through_untouched():
 
 
 def test_repeated_coindexed_leaf_is_listed_once():
-    """Two identical co-indexed comparisons fold to one clause whose shared leaf is listed once —
-    *"have the same name"*, never *"have the same name and name"*."""
+    """
+    Two identical co-indexed comparisons fold to one clause whose shared leaf is listed
+    once — *"have the same name"*, never *"have the same name and name"*.
+    """
     birds = variable(LoveBirds, domain=None)
     comparison = birds.bird_1.name == birds.bird_2.name
     repeated = birds.bird_1.name == birds.bird_2.name
@@ -126,7 +142,9 @@ def test_repeated_coindexed_leaf_is_listed_once():
 
 
 def test_distinct_coindexed_leaves_are_all_kept():
-    """The repeated-leaf fix must not over-collapse: distinct leaves are each kept."""
+    """
+    The repeated-leaf fix must not over-collapse: distinct leaves are each kept.
+    """
     pair = variable(_sibling_pair_type(), domain=None)
     [fold] = fold_coindexed_groups(
         [pair.left.low == pair.right.low, pair.left.high == pair.right.high]
@@ -135,7 +153,10 @@ def test_distinct_coindexed_leaves_are_all_kept():
 
 
 def test_repeated_leaf_collapses_while_distinct_ones_remain():
-    """A leaf repeated among distinct ones is deduped in first-occurrence order, not reordered."""
+    """
+    A leaf repeated among distinct ones is deduped in first-occurrence order, not
+    reordered.
+    """
     pair = variable(_sibling_pair_type(), domain=None)
     [fold] = fold_coindexed_groups(
         [

@@ -578,7 +578,7 @@ def test_not_and_or_with_domain_mapping(handles_and_containers_world):
 
 def test_generate_with_using_decorated_predicate(handles_and_containers_world):
     """
-    Test that symbolic functions can be used inside and outside of queries
+    Test that symbolic functions can be used inside and outside of queries.
     """
     world = handles_and_containers_world
 
@@ -703,9 +703,11 @@ def test_select_predicate(handles_and_containers_world):
 
 def test_is_same_entity_predicate_in_query(handles_and_containers_world):
     """
-    ``IsSameEntity`` is a regular EQL predicate: used symbolically in a ``where`` clause it
-    is bound and evaluated by the query engine like any other predicate. Only the literal
-    target itself is the same entity as the target, so exactly one solution is returned.
+    ``IsSameEntity`` is a regular EQL predicate: used symbolically in a ``where`` clause
+    it is bound and evaluated by the query engine like any other predicate.
+
+    Only the literal target itself is the same entity as the target, so exactly one
+    solution is returned.
     """
     world = handles_and_containers_world
     target = world.bodies[0]
@@ -1266,11 +1268,14 @@ def test_type_availability_in_mapped_variables(handles_and_containers_world):
 
 
 def test_accessing_a_dunder_attribute_symbolically_raises_a_helpful_error():
-    """Dunder attribute access on a variable raises a helpful, AttributeError-compatible error.
+    """
+    Dunder attribute access on a variable raises a helpful, AttributeError-compatible
+    error.
 
-    It must remain an :class:`AttributeError` so that ``copy``/``pickle`` machinery probing optional
-    dunder hooks still treats it as a missing attribute, while its message points at
-    ``@symbolic_function`` as the correct way to reach a dunder-named member.
+    It must remain an :class:`AttributeError` so that ``copy``/``pickle`` machinery
+    probing optional dunder hooks still treats it as a missing attribute, while its
+    message points at ``@symbolic_function`` as the correct way to reach a dunder-named
+    member.
     """
     var = variable(int, [1, 2, 3])
 

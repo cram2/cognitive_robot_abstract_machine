@@ -13,11 +13,12 @@ from random_events.variable import Variable
 def find_lowest_product_nodes_that_model_variables(
     circuit: ProbabilisticCircuit, variables: SortedSet[Variable]
 ) -> list[ProductUnit]:
-    """Find the lowest product nodes in the circuit that model all given variables.
+    """
+    Find the lowest product nodes in the circuit that model all given variables.
 
-    Traverses the circuit layer by layer from the leaves upward.  A product node
-    is included only if it models every variable in ``variables`` and none of its
-    ancestors already appears in the result (avoiding duplicates at higher layers).
+    Traverses the circuit layer by layer from the leaves upward.  A product node is
+    included only if it models every variable in ``variables`` and none of its ancestors
+    already appears in the result (avoiding duplicates at higher layers).
 
     These nodes serve as the attachment points where a grounded exchangeable
     distribution is connected to the class circuit during ``ground``.
