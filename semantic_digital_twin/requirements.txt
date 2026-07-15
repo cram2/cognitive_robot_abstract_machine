@@ -6,7 +6,7 @@ typing_extensions
 urdf-parser-py
 matplotlib
 casadi~=3.7.0
-hypothesis
+hypothesis!=6.156.6  # 6.156.6 ships no linux-x86_64 wheel; skip it so uv sync resolves
 scipy
 sqlacodegen
 pytest-order

@@ -76,7 +76,10 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         inline_predict = self._inline_predict(predict_groups, plan)
 
         header_parts: List[VerbalizationFragment] = [
-            Directive.for_underspecified(plan.underspecified).as_fragment(),
+            (
+                self.context.services.performative_override
+                or Directive.for_underspecified(plan.underspecified)
+            ).as_fragment(),
             self.context.child(plan.selection),
         ]
         if inline_predict is not None:

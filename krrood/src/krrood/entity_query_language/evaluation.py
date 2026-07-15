@@ -16,7 +16,6 @@ from krrood.entity_query_language.core.base_expressions import (
     TruthValueOperator,
 )
 from krrood.entity_query_language.core.variable import InstantiatedVariable
-from krrood.entity_query_language.enums import EvaluationContextKey
 from krrood.entity_query_language.evaluation_context import (
     EvaluationContext,
     EvaluationObserver,
@@ -67,51 +66,21 @@ class EvaluationTracker(EvaluationObserver):
         evaluation_context = get_evaluation_context()
         if evaluation_context is None:
             return
-        evaluated = evaluation_context.data.setdefault(
-            EvaluationContextKey.EVALUATED_IDS_KEY, OrderedSet()
-        )
-        evaluated.add(expression._id_)
+        evaluation_context.evaluated_expression_ids.record(expression._id_)
 
         if isinstance(sources, OperationResult) and sources.evaluated_expression_ids:
-            evaluated.update(sources.evaluated_expression_ids)
+            evaluation_context.evaluated_expression_ids.merge(
+                sources.evaluated_expression_ids
+            )
 
     def on_result_yielded(self, expression, result):
         evaluation_context = get_evaluation_context()
         if evaluation_context is None:
             return
-        evaluated = evaluation_context.data.get(EvaluationContextKey.EVALUATED_IDS_KEY)
-        if evaluated is not None and result.evaluated_expression_ids is None:
-            result.evaluated_expression_ids = self._snapshot_evaluated(
-                evaluation_context, evaluated
+        if result.evaluated_expression_ids is None:
+            result.evaluated_expression_ids = (
+                evaluation_context.evaluated_expression_ids.snapshot()
             )
-
-    @staticmethod
-    def _snapshot_evaluated(evaluation_context, evaluated):
-        """
-        Return an immutable snapshot of the cumulative *evaluated* id set, reusing the cached one
-        when the set has not grown since it was taken.
-
-        The evaluated-id set is only ever extended (never reduced), so its length uniquely
-        identifies its contents. Caching the snapshot keyed on that length collapses the previous
-        per-result copy (O(n) each, O(n^2) overall) into one copy per growth event. The returned
-        snapshot is shared between results and must be treated as read-only.
-
-        :param evaluation_context: The active evaluation context whose ``data`` holds the cache.
-        :param evaluated: The live cumulative :class:`OrderedSet` of evaluated expression ids.
-        :return: A snapshot :class:`OrderedSet` safe to stamp onto a result.
-        """
-        cached = evaluation_context.data.get(
-            EvaluationContextKey.EVALUATED_SNAPSHOT_KEY
-        )
-        current_length = len(evaluated)
-        if cached is None or cached[0] != current_length:
-            snapshot = OrderedSet(evaluated)
-            evaluation_context.data[EvaluationContextKey.EVALUATED_SNAPSHOT_KEY] = (
-                current_length,
-                snapshot,
-            )
-            return snapshot
-        return cached[1]
 
 
 class SatisfiedConditionTracker(EvaluationObserver):
@@ -130,33 +99,27 @@ class SatisfiedConditionTracker(EvaluationObserver):
         if isinstance(sources, OperationResult):
             satisfied = sources.satisfied_condition_ids
         if satisfied is not None:
-            evaluation_context.data[EvaluationContextKey.SATISFIED_IDS_KEY] = satisfied
+            evaluation_context.satisfied_condition_ids = satisfied
 
     def on_result_yielded(self, expression, result):
         evaluation_context = get_evaluation_context()
         if evaluation_context is None:
             return
-        satisfied = evaluation_context.data.get(EvaluationContextKey.SATISFIED_IDS_KEY)
+        satisfied = evaluation_context.satisfied_condition_ids
         if satisfied is not None and result.satisfied_condition_ids is None:
             result.satisfied_condition_ids = satisfied
 
     def on_conclusions_processed(self, expression, result):
-
-        if expression._conditions_root_ is not expression:
-            return
+        # The caller (_evaluate_conclusions_and_update_bindings_) already established that
+        # `expression` is the active conditions root for this evaluation pass before invoking
+        # this hook, so no re-check is needed here.
         if result.is_false:
             return
         if expression._conditions_root_ is expression._root_:
             return
 
         evaluation_context = get_evaluation_context()
-        evaluated = (
-            evaluation_context.data.get(EvaluationContextKey.EVALUATED_IDS_KEY)
-            if evaluation_context is not None
-            else None
-        )
-        if evaluated is None:
-            return
+        evaluated = evaluation_context.evaluated_expression_ids
 
         # Build a truth map from the OperationResult chain: operand_id -> is_false.
         # This reflects the actual truth values from this specific evaluation path,
@@ -187,8 +150,7 @@ class SatisfiedConditionTracker(EvaluationObserver):
                     satisfied.add(expr_id)
 
         result.satisfied_condition_ids = satisfied
-        if evaluation_context is not None:
-            evaluation_context.data[EvaluationContextKey.SATISFIED_IDS_KEY] = satisfied
+        evaluation_context.satisfied_condition_ids = satisfied
 
 
 class InferenceRecorder(EvaluationObserver):

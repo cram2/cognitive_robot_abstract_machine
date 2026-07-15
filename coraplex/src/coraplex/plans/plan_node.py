@@ -24,7 +24,8 @@ from coraplex.utils import split_list_by_type
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.graph_node import Task
-    from coraplex.robot_plans import ActionDescription, BaseMotion
+    from coraplex.robot_plans.actions.base import ActionDescription
+    from coraplex.robot_plans.motions.base import BaseMotion
 
 
 logger = logging.getLogger(__name__)

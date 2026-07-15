@@ -50,6 +50,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Table,
     Milk,
     Cereal,
+    Microwave,
+    Hood,
+    Toaster,
+    CoffeeMachine,
 )
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -966,6 +970,59 @@ class TestFactories(unittest.TestCase):
         self.assertEqual(
             double_door.calculate_left_right_door_from_view_point(view_point_back),
             (door_right, door_left),
+        )
+
+    def test_microwave_factory(self):
+        world = World()
+        root = Body(name=PrefixedName("root"))
+        with world.modify_world():
+            world.add_body(root)
+        with world.modify_world():
+            microwave = Microwave.create_with_new_body_in_world(
+                name=PrefixedName("microwave"), world=world
+            )
+            door = Door.create_with_new_body_in_world(
+                name=PrefixedName("microwave_door"),
+                scale=Scale(0.03, 0.3, 0.3),
+                world=world,
+            )
+            microwave.add(door)
+
+        semantic_microwave_annotations = world.get_semantic_annotations_by_type(
+            Microwave
+        )
+        self.assertEqual(len(semantic_microwave_annotations), 1)
+        self.assertEqual(microwave.doors[0], door)
+
+    def test_hood_toaster_coffee_machine_factories(self):
+        world = World()
+        root = Body(name=PrefixedName("root"))
+        with world.modify_world():
+            world.add_body(root)
+        with world.modify_world():
+            hood = Hood.create_with_new_body_in_world(
+                name=PrefixedName("hood"), world=world
+            )
+            toaster = Toaster.create_with_new_body_in_world(
+                name=PrefixedName("toaster"), world=world
+            )
+            coffee_machine = CoffeeMachine.create_with_new_body_in_world(
+                name=PrefixedName("coffee_machine"), world=world
+            )
+
+        self.assertEqual(len(world.get_semantic_annotations_by_type(Hood)), 1)
+        self.assertEqual(len(world.get_semantic_annotations_by_type(Toaster)), 1)
+        self.assertEqual(
+            len(world.get_semantic_annotations_by_type(CoffeeMachine)), 1
+        )
+        self.assertEqual(
+            world.root, hood.root.parent_kinematic_structure_entity
+        )
+        self.assertEqual(
+            world.root, toaster.root.parent_kinematic_structure_entity
+        )
+        self.assertEqual(
+            world.root, coffee_machine.root.parent_kinematic_structure_entity
         )
 
 

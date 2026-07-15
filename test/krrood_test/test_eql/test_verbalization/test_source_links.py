@@ -572,7 +572,7 @@ def test_pipeline_ansi_with_resolver_no_osc8_logs_warning_and_no_osc8():
     resolver = _ConstantResolver("http://example.com/sensor")
     env = {"VTE_VERSION": "", "TERM_PROGRAM": "unknown", "TERM": "xterm"}
     with patch.dict("os.environ", env, clear=False):
-        with _patch.object(pipeline_mod._log, "warning") as mock_warn:
+        with _patch.object(pipeline_mod.logger, "warning") as mock_warn:
             text = VerbalizationPipeline.ansi(link_resolver=resolver).verbalize(
                 an(entity(r))
             )
