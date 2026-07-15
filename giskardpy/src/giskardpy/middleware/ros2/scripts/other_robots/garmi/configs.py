@@ -6,6 +6,9 @@ from giskardpy.middleware.ros2.robot_interface_config import (
     RobotInterfaceConfig,
     StandAloneRobotInterfaceConfig,
 )
+from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import (
+    MultiDOFVelocityCommand,
+)
 from giskardpy.model.world_config import WorldWithOmniDriveRobot
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.garmi import Garmi
@@ -115,10 +118,12 @@ class GarmiVelocityInterface(RobotInterfaceConfig):
         self.add_joint_velocity_group_controller(
             cmd_topic="/garmi/arms/left_arm_joint_velocity_controller/reference",
             connections=GARMI_LEFT_ARM_JOINTS,
+            velocity_command=MultiDOFVelocityCommand(),
         )
         self.add_joint_velocity_group_controller(
             cmd_topic="/garmi/arms/right_arm_joint_velocity_controller/reference",
             connections=GARMI_RIGHT_ARM_JOINTS,
+            velocity_command=MultiDOFVelocityCommand(),
         )
 
         # self.add_joint_velocity_group_controller(

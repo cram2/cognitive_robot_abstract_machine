@@ -2153,6 +2153,9 @@ class MJCFParserDAO(
     prefix: Mapped[typing.Optional[builtins.str]] = mapped_column(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
+    use_visual_as_collision: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
 
 
 class EntityConverterDAO(

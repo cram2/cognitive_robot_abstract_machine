@@ -127,6 +127,7 @@ import giskardpy.qp.qp_data_symbolic
 import giskardpy.qp.qp_debugger
 import giskardpy.ros2_tools.force_torque_filter_node
 import giskardpy.ros_executor
+import giskardpy.tree.behaviors.joint_group_vel_controller_publisher
 import giskardpy.tree.behaviors.publish_debug_expressions
 import krrood.adapters.json_serializer
 import krrood.ormatic.custom_types
@@ -12539,6 +12540,32 @@ class Ros2ExecutorDAO(
         "inherit_condition": database_id == ExecutorDAO.database_id,
         "polymorphic_load": "selectin",
     }
+
+
+class Float64MultiArrayVelocityCommandDAO(
+    Base,
+    DataAccessObject[
+        giskardpy.tree.behaviors.joint_group_vel_controller_publisher.Float64MultiArrayVelocityCommand
+    ],
+):
+    __tablename__ = "Float64MultiArrayVelocityCommandDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class MultiDOFVelocityCommandDAO(
+    Base,
+    DataAccessObject[
+        giskardpy.tree.behaviors.joint_group_vel_controller_publisher.MultiDOFVelocityCommand
+    ],
+):
+    __tablename__ = "MultiDOFVelocityCommandDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
 
 
 class QPDataPublisherConfigDAO(

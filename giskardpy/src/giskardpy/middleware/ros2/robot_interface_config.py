@@ -22,6 +22,9 @@ from giskardpy.middleware.ros2.ros2_interface import (
     search_for_unique_publisher_of_type,
     search_for_unique_subscriber_of_type,
 )
+from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import (
+    VelocityCommand,
+)
 from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.tree.branches.giskard_bt import GiskardBT
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -252,12 +255,15 @@ class RobotInterfaceConfig(ABC):
         cmd_topic: str,
         connections: List[str],
         minimum_valid_velocity: float = 0.0,
+        velocity_command: Optional[VelocityCommand] = None,
     ):
         """
         For closed loop mode. Tell Giskard how it can send velocities for a group of connections.
         :param minimum_valid_velocity: minimum magnitude that small non-prismatic, non-finger
                                        joint velocities are raised to so the hardware moves.
                                        ``0.0`` disables clamping.
+        :param velocity_command: strategy selecting the command message type the controller
+                                 consumes; defaults to :class:`Float64MultiArrayVelocityCommand`.
         """
         controlled_connections: List[Connection] = []
         for i in range(len(connections)):
@@ -270,6 +276,7 @@ class RobotInterfaceConfig(ABC):
             cmd_topic=cmd_topic,
             connections=controlled_connections,
             minimum_valid_velocity=minimum_valid_velocity,
+            velocity_command=velocity_command,
         )
 
 

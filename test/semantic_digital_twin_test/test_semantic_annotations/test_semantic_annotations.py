@@ -339,11 +339,10 @@ def fit_rules_and_assert_semantic_annotations(
     )
 
 
-@pytest.mark.skipif(world_rdr is None, reason="requires world_rdr")
 def test_inferred_handle_bearing_annotations_have_handle_instance(
-    apartment_world_setup,
+    _apartment_world_setup,
 ):
-    world_reasoner = WorldReasoner(apartment_world_setup)
+    world_reasoner = WorldReasoner(_apartment_world_setup)
     found_semantic_annotations = world_reasoner.infer_semantic_annotations()
     drawers = [v for v in found_semantic_annotations if isinstance(v, Drawer)]
     doors = [v for v in found_semantic_annotations if isinstance(v, Door)]
