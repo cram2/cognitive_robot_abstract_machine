@@ -104,7 +104,7 @@ def set_of(*selected_variables: Union[Selectable[T], Any]) -> SetOf:
 def _resolve_domain(type_: Type[T], domain: Optional[DomainType]) -> DomainType:
     """
     Resolve a variable's domain: what :func:`variable` and
-    :meth:`~krrood.entity_query_language.query.match.Match.create_variable` both range a
+    :meth:`~krrood.entity_query_language.query.match.Match.create_or_update_variable` both range a
     variable's values over.
 
     :param type_: The type of the variable the domain is for.

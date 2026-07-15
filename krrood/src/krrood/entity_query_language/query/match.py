@@ -282,7 +282,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         self.kwargs = kwargs
         self._has_been_called = True
         if self.variable is None:
-            self.create_variable()
+            self.create_or_update_variable()
         return self
 
     @property
@@ -393,11 +393,11 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         if variable is not None:
             self.variable = variable
         elif self.variable is None:
-            self.create_variable()
+            self.create_or_update_variable()
 
         self.parent = parent
 
-    def create_variable(self):
+    def create_or_update_variable(self):
         """
         Create the subject variable from this match's current type and domain.
 
@@ -493,7 +493,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
 
         .. note::
             ``__call__`` eagerly creates a subject variable before the domain is known (and with
-            no domain that is a SymbolGraph-wide variable for Symbol types). ``create_variable``
+            no domain that is a SymbolGraph-wide variable for Symbol types). ``create_or_update_variable``
             re-scopes that same variable's domain in place (see its docstring) rather than
             replacing it, so a ``where`` recorded before this call keeps referencing the correct,
             now domain-scoped, variable.
@@ -502,7 +502,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         :return: This match, for chaining.
         """
         self.domain = domain
-        self.create_variable()
+        self.create_or_update_variable()
         return self
 
     def _update_kwargs_from_literal_values(self):
