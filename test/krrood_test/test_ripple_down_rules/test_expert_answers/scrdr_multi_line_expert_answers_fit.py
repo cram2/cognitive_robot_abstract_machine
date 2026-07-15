@@ -29,7 +29,7 @@ def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     return has_milk
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -63,7 +63,7 @@ def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     return is_aquatic
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -97,7 +97,7 @@ def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     return has_feathers
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -132,7 +132,7 @@ def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     return no_backbone and cannot_breath
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -166,4 +166,4 @@ def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     return has_no_fins
 
 
-"===New Answer==="
+'===New Answer==='
