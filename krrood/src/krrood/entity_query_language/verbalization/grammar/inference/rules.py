@@ -19,11 +19,13 @@ from krrood.entity_query_language.verbalization.grammar.query.rules import (
 
 
 class InferenceRuleRule(TopLevelEntityRule):
-    """Top-level inference-rule Entity → ``IF … THEN …`` block.
+    """
+    Top-level inference-rule Entity → ``IF … THEN …`` block.
 
-    A refinement of :class:`TopLevelEntityRule`: it applies exactly when that rule does *and* the
-    entity is an inference rule, so ``select`` prefers it (more-derived class) over the plain
-    top-level form without any tiebreak. Unlike the plain form it does not enter query scope.
+    A refinement of :class:`TopLevelEntityRule`: it applies exactly when that rule does
+    *and* the entity is an inference rule, so ``select`` prefers it (more-derived class)
+    over the plain top-level form without any tiebreak. Unlike the plain form it does
+    not enter query scope.
     """
 
     enters_query_scope = False

@@ -286,9 +286,9 @@ def test_has_ellipsis_attributes_true_for_nested_ellipsis():
 
 def test_has_ellipsis_attributes_true_for_ellipsis_element_in_plain_list():
     """
-    An ``...`` element sitting inside an otherwise-concrete list (no nested
-    ``Match`` elements) is still resolved as one literal-valued attribute
-    match, but is just as underspecified as a direct ``x=...`` assignment.
+    An ``...`` element sitting inside an otherwise-concrete list (no nested ``Match``
+    elements) is still resolved as one literal-valued attribute match, but is just as
+    underspecified as a direct ``x=...`` assignment.
     """
     match = a(KRROODPositions)(
         positions=[KRROODPosition(1, 2, 3)],

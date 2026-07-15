@@ -1187,6 +1187,7 @@ class DoorWithType(Door):
 
     type_description: Optional[str] = field(kw_only=True, default=None)
 
+
 @dataclass(eq=False)
 class Leg(HasRootBody):
     """

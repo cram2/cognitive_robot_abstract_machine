@@ -57,16 +57,16 @@ class StretchVelocityInterface(RobotInterfaceConfig):
 
         self.sync_joint_state_topic("/joint_states")
         joints = [
-            "joint_arm_l0", # 0
-            "joint_lift", # 1
-            "joint_wrist_yaw", # 2
-            "joint_wrist_pitch", #3
-            "joint_wrist_roll", # 4
-            "joint_head_pan", # 5
-            "joint_head_tilt", # 6
-            "joint_gripper_finger_left", #7
-            "joint_right_wheel", #8
-            "joint_left_wheel", #9
+            "joint_arm_l0",  # 0
+            "joint_lift",  # 1
+            "joint_wrist_yaw",  # 2
+            "joint_wrist_pitch",  # 3
+            "joint_wrist_roll",  # 4
+            "joint_head_pan",  # 5
+            "joint_head_tilt",  # 6
+            "joint_gripper_finger_left",  # 7
+            "joint_right_wheel",  # 8
+            "joint_left_wheel",  # 9
         ]
         self.add_joint_velocity_group_controller(
             cmd_topic="/joint_velocity_cmd",

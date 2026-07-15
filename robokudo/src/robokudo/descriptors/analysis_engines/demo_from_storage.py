@@ -16,25 +16,28 @@ from robokudo.idioms import pipeline_init
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for demonstrating tabletop segmentation from stored data.
+    """
+    Analysis engine for demonstrating tabletop segmentation from stored data.
 
-    This class implements a basic pipeline for tabletop segmentation using stored
-    camera data. It reads data from MongoDB storage and processes it through a
-    sequence of annotators to detect and segment objects on a table surface.
+    This class implements a basic pipeline for tabletop segmentation using stored camera
+    data. It reads data from MongoDB storage and processes it through a sequence of
+    annotators to detect and segment objects on a table surface.
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "demo_from_storage"
 
     def implementation(self) -> Pipeline:
-        """Create a basic pipeline for tabletop segmentation.
+        """
+        Create a basic pipeline for tabletop segmentation.
 
-        This method constructs the processing pipeline by configuring and connecting
-        the necessary annotators in sequence.
+        This method constructs the processing pipeline by configuring and connecting the
+        necessary annotators in sequence.
 
         :return: The configured pipeline for tabletop segmentation
         """

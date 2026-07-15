@@ -10,8 +10,8 @@ from krrood.exceptions import DataclassException, InputError
 @dataclass
 class NoInstancesProvidedError(InputError):
     """
-    Raised when a :class:`~krrood.parametrization.feature_extraction.feature_extractor.FeatureExtractor`
-    is constructed from an empty instance list.
+    Raised when a :class:`~krrood.parametrization.feature_extraction.feature_extractor.F
+    eatureExtractor` is constructed from an empty instance list.
     """
 
     def error_message(self) -> str:
@@ -26,9 +26,10 @@ class NoInstancesProvidedError(InputError):
 @dataclass
 class MissingFieldNameError(InputError):
     """
-    Raised when :attr:`~krrood.parametrization.feature_extraction.aggregations.AggregationStatistic.field_name`
-    is ``None`` but :attr:`~krrood.parametrization.feature_extraction.aggregations.AggregationStatistic.aggregation_features`
-    or a method that depends on it is accessed.
+    Raised when :attr:`~krrood.parametrization.feature_extraction.aggregations.Aggregati
+    onStatistic.field_name` is ``None`` but :attr:`~krrood.parametrization.feature_extra
+    ction.aggregations.AggregationStatistic.aggregation_features` or a method that
+    depends on it is accessed.
     """
 
     def error_message(self) -> str:
@@ -41,8 +42,8 @@ class MissingFieldNameError(InputError):
 @dataclass
 class OutOfDomainValueError(DataclassException):
     """
-    Raised when a computed aggregation statistic falls outside the training
-    domain of its latent variable.
+    Raised when a computed aggregation statistic falls outside the training domain of
+    its latent variable.
     """
 
     feature_name: str

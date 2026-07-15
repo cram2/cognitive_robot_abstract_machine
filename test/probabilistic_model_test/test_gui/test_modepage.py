@@ -31,21 +31,27 @@ class TestModeGUI(unittest.TestCase):
 
         # Configure marginal to return real numbers for bounds
         mock_marginal_v1 = MagicMock()
-        mock_marginal_v1.support.simple_sets = [SimpleEvent.from_data({self.v1: closed(0, 1)})]
-        
+        mock_marginal_v1.support.simple_sets = [
+            SimpleEvent.from_data({self.v1: closed(0, 1)})
+        ]
+
         mock_marginal_v2 = MagicMock()
-        mock_marginal_v2.support.simple_sets = [SimpleEvent.from_data({self.v2: Set.from_iterable(["a", "b"])})]
+        mock_marginal_v2.support.simple_sets = [
+            SimpleEvent.from_data({self.v2: Set.from_iterable(["a", "b"])})
+        ]
 
         def side_effect(vars):
             if vars == [self.v1]:
                 return mock_marginal_v1
             return mock_marginal_v2
-        
+
         self.model.marginal.side_effect = side_effect
 
         # Mock mode result: (Event, Likelihood)
         self.mode_event = Event.from_simple_sets(
-            SimpleEvent.from_data({self.v1: closed(0.5, 0.5), self.v2: Set.from_iterable(["a"])})
+            SimpleEvent.from_data(
+                {self.v1: closed(0.5, 0.5), self.v2: Set.from_iterable(["a"])}
+            )
         )
         self.likelihood = 0.8
 
@@ -79,7 +85,9 @@ class TestModeGUI(unittest.TestCase):
 
         # Mock build_evidence_event to return non-empty event
         widget.build_evidence_event = MagicMock(
-            return_value=Event.from_simple_sets(SimpleEvent.from_data({self.v1: closed(2, 3)}))
+            return_value=Event.from_simple_sets(
+                SimpleEvent.from_data({self.v1: closed(2, 3)})
+            )
         )
 
         # Mock calculate_mode to return None

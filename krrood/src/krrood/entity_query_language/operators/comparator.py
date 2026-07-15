@@ -1,8 +1,8 @@
 """
 Comparators for the Entity Query Language.
 
-This module provides binary comparison operators that evaluate relationships between symbolic expressions,
-including equality, ordering, and membership-style checks.
+This module provides binary comparison operators that evaluate relationships between
+symbolic expressions, including equality, ordering, and membership-style checks.
 """
 
 from __future__ import annotations
@@ -37,7 +37,8 @@ from krrood.entity_query_language.utils import is_iterable, make_set
 @dataclass(eq=False, repr=False)
 class Comparator(BinaryExpression, PerformsCartesianProduct):
     """
-    A symbolic equality check that can be used to compare symbolic variables using a provided comparison operation.
+    A symbolic equality check that can be used to compare symbolic variables using a
+    provided comparison operation.
     """
 
     left: Selectable
@@ -69,7 +70,6 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
         """
         Compares the left and right symbolic variables using the "operation".
         """
-
         yield from (
             self.get_operation_result(result)
             for result in self._evaluate_product_(sources)
@@ -79,7 +79,8 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
         """
         Evaluate the comparator operation and return the result.
 
-        :param child_result: The current result that has the values for the first and second operands.
+        :param child_result: The current result that has the values for the first and
+            second operands.
         :return: The result of the operation.
         """
         left_value, right_value = (

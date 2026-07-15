@@ -20,7 +20,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.habitats  of type Habitat."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.habitats  of
+    type Habitat.
+    """
     # Write your code here
     return case.species == "mammal" and case.aquatic == 0
 
@@ -50,7 +53,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.habitats  of type Habitat."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.habitats  of
+    type Habitat.
+    """
     # Write your code here
     return case.species == "fish"
 
@@ -80,7 +86,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.habitats  of type Habitat."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.habitats  of
+    type Habitat.
+    """
     # Write your code here
     return case.species == "bird" and case.legs > 0
 
@@ -110,7 +119,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.habitats  of type Habitat."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.habitats  of
+    type Habitat.
+    """
     # Write your code here
     return case.species == "molusc" and case.aquatic == 0
 
@@ -140,7 +152,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.habitats  of type Habitat."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.habitats  of
+    type Habitat.
+    """
     # Write your code here
     return case.species == "molusc" and case.aquatic == 1
 

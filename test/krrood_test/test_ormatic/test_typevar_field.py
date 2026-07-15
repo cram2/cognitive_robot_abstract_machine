@@ -7,18 +7,22 @@ from ..dataset.ormatic_interface import TypeVarFieldHolderDAO, KRROODPositionDAO
 
 
 def test_typevar_field_dao_generation():
-    """TypeVar-typed fields should generate FK columns and relationships."""
+    """
+    TypeVar-typed fields should generate FK columns and relationships.
+    """
     mapper = inspect(TypeVarFieldHolderDAO)
-    assert hasattr(TypeVarFieldHolderDAO, "typed_field_id"), (
-        "TypeVarFieldHolderDAO should have a typed_field_id column"
-    )
-    assert "typed_field" in mapper.relationships, (
-        "TypeVarFieldHolderDAO should have a typed_field relationship"
-    )
+    assert hasattr(
+        TypeVarFieldHolderDAO, "typed_field_id"
+    ), "TypeVarFieldHolderDAO should have a typed_field_id column"
+    assert (
+        "typed_field" in mapper.relationships
+    ), "TypeVarFieldHolderDAO should have a typed_field relationship"
 
 
 def test_typevar_field_to_dao(session, database):
-    """to_dao should persist TypeVar-typed fields correctly."""
+    """
+    to_dao should persist TypeVar-typed fields correctly.
+    """
     pos = KRROODPosition(1.0, 2.0, 3.0)
     holder = TypeVarFieldHolder(typed_field=pos, name="test")
 
@@ -37,7 +41,9 @@ def test_typevar_field_to_dao(session, database):
 
 
 def test_typevar_field_from_dao(session, database):
-    """from_dao should reconstruct TypeVar-typed fields correctly."""
+    """
+    from_dao should reconstruct TypeVar-typed fields correctly.
+    """
     pos = KRROODPosition(4.0, 5.0, 6.0)
     holder = TypeVarFieldHolder(typed_field=pos, name="roundtrip")
 

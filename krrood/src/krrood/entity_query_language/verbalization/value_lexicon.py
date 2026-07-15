@@ -33,7 +33,8 @@ def type_noun(type_: type) -> str:
 
 def value_phrase(value: Any) -> str:
     """
-    Render a Python value as a human-readable string — the single value-lexicalisation point.
+    Render a Python value as a human-readable string — the single value-lexicalisation
+    point.
 
     * ``None`` → ``"nothing"`` (a genuine value-slot absence; a top-level ``== None`` comparison
       is rendered as an absence predicate, not via this function).

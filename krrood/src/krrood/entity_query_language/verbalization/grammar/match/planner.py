@@ -20,8 +20,7 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
 @dataclass(frozen=True)
 class AttributeAssignment:
     """
-    One ``object.attribute == value`` equality from a match's construction
-    pattern.
+    One ``object.attribute == value`` equality from a match's construction pattern.
     """
 
     attribute: Attribute
@@ -36,31 +35,30 @@ class AttributeAssignment:
 
     is_predicted: bool
     """
-    ``True`` when the value is ``...`` (Ellipsis) — the attribute is to be
-    generated, verbalised as *"predict …"* rather than an equality.
+    ``True`` when the value is ``...`` (Ellipsis) — the attribute is to be generated,
+    verbalised as *"predict …"* rather than an equality.
     """
 
     comparator: Comparator
     """
-    The source ``attribute == value`` equality, so an ungrouped concrete
-    assignment can be said through the shared comparator-predicate path (and
-    pronominalised by coreference) rather than a hand-built genitive.
+    The source ``attribute == value`` equality, so an ungrouped concrete assignment can
+    be said through the shared comparator-predicate path (and pronominalised by
+    coreference) rather than a hand-built genitive.
     """
 
 
 @dataclass(frozen=True)
 class AttributeGroup:
     """
-    The equality assignments that share one object — e.g. the *x*, *y*, *z* of
-    one position — so they can be aggregated into *"x, y, and z of the position
-    are 1, 2, and 3 respectively"*.
+    The equality assignments that share one object — e.g. the *x*, *y*, *z* of one
+    position — so they can be aggregated into *"x, y, and z of the position are 1, 2,
+    and 3 respectively"*.
     """
 
     object: SymbolicExpression
     """
-    The object whose attributes these are — the selection itself for a direct
-    attribute, or a sub-object chain (``pose.position``) for a nested match's
-    attributes.
+    The object whose attributes these are — the selection itself for a direct attribute,
+    or a sub-object chain (``pose.position``) for a nested match's attributes.
     """
 
     assignments: List[AttributeAssignment]
@@ -116,17 +114,17 @@ class MatchPlan:
 
     other_conditions: List[SymbolicExpression]
     """
-    Construction conditions that don't group (multi-hop chains, type filters);
-    rendered as individual *"given that"* points.
+    Construction conditions that don't group (multi-hop chains, type filters); rendered
+    as individual *"given that"* points.
     """
 
     where_conditions: List[SymbolicExpression]
     """
     The conditions added via ``.where(...)``.
 
-    The plan only classifies them as the ``where`` part; deciding how to
-    say a list of conditions (including folding bound pairs into a
-    *between*) belongs to the condition verbalizer, not here.
+    The plan only classifies them as the ``where`` part; deciding how to say a list of
+    conditions (including folding bound pairs into a *between*) belongs to the condition
+    verbalizer, not here.
     """
 
 

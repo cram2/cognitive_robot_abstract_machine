@@ -30,21 +30,30 @@ from krrood.entity_query_language.verbalization.grammar.framework.planner import
 @dataclass(frozen=True)
 class ChainPlan:
     """
-    A ``MappedVariable`` chain analysed once into the values its rendering needs: the walked
-    chain, its root, the display path-parts, and whether it ends in a boolean attribute.
+    A ``MappedVariable`` chain analysed once into the values its rendering needs: the
+    walked chain, its root, the display path-parts, and whether it ends in a boolean
+    attribute.
     """
 
     chain: List[MappedVariable]
-    """The access path, root-adjacent first."""
+    """
+    The access path, root-adjacent first.
+    """
 
     root: SymbolicExpression
-    """The chain root (first non-``MappedVariable`` node)."""
+    """
+    The chain root (first non-``MappedVariable`` node).
+    """
 
     parts: List[PathStep]
-    """The display path-parts."""
+    """
+    The display path-parts.
+    """
 
     is_boolean_terminal: bool
-    """``True`` when the chain ends in a ``bool``-typed attribute (predicative form)."""
+    """
+    ``True`` when the chain ends in a ``bool``-typed attribute (predicative form).
+    """
 
     @property
     def is_single_variable_attribute(self) -> bool:
@@ -62,9 +71,10 @@ class ChainPlan:
 
     def renders_as_plural_attribute(self, number: GrammaticalNumber) -> bool:
         """
-        The chain precedence policy in one place: a single attribute on a variable, asked for in
-        the plural, renders as the bare-plural noun phrase *"attributes of Roots"* — which takes
-        precedence over the predicative form a boolean terminal would otherwise produce.
+        The chain precedence policy in one place: a single attribute on a variable,
+        asked for in the plural, renders as the bare-plural noun phrase *"attributes of
+        Roots"* — which takes precedence over the predicative form a boolean terminal
+        would otherwise produce.
 
         :param number: The grammatical number requested for the chain.
         :return: ``True`` when the chain renders as the bare-plural attribute form.
@@ -78,9 +88,9 @@ class ChainPlan:
 @dataclass
 class ChainPlanner(Planner[MappedVariable, ChainPlan]):
     """
-    Analyse a ``MappedVariable`` chain into a ``ChainPlan``: its root, the display path-parts, and
-    whether it ends in a boolean attribute (predicative form) — the chain decisions of *what to
-    say*, before any surface form is chosen.
+    Analyse a ``MappedVariable`` chain into a ``ChainPlan``: its root, the display path-
+    parts, and whether it ends in a boolean attribute (predicative form) — the chain
+    decisions of *what to say*, before any surface form is chosen.
 
     Reference: :cite:t:`reiter2000building` — content/structure determination (microplanning).
 

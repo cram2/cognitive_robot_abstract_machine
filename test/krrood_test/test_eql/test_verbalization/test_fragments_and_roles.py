@@ -1,12 +1,10 @@
 """
 VerbalizationFragment-structure tests.
 
-These tests verify that verbalization produces properly typed
-VerbalizationFragment trees — specifically that semantic roles
-(VARIABLE, ATTRIBUTE, KEYWORD, …) are preserved inside constraint
-clauses, binding phrases, grouped-by, ordered-by, and set_of output.
-They complement the plain-text regression tests in
-test_verbalization.py.
+These tests verify that verbalization produces properly typed VerbalizationFragment
+trees — specifically that semantic roles (VARIABLE, ATTRIBUTE, KEYWORD, …) are preserved
+inside constraint clauses, binding phrases, grouped-by, ordered-by, and set_of output.
+They complement the plain-text regression tests in test_verbalization.py.
 """
 
 from __future__ import annotations
@@ -102,8 +100,7 @@ def _walk_texts(frag: VerbalizationFragment, accumulator: list[str]) -> None:
 
 def test_constraint_fragment_preserves_variable_role(doors_and_drawers_world):
     """
-    'such that' clause must contain VARIABLE-role fragments, not plain
-    WordFragments.
+    'such that' clause must contain VARIABLE-role fragments, not plain WordFragments.
     """
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
@@ -150,8 +147,7 @@ def test_constraint_fragment_preserves_attribute_role(doors_and_drawers_world):
 
 def test_binding_override_replaces_entity_ref_in_constraint(doors_and_drawers_world):
     """
-    The 'such that' clause must use field-reference paths, not raw entity
-    names.
+    The 'such that' clause must use field-reference paths, not raw entity names.
     """
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
@@ -177,8 +173,7 @@ def test_binding_override_replaces_entity_ref_in_constraint(doors_and_drawers_wo
 
 def test_where_keyword_has_keyword_role():
     """
-    'where' in an InstantiatedVariable binding must carry KEYWORD semantic
-    role.
+    'where' in an InstantiatedVariable binding must carry KEYWORD semantic role.
     """
 
     @dataclass
@@ -248,8 +243,8 @@ def test_grouped_by_vars_are_role_fragments(departments_and_employees_fixture):
 
 def test_ordered_by_direction_fragment(handles_and_containers_world):
     """
-    The direction word in ordered-by must come from the ordering-range
-    vocabulary (not a bare string).
+    The direction word in ordered-by must come from the ordering-range vocabulary (not a
+    bare string).
     """
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
@@ -314,8 +309,8 @@ def test_set_of_vars_are_role_fragments(departments_and_employees_fixture):
 
 def test_where_clause_with_instantiated_var_preserves_roles(doors_and_drawers_world):
     """
-    WHERE clause on an entity query whose selected var is InstantiatedVariable
-    must preserve semantic roles (not be collapsed to a plain WordFragment).
+    WHERE clause on an entity query whose selected var is InstantiatedVariable must
+    preserve semantic roles (not be collapsed to a plain WordFragment).
     """
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)

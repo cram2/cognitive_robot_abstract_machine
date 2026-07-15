@@ -1,9 +1,8 @@
 """
 Pattern-matching helpers for the Entity Query Language.
 
-This module provides high-level match abstractions that build symbolic
-expressions for variables and attributes from concise, readable matching
-syntax.
+This module provides high-level match abstractions that build symbolic expressions for
+variables and attributes from concise, readable matching syntax.
 """
 
 from __future__ import annotations
@@ -81,10 +80,9 @@ class AbstractMatchExpression(Generic[T], ABC):
     """
     Abstract base class for constructing and handling a match expression.
 
-    This class is intended to provide a framework for defining and
-    managing match expressions, which are used to structural pattern
-    matching in the form of nested match expressions with keyword
-    arguments.
+    This class is intended to provide a framework for defining and managing match
+    expressions, which are used to structural pattern matching in the form of nested
+    match expressions with keyword arguments.
     """
 
     type_: Optional[Type[T]] = field(default=None, kw_only=True)
@@ -143,15 +141,13 @@ class AbstractMatchExpression(Generic[T], ABC):
     @abstractmethod
     def _resolve(self, *args, **kwargs):
         """
-        This method serves as an abstract definition to be implemented by
-        subclasses, aimed at handling specific resolution logic for the derived
-        class.
+        This method serves as an abstract definition to be implemented by subclasses,
+        aimed at handling specific resolution logic for the derived class.
 
-        The method is designed to be flexible in accepting any number
-        and type of input parameters through positional (*args) and
-        keyword (**kwargs) arguments. Subclasses must extend this method
-        to provide concrete implementations tailored to their unique
-        behaviors and requirements.
+        The method is designed to be flexible in accepting any number and type of input
+        parameters through positional (*args) and keyword (**kwargs) arguments.
+        Subclasses must extend this method to provide concrete implementations tailored
+        to their unique behaviors and requirements.
         """
         ...
 
@@ -162,8 +158,8 @@ class AbstractMatchExpression(Generic[T], ABC):
     @property
     def type(self) -> Optional[Type[T]]:
         """
-        If type is predefined return it, else if the variable is available
-        return its type, else return None.
+        If type is predefined return it, else if the variable is available return its
+        type, else return None.
         """
         if self.type_ is not None:
             return self.type_
@@ -233,11 +229,9 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
 
     _expression: Query = field(init=False, default=None)
     """
-    Cache for the expression (the actual EQL query) as soon as it has been
-    calculated.
+    Cache for the expression (the actual EQL query) as soon as it has been calculated.
 
-    This is needed to apply where conditions directly to the match
-    instance.
+    This is needed to apply where conditions directly to the match instance.
     """
 
     _where_conditions_: List[ConditionType] = field(init=False, default_factory=list)
@@ -248,25 +242,23 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
 
     _has_been_called: bool = field(init=False, default=False)
     """
-    Flag indicating whether the match instance has been called with keyword
-    arguments.
+    Flag indicating whether the match instance has been called with keyword arguments.
     """
 
     _quantifier_type_: Type[ResultQuantifier] = field(init=False, default=An)
     """
-    The result quantifier applied when this match is materialized into a
-    runnable query.
+    The result quantifier applied when this match is materialized into a runnable query.
 
-    Defaults to ``An`` (zero or more results); set to ``The`` when built
-    via ``the(...)``.
+    Defaults to ``An`` (zero or more results); set to ``The`` when built via
+    ``the(...)``.
     """
 
     domain: Optional[DomainType] = field(default=None, init=False)
     """
     The instances the match ranges over.
 
-    ``None`` constructs from scratch (an underspecified, generative
-    request); a domain makes it a search over those existing instances.
+    ``None`` constructs from scratch (an underspecified, generative request); a domain
+    makes it a search over those existing instances.
     """
 
     def __post_init__(self):
@@ -275,8 +267,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
 
     def _initialize_type_(self):
         """
-        Initialize the type of the match based on the provided information in-
-        place.
+        Initialize the type of the match based on the provided information in- place.
         """
         if isclass(self.factory):
             self.type_ = self.factory
@@ -292,12 +283,12 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
 
     def __call__(self, **kwargs) -> Union[T, Self, CanBehaveLikeAVariable[T]]:
         """
-        Update the match with new keyword arguments to constrain the type we
-        are matching with.
+        Update the match with new keyword arguments to constrain the type we are
+        matching with.
 
         :param kwargs: The keyword arguments to match against.
-        :return: The current match instance after updating it with the
-            new keyword arguments.
+        :return: The current match instance after updating it with the new keyword
+            arguments.
         """
         if self._has_been_called:
             raise CalledMatchMultipleTimes(self)
@@ -330,11 +321,10 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         parent: Optional[Match] = None,
     ):
         """
-        Resolve the match by creating the variable and conditions expressions
-        in-place.
+        Resolve the match by creating the variable and conditions expressions in-place.
 
-        :param variable: An optional pre-existing variable to use for
-            the match; if not provided, a new variable will be created.
+        :param variable: An optional pre-existing variable to use for the match; if not
+            provided, a new variable will be created.
         :param parent: The parent match if this is a nested match.
         """
         parent = parent or self
@@ -366,8 +356,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         :param attribute_name: The name of the attribute to create.
         :param assigned_value: The value assigned to the attribute.
         :param index_access: The index access to the attribute.
-        :return: The created instance after every child has been
-            resolved.
+        :return: The created instance after every child has been resolved.
         """
         attr_match = AttributeMatch(
             parent=parent,
@@ -388,10 +377,8 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         attribute matches for the parent match variable.
 
         :param key: The attribute name being processed.
-        :param value: The list or tuple containing elements to be
-            resolved.
-        :param parent: The parent match variable associated with the
-            provided key.
+        :param value: The list or tuple containing elements to be resolved.
+        :param parent: The parent match variable associated with the provided key.
         """
         # handle list like classes by wrapping the index access
         for index, element in enumerate(value):
@@ -410,8 +397,8 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         """
         Update the match variable, and parent.
 
-        :param variable: The variable to use for the match. If None, a
-            new variable will be created.
+        :param variable: The variable to use for the match. If None, a new variable will
+            be created.
         :param parent: The parent match if this is a nested match.
         """
         if variable is not None:
@@ -428,10 +415,10 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
 
     def _evaluate_natively_(self) -> Iterator:
         """
-        Evaluate the match selectively in the current python process: select
-        elements from the match's domain (its variable's domain, or the
-        ``SymbolGraph`` for ``Symbol`` types when no domain was given) that
-        satisfy the structural pattern and ``where`` conditions.
+        Evaluate the match selectively in the current python process: select elements
+        from the match's domain (its variable's domain, or the ``SymbolGraph`` for
+        ``Symbol`` types when no domain was given) that satisfy the structural pattern
+        and ``where`` conditions.
 
         .. note::
             Constructing *new* instances from an underspecified match is the job of a
@@ -492,8 +479,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
 
     def from_(self, domain: DomainType) -> Self:
         """
-        Range the match over ``domain`` instead of over all instances of its
-        type.
+        Range the match over ``domain`` instead of over all instances of its type.
 
         A domain does not commit the match to selection: the chosen backend decides what to do
         with it (a selective backend finds the matching existing instances, a generative backend
@@ -559,8 +545,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
 
     assigned_value: Optional[Union[Literal, Match]] = None
     """
-    The value to assign to the attribute, which can be a Match instance or a
-    Literal.
+    The value to assign to the attribute, which can be a Match instance or a Literal.
     """
 
     variable: Union[Attribute, FlatVariable] = field(default=None, kw_only=True)
@@ -583,8 +568,8 @@ class AttributeMatch(AbstractMatchExpression[T]):
 
     def _resolve(self):
         """
-        Resolve the attribute assignment by creating the conditions and
-        applying the necessary mappings to the attribute.
+        Resolve the attribute assignment by creating the conditions and applying the
+        necessary mappings to the attribute.
         """
         if not isinstance(self.assigned_value, AbstractMatchExpression) or (
             self.assigned_value.variable or self.assigned_value.resolved
@@ -653,8 +638,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
 
     def _update_kwargs_from(self, match: Match[T]):
         """
-        Update the kwargs of the parent match with the values of the assigned
-        variable.
+        Update the kwargs of the parent match with the values of the assigned variable.
 
         Only works if this is a variable assignment.
         """
@@ -709,8 +693,7 @@ def construct_graph_and_get_root(
     node_data: AbstractMatchExpression, graph: Optional[rx.PyDAG] = None
 ) -> RWXNode:
     """
-    Construct a graph representation of the match expression and return the
-    root node.
+    Construct a graph representation of the match expression and return the root node.
 
     :param node_data: The root node of the match expression.
     :param graph: The graph to construct the subgraph in.

@@ -94,7 +94,8 @@ import ast
 
 class IDGenerator:
     """
-    A class that generates incrementing, unique IDs and caches them for every object this is called on.
+    A class that generates incrementing, unique IDs and caches them for every object
+    this is called on.
     """
 
     _counter = 0
@@ -323,12 +324,13 @@ def extract_function_or_class_file(
     :param function_names: The names of the functions to extract.
     :param join_lines: Whether to join the lines of the function.
     :param return_line_numbers: Whether to return the line numbers of the function.
-    :param include_signature: Whether to include the function signature in the source code.
-    :param as_list: Whether to return a list of function sources instead of dict (useful when there is multiple
-     functions with same name).
+    :param include_signature: Whether to include the function signature in the source
+        code.
+    :param as_list: Whether to return a list of function sources instead of dict (useful
+        when there is multiple functions with same name).
     :param is_class: Whether to also look for class definitions
-    :return: A dictionary mapping function names to their source code as a string if join_lines is True,
-     otherwise as a list of strings.
+    :return: A dictionary mapping function names to their source code as a string if
+        join_lines is True, otherwise as a list of strings.
     """
     with open(file_path, "r") as f:
         source = f.read()
@@ -363,12 +365,13 @@ def extract_function_or_class_from_source(
     :param function_names: The names of the functions to extract.
     :param join_lines: Whether to join the lines of the function.
     :param return_line_numbers: Whether to return the line numbers of the function.
-    :param include_signature: Whether to include the function signature in the source code.
-    :param as_list: Whether to return a list of function sources instead of dict (useful when there is multiple
-     functions with same name).
+    :param include_signature: Whether to include the function signature in the source
+        code.
+    :param as_list: Whether to return a list of function sources instead of dict (useful
+        when there is multiple functions with same name).
     :param is_class: Whether to also look for class definitions
-    :return: A dictionary mapping function names to their source code as a string if join_lines is True,
-     otherwise as a list of strings.
+    :return: A dictionary mapping function names to their source code as a string if
+        join_lines is True, otherwise as a list of strings.
     """
     # Parse the source code into an AST
     tree = ast.parse(source)
@@ -460,7 +463,6 @@ def build_user_input_from_conclusion(conclusion: Any) -> str:
     :param conclusion: The conclusion to use for the callable expression.
     :return: The user input string.
     """
-
     # set user_input to the string representation of the conclusion
     if isinstance(conclusion, Callable):
         user_input = inspect.getsource(conclusion)
@@ -747,11 +749,14 @@ def extract_dependencies(code_lines):
 
 def serialize_dataclass(obj: Any, seen=None) -> Any:
     """
-    Recursively serialize a dataclass to a dictionary. If the dataclass contains any nested dataclasses, they will be
-    serialized as well. If the object is not a dataclass, it will be returned as is.
+    Recursively serialize a dataclass to a dictionary.
+
+    If the dataclass contains any nested dataclasses, they will be serialized as well.
+    If the object is not a dataclass, it will be returned as is.
 
     :param obj: The dataclass to serialize.
-    :return: The serialized dataclass as a dictionary or the object itself if it is not a dataclass.
+    :return: The serialized dataclass as a dictionary or the object itself if it is not
+        a dataclass.
     """
     if seen is None:
         seen = {}
@@ -784,9 +789,10 @@ def deserialize_dataclass(data: Any, refs: Optional[Dict[str, Any]] = None) -> A
 
 def preload_serialized_objects(data: Any, refs: Dict[str, Any] = None) -> Any:
     """
-    Recursively deserialize a dataclass from a dictionary, if the dictionary contains a key "__dataclass__" (Most likely
-    created by the serialize_dataclass function), it will be treated as a dataclass and deserialized accordingly,
-    otherwise it will be returned as is.
+    Recursively deserialize a dataclass from a dictionary, if the dictionary contains a
+    key "__dataclass__" (Most likely created by the serialize_dataclass function), it
+    will be treated as a dataclass and deserialized accordingly, otherwise it will be
+    returned as is.
 
     :param data: The dictionary to deserialize.
     :return: The deserialized dataclass.
@@ -946,7 +952,9 @@ def get_func_rdr_model_name(func: Callable, include_file_name: bool = False) -> 
 
 
 def stringify_hint(tp):
-    """Recursively convert a type hint to a string."""
+    """
+    Recursively convert a type hint to a string.
+    """
     if isinstance(tp, str):
         return tp
 
@@ -1023,7 +1031,9 @@ def get_type_from_type_hint(type_hint: Type) -> Union[Type, Tuple[Type, ...]]:
 
 
 def extract_types(tp, seen: Set = None) -> Set[type]:
-    """Recursively extract all base types from a type hint."""
+    """
+    Recursively extract all base types from a type hint.
+    """
     if seen is None:
         seen = set()
 
@@ -1104,7 +1114,8 @@ def get_class_file_path(cls):
 
 def get_function_representation(func: Callable) -> str:
     """
-    Get a string representation of a function, including its module and class if applicable.
+    Get a string representation of a function, including its module and class if
+    applicable.
 
     :param func: The function to represent.
     :return: A string representation of the function.
@@ -1188,7 +1199,8 @@ def is_iterable(obj: Any) -> bool:
 
 def get_type_from_string(type_path: str):
     """
-    Get a type from a string describing its path using the format "module_path.ClassName".
+    Get a type from a string describing its path using the format
+    "module_path.ClassName".
 
     :param type_path: The path to the type.
     """
@@ -1293,8 +1305,9 @@ class SubclassJSONSerializer:
     def _from_json(cls, data: Dict[str, Any]) -> Self:
         """
         Create a variable from a json dict.
-        This method is called from the from_json method after the correct subclass is determined and should be
-        overwritten by the respective subclass.
+
+        This method is called from the from_json method after the correct subclass is
+        determined and should be overwritten by the respective subclass.
 
         :param data: The json dict
         :return: The deserialized object
@@ -1366,7 +1379,9 @@ class SubclassJSONSerializer:
 
 
 def _pickle_thread(thread_obj) -> Any:
-    """Return a plain object with user-defined attributes but no thread behavior."""
+    """
+    Return a plain object with user-defined attributes but no thread behavior.
+    """
 
     class DummyThread:
         pass
@@ -1412,8 +1427,11 @@ def copy_case(case: Union[Case, SQLTable]) -> Union[Case, SQLTable, Any]:
 
 def copy_orm_instance(instance: SQLTable) -> SQLTable:
     """
-    Copy an ORM instance by expunging it from the session then deep copying it and adding it back to the session. This
-    is useful when you want to copy an instance and make changes to it without affecting the original instance.
+    Copy an ORM instance by expunging it from the session then deep copying it and
+    adding it back to the session.
+
+    This is useful when you want to copy an instance and make changes to it without
+    affecting the original instance.
 
     :param instance: The instance to copy.
     :return: The copied instance.
@@ -1519,7 +1537,7 @@ def get_origin_and_args_from_type_hint(
     type_hint: Type,
 ) -> Tuple[Optional[Type], Tuple[Type]]:
     """
-    Get the origin and arguments from a type hint.W
+    Get the origin and arguments from a type hint.W.
 
     :param type_hint: The type hint to get the origin and arguments from.
     :return: The origin and arguments of the type hint.
@@ -1612,8 +1630,10 @@ def get_attribute_name(
     possible_value: Optional[Any] = None,
 ) -> Optional[str]:
     """
-    Get the name of an attribute from an object. The attribute can be given as a value, a type or a target value.
-    And this method will try to find the attribute name using the given information.
+    Get the name of an attribute from an object.
+
+    The attribute can be given as a value, a type or a target value. And this method
+    will try to find the attribute name using the given information.
 
     :param obj: The object to get the attribute name from.
     :param attribute: The attribute to get the name of.
@@ -1687,8 +1707,8 @@ def get_attribute_name_from_value(obj: Any, attribute_value: Any) -> Optional[st
 
 def get_attribute_values_transitively(obj: Any, attribute: Any) -> Any:
     """
-    Get an attribute from a python object, if it is iterable, get the attribute values from all elements and unpack them
-    into a list.
+    Get an attribute from a python object, if it is iterable, get the attribute values
+    from all elements and unpack them into a list.
 
     :param obj: The object to get the sub attribute from.
     :param attribute: The  attribute to get.
@@ -2161,7 +2181,9 @@ subgraph cluster_legend {
 
     @staticmethod
     def esc(value):
-        """Escape Strings."""
+        """
+        Escape Strings.
+        """
         return _RE_ESC.sub(lambda m: r"\%s" % m.group(0), six.text_type(value))
 
 
@@ -2272,7 +2294,8 @@ def encapsulate_code_lines_into_a_function(
     case_query: CaseQuery,
 ) -> str:
     """
-    Encapsulate the given code lines into a function with the specified name, signature, and docstring.
+    Encapsulate the given code lines into a function with the specified name, signature,
+    and docstring.
 
     :param code_lines: The lines of code to include in the user input.
     :param function_name: The name of the function to include in the user input.

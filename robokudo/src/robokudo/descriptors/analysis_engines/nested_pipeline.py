@@ -1,4 +1,5 @@
-"""Analysis engine demonstrating nested pipeline functionality.
+"""
+Analysis engine demonstrating nested pipeline functionality.
 
 This module provides an analysis engine that demonstrates how to create and use
 nested pipelines within the main processing pipeline. It implements a main pipeline
@@ -31,7 +32,8 @@ from robokudo.gui import SetPipelineRedraw
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine demonstrating nested pipeline architecture.
+    """
+    Analysis engine demonstrating nested pipeline architecture.
 
     This class implements a pipeline that combines a main processing pipeline
     with a nested belief state pipeline. It demonstrates how to structure
@@ -50,7 +52,8 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         :rtype: str
@@ -58,7 +61,8 @@ class AnalysisEngine(AnalysisEngineInterface):
         return "nested_pipeline"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline with nested belief state processing.
+        """
+        Create a pipeline with nested belief state processing.
 
         This method constructs a processing pipeline that includes both a main
         pipeline for camera data processing and a nested pipeline for belief

@@ -59,8 +59,9 @@ class AlternativeMapping(HasGeneric[T], abc.ABC):
     def from_domain_object(cls, obj: T) -> Self:
         """
         Create this from a domain object.
-        Do not create any DAOs here but the target DAO of `T`.
-        The rest of the `to_dao` algorithm will process the fields of the created instance.
+
+        Do not create any DAOs here but the target DAO of `T`. The rest of the `to_dao`
+        algorithm will process the fields of the created instance.
 
         :param obj: The source object.
         :return: A new instance of this mapping class.
@@ -77,8 +78,11 @@ class AlternativeMapping(HasGeneric[T], abc.ABC):
     @classmethod
     def required_pre_build_classes(cls) -> List[Type]:
         """
-        A list of other classes that have to be built before this one in the `from_dao` algorithm.
-        The types inside the list are the domain types, not the data access objects nor the alternative mappings.
+        A list of other classes that have to be built before this one in the `from_dao`
+        algorithm.
+
+        The types inside the list are the domain types, not the data access objects nor
+        the alternative mappings.
         """
         return []
 

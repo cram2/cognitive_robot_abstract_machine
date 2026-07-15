@@ -9,14 +9,17 @@ _Key = TypeVar("_Key")
 _Value = TypeVar("_Value")
 
 _MISSING = object()
-"""Sentinel distinguishing a cache miss from a cached ``None``/falsy value."""
+"""
+Sentinel distinguishing a cache miss from a cached ``None``/falsy value.
+"""
 
 
 def weak_key_cache(
     function: Callable[[_Key], _Value],
 ) -> Callable[[_Key], _Value]:
     """
-    Memoize a single-argument function whose argument is a weak-referenceable key (e.g. a class).
+    Memoize a single-argument function whose argument is a weak-referenceable key (e.g.
+    a class).
 
     The cache holds the key *weakly*, so an entry is evicted as soon as the key is no longer
     referenced elsewhere. Unlike :func:`functools.lru_cache` (which keeps a strong reference to every

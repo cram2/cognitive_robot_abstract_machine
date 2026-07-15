@@ -248,8 +248,10 @@ def test_equal(session, database):
 
 
 def test_complicated_equal(session, database):
-    """Verify that a multi-variable entity query with equality constraints
-    translates correctly and returns the same result as EQL evaluation."""
+    """
+    Verify that a multi-variable entity query with equality constraints translates
+    correctly and returns the same result as EQL evaluation.
+    """
     world = World(
         1,
         [
@@ -763,7 +765,9 @@ def test_no_results(session, database):
 
 
 def test_set_of(session):
-    """Verify that set_of translates to SELECT of individual columns."""
+    """
+    Verify that set_of translates to SELECT of individual columns.
+    """
     b = variable(type_=Body, domain=[])
     query = an(set_of(b.size))
 
@@ -774,7 +778,9 @@ def test_set_of(session):
 
 
 def test_set_of_with_join(session):
-    """Verify that set_of with transitive attributes generates correct JOINs."""
+    """
+    Verify that set_of with transitive attributes generates correct JOINs.
+    """
     pose = variable(type_=KRROODPose, domain=[])
     query = an(set_of(pose.position.z))
 
@@ -830,7 +836,9 @@ def test_set_of_multi_variable(session, database):
 
 def test_set_of_move_action_transitive(session):
     """
-    Verify that set_of with both direct and transitive attributes generates correct JOINs.
+    Verify that set_of with both direct and transitive attributes generates correct
+    JOINs.
+
     This simulates the pattern of MoveToReachDAO.robot_x and
     MoveToReachDAO.grasp_description.rotate_gripper from coraplex.
     """
@@ -869,6 +877,7 @@ def test_set_of_move_action_transitive(session):
 def test_set_of_with_where(session):
     """
     Verify set_of with transitive attributes and WHERE condition.
+
     Simulates: SELECT x, y, z FROM PoseDAO JOIN PositionDAO WHERE z < 0.9
     """
     pose = variable(type_=KRROODPose, domain=[])
@@ -904,6 +913,7 @@ def test_set_of_with_where(session):
 def test_set_of_same_table_twice(session):
     """
     Verify that two variables of the same type produce separate JOINs with aliases.
+
     Simulates: JOIN NavigateActionDAO np ON ... JOIN NavigateActionDAO np2 ON ...
     This uses two KRROODPose variables to test the same pattern.
     """
@@ -998,7 +1008,9 @@ def test_plan_like_query(session):
 
 
 def test_set_of_multi_variable_evaluate(session, database):
-    """Verify that evaluate() for set_of with multiple variables returns dicts."""
+    """
+    Verify that evaluate() for set_of with multiple variables returns dicts.
+    """
     world = World(
         1,
         [
@@ -1035,7 +1047,9 @@ def test_set_of_multi_variable_evaluate(session, database):
 
 
 def test_set_of_attribute_evaluate(session, database):
-    """Verify that evaluate() for set_of with Attribute variables returns dicts."""
+    """
+    Verify that evaluate() for set_of with Attribute variables returns dicts.
+    """
     session.add(BodyDAO(name="Body1", size=10))
     session.add(BodyDAO(name="Body2", size=20))
     session.commit()
@@ -1055,7 +1069,9 @@ def test_set_of_attribute_evaluate(session, database):
 
 
 def test_set_of_transitive_evaluate(session, database):
-    """Verify evaluate() for set_of with transitive attributes returns dicts."""
+    """
+    Verify evaluate() for set_of with transitive attributes returns dicts.
+    """
     session.add(
         KRROODPoseDAO(
             position=KRROODPositionDAO(x=1.0, y=2.0, z=3.0),
@@ -1089,10 +1105,10 @@ def test_set_of_transitive_evaluate(session, database):
 def test_big_query_select_part(session):
     """
     Simulate the SELECT part of the big plan query using existing test classes.
+
     Simulates: SELECT robot_x, robot_y, rotate_gripper FROM ...
                WHERE rotate_gripper < 0.9 ORDER BY robot_x
     """
-
     move_pick = variable(type_=MoveAction, domain=[])
     move_place = variable(type_=MoveAction, domain=[])
 
@@ -1174,9 +1190,10 @@ def test_cte_from_eql(session, database):
 
 def test_case_when_with_min(session):
     """
-    Verify that min(case_when(...)) translates to SQL MIN(CASE WHEN ... THEN ... END).
-    Simulates: MIN(CASE WHEN d.polymorphic_type='PickUpActionDAO' THEN id END)
-    from the big plan query.
+    Verify that min(case_when(...)) translates to SQL MIN(CASE WHEN ...
+
+    THEN ... END). Simulates: MIN(CASE WHEN d.polymorphic_type='PickUpActionDAO' THEN id
+    END) from the big plan query.
     """
     action = variable(MoveAction, domain=None)
 
@@ -1207,7 +1224,9 @@ def test_case_when_with_min(session):
 
 
 def test_case_when_direct_in_set_of(session, database):
-    """Verify case_when directly in set_of without aggregator using rich setup."""
+    """
+    Verify case_when directly in set_of without aggregator using rich setup.
+    """
     action_obj = MoveAction(robot_x=15.5, robot_y=0.0, hip_rotation=0.0)
 
     dao = to_dao(action_obj)
@@ -1237,7 +1256,9 @@ def test_case_when_direct_in_set_of(session, database):
 
 
 def test_case_when_with_max(session):
-    """Verify max(case_when(...)) translates correctly."""
+    """
+    Verify max(case_when(...)) translates correctly.
+    """
     action = variable(MoveAction, domain=None)
     query = an(
         set_of(
@@ -1266,11 +1287,11 @@ def test_case_when_with_max(session):
 
 def test_entity_from_multi_hop_attribute(session, database):
     """
-    Prove bug: entity(a.pose.position) where the chain is two hops deep
-    (NestedAction → pose → KRROODPose → position → KRROODPosition) raises
-    AttributeResolutionError because _translate_entity_from_attribute looks up the
-    outermost attribute name ('position') directly on the leaf DAO (NestedActionDAO)
-    instead of walking the full chain.
+    Prove bug: entity(a.pose.position) where the chain is two hops deep (NestedAction →
+    pose → KRROODPose → position → KRROODPosition) raises AttributeResolutionError
+    because _translate_entity_from_attribute looks up the outermost attribute name
+    ('position') directly on the leaf DAO (NestedActionDAO) instead of walking the full
+    chain.
 
     After the fix the translator must join through KRROODPoseDAO and return
     KRROODPositionDAO instances for all linked actions.
@@ -1306,8 +1327,8 @@ def test_entity_with_relationship_selected_variable(session, database):
     Prove bug: entity(m.grasp_config).where(m.robot_x > 0.5) produces a cross-join
     instead of an INNER JOIN, returning too many results.
 
-    After the fix, GraspConfigDAO must be joined with MoveActionDAO via the FK so
-    only the grasp_config linked to a high-robot_x move is returned.
+    After the fix, GraspConfigDAO must be joined with MoveActionDAO via the FK so only
+    the grasp_config linked to a high-robot_x move is returned.
     """
     grasp_matching = GraspConfigDAO(
         rotate_gripper=0.3, approach_direction=0.0, manipulation_offset=0.0
@@ -1341,11 +1362,11 @@ def test_entity_with_relationship_selected_variable(session, database):
 
 def test_count_all_derives_dao_from_where_clause(session, database):
     """
-    Prove bug: set_of(count_all()).where(m.robot_x > 0.5) raises NoDAOFoundError
-    because CountAll carries no DAO information.
+    Prove bug: set_of(count_all()).where(m.robot_x > 0.5) raises NoDAOFoundError because
+    CountAll carries no DAO information.
 
-    After the fix, the translator must fall back to the WHERE clause to find the
-    base DAO (MoveActionDAO via m.robot_x) and emit SELECT count(*) FROM MoveActionDAO.
+    After the fix, the translator must fall back to the WHERE clause to find the base
+    DAO (MoveActionDAO via m.robot_x) and emit SELECT count(*) FROM MoveActionDAO.
     """
     session.add(MoveActionDAO(robot_x=1.0, robot_y=0.0, hip_rotation=0.0))
     session.add(MoveActionDAO(robot_x=2.0, robot_y=0.0, hip_rotation=0.0))
@@ -1369,9 +1390,9 @@ def test_order_by_aggregate(session, database):
     raises an error because _apply_clauses calls translate_attribute() on a Count
     aggregator instead of _translate_comparator_operand().
 
-    After the fix, the translator must emit:
-    SELECT size, COUNT(*) FROM BodyDAO GROUP BY size ORDER BY COUNT(*) DESC
-    and return rows ordered with the most-frequent size first.
+    After the fix, the translator must emit: SELECT size, COUNT(*) FROM BodyDAO GROUP BY
+    size ORDER BY COUNT(*) DESC and return rows ordered with the most-frequent size
+    first.
     """
     session.add_all(
         [

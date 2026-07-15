@@ -540,7 +540,9 @@ class ICub3MobileBase(MobileBase):
 @dataclass(eq=False)
 class ICub3(AbstractRobot, HasTorso[ICub3Torso], HasMobileBase[ICub3MobileBase]):
     """
-    The ICub3 robot built by the Istituto Italiano di Tecnologia. https://ami.iit.it/telexistence
+    The ICub3 robot built by the Istituto Italiano di Tecnologia.
+
+    https://ami.iit.it/telexistence
     """
 
     def _setup_collision_rules(self):

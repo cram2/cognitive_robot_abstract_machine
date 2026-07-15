@@ -1,4 +1,5 @@
-"""Analysis engine for visualizing stored annotations.
+"""
+Analysis engine for visualizing stored annotations.
 
 This module provides an analysis engine that demonstrates how to read and display
 data and annotations that have been previously stored in a MongoDB database. It
@@ -25,7 +26,8 @@ from robokudo.descriptors import CrDescriptorFactory
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for visualizing stored annotations.
+    """
+    Analysis engine for visualizing stored annotations.
 
     This class implements a pipeline that reads previously stored data and
     annotations from a MongoDB database and visualizes them. It is designed
@@ -43,14 +45,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "annotations_from_storage"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline for visualizing stored annotations.
+        """
+        Create a pipeline for visualizing stored annotations.
 
         This method constructs a processing pipeline that reads stored data and
         annotations from MongoDB and visualizes them. The pipeline is configured

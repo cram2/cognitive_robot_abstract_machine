@@ -205,7 +205,8 @@ def test_deferred_location_factory_runs_at_execution_not_construction():
 
 
 def test_deferred_location_reflects_state_changed_after_construction():
-    """The deferred factory observes the world state as it is when the location is
+    """
+    The deferred factory observes the world state as it is when the location is
     consumed, not as it was when the underspecified action was constructed.
     """
     observed_positions = []

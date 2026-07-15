@@ -44,7 +44,9 @@ def run_ae(
     ae_root: BehaviourTree,
     tickrate: int = 20,
 ) -> None:
-    """Run an Analysis Engine (AE) by periodically ticking the Behavior Tree."""
+    """
+    Run an Analysis Engine (AE) by periodically ticking the Behavior Tree.
+    """
     logger = logging.getLogger(LOGGING_IDENTIFIER_MAIN_EXECUTABLE)
     logger.info(f"Running AE named '{ae_name}'...")
 
@@ -87,8 +89,8 @@ def run_ae(
 
 def main() -> None:
     """
-    Entry point for the RoboKudo system, setting up ROS, parsing arguments,
-    loading the requested Analysis Engine, and spinning the ROS executors.
+    Entry point for the RoboKudo system, setting up ROS, parsing arguments, loading the
+    requested Analysis Engine, and spinning the ROS executors.
     """
     # 1. Parse CLI arguments (prefix_chars='_'):
     parser = argparse.ArgumentParser(prefix_chars="_")

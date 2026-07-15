@@ -31,34 +31,39 @@ from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 
 
 class StorageReaderInterface(CameraInterface):
-    """A camera interface for reading data from MongoDB storage.
+    """
+    A camera interface for reading data from MongoDB storage.
 
-    This interface reads sensor data and annotations that were previously stored
-    using the StorageWriter annotator. It handles data deserialization and
-    restoration of the Common Analysis Structure (CAS) views.
+    This interface reads sensor data and annotations that were previously stored using
+    the StorageWriter annotator. It handles data deserialization and restoration of the
+    Common Analysis Structure (CAS) views.
     """
 
     def __init__(self, camera_config: Any) -> None:
-        """Initialize the storage reader interface.
+        """
+        Initialize the storage reader interface.
 
-        Sets up MongoDB connection and creates a list reader for the specified
-        database.
+        Sets up MongoDB connection and creates a list reader for the specified database.
 
         :param camera_config: Configuration containing database settings
         """
         super().__init__(camera_config)
 
         self.storage: Storage = Storage(camera_config.db_name)
-        """MongoDB storage interface"""
-
+        """
+        MongoDB storage interface.
+        """
         self.reader: Storage.ListReader = self.storage.ListReader(camera_config.db_name)
-        """List-based reader for MongoDB data"""
+        """
+        List-based reader for MongoDB data.
+        """
 
     def has_new_data(self) -> bool:
-        """Check if more data is available to read.
+        """
+        Check if more data is available to read.
 
-        Handles looping behavior based on camera configuration and
-        maintains cursor position in the data sequence.
+        Handles looping behavior based on camera configuration and maintains cursor
+        position in the data sequence.
 
         :return: True if more data is available, False otherwise
         """
@@ -69,7 +74,8 @@ class StorageReaderInterface(CameraInterface):
         return self.reader.cursor_has_frames()
 
     def set_data(self, cas: CAS) -> None:
-        """Update the Common Analysis Structure with data from storage.
+        """
+        Update the Common Analysis Structure with data from storage.
 
         This method:
         * Retrieves the next frame from storage

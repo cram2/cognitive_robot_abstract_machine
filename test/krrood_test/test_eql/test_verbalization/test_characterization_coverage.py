@@ -1,6 +1,6 @@
 """
-Characterization (golden) tests that widen the black-box safety net before the verbalization
-refactor (:doc:`/eql/developer/verbalization_refactor_plan`).
+Characterization (golden) tests that widen the black-box safety net before the
+verbalization refactor (:doc:`/eql/developer/verbalization_refactor_plan`).
 
 They pin the *current* rendered English for behaviours the existing suite under-covers — multi-way
 coordination/folding, mixed nesting, double negation, and plural-subject agreement across the whole
@@ -36,7 +36,10 @@ from krrood.entity_query_language.verbalization.example_domain import (
 
 
 def test_three_co_owned_selection_attributes_fold_into_one_genitive():
-    """Three contiguous attributes of one owner share a single genitive, not three repetitions."""
+    """
+    Three contiguous attributes of one owner share a single genitive, not three
+    repetitions.
+    """
     employee = variable(Employee, domain=None)
     assert (
         verbalize_expression(
@@ -47,7 +50,10 @@ def test_three_co_owned_selection_attributes_fold_into_one_genitive():
 
 
 def test_range_fold_coexists_with_an_unrelated_conjunct():
-    """A folded lower/upper bound pair on one chain folds while a sibling conjunct stays standalone."""
+    """
+    A folded lower/upper bound pair on one chain folds while a sibling conjunct stays
+    standalone.
+    """
     robot = variable(Robot, domain=None)
     assert (
         verbalize_expression(
@@ -62,7 +68,10 @@ def test_range_fold_coexists_with_an_unrelated_conjunct():
 
 
 def test_and_nested_inside_or_keeps_both_connectives():
-    """A conjunction nested inside a disjunction renders both connectives without flattening across."""
+    """
+    A conjunction nested inside a disjunction renders both connectives without
+    flattening across.
+    """
     robot = variable(Robot, domain=None)
     assert verbalize_expression(
         an(
@@ -80,7 +89,10 @@ def test_and_nested_inside_or_keeps_both_connectives():
 
 
 def test_double_negation_is_not_currently_simplified():
-    """``not_(not_(x))`` is rendered literally today (a future simplification pass may collapse it)."""
+    """
+    ``not_(not_(x))`` is rendered literally today (a future simplification pass may
+    collapse it).
+    """
     robot = variable(Robot, domain=None)
     assert (
         verbalize_expression(not_(not_(robot.battery > 5)))
@@ -89,7 +101,10 @@ def test_double_negation_is_not_currently_simplified():
 
 
 def test_superlative_aggregation_in_where_collapses_to_a_modifier():
-    """``chain == max(other.chain)`` over a distinct same-type variable reads as *"with the maximum …"*."""
+    """
+    ``chain == max(other.chain)`` over a distinct same-type variable reads as *"with the
+    maximum …"*.
+    """
     transaction = variable(BankTransaction, domain=None)
     other = variable(BankTransaction, domain=None)
     assert (
@@ -106,8 +121,10 @@ def test_superlative_aggregation_in_where_collapses_to_a_modifier():
 
 
 def test_plural_subject_agreement_runs_through_the_whole_pipeline():
-    """An ordered, filtered listing exercises every realisation pass: bare-plural determiner, noun and
-    copula pluralisation, ``the`` → ``their`` pronominalisation, and comma orthography.
+    """
+    An ordered, filtered listing exercises every realisation pass: bare-plural
+    determiner, noun and copula pluralisation, ``the`` → ``their`` pronominalisation,
+    and comma orthography.
     """
     employee = variable(Employee, domain=None)
     assert verbalize_expression(

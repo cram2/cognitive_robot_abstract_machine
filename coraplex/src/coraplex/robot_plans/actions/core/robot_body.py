@@ -60,7 +60,7 @@ class MoveTorsoAction(ActionDescription):
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> SymbolicExpression | bool:
         """
-        The target joint state for the torso needs to be achieved
+        The target joint state for the torso needs to be achieved.
         """
         joint_state = context.robot.get_torso().get_joint_state_by_type(
             kwargs["torso_state"]
@@ -76,11 +76,12 @@ class SetGripperAction(ActionDescription):
 
     gripper: Arms
     """
-    The gripper that should be set 
+    The gripper that should be set.
     """
+
     motion: GripperState
     """
-    The motion that should be set on the gripper
+    The motion that should be set on the gripper.
     """
 
     @property
@@ -127,7 +128,9 @@ class ParkArmsAction(ActionDescription):
 @dataclass
 class CarryAction(ActionDescription):
     """
-    Parks the robot's arms. And align the arm with the given Axis of a frame.
+    Parks the robot's arms.
+
+    And align the arm with the given Axis of a frame.
     """
 
     arm: Arms
@@ -211,8 +214,8 @@ class CarryAction(ActionDescription):
 @dataclass
 class FollowToolCenterPointPathAction(ActionDescription):
     """
-    Represents an action to move a robotic arm's TCP (Tool Center Point) along a
-    path of poses.
+    Represents an action to move a robotic arm's TCP (Tool Center Point) along a path of
+    poses.
     """
 
     target_locations: PoseTrajectory

@@ -39,10 +39,12 @@ class GaussianLayerTestCase(unittest.TestCase):
         nx_pc = NXProbabilisticCircuit()
         x = Continuous("x")
         g1 = UnivariateContinuousLeaf(
-            GaussianDistribution(variable=x, location=0.0, scale=0.99), probabilistic_circuit=nx_pc
+            GaussianDistribution(variable=x, location=0.0, scale=0.99),
+            probabilistic_circuit=nx_pc,
         )
         g2 = UnivariateContinuousLeaf(
-            GaussianDistribution(variable=x, location=1.0, scale=1.0), probabilistic_circuit=nx_pc
+            GaussianDistribution(variable=x, location=1.0, scale=1.0),
+            probabilistic_circuit=nx_pc,
         )
         s = SumUnit(probabilistic_circuit=nx_pc)
         s.add_subcircuit(g2, 0.5)

@@ -128,9 +128,9 @@ def test_ground_preserves_room_scalar_variables(rpc, room_query_4):
 
 def test_ground_integrates_out_unavailable_aggregates(rpc, room_query_4):
     """
-    ``chair_count`` and ``table_count`` cannot be determined from the
-    underspecified query, so the Monte-Carlo path must integrate them out: they
-    must not survive as variables, while the object-type variables remain.
+    ``chair_count`` and ``table_count`` cannot be determined from the underspecified
+    query, so the Monte-Carlo path must integrate them out: they must not survive as
+    variables, while the object-type variables remain.
     """
     model = rpc.ground(room_query_4)
     names = {v.name for v in model.variables}
@@ -147,8 +147,8 @@ def test_ground_with_unavailable_aggregate_is_valid(rpc, room_query_4):
 
 def test_non_positive_sample_count_raises_when_integration_needed(rpc, room_query_4):
     """
-    Monte-Carlo integration cannot be disabled: a non-positive sample count is
-    rejected when undetermined aggregates must be integrated out.
+    Monte-Carlo integration cannot be disabled: a non-positive sample count is rejected
+    when undetermined aggregates must be integrated out.
     """
     rpc.monte_carlo_sample_count = 0
     with pytest.raises(InvalidMonteCarloSampleCountError):
@@ -157,8 +157,8 @@ def test_non_positive_sample_count_raises_when_integration_needed(rpc, room_quer
 
 def test_monte_carlo_sample_count_controls_mixture_size(rpc, room_query_4):
     """
-    Drawing more samples discovers more distinct aggregate values, each adding
-    an exchangeable-distribution instance (and its sum units) to the mixture.
+    Drawing more samples discovers more distinct aggregate values, each adding an
+    exchangeable-distribution instance (and its sum units) to the mixture.
     """
     np.random.seed(0)
     rpc.monte_carlo_sample_count = 1

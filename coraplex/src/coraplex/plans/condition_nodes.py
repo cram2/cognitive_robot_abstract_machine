@@ -16,22 +16,24 @@ from coraplex.plans.plan_node import PlanNode, ActionNode
 @dataclass
 class ConditionNode(PlanNode):
     """
-    Node representing a pre or post condition of an action
+    Node representing a pre or post condition of an action.
     """
 
     condition: ConditionType = field(kw_only=True)
     """
-    The EQL condition to be evaluated
+    The EQL condition to be evaluated.
     """
 
     pre_condition: bool = field(kw_only=True)
     """
-    If this is a pre or post condition
+    If this is a pre or post condition.
     """
 
     action_node: ActionNode = field(kw_only=True)
     """
-    The action node where this condition belongs to. Needed to raise the correct exception in case the condition is not satisfied.
+    The action node where this condition belongs to.
+
+    Needed to raise the correct exception in case the condition is not satisfied.
     """
 
     def notify(self):
@@ -46,8 +48,8 @@ class ConditionNode(PlanNode):
 
 def condition_monitor(condition_node: ConditionNode) -> ThreadedPredicateMonitor:
     """
-    Build a giskard monitor that evaluates a PyCRAM condition inside a motion
-    state chart.
+    Build a giskard monitor that evaluates a PyCRAM condition inside a motion state
+    chart.
 
     The EQL condition is wrapped in a plain callable, so giskard never sees any
     PyCRAM/EQL types. The condition is evaluated in a background thread (see
@@ -67,9 +69,9 @@ def condition_monitor(condition_node: ConditionNode) -> ThreadedPredicateMonitor
 @dataclass(eq=False, repr=False)
 class PlanNodeStatusMonitor(MotionStatechartNode):
     """
-    A motion-statechart monitor whose observation reflects a boolean predicate over
-    a PyCRAM :class:`~pycram.plans.plan_node.PlanNode`'s status (e.g. whether the
-    node is interrupted or paused).
+    A motion-statechart monitor whose observation reflects a boolean predicate over a
+    PyCRAM :class:`~pycram.plans.plan_node.PlanNode`'s status (e.g. whether the node is
+    interrupted or paused).
 
     Unlike :class:`~giskardpy.motion_statechart.monitors.payload_monitors.ThreadedPredicateMonitor`,
     the predicate is evaluated synchronously on **every** tick, so the observation
@@ -78,7 +80,9 @@ class PlanNodeStatusMonitor(MotionStatechartNode):
     """
 
     predicate: Callable[[], bool] = field(kw_only=True)
-    """The predicate over the originating plan node's status."""
+    """
+    The predicate over the originating plan node's status.
+    """
 
     def on_tick(self, context: MotionStatechartContext) -> ObservationStateValues:
         return (

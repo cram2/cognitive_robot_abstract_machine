@@ -20,7 +20,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.mammal
     return species
@@ -51,7 +53,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     has_milk_glands = case.milk == 1
     return has_milk_glands
@@ -82,7 +87,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.mammal
     return species
@@ -113,7 +120,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.fish
     return species
@@ -144,7 +153,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     is_aquatic = case.aquatic == 1
     return is_aquatic
@@ -175,7 +187,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.mammal
     return species
@@ -206,7 +220,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.mammal
     return species
@@ -237,7 +253,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.mammal
     return species
@@ -268,7 +286,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.mammal
     return species
@@ -299,7 +319,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.fish
     return species
@@ -330,7 +352,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.fish
     return species
@@ -361,7 +385,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.mammal
     return species
@@ -392,7 +418,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.mammal
     return species
@@ -423,7 +451,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.bird
     return species
@@ -454,7 +484,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     has_feathers = case.feathers == 1
     return has_feathers
@@ -485,7 +518,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.fish
     return species
@@ -516,7 +551,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.molusc
     return species
@@ -547,7 +584,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     no_backbone = case.backbone == 0
     cannot_breath = case.breathes == 0
@@ -579,7 +619,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.molusc
     return species
@@ -610,7 +652,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     has_no_fins = case.fins == 0
     return has_no_fins
@@ -641,7 +686,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.molusc
     return species
@@ -672,7 +719,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.bird
     return species
@@ -703,7 +752,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.mammal
     return species
@@ -734,7 +785,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.fish
     return species
@@ -765,7 +818,9 @@ from pandas.core.frame import DataFrame
 
 
 def animal_species_of_type_species(case: DataFrame) -> Species:
-    """Get possible value(s) for Animal.species  of type Species."""
+    """
+    Get possible value(s) for Animal.species  of type Species.
+    """
     # Write your code here
     species = Species.mammal
     return species
@@ -796,7 +851,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     has_milk_glands = case.milk == 1
     return has_milk_glands

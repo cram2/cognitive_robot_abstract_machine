@@ -43,6 +43,7 @@ class CollisionCheck(SubclassJSONSerializer):
     """
     Second body in the collision check.
     """
+
     distance: float | None = None
     """
     Minimum distance to check for collisions.
@@ -61,6 +62,7 @@ class CollisionCheck(SubclassJSONSerializer):
     ) -> Self:
         """
         Creates a CollisionCheck instance and validates its properties.
+
         Makes sure body_a and body_b are sorted properly.
         :param body_a: First body in the collision check.
         :param body_b: Second body in the collision check.
@@ -119,7 +121,9 @@ class CollisionCheck(SubclassJSONSerializer):
 @dataclass
 class CollisionMatrix:
     """
-    Describes a matrix in sparse format by storing only unique pairs of bodies with collision checks.
+    Describes a matrix in sparse format by storing only unique pairs of bodies with
+    collision checks.
+
     This is the input for collision checking algorithms.
     .. note:: CollisionRule objects are the intended way to modify collision matrices.
     """
@@ -169,9 +173,11 @@ class CollisionMatrix:
     ) -> bool:
         """
         Checks if any combination of bodies between groups is in the collision matrix.
+
         :param group_a: The first collision group.
         :param group_b: The second collision group.
-        :return: True if any combination of bodies between the groups is in the collision matrix, False otherwise.
+        :return: True if any combination of bodies between the groups is in the
+            collision matrix, False otherwise.
         """
         return any(
             CollisionCheck.create_and_validate(body_a, body_b) in self.collision_checks
@@ -183,6 +189,7 @@ class CollisionMatrix:
 class CollisionRule(ABC):
     """
     Base class for collision rules.
+
     They modify collision matrices by adding or removing collision checks.
     """
 
@@ -205,7 +212,9 @@ class CollisionRule(ABC):
 
     def update(self, world: World):
         """
-        Updates the collision rule based on the current state of the world, if the world model has changed.
+        Updates the collision rule based on the current state of the world, if the world
+        model has changed.
+
         :param world: The world used for updating
         """
         if self.is_up_to_date(world):
@@ -217,6 +226,7 @@ class CollisionRule(ABC):
     def _update(self, world: World):
         """
         Specific update logic for the collision rule.
+
         :param world: The world used for updating.
         """
 
@@ -224,7 +234,8 @@ class CollisionRule(ABC):
 @dataclass
 class MaxAvoidedCollisionsRule(ABC):
     """
-    Base class for collision rules that define the maximum number of collisions that can be avoided for a given body.
+    Base class for collision rules that define the maximum number of collisions that can
+    be avoided for a given body.
     """
 
     @abstractmethod
@@ -238,7 +249,8 @@ class MaxAvoidedCollisionsRule(ABC):
 @dataclass
 class DefaultMaxAvoidedCollisions(MaxAvoidedCollisionsRule):
     """
-    Default implementation of MaxAvoidedCollisionsRule that sets the maximum number of avoided collisions to 1 for all bodies.
+    Default implementation of MaxAvoidedCollisionsRule that sets the maximum number of
+    avoided collisions to 1 for all bodies.
     """
 
     def get_max_avoided_collisions(self, body: Body) -> int | None:
@@ -248,13 +260,15 @@ class DefaultMaxAvoidedCollisions(MaxAvoidedCollisionsRule):
 @dataclass
 class MaxAvoidedCollisionsOverride(MaxAvoidedCollisionsRule, SubclassJSONSerializer):
     """
-    Implementation of MaxAvoidedCollisionsRule that overrides the maximum number of avoided collisions for specific bodies.
+    Implementation of MaxAvoidedCollisionsRule that overrides the maximum number of
+    avoided collisions for specific bodies.
     """
 
     value: int
     """
     Maximum number of avoided collisions for the given bodies.
     """
+
     bodies: set[Body]
     """
     Bodies for which the maximum number of avoided collisions is overridden.

@@ -493,8 +493,7 @@ class TestRotationMatrix:
 
     def test_quaternion_consistency(self):
         """
-        Test consistency between quaternion and rotation matrix
-        representations.
+        Test consistency between quaternion and rotation matrix representations.
         """
         # Create rotation via different methods
         r_rpy = RotationMatrix.from_rpy(0.1, 0.2, 0.3)

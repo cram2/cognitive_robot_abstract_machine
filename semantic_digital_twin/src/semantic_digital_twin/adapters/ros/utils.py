@@ -15,7 +15,9 @@ def is_ros2_message(obj: Any) -> bool:
 
 def is_ros2_message_class(clazz: Type) -> bool:
     """
-    Checks if a class is a ROS2 message based on its slots and field types and hope nothing else has the same.
+    Checks if a class is a ROS2 message based on its slots and field types and hope
+    nothing else has the same.
+
     :param clazz: class to check
     :return: whether it's a ros2 message
     """

@@ -21,6 +21,7 @@ from random_events.product_algebra import SimpleEvent, Event
 class QueryWidget(QWidget):
     """
     The Query page widget of the GUI.
+
     Allows constructing queries and evidence to calculate probabilities.
     """
 
@@ -214,7 +215,9 @@ class QueryWidget(QWidget):
         return Event.from_simple_sets(simple_event)
 
     def refresh(self):
-        """Called when a new model is loaded."""
+        """
+        Called when a new model is loaded.
+        """
         # Clear all rows and re-initialize
         for w in self.query_widgets:
             w.parentWidget().deleteLater()

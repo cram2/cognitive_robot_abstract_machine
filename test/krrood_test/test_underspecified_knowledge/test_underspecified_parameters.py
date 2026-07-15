@@ -91,9 +91,9 @@ def test_union_types():
 
 def test_domain_object_with_exchangeable_parts_but_no_aggregation_mixin_is_skipped():
     """
-    Prove that a domain object whose class has exchangeable parts but does not
-    inherit from HasExchangeablePartAggregations produces no variables for
-    those parts and raises no exception.
+    Prove that a domain object whose class has exchangeable parts but does not inherit
+    from HasExchangeablePartAggregations produces no variables for those parts and
+    raises no exception.
     """
     container = Container(name="container")
     cabinet = Cabinet(container=container)
@@ -106,9 +106,8 @@ def test_domain_object_with_exchangeable_parts_but_no_aggregation_mixin_is_skipp
 
 def test_iterable_of_primitives_produces_indexed_variables():
     """
-    Each primitive element in a list literal must produce a distinct
-    conditioning variable named ``ClassName.field[index]`` in
-    ``parameters.variables``.
+    Each primitive element in a list literal must produce a distinct conditioning
+    variable named ``ClassName.field[index]`` in ``parameters.variables``.
 
     Regression test for a bug in
     ``_extract_variables_from_iterable_literal`` where the return value
@@ -137,18 +136,16 @@ def test_iterable_of_primitives_produces_indexed_variables():
 
 def test_list_of_enum_field_produces_indexed_variables():
     """
-    Assigning a literal list of enum values to a ``List[EnumType]`` field must
-    produce one conditioning variable per element, named
-    ``ClassName.field[index]``.
+    Assigning a literal list of enum values to a ``List[EnumType]`` field must produce
+    one conditioning variable per element, named ``ClassName.field[index]``.
 
     Regression test for a bug in the type-mismatch guard in
-    ``_handle_literal_attribute_match``: the guard fired for any value
-    that was not itself in ``compatible_types``, including lists.
-    Because the EQL system strips the ``List[...]`` container and
-    exposes only the element type as ``_type_``, a ``List[TestEnum]``
-    field and a bare ``TestEnum`` field were indistinguishable, so
-    assigning a list to the former raised ``TypeError`` instead of
-    forwarding to ``_extract_variables_from_iterable_literal``.
+    ``_handle_literal_attribute_match``: the guard fired for any value that was not
+    itself in ``compatible_types``, including lists. Because the EQL system strips the
+    ``List[...]`` container and exposes only the element type as ``_type_``, a
+    ``List[TestEnum]`` field and a bare ``TestEnum`` field were indistinguishable, so
+    assigning a list to the former raised ``TypeError`` instead of forwarding to
+    ``_extract_variables_from_iterable_literal``.
     """
     prob_q = a(ListOfEnum)(list_of_enum=[TestEnum.OPTION_A, TestEnum.OPTION_B])
     parameters = UnderspecifiedParameters(prob_q)

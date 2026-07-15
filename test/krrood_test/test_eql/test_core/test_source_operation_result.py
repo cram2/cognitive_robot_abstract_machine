@@ -35,7 +35,9 @@ class Item:
 
 
 def _first_result(expr, sources=None):
-    """Return the first OperationResult from _evaluate_()."""
+    """
+    Return the first OperationResult from _evaluate_().
+    """
     return next(expr._evaluate_(sources))
 
 
@@ -49,7 +51,10 @@ def _all_results(expr, sources=None):
 
 
 def test_variable_previous_is_none_on_top_level_evaluate():
-    """Top-level Variable evaluation: previous chain has no real bindings from another stage."""
+    """
+    Top-level Variable evaluation: previous chain has no real bindings from another
+    stage.
+    """
     var = variable_from([1, 2])
     for result in var._evaluate_():
         # previous_operation_result may be the empty sentinel; no external stage bindings appear
@@ -60,7 +65,9 @@ def test_variable_previous_is_none_on_top_level_evaluate():
 
 
 def test_variable_previous_is_sources_when_operation_result_passed():
-    """Variable links incoming OperationResult as its previous_operation_result."""
+    """
+    Variable links incoming OperationResult as its previous_operation_result.
+    """
     source_var = variable_from([99])
     incoming = _first_result(source_var)
 
@@ -70,7 +77,10 @@ def test_variable_previous_is_sources_when_operation_result_passed():
 
 
 def test_variable_previous_is_sources_when_empty_operation_result_passed():
-    """Variable links an empty OperationResult as previous (sentinel case is still OperationResult)."""
+    """
+    Variable links an empty OperationResult as previous (sentinel case is still
+    OperationResult).
+    """
     var = variable_from([1, 2])
     sentinel = OperationResult({})
     for result in _all_results(var, sentinel):
@@ -83,8 +93,10 @@ def test_variable_previous_is_sources_when_empty_operation_result_passed():
 
 
 def test_query_sources_reachable_via_all_bindings():
-    """Query results: incoming sources are reachable via all_bindings even though
-    the query's previous_operation_result points at the internal child_result."""
+    """
+    Query results: incoming sources are reachable via all_bindings even though the
+    query's previous_operation_result points at the internal child_result.
+    """
     source_var = variable_from([99])
     incoming = _first_result(source_var)
 
@@ -97,7 +109,9 @@ def test_query_sources_reachable_via_all_bindings():
 
 
 def test_query_with_where_sources_reachable_via_all_bindings():
-    """Query+where results: incoming sources propagate into all_bindings."""
+    """
+    Query+where results: incoming sources propagate into all_bindings.
+    """
     source_var = variable_from([99])
     incoming = _first_result(source_var)
 
@@ -117,7 +131,9 @@ def test_query_with_where_sources_reachable_via_all_bindings():
 
 
 def test_short_circuit_previous_is_incoming():
-    """Short-circuit path (ID already in bindings) links incoming as previous."""
+    """
+    Short-circuit path (ID already in bindings) links incoming as previous.
+    """
     var = variable_from([42])
     incoming = _first_result(var)
     assert var._id_ in incoming.bindings
@@ -133,7 +149,9 @@ def test_short_circuit_previous_is_incoming():
 
 
 def test_variable_chain_is_traversable():
-    """previous_operation_result forms a traversable chain across evaluation stages."""
+    """
+    previous_operation_result forms a traversable chain across evaluation stages.
+    """
     v1 = variable_from([1])
     r1 = _first_result(v1)
 
@@ -145,7 +163,9 @@ def test_variable_chain_is_traversable():
 
 
 def test_chain_two_hops():
-    """Three-stage Variable pipeline: each result links to previous stage."""
+    """
+    Three-stage Variable pipeline: each result links to previous stage.
+    """
     v1 = variable_from([1])
     r1 = _first_result(v1)
 
@@ -165,7 +185,9 @@ def test_chain_two_hops():
 
 
 def test_all_bindings_reaches_upstream_variable():
-    """all_bindings traverses the full previous chain to expose upstream variable values."""
+    """
+    all_bindings traverses the full previous chain to expose upstream variable values.
+    """
     source_var = variable_from([99])
     incoming = _first_result(source_var)
 
@@ -179,7 +201,9 @@ def test_all_bindings_reaches_upstream_variable():
 
 
 def test_all_bindings_does_not_affect_own_bindings():
-    """Passing an OperationResult as sources does not change own binding values."""
+    """
+    Passing an OperationResult as sources does not change own binding values.
+    """
     source_var = variable_from([99])
     incoming = _first_result(source_var)
 
@@ -200,7 +224,9 @@ def test_all_bindings_does_not_affect_own_bindings():
 
 
 def test_results_with_same_content_are_equal_regardless_of_chain():
-    """Two Variable results from the same domain with the same previous chain are equal."""
+    """
+    Two Variable results from the same domain with the same previous chain are equal.
+    """
     var = variable_from([7])
     r1 = _first_result(var)
     r2 = _first_result(var)
@@ -213,7 +239,9 @@ def test_results_with_same_content_are_equal_regardless_of_chain():
 
 
 def test_inference_sources_reachable_via_all_bindings():
-    """InstantiatedVariable results: incoming sources reachable via all_bindings."""
+    """
+    InstantiatedVariable results: incoming sources reachable via all_bindings.
+    """
     source_var = variable_from([0])
     incoming = _first_result(source_var)
 

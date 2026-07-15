@@ -15,8 +15,8 @@ from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
 @dataclass
 class RoboCasaApplianceNotFoundError(DataclassException, LookupError):
     """
-    Raised when no configured RoboCasa fixture matching a requested appliance category can be found
-    in any kitchen layout.
+    Raised when no configured RoboCasa fixture matching a requested appliance category
+    can be found in any kitchen layout.
     """
 
     category: RoboCasaKitchenApplianceCategory
@@ -37,8 +37,8 @@ class RoboCasaApplianceNotFoundError(DataclassException, LookupError):
 @dataclass
 class RoboCasaTaskNotFoundError(DataclassException, LookupError):
     """
-    Raised when a requested task name does not correspond to a registered RoboCasa kitchen task
-    environment.
+    Raised when a requested task name does not correspond to a registered RoboCasa
+    kitchen task environment.
     """
 
     task_name: str
@@ -61,7 +61,8 @@ class RoboCasaTaskNotFoundError(DataclassException, LookupError):
 @dataclass
 class RoboCasaObjectAssetsNotFoundError(DataclassException, FileNotFoundError):
     """
-    Raised when no downloaded asset files can be found for a requested RoboCasa object category.
+    Raised when no downloaded asset files can be found for a requested RoboCasa object
+    category.
     """
 
     category: RoboCasaObjectCategory
@@ -92,8 +93,8 @@ class RoboCasaObjectAssetsNotFoundError(DataclassException, FileNotFoundError):
 @dataclass
 class RoboCasaObjectInstanceIndexError(DataclassException, IndexError):
     """
-    Raised when a requested object instance index exceeds the number of downloaded instances of a
-    RoboCasa object category.
+    Raised when a requested object instance index exceeds the number of downloaded
+    instances of a RoboCasa object category.
     """
 
     category: RoboCasaObjectCategory
@@ -135,7 +136,8 @@ class RoboCasaObjectInstanceIndexError(DataclassException, IndexError):
 @dataclass
 class RoboCasaObjectHasNoCollisionError(DataclassException, ValueError):
     """
-    Raised when a loaded RoboCasa object world contains no body with collision geometry to annotate.
+    Raised when a loaded RoboCasa object world contains no body with collision geometry
+    to annotate.
     """
 
     category: RoboCasaObjectCategory

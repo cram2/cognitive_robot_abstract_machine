@@ -25,31 +25,37 @@ from semantic_digital_twin.world_description.world_entity import Body
 @dataclass
 class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
     """
-    Base class for collision variable managers that handles symbolic caching and data buffer management.
+    Base class for collision variable managers that handles symbolic caching and data
+    buffer management.
     """
 
     float_variable_data: FloatVariableData = field(default_factory=FloatVariableData)
     """
     Reference to the FloatVariableManager that stores the collision data.
     """
+
     _symbol_cache: dict = field(default_factory=dict, init=False)
     """
     Cache for symbolic variables.
     """
+
     _block_start_indices: list[int] = field(default_factory=list, init=False)
     """
     The indices of the collision data blocks in the `float_variable_manager`.
     """
+
     _reset_indices: np.ndarray = field(
         default_factory=lambda: np.array([], dtype=int), init=False
     )
     """
     Indices in the data buffer that need to be reset.
     """
+
     _reset_values: np.ndarray = field(default_factory=lambda: np.array([]), init=False)
     """
     Values to write to the reset indices.
     """
+
     _single_reset_block: np.ndarray = field(init=False)
     """
     A block that is used to reset the collision data.
@@ -76,7 +82,8 @@ class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
     @abstractmethod
     def block_size(self) -> int:
         """
-        The block size in the `float_variable_manager` of all float variables belonging to a collision.
+        The block size in the `float_variable_manager` of all float variables belonging
+        to a collision.
         """
 
     @abstractmethod
@@ -111,11 +118,12 @@ class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
 @dataclass
 class ExternalCollisionVariableManager(BaseCollisionVariableManager):
     """
-    Transforms collision results for registered groups into local frames convenient for external (registered vs non-registered groups) collision avoidance,
-    saves the data in a FloatVariableManager,
-    and provides spatial objects that refer to them.
+    Transforms collision results for registered groups into local frames convenient for
+    external (registered vs non-registered groups) collision avoidance, saves the data
+    in a FloatVariableManager, and provides spatial objects that refer to them.
 
-    For each registered group, the closest collisions are stored, depending on their maximum number of avoided collisions.
+    For each registered group, the closest collisions are stored, depending on their
+    maximum number of avoided collisions.
     """
 
     registered_groups: dict[CollisionGroup, int] = field(
@@ -149,7 +157,6 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
     """
     Offset of the violated_distance variable in the block.
     """
-
     last_closest_contacts: dict[CollisionGroup, list[ClosestPoints]] = field(init=False)
 
     def get_contact_distance_offset(self) -> int:
@@ -157,8 +164,8 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
 
     def on_compute_collisions(self, collision: CollisionCheckingResult):
         """
-        Takes collisions, checks if they are external, and inserts them
-        into the buffer at the right place.
+        Takes collisions, checks if they are external, and inserts them into the buffer
+        at the right place.
         """
         self.reset_collision_data()
         self.last_closest_contacts = defaultdict(list)
@@ -214,6 +221,7 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
     ):
         """
         Inserts a data block into the collision buffer.
+
         :param group: Registered collision group of the external collision.
         :param idx: Index of the collision in the collision buffer.
         :param group_a_P_point_on_a: Point on body A in the contact frame.
@@ -313,9 +321,9 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
 @dataclass
 class SelfCollisionVariableManager(BaseCollisionVariableManager):
     """
-    Transforms collision results for registered groups into local frames convenient for self (registered vs registered groups) collision avoidance,
-    saves the data in a FloatVariableManager,
-    and provides spatial objects that refer to them.
+    Transforms collision results for registered groups into local frames convenient for
+    self (registered vs registered groups) collision avoidance, saves the data in a
+    FloatVariableManager, and provides spatial objects that refer to them.
 
     For each combination of registered group, the closest collision is stored.
     """
@@ -365,8 +373,8 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
 
     def on_compute_collisions(self, collision_result: CollisionCheckingResult):
         """
-        Takes collisions, checks if they are external, and inserts them
-        into the buffer at the right place.
+        Takes collisions, checks if they are external, and inserts them into the buffer
+        at the right place.
         """
         self.reset_collision_data()
         self.last_closest_contacts = defaultdict(list)
@@ -433,6 +441,7 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
     ):
         """
         Inserts a data block into the collision buffer.
+
         :param group_a: Registered collision group of body A.
         :param group_b: Registered collision group of body B.
         :param group_a_P_point_on_a: Point on body A in the contact frame.

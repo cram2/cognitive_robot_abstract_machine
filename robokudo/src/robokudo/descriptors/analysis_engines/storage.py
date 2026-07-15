@@ -1,4 +1,5 @@
-"""Analysis engine for recording sensor data to storage.
+"""
+Analysis engine for recording sensor data to storage.
 
 This module provides an analysis engine that demonstrates how to record sensor
 data from a Kinect camera to storage. It implements a simple pipeline that
@@ -27,7 +28,8 @@ from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for sensor data recording.
+    """
+    Analysis engine for sensor data recording.
 
     This class implements a pipeline that records sensor data from a Kinect
     camera to storage. It can be configured to use either a standard Kinect
@@ -46,14 +48,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "storage"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline for recording sensor data.
+        """
+        Create a pipeline for recording sensor data.
 
         This method constructs a processing pipeline that captures and stores
         sensor data from a Kinect camera. The pipeline preprocesses the data
@@ -66,7 +70,6 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for data recording
         """
-
         kinect_config = CrDescriptorFactory.create_descriptor("kinect")
 
         seq = Pipeline()

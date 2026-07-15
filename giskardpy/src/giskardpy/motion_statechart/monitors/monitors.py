@@ -15,9 +15,10 @@ from giskardpy.utils.decorators import dataclass
 class ThreadedPayloadMonitor(MotionStatechartNode, ABC):
     """
     A monitor which executes its __call__ function when start_condition becomes True.
-    Subclass this and implement __init__.py and __call__. The __call__ method should change self.state to True when
-    it's done.
-    Calls __call__ in a separate thread. Use for expensive operations
+
+    Subclass this and implement __init__.py and __call__. The __call__ method should
+    change self.state to True when it's done. Calls __call__ in a separate thread. Use
+    for expensive operations
     """
 
     state: ObservationStateValues = field(
@@ -32,22 +33,27 @@ class ThreadedPayloadMonitor(MotionStatechartNode, ABC):
 @dataclass
 class LocalMinimumReached(MotionStatechartNode):
     """
-    Checks if the robot has reached a local minimum in the trajectory,
-    by checking if all velocities are below a degree of freedoms' max velocity *`joint_convergence_threshold`.
+    Checks if the robot has reached a local minimum in the trajectory, by checking if
+    all velocities are below a degree of freedoms' max velocity
+    *`joint_convergence_threshold`.
     """
 
     joint_convergence_threshold: float = 0.01
     """
-    if a degree of freedom velocity is below its maximum velocity * this value, it is considered as not moving. 
+    If a degree of freedom velocity is below its maximum velocity * this value, it is
+    considered as not moving.
     """
+
     minimum_threshold: float = 0.01
     """
-    Minimum value for degree of freedom velocity * joint_convergence_threshold. 
+    Minimum value for degree of freedom velocity * joint_convergence_threshold.
     """
+
     maximum_threshold: float = 0.06
     """
-    Maximum value for degree of freedom velocity * joint_convergence_threshold. 
+    Maximum value for degree of freedom velocity * joint_convergence_threshold.
     """
+
     windows_size: int = 1
     """
     Windows size for joint convergence check.

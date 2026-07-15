@@ -1,11 +1,10 @@
 """
-The bound-value contract shared by symbolic callables and read by the query
-evaluator.
+The bound-value contract shared by symbolic callables and read by the query evaluator.
 
-Kept in its own leaf module (depending only on the standard library) so
-that both :mod:`krrood.entity_query_language.core.variable` and
-:mod:`krrood.entity_query_language.predicate` can import it without
-forming an import cycle.
+Kept in its own leaf module (depending only on the standard library) so that both
+:mod:`krrood.entity_query_language.core.variable` and
+:mod:`krrood.entity_query_language.predicate` can import it without forming an import
+cycle.
 """
 
 from __future__ import annotations
@@ -17,8 +16,7 @@ from typing_extensions import Any
 
 class HasBoundValue(ABC):
     """
-    A type whose contribution to a query result is computed from keyword
-    arguments.
+    A type whose contribution to a query result is computed from keyword arguments.
 
     :class:`~krrood.entity_query_language.core.variable.InstantiatedVariable` binds a callable class's
     value through :meth:`_bound_value_` — the constructed instance for a boolean operation, the

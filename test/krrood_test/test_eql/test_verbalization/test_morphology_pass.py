@@ -1,6 +1,8 @@
 """
 Unit tests for the morphology realisation pass — the single place grammatical number is
-*applied*.  Assemblers tag a leaf ``GrammaticalNumber.PLURAL``; this pass pluralises it.
+*applied*.
+
+Assemblers tag a leaf ``GrammaticalNumber.PLURAL``; this pass pluralises it.
 """
 
 from __future__ import annotations

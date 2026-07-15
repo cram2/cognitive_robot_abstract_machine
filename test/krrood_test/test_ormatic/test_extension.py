@@ -11,7 +11,7 @@ from ..dataset import ormatic_interface
 
 def test_extension(tmp_path):
     """
-    Test that existing ormatic interfaces can be extended
+    Test that existing ormatic interfaces can be extended.
     """
     # import classes from the existing interface
     classes, alternative_mappings, type_mappings = get_classes_of_ormatic_interface(

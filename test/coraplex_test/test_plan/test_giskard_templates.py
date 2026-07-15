@@ -2,9 +2,10 @@
 Tests for the PyCRAM Giskard motion statechart templates ``TryAll`` and ``TryInOrder``
 (see ``pycram/src/pycram/language_giskard_templates.py``).
 
-The templates are exercised by compiling them into a real :class:`MotionStatechart` and ticking the
-executor, asserting the resulting observation and life cycle states. ``ConstTrueNode`` /
-``ConstFalseNode`` are used as deterministic children that always succeed / fail.
+The templates are exercised by compiling them into a real :class:`MotionStatechart` and
+ticking the executor, asserting the resulting observation and life cycle states.
+``ConstTrueNode`` / ``ConstFalseNode`` are used as deterministic children that always
+succeed / fail.
 """
 
 from giskardpy.executor import Executor
@@ -29,7 +30,10 @@ SETTLE_TICKS = 4
 
 
 def _compile_and_tick(goal: MotionStatechartNode, ticks: int = SETTLE_TICKS) -> None:
-    """Add the goal to a fresh statechart, compile it and tick the executor ``ticks`` times."""
+    """
+    Add the goal to a fresh statechart, compile it and tick the executor ``ticks``
+    times.
+    """
     msc = MotionStatechart()
     msc.add_node(goal)
     executor = Executor(MotionStatechartContext(world=World()))
@@ -44,7 +48,9 @@ def _compile_and_tick(goal: MotionStatechartNode, ticks: int = SETTLE_TICKS) -> 
 
 
 def test_language_nodes_use_templates():
-    """The parallel/sequential try-nodes point at the matching statechart templates."""
+    """
+    The parallel/sequential try-nodes point at the matching statechart templates.
+    """
     assert TryAllNode.motion_state_chart_template is TryAll
     assert TryInOrderNode.motion_state_chart_template is TryInOrder
 

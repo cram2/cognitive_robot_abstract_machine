@@ -41,8 +41,11 @@ if TYPE_CHECKING:
 @dataclass
 class CollisionConsumer(ABC):
     """
-    Interface for classes that want to be notified about changes in the collision matrix or when collision checking is performed.
-    These classes are used for postprocessing collision checking results for specific purposes, like external/self collision avoidance tasks in giskard.
+    Interface for classes that want to be notified about changes in the collision matrix
+    or when collision checking is performed.
+
+    These classes are used for postprocessing collision checking results for specific
+    purposes, like external/self collision avoidance tasks in giskard.
     """
 
     collision_manager: CollisionManager = field(init=False)
@@ -54,6 +57,7 @@ class CollisionConsumer(ABC):
     def on_compute_collisions(self, collision_results: CollisionCheckingResult):
         """
         Called when collision checking is finished.
+
         :param collision_results:
         """
 
@@ -61,6 +65,7 @@ class CollisionConsumer(ABC):
     def on_world_model_update(self, world: World):
         """
         Called when the world model changes.
+
         :param world: Reference to the updated world.
         """
 
@@ -75,8 +80,10 @@ class CollisionConsumer(ABC):
 class CollisionManager(ModelChangeCallback):
     """
     This class is intended as the primary interface for collision checking.
-    It manages collision rules, owns the collision checker, and manages collision consumers using an observer pattern.
-    This class is a world model callback and will update the collision detector's scene and collision matrix on world model changes.
+
+    It manages collision rules, owns the collision checker, and manages collision consumers using
+    an observer pattern. This class is a world model callback and will update the
+    collision detector's scene and collision matrix on world model changes.
 
     Collision matrices are updated using rules in the following order:
     1. apply default rules
@@ -88,27 +95,32 @@ class CollisionManager(ModelChangeCallback):
 
     collision_detector: CollisionDetector = field(kw_only=True)
     """
-    The collision detector implementation used for computing closest points between bodies.
+    The collision detector implementation used for computing closest points between
+    bodies.
     """
 
     collision_matrix: CollisionMatrix = field(init=False, repr=False)
     """
-    The collision matrix describing for which body pairs the collision detector should check for closest points.
+    The collision matrix describing for which body pairs the collision detector should
+    check for closest points.
     """
 
     default_rules: List[CollisionRule] = field(default_factory=list)
     """
     Rules that are applied to the collision matrix before temporary rules.
-    They are intended for the most general rules, like default distance thresholds.
-    Any other rules will overwrite these.
-    .. note: These rules ARE synced with other worlds.
+
+    They are intended for the most general rules, like default distance thresholds. Any
+    other rules will overwrite these. .. note: These rules ARE synced with other worlds.
     """
+
     temporary_rules: List[CollisionRule] = field(default_factory=list)
     """
     Rules that are applied to the collision matrix after default rules.
-    These are intended for task specific rules.
-    .. note: These rules are NOT synced with other worlds.
+
+    These are intended for task specific rules. .. note: These rules are NOT synced with
+    other worlds.
     """
+
     ignore_collision_rules: List[AllowCollisionRule] = field(
         default_factory=lambda: [
             AllowCollisionForAdjacentPairs(),
@@ -117,11 +129,12 @@ class CollisionManager(ModelChangeCallback):
     )
     """
     Rules that are applied to the collision matrix to ignore collisions.
+
     The permanently allow collisions and cannot be overwritten by other rules.
-    
+
     By default we allow collisions between non-robot bodies and between adjacent bodies.
-    
-    .. note: This is only meant for collision that should NEVER be checked. 
+
+    .. note: This is only meant for collision that should NEVER be checked.
         Allow collision rules can also be added to default or temporary rules if needed.
     .. note: These rules ARE synced with other worlds.
     """
@@ -130,7 +143,8 @@ class CollisionManager(ModelChangeCallback):
         default_factory=lambda: [DefaultMaxAvoidedCollisions()]
     )
     """
-    Rules that determine the maximum number of collisions considered for avoidance tasks between two bodies.
+    Rules that determine the maximum number of collisions considered for avoidance tasks
+    between two bodies.
     """
 
     collision_consumers: list[CollisionConsumer] = field(default_factory=list)
@@ -188,6 +202,7 @@ class CollisionManager(ModelChangeCallback):
     def add_collision_consumer(self, consumer: CollisionConsumer):
         """
         Adds a collision consumer to the list of consumers.
+
         It will be notified when:
         - when the collision matrix is updated
         - with the world, when its model updates
@@ -205,7 +220,9 @@ class CollisionManager(ModelChangeCallback):
 
     def update_collision_matrix(self, buffer: float = 0.05):
         """
-        Creates a new collision matrix based on the current rules and applies it to the collision detector.
+        Creates a new collision matrix based on the current rules and applies it to the
+        collision detector.
+
         .. note:: This method is not called in `compute_collisions` because it is potentially expensive
             and you quite often want to compute collisions without updating the collision matrix.
         :param buffer: A buffer is added to the collision matrix distance thresholds.
@@ -229,6 +246,7 @@ class CollisionManager(ModelChangeCallback):
     def set_collision_matrix(self, collision_matrix: CollisionMatrix):
         """
         Sets the collision matrix directly and clears caches.
+
         .. warning: if the collision matrix was computed with a different world model version, you may get unexpected results.
         :param collision_matrix: New collision matrix.
         """
@@ -238,6 +256,7 @@ class CollisionManager(ModelChangeCallback):
     def compute_collisions(self) -> CollisionCheckingResult:
         """
         Computes collisions based on the current collision matrix.
+
         .. note:: You may want to call `update_collision_matrix` before calling this method if rules or the world model have changed.
         :return: Result of the collision checking.
         """
@@ -251,6 +270,7 @@ class CollisionManager(ModelChangeCallback):
     def get_max_avoided_bodies(self, body: Body) -> int:
         """
         Returns the maximum number of collisions `body` should avoid.
+
         :param body: The body to check.
         :return: Maximum number of collisions that are allowed between two bodies.
         """
@@ -263,7 +283,8 @@ class CollisionManager(ModelChangeCallback):
     @memoize
     def get_buffer_zone_distance(self, body_a: Body, body_b: Body) -> float:
         """
-        Returns the buffer-zone distance for the body pair by scanning rules from highest to lowest priority.
+        Returns the buffer-zone distance for the body pair by scanning rules from
+        highest to lowest priority.
         """
         for rule in reversed(self.rules):
             if not isinstance(rule, AvoidCollisionRule):
@@ -276,7 +297,8 @@ class CollisionManager(ModelChangeCallback):
     @memoize
     def get_violated_distance(self, body_a: Body, body_b: Body) -> float:
         """
-        Returns the violated distance for the body pair by scanning rules from highest to lowest priority.
+        Returns the violated distance for the body pair by scanning rules from highest
+        to lowest priority.
         """
         for rule in reversed(self.rules):
             if not isinstance(rule, AvoidCollisionRule):

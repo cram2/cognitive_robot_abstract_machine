@@ -22,7 +22,9 @@ from krrood.entity_query_language.verbalization.grammar.instantiated.planner imp
 
 
 class InstantiatedVariableRule(PhraseRule):
-    """*"a TypeName where the field of the TypeName is … such that …"*."""
+    """
+    *"a TypeName where the field of the TypeName is … such that …"*.
+    """
 
     construct = InstantiatedVariable
 
@@ -49,7 +51,10 @@ class InstantiatedVariableRule(PhraseRule):
 
 
 class InstantiatedVerbalizableRule(PhraseRule):
-    """An InstantiatedVariable whose type builds its own verbalization :class:`VerbalizationFragment`."""
+    """
+    An InstantiatedVariable whose type builds its own verbalization
+    :class:`VerbalizationFragment`.
+    """
 
     construct = InstantiatedVariable
 

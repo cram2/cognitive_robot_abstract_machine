@@ -884,9 +884,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
 
     def inline_noun(self, entity: Query) -> VerbalizationFragment:
         """
-        The entity's WHERE condition is deferred to the binding scope so it can
-        be emitted as a *"such that …"* clause after all binding overrides are
-        registered.
+        The entity's WHERE condition is deferred to the binding scope so it can be
+        emitted as a *"such that …"* clause after all binding overrides are registered.
 
         :param entity: The entity used as a chain root inside an instantiated variable.
         :return: The inline-noun form for *entity*.

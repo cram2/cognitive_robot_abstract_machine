@@ -53,17 +53,17 @@ class ReachAction(ActionDescription):
 
     arm: Arms
     """
-    The arm that should be used for pick up
+    The arm that should be used for pick up.
     """
 
     grasp_description: GraspDescription
     """
-    The grasp description that should be used for picking up the object
+    The grasp description that should be used for picking up the object.
     """
 
     object_designator: Optional[Body] = None
     """
-    Object designator_description describing the object that should be picked up
+    Object designator_description describing the object that should be picked up.
     """
 
     reverse_reach_order: bool = False
@@ -98,7 +98,8 @@ class ReachAction(ActionDescription):
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> ConditionType:
         """
-        The sequence in which the robot would reach the target pose needs to be achievable
+        The sequence in which the robot would reach the target pose needs to be
+        achievable.
         """
         return and_(
             IsObjectReachableBy(
@@ -120,7 +121,7 @@ class ReachAction(ActionDescription):
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> ConditionType:
         """
-        The end effector needs to be close to the target pose
+        The end effector needs to be close to the target pose.
         """
         end_effector = ViewManager.get_end_effector_view(kwargs["arm"], context.robot)
         return or_(
@@ -142,17 +143,17 @@ class PickUpAction(ActionDescription):
 
     object_designator: Body
     """
-    Object designator_description describing the object that should be picked up
+    Object designator_description describing the object that should be picked up.
     """
 
     arm: Arms
     """
-    The arm that should be used for pick up
+    The arm that should be used for pick up.
     """
 
     grasp_description: GraspDescription
     """
-    The GraspDescription that should be used for picking up the object
+    The GraspDescription that should be used for picking up the object.
     """
 
     @property
@@ -191,7 +192,8 @@ class PickUpAction(ActionDescription):
         variables: Dict, context: Context, kwargs: Dict[str, Any]
     ) -> ConditionType:
         """
-        The gripper with which to grasp the object needs to be free and the object needs to be reachable
+        The gripper with which to grasp the object needs to be free and the object needs
+        to be reachable.
         """
         end_effector = ViewManager.get_end_effector_view(
             variables["arm"], context.robot
@@ -215,7 +217,7 @@ class PickUpAction(ActionDescription):
         variables: Dict, context: Context, kwargs: Dict[str, Any]
     ) -> ConditionType:
         """
-        The object needs to be in the gripper frame
+        The object needs to be in the gripper frame.
         """
         end_effector = ViewManager.get_end_effector_view(
             variables["arm"], context.robot
@@ -230,20 +232,22 @@ class PickUpAction(ActionDescription):
 @dataclass
 class GraspingAction(ActionDescription):
     """
-    Grasps an object described by the given Object Designator description
+    Grasps an object described by the given Object Designator description.
     """
 
     object_designator: Body
     """
-    Object Designator for the object that should be grasped
+    Object Designator for the object that should be grasped.
     """
+
     arm: Arms
     """
-    The arm that should be used to grasp
+    The arm that should be used to grasp.
     """
+
     grasp_description: GraspDescription
     """
-    The grasp description that should be used to grasp the object
+    The grasp description that should be used to grasp the object.
     """
 
     @property

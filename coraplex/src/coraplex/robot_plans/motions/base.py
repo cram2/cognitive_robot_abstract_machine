@@ -21,21 +21,24 @@ T = TypeVar("T", bound=AbstractRobot)
 class BaseMotion(Designator):
     """
     Base class for all motions.
-    Motions are like builders for Motion State Charts.
-    Motions never create any other motions or actions.
-    Motions create exactly one goal.
+
+    Motions are like builders for Motion State Charts. Motions never create any other
+    motions or actions. Motions create exactly one goal.
     """
 
     def perform(self):
         """
-        Passes this designator to the process module for execution. Will be overwritten by each motion.
+        Passes this designator to the process module for execution.
+
+        Will be overwritten by each motion.
         """
         pass
 
     @property
     def motion_chart(self) -> Task:
         """
-        Returns the mapped motion chart for this motion or the alternative motion if there is one.
+        Returns the mapped motion chart for this motion or the alternative motion if
+        there is one.
 
         :return: The motion chart for this motion in this context
         """

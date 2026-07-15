@@ -20,7 +20,8 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 @dataclass
 class FaceAtAction(ActionDescription):
     """
-    Turn the robot chassis such that is faces the ``pose`` and after that perform a look at action.
+    Turn the robot chassis such that is faces the ``pose`` and after that perform a look
+    at action.
     """
 
     pose: Pose

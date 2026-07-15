@@ -19,7 +19,9 @@ class HsrRos2CameraConfig(
     StableViewpointComponent,
     WorldDescriptorComponent,
 ):
-    """Camera config for the HSR robot."""
+    """
+    Camera config for the HSR robot.
+    """
 
     registry_name: ClassVar[str] = "hsr_ros2"
 

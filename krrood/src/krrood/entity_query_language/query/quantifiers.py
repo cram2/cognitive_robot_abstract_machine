@@ -1,8 +1,8 @@
 """
 Result quantifiers and constraints for the Entity Query Language.
 
-This module defines quantifiers that control how many results are acceptable (e.g., an/the) and the
-constraints used to evaluate result counts.
+This module defines quantifiers that control how many results are acceptable (e.g.,
+an/the) and the constraints used to evaluate result counts.
 """
 
 from __future__ import annotations
@@ -45,7 +45,8 @@ class ResultQuantificationConstraint(ABC):
         self, number_of_solutions: int, quantifier: ResultQuantifier, done: bool
     ) -> None:
         """
-        Check if the constraint is satisfied, if not, raise a QuantificationNotSatisfiedError exception.
+        Check if the constraint is satisfied, if not, raise a
+        QuantificationNotSatisfiedError exception.
 
         :param number_of_solutions: The current number of solutions.
         :param quantifier: The quantifier expression of the query.
@@ -165,17 +166,19 @@ class ResultQuantifier(
     UnaryExpression, DerivedExpression, CanBehaveLikeAVariable[T], ABC
 ):
     """
-    Base for quantifiers that return concrete results from entity/set queries
-    (e.g., An, The).
+    Base for quantifiers that return concrete results from entity/set queries (e.g., An,
+    The).
     """
 
     _child_: Selectable[T]
     """
     The child expression of the quantifier.
     """
+
     _quantification_constraint_: Optional[ResultQuantificationConstraint] = None
     """
-    The quantification constraint that must be satisfied by the result quantifier if present.
+    The quantification constraint that must be satisfied by the result quantifier if
+    present.
     """
 
     def __post_init__(self):
@@ -213,7 +216,8 @@ class ResultQuantifier(
 
         :param result_count: The current count of results
         :param done: Whether all results have been processed
-        :raises QuantificationNotSatisfiedError: If the quantification constraints are not satisfied.
+        :raises QuantificationNotSatisfiedError: If the quantification constraints are
+            not satisfied.
         """
         if self._quantification_constraint_:
             self._quantification_constraint_.assert_satisfaction(
@@ -232,7 +236,9 @@ class ResultQuantifier(
 
 @dataclass(eq=False, repr=False)
 class An(ResultQuantifier):
-    """Quantifier that yields all matching results one by one."""
+    """
+    Quantifier that yields all matching results one by one.
+    """
 
     ...
 
@@ -240,7 +246,8 @@ class An(ResultQuantifier):
 @dataclass(eq=False, repr=False)
 class The(ResultQuantifier):
     """
-    Quantifier that expects exactly one result; raises MultipleSolutionFound if more, and NoSolutionFound if none.
+    Quantifier that expects exactly one result; raises MultipleSolutionFound if more,
+    and NoSolutionFound if none.
     """
 
     _quantification_constraint_: ResultQuantificationConstraint = field(
@@ -252,7 +259,8 @@ class The(ResultQuantifier):
         sources: OperationResult,
     ) -> Iterable[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]]:
         """
-        Evaluates the query object descriptor with the given bindings and yields the results.
+        Evaluates the query object descriptor with the given bindings and yields the
+        results.
 
         :raises MultipleSolutionFound: If more than one result is found.
         :raises NoSolutionFound: If no result is found.

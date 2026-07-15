@@ -148,9 +148,7 @@ class EndEffectorDidNotReachTarget(PlanFailure):
     """
 
     def error_message(self) -> str:
-        return (
-            f"EndEffector {self.end_effector} did not reach target {self.target}"
-        )
+        return f"EndEffector {self.end_effector} did not reach target {self.target}"
 
     def suggest_correction(self) -> str:
         return ""

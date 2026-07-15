@@ -17,7 +17,9 @@ class LifeCycleValues(IntEnum):
 
 
 class FloatEnum(float, Enum):
-    """Enum where members are also (and must be) floats"""
+    """
+    Enum where members are also (and must be) floats.
+    """
 
 
 class ObservationStateValues(FloatEnum):
@@ -39,14 +41,17 @@ class TransitionKind(Enum):
     """
     Transitions nodes from NOT_STARTED to RUNNING.
     """
+
     PAUSE = 2
     """
     Transitions nodes from RUNNING to PAUSED if True, or back if False.
     """
+
     END = 3
     """
     Transitions nodes from RUNNING or PAUSED to DONE.
     """
+
     RESET = 4
     """
     Transitions nodes from any state to NOT_STARTED.
