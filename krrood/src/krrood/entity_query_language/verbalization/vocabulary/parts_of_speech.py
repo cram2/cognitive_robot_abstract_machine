@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import Iterable, Protocol, Union, runtime_checkable
+from typing_extensions import ClassVar, Iterable, Protocol, Union, runtime_checkable
 
 from krrood.entity_query_language.predicate import VerbalizationField
 from krrood.entity_query_language.utils import camel_case_to_words
@@ -164,6 +164,12 @@ class Copula(ClauseElement):
     """
     The copula *"is"* of a predicative clause — realised for number (*"is"* / *"are"*)
     and negation (*"is not"*) by the morphology pass.
+    """
+
+    lemma: ClassVar[str] = "be"
+    """
+    The lemma a copular predicate name's leading word reduces to (``is`` / ``are`` ->
+    ``be``).
     """
 
     def as_fragment(self) -> RoleFragment:
@@ -482,32 +488,29 @@ class FunctionVerbalizationTemplates:
         )
 
 
-_COPULA_LEMMA = "be"
-"""
-The lemma a copular predicate name's leading word reduces to (``is`` / ``are`` ->
-``be``).
-"""
-
-
 def predicate_clause(
-    name: str, subject: ClauseConstituent, *objects: ClauseConstituent
+    predicate_class: type, subject: ClauseConstituent, *objects: ClauseConstituent
 ) -> Clause:
     """
-    Build a predicate clause from a predicate's *name* and its operands — the boolean
+    Build a predicate clause from a predicate's *class* and its operands — the boolean
     counterpart of :meth:`FunctionVerbalizationTemplates.possessive`.
 
-    The name (CamelCase or snake_case) is read as the predicate. A copular name — its leading word a
-    form of *"be"* (``IsReachable``) — uses the copula with the remaining words as the complement
-    (*"<subject> is reachable"*). Any other name reads verb-first, so a wrapping ``Not`` negates it
-    with do-support (``ConnectsTo`` → *"<subject> connects to <object>"*). The first operand is the
-    subject; any further operands are trailing objects.
+    The class name (CamelCase or snake_case) is read as the predicate. A copular name — its leading
+    word a form of *"be"* (``IsReachable``) — uses the copula with the remaining words as the
+    complement (*"<subject> is reachable"*). Any other name reads verb-first, so a wrapping ``Not``
+    negates it with do-support (``ConnectsTo`` → *"<subject> connects to <object>"*). The first
+    operand is the subject; any further operands are trailing objects.
 
     A copular complement attaches trailing operands only through a final preposition
     (``is_supported_by`` → *"… is supported by <object>"*). With none, an adjective/noun complement
     cannot take them as objects and naming any single operand the subject would be a false claim, so
     the condition is stated to *hold given* all operands: *"one month holds given the begin and the end"*.
 
-    :param name: The predicate's identifier — a class or function name.
+    ..note:: The class name is only read as an English predicate when it happens to be a grammatical
+        verb phrase (``IsReachable``, ``ConnectsTo``); this is the opt-in :class:`NameVerbalized`
+        surface. A predicate whose name does not read that way supplies its own fragment instead.
+
+    :param predicate_class: The predicate's class; its name is read as the predicate.
     :param subject: The first operand, rendered as the clause's subject.
     :param objects: Any further operands, rendered as trailing objects.
     :return: The predicate clause.
@@ -524,16 +527,19 @@ def predicate_clause(
     ... )
     >>> def render(fragment):
     ...     return flatten_fragment_to_plain_text(realize_tree(fragment))
-    >>> render(predicate_clause("IsReachable", Noun("Robot")))
+    >>> class IsReachable: pass
+    >>> render(predicate_clause(IsReachable, Noun("Robot")))
     'a Robot is reachable'
-    >>> render(predicate_clause("ConnectsTo", Noun("body"), Noun("gripper")))
+    >>> class ConnectsTo: pass
+    >>> render(predicate_clause(ConnectsTo, Noun("body"), Noun("gripper")))
     'a body connects to a gripper'
-    >>> render(predicate_clause("IsOneMonth", Noun.the("begin"), Noun.the("end")))
+    >>> class IsOneMonth: pass
+    >>> render(predicate_clause(IsOneMonth, Noun.the("begin"), Noun.the("end")))
     'one month holds given the begin and the end'
     """
-    head, *rest = camel_case_to_words(name).split()
+    head, *rest = camel_case_to_words(predicate_class.__name__).split()
     complement = [WordFragment(text=word) for word in rest]
-    is_copular = morphology.verb_lemma(head) == _COPULA_LEMMA
+    is_copular = morphology.verb_lemma(head) == Copula.lemma
     if is_copular and objects and (not rest or rest[-1] not in Prepositions.texts()):
         operands = ConjunctivePhrase(
             [Noun(subject), *(Noun(obj) for obj in objects)]

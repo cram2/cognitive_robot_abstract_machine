@@ -1646,9 +1646,8 @@ def test_verbalize_predicate_without_fragment_raises():
 
 def test_name_based_clause_reads_a_verb_name_verb_first():
     """
-    A fragment built from ``predicate_clause(cls.__name__, …)`` says the class name as
-    the clause — verb-first for a plain verb name (``EarnsMoreThan`` → *"… earns more
-    than …"*).
+    A fragment built from ``predicate_clause(cls, …)`` says the class name as the clause
+    — verb-first for a plain verb name (``EarnsMoreThan`` → *"… earns more than …"*).
     """
 
     @dataclass(eq=False)
@@ -1662,7 +1661,7 @@ def test_name_based_clause_reads_a_verb_name_verb_first():
         @classmethod
         def _verbalization_fragment_(cls, fields):
             subject, *objects = fields.values()
-            return predicate_clause(cls.__name__, subject, *objects)
+            return predicate_clause(cls, subject, *objects)
 
     employee = variable(Employee, [])
     assert (
@@ -1687,7 +1686,7 @@ def test_name_based_clause_reads_a_copular_name_as_subject_is_complement():
         @classmethod
         def _verbalization_fragment_(cls, fields):
             subject, *objects = fields.values()
-            return predicate_clause(cls.__name__, subject, *objects)
+            return predicate_clause(cls, subject, *objects)
 
     employee = variable(Employee, [])
     assert verbalize_expression(IsActive(employee)) == "an Employee is active"
