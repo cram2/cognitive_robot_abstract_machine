@@ -175,6 +175,7 @@ def main():
         "ros-jazzy-ament-cmake-ros",
         "ros-jazzy-launch-testing-ament-cmake",
         "ros-jazzy-rviz2",
+        "ros-jazzy-control-msgs",
     ]
     manager.dep_manager.install_packages(packages)
 
@@ -238,6 +239,11 @@ def main():
             "https://github.com/code-iai/iai_tiago_description.git",
             "ros2-main",
             "iai_tiago_description",
+        ),
+        Repository(
+            "https://github.com/geriatronics/garmi_description.git",
+            "main",
+            "garmi_description",
         ),
         Repository(
             "https://github.com/pal-robotics/pmb2_robot.git",

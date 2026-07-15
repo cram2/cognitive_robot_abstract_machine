@@ -2,11 +2,15 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 import pytest
+from control_msgs.msg import MultiDOFCommand
 from py_trees.common import Status
 from std_msgs.msg import Float64MultiArray
 
 from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import (
+    Float64MultiArrayVelocityCommand,
     JointGroupVelController,
+    MultiDOFVelocityCommand,
+    VelocityCommand,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import Vector3
@@ -45,7 +49,9 @@ class ConnectionSpec:
 
 
 def build_controller(
-    specs: List[ConnectionSpec], minimum_valid_velocity: float = 0.0
+    specs: List[ConnectionSpec],
+    minimum_valid_velocity: float = 0.0,
+    velocity_command: Optional[VelocityCommand] = None,
 ) -> JointGroupVelController:
     """Build a controller over a chain of freshly created connections."""
     world = World()
@@ -70,7 +76,16 @@ def build_controller(
         cmd_topic="test_cmd",
         connections=connections,
         minimum_valid_velocity=minimum_valid_velocity,
+        velocity_command=velocity_command,
     )
+
+
+def tick_message(controller: JointGroupVelController) -> object:
+    """Replace the publisher with a recorder, tick once, and return the published message."""
+    recorder = RecordingPublisher()
+    controller.cmd_pub = recorder
+    assert controller.update() == Status.RUNNING
+    return recorder.published_message
 
 
 def tick(controller: JointGroupVelController) -> List[float]:
@@ -148,3 +163,38 @@ def test_prismatic_and_finger_joints_are_not_clamped(init_rospy):
 
     assert data[0] == pytest.approx(0.01)
     assert data[1] == pytest.approx(0.01)
+
+
+def test_default_command_publishes_float64_multi_array(init_rospy):
+    controller = build_controller([ConnectionSpec(name="joint_a", velocity=0.1)])
+
+    message = tick_message(controller)
+
+    assert isinstance(message, Float64MultiArray)
+    assert list(message.data) == pytest.approx([0.1])
+
+
+def test_multi_dof_command_publishes_values(init_rospy):
+    specs = [
+        ConnectionSpec(name="joint_a", velocity=0.1),
+        ConnectionSpec(name="joint_b", velocity=0.2),
+    ]
+    controller = build_controller(specs, velocity_command=MultiDOFVelocityCommand())
+
+    message = tick_message(controller)
+
+    assert isinstance(message, MultiDOFCommand)
+    assert list(message.values) == pytest.approx([0.1, 0.2])
+
+
+def test_clamping_is_independent_of_command_message_type(init_rospy):
+    specs = [ConnectionSpec(name="slow_positive", velocity=0.01)]
+    controller = build_controller(
+        specs,
+        minimum_valid_velocity=0.03,
+        velocity_command=MultiDOFVelocityCommand(),
+    )
+
+    message = tick_message(controller)
+
+    assert message.values[0] == pytest.approx(0.03)

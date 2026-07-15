@@ -96,6 +96,8 @@ class TransportAction(ActionDescription):
                 keep_joint_states=True,
             ),
             OpenAction(handle, self.arm),
+            # Note: without the CostmapLocation fails
+            MoveTorsoAction(TorsoState.HIGH),
         ]
 
     @property

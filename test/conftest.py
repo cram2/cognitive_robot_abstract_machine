@@ -33,7 +33,6 @@ from krrood.utils import recursive_subclasses
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
@@ -346,7 +345,7 @@ def supported_abstract_robots():
         ICub3,
         UnitreeG1,
         MMPDresden,
-        # Garmi, We dont have the ROS Package yet
+        Garmi,
     ]
 
 
@@ -459,11 +458,7 @@ def hsr_world_copy(_hsr_world_setup):
 def _garmi_world_setup():
     if Garmi is None:
         pytest.skip("GARMI semantic annotation not installed")
-    urdf_dir = "package://garmi_description/urdf/garmi.urdf"
-    try:
-        return world_with_urdf_factory(urdf_dir, Garmi, OmniDrive)
-    except ParsingError as error:
-        pytest.skip(f"GARMI URDF not available: {error}")
+    return world_with_urdf_factory(Garmi, OmniDrive)
 
 
 @pytest.fixture(scope="session")

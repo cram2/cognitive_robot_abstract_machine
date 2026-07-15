@@ -32,10 +32,9 @@ class InteractiveMarkerNode:
     users to manipulate them via RViz. When a marker is moved, it generates motion
     goals that are sent to Giskard for execution.
 
-    Node parameters for launching the node:
-
-    - root_links: List of root link names for kinematic chains
-    - tip_links: List of tip link names corresponding to root_links
+    ``root_links`` and ``tip_links`` may be supplied directly as constructor arguments.
+    When omitted, they are read from ROS 2 node parameters, which allows configuration
+    via a launch file.
 
     Example Node for .launch.py:
 
@@ -63,6 +62,15 @@ class InteractiveMarkerNode:
     """
     Timeout in seconds for motion execution.
     """
+    root_links: List[str] | None = None
+    """
+    List of root link names. When ``None``, read from the ``root_links`` ROS 2 parameter.
+    """
+    tip_links: List[str] | None = None
+    """
+    List of tip link names corresponding to ``root_links``. When ``None``, read from
+    the ``tip_links`` ROS 2 parameter.
+    """
     giskard: GiskardWrapper = field(init=False)
     """
     Wrapper for Giskard motion planner.
@@ -75,23 +83,16 @@ class InteractiveMarkerNode:
     """
     Interactive marker server for RViz.
     """
-    root_links: List[str] = field(init=False)
-    """
-    List of root link names from parameters.
-    """
-    tip_links: List[str] = field(init=False)
-    """
-    List of tip link names from parameters.
-    """
 
     def __post_init__(self) -> None:
         """
-        Sets up the Giskard wrapper, reads parameters, creates kinematic chain markers,
-        and initializes the interactive marker server. Retries up to world_entity_retry_attempts
-        times if world entities are not found initially.
+        Sets up the Giskard wrapper, resolves kinematic chain parameters, creates
+        markers, and initializes the interactive marker server.
 
-        :raises WorldEntityNotFoundError: If kinematic structure entities cannot be found
-            after all retry attempts.
+        When ``root_links`` or ``tip_links`` were not passed to the constructor,
+        they are read from the ``root_links`` and ``tip_links`` ROS 2 node parameters.
+
+        :raises WorldEntityNotFoundError: If kinematic structure entities cannot be found.
         """
         self.giskard = GiskardWrapper(
             node_handle=rospy.node, giskard_node_name="giskard"
@@ -99,15 +100,16 @@ class InteractiveMarkerNode:
         self.markers = {}
         self.server = None
 
-        self.giskard.node_handle.declare_parameters(
-            namespace="",
-            parameters=[
-                ("root_links", Parameter.Type.STRING_ARRAY),
-                ("tip_links", Parameter.Type.STRING_ARRAY),
-            ],
-        )
-        self.root_links = self.giskard.node_handle.get_parameter("root_links").value
-        self.tip_links = self.giskard.node_handle.get_parameter("tip_links").value
+        if self.root_links is None or self.tip_links is None:
+            self.giskard.node_handle.declare_parameters(
+                namespace="",
+                parameters=[
+                    ("root_links", Parameter.Type.STRING_ARRAY),
+                    ("tip_links", Parameter.Type.STRING_ARRAY),
+                ],
+            )
+            self.root_links = self.giskard.node_handle.get_parameter("root_links").value
+            self.tip_links = self.giskard.node_handle.get_parameter("tip_links").value
 
         self._initialize_markers()
         self._setup_marker_server()
