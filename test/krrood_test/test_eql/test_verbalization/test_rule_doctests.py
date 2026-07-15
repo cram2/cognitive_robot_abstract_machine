@@ -56,9 +56,7 @@ factories = [
     eql.exists,  # quantified conditionals
     eql.not_,  # negation
     eql.inference,  # rule-tree inference queries
-    eql.match,
-    eql.match_variable,  # construction-pattern matches
-    eql.underspecified,  # generative (underspecified) requests
+    eql.an,  # structural / generative matches
 ]
 _GLOBS = {factory.__name__: factory for factory in factories}
 _GLOBS.update(

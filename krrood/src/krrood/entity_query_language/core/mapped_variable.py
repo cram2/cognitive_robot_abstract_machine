@@ -33,6 +33,7 @@ from krrood.entity_query_language.core.base_expressions import (
 )
 from krrood.entity_query_language.exceptions import SymbolicDunderAccessError
 from krrood.entity_query_language.operators.comparator import Comparator
+from krrood.entity_query_language.operators.math_operations import MathOperator
 from krrood.entity_query_language.utils import (
     T,
     merge_args_and_kwargs,
@@ -125,6 +126,90 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
 
     def __ge__(self, other) -> Comparator:
         return Comparator(self, other, operator.ge)
+
+    def _arithmetic_(
+        self, other: Any, math_operator: MathOperator
+    ) -> CanBehaveLikeAVariable[T]:
+        """
+        Build a binary arithmetic operation with this variable as the left operand.
+
+        :param other: The right operand.
+        :param math_operator: The operator to apply.
+        :return: The symbolic arithmetic operation.
+        """
+        from krrood.entity_query_language.operators.arithmetic import (
+            ArithmeticOperation,
+        )
+
+        return ArithmeticOperation(self, other, math_operator)
+
+    def _reflected_arithmetic_(
+        self, other: Any, math_operator: MathOperator
+    ) -> CanBehaveLikeAVariable[T]:
+        """
+        Build a binary arithmetic operation with this variable as the right operand.
+
+        This is used for the reflected dunders (``other <op> self``) so that the operand order is
+        preserved for non-commutative operators such as subtraction and division.
+
+        :param other: The left operand.
+        :param math_operator: The operator to apply.
+        :return: The symbolic arithmetic operation.
+        """
+        from krrood.entity_query_language.operators.arithmetic import (
+            ArithmeticOperation,
+        )
+
+        return ArithmeticOperation(other, self, math_operator)
+
+    def __add__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._arithmetic_(other, MathOperator.ADD)
+
+    def __radd__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._reflected_arithmetic_(other, MathOperator.ADD)
+
+    def __sub__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._arithmetic_(other, MathOperator.SUBTRACT)
+
+    def __rsub__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._reflected_arithmetic_(other, MathOperator.SUBTRACT)
+
+    def __mul__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._arithmetic_(other, MathOperator.MULTIPLY)
+
+    def __rmul__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._reflected_arithmetic_(other, MathOperator.MULTIPLY)
+
+    def __truediv__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._arithmetic_(other, MathOperator.DIVIDE)
+
+    def __rtruediv__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._reflected_arithmetic_(other, MathOperator.DIVIDE)
+
+    def __floordiv__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._arithmetic_(other, MathOperator.FLOOR_DIVIDE)
+
+    def __rfloordiv__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._reflected_arithmetic_(other, MathOperator.FLOOR_DIVIDE)
+
+    def __mod__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._arithmetic_(other, MathOperator.MODULO)
+
+    def __rmod__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._reflected_arithmetic_(other, MathOperator.MODULO)
+
+    def __pow__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._arithmetic_(other, MathOperator.POWER)
+
+    def __rpow__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._reflected_arithmetic_(other, MathOperator.POWER)
+
+    def __neg__(self) -> CanBehaveLikeAVariable[T]:
+        from krrood.entity_query_language.operators.arithmetic import (
+            UnaryArithmeticOperation,
+        )
+
+        return UnaryArithmeticOperation(self, MathOperator.NEGATE)
 
     def __hash__(self):
         return super().__hash__()

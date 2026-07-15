@@ -283,8 +283,8 @@ def test_explain_inferred_semantic_annotations(apartment_world_copy):
 
 
 @pytest.mark.order("fourth_to_last")
-def test_verbalize_query_that_inferred_semantic_annotations(_apartment_world_setup):
-    world_reasoner = WorldReasoner(_apartment_world_setup)
+def test_verbalize_query_that_inferred_semantic_annotations(apartment_world_copy):
+    world_reasoner = WorldReasoner(apartment_world_copy)
     found_semantic_annotations = list(world_reasoner.infer_semantic_annotations())
     drawer = next(ann for ann in found_semantic_annotations if isinstance(ann, Drawer))
     explanation = explain_inference(drawer)

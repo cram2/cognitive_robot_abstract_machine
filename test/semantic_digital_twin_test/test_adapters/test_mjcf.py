@@ -73,3 +73,30 @@ def test_pr2_parsing(pr2_xml_parser):
     assert len(world.kinematic_structure_entities) > 0
     assert len(world.connections) > 0
     assert world.root.name.name == "world"
+
+
+HINGED_BODY_MJCF = """
+<mujoco>
+  <worldbody>
+    <body name="base">
+      <geom type="box" size="0.1 0.1 0.1"/>
+      <body name="door">
+        <joint name="hinge" type="hinge" axis="0 0 1" range="-1.57 0"/>
+        <geom type="box" size="0.1 0.1 0.1"/>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>
+"""
+
+
+def test_joint_position_limits_are_python_floats():
+    """
+    Parsed joint position limits must be plain Python floats. MuJoCo reports them as numpy scalars,
+    which do not interoperate with the symbolic-math layer (``numpy_scalar - symbol`` makes numpy
+    try to arrayify the symbol) and break motion planning on the joint.
+    """
+    world = MJCFParser.from_xml_string(HINGED_BODY_MJCF).parse()
+    limits = world.get_degree_of_freedom_by_name("hinge").limits
+    assert type(limits.lower.position) is float
+    assert type(limits.upper.position) is float

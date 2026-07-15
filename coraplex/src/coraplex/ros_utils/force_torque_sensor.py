@@ -1,4 +1,3 @@
-import atexit
 import time
 import threading
 import logging
@@ -39,10 +38,8 @@ class ForceTorqueSensorSimulated:
         self.interval = interval
         self.kill_event = threading.Event()
 
-        self.thread = threading.Thread(target=self._publish)
+        self.thread = threading.Thread(target=self._publish, daemon=True)
         self.thread.start()
-
-        atexit.register(self._stop_publishing)
 
     def _publish(self) -> None:
         """

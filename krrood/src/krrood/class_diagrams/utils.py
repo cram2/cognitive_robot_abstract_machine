@@ -89,7 +89,15 @@ def is_builtin_class(clazz: Type) -> bool:
 
 def is_external_module(module) -> bool:
     """
-    Check if a module is external to the project.
+    Check if a module is external to the project, i.e. one whose source is not searched when
+    resolving a project class's forward references.
+
+    Only the standard library and builtins are treated as external. A module installed under
+    ``site-packages``/``dist-packages`` is *not* external: a pip-installed project package lives
+    there, and excluding it would leave every installed project class unable to resolve its own
+    ``TYPE_CHECKING`` forward references (:func:`resolve_name_in_hierarchy` searches each base's
+    module source). A genuinely third-party ``site-packages`` module simply will not contain the
+    project name being resolved, so searching it is harmless.
 
     :param module: The module to check.
     :return: True if the module is external, False otherwise.
@@ -104,9 +112,6 @@ def is_external_module(module) -> bool:
 
     file_path = module.__file__
     if file_path is None:
-        return True
-
-    if "site-packages" in file_path or "dist-packages" in file_path:
         return True
 
     # Handle standard library modules (this is a bit heuristic)
@@ -306,11 +311,53 @@ def _cached_scope_from_imports(source_path: str) -> Dict[str, Any]:
     return _scope_from_imports_by_mtime(source_path, mtime)
 
 
+def _count_of_modules_that_finished_initializing() -> int:
+    """
+    Count the modules in ``sys.modules`` that have finished executing.
+
+    This only grows as modules complete loading, so two calls returning the same value guarantee
+    that nothing relevant to an in-progress circular import could have changed in between.
+
+    :return: The current count of fully initialized modules in ``sys.modules``.
+    """
+    return sum(
+        1
+        for module in tuple(sys.modules.values())
+        if not getattr(getattr(module, "__spec__", None), "_initializing", False)
+    )
+
+
+@lru_cache(maxsize=None)
+def _fallback_scope_for_import_generation(
+    source_path: str, generation: int
+) -> Dict[str, Any]:
+    """
+    Recompute *source_path*'s import scope from scratch, memoized per import-system generation.
+
+    A ``TYPE_CHECKING`` name whose module is still mid-import fails identically on every retry
+    until that module finishes loading. Keying this on *generation*
+    (:func:`_count_of_modules_that_finished_initializing`) means the expensive, uncached
+    :func:`~krrood.utils.get_scope_from_imports` recompute only actually runs again once something
+    has genuinely changed, instead of once per failed lookup: many dataclasses across a codebase can
+    independently need the same still-unavailable name while a dependency is mid-import, and without
+    this every one of those lookups would re-parse the file and re-import everything it references.
+
+    :param source_path: The file whose import scope is recomputed.
+    :param generation: The import-system generation the recompute is valid for.
+    :return: The freshly computed import scope for *source_path*.
+    """
+    return get_scope_from_imports(file_path=source_path)
+
+
 def get_object_by_name_from_another_object_in_same_module(
     name: str, object_: Any
 ) -> Any:
     """
     Get the object with the given name from another object in the same module.
+
+    If the cached import scope for the object's module was built while a dependency was still
+    partially initialized (a circular import during module load), the recovered names are merged
+    back into that cached scope so later lookups do not repeat the uncached recomputation.
 
     :param name: The name of the type to get.
     :param object_: The object to get the type from.
@@ -333,9 +380,15 @@ def get_object_by_name_from_another_object_in_same_module(
     # The cached scope can be incomplete if it was first built while a dependency was only partially
     # initialized (a circular import during module load), which makes a TYPE_CHECKING import such as
     # ``World`` silently unresolvable and that absence gets cached. Recompute the scope without the
-    # cache now that imports may have completed before giving up.
-    fresh_scope = get_scope_from_imports(file_path=source_path)
+    # long-lived cache now that imports may have completed before giving up, but memoized per import
+    # generation so many lookups failing for the same reason at the same moment share one recompute
+    # instead of each re-parsing and re-importing the file from scratch. Merge the recovered names
+    # into the memoized scope so later lookups reuse them instead of repeating this forever.
+    fresh_scope = _fallback_scope_for_import_generation(
+        source_path, _count_of_modules_that_finished_initializing()
+    )
     if name in fresh_scope:
+        scope.update(fresh_scope)
         return fresh_scope[name]
     raise CouldNotResolveType(
         name,

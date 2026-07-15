@@ -12,6 +12,7 @@ from krrood.entity_query_language.factories import (
     deduced_variable,
     add,
 )
+from krrood.entity_query_language.core.base_expressions import OperationResult
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.rules.conclusion import Add
 from ...dataset.eql_rule_tree_doc_example import (
@@ -510,3 +511,78 @@ def test_doc_example(rule_tree_doc_example_connections, alternative_code, result
     results = query.tolist()
     assert len(results) == len(result_set)
     assert set(results) == result_set
+
+
+def test_rule_tree_anchors_when_where_condition_is_reused_in_a_sibling():
+    """A node used as the bare WHERE condition and reused inside a sibling branch must still anchor.
+
+    ``drawer.correct`` is a shared node: it is the WHERE condition and also appears in the
+    ``alternative`` condition ``drawer.correct == False``. Building that comparator adds it as an
+    extra parent of the shared node. Its primary ``_parent_`` must stay the structural (WHERE)
+    parent so rule-tree splicing still finds the anchor; when the reuse overwrote ``_parent_``
+    the splice navigated from the comparator instead and failed.
+    """
+    correct_drawer = Drawer(
+        handle=Handle("Handle1"), container=Container("Container1"), correct=True
+    )
+    incorrect_drawer = Drawer(
+        handle=Handle("Handle2"), container=Container("Container2"), correct=False
+    )
+    drawer = variable(Drawer, domain=[correct_drawer, incorrect_drawer])
+    views = deduced_variable(View)
+    query = an(entity(views).where(drawer.correct))
+
+    with query:
+        add(views, inference(Door)(handle=drawer.handle, body=drawer.container))
+        with alternative(drawer.correct == False):
+            add(views, inference(Door)(handle=drawer.handle, body=drawer.container))
+
+    all_solutions = list(query.evaluate())
+    assert (
+        len(all_solutions) == 2
+    ), "The base branch and its reused-condition alternative must both fire."
+    assert {(door.handle.name, door.body.name) for door in all_solutions} == {
+        ("Handle1", "Container1"),
+        ("Handle2", "Container2"),
+    }
+
+
+def test_conclusions_fire_without_an_active_evaluation_context(
+    handles_and_containers_world,
+):
+    """A conclusion must still fire when no ``EvaluationContext`` is active.
+
+    ``_evaluate_conclusions_and_update_bindings_`` is normally only reached from inside
+    ``_evaluate_``, which has already set one up. But real-world callers can drive evaluation
+    from a code path where no context was ever created for the current thread (for example,
+    resuming a query from a thread that does not share the caller's ``contextvars.Context`` --
+    Python's ``ContextVar`` values do not propagate into a plain ``threading.Thread`` by
+    default). This calls the raw, double-underscore ``_evaluate__`` directly (bypassing
+    ``_evaluate_``'s context setup entirely) to prove the conclusion-firing check falls back to
+    a purely structural one instead of assuming a context always exists.
+    """
+    world = handles_and_containers_world
+    container = variable(Container, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+    drawers = variable(Drawer, domain=[])
+    condition = and_(
+        container == fixed_connection.parent,
+        handle == fixed_connection.child,
+    )
+
+    with condition:
+        Add(drawers, inference(Drawer)(handle=handle, container=container))
+
+    assert condition._conditions_root_ is condition
+
+    raw_result = next(
+        result
+        for result in condition._evaluate__(OperationResult({}))
+        if not result.is_false
+    )
+
+    processed_result = condition._evaluate_conclusions_and_update_bindings_(raw_result)
+
+    assert drawers._id_ in processed_result.bindings
+    assert isinstance(processed_result.bindings[drawers._id_], Drawer)

@@ -242,6 +242,20 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         return cls(text=value_phrase(value), role=SemanticRole.LITERAL)
 
     @classmethod
+    def for_member(cls, value: Any) -> RoleFragment:
+        """Build a fragment for one admissible member of a set or disjunction: a class renders as a
+        source-linked type reference (:meth:`for_type`), any other value as a literal
+        (:meth:`for_literal`). Lets the set/disjunction elements render members uniformly without
+        branching on whether they are types.
+
+        >>> RoleFragment.for_member(int).text
+        'Integer'
+        >>> RoleFragment.for_member(42).text
+        '42'
+        """
+        return cls.for_type(value) if isinstance(value, type) else cls.for_literal(value)
+
+    @classmethod
     def for_operator(cls, label: str) -> RoleFragment:
         """
         Build a fragment for an operator or copula (no source link).

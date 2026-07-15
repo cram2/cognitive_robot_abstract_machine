@@ -31,7 +31,7 @@ from experiments.experiment_definitions import (
     TypstRenderer,
 )
 from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.factories import a, an
 from krrood.ormatic.data_access_objects.dao import selectin_loading
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine, drop_database
@@ -93,8 +93,8 @@ def _random_navigate_action(world: World):
     """
     Return an underspecified :class:`NavigateAction` with randomised pose.
     """
-    action = underspecified(NavigateAction)(
-        target_location=underspecified(Pose.from_xyz_rpy)(
+    action = a(NavigateAction)(
+        target_location=a(Pose.from_xyz_rpy)(
             x=...,
             y=...,
             z=0.0,

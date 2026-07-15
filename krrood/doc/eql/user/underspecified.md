@@ -13,10 +13,14 @@ kernelspec:
 
 # Underspecified Queries and Generative Backends
 
-The {py:func}`~krrood.entity_query_language.factories.underspecified` function is the entry point
-for *generative* queries.  Where {py:func}`~krrood.entity_query_language.factories.match` **finds**
-objects that already exist in a domain, `underspecified` **creates** new objects whose field values
-are inferred by a generative backend.
+A match built with {py:func}`~krrood.entity_query_language.factories.an` is **selective by
+default**: `an(Type)(...).from_(domain)` selects from the given domain, and a domain-less
+`an(Type)` selects from the SymbolGraph (for `Symbol` types). To instead **construct new
+instances** from an
+underspecified match, evaluate it with an explicit *generative backend* — either
+{py:class}`~krrood.entity_query_language.backends.ProbabilisticBackend` (samples a probabilistic
+model) or {py:class}`~krrood.entity_query_language.backends.EntityQueryLanguageGenerativeBackend`
+(deterministically enumerates discrete domains and constructs an instance per combination).
 
 This page explains:
 
@@ -30,46 +34,58 @@ This page explains:
 
 ## Building an Underspecified Query
 
-Call `underspecified(MyClass)` exactly like you would call `match(MyClass)` — then immediately
-invoke the result with keyword arguments that constrain each field:
+Call `an(MyClass)` with a *type* (and no `domain`) — then immediately invoke the result with
+keyword arguments that constrain each field:
 
 ```python
-from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.factories import an, a
 
-query = underspecified(KRROODPosition)(x=..., y=..., z=...)
+query = a(KRROODPosition)(x=..., y=..., z=...)
 ```
 
 The returned object is a {py:class}`~krrood.entity_query_language.query.match.Match` and supports
-the same `.where()`, `.resolve()`, and nesting patterns as `match`.
+the `.where()`, `.resolve()`, and nesting patterns. Use `the(MyClass)` instead of `an(MyClass)`
+when exactly one solution is expected.
 
 ---
 
 ## Field Specification: Three Kinds of Values
 
-Every keyword argument passed to the factory call carries a distinct meaning for the generative
-backend.
+Every keyword argument passed to the factory call carries a distinct meaning for a *generative*
+backend. The semantics below describe the
+{py:class}`~krrood.entity_query_language.backends.ProbabilisticBackend` (conditioning, truncation,
+sampling).
+
+```{note}
+The deterministic
+{py:class}`~krrood.entity_query_language.backends.EntityQueryLanguageGenerativeBackend` instead
+*enumerates*: concrete literals and `variable(..., domain=...)` are used directly, enum `...`
+fields are enumerated over their members, but a free `...` on a non-enum field cannot be enumerated
+and raises. Under the default *selective* evaluation (no generative backend), the same kwargs act
+as ordinary structural equality conditions over existing objects.
+```
 
 ### Ellipsis (`...`) — free variable
 
 ```python
-query = underspecified(KRROODPosition)(x=..., y=..., z=...)
+query = a(KRROODPosition)(x=..., y=..., z=...)
 ```
 
-An `Ellipsis` marks the field as *unconstrained*.  The backend samples a value for that dimension
-from the **marginal** of the probabilistic model — no restriction is applied.  Use `...` whenever
-you genuinely have no prior knowledge about a field.
+An `Ellipsis` marks the field as *unconstrained*.  With the `ProbabilisticBackend`, the backend
+samples a value for that dimension from the **marginal** of the probabilistic model — no
+restriction is applied.  Use `...` whenever you genuinely have no prior knowledge about a field.
 
 ```{important}
 `...` can only be used on fields whose Python type appears in
 {py:data}`random_events.variable.compatible_types` — currently `int`, `float`, `bool`, and
-`enum.Enum` subclasses.  For structured/nested fields, nest another `underspecified(...)` call
+`enum.Enum` subclasses.  For structured/nested fields, nest another `an(...)` call
 instead of using `...`.
 ```
 
 ### Concrete literal — conditioning assignment
 
 ```python
-query = underspecified(KRROODPosition)(x=0.5, y=..., z=...)
+query = a(KRROODPosition)(x=0.5, y=..., z=...)
 ```
 
 A concrete value becomes a **conditioning assignment**: the model is updated to
@@ -88,7 +104,7 @@ after the model has already been conditioned.
 ```python
 from krrood.entity_query_language.factories import variable
 
-query = underspecified(KRROODPosition)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
+query = a(KRROODPosition)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
 ```
 
 A KRROOD {py:func}`~krrood.entity_query_language.factories.variable` passes the field's domain
@@ -122,8 +138,8 @@ condition is translated into a truncation event that carves a region out of the 
 joint distribution.
 
 ```python
-query = underspecified(KRROODPose)(
-    position=underspecified(KRROODPosition)(x=..., y=..., z=...),
+query = a(KRROODPose)(
+    position=a(KRROODPosition)(x=..., y=..., z=...),
     orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),  # ← kwargs: condition the model
 )
 query.resolve()
@@ -152,7 +168,7 @@ Once the query is built, pass it to a backend to obtain instances:
 :tags: [raises-exception]
 
 from dataclasses import dataclass
-from krrood.entity_query_language.factories import underspecified, variable
+from krrood.entity_query_language.factories import an, variable
 from krrood.entity_query_language.backends import ProbabilisticBackend
 
 @dataclass
@@ -162,10 +178,10 @@ class Position:
     z: float
 
 # All fields free — samples from the prior
-query = underspecified(Position)(x=..., y=..., z=...)
+query = a(Position)(x=..., y=..., z=...)
 
 backend = ProbabilisticBackend(number_of_samples=5)
-positions = list(backend.evaluate(query))
+positions = list(query.evaluate(backend=backend))
 for p in positions:
     print(p)
 ```
@@ -174,8 +190,8 @@ for p in positions:
 
 ```python
 # Fix x=0.5; sample y and z from P(y, z | x=0.5)
-query = underspecified(Position)(x=0.5, y=..., z=...)
-positions = list(ProbabilisticBackend(number_of_samples=5).evaluate(query))
+query = a(Position)(x=0.5, y=..., z=...)
+positions = list(query.evaluate(backend=ProbabilisticBackend(number_of_samples=5)))
 assert all(p.x == 0.5 for p in positions)
 ```
 
@@ -183,8 +199,8 @@ assert all(p.x == 0.5 for p in positions)
 
 ```python
 # z is sampled only from {1, 2, 3}
-query = underspecified(Position)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
-positions = list(ProbabilisticBackend(number_of_samples=5).evaluate(query))
+query = a(Position)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
+positions = list(query.evaluate(backend=ProbabilisticBackend(number_of_samples=5)))
 assert all(p.z in (1, 2, 3) for p in positions)
 ```
 
@@ -193,32 +209,32 @@ assert all(p.z in (1, 2, 3) for p in positions)
 ```python
 # Sample only poses where position.x > 0.5.
 # The orientation is fixed by conditioning (kwargs); the x constraint is a range filter (.where).
-query = underspecified(Pose)(
-    position=underspecified(Position)(x=..., y=..., z=...),
+query = a(Pose)(
+    position=a(Position)(x=..., y=..., z=...),
     orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
 )
 query.resolve()
 query.where(query.variable.position.x > 0.5)
 
-poses = list(ProbabilisticBackend(number_of_samples=10).evaluate(query))
+poses = list(query.evaluate(backend=ProbabilisticBackend(number_of_samples=10)))
 assert all(p.position.x > 0.5 for p in poses)
 ```
 
 ### Example: nested underspecified objects
 
-Complex action types can be described by nesting multiple `underspecified` calls.
+Complex action types can be described by nesting multiple `an(...)` calls.
 Each level of nesting introduces its own field constraints independently:
 
 ```python
-query = underspecified(NestedAction)(
+query = a(NestedAction)(
     obj=apple,                                         # condition: exactly this apple instance
-    pose=underspecified(Pose)(
-        position=underspecified(Position)(
+    pose=a(Pose)(
+        position=a(Position)(
             x=0.02,                                    # condition: x is exactly 0.02
             y=...,                                     # free
             z=...,                                     # free
         ),
-        orientation=underspecified(Orientation)(
+        orientation=an(Orientation)(
             x=..., y=..., z=...,
             w=variable(float, domain=[0.0, 1.0]),      # truncate: w in {0.0, 1.0}
         ),
@@ -252,7 +268,7 @@ class to its own model:
 import json
 from krrood.adapters.json_serializer import from_json
 from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.factories import an
 from krrood.parametrization.model_registries import DictRegistry
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import ProbabilisticCircuit
 
@@ -264,17 +280,17 @@ with open("nested_action_model.json", "r") as f:
 registry = DictRegistry({NestedAction: learned_model})
 
 # Build the underspecified query as usual
-query = underspecified(NestedAction)(
+query = a(NestedAction)(
     obj=Body(name="mug"),
-    pose=underspecified(KRROODPose)(
-        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
-        orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
+    pose=a(KRROODPose)(
+        position=a(KRROODPosition)(x=..., y=..., z=...),
+        orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
     ),
 )
 
 # Pass the registry to the backend
 backend = ProbabilisticBackend(registry, number_of_samples=10)
-samples = list(backend.evaluate(query))
+samples = list(query.evaluate(backend=backend))
 ```
 
 The backend calls `registry.get_model(parameters)` to retrieve the model before conditioning and
@@ -286,8 +302,8 @@ query itself.
 
 ## API Reference
 
-- {py:func}`~krrood.entity_query_language.factories.underspecified`
-- {py:func}`~krrood.entity_query_language.factories.match`
+- {py:func}`~krrood.entity_query_language.factories.an`
+- {py:func}`~krrood.entity_query_language.factories.the`
 - {py:class}`~krrood.entity_query_language.query.match.Match`
 - {py:class}`~krrood.entity_query_language.backends.ProbabilisticBackend`
 - {py:class}`~krrood.parametrization.parameterizer.UnderspecifiedParameters`

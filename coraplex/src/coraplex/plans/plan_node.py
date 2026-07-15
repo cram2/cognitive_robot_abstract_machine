@@ -24,7 +24,8 @@ from coraplex.utils import split_list_by_type
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.graph_node import Task
-    from coraplex.robot_plans import ActionDescription, BaseMotion
+    from coraplex.robot_plans.actions.base import ActionDescription
+    from coraplex.robot_plans.motions.base import BaseMotion
 
 
 logger = logging.getLogger(__name__)
@@ -373,7 +374,7 @@ class PlanNode(PlanEntity):
 @dataclass(eq=False, repr=False)
 class UnderspecifiedNode(PlanNode):
     """
-    An action or language expression that is described by an `underspecified(...)` statement.
+    An action or language expression that is described by an underspecified `an(...)` match statement.
     This node is used to generate fully specified actions  or language expressions.
     The semantics are: try until it succeeds or fails if the underspecified action is exhausted.
     If you want to limit the number of attempts, add a limit clause to the underspecified action.
@@ -418,12 +419,28 @@ class UnderspecifiedNode(PlanNode):
 
         grounded_action = next(self._action_iterator, None)
         if grounded_action is None:
+            self._action_iterator = None
             return None
 
         candidate = ActionNode(designator=grounded_action)
         self.add_child(candidate)
         self.current_candidate = candidate
         return candidate
+
+    def stop_grounding(self) -> None:
+        """
+        Release the action iterator once no further candidate will be requested from it.
+
+        Between candidates the iterator is left suspended (rather than exhausted) so a later
+        retry can resume the search instead of restarting it; a suspended generator keeps every
+        value its frame holds alive, including resources a candidate generator only builds to
+        validate against (for example a location's deep-copied test world). Once a candidate is
+        accepted and no retry will happen, closing the iterator here releases those resources
+        immediately instead of retaining them for this node's whole lifetime.
+        """
+        if self._action_iterator is not None:
+            self._action_iterator.close()
+            self._action_iterator = None
 
     def notify(self):
         # Resolution is deferred to execution time: the underspecified statement can

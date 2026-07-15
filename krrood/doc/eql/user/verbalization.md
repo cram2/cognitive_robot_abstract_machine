@@ -278,15 +278,15 @@ query = an(entity(p).where(p.begin.month == p.end.month, p.begin.year == p.end.y
 print(verbalize_expression(query))
 ```
 
-## Underspecified Constructions (`match` / `underspecified`)
+## Underspecified Constructions (`an`)
 
-An `underspecified(...)` construction asks the system to *make* something rather than find it —
+An underspecified `an(...)` construction asks the system to *make* something rather than find it —
 *"Generate a … given that …"*. Several single-value settings on one object are combined into one
 *"… respectively"* line (up to three; longer or phrase-length values are said separately, and a `None`
 becomes a *"has no"* line):
 
 ```{code-cell} ipython3
-from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.factories import an
 
 @dataclass
 class Point:
@@ -294,7 +294,7 @@ class Point:
     y: float
     z: float
 
-print(verbalize_expression(underspecified(Point)(x=1, y=2, z=3)))
+print(verbalize_expression(an(Point)(x=1, y=2, z=3)))
 ```
 
 ## Aggregations

@@ -5,16 +5,12 @@ from dataclasses import dataclass, field
 
 from typing_extensions import (
     Optional,
-    Any,
-    TYPE_CHECKING,
-    ClassVar,
-    List,
-    Type,
+    Any, TYPE_CHECKING, ClassVar, List, Type,
 )
 
 from krrood.entity_query_language.backends import (
     QueryBackend,
-    EntityQueryLanguageBackend,
+    EntityQueryLanguageGenerativeBackend,
 )
 from krrood.class_diagrams.mocking import MockedClass, MockedModule
 from coraplex.plans.plan import Plan
@@ -63,14 +59,15 @@ class Context(PlanEntity):
     Should pre -and postconditions of actions be evaluated in this plan
     """
 
-    query_backend: QueryBackend = field(default_factory=EntityQueryLanguageBackend)
+    query_backend: QueryBackend = field(
+        default_factory=EntityQueryLanguageGenerativeBackend
+    )
     """
-    The backend used to answer queries about underspecified statements.
+    The backend used to answer queries about underspecified statements. Defaults to the
+    deterministic generative backend, since underspecified actions are constructed (generated).
     """
 
-    alternative_motion_mappings: List[Type[AlternativeMotion]] = field(
-        default_factory=list
-    )
+    alternative_motion_mappings: List[Type[AlternativeMotion]] = field(default_factory=list)
     """
     The alternative motion mappings that are used to resolve motions in this plan. A motion is
     replaced by an alternative motion from this list if the alternative matches the motion type,
@@ -117,13 +114,8 @@ class Context(PlanEntity):
         return self._giskard_wrapper
 
     @classmethod
-    def from_world(
-        cls,
-        world: World,
-        plan: Plan = None,
-        query_backend: Optional[QueryBackend] = None,
-        alternative_motion_mappings: Optional[List[Type[AlternativeMotion]]] = None,
-    ):
+    def from_world(cls, world: World, plan: Plan = None, query_backend: Optional[QueryBackend] = None,
+                   alternative_motion_mappings: Optional[List[Type[AlternativeMotion]]] = None):
         """
         Create a context from a world by getting the first robot in the world. There is no super plan in this case.
 
@@ -135,13 +127,13 @@ class Context(PlanEntity):
         """
 
         if query_backend is None:
-            query_backend = EntityQueryLanguageBackend()
+            query_backend = EntityQueryLanguageGenerativeBackend()
 
         result = cls(
             world=world,
             robot=world.get_semantic_annotations_by_type(AbstractRobot)[0],
             query_backend=query_backend,
-            alternative_motion_mappings=alternative_motion_mappings or [],
+            alternative_motion_mappings=alternative_motion_mappings or []
         )
         if plan:
             plan.add_plan_entity(result)

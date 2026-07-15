@@ -133,28 +133,38 @@ class SymbolicExpression(ABC):
         return self._expression_id_cache_[id_]
 
     def tolist(
-            self,
+        self,
+        backend=None,
     ) -> list[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]]:
         """
         Evaluate and return the results as a list.
-        """
-        return make_list(self.evaluate())
 
-    def first(self) -> TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]:
+        :param backend: Optional query backend; forwarded to :py:meth:`evaluate`.
+        """
+        return make_list(self.evaluate(backend=backend))
+
+    def first(
+        self, backend=None
+    ) -> TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]:
         """
         Evaluate and return the first result of the query object descriptor.
 
+        :param backend: Optional query backend; forwarded to :py:meth:`evaluate`.
         :return: The first result of the query object descriptor.
         :raises StopIteration: If no results are found.
         """
-        return next(self.evaluate())
+        return next(self.evaluate(backend=backend))
 
     def evaluate(
-            self,
+        self,
+        backend=None,
     ) -> Iterator[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]]:
         """
         Evaluate the query and map the results to the correct output data structure.
         This is the exposed evaluation method for users.
+
+        :param backend: Accepted for interface uniformity with ``Query``/``Match``; the base
+            symbolic-expression engine always evaluates natively and ignores this argument.
         """
         SymbolGraph().remove_dead_instances()
         results = (
@@ -196,11 +206,17 @@ class SymbolicExpression(ABC):
         """
         Remove the parent relationship between this expression and the given parent expression.
 
+        When the removed parent is the primary one, another remaining parent is promoted so a node
+        that still lives elsewhere in the DAG keeps a valid primary parent.
+
         :param parent: The parent expression to remove.
         """
-        self._parents_.remove(parent)
+        if parent in self._parents_:
+            self._parents_.remove(parent)
+        if self._id_ in [child._id_ for child in parent._children_]:
+            parent._children_.remove(self)
         if parent is self._parent__:
-            self._parent_ = None
+            self._parent__ = self._parents_[-1] if self._parents_ else None
 
     def _update_children_(
             self, *children: SymbolicExpression
@@ -271,6 +287,7 @@ class SymbolicExpression(ABC):
 
             evaluation_context = create_default_evaluation_context()
             context_token = set_evaluation_context(evaluation_context)
+            evaluation_context.active_conditions_root.claim(self._conditions_root_)
         try:
             evaluation_context.on_evaluate_enter(expression=self, sources=sources)
             # Normalize sources: always work with an OperationResult
@@ -304,16 +321,29 @@ class SymbolicExpression(ABC):
 
         :param current_result: The current result of this expression.
         """
-        # Only evaluate the conclusions at the root condition expression (i.e. after all conditions have been evaluated)
-        # and when the result truth value is True.
-        if not (self._conditions_root_ is self) or current_result.is_false:
+        # Only evaluate the conclusions at the active conditions root of the current evaluation
+        # pass (i.e. after all conditions have been evaluated) and when the result truth value is
+        # True. "Active" is an evaluation-scoped fact, not a structural one: a node reused as the
+        # condition of more than one Filter has no single correct root, so this is resolved by
+        # which evaluation is currently running (see ActiveConditionsRoot), not by the node's
+        # construction history. When no evaluation context is active (this method is only ever
+        # reached from inside _evaluate_'s own thread, but a caller may drive evaluation from a
+        # thread that never had one set up — contextvars.ContextVar values do not propagate into a
+        # plain threading.Thread), fall back to the structural check: it is the only signal left.
+        evaluation_context = get_evaluation_context()
+        if evaluation_context is not None:
+            is_active_root = evaluation_context.active_conditions_root.is_active_root(
+                self
+            )
+        else:
+            is_active_root = self._conditions_root_ is self
+        if not is_active_root or current_result.is_false:
             return current_result
         for conclusion in self._conclusions_:
             current_result.bindings = next(
                 conclusion._evaluate_(current_result)
             ).bindings
 
-        evaluation_context = get_evaluation_context()
         if evaluation_context is not None:
             evaluation_context.on_conclusions_processed(
                 expression=self,
@@ -353,20 +383,24 @@ class SymbolicExpression(ABC):
         if value is self:
             return
 
-        if value is None and self._parent__ is not None:
-            if self._id_ in [v._id_ for v in self._parent__._children_]:
-                self._parent__._children_.remove(self)
-            if self._parent__ in self._parents_:
-                self._parents_.remove(self._parent__)
+        if value is None:
+            if self._parent__ is not None:
+                self._remove_parent_(self._parent__)
+            return
 
-        self._parent__ = value
-
-        if value is not None and value._id_ not in [v._id_ for v in self._parents_]:
+        if value._id_ not in [v._id_ for v in self._parents_]:
             self._parents_.append(value)
             value._ensure_children_ids_are_cached_(self)
 
-        if value is not None and self._id_ not in [v._id_ for v in value._children_]:
+        if self._id_ not in [v._id_ for v in value._children_]:
             value._children_.append(self)
+
+        # Keep the first structural parent as the primary one: a node reused as an operand
+        # elsewhere in the DAG records the extra parent above but must not have its primary
+        # parent hijacked. Structural re-parenting removes the old parent first (see
+        # ``_replace_child_``), so the promotion in ``_remove_parent_`` re-establishes the primary.
+        if self._parent__ is None:
+            self._parent__ = value
 
     @property
     def _conditions_root_(self) -> Optional[SymbolicExpression]:

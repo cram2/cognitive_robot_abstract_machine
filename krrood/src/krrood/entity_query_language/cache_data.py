@@ -8,7 +8,8 @@ Cache utilities.
 This module provides caching datastructures and utilities.
 """
 from dataclasses import dataclass, field
-from typing_extensions import Dict, Generic, Iterable, List
+from itertools import islice
+from typing_extensions import Dict, Generic, Iterable, Iterator, List, Optional
 
 
 @dataclass
@@ -93,19 +94,62 @@ class SeenSet:
 
 
 @dataclass
+class InstanceFilteredDomain(Generic[T]):
+    """
+    A re-iterable view over a domain that yields only the elements that are instances of a type.
+
+    Unlike :func:`filter`, which is a one-shot iterator that eagerly holds ``iter(domain)`` for its
+    whole lifetime, this creates a fresh underlying iterator on every iteration and holds none
+    between them. That keeps :class:`ReEnterableLazyIterable` able to release and recreate its
+    source, so a domain whose iterator only holds a heavy object in its suspended frame (for example
+    a location generator that deep-copied the world) is not pinned for the variable's whole life.
+    """
+
+    type_: type
+    """
+    The type each yielded element must be an instance of.
+    """
+    domain: Iterable[T]
+    """
+    The underlying domain to filter.
+    """
+
+    def __iter__(self) -> Iterator[T]:
+        return (element for element in self.domain if isinstance(element, self.type_))
+
+
+@dataclass
 class ReEnterableLazyIterable(Generic[T]):
     """
     A wrapper for an iterable that allows multiple iterations over its elements,
     materializing values as they are iterated over.
     """
 
-    iterable: Iterable[T] = field(default_factory=list)
+    iterable: Optional[Iterator[T]] = field(default=None)
     """
-    The iterable to wrap.
+    The live source iterator currently feeding new values, or ``None`` when it has been released. It
+    is recreated on demand from :attr:`_source` so releasing it never loses values still to come.
     """
     materialized_values: List[T] = field(default_factory=list)
     """
     The materialized values of the iterable.
+    """
+    _source: Optional[Iterable[T]] = field(default=None, init=False, repr=False)
+    """
+    The original iterable, kept so a released source iterator can be recreated for a later iteration.
+    """
+    _source_is_re_iterable: bool = field(default=False, init=False)
+    """
+    Whether iterating :attr:`_source` yields a fresh iterator each time; only then can the live source
+    be released early and recreated without losing values.
+    """
+    _source_exhausted: bool = field(default=False, init=False)
+    """
+    Whether the source has been fully materialized; once true, iterations serve only from the buffer.
+    """
+    _active_iteration_count: int = field(default=0, init=False, repr=False)
+    """
+    How many iterations are currently in flight, so the source is only released when none remain.
     """
 
     def set_iterable(self, iterable):
@@ -116,31 +160,88 @@ class ReEnterableLazyIterable(Generic[T]):
         weakref instances die, the iterable would have None values for them. But if we wrap it in a generator,
         they are actually removed, and the generator doesn't find them, which is the wanted behavior.
         """
+        self._source = iterable
+        # A source is re-iterable when ``iter(source)`` returns a fresh iterator rather than the
+        # source itself (as one-shot iterators like generators and ``filter`` do). The probe iterator
+        # is discarded without being advanced.
+        self._source_is_re_iterable = iter(iterable) is not iterable
         self.iterable = (v for v in iterable)
+        self.materialized_values = []
+        self._source_exhausted = False
 
     def __iter__(self):
         """
         Iterate over the values, materializing them as they are iterated over. This allows multiple iterations over
         the iterable simultaneously, and it also allows for efficient access to previously materialized values.
 
+        When a re-iterable source has no iteration left in flight its live iterator is released, so a source that only
+        holds a heavy object in its suspended frame (for example a location generator that deep-copied the world)
+        does not keep it alive; a later iteration recreates the source and skips the already-materialized values.
+
         :return: An iterator over the values.
         """
         index = 0
-        while True:
-            if index < len(self.materialized_values):
-                yield self.materialized_values[index]
-                index += 1
-            else:
-                try:
-                    v = next(self.iterable)
-                    self.materialized_values.append(v)
-                    yield v
+        self._active_iteration_count += 1
+        try:
+            while True:
+                if index < len(self.materialized_values):
+                    yield self.materialized_values[index]
                     index += 1
-                except StopIteration:
+                    continue
+                if self._source_exhausted:
                     return
+                self._ensure_source()
+                try:
+                    value = next(self.iterable)
+                except StopIteration:
+                    self._source_exhausted = True
+                    self._release_source()
+                    return
+                self.materialized_values.append(value)
+                yield value
+                index += 1
+        finally:
+            self._active_iteration_count -= 1
+            self._release_source_if_idle()
+
+    def _release_source_if_idle(self) -> None:
+        """
+        Release the live source once nothing is iterating it, but only when it can be recreated
+        without losing values (a re-iterable source that is not yet exhausted).
+        """
+        if (
+            self._active_iteration_count == 0
+            and self._source_is_re_iterable
+            and not self._source_exhausted
+        ):
+            self._release_source()
+
+    def _ensure_source(self) -> None:
+        """
+        Recreate the live source iterator if it was released, skipping the values already materialized.
+        """
+        if self.iterable is not None:
+            return
+        recreated_source = (v for v in self._source)
+        skip_count = len(self.materialized_values)
+        # itertools' "consume" recipe: an empty slice starting at skip_count still forces the
+        # underlying iterator to be advanced that many steps, entirely at C speed.
+        next(islice(recreated_source, skip_count, skip_count), None)
+        self.iterable = recreated_source
+
+    def _release_source(self) -> None:
+        """
+        Close and drop the live source iterator so its suspended frame (and anything it holds) is freed.
+        """
+        released_source = self.iterable
+        self.iterable = None
+        if released_source is not None:
+            released_source.close()
 
     def __bool__(self):
         """
         Return True if the iterable has values, False otherwise.
         """
-        return bool(self.materialized_values) or bool(self.iterable)
+        return bool(self.materialized_values) or (
+            not self._source_exhausted and self._source is not None
+        )

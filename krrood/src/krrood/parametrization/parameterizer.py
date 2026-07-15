@@ -12,7 +12,7 @@ import random_events.variable
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Literal, Variable
 from krrood.entity_query_language.factories import and_
-from krrood.entity_query_language.query.match import MatchVariable, AttributeMatch
+from krrood.entity_query_language.query.match import Match, AttributeMatch
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 from krrood.parametrization.random_events_translator import (
@@ -37,9 +37,9 @@ class UnderspecifiedParameters:
     generative models. This generally serves as glue between `ProbabilisticModel` and `Match`.
     """
 
-    statement: MatchVariable
+    statement: Match
     """
-    The UnderspecifiedVariable to extract information from.
+    The match to extract information from.
     """
 
     _random_event_compiler: Optional[WhereExpressionToRandomEventTranslator] = field(
