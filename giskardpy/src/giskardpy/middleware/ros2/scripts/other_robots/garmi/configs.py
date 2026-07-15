@@ -39,7 +39,7 @@ GARMI_RIGHT_ARM_JOINTS = [
 ]
 """Names of the seven right FR3 arm joints, ordered from base to tip."""
 
-GARMI_HEAD_JOINTS = ["head_pan_joint", "head_tilt_joint"]
+GARMI_HEAD_JOINTS = ["o1_motor_1", "o1_motor_2"]
 """Names of the head pan and tilt joints."""
 
 GARMI_LIFT_JOINTS = ["lift_0_lower_joint", "lift_0_upper_joint"]
@@ -78,10 +78,10 @@ class GarmiStandaloneInterface(StandAloneRobotInterfaceConfig):
                 *GARMI_HEAD_JOINTS,
                 *GARMI_LEFT_ARM_JOINTS,
                 *GARMI_RIGHT_ARM_JOINTS,
-                "arm_0_gripper_fr3_finger_joint1",
-                "arm_0_gripper_fr3_finger_joint2",
-                "arm_1_gripper_fr3_finger_joint1",
-                "arm_1_gripper_fr3_finger_joint2",
+                "left_fr3_finger_joint1",
+                "left_fr3_finger_joint2",
+                "right_fr3_finger_joint1",
+                "right_fr3_finger_joint2",
                 drive_joint_name,
             ]
         )

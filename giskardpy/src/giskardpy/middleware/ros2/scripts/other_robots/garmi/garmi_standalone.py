@@ -19,8 +19,8 @@ from giskardpy.qp.qp_controller_config import QPControllerConfig
 
 GARMI_ROOT_LINKS = ["arm_mount_left_link", "map"]
 GARMI_TIP_LINKS = [
-    "arm_0_gripper_fr3_hand_tcp",  # left arm TCP
-    "arm_1_gripper_fr3_hand_tcp",  # right arm TCP
+    "left_fr3_hand_tcp",  # left arm TCP
+    "right_fr3_hand_tcp",  # right arm TCP
 ]
 
 
