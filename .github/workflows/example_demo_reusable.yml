@@ -41,6 +41,20 @@ jobs:
           sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libegl1 ros-jazzy-control-msgs
           uv sync --extra dev,doc --active
 
+      - name: Add garmi_description to overlay workspace
+        # Temporary bridge: the prebuilt CI image predates the garmi_description entry in
+        # .github/docker/setup_workspace.py. Clone and build it into the overlay so the GARMI
+        # robot description resolves. Remove once the image is rebuilt from setup_workspace.py.
+        run: |
+          if [ ! -d /opt/ros/overlay_ws/src/garmi_description ]; then
+            git clone -b main --single-branch \
+              https://github.com/geriatronics/garmi_description.git \
+              /opt/ros/overlay_ws/src/garmi_description
+            source /opt/ros/jazzy/setup.bash
+            cd /opt/ros/overlay_ws
+            colcon build --merge-install --packages-select garmi_description
+          fi
+
       - name: Restore cache
         uses: actions/cache/restore@v4
         with:

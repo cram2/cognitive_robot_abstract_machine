@@ -143,7 +143,8 @@ def setup_multi_robot_simple_apartment(
         apartment_copy.merge_world(
             garmi_copy,
         )
-        view = Garmi.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(Garmi)
+        view = view[0] if view else Garmi.from_world(apartment_copy)
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
