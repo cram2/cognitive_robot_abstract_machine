@@ -4,31 +4,41 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+from control_msgs.action import ParallelGripperCommand
+from control_msgs.msg import GripperCommand, Float64Values
+
+from geometry_msgs.msg import (
+    Point as ROSPoint,
+)
+from geometry_msgs.msg import (
+    Pose as ROSPose,
+)
 from geometry_msgs.msg import (
     PoseStamped as ROSPoseStamped,
-    Pose as ROSPose,
-    Point as ROSPoint,
+)
+from geometry_msgs.msg import (
     Quaternion as ROSQuaternion,
 )
+from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.robots.robot_parts import EndEffector
 
 try:
     from nav2_msgs.action import NavigateToPose
 except ModuleNotFoundError:
     NavigateToPose = None
-from rclpy.action import ActionClient
-from std_msgs.msg import Header
-from typing_extensions import Type, TypeVar, Generic
-
 import krrood.symbolic_math.symbolic_math as sm
+from rclpy.action import ActionClient
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world_description.world_entity import Body
+from std_msgs.msg import Header
+from typing_extensions import Generic, Type, TypeVar
+
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
 from giskardpy.motion_statechart.ros_context import RosContextExtension
-from semantic_digital_twin.spatial_types.spatial_types import Pose
-from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
-
 
 Action = TypeVar("Action")
 ActionGoal = TypeVar("ActionGoal")
@@ -208,3 +218,83 @@ class NavigateActionServerTask(
                 else ObservationStateValues.FALSE
             )
         return ObservationStateValues.UNKNOWN
+
+
+@dataclass(eq=False, repr=False)
+class RobotiqGripperActionServerTask(
+    ActionServerTask[
+        ParallelGripperCommand,
+        ParallelGripperCommand.Goal,
+        ParallelGripperCommand.Result,
+        ParallelGripperCommand.Feedback,
+    ]
+):
+    """
+    Node for calling a Robotiq ROS2 action server using the
+    control_msgs/ParallelGripperCommand interface.
+    """
+
+    target_position: float
+    """
+    Desired gripper opening in meters.
+
+    Examples:
+        0.0   -> Fully closed
+        0.7 -> Fully open
+    """
+
+    target_velocity: float = 10.0
+    """
+    Desired gripper velocity.
+    """
+
+    target_effort: float = 10.0
+    """
+    Maximum gripping effort.
+    """
+
+    def build_msg(self, context: MotionStatechartContext):
+        """
+        Builds the ParallelGripperCommand goal message.
+
+        """
+
+        self._msg = ParallelGripperCommand.Goal()
+
+        self._msg.command.position = [float(self.target_position)]
+        self._msg.command.velocity = [float(self.target_velocity)]
+        self._msg.command.effort = [float(self.target_effort)]
+
+    def result_callback(self, future):
+        """
+        Stores the gripper action result returned by the action server.
+        """
+        super().result_callback(future)
+
+        logger.info(
+            f"Gripper action finished. "
+            f"Reached goal: {self._result.result.reached_goal}, "
+            f"Stalled: {self._result.result.stalled}"
+        )
+
+    def on_tick(self, context: MotionStatechartContext) -> ObservationStateValues:
+        """
+        Returns:
+            TRUE    -> Goal reached or gripper stalled while grasping.
+            FALSE   -> Action finished unsuccessfully.
+            UNKNOWN -> Action still running.
+        """
+
+        if self._result is None:
+            return ObservationStateValues.UNKNOWN
+
+        result = self._result.result
+
+        if result.reached_goal:
+            return ObservationStateValues.TRUE
+
+        if result.stalled:
+            # Stalled usually means the gripper contacted an object.
+            return ObservationStateValues.TRUE
+
+        return ObservationStateValues.FALSE
