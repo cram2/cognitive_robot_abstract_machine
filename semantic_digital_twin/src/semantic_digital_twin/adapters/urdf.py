@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import Optional, Tuple, Union, List
+from typing_extensions import Dict, Optional, Tuple, Union, List
 from urdf_parser_py import urdf as urdfpy
+from xacro import process_file
 
 from semantic_digital_twin.adapters.package_resolver import (
     CompositePathResolver,
@@ -57,14 +58,13 @@ def urdf_joint_to_limits(
 ) -> Tuple[DerivativeMap[float], DerivativeMap[float]]:
     """
     Maps the URDF joint specifications to lower and upper joint limits, including
-    position and velocity constraints. Mimics and safety controller parameters are
-    also considered when determining the limits.
+    position and velocity constraints. Mimics and safety controller parameters are also
+    considered when determining the limits.
 
-    :param urdf_joint: A URDF (Unified Robot Description Format) joint object
-                       which contains the joint's type, limits, safety controller,
-                       and mimic information.
-    :return: A tuple containing two DerivativeMap objects, representing the lower
-             and upper limits of the joint in terms of position and velocity.
+    :param urdf_joint: A URDF (Unified Robot Description Format) joint object which
+        contains the joint's type, limits, safety controller, and mimic information.
+    :return: A tuple containing two DerivativeMap objects, representing the lower and
+        upper limits of the joint in terms of position and velocity.
     """
     lower_limits = DerivativeMap()
     upper_limits = DerivativeMap()
@@ -104,6 +104,7 @@ def urdf_joint_to_limits(
 class URDFParser:
     """
     Class to parse URDF files to worlds.
+
     Must set either urdf or file_path.
     """
 
@@ -151,11 +152,26 @@ class URDFParser:
         return urdf_parser
 
     @classmethod
-    def from_xacro(cls, xacro_path: str, prefix: Optional[str] = None) -> URDFParser:
-        from xacro import process_file
+    def from_xacro(
+        cls,
+        xacro_path: str,
+        prefix: Optional[str] = None,
+        mappings: Optional[Dict[str, str]] = None,
+    ) -> URDFParser:
+        """
+        Creates a parser from a xacro file by expanding it to URDF.
 
+        The xacro file is resolved and processed into a URDF string, applying the given
+        substitution arguments, before constructing the parser.
+
+        :param xacro_path: The path to the xacro file to expand.
+        :param prefix: The prefix for every name used in this world.
+        :param mappings: The xacro substitution arguments to apply during expansion (the
+            ``arg`` values, e.g. ``{"ur_type": "ur5"}``).
+        :return: A parser for the world described by the expanded xacro file.
+        """
         xacro_path = CompositePathResolver().resolve(xacro_path)
-        urdf = process_file(xacro_path).toxml()
+        urdf = process_file(xacro_path, mappings=mappings).toxml()
         return URDFParser(urdf=urdf, prefix=prefix)
 
     def parse(self) -> World:
@@ -195,12 +211,12 @@ class URDFParser:
         """
         Parses a given URDF joint and creates a corresponding connection object.
 
-        The function processes the provided joint data, extracting necessary
-        information including translation offsets, rotation offsets, connection type,
-        and relevant joint limits. It maps URDF joint types to predefined connection
-        types and either retrieves or creates a degree of freedom (DOF) in the world
-        context. It generates and returns a connection object representing the
-        relationship between a parent and a child body.
+        The function processes the provided joint data, extracting necessary information
+        including translation offsets, rotation offsets, connection type, and relevant
+        joint limits. It maps URDF joint types to predefined connection types and either
+        retrieves or creates a degree of freedom (DOF) in the world context. It
+        generates and returns a connection object representing the relationship between
+        a parent and a child body.
 
         :param joint: The URDF joint to be parsed.
         :param parent: The parent body to be connected by the joint.
@@ -265,8 +281,10 @@ class URDFParser:
     def parse_link(self, link: urdfpy.Link, parent_frame: PrefixedName) -> Body:
         """
         Parses a URDF link to a link object.
+
         :param link: The URDF link to parse.
-        :param parent_frame: The parent frame of the link, used for transformations of collisions and visuals.
+        :param parent_frame: The parent frame of the link, used for transformations of
+            collisions and visuals.
         :return: The parsed link object.
         """
         name = PrefixedName(prefix=self.prefix, name=link.name)
@@ -284,6 +302,7 @@ class URDFParser:
     ) -> ShapeCollection:
         """
         Parses a URDF geometry to the corresponding shapes.
+
         :param geometry: The URDF geometry to parse either the collisions of visuals.'
         :param body: The body of the geometry, used for back referencing.
         :return: A List of shapes corresponding to the URDF geometry.

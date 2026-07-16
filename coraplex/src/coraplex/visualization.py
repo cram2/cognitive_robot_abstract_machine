@@ -1,17 +1,253 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple
+import logging
+from typing_extensions import (
+    Any,
+    Callable,
+    Dict,
+    Optional,
+    Sequence,
+    Tuple,
+    TYPE_CHECKING,
+    List,
+)
+from dataclasses import dataclass
 
 import networkx as nx
+from rustworkx import PyDiGraph
+
+from coraplex.datastructures.enums import VisualizationLayout
+
+if TYPE_CHECKING:
+    from bokeh.document import Document
+    from bokeh.models import GraphRenderer
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class GraphVisualizer:
+    """
+    Handles the interactive visualization of a rustworkx graph using Bokeh.
+    Supports dynamic updates by periodically checking for graph changes.
+    """
+
+    graph: Any
+    """
+    The rustworkx graph to visualize.
+    """
+
+    graph_source: Optional[Callable[[], Any]] = None
+    """
+    Optional callable returning the current graph, polled on every update tick.
+    """
+
+    node_params: Optional[Dict[int, Dict[str, Any]]] = None
+    """
+    Optional mapping from node index to the parameters shown when the node is clicked.
+    """
+
+    node_label: Optional[Callable[[int, Any], str]] = None
+    """
+    Optional callable mapping (index, payload) to the label shown for a node.
+    """
+
+    # attributes: Optional[Sequence[str]] = None # kroodd has problems with this
+    attributes: List[str] = None
+    """
+    Optional attribute names to display; ``None`` shows all parameters.
+    """
+
+    layout: VisualizationLayout = VisualizationLayout.BFS
+    """
+    Layout algorithm to use: "spring", "kamada_kawai", or "bfs".
+    """
+
+    start: Optional[int] = None
+    """
+    Optional start node index for the "bfs" layout.
+    """
+
+    title: str = "Rustworkx Graph"
+    """
+    Title of the plot.
+    """
+
+    width: int = 1200
+    """
+    Figure width in pixels.
+    """
+
+    height: int = 800
+    """
+    Figure height in pixels.
+    """
+
+    update_interval: int = 1000
+    """
+    Interval in milliseconds between graph-change checks.
+    """
+
+    def _build_bokeh_app(self, doc: Document) -> None:
+        # Local imports to keep dependency optional
+        from bokeh.layouts import row
+        from bokeh.models import (
+            HoverTool,
+            NodesAndLinkedEdges,
+            TapTool,
+            CustomJS,
+            Div,
+        )
+        from bokeh.plotting import figure, from_networkx
+
+        nx_graph = self._build_current_nx_graph()
+        positions = calculate_layout_positions(self.layout.value, nx_graph, self.start)
+
+        plot = figure(
+            title=self.title,
+            x_axis_location=None,
+            y_axis_location=None,
+            width=self.width,
+            height=self.height,
+            toolbar_location="below",
+            background_fill_color="#efefef",
+        )
+        plot.grid.grid_line_color = None
+
+        renderer = from_networkx(nx_graph, positions)
+        renderer.node_renderer.glyph.update(size=18, fill_color="#79a6d2")
+
+        hover = HoverTool(tooltips=[("label", "@label")])
+        plot.add_tools(hover, TapTool())
+        renderer.selection_policy = NodesAndLinkedEdges()
+        renderer.inspection_policy = NodesAndLinkedEdges()
+
+        info_panel = Div(
+            text="<b>Click a node to see its parameters</b>",
+            width=400,
+            height=self.height,
+        )
+
+        node_source = renderer.node_renderer.data_source
+
+        callback = CustomJS(
+            args=dict(source=node_source, panel=info_panel),
+            code="""
+                const indices = source.selected.indices;
+                if (indices.length === 0) {
+                    panel.text = "<b>Click a node to see its parameters</b>";
+                    return;
+                }
+                const index = indices[0];
+                const label = source.data['label'][index];
+                const parameters = source.data['param_text'][index] || '';
+                panel.text = `<div><h3 style=\"margin:0 0 8px 0;\">${label}</h3>${parameters}</div>`;
+            """,
+        )
+        node_source.selected.js_on_change("indices", callback)
+
+        plot.renderers.append(renderer)
+
+        last_snapshot = _graph_snapshot(nx_graph)
+
+        def update_callback() -> None:
+            nonlocal last_snapshot
+            try:
+                new_nx_graph = self._build_current_nx_graph()
+                snapshot = _graph_snapshot(new_nx_graph)
+                if snapshot != last_snapshot:
+                    last_snapshot = snapshot
+                    self._update_plot(renderer, new_nx_graph)
+            except Exception:
+                logger.exception("Failed to update the graph visualization")
+
+        doc.add_periodic_callback(update_callback, self.update_interval)
+        doc.add_root(row(plot, info_panel))
+
+    def _build_current_nx_graph(self) -> nx.Graph:
+        """
+        Build the networkx graph to display, fetching a fresh graph from
+        ``graph_source`` if one was given.
+        """
+        if self.graph_source is not None:
+            self.graph = self.graph_source()
+        return build_nx_graph(
+            self.graph, self.node_params, self.attributes, self.node_label
+        )
+
+    def _update_plot(self, renderer: GraphRenderer, nx_graph: nx.Graph) -> None:
+        from bokeh.plotting import from_networkx
+
+        positions = calculate_layout_positions(self.layout, nx_graph, self.start)
+        new_renderer = from_networkx(nx_graph, positions)
+
+        renderer.node_renderer.data_source.data = dict(
+            new_renderer.node_renderer.data_source.data
+        )
+        renderer.edge_renderer.data_source.data = dict(
+            new_renderer.edge_renderer.data_source.data
+        )
+        renderer.layout_provider.graph_layout = dict(
+            new_renderer.layout_provider.graph_layout
+        )
+
+    def show(self) -> None:
+        """
+        Launch the Bokeh server in a background thread and open the plot in
+        the browser.
+
+        The server runs on a daemon thread, so the calling process must stay
+        alive for the visualization to remain reachable.
+        """
+        import asyncio
+        import threading
+
+        def run_server() -> None:
+            from bokeh.server.server import Server
+
+            # The server and its IOLoop must be created on the thread that
+            # runs them, with an event loop bound to that thread.
+            asyncio.set_event_loop(asyncio.new_event_loop())
+            server = Server({"/": self._build_bokeh_app}, port=0)
+            server.start()
+            server.io_loop.add_callback(server.show, "/")
+            server.io_loop.start()
+
+        threading.Thread(
+            target=run_server, daemon=True, name="GraphVisualizerServer"
+        ).start()
+
+
+def create_ordered_graph(plan) -> Tuple[PyDiGraph, Dict[int, int]]:
+    """
+    Build a new graph containing the plan's nodes in depth-first order.
+
+    The node indices are remapped, so they differ from the indices in
+    ``plan.plan_graph``.
+
+    :param plan: The plan to build the graph from.
+    :return: The new graph and a mapping from plan node indices to the
+        indices in the new graph.
+    """
+    ordered_graph = PyDiGraph(multigraph=False)
+    mapping = {}
+
+    for node in plan.nodes:
+        mapping[node.index] = ordered_graph.add_node(node)
+    for node in plan.nodes:
+        for child in node.children:
+            ordered_graph.add_edge(mapping[node.index], mapping[child.index], None)
+    return ordered_graph, mapping
 
 
 def plot_rustworkx_interactive(
     graph: Any,
     *,
+    graph_source: Optional[Callable[[], Any]] = None,
     node_params: Optional[Dict[int, Dict[str, Any]]] = None,
     node_label: Optional[Callable[[int, Any], str]] = None,
     attributes: Optional[Sequence[str]] = None,
-    layout: str = "spring",
+    layout: VisualizationLayout = VisualizationLayout.BFS,
     start: Optional[int] = None,
     title: str = "Rustworkx Graph",
     width: int = 1200,
@@ -22,11 +258,16 @@ def plot_rustworkx_interactive(
 
     - Click on a node to show its parameters in a side panel.
     - Hover shows the node label.
+    - The plot is dynamically updated when the given graph is changing.
 
     Parameters
     ----------
     graph:
         A rustworkx.PyGraph or rustworkx.PyDiGraph instance.
+    graph_source:
+        Optional callable returning the current graph to display. If given,
+        it is invoked on every update tick so that changes to the underlying
+        data are picked up even when ``graph`` is a one-time snapshot.
     node_params:
         Optional mapping from node index to a dict of parameters to display when
         the node is clicked. If not provided and the node payload is a dict,
@@ -53,90 +294,26 @@ def plot_rustworkx_interactive(
     This function imports bokeh lazily so that it does not add a hard runtime
     dependency unless you call it. Install with `pip install bokeh`.
     """
-
-    # Local imports to keep dependency optional at import time.
     try:
-        import networkx as nx
-        import importlib
-        from bokeh.layouts import row
-        from bokeh.models import (
-            ColumnDataSource,
-            Div,
-            HoverTool,
-            NodesAndLinkedEdges,
-            TapTool,
-            CustomJS,
-        )
-        from bokeh.plotting import figure, from_networkx, show
-    except Exception as exc:  # pragma: no cover - informative error only if used
+        import bokeh  # noqa: F401
+    except ImportError as exc:
         raise RuntimeError(
-            "plot_rustworkx_interactive requires bokeh and networkx. Install with 'pip install bokeh networkx'."
+            "plot_rustworkx_interactive requires bokeh. Install with 'pip install bokeh'."
         ) from exc
 
-    nx_g = build_nx_graph(graph, node_params, attributes, node_label)
-
-    pos = calculate_layout_positions(layout, nx_g, start)
-
-    # Create bokeh figure
-    p = figure(
+    visualizer = GraphVisualizer(
+        graph=graph,
+        graph_source=graph_source,
+        node_params=node_params,
+        node_label=node_label,
+        attributes=attributes,
+        layout=layout,
+        start=start,
         title=title,
-        x_axis_location=None,
-        y_axis_location=None,
         width=width,
         height=height,
-        toolbar_location="below",
-        background_fill_color="#efefef",
     )
-    p.grid.grid_line_color = None
-
-    # Build graph renderer via from_networkx
-    g_renderer = from_networkx(nx_g, pos)
-
-    # Node glyphs and hover
-    g_renderer.node_renderer.glyph.update(size=18, fill_color="#79a6d2")
-    hover = HoverTool(tooltips=[("label", "@label")])
-    p.add_tools(hover, TapTool())
-    g_renderer.selection_policy = NodesAndLinkedEdges()
-    g_renderer.inspection_policy = NodesAndLinkedEdges()
-
-    # Prepare a side panel for parameters
-    info = Div(
-        text="<b>Click a node to see its parameters</b>", width=400, height=height
-    )
-
-    # Ensure param_text exists on data source
-    # from_networkx created a CDS with 'index' only; merge our attrs
-    cds = g_renderer.node_renderer.data_source
-    # Extract param_texts and labels in the same order as 'index'
-    index_list = list(cds.data.get("index", []))
-    labels = [nx_g.nodes[i].get("label", str(i)) for i in index_list]
-    params_html = [nx_g.nodes[i].get("param_text", "") for i in index_list]
-
-    # Update CDS with fields used by JS callback and hover
-    cds.data["label"] = labels
-    cds.data["param_text"] = params_html
-
-    # JS callback to update the Div when selection changes
-    callback = CustomJS(
-        args=dict(source=cds, panel=info),
-        code="""
-            const inds = source.selected.indices;
-            if (inds.length === 0) {
-                panel.text = "<b>Click a node to see its parameters</b>";
-                return;
-            }
-            const i = inds[0];
-            const label = source.data['label'][i];
-            const params = source.data['param_text'][i] || '';
-            panel.text = `<div><h3 style=\"margin:0 0 8px 0;\">${label}</h3>${params}</div>`;
-        """,
-    )
-    cds.selected.js_on_change("indices", callback)
-
-    p.renderers.append(g_renderer)
-
-    # Show composed layout
-    show(row(p, info))
+    visualizer.show()
 
 
 def calculate_layout_positions(
@@ -144,39 +321,38 @@ def calculate_layout_positions(
 ) -> Dict[int, Tuple[float, float]]:
     """
     Calculates node positions based on the selected layout.
-    :param layout: Layout name, e.g. "spring", "kamada_kawai", "bfs
+    :param layout: Layout name, e.g. "spring", "kamada_kawai", "bfs"
     :param nx_g: networkx graph
     :param start: Optional start node index for "bfs" layout.
     :return: A dictionary mapping node indices to 2d coordinates.
     """
-    # Choose layout
+    if len(nx_g) == 0:
+        return {}
     if layout == "spring":
         pos = nx.spring_layout(nx_g, seed=42)
     elif layout == "kamada_kawai":
         pos = nx.kamada_kawai_layout(nx_g)
     elif layout == "bfs":
-        if start is None and len(nx_g.nodes) > 0:
-            start = 0
-        pos = nx.bfs_layout(nx_g, start=start)
+        if start is None or start not in nx_g:
+            start = next(iter(nx_g.nodes))
+        try:
+            pos = nx.bfs_layout(nx_g, start=start)
+        except nx.NetworkXError:
+            pos = nx.spring_layout(nx_g, seed=42)
     else:
         pos = nx.spring_layout(nx_g, seed=42)
     return pos
 
 
-def build_nx_graph(graph: "Any", node_params, attributes, node_label) -> nx.Graph:
+def build_nx_graph(graph: PyDiGraph, node_params, attributes, node_label) -> nx.Graph:
     """Convert a rustworkx graph to a networkx graph."""
-    # Build a NetworkX graph from rustworkx graph
-    is_directed = getattr(graph, "is_directed", lambda: True)()
-    nx_g = nx.DiGraph() if is_directed else nx.Graph()
+    nx_g = nx.DiGraph() if isinstance(graph, PyDiGraph) else nx.Graph()
 
-    # rustworkx nodes are indexed 0..n-1. Access via graph.nodes(), graph.node_indices() or graph.num_nodes()
-    # We'll iterate over range(num_nodes) and get payload via graph[node]
-    num_nodes = graph.num_nodes()
-
-    # Prepare label/params for each node
     attributes = list(attributes) if attributes is not None else None
 
-    for i in range(num_nodes):
+    # Iterate node_indices() instead of range(num_nodes()): rustworkx indices
+    # are not contiguous after node removals.
+    for i in graph.node_indices():
         payload = graph[i]
         # Label
         if node_label is not None:
@@ -188,7 +364,6 @@ def build_nx_graph(graph: "Any", node_params, attributes, node_label) -> nx.Grap
             if label is None:
                 label = str(payload)
         # Parameters
-        params = None
         if node_params is not None:
             params = node_params.get(i)
         else:
@@ -203,11 +378,28 @@ def build_nx_graph(graph: "Any", node_params, attributes, node_label) -> nx.Grap
             param_text=_format_params(params),
         )
 
-    # Add edges
     for u, v in graph.edge_list():
         nx_g.add_edge(u, v)
 
     return nx_g
+
+
+def _graph_snapshot(nx_graph: nx.Graph) -> Tuple[Any, Any]:
+    """
+    Return a hashable summary of the rendered graph used for change detection.
+
+    Comparing the rendered labels and parameter texts detects in-place
+    mutations of node payloads, which comparing the payload objects
+    themselves cannot.
+    """
+    nodes = tuple(
+        sorted(
+            (i, data.get("label", ""), data.get("param_text", ""))
+            for i, data in nx_graph.nodes(data=True)
+        )
+    )
+    edges = tuple(sorted(nx_graph.edges()))
+    return nodes, edges
 
 
 def _object_params_with_properties(payload: Any) -> Optional[Dict[str, Any]]:
@@ -219,6 +411,7 @@ def _object_params_with_properties(payload: Any) -> Optional[Dict[str, Any]]:
 
     Private attributes (starting with '_') and the key 'label' are excluded.
     Values that raise on access are skipped. Callables are skipped.
+    Explicit attributes take precedence over properties of the same name.
     """
     # If the payload is already a dict, filter and return it.
     if isinstance(payload, dict):
@@ -231,23 +424,18 @@ def _object_params_with_properties(payload: Any) -> Optional[Dict[str, Any]]:
 
     # Collect from __dict__ if available
     try:
-        if hasattr(payload, "__dict__") and isinstance(
-            getattr(payload, "__dict__", None), dict
-        ):
+        if isinstance(getattr(payload, "__dict__", None), dict):
             for k, v in vars(payload).items():
                 if k.startswith("_") or k == "label":
                     continue
                 # Avoid adding callables
-                try:
-                    is_callable = callable(v)
-                except Exception:
-                    is_callable = False
-                if not is_callable:
+                if not callable(v):
                     params[k] = v
     except Exception:
         pass
 
-    params.update(_collect_properties(payload))
+    for name, value in _collect_properties(payload).items():
+        params.setdefault(name, value)
 
     return params if params else None
 
@@ -264,19 +452,14 @@ def _collect_properties(payload) -> Dict[str, Any]:
                 continue
             if name.startswith("_") or name == "label":
                 continue
-            if name in params:
-                continue  # do not overwrite explicit attributes
             # Access property value safely
             try:
                 value = getattr(payload, name)
             except Exception:
                 continue
             # Skip callables
-            try:
-                if callable(value):
-                    continue
-            except Exception:
-                pass
+            if callable(value):
+                continue
             params[name] = value
     except Exception:
         # If inspection fails, just ignore properties
@@ -292,7 +475,7 @@ def _format_params(params: Optional[Dict[str, Any]]) -> str:
         items = []
         for k, v in params.items():
             items.append(
-                f"<tr><td style='padding-right:8px; white-space:nowrap;'><b>{k}</b></td><td>{_escape_html(v)}</td></tr>"
+                f"<tr><td style='padding-right:8px; white-space:nowrap;'><b>{_escape_html(k)}</b></td><td>{_escape_html(v)}</td></tr>"
             )
         return "<table>" + "".join(items) + "</table>"
     except Exception:

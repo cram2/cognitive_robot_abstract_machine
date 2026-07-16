@@ -14,9 +14,10 @@ from krrood.parametrization.feature_extraction.exceptions import (
     OutOfDomainValueError,
 )
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Generic
 from random_events.variable import Variable, Symbolic
 from krrood.entity_query_language.factories import variable
-from krrood.utils import T, recursive_subclasses
+from krrood.utils import T, recursive_subclasses, get_generic_type_parameters
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +27,10 @@ class _AggregationStatisticDescriptor:
     """
     Descriptor returned by :func:`aggregation_statistic`.
 
-    When Python constructs the enclosing class, it calls
-    :meth:`__set_name__` with the owner class and the attribute name. At
-    that point the function is registered and the descriptor replaces
-    itself with the bare function so normal method-call semantics are
-    preserved.
+    When Python constructs the enclosing class, it calls :meth:`__set_name__` with the
+    owner class and the attribute name. At that point the function is registered and the
+    descriptor replaces itself with the bare function so normal method-call semantics
+    are preserved.
     """
 
     field_name: str
@@ -54,8 +54,7 @@ def aggregation_statistic(
     field_name: str,
 ) -> Callable[[Callable], _AggregationStatisticDescriptor]:
     """
-    Marks a method as an aggregation statistic for the named exchangeable-part
-    field.
+    Marks a method as an aggregation statistic for the named exchangeable-part field.
 
     The containing class is discovered automatically via
     ``__set_name__`` — there is no need to pass it explicitly.
@@ -72,29 +71,27 @@ def aggregation_statistic(
 @lru_cache(maxsize=None)
 def get_aggregation_class(owner: Type) -> Optional[Type[AggregationStatistic]]:
     """
-    Returns the most specific :class:`AggregationStatistic` subclass for
-    ``owner``.
+    Returns the most specific :class:`AggregationStatistic` subclass for ``owner``.
 
-    Walks the MRO of ``owner`` from most specific to least specific,
-    returning the first subclass of :class:`AggregationStatistic` whose
-    generic ``T`` matches that ancestor.  This means that if ``B``
-    extends ``A`` and only ``AggregationStatistic[A]`` exists, a lookup
-    for ``B`` will return it.
+    Walks the MRO of ``owner`` from most specific to least specific, returning the first
+    subclass of :class:`AggregationStatistic` whose generic ``T`` matches that ancestor.
+    This means that if ``B`` extends ``A`` and only ``AggregationStatistic[A]`` exists,
+    a lookup for ``B`` will return it.
 
     :param owner: The domain class to look up.
-    :return: The most specific matching subclass, or ``None`` if none
-        has been defined.
+    :return: The most specific matching subclass, or ``None`` if none has been defined.
     """
     subclasses = list(recursive_subclasses(AggregationStatistic))
     for ancestor in owner.__mro__:
         for subclass in subclasses:
-            if subclass.get_generic_type() == ancestor:
+            bound = get_generic_type_parameters(subclass, AggregationStatistic)
+            if bound and bound[0] == ancestor:
                 return subclass
     return None
 
 
 @dataclass
-class AggregationStatistic(SubClassSafeGeneric[T]):
+class AggregationStatistic(Generic[T], SubClassSafeGeneric):
     """
     Base class for aggregation statistics over a domain object's exchangeable-
     part fields.
@@ -131,12 +128,12 @@ class AggregationStatistic(SubClassSafeGeneric[T]):
 
     aggregation_registry: ClassVar[dict[str, list[Callable]]] = defaultdict(list)
     """
-    Methods marked with :func:`aggregation_statistic` that are defined directly
-    on this class.
+    Methods marked with :func:`aggregation_statistic` that are defined directly on this
+    class.
 
-    Keys are field names; values are the registered callables.  Each subclass
-    receives its own registry via :meth:`__init_subclass__` so registrations
-    never bleed across unrelated branches of the hierarchy.
+    Keys are field names; values are the registered callables.  Each subclass receives
+    its own registry via :meth:`__init_subclass__` so registrations never bleed across
+    unrelated branches of the hierarchy.
     """
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
@@ -147,8 +144,8 @@ class AggregationStatistic(SubClassSafeGeneric[T]):
     @classmethod
     def _registered_names_for_field(cls, field_name: str) -> set[str]:
         """
-        Collect the names of all statistics registered for ``field_name``
-        across the MRO so inherited registrations are included.
+        Collect the names of all statistics registered for ``field_name`` across the MRO
+        so inherited registrations are included.
 
         :param field_name: The exchangeable-part field to look up.
         :return: Names of all callables registered under ``field_name``.
@@ -167,10 +164,9 @@ class AggregationStatistic(SubClassSafeGeneric[T]):
         All methods on this class marked with :func:`aggregation_statistic` for
         :attr:`field_name`.
 
-        :return: The marked callable methods for the scoped field,
-            sorted alphabetically by name.
-        :raises MissingFieldNameError: If :attr:`field_name` was not
-            provided.
+        :return: The marked callable methods for the scoped field, sorted alphabetically
+            by name.
+        :raises MissingFieldNameError: If :attr:`field_name` was not provided.
         """
         if self.field_name is None:
             raise MissingFieldNameError()
@@ -217,20 +213,16 @@ def compute_aggregation_statistics(
     latent_variables: list[Variable],
 ) -> dict[Variable, Any]:
     """
-    Evaluate aggregation feature functions against a domain object and map
-    results to latent variables.
+    Evaluate aggregation feature functions against a domain object and map results to
+    latent variables.
 
-    Each feature function is evaluated only if its name matches a latent
-    variable.
+    Each feature function is evaluated only if its name matches a latent variable.
 
-    :param domain_object: The domain object whose aggregation statistics
-        are computed.
-    :param feature_functions: Symbolic feature functions for one
-        exchangeable-part field.
-    :param latent_variables: Latent variables that define which
-        statistics are relevant.
-    :return: A mapping from matched latent variables to their observed
-        values.
+    :param domain_object: The domain object whose aggregation statistics are computed.
+    :param feature_functions: Symbolic feature functions for one exchangeable-part
+        field.
+    :param latent_variables: Latent variables that define which statistics are relevant.
+    :return: A mapping from matched latent variables to their observed values.
     """
     latent_variable_by_name = {
         latent_variable.name: latent_variable for latent_variable in latent_variables

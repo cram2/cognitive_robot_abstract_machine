@@ -32,7 +32,7 @@ ActionClient.__init__ = _patched_action_client_init
 
 def spinner_thread_target():
     """
-    Thread that runs a multithreaded executor in the background
+    Thread that runs a multithreaded executor in the background.
     """
     global node, executor
     executor = MultiThreadedExecutor()
@@ -65,7 +65,8 @@ def init_node(node_name: str) -> None:
     global node, spinner_thread, executor
     if node is not None:
         return
-    rclpy.init()
+    if not rclpy.ok():
+        rclpy.init()
     node = Node(node_name)
     spinner_thread = Thread(
         target=spinner_thread_target, daemon=True, name=f"{node.get_name()} spin"
@@ -76,6 +77,7 @@ def init_node(node_name: str) -> None:
 def shutdown() -> None:
     """
     Cleanly shutdown the ROS2 node, executor and spin thread between tests.
+
     This avoids InvalidHandle errors on subsequent initialisations.
     """
     global node, executor, spinner_thread

@@ -27,10 +27,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     def implementation(self) -> Pipeline:
         """
-        Create a pipeline that does tabletop segmentation and integrates primary navigation
-        using a YOLO annotator.
+        Create a pipeline that does tabletop segmentation and integrates primary
+        navigation using a YOLO annotator.
         """
-
         urdf_path = os.path.join(
             os.path.dirname(__file__),
             "..",

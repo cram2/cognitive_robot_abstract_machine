@@ -1,4 +1,5 @@
-"""Implementation of helper functions and classes for internal usage only.
+"""
+Implementation of helper functions and classes for internal usage only.
 
 Functions:
 _block -- wrap multiple statements into a single block.
@@ -11,6 +12,7 @@ from __future__ import annotations
 
 import math
 from copy import deepcopy
+from itertools import groupby
 from typing import Union, Iterator
 
 import numpy as np
@@ -20,31 +22,45 @@ from typing_extensions import (
     Dict,
     TYPE_CHECKING,
     Sequence,
+    Any,
+    Type,
 )
 
 from coraplex.tf_transformations import (
     quaternion_about_axis,
     quaternion_multiply,
 )
-from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
-from semantic_digital_twin.collision_checking.collision_rules import AllowSelfCollisions
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
     Point3,
 )
-from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
     from coraplex.view_manager import CameraDescription
 
 
+def split_list_by_type(
+    flat_list: List[Any], cluster_type: Type[Any]
+) -> List[List[Any]]:
+    """
+    Split a list into consecutive runs that alternate between elements that are
+    instances of ``cluster_type`` and those that are not, preserving order.
+    """
+    return [
+        list(group)
+        for _, group in groupby(
+            flat_list, key=lambda element: isinstance(element, cluster_type)
+        )
+    ]
+
+
 def link_pose_for_joint_config(obj: Body, joint_config: Dict[str, float]) -> Pose:
     """
-    Get the pose a link would be in if the given joint configuration would be applied to the object.
-    This is done by using the respective object in the prospection world and applying the joint configuration
-    to this one. After applying the joint configuration the link position is taken from there.
+    Get the pose a link would be in if the given joint configuration would be applied to
+    the object. This is done by using the respective object in the prospection world and
+    applying the joint configuration to this one. After applying the joint configuration
+    the link position is taken from there.
 
     :param obj: The body for which the pose should be calculated
     :param joint_config: Dict with the goal joint configuration
@@ -137,8 +153,9 @@ def chunks(lst: Union[List, np.ndarray], n: int) -> Iterator[List]:
 
 class bcolors:
     """
-    Color codes which can be used to highlight Text in the Terminal. For example,
-    for warnings.
+    Color codes which can be used to highlight Text in the Terminal.
+
+    For example, for warnings.
     Usage:
     Firstly import the class into the file.
     print(f'{bcolors.WARNING} Some Text {bcolors.ENDC}')
@@ -181,8 +198,9 @@ def adjust_camera_pose_based_on_target(
     camera_description: CameraDescription,
 ) -> Pose:
     """
-    Adjust the given cam_pose orientation such that it is facing the target_pose, which partly depends on the
-     front_facing_axis of the that is defined in the camera_description.
+    Adjust the given cam_pose orientation such that it is facing the target_pose, which
+    partly depends on the front_facing_axis of the that is defined in the
+    camera_description.
 
     :param cam_pose: The camera pose.
     :param target_pose: The target pose.
@@ -324,13 +342,14 @@ def translate_pose_along_local_axis(
     pose: Pose, axis: Union[List, np.ndarray], distance: float
 ) -> Pose:
     """
-    Translate a pose along a given 3d vector (axis) by a given distance. The axis is given in the local coordinate
-    frame of the pose. The axis is normalized and then scaled by the distance.
+    Translate a pose along a given 3d vector (axis) by a given distance.
+
+    The axis is given in the local coordinate frame of the pose. The axis is normalized
+    and then scaled by the distance.
 
     :param pose: The pose that should be translated
     :param axis: The local axis along which the translation should be performed
     :param distance: The distance by which the pose should be translated
-
     :return: The translated pose
     """
     normalized_translation_vector = np.array(axis) / np.linalg.norm(axis)

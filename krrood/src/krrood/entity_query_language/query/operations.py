@@ -22,9 +22,14 @@ from typing_extensions import (
     Dict,
     FrozenSet,
     Hashable,
+    Set,
 )
 
-from krrood.entity_query_language.core.variable import Literal, ExternallySetVariable
+from krrood.entity_query_language.core.variable import (
+    Literal,
+    ExternallySetVariable,
+    InstantiatedVariable,
+)
 from krrood.entity_query_language.operators.aggregators import (
     Aggregator,
     Count,
@@ -49,6 +54,7 @@ from krrood.entity_query_language.operators.set_operations import (
 from krrood.entity_query_language.utils import is_iterable
 from krrood.utils import ensure_hashable
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
+from krrood.entity_query_language.core.expression_structure import root_variable_ids
 from krrood.utils import memoize
 
 GroupKey = Tuple[Any, ...]
@@ -264,6 +270,14 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
 
         return groups, group_key_count
 
+    @lru_cache
+    def get_group_key(self, result_values: FrozenSet[uuid.UUID]) -> GroupKey:
+        """
+        :param result_values: The values of the variables to group by in the current result.
+        :return: A tuple of the values of the variables to group by representing a group key.
+        """
+        return tuple(ensure_hashable(value) for value in result_values)
+
     def update_group_from_bindings(self, group: OperationResult, results: Bindings):
         """
         Updates the group with the given results.
@@ -322,6 +336,14 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         :return: A tuple of the binding IDs of the variables to group by.
         """
         return tuple(var._id_ for var in self.variables_to_group_by)
+
+    @cached_property
+    def group_key_root_ids(self) -> Set[uuid.UUID]:
+        """
+        :return: The ids of the distinct ``Variable`` chain-roots of the group-by keys (e.g. for a
+            key ``employee.department`` the root is the ``employee`` variable).
+        """
+        return root_variable_ids(self.variables_to_group_by)
 
     @property
     def _name_(self) -> str:

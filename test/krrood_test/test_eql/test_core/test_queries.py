@@ -15,6 +15,7 @@ from krrood.entity_query_language.exceptions import (
     LiteralConditionError,
     UnsupportedExpressionTypeForDistinct,
     TryingToModifyAnAlreadyBuiltQuery,
+    SymbolicDunderAccessError,
 )
 from krrood.entity_query_language.factories import (
     entity,
@@ -40,6 +41,16 @@ from krrood.entity_query_language.predicate import (
     symbolic_function,
     Predicate,
 )
+from krrood.entity_query_language.verbalization.fragments.features import (
+    GrammaticalNumber,
+)
+from krrood.entity_query_language.verbalization.vocabulary.english import Prepositions
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    clause,
+    Noun,
+    Verb,
+)
+from krrood.patterns.role_predicates import IsSameSemanticEntity
 from krrood.entity_query_language.query.quantifiers import (
     ResultQuantificationConstraint,
     Exactly,
@@ -567,7 +578,7 @@ def test_not_and_or_with_domain_mapping(handles_and_containers_world):
 
 def test_generate_with_using_decorated_predicate(handles_and_containers_world):
     """
-    Test that symbolic functions can be used inside and outside of queries
+    Test that symbolic functions can be used inside and outside of queries.
     """
     world = handles_and_containers_world
 
@@ -605,6 +616,18 @@ def test_generate_with_using_inherited_predicate(handles_and_containers_world):
 
         def __call__(self):
             return self.body1.name[0] == self.body2.name[0] == self.body3.name[0]
+
+        @classmethod
+        def _verbalization_fragment_(cls, fields):
+            return clause(
+                Noun(fields["body1"]),
+                Verb("share", number=GrammaticalNumber.PLURAL),
+                Noun("first character"),
+                Prepositions.WITH,
+                Noun(fields["body2"]),
+                Noun("and"),
+                Noun(fields["body3"]),
+            )
 
     body1 = variable(Body, world.bodies)
     body2 = variable(Body, world.bodies)
@@ -658,6 +681,15 @@ def test_select_predicate(handles_and_containers_world):
         def __call__(self):
             return self.body.name == self.name
 
+        @classmethod
+        def _verbalization_fragment_(cls, fields):
+            return clause(
+                Noun(fields["body"]),
+                Verb("have"),
+                Noun.the("name"),
+                Noun(fields["name"]),
+            )
+
     body = variable(Body, world.bodies)
     has_name = HasName(body, "Handle1")
     query = the(entity(has_name).where(has_name))
@@ -667,6 +699,27 @@ def test_select_predicate(handles_and_containers_world):
     assert (
         handle1.body.name == "Handle1"
     ), "The generated handle should have the expected name."
+
+
+def test_is_same_entity_predicate_in_query(handles_and_containers_world):
+    """
+    ``IsSameEntity`` is a regular EQL predicate: used symbolically in a ``where`` clause
+    it is bound and evaluated by the query engine like any other predicate.
+
+    Only the literal target itself is the same entity as the target, so exactly one
+    solution is returned.
+    """
+    world = handles_and_containers_world
+    target = world.bodies[0]
+
+    body = variable(type_=Body, domain=world.bodies)
+    same = IsSameSemanticEntity(body, target)
+    query = the(entity(same).where(same))
+
+    matches = query.tolist()
+    assert len(matches) == 1
+    assert isinstance(matches[0], IsSameSemanticEntity)
+    assert matches[0].entity_1 is target
 
 
 def test_literal_predicate(handles_and_containers_world):
@@ -679,6 +732,15 @@ def test_literal_predicate(handles_and_containers_world):
 
         def __call__(self):
             return self.body.name == self.name
+
+        @classmethod
+        def _verbalization_fragment_(cls, fields):
+            return clause(
+                Noun(fields["body"]),
+                Verb("have"),
+                Noun.the("name"),
+                Noun(fields["name"]),
+            )
 
     has_name = HasName(world.bodies[0], world.bodies[0].name)
     with pytest.raises(LiteralConditionError):
@@ -707,7 +769,7 @@ def test_equivalent_to_contains_type_using_exists():
     fb = variable(FruitBox, domain=None)
     fruit_box_query = an(
         entity(fb).where(
-            exists(var:=flat_variable(fb.fruits), HasType(var, Apple)),
+            exists(var := flat_variable(fb.fruits), HasType(var, Apple)),
         )
     )
 
@@ -1205,6 +1267,31 @@ def test_type_availability_in_mapped_variables(handles_and_containers_world):
     assert first_drawer_handle._type_ is Handle
 
 
+def test_accessing_a_dunder_attribute_symbolically_raises_a_helpful_error():
+    """
+    Dunder attribute access on a variable raises a helpful, AttributeError-compatible
+    error.
+
+    It must remain an :class:`AttributeError` so that ``copy``/``pickle`` machinery
+    probing optional dunder hooks still treats it as a missing attribute, while its
+    message points at ``@symbolic_function`` as the correct way to reach a dunder-named
+    member.
+    """
+    var = variable(int, [1, 2, 3])
+
+    with pytest.raises(SymbolicDunderAccessError) as exception_info:
+        var.__name__
+
+    assert isinstance(exception_info.value, AttributeError)
+    assert exception_info.value.attribute_name == "__name__"
+    message = str(exception_info.value)
+    assert "__name__" in message
+    assert "symbolic_function" in message
+
+    # The AttributeError contract keeps optional-hook probing working.
+    assert getattr(var, "__name__", "fallback") == "fallback"
+
+
 def test_root_caches_all_descendant_ids_for_nested_queries():
     """
     Test that the root of a query has all descendant IDs in its _expression_id_cache_,
@@ -1217,9 +1304,9 @@ def test_root_caches_all_descendant_ids_for_nested_queries():
     outer = an(entity(var).where(var != inner))
     root = outer._root_
     for descendant in root._descendants_:
-        assert descendant._id_ in root._expression_id_cache_, (
-            f"{descendant} (id={descendant._id_}) missing from root._expression_id_cache_"
-        )
+        assert (
+            descendant._id_ in root._expression_id_cache_
+        ), f"{descendant} (id={descendant._id_}) missing from root._expression_id_cache_"
 
     # Doubly-nested: the inside the inside an
     var2 = variable(int, [1, 2, 3, 4])
@@ -1228,9 +1315,9 @@ def test_root_caches_all_descendant_ids_for_nested_queries():
     outermost = an(entity(var2).where(var2 != middle))
     root2 = outermost._root_
     for descendant in root2._descendants_:
-        assert descendant._id_ in root2._expression_id_cache_, (
-            f"{descendant} (id={descendant._id_}) missing from root2._expression_id_cache_"
-        )
+        assert (
+            descendant._id_ in root2._expression_id_cache_
+        ), f"{descendant} (id={descendant._id_}) missing from root2._expression_id_cache_"
 
 
 def test_indexing_on_dict_field():
@@ -1299,17 +1386,6 @@ def test_indexing_2():
     body_tha_has_red_shape = list(body_tha_has_red_shape)
     assert len(body_tha_has_red_shape) == 1
     assert body_tha_has_red_shape[0].shapes[0].color == "red"
-
-
-def test_accessing_dunder_methods():
-    world_classes = [Body, Cabinet, Drawer, Handle, Container, Connection]
-    world_class = variable_from(world_classes)
-    world_class_starting_with_c = entity(world_class).where(
-        world_class.__name__.startswith("C")
-    )
-    results = world_class_starting_with_c.tolist()
-    assert len(results) == 3
-    assert set(results) == {c for c in world_classes if c.__name__.startswith("C")}
 
 
 def test_debugger_issue():

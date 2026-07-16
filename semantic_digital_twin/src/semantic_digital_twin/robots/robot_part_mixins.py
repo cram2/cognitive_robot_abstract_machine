@@ -17,9 +17,9 @@ from typing_extensions import (
 
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.patterns.subclass_safe_generic import (
-    AbstractSubClassSafeGeneric,
+    SubClassSafeGeneric,
 )
-from krrood.utils import get_generic_type_params
+from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.world_description.world_modification import (
@@ -62,7 +62,7 @@ class RobotPartMixin(ABC):
 @dataclass(eq=False)
 class HasFingers(
     Generic[TGenericThumb, Unpack[TGenericFingers]],
-    AbstractSubClassSafeGeneric,
+    SubClassSafeGeneric,
     RobotPartMixin,
     ABC,
 ):
@@ -79,7 +79,8 @@ class HasFingers(
 
     def validate(self):
         """
-        Validation method that checks that there is exactly one thumb in the fingers list.
+        Validation method that checks that there is exactly one thumb in the fingers
+        list.
         """
         assert (
             len(self.fingers) >= 3
@@ -87,7 +88,7 @@ class HasFingers(
 
     @property
     def thumb(self) -> TGenericThumb:
-        concrete_thumb_class = get_generic_type_params(self, HasFingers)[0]
+        concrete_thumb_class = get_generic_type_parameters(self, HasFingers)[0]
         [thumb] = [
             finger
             for finger in self.fingers
@@ -100,11 +101,12 @@ class HasFingers(
 class HasTwoFingers(
     Generic[TGenericLeftFinger, TGenericRightFinger],
     HasFingers[TGenericLeftFinger, TGenericRightFinger],
-    AbstractSubClassSafeGeneric,
+    SubClassSafeGeneric,
     ABC,
 ):
     """
-    Mixin class for robots or robot parts that have exactly two fingers, one of which is a thumb.
+    Mixin class for robots or robot parts that have exactly two fingers, one of which is
+    a thumb.
     """
 
     def validate(self):
@@ -114,7 +116,7 @@ class HasTwoFingers(
 
     @property
     def finger(self) -> Union[TGenericLeftFinger, TGenericRightFinger]:
-        concrete_thumb_class = get_generic_type_params(self, HasFingers)[0]
+        concrete_thumb_class = get_generic_type_parameters(self, HasFingers)[0]
 
         [finger] = [
             finger
@@ -126,10 +128,10 @@ class HasTwoFingers(
 
 @dataclass(eq=False)
 class HasSensors(
-    Generic[Unpack[TGenericSensors]], AbstractSubClassSafeGeneric, RobotPartMixin, ABC
+    Generic[Unpack[TGenericSensors]], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
     """
-    Mixin class for robots or robot parts that have sensors
+    Mixin class for robots or robot parts that have sensors.
     """
 
     sensors: list[Union[Unpack[TGenericSensors]]] = field(
@@ -145,10 +147,11 @@ class HasSensors(
 
 @dataclass(eq=False)
 class HasEndEffector(
-    Generic[TGenericEndEffector], AbstractSubClassSafeGeneric, RobotPartMixin, ABC
+    Generic[TGenericEndEffector], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
     """
-    Mixin class for robots or robot parts that have an end effector as their direct child.
+    Mixin class for robots or robot parts that have an end effector as their direct
+    child.
     """
 
     end_effector: TGenericEndEffector = field(default=None, kw_only=True)
@@ -161,9 +164,7 @@ class HasEndEffector(
 
 
 @dataclass(eq=False)
-class HasArms(
-    Generic[Unpack[TGenericArms]], AbstractSubClassSafeGeneric, RobotPartMixin, ABC
-):
+class HasArms(Generic[Unpack[TGenericArms]], SubClassSafeGeneric, RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have arms as their direct children.
     """
@@ -197,12 +198,13 @@ class HasOneArm(HasArms[TGenericArm], RobotPartMixin, ABC):
 @dataclass(eq=False)
 class HasLeftRightArm(
     HasArms[TGenericLeftArm, TGenericRightArm],
-    AbstractSubClassSafeGeneric,
+    SubClassSafeGeneric,
     RobotPartMixin,
     ABC,
 ):
     """
-    Mixin class for robots or robot parts that have two arms and can specify which is the left and which is the right arm.
+    Mixin class for robots or robot parts that have two arms and can specify which is
+    the left and which is the right arm.
     """
 
     def validate(self):
@@ -224,8 +226,11 @@ class HasLeftRightArm(
         self, relation: Type[Union[LeftOf, RightOf]]
     ) -> Union[TGenericLeftArm, TGenericRightArm]:
         """
-        Assigns the left and right arms based on their position relative to the robot's root body.
-        :param relation: The relation to use for determining left or right (LeftOf or RightOf).
+        Assigns the left and right arms based on their position relative to the robot's
+        root body.
+
+        :param relation: The relation to use for determining left or right (LeftOf or
+            RightOf).
         :return: The arm that is on the left or right side of the robot.
         """
         assert (
@@ -250,7 +255,7 @@ class HasLeftRightArm(
 
 @dataclass(eq=False)
 class HasMobileBase(
-    Generic[TGenericMobileBase], AbstractSubClassSafeGeneric, RobotPartMixin, ABC
+    Generic[TGenericMobileBase], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
     """
     Mixin class for robots that have a mobile base.
@@ -266,9 +271,7 @@ class HasMobileBase(
 
 
 @dataclass(eq=False)
-class HasTorso(
-    Generic[TGenericTorso], AbstractSubClassSafeGeneric, RobotPartMixin, ABC
-):
+class HasTorso(Generic[TGenericTorso], SubClassSafeGeneric, RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have a torso as their direct child.
     """
@@ -283,7 +286,7 @@ class HasTorso(
 
 
 @dataclass(eq=False)
-class HasNeck(Generic[TGenericNeck], AbstractSubClassSafeGeneric, RobotPartMixin, ABC):
+class HasNeck(Generic[TGenericNeck], SubClassSafeGeneric, RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have a neck as their direct child.
     """

@@ -5,11 +5,12 @@ from datetime import timedelta
 
 from typing_extensions import Optional, Any, Dict
 
-from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.factories import variable_from, and_
+from krrood.entity_query_language.core.variable import Variable
+from krrood.entity_query_language.factories import variable_from, and_, ConditionType
 from coraplex.config.action_conf import ActionConfig
 from coraplex.datastructures.dataclasses import Context
 from coraplex.plans.factories import execute_single
+from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.motions.navigation import MoveMotion
 from coraplex.robot_plans.motions.robot_body import LookingMotion
@@ -35,17 +36,17 @@ class NavigateAction(ActionDescription):
     Keep the joint states of the robot the same during the navigation.
     """
 
-    def execute(self) -> None:
-        self.add_subplan(
-            execute_single(MoveMotion(self.target_location, self.keep_joint_states))
-        ).perform()
+    @property
+    def _action_plan(self) -> PlanNode:
+        return execute_single(MoveMotion(self.target_location, self.keep_joint_states))
 
     @staticmethod
     def pre_condition(
-        variables, context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression:
+        variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
+    ) -> ConditionType:
         """
-        The robot needs to have a drive and the target location needs to be free from obstacles
+        The robot needs to have a drive and the target location needs to be free from
+        obstacles.
         """
         drive_variable = variable_from(context.robot.drive is not None)
         return and_(
@@ -55,14 +56,13 @@ class NavigateAction(ActionDescription):
 
     @staticmethod
     def post_condition(
-        variables, context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression:
+        variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
+    ) -> ConditionType:
         """
-        The robot needs to be within 3 cm of the target location
+        The robot needs to be within 3 cm of the target location.
         """
-
         return allclose(
-            context.robot.root.global_pose,
+            variable_from(context.robot.root).global_pose,
             kwargs["target_location"],
             atol=0.03,
         )
@@ -76,16 +76,15 @@ class LookAtAction(ActionDescription):
 
     target: Pose
     """
-    Position at which the robot should look, given as 6D pose
+    Position at which the robot should look, given as 6D pose.
     """
 
-    camera: Camera = None
+    camera: Optional[Camera] = None
     """
-    Camera that should be looking at the target
+    Camera that should be looking at the target.
     """
 
-    def execute(self) -> None:
+    @property
+    def _action_plan(self) -> PlanNode:
         camera = self.camera or self.robot.get_default_camera()
-        self.add_subplan(
-            execute_single(LookingMotion(target=self.target, camera=camera))
-        ).perform()
+        return execute_single(LookingMotion(target=self.target, camera=camera))

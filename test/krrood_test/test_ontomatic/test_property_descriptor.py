@@ -1,7 +1,14 @@
 from __future__ import annotations
 
-from ..dataset.university_ontology_like_classes import Company, Person, CEO
 from krrood.symbol_graph.symbol_graph import SymbolGraph
+from ..dataset.role_and_ontology.university_ontology_like_classes import (
+    Company,
+    Person,
+    CEOAsFirstRole,
+    RepresentativeAsSecondRole,
+    DelegateAsThirdRole,
+    Country,
+)
 
 SymbolGraph().clear()
 SymbolGraph()
@@ -47,13 +54,13 @@ def test_set_container_property():
 def test_setting_a_role_affects_role_taker():
     company = Company(name="BassCo")
     person1 = Person(name="Bass1")
-    ceo1 = CEO(person1)
+    ceo1 = CEOAsFirstRole(role_taker=person1)
 
     ceo1.head_of = company
     assert ceo1.head_of == company
-    assert ceo1.person.works_for == company
+    assert ceo1.role_taker.works_for == company
     assert ceo1 in company.members
-    assert company in ceo1.person.member_of
+    assert company in ceo1.role_taker.member_of
 
 
 def test_transitive_property():

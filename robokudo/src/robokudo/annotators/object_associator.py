@@ -14,7 +14,10 @@ from robokudo.utils.hypothesis_comparators import ObjectHypothesisComparator
 
 
 class ObjectAssociator(BaseAnnotator):
-    """An annotator that associates the objects of the current iteration with the objects of the last iteration."""
+    """
+    An annotator that associates the objects of the current iteration with the objects
+    of the last iteration.
+    """
 
     def __init__(self, name: str = "ObjectAssociator") -> None:
         super().__init__(name)

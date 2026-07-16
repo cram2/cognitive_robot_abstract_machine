@@ -3,6 +3,12 @@ from dataclasses import dataclass
 from typing_extensions import List, Callable
 
 from krrood.entity_query_language.predicate import Predicate
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    Adjective,
+    clause,
+    Copula,
+    Noun,
+)
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -24,7 +30,9 @@ class GripperOccupancy:
     def check_man_occupancy(self, condition: Callable[List[Body], bool]) -> bool:
         """
         Checks the occupancy of the gripper against a condition.
-        The condition get the list of bodies that are under the TCP in the kinematic structure and returns a boolean.
+
+        The condition get the list of bodies that are under the TCP in the kinematic
+        structure and returns a boolean.
 
         :param condition: The condition that should be evaluated.
         :return: True if the condition is satisfied, False otherwise.
@@ -42,19 +50,30 @@ class GripperOccupancy:
 @dataclass
 class GripperIsFree(GripperOccupancy, Predicate):
     """
-    Checks if the gripper is holding something. Checks this by looking at the kinematic structure of the end_effector.
+    Checks if the gripper is holding something.
+
+    Checks this by looking at the kinematic structure of the end_effector.
     """
 
     def __call__(self) -> bool:
         return self.check_man_occupancy(lambda bodies: len(bodies) == 0)
 
+    @classmethod
+    def _verbalization_fragment_(cls, fields):
+        return clause(Noun(fields["end_effector"]), Copula(), Adjective("free"))
+
 
 @dataclass
 class GripperIsNotFree(GripperOccupancy, Predicate):
     """
-    Checks if the gripper is free at the moment, so it can be used to grab something. This is checked by looking at the
-    kinematic structure.
+    Checks if the gripper is free at the moment, so it can be used to grab something.
+
+    This is checked by looking at the kinematic structure.
     """
 
     def __call__(self) -> bool:
         return self.check_man_occupancy(lambda bodies: len(bodies) != 0)
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields):
+        return clause(Noun(fields["end_effector"]), Copula(), Adjective("occupied"))

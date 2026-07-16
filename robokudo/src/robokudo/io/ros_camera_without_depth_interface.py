@@ -36,15 +36,17 @@ if TYPE_CHECKING:
 
 # TODO Needs to be migrated to ROS2 for new RGB-only use cases
 class ROSCameraWithoutDepthInterface(ROSCameraInterface):
-    """A ROS camera interface for RGB-only cameras.
+    """
+    A ROS camera interface for RGB-only cameras.
 
-    This class handles cameras that provide only RGB images without depth data.
-    It synchronizes RGB images with camera calibration information and supports
-    image rotation with proper intrinsics adjustment.
+    This class handles cameras that provide only RGB images without depth data. It
+    synchronizes RGB images with camera calibration information and supports image
+    rotation with proper intrinsics adjustment.
     """
 
     def __init__(self, camera_config: Any) -> None:
-        """Initialize the RGB-only camera interface.
+        """
+        Initialize the RGB-only camera interface.
 
         Sets up ROS subscribers and synchronization for RGB image and camera info
         topics. Also initializes internal data structures and thread safety.
@@ -57,13 +59,15 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         self.color_subscriber: Subscriber = message_filters.Subscriber(
             camera_config.topic_color, Image
         )
-        """Subscriber for RGB image topic"""
-
+        """
+        Subscriber for RGB image topic.
+        """
         self.cam_info_subscriber: Subscriber = message_filters.Subscriber(
             camera_config.topic_cam_info, CameraInfo
         )
-        """Subscriber for camera info topic"""
-
+        """
+        Subscriber for camera info topic.
+        """
         ts = message_filters.ApproximateTimeSynchronizer(
             [self.color_subscriber, self.cam_info_subscriber], queue_size=10, slop=0.4
         )
@@ -74,43 +78,53 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         self.rk_logger.info(f"  {camera_config.topic_cam_info}")
 
         self.color: Optional[Tuple[npt.NDArray]] = None
-        """Latest RGB image data"""
-
+        """
+        Latest RGB image data.
+        """
         self.cam_info: Optional[CameraInfo] = None
-        """Latest camera calibration info"""
-
+        """
+        Latest camera calibration info.
+        """
         self.cam_intrinsic: Optional[o3d.camera.PinholeCameraIntrinsic] = None
-        """Camera intrinsic parameters in Open3D format"""
-
+        """
+        Camera intrinsic parameters in Open3D format.
+        """
         self.color2depth_ratio: Optional[Tuple[float, float]] = (1.0, 1.0)
-        """Always (1.0, 1.0) since no depth data"""
-
+        """
+        Always (1.0, 1.0) since no depth data.
+        """
         self.cam_translation: Optional[List[float]] = None
-        """Camera translation from TF"""
-
+        """
+        Camera translation from TF.
+        """
         self.cam_quaternion: Optional[List[float]] = None
-        """Camera rotation as quaternion from TF"""
-
+        """
+        Camera rotation as quaternion from TF.
+        """
         self.timestamp: Optional[float] = None
-        """Timestamp of latest data"""
-
+        """
+        Timestamp of latest data.
+        """
         self.lock: Lock = Lock()
-        """Thread synchronization lock"""
-
+        """
+        Thread synchronization lock.
+        """
         # hack because my rosbag has image topic
         self.bridge: CvBridge = CvBridge()
-        """Bridge for converting between ROS and OpenCV images"""
-
+        """
+        Bridge for converting between ROS and OpenCV images.
+        """
         print("ROSCameraWithoutDepthInterface initialized")
 
     def rotate_camera_intrinsics(
         self, K: npt.NDArray, image_size: Tuple[int, int], rotation: str = "90_ccw"
     ) -> Tuple[npt.NDArray, Tuple[int, int]]:
-        """Adjust camera intrinsics matrix for image rotation.
+        """
+        Adjust camera intrinsics matrix for image rotation.
 
-        Computes the new camera intrinsics matrix and image dimensions after
-        applying a rotation to the image. Supports 90° counter-clockwise,
-        90° clockwise, and 180° rotations.
+        Computes the new camera intrinsics matrix and image dimensions after applying a
+        rotation to the image. Supports 90° counter-clockwise, 90° clockwise, and 180°
+        rotations.
 
         :param K: Original camera intrinsic matrix of shape (3, 3)
         :param image_size: Original image dimensions as (width, height)
@@ -173,17 +187,17 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         color_data: Image,
         cam_info: Optional[CameraInfo] = None,
     ) -> None:
-        """Process synchronized RGB image and camera info messages.
+        """
+        Process synchronized RGB image and camera info messages.
 
-        TODO make this generic. handle the encoding and order properly.
-        For standard and compressed images.
-        this might also depend on the fix of image_transport_plugins being published as a package.
-        Startpoint can be found at the bottom of this method.
+        TODO make this generic. handle the encoding and order properly. For standard and
+        compressed images. this might also depend on the fix of image_transport_plugins
+        being published as a package. Startpoint can be found at the bottom of this
+        method.
 
         :param color_data: RGB image message
         :param cam_info: Camera calibration info message, defaults to None
         """
-
         # hack becasue my rosbag has image topics
         # color_arr = np.fromstring(color_data.data, np.uint8)
         self.lock.acquire()

@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass, field
 
-from typing_extensions import Dict, Any
+from typing_extensions import Dict, Any, Generic, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
@@ -26,7 +26,9 @@ class PositionVariable(sm.FloatVariable):
     """
 
     dof: DegreeOfFreedom = field(kw_only=True)
-    """ Backreference """
+    """
+    Backreference.
+    """
 
     def __init__(self, name: str, dof: DegreeOfFreedom):
         super().__init__(name)
@@ -43,7 +45,9 @@ class VelocityVariable(sm.FloatVariable):
     """
 
     dof: DegreeOfFreedom = field(kw_only=True)
-    """ Backreference """
+    """
+    Backreference.
+    """
 
     def __init__(self, name: str, dof: DegreeOfFreedom):
         super().__init__(name)
@@ -60,7 +64,9 @@ class AccelerationVariable(sm.FloatVariable):
     """
 
     dof: DegreeOfFreedom = field(kw_only=True)
-    """ Backreference """
+    """
+    Backreference.
+    """
 
     def __init__(self, name: str, dof: DegreeOfFreedom):
         super().__init__(name)
@@ -77,7 +83,9 @@ class JerkVariable(sm.FloatVariable):
     """
 
     dof: DegreeOfFreedom = field(kw_only=True)
-    """ Backreference """
+    """
+    Backreference.
+    """
 
     def __init__(self, name: str, dof: DegreeOfFreedom):
         super().__init__(name)
@@ -87,18 +95,21 @@ class JerkVariable(sm.FloatVariable):
         return self.dof._world.state[self.dof.id].jerk
 
 
+T = TypeVar("T")
+
+
 @dataclass
-class DegreeOfFreedomLimits:
+class DegreeOfFreedomLimits(Generic[T]):
     """
     A class representing the limits of a degree of freedom.
     """
 
-    lower: DerivativeMap[float] = field(default=None)
+    lower: DerivativeMap[T] = field(default=None)
     """
     Lower limits of the degree of freedom.
     """
 
-    upper: DerivativeMap[float] = field(default=None)
+    upper: DerivativeMap[T] = field(default=None)
     """
     Upper limits of the degree of freedom.
     """
@@ -116,32 +127,35 @@ class DegreeOfFreedomLimits:
 @dataclass(eq=False)
 class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     """
-    A class representing a degree of freedom in a world model with associated derivatives and limits.
+    A class representing a degree of freedom in a world model with associated
+    derivatives and limits.
 
-    This class manages a variable that can freely change within specified limits, tracking its position,
-    velocity, acceleration, and jerk. It maintains symbolic representations for each derivative order
-    and provides methods to get and set limits for these derivatives.
+    This class manages a variable that can freely change within specified limits,
+    tracking its position, velocity, acceleration, and jerk. It maintains symbolic
+    representations for each derivative order and provides methods to get and set limits
+    for these derivatives.
     """
 
-    limits: DegreeOfFreedomLimits = field(default=None)
+    limits: DegreeOfFreedomLimits[float] = field(default=None)
     """
-    Lower and upper bounds for each derivative
+    Lower and upper bounds for each derivative.
     """
 
     variables: DerivativeMap[sm.FloatVariable] = field(
         default_factory=DerivativeMap, init=False
     )
     """
-    Symbolic representations for each derivative
+    Symbolic representations for each derivative.
     """
 
     has_hardware_interface: bool = False
     """
-    Whether this DOF is linked to a controller and can therefore respond to control commands.
+    Whether this DOF is linked to a controller and can therefore respond to control
+    commands.
 
-    E.g. the caster wheels of a PR2 have dofs, but they are not directly controlled. 
-    Instead a the omni drive connection is directly controlled and a low level controller translates these commands
-    to commands for the caster wheels.
+    E.g. the caster wheels of a PR2 have dofs, but they are not directly controlled.
+    Instead a the omni drive connection is directly controlled and a low level
+    controller translates these commands to commands for the caster wheels.
 
     A door hinge also has a dof that cannot be controlled.
     """
@@ -155,7 +169,8 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
 
     def create_variables(self):
         """
-        Creates a variable for each derivative, that refer to the corresponding values of this dof.
+        Creates a variable for each derivative, that refer to the corresponding values
+        of this dof.
         """
         assert self._world is not None
         self.variables.position = PositionVariable(
@@ -223,15 +238,18 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
         new_upper_limits: DerivativeMap[float],
     ):
         """
-        Overwrites the degree-of-freedom (DOF) limits for a range of derivatives. This updates
-        lower and upper limits based on the given new limits. For each derivative, if the
-        new limit is provided and it is more restrictive than the original limit, the limit
-        will be updated accordingly.
+        Overwrites the degree-of-freedom (DOF) limits for a range of derivatives.
 
-        :param new_lower_limits: A mapping of new lower limits for the specified derivatives.
-            If a new lower limit is None, no change is applied for that derivative.
-        :param new_upper_limits: A mapping of new upper limits for the specified derivatives.
-            If a new upper limit is None, no change is applied for that derivative.
+        This updates lower and upper limits based on the given new limits. For each
+        derivative, if the new limit is provided and it is more restrictive than the
+        original limit, the limit will be updated accordingly.
+
+        :param new_lower_limits: A mapping of new lower limits for the specified
+            derivatives. If a new lower limit is None, no change is applied for that
+            derivative.
+        :param new_upper_limits: A mapping of new upper limits for the specified
+            derivatives. If a new upper limit is None, no change is applied for that
+            derivative.
         """
         if not isinstance(self.variables.position, sm.FloatVariable):
             raise MimicDofLimitOverwriteError(self.name)

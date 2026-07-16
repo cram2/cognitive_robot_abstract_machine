@@ -83,14 +83,18 @@ def eval_performance(
     warmup_iterations=10,
 ):
     """
-    Evaluate the performance of two methods by running them multiple times and measuring the time taken for each run.
+    Evaluate the performance of two methods by running them multiple times and measuring
+    the time taken for each run.
+
     :param rustworkx_method: The method to be evaluated in Rustworkx.
     :param rustworkx_args: The arguments to be passed to the Rustworkx method.
     :param jax_method: The method to be evaluated in JAX.
     :param jax_args: The arguments to be passed to the JAX method.
     :param number_of_iterations: The number of iterations to be run for each method.
-    :param warmup_iterations: The number of iterations to be run before measuring the performance.
-    :return: A tuple containing the times for the Rustworkx method and the times for the JAX method.
+    :param warmup_iterations: The number of iterations to be run before measuring the
+        performance.
+    :return: A tuple containing the times for the Rustworkx method and the times for the
+        JAX method.
     """
 
     @timeit

@@ -4,9 +4,7 @@ import logging
 from abc import abstractmethod
 from dataclasses import dataclass
 from inspect import signature
-from typing import Optional
-
-from typing_extensions import TypeVar, Type
+from typing_extensions import TypeVar, Type, Optional
 
 from giskardpy.motion_statechart.graph_node import Task
 from coraplex.plans.designator import Designator
@@ -23,21 +21,24 @@ T = TypeVar("T", bound=AbstractRobot)
 class BaseMotion(Designator):
     """
     Base class for all motions.
-    Motions are like builders for Motion State Charts.
-    Motions never create any other motions or actions.
-    Motions create exactly one goal.
+
+    Motions are like builders for Motion State Charts. Motions never create any other
+    motions or actions. Motions create exactly one goal.
     """
 
     def perform(self):
         """
-        Passes this designator to the process module for execution. Will be overwritten by each motion.
+        Passes this designator to the process module for execution.
+
+        Will be overwritten by each motion.
         """
         pass
 
     @property
     def motion_chart(self) -> Task:
         """
-        Returns the mapped motion chart for this motion or the alternative motion if there is one.
+        Returns the mapped motion chart for this motion or the alternative motion if
+        there is one.
 
         :return: The motion chart for this motion in this context
         """
@@ -58,7 +59,9 @@ class BaseMotion(Designator):
         pass
 
     def get_alternative_motion(self) -> Optional[Type[AlternativeMotion]]:
-        return AlternativeMotion.check_for_alternative(self.robot, self.__class__)
+        return AlternativeMotion.check_for_alternative(
+            self.context.alternative_motion_mappings, self.robot, self.__class__
+        )
 
 
 MotionType = TypeVar("MotionType", bound=BaseMotion)

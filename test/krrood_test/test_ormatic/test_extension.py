@@ -1,7 +1,7 @@
 import importlib
 import importlib.util
 import sys
-from krrood.class_diagrams import ClassDiagram
+from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.helper import get_classes_of_ormatic_interface
@@ -11,7 +11,7 @@ from ..dataset import ormatic_interface
 
 def test_extension(tmp_path):
     """
-    Test that existing ormatic interfaces can be extended
+    Test that existing ormatic interfaces can be extended.
     """
     # import classes from the existing interface
     classes, alternative_mappings, type_mappings = get_classes_of_ormatic_interface(

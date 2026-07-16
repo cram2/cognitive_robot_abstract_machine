@@ -25,6 +25,7 @@ from probabilistic_model.probabilistic_model import ProbabilisticModel
 class PosteriorWidget(QWidget):
     """
     The Posterior page widget of the GUI.
+
     Allows calculating and viewing posterior distributions given evidence.
     """
 
@@ -336,7 +337,9 @@ class PosteriorWidget(QWidget):
             self.update_plot()
 
     def refresh(self):
-        """Called when a new model is loaded."""
+        """
+        Called when a new model is loaded.
+        """
         if not self.controller.model:
             return
 

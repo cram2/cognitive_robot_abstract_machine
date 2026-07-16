@@ -1,7 +1,6 @@
 import time
 
 import threading
-import atexit
 
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
@@ -13,20 +12,26 @@ from coraplex.ros import create_publisher
 
 class JointStatePublisher:
     """
-    Joint state publisher for all robots currently loaded in the World
+    Joint state publisher for all robots currently loaded in the World.
     """
 
     def __init__(
-        self, world: World, node, joint_state_topic="/coraplex/joint_state", interval=0.1
+        self,
+        world: World,
+        node,
+        joint_state_topic="/coraplex/joint_state",
+        interval=0.1,
     ):
         """
-        Robot object is from :py:attr:`~coraplex.world.World.robot` and current joint states are published to
-        the given joint_state_topic as a JointState message.
+        Robot object is from :py:attr:`~coraplex.world.World.robot` and current joint
+        states are published to the given joint_state_topic as a JointState message.
 
         :param world: World object from which the joint states should be read
         :param node: ROS2 node used to create the publisher
-        :param joint_state_topic: Topic name to which the joint states should be published
-        :param interval: Interval at which the joint states should be published, in seconds
+        :param joint_state_topic: Topic name to which the joint states should be
+            published
+        :param interval: Interval at which the joint states should be published, in
+            seconds
         """
         self.world = world
 
@@ -36,15 +41,16 @@ class JointStatePublisher:
         self.node = node
         self.interval = interval
         self.kill_event = threading.Event()
-        self.thread = threading.Thread(target=self._publish)
+        self.thread = threading.Thread(target=self._publish, daemon=True)
         self.thread.start()
-
-        atexit.register(self._stop_publishing)
 
     def _publish(self) -> None:
         """
-        Publishes the current joint states of the :py:attr:`~coraplex.world.World.robot` in an infinite loop.
-        The joint states are published as long as the kill_event is not set by :py:meth:`~JointStatePublisher._stop_publishing`
+        Publishes the current joint states of the :py:attr:`~coraplex.world.World.robot`
+        in an infinite loop.
+
+        The joint states are published as long as the kill_event is not set by
+        :py:meth:`~JointStatePublisher._stop_publishing`
         """
         robot_views = self.world.get_semantic_annotations_by_type(AbstractRobot)
         dofs = {

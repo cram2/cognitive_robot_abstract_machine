@@ -1,0 +1,19 @@
+<?xml version="1.0" ?>
+<mujoco model="cabinet_fixture">
+	<compiler angle="radian" autolimits="true"/>
+	<worldbody>
+		<body name="hinge_cabinet_main" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0">
+			<inertial mass="5.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="1.0 1.0 1.0"/>
+			<geom type="box" size="0.3 0.3 0.5" rgba="0.6 0.4 0.2 1.0" contype="1" conaffinity="1" group="3"/>
+			<body name="hinge_cabinet_door" pos="0.3 0.0 0.0" quat="1.0 0.0 0.0 0.0">
+				<inertial mass="1.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.1 0.1 0.1"/>
+				<joint name="hinge_cabinet_door_joint" type="hinge" axis="0 0 1" pos="0 0 0"/>
+				<geom type="box" size="0.02 0.3 0.5" rgba="0.6 0.4 0.2 1.0" contype="1" conaffinity="1" group="3"/>
+				<body name="hinge_cabinet_handle" pos="0.02 0.25 0.0" quat="1.0 0.0 0.0 0.0">
+					<inertial mass="0.1" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.01 0.01 0.01"/>
+					<geom type="box" size="0.02 0.02 0.1" rgba="0.1 0.1 0.1 1.0" contype="1" conaffinity="1" group="3"/>
+				</body>
+			</body>
+		</body>
+	</worldbody>
+</mujoco>

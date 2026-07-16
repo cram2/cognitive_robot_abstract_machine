@@ -19,7 +19,9 @@ class OrbbecCameraConfig(
     StableViewpointComponent,
     WorldDescriptorComponent,
 ):
-    """Configuration class for the OrbBec Astra camera."""
+    """
+    Configuration class for the OrbBec Astra camera.
+    """
 
     registry_name: ClassVar[str] = "orbbec"
 

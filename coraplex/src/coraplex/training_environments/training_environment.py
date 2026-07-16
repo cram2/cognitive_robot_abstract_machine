@@ -6,7 +6,7 @@ from typing import ClassVar, Optional
 
 from krrood.adapters.json_serializer import from_json
 from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import underspecified, variable
+from krrood.entity_query_language.factories import a, an, variable
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
@@ -22,10 +22,11 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 )
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.grasp import GraspDescription
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import execute_single
 from coraplex.plans.failures import (
     PlanFailure,
+    EmptyUnderspecified,
 )
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import UnderspecifiedNode
@@ -83,6 +84,7 @@ class TrainingEnvironment(ABC):
     def setup_plan(self, limit: int = 10, **kwargs) -> Plan:
         """
         Create a plan with an underspecified node as a root.
+
         This plan is used to generate variants of the actions.
 
         :param limit: The maximum number of actions that should be executed.
@@ -93,9 +95,9 @@ class TrainingEnvironment(ABC):
         """
         Generate episodes until `number_of_actions` have been executed.
 
-        :param number_of_actions: The number of action executions that should be generated.
+        :param number_of_actions: The number of action executions that should be
+            generated.
         """
-
         remaining_actions = number_of_actions
 
         while remaining_actions > 0:
@@ -109,7 +111,6 @@ class TrainingEnvironment(ABC):
         :param limit: The maximum number of actions that should be executed.
         :return: The number of actions executed in the episode.
         """
-
         plan = self.setup_plan(limit)
 
         if self.visualize:
@@ -122,7 +123,11 @@ class TrainingEnvironment(ABC):
             pub.with_tf_publisher()
 
         with simulated_robot:
-            plan.perform()
+            try:
+                plan.perform()
+            except EmptyUnderspecified:
+                # No working solution found in this episode
+                pass
             self.executed_plans.append(plan)
 
         number_of_executed_variants = len(plan.root.children)
@@ -145,6 +150,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
     model_path: Optional[Path] = None
     """
     Path to a model file that should be used for the action.
+
     Creates a default model when this is None.
     """
 
@@ -186,13 +192,13 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
             reference_frame=world.root,
         )
 
-        move_to_reach = underspecified(MoveToReach)(
+        move_to_reach = a(MoveToReach)(
             target_pose_end_effector=target_pose,
-            target_pose_offset_robot=underspecified(Pose2D)(
+            target_pose_offset_robot=a(Pose2D)(
                 x=..., y=..., yaw=..., reference_frame=None
             ),
             hip_rotation=...,
-            grasp_description=underspecified(GraspDescription)(
+            grasp_description=a(GraspDescription)(
                 approach_direction=...,
                 vertical_alignment=...,
                 end_effector=variable(EndEffector, world.semantic_annotations),
@@ -214,7 +220,9 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
 
     def setup_backend(self, underspecified_action: Match) -> ProbabilisticBackend:
         """
-        Create a backend containing the best guesses as distribution for this action in this environment.
+        Create a backend containing the best guesses as distribution for this action in
+        this environment.
+
         :param underspecified_action: The underspecified action to create a backend for.
         :return: The probabilistic backend
         """
@@ -243,6 +251,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
     def setup_backend_from_path(self, underspecified_action: Match):
         """
         Setup a backend from a model file.
+
         Adds the variables of the action to the loaded model if they don't exist.
 
         :param underspecified_action: The action to load the model for.

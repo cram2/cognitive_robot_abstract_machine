@@ -4,7 +4,7 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from typing_extensions import List
+from typing_extensions import List, Optional
 
 from semantic_digital_twin.exceptions import (
     ParsingError,
@@ -127,7 +127,7 @@ class FileUriResolver(PathResolver):
     Resolves file:// URIs and plain filesystem paths.
     """
 
-    base_directory: str = None
+    base_directory: Optional[str] = None
     """
     The base directory to resolve relative paths from.
     """
@@ -138,13 +138,13 @@ class FileUriResolver(PathResolver):
     def resolve(self, uri: str) -> str:
         if uri.startswith("file://"):
             if uri.startswith("file:///"):
-                path = uri[len("file://"):]  # absolute
+                path = uri[len("file://") :]  # absolute
             else:
                 path = uri.replace("file://", "", 1)  # relative
         else:
             path = uri
 
-        if not os.path.isabs(path):
+        if self.base_directory and not os.path.isabs(path):
             path = os.path.join(self.base_directory, path)
 
         return os.path.abspath(path)

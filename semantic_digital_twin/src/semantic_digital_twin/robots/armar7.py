@@ -539,7 +539,9 @@ class Armar7MobileBase(MobileBase, HasTorso[Armar7Torso]):
 @dataclass(eq=False)
 class Armar7(AbstractRobot, HasMobileBase[Armar7MobileBase]):
     """
-    The Armar7 robot built by the KIT. https://h2t.iar.kit.edu/397.php
+    The Armar7 robot built by the KIT.
+
+    https://h2t.iar.kit.edu/397.php
     """
 
     @classmethod

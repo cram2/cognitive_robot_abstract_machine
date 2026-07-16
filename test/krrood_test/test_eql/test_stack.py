@@ -12,6 +12,7 @@ Covers:
   - InferenceExplanation.triggering_functions
   - InferenceExplanation.root_frame_in
 """
+
 import inspect
 from dataclasses import dataclass
 
@@ -31,6 +32,7 @@ class Person(Symbol):
 # ---------------------------------------------------------------------------
 # StackFrame
 # ---------------------------------------------------------------------------
+
 
 def test_stack_frame_is_method_true():
     frame = StackFrame("f.py", 1, "m", None, Person, None, None)
@@ -97,10 +99,17 @@ def test_stack_frame_code_snippet_stripped():
 # CallStack
 # ---------------------------------------------------------------------------
 
+
 def _make_frame(**kwargs) -> StackFrame:
-    defaults = dict(filename="f.py", lineno=1, function_name="f",
-                    code_snippet=None, class_object=None, function_object=None,
-                    module_name=None)
+    defaults = dict(
+        filename="f.py",
+        lineno=1,
+        function_name="f",
+        code_snippet=None,
+        class_object=None,
+        function_object=None,
+        module_name=None,
+    )
     defaults.update(kwargs)
     return StackFrame(**defaults)
 
@@ -117,7 +126,9 @@ def test_call_stack_iter():
 
 def test_call_stack_filter_removes_site_packages():
     frames = [
-        _make_frame(filename="/usr/lib/python3/site-packages/foo.py", module_name="foo"),
+        _make_frame(
+            filename="/usr/lib/python3/site-packages/foo.py", module_name="foo"
+        ),
         _make_frame(filename="/my/project/bar.py", module_name="project.bar"),
     ]
     filtered = CallStack(frames).filter()
@@ -177,8 +188,11 @@ def test_call_stack_root_frame_in_none_module_name_skipped():
 
 
 def test_call_stack_classes_distinct_ordered():
-    class A: pass
-    class B: pass
+    class A:
+        pass
+
+    class B:
+        pass
 
     frames = [
         _make_frame(class_object=A),
@@ -191,8 +205,11 @@ def test_call_stack_classes_distinct_ordered():
 
 
 def test_call_stack_functions_distinct_ordered():
-    def f(): pass
-    def g(): pass
+    def f():
+        pass
+
+    def g():
+        pass
 
     frames = [
         _make_frame(function_object=f),
@@ -216,6 +233,7 @@ def test_call_stack_is_from_method_false():
 # ---------------------------------------------------------------------------
 # InferenceExplanation stack query methods
 # ---------------------------------------------------------------------------
+
 
 def _infer_person(name: str):
     person_inf = inference(Person)
@@ -314,7 +332,9 @@ def test_root_frame_in_returns_none_for_unknown_package():
 
 
 def test_root_frame_in_outermost_wins():
-    """The outermost frame in the package is returned, not the innermost."""
+    """
+    The outermost frame in the package is returned, not the innermost.
+    """
 
     def inner():
         person_inf = inference(Person)

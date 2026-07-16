@@ -4,9 +4,35 @@ from typing import Optional
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.goals.templates import Sequence
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode, Goal, NodeArtifacts, CancelMotion
-from giskardpy.motion_statechart.monitors.payload_monitors import CountControlCycles, Pulse
+from giskardpy.motion_statechart.graph_node import (
+    MotionStatechartNode,
+    Goal,
+    NodeArtifacts,
+    CancelMotion,
+)
+from giskardpy.motion_statechart.monitors.payload_monitors import (
+    CountControlCycles,
+    Pulse,
+)
 from giskardpy.data_types.exceptions import GiskardException
+
+
+@dataclass
+class TestNodeAssertionError(GiskardException):
+    """
+    Raised by test motion statechart nodes when a behaviour they assert on is violated.
+    """
+
+    reason: str
+    """
+    Description of the violated assertion.
+    """
+
+    def error_message(self) -> str:
+        return self.reason
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass(eq=False, repr=False)
@@ -76,7 +102,9 @@ class TestNestedGoal(Goal):
 class TestRunAfterStop(Goal):
     """
     Goal that tests if a child node runs after the parent node has stopped.
-    Uses a CancelMotion node to raise an exception if the child node runs after the parent has stopped.
+
+    Uses a CancelMotion node to raise an exception if the child node runs after the
+    parent has stopped.
     """
 
     ticking1: CountControlCycles = field(init=False)
@@ -88,7 +116,9 @@ class TestRunAfterStop(Goal):
         self.ticking2 = CountControlCycles(name="2ticks", control_cycles=2)
         self.cancel = CancelMotion(
             name="Cancel_on_tick_after_done",
-            exception=GiskardException("Node ticked after template stopped"),
+            exception=TestNodeAssertionError(
+                reason="Node ticked after template stopped"
+            ),
         )
 
         self.add_nodes(
@@ -108,10 +138,11 @@ class TestRunAfterStop(Goal):
 class TestEndBeforeStart(Goal):
     """
     Test if a child node can end before it was started.
-    node1 waits 1 tick, then starts node 3.
-    node2 fulfills the end condition of node 3 immediately.
-    node3 should start when node1 is True and transition to RUNNING with Observationstate UNKNOWN.
-    On the next tick, node3 should end because its end condition is already fulfilled by node2.
+
+    node1 waits 1 tick, then starts node 3. node2 fulfills the end condition of node 3
+    immediately. node3 should start when node1 is True and transition to RUNNING with
+    Observationstate UNKNOWN. On the next tick, node3 should end because its end
+    condition is already fulfilled by node2.
     """
 
     node1: CountControlCycles = field(init=False)
@@ -136,7 +167,9 @@ class TestEndBeforeStart(Goal):
 class TestRunAfterStopFromPause(Goal):
     """
     Test if child node can transition to RUNNING from PAUSED after parent node is DONE.
-    Uses a CancelMotion node to raise an exception if the child node runs after the parent has stopped.
+
+    Uses a CancelMotion node to raise an exception if the child node runs after the
+    parent has stopped.
     """
 
     ticking1: CountControlCycles = field(init=False)
@@ -154,7 +187,9 @@ class TestRunAfterStopFromPause(Goal):
         self.pulse = Pulse()
         self.cancel = CancelMotion(
             name="Cancel_on_tick_after_done",
-            exception=GiskardException("Node ticked after template stopped"),
+            exception=TestNodeAssertionError(
+                reason="Node ticked after template stopped"
+            ),
         )
 
         self.add_nodes(
@@ -171,7 +206,9 @@ class TestRunAfterStopFromPause(Goal):
 @dataclass(repr=False, eq=False)
 class TestUnpauseUnknownFromParentPause(Goal):
     """
-    Tests if a child node can transition from PAUSED back to RUNNING when child.pause_condition is UNKNOWN.
+    Tests if a child node can transition from PAUSED back to RUNNING when
+    child.pause_condition is UNKNOWN.
+
     Child was paused by parent node being paused and child.pause_condition is UNKNOWN.
     When parent unpauses, child should transition back to RUNNING.
     """
@@ -185,7 +222,7 @@ class TestUnpauseUnknownFromParentPause(Goal):
         self.count_ticks2 = CountControlCycles(control_cycles=5)
         self.cancel = CancelMotion(
             name="check_unpause_failed",
-            exception=GiskardException("Node did not unpause correctly"),
+            exception=TestNodeAssertionError(reason="Node did not unpause correctly"),
         )
 
         self.add_node(self.count_ticks1)

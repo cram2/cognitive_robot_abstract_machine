@@ -174,6 +174,7 @@ def main():
         "ros-jazzy-ament-lint-auto",
         "ros-jazzy-ament-cmake-ros",
         "ros-jazzy-launch-testing-ament-cmake",
+        "ros-jazzy-rviz2",
     ]
     manager.dep_manager.install_packages(packages)
 
@@ -264,6 +265,12 @@ def main():
             "https://github.com/cram2/cram_ros2_packages.git",
             "main",
             "cram_ros2_packages",
+        ),
+        Repository(
+            "https://github.com/code-iai/iai_weiss_wpg_300-120-gripper.git",
+            "main",
+            "iai_weiss_wpg_300-120-gripper",
+            ["griplink"],
         ),
     ]
 

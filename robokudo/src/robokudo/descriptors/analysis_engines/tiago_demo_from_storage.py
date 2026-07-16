@@ -1,4 +1,5 @@
-"""Analysis engine for TIAGo robot perception using stored data.
+"""
+Analysis engine for TIAGo robot perception using stored data.
 
 This module provides an analysis engine that demonstrates TIAGo robot perception
 capabilities using stored camera data. It implements a pipeline that combines
@@ -37,7 +38,8 @@ from robokudo.descriptors import CrDescriptorFactory
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for TIAGo robot perception with stored data.
+    """
+    Analysis engine for TIAGo robot perception with stored data.
 
     This class implements a pipeline that processes stored TIAGo camera data
     using a combination of sequential and parallel processing stages. It
@@ -62,14 +64,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "tiago_demo_from_storage"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline for TIAGo perception with stored data.
+        """
+        Create a pipeline for TIAGo perception with stored data.
 
         This method constructs a processing pipeline that combines sequential
         and parallel stages for processing stored TIAGo camera data. The

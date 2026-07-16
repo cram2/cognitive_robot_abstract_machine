@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 class QPControllerConfig:
     """
     Configuration for the QPController.
+
     .. warning:: Giskard relies on the robot tracking velocity commands well. Make sure it does!
     .. note::
     Tuning works the following way:
@@ -36,9 +37,10 @@ class QPControllerConfig:
     target_frequency: float
     """
     Target frequency of the control loop in Hz.
-    A higher value will result in a more responsive and thus smoother control signal, 
-    but the QP will have to be solved more often per second.
-    If the value is too low, the QP might start running into infeasiblity issues.
+
+    A higher value will result in a more responsive and thus smoother control signal, but the QP will have to be solved more
+    often per second. If the value is too low, the QP might start running into
+    infeasiblity issues.
 
     .. note::
     On a real robot:
@@ -54,7 +56,10 @@ class QPControllerConfig:
     prediction_horizon: int = field(default=7)
     """
     The prediction horizon in time steps used for the QP formulation.
-    Each step will have a length of 1/hz, meaning the prediction horizon in seconds is prediction_horizon / hz. 
+
+    Each step will have a length of 1/hz, meaning the prediction horizon in seconds is
+    prediction_horizon / hz.
+
     Increasing this value will:
         - make the commands produced by Giskard smoother
         - increase the computational cost of the controller.
@@ -70,6 +75,7 @@ class QPControllerConfig:
     )
     """
     Weights for the derivatives of the DOFs.
+
     A lower weight for a dof will make it cheaper for Giskard to use it.
     If you think Giskard is using a certain DOF too much, you can increase its weight here.
     .. warning:: If you increase the weights too much, Giskard might prefer violating goals over moving Dofs.
@@ -78,19 +84,21 @@ class QPControllerConfig:
     horizon_weight_gain_scalar: float = 0.1
     """
     Decides how much the dof_weights decrease over the prediction horizon.
+
     .. warning:: Only change if you really know what you are doing.
     """
 
     max_derivative: Derivatives = field(default=Derivatives.jerk)
     """
     The highest derivative that will be considered in the QP formulation.
+
     ..warning:: Only change if you really know what you are doing.
     """
 
     retries_with_relaxed_constraints: int = field(default=5)
     """
-    If the QP insolvable, the constraints will be relaxed with high weight slack variables 
-    up to 'retries_with_relaxed_constraints' many times.
+    If the QP insolvable, the constraints will be relaxed with high weight slack
+    variables up to 'retries_with_relaxed_constraints' many times.
     """
 
     verbose: bool = field(default=True)
@@ -99,19 +107,20 @@ class QPControllerConfig:
     """
 
     # %% init false
-    mpc_dt: float = field(init=False)
+    model_predictive_control_time_step: float = field(init=False)
     """
     The time step of the MPC in seconds.
+
     control_dt == mpc_dt:
         default
     control_dt > mpc_dt:
         The control commands apply over longer intervals than expected, almost guaranteeing overshoot or in stability.
     control_dt < mpc_dt:
-        The MPC formulation underestimates real kinematics based on mpc_dt. If the control loop runs faster, 
-        the actual system evolves more frequently, potentially causing overshooting as velocity 
-        integrals exceed the controller’s estimate. In extreme cases, QPs may become infeasible due to excessive 
+        The MPC formulation underestimates real kinematics based on mpc_dt. If the control loop runs faster,
+        the actual system evolves more frequently, potentially causing overshooting as velocity
+        integrals exceed the controller’s estimate. In extreme cases, QPs may become infeasible due to excessive
         velocity/acceleration demands.
-    .. warning:: Don't change this.  
+    .. warning:: Don't change this.
     """
 
     qp_solver_class: Type[QPSolver] = field(default=QPSolverPIQP)
@@ -124,7 +133,7 @@ class QPControllerConfig:
             logging.warning(
                 f"Hertz ({self.target_frequency}) is below 20Hz. This might cause instability."
             )
-        self.mpc_dt = self.control_dt
+        self.model_predictive_control_time_step = self.control_dt
 
         if self.prediction_horizon < 4:
             raise ValueError("prediction horizon must be >= 4.")
@@ -136,8 +145,19 @@ class QPControllerConfig:
         """
         return 1 / self.target_frequency
 
+    @property
+    def control_horizon(self) -> int:
+        """
+        Number of time steps over which commands are applied, two fewer than the
+        prediction horizon because the final two steps only bring the system to rest.
+        """
+        return self.prediction_horizon - 2
+
     @classmethod
     def create_with_simulation_defaults(cls):
+        """
+        Creates a configuration with the default values used for kinematic simulation.
+        """
         return cls(
             target_frequency=20,
             prediction_horizon=7,
@@ -146,13 +166,21 @@ class QPControllerConfig:
     def set_dof_weight(
         self, dof_name: PrefixedName, derivative: Derivatives, weight: float
     ):
-        """Set weight for a specific DOF derivative."""
+        """
+        Sets the objective weight of a single degree-of-freedom derivative.
+        """
         self.dof_weights[dof_name][derivative] = weight
 
     def set_dof_weights(self, dof_name: PrefixedName, weight_map: DerivativeMap[float]):
-        """Set multiple weights for a DOF."""
+        """
+        Sets the objective weights of all derivatives of a degree of freedom.
+        """
         self.dof_weights[dof_name] = weight_map
 
-    def get_dof_weight(self, dof_name: PrefixedName, derivative: Derivatives) -> float:
-        """Get weight for a specific DOF derivative."""
+    def get_degree_of_freedom_weight(
+        self, dof_name: PrefixedName, derivative: Derivatives
+    ) -> float:
+        """
+        Returns the objective weight of a single degree-of-freedom derivative.
+        """
         return self.dof_weights[dof_name][derivative]

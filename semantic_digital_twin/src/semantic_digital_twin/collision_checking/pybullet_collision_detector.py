@@ -1,9 +1,8 @@
 import hashlib
 import logging
 import os
-import tempfile
 from dataclasses import dataclass, field
-from krrood.utils import memoize, clear_memoization_cache
+from importlib.resources import files
 from pathlib import Path
 from typing import Dict
 from typing import List, Tuple, Optional
@@ -12,9 +11,9 @@ from uuid import UUID
 import giskardpy_bullet_bindings as bullet
 import numpy as np
 import trimesh
-from platformdirs import user_cache_dir
-
 from giskardpy.utils.utils import create_path
+from krrood.utils import memoize, clear_memoization_cache
+from platformdirs import user_cache_dir
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionDetector,
     CollisionCheckingResult,
@@ -54,6 +53,7 @@ def trimesh_quantized_hash(
 ) -> str:
     """
     Hash tolerant to tiny float differences by rounding vertices.
+
     Still order-sensitive (vertex/face order changes -> different hash).
     """
     h = hashlib.blake2b(digest_size=digest_size)
@@ -78,6 +78,7 @@ def trimesh_quantized_hash(
 def create_cube_shape(extents: Tuple[float, float, float]) -> bullet.BoxShape:
     """
     Creates a bullet box shape.
+
     :param extents: the extents of the box along x, y and z axis respectively.
     :return: the bullet box shape.
     """
@@ -93,18 +94,31 @@ def create_cube_shape(extents: Tuple[float, float, float]) -> bullet.BoxShape:
 def create_cylinder_shape(diameter: float, height: float) -> bullet.CylinderShape:
     """
     Creates a bullet cylinder shape.
+
+    .. note:: we are using an obj, because the cylinder primitive of bullet produces wrong contact points sometimes.
+              The obj is scaled by 0.996 because it is slightly too large. The number was determined by comparing results
+              to fcl.
     :param diameter: the diameter of the cylinder.
     :param height: the height of the cylinder.
     :return: the bullet cylinder shape.
     """
-    out = bullet.CylinderShapeZ(bullet.Vector3(diameter / 2, diameter / 2, height))
-    out.margin = 0.001
-    return out
+    cylinder_mesh = os.path.join(
+        Path(files("semantic_digital_twin")).parent.parent,
+        "resources",
+        "obj",
+        "cylinder.obj",
+    )
+    return bullet.load_convex_shape(
+        cylinder_mesh,
+        single_shape=True,
+        scaling=bullet.Vector3(diameter, diameter, height) * 0.996,
+    )
 
 
 def create_sphere_shape(diameter: float) -> bullet.SphereShape:
     """
     Creates a bullet sphere shape.
+
     :param diameter: the diameter of the sphere.
     :return: the bullet sphere shape.
     """
@@ -119,6 +133,7 @@ def create_shape_from_geometry(
 ) -> bullet.CollisionShape:
     """
     Creates a bullet collision shape from a geometry.
+
     :param geometry: the geometry to create a collision shape from.
     :param mesh_decomposer: optional decomposer used for non-convex meshes.
     :return: the bullet collision shape.
@@ -157,6 +172,7 @@ def create_shape_from_body(
 ) -> bullet.CollisionObject:
     """
     Creates a bullet collision object from a body.
+
     :param body: the body to create a collision object from.
     :param mesh_decomposer: optional decomposer forwarded to non-convex mesh handling.
     :return: the bullet collision object.
@@ -177,6 +193,7 @@ def create_compound_shape(
 ) -> bullet.CompoundShape:
     """
     Creates a bullet compound shape.
+
     :param shapes_poses: the shapes and their poses.
     :return: the bullet compound shape.
     """
@@ -194,6 +211,7 @@ def load_convex_mesh_shape(
 ) -> bullet.ConvexShape:
     """
     Loads a convex mesh shape from a mesh.
+
     :param mesh: the mesh to load the convex shape from.
     :param single_shape: whether to load the mesh as a single shape.
     :param scale: the scale of the mesh.
@@ -216,6 +234,7 @@ def load_convex_mesh_shape(
 def clear_cache(cache_dir: Path = CACHE_DIR):
     """
     Clears the convex decomposition cache.
+
     :param cache_dir: the cache directory to clear.
     """
     for file in cache_dir.iterdir():
@@ -230,6 +249,7 @@ def convert_to_decomposed_obj_and_save_in_tmp(
 ) -> str:
     """
     Converts a mesh to a convex decomposition and saves it in a cache file.
+
     :param mesh: the mesh to convert.
     :param mesh_decomposer: optional decomposer used for non-convex meshes.
     :param cache_dir: the cache directory to save the convex decomposition in.
@@ -262,6 +282,7 @@ def create_object(
 ) -> bullet.CollisionObject:
     """
     Creates a bullet collision object.
+
     :param name: the name of the collision object.
     :param shape: the collision shape of the collision object.
     :param transform: the transform of the collision object.
@@ -288,25 +309,31 @@ class BulletCollisionDetector(CollisionDetector):
     """
     Reference to the bullet world.
     """
+
     body_to_bullet_object: Dict[Body, bullet.CollisionObject] = field(
         default_factory=dict, init=False
     )
     """
     Maps semdt world bodies to their bullet collision objects.
     """
+
     _ordered_bullet_objects: List[bullet.CollisionObject] = field(
         default_factory=list, init=False
     )
     """
     The bullet collision objects in the order they are added to the world.
+
     This is only a cache for performance reasons.
     """
+
     mesh_decomposer: Optional[MeshDecomposer] = field(
         default_factory=VHACDMeshDecomposer
     )
     """
     Decomposer used to split non-convex meshes into convex parts before handing them to
-    Bullet. Defaults to VHACD; pass ``None`` to skip decomposition.
+    Bullet.
+
+    Defaults to VHACD; pass ``None`` to skip decomposition.
     """
 
     def sync_world_model(self) -> None:

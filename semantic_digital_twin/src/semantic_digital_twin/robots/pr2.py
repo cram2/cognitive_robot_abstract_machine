@@ -312,7 +312,7 @@ class PR2LeftArm(Arm[PR2LeftGripper]):
                         -0.264,
                         1.38,
                         -2.12,
-                        16.996 + 3.14159,
+                        4.2,
                         -0.073,
                         0.0,
                     ],
@@ -452,7 +452,9 @@ class PR2MobileBase(MobileBase, HasTorso[PR2Torso]):
 @dataclass(eq=False)
 class PR2(AbstractRobot, HasMobileBase[PR2MobileBase]):
     """
-    The PR2 robot built by Willow Garage. https://robotsguide.com/robots/pr2
+    The PR2 robot built by Willow Garage.
+
+    https://robotsguide.com/robots/pr2
     """
 
     @classmethod

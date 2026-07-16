@@ -22,8 +22,8 @@ from semantic_digital_twin.world import World
 
 def _axes_width_in(ax: plt.Axes) -> float:
     """
-    Return the drawable width of an axes in inches based on its position box,
-    excluding figure margins and avoiding text extents influencing the result.
+    Return the drawable width of an axes in inches based on its position box, excluding
+    figure margins and avoiding text extents influencing the result.
     """
     fig = ax.figure
     fig.canvas.draw()

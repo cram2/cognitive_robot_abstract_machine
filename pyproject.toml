@@ -32,7 +32,8 @@ dev = [
     "pytest-asyncio>=0.23.0,<0.24.0",
     "pytest-xdist",
     "objgraph",
-
+    "bokeh",
+    "mypy>=1.8",
 ]
 
 # Requirements for building the documentation of all sub-packages.
@@ -59,7 +60,10 @@ doc = [
     "graphviz",
     "polytope",
     "ortools",
-    "cvxopt"
+    "cvxopt",
+    "treon",
+    "jupytext",
+    "jupyterquiz",
 ]
 
 [tool.uv.workspace]
@@ -107,3 +111,4 @@ packages = []
 make-summary-multi-line = true
 pre-summary-newline = true
 close-quotes-on-newline = true
+black = true

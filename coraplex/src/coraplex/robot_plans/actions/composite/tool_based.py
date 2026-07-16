@@ -38,6 +38,7 @@ class MixingAction(ActionDescription):
     """
     The tool to be used for mixing.
     """
+
     arm: Arms
     """
     The arm to be used for the mixing action.
@@ -78,18 +79,22 @@ class PouringAction(ActionDescription):
     """
     The object over which the pouring action is performed.
     """
+
     tool: SemanticAnnotation
     """
     The tool used for pouring, e.g., a jug or a bottle.
     """
+
     arm: Arms
     """
     The arm to be used for the pouring action.
     """
+
     technique: Optional[str] = None
     """
     The technique to be used for pouring, e.g., 'Pouring'.
     """
+
     angle: Optional[float] = 90
     """
     The angle at which the tool is tilted during the pouring action, in degrees.
@@ -154,18 +159,22 @@ class CuttingAction(ActionDescription):
     """
     The object to be cut.
     """
+
     tool: SemanticAnnotation
     """
     The tool used for cutting, e.g., a knife or a saw.
     """
+
     arm: Arms
     """
     The arm to be used for the cutting action.
     """
+
     technique: Optional[str] = None
     """
     The technique to be used for cutting, e.g., 'Slicing', 'Halving', etc.
     """
+
     slice_thickness: Optional[float] = 0.03
     """
     The thickness of each slice to be cut from the object, in meters.
@@ -240,12 +249,14 @@ class CuttingAction(ActionDescription):
         pose_a, pose_b: Pose
     ) -> Tuple[int, float]:
         """
-        Compute a discrete rotation offset (-90 or 90 degrees) to align this pose's local axes with the direction
-        toward a target pose, based on which axis (X or Y) is more aligned.
+        Compute a discrete rotation offset (-90 or 90 degrees) to align this pose's
+        local axes with the direction toward a target pose, based on which axis (X or Y)
+        is more aligned.
 
         :param pose_a: The source pose.
         :param pose_b: The target pose to align with.
-        :return: Tuple of (rotation offset in degrees, signed angle difference in radians for Y axis).
+        :return: Tuple of (rotation offset in degrees, signed angle difference in
+            radians for Y axis).
         """
         fx, ax = pose_a.is_facing_2d_axis(pose_b, axis=AxisIdentifier.X)
         fy, ay = pose_a.is_facing_2d_axis(pose_b, axis=AxisIdentifier.Y)

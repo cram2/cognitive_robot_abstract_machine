@@ -10,8 +10,14 @@ class NormalizationTestCase(unittest.TestCase):
 
     def test_normalization(self):
         pc = ProbabilisticCircuit()
-        u1 = leaf(UniformDistribution(variable=self.x, interval=closed(0, 1).simple_sets[0]), pc)
-        u2 = leaf(UniformDistribution(variable=self.x, interval=closed(3, 4).simple_sets[0]), pc)
+        u1 = leaf(
+            UniformDistribution(variable=self.x, interval=closed(0, 1).simple_sets[0]),
+            pc,
+        )
+        u2 = leaf(
+            UniformDistribution(variable=self.x, interval=closed(3, 4).simple_sets[0]),
+            pc,
+        )
         sum_unit = SumUnit(probabilistic_circuit=pc)
         sum_unit.add_subcircuit(u1, np.log(0.5))
         sum_unit.add_subcircuit(u2, np.log(0.3))
@@ -29,8 +35,14 @@ class SumUnitTestCase(unittest.TestCase):
 
     def setUp(self):
         pc = ProbabilisticCircuit()
-        u1 = leaf(UniformDistribution(variable=self.x, interval=closed(0, 1).simple_sets[0]), pc)
-        u2 = leaf(UniformDistribution(variable=self.x, interval=closed(3, 4).simple_sets[0]), pc)
+        u1 = leaf(
+            UniformDistribution(variable=self.x, interval=closed(0, 1).simple_sets[0]),
+            pc,
+        )
+        u2 = leaf(
+            UniformDistribution(variable=self.x, interval=closed(3, 4).simple_sets[0]),
+            pc,
+        )
 
         model = SumUnit(probabilistic_circuit=pc)
         model.add_subcircuit(u1, np.log(0.6))
@@ -102,7 +114,9 @@ class SumUnitTestCase(unittest.TestCase):
     def test_mode(self):
         mode, likelihood = self.model.mode()
         self.assertEqual(likelihood, 0.6)
-        self.assertEqual(mode, SimpleEvent.from_data({self.x: closed(0, 1)}).as_composite_set())
+        self.assertEqual(
+            mode, SimpleEvent.from_data({self.x: closed(0, 1)}).as_composite_set()
+        )
 
     def test_serialization(self):
         event = SimpleEvent.from_data({self.x: closed(0, 0.5)}).as_composite_set()
@@ -120,7 +134,10 @@ class SumUnitTestCase(unittest.TestCase):
         s1 = SumUnit(probabilistic_circuit=ProbabilisticCircuit())
         s2 = SumUnit(probabilistic_circuit=pc)
         s3 = SumUnit(probabilistic_circuit=pc)
-        u1 = leaf(UniformDistribution(variable=self.x, interval=closed(0, 1).simple_sets[0]), pc)
+        u1 = leaf(
+            UniformDistribution(variable=self.x, interval=closed(0, 1).simple_sets[0]),
+            pc,
+        )
         s2.probabilistic_circuit.add_nodes_from([s2, s3, u1])
         s2.probabilistic_circuit.add_edges_from([(s2, s3, 1.0), (s3, u1, 1.0)])
         s1.probabilistic_circuit.mount(s2)

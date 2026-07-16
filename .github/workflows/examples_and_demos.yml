@@ -34,6 +34,7 @@ jobs:
           - script: semantic_digital_twin/scripts/test_exercises.sh
           - script: semantic_digital_twin/scripts/test_quizzes.sh
           - script: coraplex/demos/coraplex_bullet_world_demo/test_demo.py
+          - script: coraplex/demos/coraplex_real_tracy/test_demo.py
     uses: ./.github/workflows/example_demo_reusable.yml
     with:
       script: ${{ matrix.script }}

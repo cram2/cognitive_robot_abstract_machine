@@ -1,4 +1,5 @@
-"""Behavior tree utilities for RoboKudo.
+"""
+Behavior tree utilities for RoboKudo.
 
 This module provides helper functions for working with py_trees behavior trees.
 It supports:
@@ -33,8 +34,10 @@ def behavior_iterate_except_type(
     direct_descendants: bool = False,
     include_tree: bool = False,
 ) -> Generator[Behaviour, None, None]:
-    """Generator similar to Behavior.iterate(). But this one doesn't traverse
-    nodes of a specific type. It also traverses in a post-order manner like Behavior.iterate().
+    """
+    Generator similar to Behavior.iterate().
+
+    But this one doesn't traverse nodes of a specific type. It also traverses in a post-order manner like Behavior.iterate().
     @param include_tree will control if you want to include 'tree' itself in the enumeration,
     like it is done in Behavior.iterate()
 
@@ -61,7 +64,9 @@ def behavior_iterate_except_type(
 
 
 def find_parent_of_type(behaviour: Behaviour, parent_type: Type) -> Optional[Behaviour]:
-    """Traverse the given behaviour up until we either hit the top of the tree or find a node of type parent_type.
+    """
+    Traverse the given behaviour up until we either hit the top of the tree or find a
+    node of type parent_type.
 
     :param behaviour: Starting behavior node
     :param parent_type: Type of parent to find
@@ -81,15 +86,15 @@ def find_children_with_name(
     name: str,
     direct_descendants: bool = False,
 ) -> Optional[Behaviour]:
-    """Iterate() the given composite over its children and return the first child
-    with child.name == name.
+    """
+    Iterate() the given composite over its children and return the first child with
+    child.name == name.
 
     :param composite: Parent node to search in
     :param name: Name to search for
     :param direct_descendants: Only search direct children, defaults to False
     :return: First child with matching name, or None if not found
     """
-
     for child in composite.iterate(direct_descendants=direct_descendants):
         if child.name == name:
             return child
@@ -130,7 +135,8 @@ def get_scoped_list_of_names(
 def get_scoped_name(
     behaviour: Behaviour, scoping_behaviour_type: Type, delimiter: str = "/"
 ) -> str:
-    """Get scoped name string for behavior.
+    """
+    Get scoped name string for behavior.
 
     Joins ancestor names with delimiter to create a scoped name.
 
@@ -143,12 +149,13 @@ def get_scoped_name(
 
 
 def setup_with_descendants_rk(tree: BehaviourTree, setup_timeout: float = 0) -> None:
-    """Set up ROS behavior tree and all descendants.
+    """
+    Set up ROS behavior tree and all descendants.
 
     Call setup(0) on all children of tree.root
 
-    :param tree: A BehaviourTree which already constains all trees that should be setup'ed
-    during startup.
+    :param tree: A BehaviourTree which already constains all trees that should be
+        setup'ed during startup.
     :param setup_timeout: Timeout value that is passed to the setup of each child.
     :return: Result of setup operation
     """
@@ -158,7 +165,8 @@ def setup_with_descendants_rk(tree: BehaviourTree, setup_timeout: float = 0) -> 
 def setup_with_descendants_on_behavior(
     tree: Behaviour, setup_timeout: float = 0
 ) -> None:
-    """Set up behavior tree node and all descendants.
+    """
+    Set up behavior tree node and all descendants.
 
     Call setup(0) on all children of tree
 
@@ -172,13 +180,16 @@ def setup_with_descendants_on_behavior(
 
 
 def fix_parent_relationship_of_childs(behavior: Behaviour) -> None:
-    """Fix parent references in behavior tree.
+    """
+    Fix parent references in behavior tree.
 
     Iterate top-down over this tree and reset the parent relationship for all childs.
-    This may be required if you dynamically assign the same instance of a Behavior Tree node
-    into different parts of the BT or also have the same instance in multiple individual Behavior Trees.
+    This may be required if you dynamically assign the same instance of a Behavior Tree
+    node into different parts of the BT or also have the same instance in multiple
+    individual Behavior Trees.
 
-    :param behavior: The behavior to start with. This is typically the root node of the tree you need to "repair"
+    :param behavior: The behavior to start with. This is typically the root node of the
+        tree you need to "repair"
     """
     for child in behavior.children:
         child.parent = behavior
@@ -186,7 +197,8 @@ def fix_parent_relationship_of_childs(behavior: Behaviour) -> None:
 
 
 def find_root(behavior: Behaviour) -> Behaviour:
-    """Find the root of this behavior tree
+    """
+    Find the root of this behavior tree.
 
     :param behavior: The behaviour to start searching from.
     :return: The root node of the tree
@@ -202,12 +214,13 @@ def find_root(behavior: Behaviour) -> Behaviour:
 
 
 def add_child_to_parent(parent: Composite, child: Behaviour) -> uuid.UUID:
-    """Adds the given child to the parent composite node.
+    """
+    Adds the given child to the parent composite node.
 
-    Add a child. In contrast to the standard add_child method of py_trees,
-    this version does not check if the parent is already set.
-    This is currently required in dynamic PPT selection during runtime,
-    where subtrees are (re-)introduces based on runtime queries.
+    Add a child. In contrast to the standard add_child method of py_trees, this version
+    does not check if the parent is already set. This is currently required in dynamic
+    PPT selection during runtime, where subtrees are (re-)introduces based on runtime
+    queries.
 
     :param parent: the composite node to add child to
     :param child: child to add
@@ -224,7 +237,8 @@ def add_child_to_parent(parent: Composite, child: Behaviour) -> uuid.UUID:
 
 
 def add_children_to_parent(parent: Composite, children: List[Behaviour]) -> Behaviour:
-    """Append a list of children to the current list.
+    """
+    Append a list of children to the current list.
 
     :param parent: the composite node to add child to
     :param children: list of children to add

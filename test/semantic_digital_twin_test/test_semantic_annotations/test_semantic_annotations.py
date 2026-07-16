@@ -1,13 +1,19 @@
 import logging
 
-from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.core.variable import InstantiatedVariable
-from krrood.entity_query_language.explanation.explanation import explain_inference
-from krrood.entity_query_language.factories import entity, variable, in_, inference, an
-from krrood.entity_query_language.query.quantifiers import An
 from numpy.ma.testutils import (
     assert_equal,
 )  # You could replace this with numpy's regular assert for better compatibility
+
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.explanation.explanation import explain_inference
+from krrood.entity_query_language.factories import entity, variable, in_, inference, an
+from krrood.entity_query_language.verbalization.rendering.renderer import (
+    HierarchicalRenderer,
+)
+from krrood.entity_query_language.verbalization.pipeline import (
+    verbalize_expression,
+    VerbalizationPipeline,
+)
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
@@ -16,6 +22,12 @@ from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, KinematicChain
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Handle,
+    Drawer,
+    Wardrobe,
+    Door,
+)
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -54,13 +66,13 @@ class TestSemanticAnnotation(SemanticAnnotation):
 def test_aggregate_bodies(kitchen_world):
     """
     Tests that SemanticAnnotation.kinematic_structure_entities aggregates:
+
     -  public direct kinematic structure entity fields
     - public list fields containing kinematic structure entities
     - public nested semantic annotations' kinematic structure entities
     but nothing from private fields
     The exact order is not specified by the contract, so we check set membership.
     """
-
     # Arrange: pick some existing bodies from the world fixture
     b0, b1, b2, b3 = kitchen_world.bodies[:4]
 
@@ -193,18 +205,24 @@ def test_handle_semantic_annotation_eql(apartment_world_copy):
 
 
 @pytest.mark.parametrize(
-    "semantic_annotation_type, update_existing_semantic_annotations, scenario",
+    "semantic_annotation_type, update_existing_semantic_annotations, scenario, expected_number",
     [
-        (Handle, False, None),
-        (Drawer, False, None),
-        (Wardrobe, False, None),
-        (Door, False, None),
+        (Handle, False, None, 29),
+        (Drawer, False, None, 19),
+        (Wardrobe, False, None, 8),
+        (
+            Door,
+            False,
+            None,
+            8,
+        ),  # Should be 11 as there are prismatically connected doors.
     ],
 )
 def test_infer_apartment_semantic_annotation(
     semantic_annotation_type,
     update_existing_semantic_annotations,
     scenario,
+    expected_number,
     apartment_world_copy,
 ):
     fit_rules_and_assert_semantic_annotations(
@@ -212,6 +230,7 @@ def test_infer_apartment_semantic_annotation(
         semantic_annotation_type,
         update_existing_semantic_annotations,
         scenario,
+        expected_number,
     )
 
 
@@ -263,8 +282,41 @@ def test_explain_inferred_semantic_annotations(apartment_world_copy):
         explanation.condition_graph().visualize(filename="drawer_explanation.pdf")
 
 
+@pytest.mark.order("fourth_to_last")
+def test_verbalize_query_that_inferred_semantic_annotations(apartment_world_copy):
+    world_reasoner = WorldReasoner(apartment_world_copy)
+    found_semantic_annotations = list(world_reasoner.infer_semantic_annotations())
+    drawer = next(ann for ann in found_semantic_annotations if isinstance(ann, Drawer))
+    explanation = explain_inference(drawer)
+    verbalization_paragraph = verbalize_expression(explanation.query_root)
+    verbalization_hierarchical = VerbalizationPipeline(
+        HierarchicalRenderer()
+    ).verbalize(explanation.query_root)
+    assert verbalization_paragraph == (
+        "If there's a FixedConnection whose parent is the child of a PrismaticConnection,"
+        " there's a Handle whose root is the child of the FixedConnection,"
+        " then there's a Drawer whose root is the parent of the FixedConnection,"
+        " and whose handle is the Handle"
+    )
+    assert verbalization_hierarchical == (
+        "If\n"
+        "  there's a FixedConnection\n"
+        "    - whose parent is the child of a PrismaticConnection\n"
+        "  there's a Handle\n"
+        "    - whose root is the child of the FixedConnection\n"
+        "then\n"
+        "  there's a Drawer\n"
+        "    - whose root is the parent of the FixedConnection\n"
+        "    - whose handle is the Handle"
+    )
+
+
 def fit_rules_and_assert_semantic_annotations(
-    world, semantic_annotation_type, update_existing_semantic_annotations, scenario
+    world,
+    semantic_annotation_type,
+    update_existing_semantic_annotations,
+    scenario,
+    expected_number: int,
 ):
     world_reasoner = WorldReasoner(world)
     world_reasoner.fit_semantic_annotations(
@@ -275,8 +327,15 @@ def fit_rules_and_assert_semantic_annotations(
     )
 
     found_semantic_annotations = world_reasoner.infer_semantic_annotations()
-    assert any(
-        isinstance(v, semantic_annotation_type) for v in found_semantic_annotations
+    assert (
+        len(
+            [
+                v
+                for v in found_semantic_annotations
+                if isinstance(v, semantic_annotation_type)
+            ]
+        )
+        == expected_number
     )
 
 
@@ -327,7 +386,9 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
 
     @dataclass(eq=False)
     class ReviewKinematicChain(KinematicChain):
-        """Minimal concrete KinematicChain for chain tests."""
+        """
+        Minimal concrete KinematicChain for chain tests.
+        """
 
         def setup_hardware_interfaces(self):
             pass

@@ -55,13 +55,13 @@ class ProbabilisticCircuit(SubclassJSONSerializer):
     ) -> ProbabilisticCircuit:
         """
         Convert a probabilistic circuit to a layered circuit.
+
         The result expresses the same distribution as `pc`.
 
         :param pc: The probabilistic circuit.
         :param progress_bar: Whether to show a progress bar.
         :return: The layered circuit.
         """
-
         # group nodes by depth
         layer_to_nodes_map = {index: layer for index, layer in enumerate(pc.layers)}
         reversed_layers_to_nodes_map = dict(reversed(layer_to_nodes_map.items()))
@@ -119,12 +119,13 @@ class ProbabilisticCircuit(SubclassJSONSerializer):
         **kwargs,
     ) -> None:
         """
-        Fit the circuit to the data using generative training with the negative average log-likelihood as loss.
+        Fit the circuit to the data using generative training with the negative average
+        log-likelihood as loss.
 
         :param data: The data.
         :param epochs: The number of epochs.
-        :param optimizer: The optimizer to use.
-        If `None`, the Adam optimizer with a learning rate of 1e-3 is used.
+        :param optimizer: The optimizer to use. If `None`, the Adam optimizer with a
+            learning rate of 1e-3 is used.
         """
 
         @eqx.filter_jit
@@ -153,7 +154,9 @@ class ProbabilisticCircuit(SubclassJSONSerializer):
 class ClassificationCircuit(ProbabilisticCircuit):
     """
     A probabilistic circuit for classification.
-    It is assumed that the root layer of the circuit has as many output units as there are classes.
+
+    It is assumed that the root layer of the circuit has as many output units as there
+    are classes.
     """
 
     def as_probabilistic_circuit(
@@ -161,16 +164,16 @@ class ClassificationCircuit(ProbabilisticCircuit):
     ) -> ProbabilisticCircuit:
         """
         Create a full probabilistic circuit from this classification circuit.
-        This is done by adding meaning to the sum units of the root layer.
-        The first sum unit is the first class in the variables' domain,
-        the second sum unit is the second class, and so on.
+
+        This is done by adding meaning to the sum units of the root layer. The first sum
+        unit is the first class in the variables' domain, the second sum unit is the
+        second class, and so on.
 
         :param class_variable: The variable to use for interpretation
-        :param class_probabilities: The probabilities of the classes.
-        If `None`, the classes are assumed to be uniformly distributed.
+        :param class_probabilities: The probabilities of the classes. If `None`, the
+            classes are assumed to be uniformly distributed.
         :return: The full probabilistic circuit.
         """
-
         assert (
             len(class_variable.domain.simple_sets) == self.root.number_of_nodes
         ), "The number of classes must match the number of sum units."
@@ -238,13 +241,14 @@ class ClassificationCircuit(ProbabilisticCircuit):
         optimizer: Optional[optax.GradientTransformation] = None,
     ) -> None:
         """
-        Fit the circuit to the data using generative training with the cross-entropy as loss.
+        Fit the circuit to the data using generative training with the cross-entropy as
+        loss.
 
         :param data: The data.
         :param labels: The labels.
         :param epochs: The number of epochs.
-        :param optimizer: The optimizer to use.
-        If `None`, the Adam optimizer with a learning rate of 1e-3 is used.
+        :param optimizer: The optimizer to use. If `None`, the Adam optimizer with a
+            learning rate of 1e-3 is used.
         """
 
         @eqx.filter_jit

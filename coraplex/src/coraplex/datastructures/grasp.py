@@ -2,28 +2,43 @@ from __future__ import annotations
 
 import math
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple
 
 import numpy as np
-from typing_extensions import Optional, Union, List
+from typing_extensions import Optional, Union, List, TYPE_CHECKING
 
-from semantic_digital_twin import utils
-from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vector3, Quaternion
-from semantic_digital_twin.world_description.world_entity import Body, KinematicStructureEntity
+from semantic_digital_twin.spatial_types.spatial_types import (
+    Pose,
+    Point3,
+    Vector3,
+    Quaternion,
+)
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    KinematicStructureEntity,
+)
 from coraplex.datastructures.rotations import Rotations
-from coraplex.datastructures.enums import AxisIdentifier, ApproachDirection, VerticalAlignment, Arms
+from coraplex.datastructures.enums import (
+    AxisIdentifier,
+    ApproachDirection,
+    VerticalAlignment,
+    Arms,
+)
 from coraplex.tf_transformations import quaternion_multiply
 from coraplex.utils import translate_pose_along_local_axis
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.robots.robot_parts import EndEffector
 
 
 @dataclass
 class GraspDescription:
     """
-    Describes a grasp configuration for a end_effector the description consists of the approach direction (the side from
-    which to grasp e.g. FRONT, LEFT, etc and the vertical alignment (TOP, BOTTOM).
+    Describes a grasp configuration for a end_effector the description consists of the
+    approach direction (the side from which to grasp e.g. FRONT, LEFT, etc and the
+    vertical alignment (TOP, BOTTOM).
     """
 
     approach_direction: ApproachDirection
@@ -48,16 +63,17 @@ class GraspDescription:
 
     manipulation_offset: float = 0.05
     """
-    The offset between the center of the pose in the grasp sequence
+    The offset between the center of the pose in the grasp sequence.
     """
 
-    def _pose_sequence(
+    def pose_sequence(
         self, target_T_grasp_pose: Pose, body: Body = None, reverse: bool = False
     ) -> List[Pose]:
         """
-        Calculates the pose sequence to grasp something at the pose if the body is given its geometry is also taken into
-        account. The pose sequence consists of 3 poses: one in front of the body (taking body geometry into account),
-        one at the center of the body, and the last one above the body to lift it.
+        Calculates the pose sequence to grasp something at the pose if the body is given
+        its geometry is also taken into account. The pose sequence consists of 3 poses:
+        one in front of the body (taking body geometry into account), one at the center
+        of the body, and the last one above the body to lift it.
 
         :param target_T_grasp_pose: The pose of the grasp in the target frame.
         :param body: The body of the grasp.
@@ -72,8 +88,15 @@ class GraspDescription:
 
         # if we just did target_T_grasp_pose @ grasp_pose_R_gripper_goal we would also rotate the translation in the
         # global frame, which we dont want here. Thus we just multiply the rotations, and take the translation as is
-        target_R_gripper_goal = target_T_grasp_pose.to_rotation_matrix() @ grasp_pose_R_gripper_goal.to_rotation_matrix()
-        target_T_gripper_goal: Pose = Pose(position=target_T_grasp_pose.to_position(), orientation=target_R_gripper_goal.to_quaternion(), reference_frame=target)
+        target_R_gripper_goal = (
+            target_T_grasp_pose.to_rotation_matrix()
+            @ grasp_pose_R_gripper_goal.to_rotation_matrix()
+        )
+        target_T_gripper_goal: Pose = Pose(
+            position=target_T_grasp_pose.to_position(),
+            orientation=target_R_gripper_goal.to_quaternion(),
+            reference_frame=target,
+        )
 
         if body:
             bb_in_frame = body.collision.as_bounding_box_collection_in_frame(
@@ -98,8 +121,12 @@ class GraspDescription:
         target_T_gripper_goal_copy = deepcopy(target_T_gripper_goal)
 
         # Lift pose calculation. We want the lift pose to be moved along the global z-axis, but the final pose should be in the target frame.
-        map_T_grasp = world.transform(target_T_grasp_pose.to_homogeneous_matrix(), world.root)
-        grasp_T_lift = HomogeneousTransformationMatrix.from_xyz_rpy(z=self.manipulation_offset)
+        map_T_grasp = world.transform(
+            target_T_grasp_pose.to_homogeneous_matrix(), world.root
+        )
+        grasp_T_lift = HomogeneousTransformationMatrix.from_xyz_rpy(
+            z=self.manipulation_offset
+        )
 
         # the grasp pose, not adjusted for the gripper orientation, used to calculate the lift pose
         map_T_lift = (map_T_grasp @ grasp_T_lift).to_position()
@@ -108,7 +135,9 @@ class GraspDescription:
         target_P_lift = world.transform(map_T_lift, target)
 
         # the lift pose is adjusted for the gripper orientation, but without rotating the point we want to grasp
-        lift_pose = Pose(target_P_lift, target_T_gripper_goal.to_quaternion(), reference_frame=target)
+        lift_pose = Pose(
+            target_P_lift, target_T_gripper_goal.to_quaternion(), reference_frame=target
+        )
 
         sequence = [pre_pose, target_T_gripper_goal_copy, lift_pose]
 
@@ -118,29 +147,34 @@ class GraspDescription:
 
     def grasp_pose_sequence(self, body: Body):
         """
-        Calculates the pose sequence to grasp the body. The sequence is 3 poses, one in front of the body (taking body
-        geometry into account), one at the center of the body, and the last one above the body to lift it.
+        Calculates the pose sequence to grasp the body.
+
+        The sequence is 3 poses, one in front of the body (taking body geometry into
+        account), one at the center of the body, and the last one above the body to lift
+        it.
 
         :param body: The body of the grasp.
         :return: The pose sequence.
         """
-        return self._pose_sequence(Pose(reference_frame=body), body)
+        return self.pose_sequence(Pose(reference_frame=body), body)
 
     def place_pose_sequence(self, pose: Pose) -> List[Pose]:
         """
-        Calculates the pose sequence to place a body at the given pose. Assumes that the end_effector is holding a body
-        which is being placed.
+        Calculates the pose sequence to place a body at the given pose.
+
+        Assumes that the end_effector is holding a body which is being placed.
 
         :param pose: The pose at which the body in the end_effector should be placed
         :return: The pose sequence.
         """
         body = self.end_effector.tool_frame.child_kinematic_structure_entities[0]
-        return self._pose_sequence(pose, body, reverse=True)
+        return self.pose_sequence(pose, body, reverse=True)
 
     def manipulation_axis(self) -> List[float]:
         """
-        Axis of the end_effector that is manipulating the body. Translates the x-axis of the global frame to how the
-        end_effector is rotated.
+        Axis of the end_effector that is manipulating the body.
+
+        Translates the x-axis of the global frame to how the end_effector is rotated.
 
         :returns: The axis of the end_effector that is manipulating the body.
         """
@@ -148,8 +182,9 @@ class GraspDescription:
 
     def lift_axis(self) -> List[float]:
         """
-        Axis of the end_effector that is lifting the body. Translates the z-axis of the global frame to how the
-        end_effector is rotated.
+        Axis of the end_effector that is lifting the body.
+
+        Translates the z-axis of the global frame to how the end_effector is rotated.
 
         :returns: The axis of the end_effector that is lifting the body.
         """
@@ -157,10 +192,12 @@ class GraspDescription:
 
     def calculate_end_effector_axis(self, axis: AxisIdentifier) -> List[float]:
         """
-        Calculates the corresponding axis of the end_effector for a given axis of the body.
+        Calculates the corresponding axis of the end_effector for a given axis of the
+        body.
 
         :param axis: The axis of the body as a list of [x, y, z] indices.
-        :return: The corresponding axis of the end_effector as a list of [x, y, z] values.
+        :return: The corresponding axis of the end_effector as a list of [x, y, z]
+            values.
         """
         axis_list = axis.value
         front_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -186,8 +223,9 @@ class GraspDescription:
 
     def grasp_orientation(self) -> Quaternion:
         """
-        The orientation of the grasp. Takes into account the approach direction and vertical
-        alignment.
+        The orientation of the grasp.
+
+        Takes into account the approach direction and vertical alignment.
         """
         rotation = Rotations.SIDE_ROTATIONS[self.approach_direction]
         rotation = quaternion_multiply(
@@ -208,7 +246,8 @@ class GraspDescription:
 
     def edge_offset(self, body: Body) -> float:
         """
-        The offset between the center of the body and its edge in the direction of the approach axis.
+        The offset between the center of the body and its edge in the direction of the
+        approach axis.
 
         :param body: The body to calculate the edge offset for.
         :return: The edge offset.
@@ -228,14 +267,13 @@ class GraspDescription:
         The pose for the given end_effector to grasp the body in the frame of the body.
 
         :param body: The body to grasp.
-        :param grasp_edge: Indicates if the pose should be for the edge of the body or the center.
+        :param grasp_edge: Indicates if the pose should be for the edge of the body or
+            the center.
         :return: The pose of the body in the body frame.
         """
         edge_offset = -self.edge_offset(body) if grasp_edge else 0
         orientation = self.grasp_orientation()
-        grasp_pose = Pose(Point3(
-            edge_offset, 0, 0), orientation, reference_frame=body
-        )
+        grasp_pose = Pose(Point3(edge_offset, 0, 0), orientation, reference_frame=body)
 
         return grasp_pose
 
@@ -247,17 +285,21 @@ class GraspDescription:
         grasp_alignment: Optional[PreferredGraspAlignment] = None,
     ) -> List[GraspDescription]:
         """
-        This method determines the possible grasp configurations (approach axis and vertical alignment) of the body,
-        taking into account the bodies orientation, position, and whether the gripper should be rotated by 90°.
+        This method determines the possible grasp configurations (approach axis and
+        vertical alignment) of the body, taking into account the bodies orientation,
+        position, and whether the gripper should be rotated by 90°.
 
         :param end_effector: The end_effector to use.
-        :param grasp_alignment: An optional PreferredGraspAlignment object that specifies preferred grasp axis,
+        :param grasp_alignment: An optional PreferredGraspAlignment object that
+            specifies preferred grasp axis,
         :param pose: The pose of the object to be grasped.
-
-        :return: A sorted list of GraspDescription instances representing all grasp permutations.
+        :return: A sorted list of GraspDescription instances representing all grasp
+            permutations.
         """
         world = end_effector._world
-        map_T_object = world.transform(pose.to_homogeneous_matrix(), world.root).to_pose()
+        map_T_object = world.transform(
+            pose.to_homogeneous_matrix(), world.root
+        ).to_pose()
 
         map_T_robot = end_effector._robot.root.global_pose
 
@@ -276,7 +318,6 @@ class GraspDescription:
         map_P_robot = map_T_robot.to_position()
 
         map_V_robot_to_object = map_P_robot - map_P_object
-
 
         object_R_map = map_T_object.to_rotation_matrix().inverse()
 
@@ -315,17 +356,18 @@ class GraspDescription:
         """
         Determines the faces of the object based on the input vector.
 
-        If `specified_grasp_axis` is None, it calculates the primary and secondary faces based on the vector's magnitude
-        determining which sides of the object are most aligned with the robot. This will either be the x, y plane for side faces
-        or the z axis for top/bottom faces.
-        If `specified_grasp_axis` is provided, it only considers the specified axis and calculates the faces aligned
-        with that axis.
+        If `specified_grasp_axis` is None, it calculates the primary and secondary faces
+        based on the vector's magnitude determining which sides of the object are most
+        aligned with the robot. This will either be the x, y plane for side faces or the
+        z axis for top/bottom faces. If `specified_grasp_axis` is provided, it only
+        considers the specified axis and calculates the faces aligned with that axis.
 
-        :param pose_to_robot_vector: A 3D vector representing one of the robot's axes in the pose's frame, with
-                              irrelevant components set to np.nan.
-        :param specified_grasp_axis: Specifies a specific axis (e.g., X, Y, Z) to focus on.
-
-        :return: A tuple of two Grasp enums representing the primary and secondary faces.
+        :param pose_to_robot_vector: A 3D vector representing one of the robot's axes in
+            the pose's frame, with irrelevant components set to np.nan.
+        :param specified_grasp_axis: Specifies a specific axis (e.g., X, Y, Z) to focus
+            on.
+        :return: A tuple of two Grasp enums representing the primary and secondary
+            faces.
         """
         all_axes = [AxisIdentifier.X, AxisIdentifier.Y, AxisIdentifier.Z]
 
@@ -378,6 +420,7 @@ class GraspDescription:
     def __hash__(self):
         return id(self)
 
+
 @dataclass
 class PreferredGraspAlignment:
     """
@@ -399,34 +442,47 @@ class PreferredGraspAlignment:
     Indicates if the gripper should be rotated by 90° around X.
     """
 
+
 @dataclass(eq=False, init=False)
 class GraspPose(Pose):
     """
-    A pose from which a grasp can be performed along with the respective arm and grasp description.
+    A pose from which a grasp can be performed along with the respective arm and grasp
+    description.
     """
 
-    arm: Arms = None
+    arm: Optional[Arms] = None
     """
     Arm corresponding to the grasp pose.
     """
-    grasp_description: GraspDescription = None
+
+    grasp_description: Optional[GraspDescription] = None
     """
     Grasp description corresponding to the grasp pose.
     """
 
     def __init__(
-            self,
-            position: Optional[Point3] = None,
-            orientation: Optional[Quaternion] = None,
-            reference_frame: Optional[KinematicStructureEntity] = None,
-            arm: Arms = None,
-            grasp_description: GraspDescription = None,
-        ):
+        self,
+        position: Optional[Point3] = None,
+        orientation: Optional[Quaternion] = None,
+        reference_frame: Optional[KinematicStructureEntity] = None,
+        arm: Optional[Arms] = None,
+        grasp_description: Optional[GraspDescription] = None,
+    ):
         super().__init__(position, orientation, reference_frame)
         self.arm = arm
         self.grasp_description = grasp_description
 
     @classmethod
-    def from_pose(cls, pose: Pose, arm: Arms, grasp_description: GraspDescription):
-        return cls(position=pose.to_position(), orientation=pose.to_quaternion(), reference_frame=pose.reference_frame,
-                   arm=arm, grasp_description=grasp_description)
+    def from_pose(
+        cls,
+        pose: Pose,
+        arm: Arms,
+        grasp_description: GraspDescription,
+    ) -> GraspPose:
+        return cls(
+            position=pose.to_position(),
+            orientation=pose.to_quaternion(),
+            reference_frame=pose.reference_frame,
+            arm=arm,
+            grasp_description=grasp_description,
+        )

@@ -19,10 +19,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     def implementation(self) -> Pipeline:
         """
-        Create a pipeline that does tabletop segmentation and integrates primary navigation
-        using a YOLO annotator.
+        Create a pipeline that does tabletop segmentation and integrates primary
+        navigation using a YOLO annotator.
         """
-
         descriptor = SemanticDigitalTwinConnector.Descriptor()
         sw_connector = SemanticDigitalTwinConnector(descriptor=descriptor)
 

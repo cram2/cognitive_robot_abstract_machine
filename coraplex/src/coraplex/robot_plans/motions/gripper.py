@@ -3,6 +3,7 @@ from typing import Optional, List
 
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     CartesianPosition,
@@ -258,18 +259,13 @@ class MoveManipulatorMotion(BaseMotion):
             if isinstance(robot, HasMobileBase)
             else False
         )
-
         root = self.world.root if full_body_controlled else robot.root
-        goal_pose = (
-            self.target
-            if full_body_controlled
-            else self.world.transform(self.target, root)
-        )
         task = CartesianPose(
             root_link=root,
             tip_link=self.end_effector.tool_frame,
-            goal_pose=goal_pose,
+            goal_pose=self.target,
             threshold=0.005,
+            binding_policy=GoalBindingPolicy.Bind_on_start,
             name=self.__class__.__name__,
         )
         return task

@@ -12,6 +12,17 @@ except ImportError:
 import py_trees
 from action_msgs.msg import GoalStatus
 
+from giskardpy.middleware.ros2.exceptions import (
+    ExecutionPreemptedException,
+    ExecutionSucceededPrematurely,
+    ExecutionTimeoutException,
+    FollowJointTrajectoryError,
+    FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED,
+    FollowJointTrajectory_INVALID_GOAL,
+    FollowJointTrajectory_INVALID_JOINTS,
+    FollowJointTrajectory_OLD_HEADER_TIMESTAMP,
+    FollowJointTrajectory_PATH_TOLERANCE_VIOLATED,
+)
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.blackboard_utils import (
     raise_to_blackboard,
@@ -142,9 +153,9 @@ class SendFollowJointTrajectory(GiskardBehavior):
     @record_time
     def update(self):
         """
-        Check only to see whether the underlying action server has
-        succeeded, is running, or has cancelled/aborted for some reason and
-        map these to the usual behaviour return states.
+        Check only to see whether the underlying action server has succeeded, is
+        running, or has cancelled/aborted for some reason and map these to the usual
+        behaviour return states.
 
         overriding this shit because of the fucking prints
         """
@@ -166,28 +177,28 @@ class SendFollowJointTrajectory(GiskardBehavior):
             return py_trees.Status.RUNNING
         if self.action_client.get_state() in [GoalStatus.ABORTED, GoalStatus.REJECTED]:
             result = self.action_client.get_result()
-            self.feedback_message = self.error_code_to_str[result.error_code]
-            msg = (
-                f"'{self.namespace}' failed to execute goal. "
-                f"Error: '{self.error_code_to_str[result.error_code]}'"
-            )
-            rospy.node.get_logger().error(msg)
+            error_description = self.error_code_to_str[result.error_code]
+            self.feedback_message = error_description
             if result.error_code == FollowJointTrajectoryResult.INVALID_GOAL:
-                e = FollowJointTrajectory_INVALID_GOAL(msg)
+                exception_type = FollowJointTrajectory_INVALID_GOAL
             elif result.error_code == FollowJointTrajectoryResult.INVALID_JOINTS:
-                e = FollowJointTrajectory_INVALID_JOINTS(msg)
+                exception_type = FollowJointTrajectory_INVALID_JOINTS
             elif result.error_code == FollowJointTrajectoryResult.OLD_HEADER_TIMESTAMP:
-                e = FollowJointTrajectory_OLD_HEADER_TIMESTAMP(msg)
+                exception_type = FollowJointTrajectory_OLD_HEADER_TIMESTAMP
             elif (
                 result.error_code == FollowJointTrajectoryResult.PATH_TOLERANCE_VIOLATED
             ):
-                e = FollowJointTrajectory_PATH_TOLERANCE_VIOLATED(msg)
+                exception_type = FollowJointTrajectory_PATH_TOLERANCE_VIOLATED
             elif (
                 result.error_code == FollowJointTrajectoryResult.GOAL_TOLERANCE_VIOLATED
             ):
-                e = FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED(msg)
+                exception_type = FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED
             else:
-                e = ExecutionException(msg)
+                exception_type = FollowJointTrajectoryError
+            e = exception_type(
+                namespace=self.namespace, error_description=error_description
+            )
+            rospy.node.get_logger().error(str(e))
             raise_to_blackboard(e)
             return py_trees.Status.FAILURE
         if self.action_client.get_state() in [
@@ -195,22 +206,20 @@ class SendFollowJointTrajectory(GiskardBehavior):
             GoalStatus.PREEMPTING,
         ]:
             if rospy.node.get_clock().now() > self.max_deadline:
-                msg = (
-                    f"'{self.namespace}' preempted, "
-                    "probably because it took to long to execute the goal."
+                e = ExecutionTimeoutException(
+                    namespace=self.namespace,
+                    reason="Probably because it took too long to execute the goal.",
                 )
-                raise_to_blackboard(ExecutionTimeoutException(msg))
             else:
-                msg = f"'{self.namespace}' preempted. Stopping execution."
-                raise_to_blackboard(ExecutionPreemptedException(msg))
-            rospy.node.get_logger().error(msg)
+                e = ExecutionPreemptedException(namespace=self.namespace)
+            raise_to_blackboard(e)
+            rospy.node.get_logger().error(str(e))
             return py_trees.Status.FAILURE
 
         result = self.action_client.get_result()
         if result:
             if current_time.to_sec() < self.min_deadline.to_sec():
-                msg = f"'{self.namespace}' executed too quickly, stopping execution."
-                e = ExecutionSucceededPrematurely(msg)
+                e = ExecutionSucceededPrematurely(namespace=self.namespace)
                 raise_to_blackboard(e)
                 return py_trees.Status.FAILURE
             self.feedback_message = "goal reached"
@@ -221,14 +230,20 @@ class SendFollowJointTrajectory(GiskardBehavior):
 
         if current_time.to_sec() > self.max_deadline.to_sec():
             self.action_client.cancel_goal()
-            msg = f"Cancelling '{self.namespace}' because it took to long to execute the goal."
-            rospy.node.get_logger().error(msg)
+            rospy.node.get_logger().error(
+                f"Cancelling '{self.namespace}' because it took too long to execute the goal."
+            )
             self.cancel_tries += 1
             if self.cancel_tries > 5:
                 rospy.node.get_logger().warning(
                     f"'{self.namespace}' didn't cancel execution after 5 tries."
                 )
-                raise_to_blackboard(ExecutionTimeoutException(msg))
+                raise_to_blackboard(
+                    ExecutionTimeoutException(
+                        namespace=self.namespace,
+                        reason="Did not cancel execution after 5 tries.",
+                    )
+                )
                 return py_trees.Status.FAILURE
             return py_trees.Status.RUNNING
 

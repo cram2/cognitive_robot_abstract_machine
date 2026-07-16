@@ -49,11 +49,11 @@ class ExtractedFeatures:
 @dataclass
 class FeatureExtractor:
     """
-    Extracts symbolic features from DAO instances, including scalar attributes,
-    unique-part sub-trees, and aggregation statistics over exchangeable parts.
+    Extracts symbolic features from DAO instances, including scalar attributes, unique-
+    part sub-trees, and aggregation statistics over exchangeable parts.
 
-    Prefer ``FeatureExtractor.from_instances`` for construction; the direct
-    constructor receives an already-built :class:`ExtractedFeatures`.
+    Prefer ``FeatureExtractor.from_instances`` for construction; the direct constructor
+    receives an already-built :class:`ExtractedFeatures`.
     """
 
     extracted_features: ExtractedFeatures
@@ -188,7 +188,7 @@ class FeatureExtractor:
         :param instance: The DAO instance to inspect.
         :param symbolic_root: The symbolic variable rooted at ``instance``.
         :param relationships: Single-valued relationships of the instance's schema.
-        :return: ``(child_instance, child_symbolic)`` pairs ready for BFS expansion.
+        :return:``(child_instance, child_symbolic)`` pairs ready for BFS expansion.
         """
         queue = deque()
         for relationship in relationships:
@@ -206,7 +206,8 @@ class FeatureExtractor:
         relationships: tuple[CollectionRelationship, ...],
     ) -> dict[str, list[MappedVariable]]:
         """
-        Collects aggregation statistic variables for all collection-valued relations of ``current_instance``.
+        Collects aggregation statistic variables for all collection-valued relations of
+        ``current_instance``.
 
         :param current_instance: The DAO instance to inspect.
         :param relationships: Collection-valued relationships of the instance's schema.
@@ -234,6 +235,7 @@ class FeatureExtractor:
     def apply_mapping(self, instance: DataAccessObject) -> list[Any]:
         """
         Extracts the mapped values for each feature from the given instance.
+
         :param instance: The instance to extract features from.
         :return: A list of mapped values.
         """
@@ -263,6 +265,7 @@ class FeatureExtractor:
     def create_dataframe(self, instances: list[DataAccessObject]) -> pd.DataFrame:
         """
         Create a dataframe from the given instances.
+
         :param instances: The instances to create the dataframe from.
         :return: A dataframe containing the mapped values for each feature.
         """
@@ -272,7 +275,9 @@ class FeatureExtractor:
 
     def preprocess_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Preprocess the dataframe for JointProbabilityTrees by converting boolean columns to integers and enum columns to hashes.
+        Preprocess the dataframe for JointProbabilityTrees by converting boolean columns
+        to integers and enum columns to hashes.
+
         :param df: The dataframe to preprocess.
         :return: The dataframe in a JPT compatible format.
         """

@@ -60,8 +60,8 @@ def _build_type_existence_condition(
     node_variable: SymbolicExpression, type_: Type
 ) -> SymbolicExpression:
     """
-    Build an exists-condition that checks whether *node_variable* (or one of its descendants)
-    has a ``_type_`` that is a subclass of *type_*.
+    Build an exists-condition that checks whether *node_variable* (or one of its
+    descendants) has a ``_type_`` that is a subclass of *type_*.
 
     :param node_variable: The EQL variable node to test.
     :param type_: The type to check for subclass membership.
@@ -84,12 +84,12 @@ def _is_krrood_internal_frame(frame: StackFrame) -> bool:
     Check whether *frame* belongs to the krrood package internals.
 
     Uses ``frame.module_name`` as the primary signal.  Falls back to a
-    :mod:`pathlib`-based path check (relative to :data:`_KRROOD_SRC_ROOT`)
-    for frames where ``module_name`` is absent — e.g. notebook cells or
-    frames captured inside ``eval()``.
+    :mod:`pathlib`-based path check (relative to :data:`_KRROOD_SRC_ROOT`) for frames
+    where ``module_name`` is absent — e.g. notebook cells or frames captured inside
+    ``eval()``.
 
     :param frame: The stack frame to test.
-    :return: ``True`` when the frame originates from within the krrood package.
+    :return:``True`` when the frame originates from within the krrood package.
     """
     if frame.module_name and (
         frame.module_name == "krrood" or frame.module_name.startswith("krrood.")
@@ -109,7 +109,8 @@ def _get_query_source(frame: StackFrame) -> Optional[str]:
     Extract the full source statement that contains ``frame.lineno``.
 
     :param frame: The stack frame whose source to extract.
-    :return: The full source statement at ``frame.lineno``, or ``frame.code_snippet`` as a fallback.
+    :return: The full source statement at ``frame.lineno``, or ``frame.code_snippet`` as
+        a fallback.
     """
     if not frame or not frame.filename:
         return None
@@ -189,7 +190,8 @@ def _format_indented_source(source_frame: Optional[StackFrame]) -> str:
     Return the source statement at *source_frame*, indented by two spaces per line.
 
     :param source_frame: The frame whose source to render, or ``None``.
-    :return: The indented source string, or ``"  (unavailable)"`` when no source is found.
+    :return: The indented source string, or ``" (unavailable)"`` when no source is
+        found.
     """
     query_source = _get_query_source(source_frame) if source_frame else None
     if query_source:
@@ -202,8 +204,8 @@ def _format_stack_trace(stack: CallStack, focus_package: Optional[str]) -> str:
     Render up to ten frames of *stack* as a formatted call-stack string.
 
     :param stack: The call stack to render.
-    :param focus_package: When given, only frames whose module name contains this
-        string are included; ``None`` includes all frames.
+    :param focus_package: When given, only frames whose module name contains this string
+        are included; ``None`` includes all frames.
     :return: A multi-line string with one frame per entry.
     """
     display_stack = stack.filter(package=focus_package)
@@ -226,6 +228,7 @@ class ConditionAndBindings:
     """
     The condition expression.
     """
+
     bindings: Bindings
     """
     A dictionary mapping UUIDs of condition children to their corresponding bindings.
@@ -258,14 +261,18 @@ class InferenceExplanation(Symbol):
     """
     The query node that was used to create the instance.
     """
+
     stack: CallStack
     """
-    The call stack at the point of creation, as a :class:`~krrood.entity_query_language._stack.CallStack`.
+    The call stack at the point of creation, as a
+    :class:`~krrood.entity_query_language._stack.CallStack`.
     """
+
     query_root: Query | InstantiatedVariable
     """
     The root of the query that was used to create the instance.
     """
+
     satisfied_condition_ids: Optional[OrderedSet[UUID]] = None
     """
     An ordered set of UUIDs of condition expressions that were satisfied (truth value = True)
@@ -273,7 +280,9 @@ class InferenceExplanation(Symbol):
     """
     operation_result: Optional[OperationResult] = None
     """
-    The full :class:`OperationResult` from the evaluation iteration that produced this instance.
+    The full :class:`OperationResult` from the evaluation iteration that produced this
+    instance.
+
     Contains bindings, all_bindings, is_false, operand, previous_operation_result, and
     satisfied_condition_ids. None if no result information is available.
     """
@@ -286,17 +295,20 @@ class InferenceExplanation(Symbol):
 
     @property
     def instance(self) -> Any:
-        """The inferred instance, or ``None`` if it has been garbage-collected."""
+        """
+        The inferred instance, or ``None`` if it has been garbage-collected.
+        """
         if self._instance_ref is None:
             return None
         return self._instance_ref()
 
     def get_satisfied_conditions_as_string(self) -> str:
         """
-        Render all satisfied conditions as a single string, with each condition separated by ' AND '.
+        Render all satisfied conditions as a single string, with each condition
+        separated by ' AND '.
 
-        :return: A string containing all satisfied conditions joined by ``\\nAND ``,
-            or an empty string when no conditions were satisfied.
+        :return: A string containing all satisfied conditions joined by ``\\nAND ``, or
+            an empty string when no conditions were satisfied.
         """
         return "\nAND ".join(
             str(c) for c in self.get_satisfied_conditions_and_their_bindings()
@@ -304,7 +316,8 @@ class InferenceExplanation(Symbol):
 
     def get_satisfied_conditions_and_their_bindings(self) -> List[ConditionAndBindings]:
         """
-        Retrieve the list of satisfied non-logical condition expressions along with their bindings.
+        Retrieve the list of satisfied non-logical condition expressions along with
+        their bindings.
 
         :return: A list of :class:`ConditionAndBindings` objects, each pairing a satisfied
             condition expression (excluding :class:`~krrood.entity_query_language.operators.core_logical_operators.LogicalOperator`
@@ -331,12 +344,12 @@ class InferenceExplanation(Symbol):
         """
         Build a QueryGraph of the full query tree with satisfaction data overlaid.
 
-        Each ``QueryNode`` carries an ``is_satisfied`` flag grounded directly on
-        the satisfied condition IDs.  Unsatisfied condition subtrees are also
-        marked as *faded* for visualization purposes.
+        Each ``QueryNode`` carries an ``is_satisfied`` flag grounded directly on the
+        satisfied condition IDs.  Unsatisfied condition subtrees are also marked as
+        *faded* for visualization purposes.
 
-        :return: A :class:`QueryGraph` instance, or None if no conditions exist
-            or no satisfaction data is available.
+        :return: A :class:`QueryGraph` instance, or None if no conditions exist or no
+            satisfaction data is available.
         """
         if self.query_root is None or not self.satisfied_condition_ids:
             return None
@@ -351,8 +364,10 @@ class InferenceExplanation(Symbol):
         """
         Convert an InferenceExplanation into a human-readable string.
 
-        :param focus_package: Optional package name; only applies when ``show_trace=True``.
-        :param show_trace: When ``True``, append the call stack recorded at query-definition time.
+        :param focus_package: Optional package name; only applies when
+            ``show_trace=True``.
+        :param show_trace: When ``True``, append the call stack recorded at query-
+            definition time.
         :return: A formatted string explaining the inference.
         """
         source_frame = _select_source_frame(self.stack.filter().frames)
@@ -384,37 +399,43 @@ class InferenceExplanation(Symbol):
 
     @property
     def frame_count(self) -> int:
-        """Number of frames in the captured call stack."""
+        """
+        Number of frames in the captured call stack.
+        """
         return len(self.stack)
 
     def is_triggered_from_method(self) -> bool:
         """
-        Check whether any frame in the call stack is inside a class method or classmethod.
+        Check whether any frame in the call stack is inside a class method or
+        classmethod.
 
-        :return: ``True`` if at least one frame has a non-``None`` ``class_object``, ``False`` otherwise.
+        :return:``True`` if at least one frame has a non-``None`` ``class_object``,
+            ``False`` otherwise.
         """
         return self.stack.is_from_method()
 
     def triggering_classes(self) -> List[type]:
         """
-        Retrieve the distinct class objects that appear in the call stack,
-        in order of first occurrence (innermost first).
+        Retrieve the distinct class objects that appear in the call stack, in order of
+        first occurrence (innermost first).
 
         Useful for answering "from which class was this inference triggered?"
 
-        :return: A list of class objects appearing in the stack, deduplicated and in innermost-first order.
+        :return: A list of class objects appearing in the stack, deduplicated and in
+            innermost-first order.
         """
         return self.stack.classes()
 
     def triggering_functions(self) -> List[Callable]:
         """
-        Retrieve the distinct function objects that appear in the call stack,
-        in order of first occurrence (innermost first).
+        Retrieve the distinct function objects that appear in the call stack, in order
+        of first occurrence (innermost first).
 
-        Nested functions defined inside other functions may not be resolvable
-        and will be absent from this list.
+        Nested functions defined inside other functions may not be resolvable and will
+        be absent from this list.
 
-        :return: A list of callable objects appearing in the stack, deduplicated and in innermost-first order.
+        :return: A list of callable objects appearing in the stack, deduplicated and in
+            innermost-first order.
         """
         return self.stack.functions()
 
@@ -423,9 +444,9 @@ class InferenceExplanation(Symbol):
         Find the outermost :class:`~krrood.entity_query_language._stack.StackFrame`
         whose ``module_name`` contains *package*.
 
-        This identifies the highest-level entry point into *package* that
-        triggered the inference, which is useful for understanding where inside
-        your own library the query was constructed.
+        This identifies the highest-level entry point into *package* that triggered the
+        inference, which is useful for understanding where inside your own library the
+        query was constructed.
 
         :param package: Substring matched against ``StackFrame.module_name``.
         :return: The outermost matching frame, or ``None`` if no frame matches.
@@ -553,10 +574,11 @@ class InferenceExplanation(Symbol):
         self, type_a: Type, type_b: Type
     ) -> Entity[SymbolicExpression]:
         """
-        Generalisation of :meth:`get_conditions_that_relate_the_variables_of_type` for two
-        potentially different types.  Returns satisfied condition expressions that have at least one
-        descendant variable node whose ``_type_`` is a subclass of *type_a* and at least one
-        (different) descendant variable node whose ``_type_`` is a subclass of *type_b*.
+        Generalisation of :meth:`get_conditions_that_relate_the_variables_of_type` for
+        two potentially different types.  Returns satisfied condition expressions that
+        have at least one descendant variable node whose ``_type_`` is a subclass of
+        *type_a* and at least one (different) descendant variable node whose ``_type_``
+        is a subclass of *type_b*.
 
         When ``type_a == type_b`` the semantics reduce to
         :meth:`get_conditions_that_relate_the_variables_of_type`.
@@ -585,7 +607,8 @@ class InferenceExplanation(Symbol):
         explanation_variable: Selectable[InferenceExplanation] | InferenceExplanation,
     ) -> FlatVariable[SymbolicExpression] | SymbolicExpression:
         """
-        Build a flat variable ranging over all descendant nodes of the explanation's query root.
+        Build a flat variable ranging over all descendant nodes of the explanation's
+        query root.
 
         :param explanation_variable: A :class:`~krrood.entity_query_language.core.base_expressions.Selectable`
             wrapping an :class:`InferenceExplanation`, or an explanation instance used as a domain source.
@@ -609,8 +632,8 @@ def register_inference(
     result: Optional[OperationResult] = None,
 ) -> None:
     """
-    Register an instance created via inference by attaching an :class:`InferenceExplanation`
-    directly to the instance.
+    Register an instance created via inference by attaching an
+    :class:`InferenceExplanation` directly to the instance.
 
     Only :class:`~krrood.symbol_graph.symbol_graph.Symbol` instances are supported.
     Non-Symbol values (plain ints, strings, frozen third-party objects) are silently

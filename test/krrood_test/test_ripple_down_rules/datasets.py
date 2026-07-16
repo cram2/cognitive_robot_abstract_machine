@@ -26,7 +26,9 @@ from krrood.ripple_down_rules.rdr_decorators import RDRDecorator
 
 
 def load_cached_dataset(cache_file):
-    """Loads the dataset from cache if it exists."""
+    """
+    Loads the dataset from cache if it exists.
+    """
     dataset = {}
     if ".pkl" not in cache_file:
         cache_file += ".pkl"
@@ -40,7 +42,9 @@ def load_cached_dataset(cache_file):
 
 
 def save_dataset_to_cache(dataset, cache_file):
-    """Saves only essential parts of the dataset to cache."""
+    """
+    Saves only essential parts of the dataset to cache.
+    """
     dataset_to_cache = {
         "features": dataset.data.features,
         "targets": dataset.data.targets,
@@ -54,7 +58,9 @@ def save_dataset_to_cache(dataset, cache_file):
 
 
 def get_dataset(dataset_id, cache_file: Optional[str] = None):
-    """Fetches dataset from cache or downloads it if not available."""
+    """
+    Fetches dataset from cache or downloads it if not available.
+    """
     if cache_file is not None:
         if not cache_file.endswith(".pkl"):
             cache_file += ".pkl"
@@ -160,22 +166,26 @@ class PhysicalObject:
     """
     The name of the object.
     """
+
     _contained_objects: List[PhysicalObject] = field(default_factory=list)
     """
     The list of objects contained in this object.
     """
+
     _rdr_json_dir: ClassVar[str] = os.path.join(
         os.path.dirname(__file__), "test_results"
     )
     """
     The directory where the RDR serialized JSON files are stored.
     """
+
     _is_a_robot_rdr: ClassVar[RDRDecorator] = RDRDecorator(
         _rdr_json_dir, (bool,), True, package_name="test"
     )
     """
     The RDR decorator that is used to determine if the object is a robot or not.
     """
+
     _select_parts_rdr: ClassVar[RDRDecorator] = RDRDecorator(
         _rdr_json_dir, (Self,), False, package_name="test"
     )

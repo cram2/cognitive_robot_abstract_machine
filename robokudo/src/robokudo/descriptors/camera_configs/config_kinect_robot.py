@@ -19,36 +19,55 @@ class KinectCameraConfig(
     StableViewpointComponent,
     WorldDescriptorComponent,
 ):
-    """Configuration class for a Kinect camera setup in a robotic environment.
+    """
+    Configuration class for a Kinect camera setup in a robotic environment.
 
     This class defines the configuration parameters for a Kinect camera, including
-    interface settings, topic names, and transformation settings. It is designed to
-    work with ROS topics and TF transformations.
+    interface settings, topic names, and transformation settings. It is designed to work
+    with ROS topics and TF transformations.
     """
 
     registry_name: ClassVar[str] = "kinect"
-    """Overwrite BaseCameraConfig"""
+    """
+    Overwrite BaseCameraConfig.
+    """
 
     interface_type: str = "Kinect"
-    """Overwrite BaseCameraConfig"""
+    """
+    Overwrite BaseCameraConfig.
+    """
 
     topic_depth: str = "/kinect_head/depth_registered/image_raw/compressedDepth"
-    """Overwrite RGBDComponent"""
+    """
+    Overwrite RGBDComponent.
+    """
 
     topic_color: str = "/kinect_head/rgb/image_color/compressed"
-    """Overwrite RGBDComponent"""
+    """
+    Overwrite RGBDComponent.
+    """
 
     topic_cam_info: str = "/kinect_head/rgb/camera_info"
-    """Overwrite RGBDComponent"""
+    """
+    Overwrite RGBDComponent.
+    """
 
     color2depth_ratio: Tuple[float, float] = (0.5, 0.5)
-    """Overwrite RGBDComponent"""
+    """
+    Overwrite RGBDComponent.
+    """
 
     hi_res_mode: bool = True
-    """Overwrite RGBDComponent"""
+    """
+    Overwrite RGBDComponent.
+    """
 
     tf_from: str = "head_mount_kinect_rgb_optical_frame"
-    """Overwrite TFComponent"""
+    """
+    Overwrite TFComponent.
+    """
 
     tf_to: str = "map"
-    """Overwrite TFComponent"""
+    """
+    Overwrite TFComponent.
+    """

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from copy import deepcopy
 
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
@@ -7,11 +9,13 @@ from giskardpy.motion_statechart.goals.open_close import Close
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from coraplex.datastructures.enums import ExecutionType
 from coraplex.robot_plans import MoveToolCenterPointMotion, MoveMotion, ClosingMotion
 from coraplex.robot_plans.motions.base import AlternativeMotion
 from coraplex.view_manager import ViewManager
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -19,11 +23,12 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[Stretch]):
     """
-    Better motions for stretch to move the tool center point to the given goal, first rotates the base such that the
-    gripper is pointing at the goal pose and then uses full body control to move the TCP to the goal.
+    Better motions for stretch to move the tool center point to the given goal, first
+    rotates the base such that the gripper is pointing at the goal pose and then uses
+    full body control to move the TCP to the goal.
     """
 
-    execution_type = ExecutionType.SIMULATED
+    execution_type = ExecutionType.SIMULATED, ExecutionType.REAL
 
     def perform(self):
         return
@@ -55,7 +60,8 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
 
 class StretchMoveSim(MoveMotion, AlternativeMotion[Stretch]):
     """
-    Different giskard goal for moving stretch to a goal pose, this uses a goal optimal for a diff drive
+    Different giskard goal for moving stretch to a goal pose, this uses a goal optimal
+    for a diff drive.
     """
 
     execution_type = ExecutionType.SIMULATED
@@ -65,16 +71,42 @@ class StretchMoveSim(MoveMotion, AlternativeMotion[Stretch]):
 
     @property
     def _motion_chart(self):
+        world_T_target = self.world.transform(self.target, self.world.root)
+        world_T_target.z = 0
+        return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.01)
 
-        return DifferentialDriveBaseGoal(
-            goal_pose=self.target,
-        )
+
+class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
+    """
+    Uses a Giskard differential drive goal to move the Stretch base during real
+    execution.
+    """
+
+    execution_type = ExecutionType.REAL
+
+    def perform(self):
+        return
+
+    @property
+    def _motion_chart(self) -> DifferentialDriveBaseGoal:
+        world_T_target = self.world.transform(self.target, self.world.root)
+        world_T_target.z = 0
+        return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.1)
+        # Commented out for now since we use the giskard goal which also works for smaller distances
+        # return NavigateActionServerTask(
+        #     target_pose=self.target,
+        #     base_link=self.robot.root,
+        #     action_topic="/navigate_to_pose",
+        #     message_type=NavigateToPose,
+        # )
 
 
 class StretchClose(ClosingMotion, AlternativeMotion[Stretch]):
     """
-    Optimized close motion for the stretch robot. This puts the stretch directly in front of the container while holding
-    the handle and then pushes it arm forward to close the container.
+    Optimized close motion for the stretch robot.
+
+    This puts the stretch directly in front of the container while holding the handle
+    and then pushes it arm forward to close the container.
     """
 
     execution_type = ExecutionType.SIMULATED

@@ -21,11 +21,14 @@ class WorldStateTrajectoryPlotter:
     """
     Plot a trajectory of world states with one subplot per derivative.
 
-    Subplots share the x-axis (time in seconds, normalized so that the first time maps to 0).
+    Subplots share the x-axis (time in seconds, normalized so that the first time maps
+    to 0).
     """
 
     world_state_trajectory: WorldStateTrajectory = field(init=False)
-    """The trajectory of the robot's world state."""
+    """
+    The trajectory of the robot's world state.
+    """
 
     derivatives_to_plot: List[Derivatives] = field(
         default_factory=lambda: [
@@ -35,19 +38,29 @@ class WorldStateTrajectoryPlotter:
             Derivatives.jerk,
         ]
     )
-    """A plot will be generated for each entry in this list."""
+    """
+    A plot will be generated for each entry in this list.
+    """
 
     subplot_height_in_cm: float = 6.0
-    """Height of each derivative subplot in cm."""
+    """
+    Height of each derivative subplot in cm.
+    """
 
     legend: bool = True
-    """If True, a legend will be added to the plot."""
+    """
+    If True, a legend will be added to the plot.
+    """
 
     sort_degrees_of_freedom: bool = True
-    """If True, the degrees of freedom will be sorted by name before plotting."""
+    """
+    If True, the degrees of freedom will be sorted by name before plotting.
+    """
 
     second_width_in_cm: float = 2.0
-    """Width of a second in cm."""
+    """
+    Width of a second in cm.
+    """
 
     y_label: Dict[Derivatives, str] = field(
         default_factory=lambda: {
@@ -57,27 +70,35 @@ class WorldStateTrajectoryPlotter:
             Derivatives.jerk: "rad/s³ or m/s³",
         }
     )
-    """Label of the y-axis."""
+    """
+    Label of the y-axis.
+    """
 
     center_positions: bool = False
     """
-    If True, the position plots will be centered, such that they start at 0 instead of the initial value.
-    This may be useful if continues joints are used, because they can achieve very large values.
+    If True, the position plots will be centered, such that they start at 0 instead of
+    the initial value.
+
+    This may be useful if continues joints are used, because they can achieve very large
+    values.
     """
 
     plot_constant_lines: bool = False
     """
-    If False, lines of degrees of freedom that are constant 0 will not be plotted to reduce clutter.
+    If False, lines of degrees of freedom that are constant 0 will not be plotted to
+    reduce clutter.
+
     For positions this suppresses lines that are always equal to the initial value.
     """
 
     color_map: Dict[UUID, str] | None = None
     """
     A color map to use for plotting the trajectory.
-    Use can use matplotlib styles, like 'r:' for dotted red lines.
-    It should map the UUIDs of degrees of freedom in the world state trajectory to colors. 
-    If None, a default color map will be used.
-    
+
+    Use can use matplotlib styles, like 'r:' for dotted red lines. It should map the
+    UUIDs of degrees of freedom in the world state trajectory to colors. If None, a
+    default color map will be used.
+
     Each degree of freedom will have the same color in each subplot.
     """
 
@@ -89,6 +110,7 @@ class WorldStateTrajectoryPlotter:
     def _seconds_to_inches(self, seconds: float) -> float:
         """
         Converts seconds to inches.
+
         :param seconds: Input duration in seconds.
         :return: The drawable width in inches for a given duration.
         """
@@ -98,7 +120,9 @@ class WorldStateTrajectoryPlotter:
         self, duration: float, number_of_subplots: int
     ) -> tuple[plt.Figure, list[plt.Axes]]:
         """
-        Create a stacked subplot figure sized so the inner axes width matches duration_s in physical units.
+        Create a stacked subplot figure sized so the inner axes width matches duration_s
+        in physical units.
+
         :param duration: Duration of the trajectory in seconds.
         :param number_of_subplots: Number of subplots to create.
         :return: The figure and list of subplot axes.
@@ -147,7 +171,9 @@ class WorldStateTrajectoryPlotter:
 
     def _choose_ticks(self, duration: float) -> np.ndarray:
         """
-        Choose semi-automatic tick spacing: either 0.5s or integer seconds with adaptive spacing.
+        Choose semi-automatic tick spacing: either 0.5s or integer seconds with adaptive
+        spacing.
+
         :param duration: Duration of the trajectory in seconds.
         :return: x-ticks
         """
@@ -165,6 +191,7 @@ class WorldStateTrajectoryPlotter:
     def _sort_degrees_of_freedom(self, traj: WorldStateTrajectory) -> List[UUID]:
         """
         Return DOF ids ordered based on self.sort_degrees_of_freedom.
+
         :param traj: The trajectory to sort.
         :return: Degrees of freedom, either sorted by name or in original order
         """
@@ -178,6 +205,7 @@ class WorldStateTrajectoryPlotter:
     def _should_plot_series(self, series: np.ndarray) -> bool:
         """
         Decide whether to plot a DOF series according to suppression rules.
+
         :param derivative: Derivative of the subplot
         :param series: Data to be plotted.
         :return: whether to plot the series.
@@ -190,7 +218,9 @@ class WorldStateTrajectoryPlotter:
         self, dof_ids: List[UUID]
     ) -> Dict[UUID, dict]:
         """
-        Assign styles to DOFs, respecting an optional color_map of matplotlib format strings.
+        Assign styles to DOFs, respecting an optional color_map of matplotlib format
+        strings.
+
         :param dof_ids: DOF ids for which to create styles.
         :return: Dict mapping DOF ids to matplotlib style dicts.
         """
@@ -288,15 +318,14 @@ class WorldStateTrajectoryPlotter:
         """
         Actually plots the derivatives.
 
-        :param axes: List of matplotlib Axes objects where the trajectory data
-            for different derivatives will be plotted.
-        :param styles: Dictionary mapping DOF UUIDs to plot style definitions
-            (e.g., line formats). Key is a UUID, value is a dictionary with style
-            attributes.
+        :param axes: List of matplotlib Axes objects where the trajectory data for
+            different derivatives will be plotted.
+        :param styles: Dictionary mapping DOF UUIDs to plot style definitions (e.g.,
+            line formats). Key is a UUID, value is a dictionary with style attributes.
         :param dof_ids: List of UUIDs representing degrees of freedom for which
             trajectory data will be plotted.
-        :param traj: WorldStateTrajectory object that contains trajectory data
-            for plotting.
+        :param traj: WorldStateTrajectory object that contains trajectory data for
+            plotting.
         :param t: Numpy array representing the time steps corresponding to the
             trajectory data.
         """

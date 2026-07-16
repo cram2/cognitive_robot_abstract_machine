@@ -1,8 +1,8 @@
 from krrood.entity_query_language.backends import (
-    EntityQueryLanguageBackend,
+    EntityQueryLanguageGenerativeBackend,
     ProbabilisticBackend,
 )
-from krrood.entity_query_language.factories import underspecified, variable_from
+from krrood.entity_query_language.factories import a, an, variable_from
 from coraplex.datastructures.enums import (
     Arms,
     ApproachDirection,
@@ -12,7 +12,7 @@ from coraplex.datastructures.enums import (
 from coraplex.datastructures.grasp import GraspDescription
 
 from coraplex.language import SequentialNode
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
@@ -22,10 +22,14 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 def test_underspecified_action(apartment_world_pr2_copy_with_context):
     """
-    Test that an underspecified action can be executed
+    Test that an underspecified action resolves to a concrete candidate and parses into
+    an executable.
+
+    Execution is deferred to parse().execute(), so performing the node only expands it;
+    the resolved candidate is not performed here.
     """
     world, robot, context = apartment_world_pr2_copy_with_context
-    action = underspecified(NavigateAction)(
+    action = a(NavigateAction)(
         target_location=variable_from(
             [
                 Pose.from_xyz_quaternion(1, -1, 0, reference_frame=world.root),
@@ -38,19 +42,30 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
     plan = execute_single(action_like=action, context=context).plan
     with simulated_robot:
         plan.perform()
-    assert len(plan.nodes) == 3
+
     assert plan.root.status == TaskStatus.SUCCEEDED
-    assert plan.root.children[0].status == TaskStatus.SUCCEEDED
+    candidate = plan.root.children[0]
+    assert isinstance(candidate.designator, NavigateAction)
+    assert plan.root.parse() is not None
+    assert plan.root._action_iterator is None, (
+        "the action iterator must be released once grounding succeeds, so any resources a "
+        "candidate generator only holds to validate against (for example a location's "
+        "deep-copied test world) are not retained for the node's whole lifetime"
+    )
 
 
 def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_context):
     """
-    Test that an underspecified action can be executed when a factory for a spatial type is used with ellipsis
+    Test that an underspecified action resolves and parses when a factory for a spatial
+    type is used with ellipsis.
+
+    Execution is deferred to parse().execute(), so performing the node only expands it;
+    the resolved candidate is not performed here.
     """
     world, robot, context = apartment_world_pr2_copy_with_context
     context.query_backend = ProbabilisticBackend()
-    action = underspecified(NavigateAction)(
-        target_location=underspecified(Pose.from_xyz_rpy)(
+    action = a(NavigateAction)(
+        target_location=a(Pose.from_xyz_rpy)(
             x=...,
             y=...,
             z=0.0,
@@ -65,14 +80,16 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
     plan = execute_single(action_like=action, context=context).plan
     with simulated_robot:
         plan.perform()
-    assert len(plan.nodes) >= 3
+
     assert plan.root.status == TaskStatus.SUCCEEDED
-    assert plan.root.children[-1].status == TaskStatus.SUCCEEDED
+    candidate = plan.root.children[-1]
+    assert isinstance(candidate.designator, NavigateAction)
+    assert plan.root.parse() is not None
 
 
 def test_underspecified_language(apartment_world_pr2_copy_with_context):
     """
-    Test that entire plans can be underspecified
+    Test that entire plans can be underspecified.
     """
     world, robot, context = apartment_world_pr2_copy_with_context
     grasp_description = GraspDescription(
@@ -80,9 +97,9 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
         VerticalAlignment.NoAlignment,
         robot.left_arm.end_effector,
     )
-    plan_generator = underspecified(sequential, target_type=SequentialNode)(
+    plan_generator = an(sequential, target_type=SequentialNode)(
         children=[
-            underspecified(NavigateAction)(
+            a(NavigateAction)(
                 target_location=(
                     target_locations := variable_from(
                         [
@@ -97,7 +114,7 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
                 ),
                 keep_joint_states=True,
             ),
-            underspecified(PickUpAction)(
+            a(PickUpAction)(
                 arm=...,
                 grasp_description=grasp_description,
                 object_designator=world.get_body_by_name("milk.stl"),
@@ -106,5 +123,5 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
         context=context,
     )
     plan_generator.resolve()
-    plans = list(EntityQueryLanguageBackend().evaluate(plan_generator))
+    plans = list(EntityQueryLanguageGenerativeBackend().evaluate(plan_generator))
     assert len(plans) == len(list(target_locations._domain_)) * len(list(Arms))

@@ -1,0 +1,91 @@
+<idea-plugin>
+    <!-- Unique, permanent id (cannot be changed after the first Marketplace publish). -->
+    <id>io.github.abdelrhmanbassiouny.pyroles</id>
+    <name>Python Role Lens</name>
+    <vendor email="abdelrhman_bassuny@hotmail.com" url="https://github.com/AbdelrhmanBassiouny">Abdelrhman Bassiouny</vendor>
+
+    <description><![CDATA[
+        Adds IDE awareness for the <b>Role / delegation</b> pattern in Python, where a class
+        subclasses <code>Role[SomeTaker]</code> and forwards attribute access to a wrapped
+        instance through <code>__getattr__</code>.
+        <br/><br/>
+        The members of the taker class — together with everything it inherits, and any
+        nested roles — become available on the role instance for <b>code completion</b>,
+        <b>type inference</b>, and <b>Go to Declaration</b> (Ctrl/Cmd+Click), without
+        using inheritance.
+
+        <h3>Getting started</h3>
+        <p>
+          Install the plugin and restart — there is nothing to configure. It activates
+          automatically for any class that takes on a role by subclassing a
+          <code>Role[Taker]</code> base that delegates through <code>__getattr__</code>.
+        </p>
+        <pre><code>from dataclasses import dataclass, field
+from krrood.patterns.role import Role
+
+@dataclass
+class Person:
+    name: str
+    age: int
+    def greet(self) -> str:
+        return f"Hi, I'm {self.name}"
+
+@dataclass
+class Teacher(Role[Person]):                    # the taker type is the generic argument
+    courses: list[str] = field(default_factory=list)
+
+teacher = Teacher(role_taker=Person("Ahmed", 20))
+teacher.name       # completes, inferred as str
+teacher.greet()    # completes; Ctrl/Cmd-Click jumps to Person.greet
+teacher.courses    # the role's own field</code></pre>
+
+        <h3>What you get</h3>
+        <ul>
+          <li><b>Code completion</b> after <code>.</code> on a role instance — the taker's
+              attributes and methods appear.</li>
+          <li><b>Type inference</b> — a delegated attribute is typed from its real declaration.</li>
+          <li><b>Go to Declaration</b> (Ctrl/Cmd+Click), <b>Find Usages</b>, and <b>Rename</b>
+              all resolve to the real member in the taker class.</li>
+        </ul>
+        <p>
+          It also handles <b>transitive roles</b> (a subclass of a role), <b>inherited taker
+          members</b> (the taker's own base classes), and <b>nested roles</b> (a taker that is
+          itself a role).
+        </p>
+
+        <h3>Requirements</h3>
+        <p>
+          Works out of the box with krrood's <code>Role</code>, and with any
+          <code>Role[...]</code> base that delegates via <code>__getattr__</code>. The role
+          taker is read from the <code>Role[...]</code> generic argument.
+        </p>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <b>0.2.0</b> — The role taker is now resolved solely from the <code>Role[Taker]</code>
+        generic argument, matching krrood's move to an inherited keyword-only <code>role_taker</code>
+        field (the <code>role_taker_field()</code> declaration was removed). Roles must declare
+        <code>Role[Taker]</code> for their taker's members to be injected.
+        <br/>
+        <b>0.1.0</b> — Initial release. Completion, type inference, and Go to Declaration for
+        the Role / delegation pattern: the taker's members (plus everything it inherits and any
+        nested roles) are injected onto a role declared with <code>Role[Taker]</code>. A
+        <code>Role[T]</code> parameterised by a bounded <code>TypeVar</code> resolves to its bound.
+    ]]></change-notes>
+
+    <!--
+      Marks this as a Python-aware plugin. The module com.intellij.modules.python is
+      provided by both PyCharm Community (PythonCore) and PyCharm Professional /
+      IntelliJ IDEA + Python plugin (Pythonid), so the plugin loads in all of them.
+    -->
+    <depends>com.intellij.modules.python</depends>
+
+    <!--
+      The Python plugin declares its extension points under the "Pythonid" namespace,
+      even in the Community edition. Using the wrong namespace makes the plugin load
+      WITHOUT ever instantiating the provider class (a silent no-op) — a classic gotcha.
+    -->
+    <extensions defaultExtensionNs="Pythonid">
+        <pyClassMembersProvider implementation="com.example.pyroles.RoleMembersProvider"/>
+    </extensions>
+</idea-plugin>

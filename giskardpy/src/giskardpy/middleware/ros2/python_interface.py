@@ -10,7 +10,7 @@ import rclpy
 from json_msgs.action import JsonAction
 from json_msgs.action._json_action import JsonAction_Result
 from giskardpy.middleware.ros2 import rospy
-from giskardpy.middleware.ros2.exceptions import ExecutionException
+from giskardpy.middleware.ros2.exceptions import NoActiveGoalToCancelError
 from giskardpy.middleware.ros2.ros2_interface import MyActionClient
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
@@ -32,6 +32,7 @@ from semantic_digital_twin.world import World
 class GiskardWrapper:
     """
     Python wrapper for the ROS interface of Giskard.
+
     :param giskard_node_name: node name of Giskard
     """
 
@@ -107,9 +108,7 @@ class GiskardWrapper:
         try:
             future = self._client._goal_handle.cancel_goal_async()
         except AttributeError as e:
-            raise ExecutionException(
-                "Can't cancel goals, because there is no active one"
-            )
+            raise NoActiveGoalToCancelError()
         return future
 
     async def get_result(self):
@@ -130,8 +129,11 @@ class GiskardWrapper:
         self, move_result: Optional[JsonAction_Result] = None, show_all: bool = False
     ) -> Dict[str, bool]:
         """
-        Analyzes a MoveResult msg to return a list of all monitors that hindered the EndMotion Monitors from becoming active.
-        Uses the last received MoveResult msg from execute() or projection() when not explicitly given.
+        Analyzes a MoveResult msg to return a list of all monitors that hindered the
+        EndMotion Monitors from becoming active.
+
+        Uses the last received MoveResult msg from execute() or projection() when not
+        explicitly given.
         :param move_result: the move_result msg to analyze
         :param show_all: returns the state of all monitors when show_all==True
         :return: Dict with monitor name as key and True or False as value

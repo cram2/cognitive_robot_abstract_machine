@@ -1,10 +1,10 @@
 import json
+import threading
 import time
 from dataclasses import dataclass
 
 import numpy as np
 import pytest
-
 from giskardpy.data_types.exceptions import DuplicateNameException
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -33,6 +33,7 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
     Pulse,
     CountSeconds,
     CountControlCycles,
+    ThreadedPredicateMonitor,
 )
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
@@ -42,6 +43,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability
 from giskardpy.motion_statechart.test_nodes.test_nodes import (
     ChangeStateOnEvents,
     ConstTrueNode,
@@ -53,7 +55,9 @@ from giskardpy.motion_statechart.test_nodes.test_nodes import (
     TestEndBeforeStart,
     TestUnpauseUnknownFromParentPause,
 )
-from giskardpy.qp.constraint import EqualityConstraint
+from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
+from giskardpy.qp.constraint import GiskardEqualityConstraint
+from giskardpy.qp.enforcement_strategy import IntegralStrategy
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from krrood.symbolic_math.symbolic_math import (
     trinary_logic_and,
@@ -66,6 +70,7 @@ from semantic_digital_twin.spatial_types import (
     Vector3,
     Point3,
 )
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 
 
@@ -332,6 +337,95 @@ def test_thread_payload_monitor_non_blocking_and_caching():
     time.sleep(mon.delay * 2)
     val1 = mon.compute_observation()
     assert val1 == ObservationStateValues.TRUE
+
+
+def _tick_until(sim, predicate, timeout=2.0):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        sim.tick()
+        if predicate():
+            return
+        time.sleep(0.005)
+    raise AssertionError("condition not reached within timeout")
+
+
+def test_threaded_predicate_monitor_unknown_then_true():
+    gate = threading.Event()
+    msc = MotionStatechart()
+    # predicate blocks on the gate, so we can observe the UNKNOWN phase
+    mon = ThreadedPredicateMonitor(predicate=lambda: gate.wait(2.0), name="cond")
+    msc.add_node(mon)
+    end = EndMotion.when_true(mon)
+    msc.add_node(end)
+
+    sim = Executor(MotionStatechartContext(world=World()))
+    sim.compile(motion_statechart=msc)
+
+    # while the predicate is blocked, the monitor stays UNKNOWN and ticking
+    # never blocks on the (slow) evaluation
+    for _ in range(3):
+        t0 = time.perf_counter()
+        sim.tick()
+        assert time.perf_counter() - t0 < 0.5
+        assert mon.observation_state == ObservationStateValues.UNKNOWN
+        assert not msc.is_end_motion()
+
+    gate.set()
+    _tick_until(sim, lambda: mon.observation_state == ObservationStateValues.TRUE)
+    assert mon.observation_state == ObservationStateValues.TRUE
+    sim.tick()
+    assert msc.is_end_motion()
+
+
+def test_threaded_predicate_monitor_false():
+    msc = MotionStatechart()
+    mon = ThreadedPredicateMonitor(predicate=lambda: False, name="cond")
+    msc.add_node(mon)
+    end = EndMotion.when_true(mon)
+    msc.add_node(end)
+
+    sim = Executor(MotionStatechartContext(world=World()))
+    sim.compile(motion_statechart=msc)
+
+    _tick_until(sim, lambda: mon.observation_state == ObservationStateValues.FALSE)
+    assert mon.observation_state == ObservationStateValues.FALSE
+    assert not msc.is_end_motion()
+
+
+def test_threaded_predicate_monitor_false_triggers_cancel():
+    msc = MotionStatechart()
+    mon = ThreadedPredicateMonitor(predicate=lambda: False, name="cond")
+    msc.add_node(mon)
+    cancel = CancelMotion(exception=Exception("condition is false"))
+    cancel.start_condition = trinary_logic_not(mon.observation_variable)
+    msc.add_node(cancel)
+
+    sim = Executor(MotionStatechartContext(world=World()))
+    sim.compile(motion_statechart=msc)
+
+    with pytest.raises(Exception, match="condition is false"):
+        _tick_until(sim, lambda: False)
+
+
+def test_threaded_predicate_monitor_exception_is_false():
+    def boom():
+        raise RuntimeError("query failed")
+
+    msc = MotionStatechart()
+    mon = ThreadedPredicateMonitor(predicate=boom, name="cond")
+    msc.add_node(mon)
+    end = EndMotion.when_true(mon)
+    msc.add_node(end)
+
+    sim = Executor(MotionStatechartContext(world=World()))
+    sim.compile(motion_statechart=msc)
+
+    # a raising predicate must not crash the control loop; it reports FALSE
+    try:
+        _tick_until(sim, lambda: mon.observation_state == ObservationStateValues.FALSE)
+    except RuntimeError:
+        pass
+    assert mon.observation_state == ObservationStateValues.UNKNOWN
 
 
 class TestMotionStatechartLogic:
@@ -1152,7 +1246,9 @@ class TestTemplates:
         kin_sim.tick_until_end()
 
     def test_parallel_minimum_success(self):
-        """Test that Parallel completes when minimum_success nodes are True"""
+        """
+        Test that Parallel completes when minimum_success nodes are True.
+        """
         msc = MotionStatechart()
         msc.add_nodes(
             [
@@ -1177,7 +1273,9 @@ class TestTemplates:
         assert kin_sim.control_cycles == 6
 
     def test_parallel_minimum_success_zero(self):
-        """Test that Parallel completes when no node is True"""
+        """
+        Test that Parallel completes when no node is True.
+        """
         msc = MotionStatechart()
         msc.add_nodes(
             [
@@ -1204,8 +1302,9 @@ class TestTemplates:
 
 def test_constraint_collection(pr2_world_state_reset: World):
     """
-    Test the constraint collection naming behavior. Expected behavior is:
-    - Not naming constraints should result in automatically generated unique names
+    Test the constraint collection naming behavior.
+
+    Expected behavior is: - Not naming constraints should result in automatically generated unique names
     - Manually naming constraints the same name should result in an Exception
     - Merging constraint collections should handle duplicates via prefix if they are in different collections
     - Merge raises an Exception if a collection contains duplicates in itself
@@ -1218,7 +1317,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
 
     expr = Vector3.X(tip).angle_between(Vector3.Y(root))
 
-    col.add_point_goal_constraints(
+    GeometricConstraintBuilder(col).add_point_goal_constraints(
         frame_P_current=Point3(0, 0, 0, reference_frame=tip),
         frame_P_goal=Point3(0, 0, 0, reference_frame=tip),
         reference_velocity=0.1,
@@ -1275,15 +1374,16 @@ def test_constraint_collection(pr2_world_state_reset: World):
         quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         task_expression=expr,
     )
-    constraint = EqualityConstraint(
+    constraint = GiskardEqualityConstraint(
         name="same_name",
         expression=expr,
-        bound=0.0,
         normalization_factor=0.1,
         quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         lower_slack_limit=-float("inf"),
         upper_slack_limit=float("inf"),
         linear_weight=0,
+        enforcement_strategy=IntegralStrategy,
+        bound=0.0,
     )
     col3._constraints.append(constraint)
 
@@ -1296,7 +1396,8 @@ def test_constraint_collection(pr2_world_state_reset: World):
 
 class TestLifeCycleTransitions:
     """
-    Tests the LifeCycle transitions of nodes in various edge cases and intended behavior.
+    Tests the LifeCycle transitions of nodes in various edge cases and intended
+    behavior.
     """
 
     def test_run_after_stop(self):
@@ -1356,6 +1457,7 @@ class TestLifeCycleTransitions:
     def test_end_before_start(self):
         """
         Test for node to start even if it's end condition is met before start condition.
+
         Node3 should start and run for 1 tick before ending, instead of never starting.
         """
         msc = MotionStatechart()
@@ -1652,9 +1754,9 @@ class TestLifeCycleTransitions:
     def test_unpause_unknown_from_parent_pause(self):
         """
         Test for child node to unpause when parent node unpauses.
+
         Child node pause condition is unknown.
         """
-
         msc = MotionStatechart()
 
         pulse = Pulse()
@@ -1692,3 +1794,30 @@ class TestLifeCycleTransitions:
         msc.plot_gantt_chart()
 
         assert len(msc.history) == 5
+
+
+class TestMaxManipulability:
+    def test_MaxManipulability(self, pr2_world_state_reset: World):
+        root = pr2_world_state_reset.get_body_by_name("base_footprint")
+        tip = pr2_world_state_reset.get_body_by_name("r_gripper_tool_frame")
+
+        goal_pose = Pose.from_xyz_rpy(
+            x=0.8, y=-0.3, z=1.0, reference_frame=pr2_world_state_reset.root
+        )
+        msc = MotionStatechart()
+        cart_goal = CartesianPose(
+            root_link=pr2_world_state_reset.root,
+            tip_link=tip,
+            goal_pose=goal_pose,
+        )
+        msc.add_nodes([cart_goal, MaxManipulability(root_link=root, tip_link=tip)])
+        msc.add_node(EndMotion.when_true(cart_goal))
+
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        fk = pr2_world_state_reset.compute_forward_kinematics_np(
+            pr2_world_state_reset.root, tip
+        )
+        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.threshold)

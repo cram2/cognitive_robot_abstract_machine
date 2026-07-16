@@ -29,6 +29,7 @@ except ImportError:
 class Sage10kDatasetLoader:
     """
     Loader for scenes from the Sage10k dataset.
+
     This loader currently does not load Windows of walls.
     """
 
@@ -40,6 +41,7 @@ class Sage10kDatasetLoader:
     def _download_scene_if_not_exists(self, scene_url: str) -> Path:
         """
         Download the scene from the Sage10k dataset and unzip it.
+
         Returns early if a directory with the requested scene already exists.
 
         :param scene_url: The URL of the scene to be downloaded.
@@ -74,12 +76,14 @@ class Sage10kDatasetLoader:
 
     def _parse_json(self, extracted_dir: Path) -> Sage10kScene:
         """
-        Parses the extracted directory to locate and load a specific JSON file, ensuring there is
-        exactly one valid file matching the naming pattern. Load the JSON into a Sage10kScene object.
+        Parses the extracted directory to locate and load a specific JSON file, ensuring
+        there is exactly one valid file matching the naming pattern. Load the JSON into
+        a Sage10kScene object.
 
         :param extracted_dir: The directory containing the extracted files to be parsed.
-        :return: A Sage10kScene object created from the parsed JSON content. The object's
-            `directory_path` attribute is also updated to the given `extracted_dir`.
+        :return: A Sage10kScene object created from the parsed JSON content. The
+            object's `directory_path` attribute is also updated to the given
+            `extracted_dir`.
         """
         json_files = list(extracted_dir.glob("layout_*.json"))
         if not json_files:
@@ -98,6 +102,7 @@ class Sage10kDatasetLoader:
     def _delete_assets(self, extracted_dir: Path):
         """
         Delete the assets of a scene.
+
         Use this when you only want to fetch all layout JSONS.
 
         :param extracted_dir: The directory containing the extracted scene.
@@ -111,7 +116,8 @@ class Sage10kDatasetLoader:
 
     def create_scene(self, scene_url: str) -> Sage10kScene:
         """
-        Create a scene from the given URL by downloading it and loading it into the memory.
+        Create a scene from the given URL by downloading it and loading it into the
+        memory.
 
         :param scene_url: The URL of the scene to be loaded.
         :return: The Sage10kScene object.
@@ -126,13 +132,14 @@ class Sage10kDatasetLoader:
     ) -> list[str]:
         """
         Use this to select random scenes from the dataset.
+
         Requires the extra requirement huggingface_hu.
 
         :param repository: The repo id of the dataset.
-        :param folder_path: The path to the folder containing the scenes in the repository.
+        :param folder_path: The path to the folder containing the scenes in the
+            repository.
         :return: A list of all possible URLs to the scenes in the dataset.
         """
-
         fs = huggingface_hub.HfFileSystem()
 
         # Hugging Face filesystem paths follow the format: datasets/repo_id/path

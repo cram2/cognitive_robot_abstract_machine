@@ -15,7 +15,7 @@ from coraplex.robot_plans.actions.core.navigation import NavigateAction, LookAtA
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
-#todo: this is deprecated-> needs update
+# todo: this is deprecated-> needs update
 
 #
 # @dataclass
