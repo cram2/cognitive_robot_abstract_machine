@@ -30,7 +30,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 from coraplex.alternative_motion_mappings.tracy_motion_mapping import TracyGripperMotion
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment, ExecutionType
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.motion_executor import real_robot, simulated_robot
 from coraplex.plans.factories import sequential
@@ -46,7 +46,8 @@ from coraplex.testing import setup_world
 
 logger = logging.getLogger(__name__)
 
-real = False  # Set to True for real robot hardware, False for simulation
+ExecutionType = ExecutionType.SIMULATED
+#real = False  # Set to True for real robot hardware, False for simulation
 
 print("Initializing ROS2...")
 rclpy.init()
@@ -61,7 +62,7 @@ executor.add_node(node)
 thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
 thread.start()
 
-if real:
+if ExecutionType == ExecutionType.REAL:
     print("REAL MODE: Fetching active world from service...")
     # Fetch world from service (up to 300s timeout for slow service starts)
     world = fetch_world_from_service(node=node, timeout_seconds=300)
@@ -69,7 +70,7 @@ if real:
     # Start state synchronizer
     world_sync = WorldSynchronizer(_world=world, node=node)
 
-else:
+elif ExecutionType == ExecutionType.SIMULATED:
     print("SIMULATED MODE: Parsing local URDF/Xacro description...")
     # Parse local simulated robot URDF/Xacro directly
     tracy_urdf_path = "package://iai_tracy_description/urdf/tracy.urdf.xacro"
@@ -139,7 +140,7 @@ plan = sequential(
     context,
 )
 
-if real:
+if ExecutionType == ExecutionType.REAL:
     with real_robot:
         plan.perform()
 else:
