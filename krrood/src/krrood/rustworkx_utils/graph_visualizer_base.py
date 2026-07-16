@@ -40,6 +40,9 @@ class GraphVisualizerBackend(Enum):
     VIS_NETWORK = auto()
     """A Flask application drawing the graph with vis-network."""
 
+    THREE = auto()
+    """A Flask application drawing the graph in 3D with 3d-force-graph (Three.js)."""
+
 
 def label_by_string(payload: Any) -> str:
     """Label a node by the string representation of its payload."""

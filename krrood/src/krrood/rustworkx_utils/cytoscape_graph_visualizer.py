@@ -204,6 +204,7 @@ requestAnimationFrame(pulseSelectionGlow);
 
 refresh();
 setInterval(refresh, {{ interval_ms }});
+{{ extra_script | safe }}
 </script>
 </body>
 </html>
@@ -288,6 +289,14 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
         :param application: The Flask application to add routes to.
         """
 
+    def extra_script(self) -> str:
+        """
+        :return: Extra JavaScript appended to the page after the built-in refresh/interaction
+            wiring, letting subclasses add their own behaviour (for example animation loops)
+            without overriding the whole page template. Empty by default.
+        """
+        return ""
+
     def build_application(self) -> Flask:
         """
         :return: The Flask application serving the page and the graph and node endpoints.
@@ -304,6 +313,7 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
                 layout_options_json=json.dumps(self.cytoscape_layout_options()),
                 extra_node_styles_json=json.dumps(self.extra_node_styles()),
                 interval_ms=int(self.refresh_interval_seconds * 1000),
+                extra_script=self.extra_script(),
             )
 
         @application.route("/graph")

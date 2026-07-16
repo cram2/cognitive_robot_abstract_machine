@@ -192,6 +192,21 @@ class TestExtensionHooks:
         assert client.get("/extra").data == b"extra"
         assert len(calls) == 1
 
+    def test_extra_script_defaults_to_empty(self):
+        visualizer = named_visualizer(chain_graph(["a"]))
+
+        assert visualizer.extra_script() == ""
+
+    def test_extra_script_is_appended_to_the_rendered_page(self):
+        class ScriptedVisualizer(CytoscapeGraphVisualizer):
+            def extra_script(self):
+                return "console.log('marker-from-subclass');"
+
+        client = ScriptedVisualizer(graph=chain_graph(["a"])).build_application().test_client()
+
+        page = client.get("/").data
+        assert b"marker-from-subclass" in page
+
 
 class TestCheckDependencies:
     def test_raises_when_flask_is_missing(self, monkeypatch):

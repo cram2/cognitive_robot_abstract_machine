@@ -17,3 +17,6 @@ from krrood.rustworkx_utils.cytoscape_graph_visualizer import (
 from krrood.rustworkx_utils.visnetwork_graph_visualizer import (
     VisNetworkGraphVisualizer,
 )
+from krrood.rustworkx_utils.three_graph_visualizer import (
+    ThreeGraphVisualizer,
+)
