@@ -6,7 +6,9 @@ from dataclasses import dataclass
 import pytest
 import rustworkx as rx
 
-from krrood.rustworkx_utils.cytoscape_graph_visualizer import CytoscapeGraphVisualizer
+from rustworkx_utils.visualization.cytoscape_graph_visualizer import (
+    CytoscapeGraphVisualizer,
+)
 from krrood.rustworkx_utils.graph_visualizer_base import GraphLayout
 
 
@@ -56,7 +58,9 @@ class TestGraphElements:
     def test_node_labels_come_from_the_label_getter(self):
         visualizer = named_visualizer(chain_graph(["pick", "place"]))
 
-        labels = [node["data"]["label"] for node in node_elements(visualizer.graph_elements())]
+        labels = [
+            node["data"]["label"] for node in node_elements(visualizer.graph_elements())
+        ]
         assert labels == ["pick", "place"]
 
     def test_node_colors_come_from_the_color_getter(self):
@@ -65,17 +69,22 @@ class TestGraphElements:
             color_getter=lambda payload: "red" if payload.name == "a" else "green",
         )
 
-        colors = [node["data"]["color"] for node in node_elements(visualizer.graph_elements())]
+        colors = [
+            node["data"]["color"] for node in node_elements(visualizer.graph_elements())
+        ]
         assert colors == ["red", "green"]
 
     def test_node_border_colors_come_from_the_border_color_getter(self):
         visualizer = named_visualizer(
             chain_graph(["a", "b"]),
-            border_color_getter=lambda payload: "black" if payload.name == "a" else "white",
+            border_color_getter=lambda payload: (
+                "black" if payload.name == "a" else "white"
+            ),
         )
 
         border_colors = [
-            node["data"]["borderColor"] for node in node_elements(visualizer.graph_elements())
+            node["data"]["borderColor"]
+            for node in node_elements(visualizer.graph_elements())
         ]
         assert border_colors == ["black", "white"]
 
@@ -89,14 +98,18 @@ class TestGraphElements:
         visualizer = named_visualizer(chain_graph(["a", "b"]))
 
         edges = edge_elements(visualizer.graph_elements())
-        assert [(edge["data"]["source"], edge["data"]["target"]) for edge in edges] == [("0", "1")]
+        assert [(edge["data"]["source"], edge["data"]["target"]) for edge in edges] == [
+            ("0", "1")
+        ]
 
     def test_non_contiguous_indices_after_removal_are_handled(self):
         graph = chain_graph(["a", "b", "c"])
         graph.remove_node(1)
         visualizer = named_visualizer(graph)
 
-        ids = [node["data"]["id"] for node in node_elements(visualizer.graph_elements())]
+        ids = [
+            node["data"]["id"] for node in node_elements(visualizer.graph_elements())
+        ]
         assert ids == ["0", "2"]
 
 
@@ -110,7 +123,9 @@ class TestFlaskEndpoints:
         assert b"cytoscape" in response.data.lower()
 
     def test_graph_endpoint_returns_nodes_and_edges(self):
-        client = named_visualizer(chain_graph(["a", "b"])).build_application().test_client()
+        client = (
+            named_visualizer(chain_graph(["a", "b"])).build_application().test_client()
+        )
 
         elements = client.get("/graph").get_json()["elements"]
 
@@ -118,7 +133,11 @@ class TestFlaskEndpoints:
         assert len(edge_elements(elements)) == 1
 
     def test_node_endpoint_returns_details(self):
-        client = named_visualizer(chain_graph(["a", "b", "c"])).build_application().test_client()
+        client = (
+            named_visualizer(chain_graph(["a", "b", "c"]))
+            .build_application()
+            .test_client()
+        )
 
         assert client.get("/node/2").get_json()["details"] == ["name: c"]
 
@@ -137,9 +156,11 @@ class TestLayout:
         assert options["infinite"] is True
 
     def test_physics_libraries_are_loaded_in_the_page(self):
-        client = named_visualizer(
-            chain_graph(["a"]), layout=GraphLayout.PHYSICS
-        ).build_application().test_client()
+        client = (
+            named_visualizer(chain_graph(["a"]), layout=GraphLayout.PHYSICS)
+            .build_application()
+            .test_client()
+        )
 
         assert b"cytoscape-cola" in client.get("/").data
 
@@ -169,9 +190,13 @@ class TestExtensionHooks:
     def test_extra_node_styles_are_spread_into_the_rendered_page(self):
         class StyledVisualizer(CytoscapeGraphVisualizer):
             def extra_node_styles(self):
-                return [{"selector": "node[image]", "style": {"background-fit": "cover"}}]
+                return [
+                    {"selector": "node[image]", "style": {"background-fit": "cover"}}
+                ]
 
-        client = StyledVisualizer(graph=chain_graph(["a"])).build_application().test_client()
+        client = (
+            StyledVisualizer(graph=chain_graph(["a"])).build_application().test_client()
+        )
 
         page = client.get("/").data
         assert b'"selector": "node[image]"' in page
@@ -187,7 +212,9 @@ class TestExtensionHooks:
                 def extra():
                     return "extra"
 
-        client = RoutedVisualizer(graph=chain_graph(["a"])).build_application().test_client()
+        client = (
+            RoutedVisualizer(graph=chain_graph(["a"])).build_application().test_client()
+        )
 
         assert client.get("/extra").data == b"extra"
         assert len(calls) == 1
@@ -202,7 +229,11 @@ class TestExtensionHooks:
             def extra_script(self):
                 return "console.log('marker-from-subclass');"
 
-        client = ScriptedVisualizer(graph=chain_graph(["a"])).build_application().test_client()
+        client = (
+            ScriptedVisualizer(graph=chain_graph(["a"]))
+            .build_application()
+            .test_client()
+        )
 
         page = client.get("/").data
         assert b"marker-from-subclass" in page

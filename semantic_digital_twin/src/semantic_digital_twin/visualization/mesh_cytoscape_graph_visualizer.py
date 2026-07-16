@@ -8,7 +8,7 @@ import numpy as np
 import trimesh
 from typing_extensions import Any, ClassVar, Dict, List, Optional, Tuple, TYPE_CHECKING
 
-from krrood.rustworkx_utils.cytoscape_graph_visualizer import (
+from rustworkx_utils.visualization.cytoscape_graph_visualizer import (
     CytoscapeElement,
     CytoscapeGraphVisualizer,
 )
@@ -187,11 +187,15 @@ class MeshCytoscapeGraphVisualizer(CytoscapeGraphVisualizer):
                     self._mesh_frame_cache[key] = None
                 else:
                     angle = 2 * np.pi * key[1] / MESH_ANIMATION_FRAME_COUNT
-                    self._mesh_frame_cache[key] = self._render_mesh_thumbnail(mesh, angle)
+                    self._mesh_frame_cache[key] = self._render_mesh_thumbnail(
+                        mesh, angle
+                    )
             return self._mesh_frame_cache[key]
 
     @staticmethod
-    def _render_mesh_thumbnail(mesh: trimesh.Trimesh, rotation_angle: float = 0.0) -> bytes:
+    def _render_mesh_thumbnail(
+        mesh: trimesh.Trimesh, rotation_angle: float = 0.0
+    ) -> bytes:
         """
         Render a mesh to a transparent PNG thumbnail using Matplotlib's non-interactive Agg backend.
 
@@ -226,7 +230,9 @@ class MeshCytoscapeGraphVisualizer(CytoscapeGraphVisualizer):
 
         polygons = np.stack([triangles @ right, triangles @ camera_up], axis=-1)[order]
 
-        shade = np.clip(face_normals[order] @ -_VIEW_DIRECTION, MESH_THUMBNAIL_MINIMUM_SHADE, 1.0)
+        shade = np.clip(
+            face_normals[order] @ -_VIEW_DIRECTION, MESH_THUMBNAIL_MINIMUM_SHADE, 1.0
+        )
         colors = np.tile(np.array(MESH_THUMBNAIL_FACE_COLOR), (len(order), 1))
         colors[:, :3] *= shade[:, None]
 
@@ -242,7 +248,9 @@ class MeshCytoscapeGraphVisualizer(CytoscapeGraphVisualizer):
         axes.set_aspect("equal")
         axes.set_xlim(center[0] - radius, center[0] + radius)
         axes.set_ylim(center[1] - radius, center[1] + radius)
-        axes.add_collection(PolyCollection(polygons, facecolor=colors, edgecolor="none"))
+        axes.add_collection(
+            PolyCollection(polygons, facecolor=colors, edgecolor="none")
+        )
 
         buffer = io.BytesIO()
         figure.savefig(buffer, format="png", transparent=True)

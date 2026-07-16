@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import pytest
 import rustworkx as rx
 
-from krrood.rustworkx_utils.interactive_graph_visualizer import (
+from rustworkx_utils.visualization.interactive_graph_visualizer import (
     GraphLayout,
     InteractiveGraphVisualizer,
 )
@@ -29,9 +29,7 @@ def chain_graph(names: list[str]) -> rx.PyDiGraph:
     return graph
 
 
-def named_visualizer(
-    graph: rx.PyDiGraph, **overrides
-) -> InteractiveGraphVisualizer:
+def named_visualizer(graph: rx.PyDiGraph, **overrides) -> InteractiveGraphVisualizer:
     """A visualizer that labels and describes nodes by their payload name."""
     return InteractiveGraphVisualizer(
         graph=graph,

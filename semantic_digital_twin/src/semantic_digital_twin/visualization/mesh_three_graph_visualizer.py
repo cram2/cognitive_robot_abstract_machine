@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import trimesh
 from typing_extensions import Any, ClassVar, Dict, Optional, Tuple, TYPE_CHECKING
 
-from krrood.rustworkx_utils.three_graph_visualizer import ThreeGraphVisualizer
+from rustworkx_utils.visualization.three_graph_visualizer import ThreeGraphVisualizer
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:

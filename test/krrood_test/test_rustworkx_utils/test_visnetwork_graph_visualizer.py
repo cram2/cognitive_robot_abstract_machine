@@ -7,7 +7,9 @@ import pytest
 import rustworkx as rx
 
 from krrood.rustworkx_utils.graph_visualizer_base import GraphLayout
-from krrood.rustworkx_utils.visnetwork_graph_visualizer import VisNetworkGraphVisualizer
+from rustworkx_utils.visualization.visnetwork_graph_visualizer import (
+    VisNetworkGraphVisualizer,
+)
 
 
 @dataclass
@@ -61,7 +63,9 @@ class TestGraphNodes:
     def test_node_border_colors_come_from_the_border_color_getter(self):
         visualizer = named_visualizer(
             chain_graph(["a", "b"]),
-            border_color_getter=lambda payload: "black" if payload.name == "a" else "white",
+            border_color_getter=lambda payload: (
+                "black" if payload.name == "a" else "white"
+            ),
         )
 
         border_colors = [node["color"]["border"] for node in visualizer.graph_nodes()]
@@ -104,7 +108,9 @@ class TestFlaskEndpoints:
         assert b"vis-network" in response.data.lower()
 
     def test_graph_endpoint_returns_nodes_and_edges(self):
-        client = named_visualizer(chain_graph(["a", "b"])).build_application().test_client()
+        client = (
+            named_visualizer(chain_graph(["a", "b"])).build_application().test_client()
+        )
 
         payload = client.get("/graph").get_json()
 
@@ -112,7 +118,11 @@ class TestFlaskEndpoints:
         assert len(payload["edges"]) == 1
 
     def test_node_endpoint_returns_details(self):
-        client = named_visualizer(chain_graph(["a", "b", "c"])).build_application().test_client()
+        client = (
+            named_visualizer(chain_graph(["a", "b", "c"]))
+            .build_application()
+            .test_client()
+        )
 
         assert client.get("/node/2").get_json()["details"] == ["name: c"]
 

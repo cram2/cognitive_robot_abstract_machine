@@ -8,7 +8,7 @@ import pytest
 import rustworkx as rx
 
 from krrood.rustworkx_utils.graph_visualizer_base import GraphLayout
-from krrood.rustworkx_utils.three_graph_visualizer import ThreeGraphVisualizer
+from rustworkx_utils.visualization.three_graph_visualizer import ThreeGraphVisualizer
 
 
 @dataclass
@@ -77,7 +77,9 @@ class TestGraphNodes:
             def node_extra_data(self, node_index):
                 return {"tag": "extra"}
 
-        visualizer = TaggedVisualizer(graph=chain_graph(["a"]), label_getter=lambda p: p.name)
+        visualizer = TaggedVisualizer(
+            graph=chain_graph(["a"]), label_getter=lambda p: p.name
+        )
 
         assert visualizer.graph_nodes()[0]["tag"] == "extra"
 
@@ -124,7 +126,11 @@ class TestGraphNodes:
         visualizer = named_visualizer(
             chain_graph(["a"]),
             layout=GraphLayout.FIXED,
-            position_getter=lambda payload: (np.float64(1.0), np.float64(2.0), np.float64(3.0)),
+            position_getter=lambda payload: (
+                np.float64(1.0),
+                np.float64(2.0),
+                np.float64(3.0),
+            ),
         )
 
         node = visualizer.graph_nodes()[0]
@@ -156,7 +162,9 @@ class TestFlaskEndpoints:
         assert b"3d-force-graph" in response.data.lower()
 
     def test_graph_endpoint_returns_nodes_and_links(self):
-        client = named_visualizer(chain_graph(["a", "b"])).build_application().test_client()
+        client = (
+            named_visualizer(chain_graph(["a", "b"])).build_application().test_client()
+        )
 
         payload = client.get("/graph").get_json()
 
@@ -164,7 +172,11 @@ class TestFlaskEndpoints:
         assert len(payload["links"]) == 1
 
     def test_node_endpoint_returns_details(self):
-        client = named_visualizer(chain_graph(["a", "b", "c"])).build_application().test_client()
+        client = (
+            named_visualizer(chain_graph(["a", "b", "c"]))
+            .build_application()
+            .test_client()
+        )
 
         assert client.get("/node/2").get_json()["details"] == ["name: c"]
 
@@ -203,7 +215,7 @@ class TestAppearance:
         client = named_visualizer(chain_graph(["a"])).build_application().test_client()
 
         page = client.get("/").data
-        assert b'.node-label {' in page
+        assert b".node-label {" in page
         assert b'element.className = "node-label"' in page
         assert b"updateLabels" in page
         assert b"onBackgroundClick(hidePopup)" in page
@@ -247,7 +259,9 @@ class TestExtensionHooks:
                 def extra():
                     return "extra"
 
-        client = RoutedVisualizer(graph=chain_graph(["a"])).build_application().test_client()
+        client = (
+            RoutedVisualizer(graph=chain_graph(["a"])).build_application().test_client()
+        )
 
         assert client.get("/extra").data == b"extra"
         assert len(calls) == 1
@@ -262,7 +276,11 @@ class TestExtensionHooks:
             def extra_script(self):
                 return "console.log('marker-from-subclass');"
 
-        client = ScriptedVisualizer(graph=chain_graph(["a"])).build_application().test_client()
+        client = (
+            ScriptedVisualizer(graph=chain_graph(["a"]))
+            .build_application()
+            .test_client()
+        )
 
         page = client.get("/").data
         assert b"marker-from-subclass" in page
@@ -277,7 +295,9 @@ class TestExtensionHooks:
             def extra_head(self):
                 return '<script src="https://example.com/marker-lib.js"></script>'
 
-        client = HeadedVisualizer(graph=chain_graph(["a"])).build_application().test_client()
+        client = (
+            HeadedVisualizer(graph=chain_graph(["a"])).build_application().test_client()
+        )
 
         page = client.get("/").data.decode()
         assert "marker-lib.js" in page

@@ -23,13 +23,15 @@ from coraplex.plans.plan_node import (
     ActionNode,
     DesignatorNode,
 )
-from krrood.rustworkx_utils.cytoscape_graph_visualizer import CytoscapeGraphVisualizer
+from rustworkx_utils.visualization.cytoscape_graph_visualizer import (
+    CytoscapeGraphVisualizer,
+)
 from krrood.rustworkx_utils.graph_visualizer_base import (
     GraphLayout,
     GraphVisualizerBackend,
     GraphVisualizerBase,
 )
-from krrood.rustworkx_utils.interactive_graph_visualizer import (
+from rustworkx_utils.visualization.interactive_graph_visualizer import (
     InteractiveGraphVisualizer,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
