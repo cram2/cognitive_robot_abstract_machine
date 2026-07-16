@@ -1,8 +1,8 @@
 """
 Query builders for the Entity Query Language.
 
-This module defines builder classes that collect metadata and produce symbolic expressions for filtering,
- grouping, ordering, and quantifying query results.
+This module defines builder classes that collect metadata and produce symbolic
+expressions for filtering,  grouping, ordering, and quantifying query results.
 """
 
 from __future__ import annotations
@@ -62,8 +62,9 @@ if TYPE_CHECKING:
 @dataclass
 class ExpressionBuilder(ABC):
     """
-    Base class for builder classes of symbolic expressions. This class collects meta-data about expressions to finally
-    build the expression.
+    Base class for builder classes of symbolic expressions.
+
+    This class collects meta-data about expressions to finally build the expression.
     """
 
     query: Query
@@ -176,7 +177,8 @@ class WhereBuilder(FilterBuilder):
         """
         Assert that the where conditions are correct.
 
-        :raises AggregatorInWhereConditionsError: If the where conditions contain any aggregators.
+        :raises AggregatorInWhereConditionsError: If the where conditions contain any
+            aggregators.
         """
         super().assert_correct_conditions()
         aggregators, non_aggregators = (
@@ -197,8 +199,8 @@ class HavingBuilder(FilterBuilder):
 
     grouped_by: GroupedBy = field(kw_only=True, default=None)
     """
-    The GroupedBy expression associated with the having Filter, as the having conditions are applied on
-     the aggregations of grouped results.
+    The GroupedBy expression associated with the having Filter, as the having conditions
+    are applied on the aggregations of grouped results.
     """
 
     def build(self) -> Having:
@@ -386,6 +388,7 @@ class QuantifierBuilder(ExpressionBuilder):
     """
     The kind of quantifier requested.
     """
+
     quantification_constraint: Optional[ResultQuantificationConstraint] = None
     """
     The quantification constraint that must be satisfied, if any.
@@ -403,10 +406,12 @@ class OrderedByBuilder(ExpressionBuilder):
     """
     The variable to order by.
     """
+
     descending: bool = False
     """
     Whether to order the results in descending order.
     """
+
     key: Optional[Callable] = None
     """
     A function to extract the key from the variable value.

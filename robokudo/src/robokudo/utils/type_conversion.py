@@ -1,4 +1,5 @@
-"""Type conversion utilities for Robokudo.
+"""
+Type conversion utilities for Robokudo.
 
 This module provides functions for converting between different type representations:
 
@@ -38,7 +39,8 @@ if TYPE_CHECKING:
 
 
 def ros_cam_info_to_dict(cam_info: CameraInfo) -> Dict:
-    """Convert ROS CameraInfo message to dictionary.
+    """
+    Convert ROS CameraInfo message to dictionary.
 
     :param cam_info: ROS CameraInfo message
     :return: Dictionary representation of camera info
@@ -47,7 +49,8 @@ def ros_cam_info_to_dict(cam_info: CameraInfo) -> Dict:
 
 
 def ros_cam_info_from_dict(dict_cam_info: Dict) -> CameraInfo:
-    """Convert dictionary to ROS CameraInfo message.
+    """
+    Convert dictionary to ROS CameraInfo message.
 
     :param dict_cam_info: Dictionary containing camera info
     :return: ROS CameraInfo message
@@ -96,7 +99,8 @@ def ros_cam_info_from_dict(dict_cam_info: Dict) -> CameraInfo:
 def get_geometry_msgs_pose_from_position_annotation(
     position_annotation: PositionAnnotation,
 ) -> Pose:
-    """Convert position annotation to ROS Pose message.
+    """
+    Convert position annotation to ROS Pose message.
 
     Creates a Pose with position from annotation and identity quaternion.
 
@@ -117,7 +121,8 @@ def get_geometry_msgs_pose_from_position_annotation(
 def get_geometry_msgs_pose_from_pose_annotation(
     pose_annotation: PoseAnnotation,
 ) -> Pose:
-    """Convert pose annotation to ROS Pose message.
+    """
+    Convert pose annotation to ROS Pose message.
 
     :param pose_annotation: Pose annotation to convert
     :return: ROS Pose message
@@ -137,7 +142,8 @@ def get_geometry_msgs_pose_stamped_from_pose_annotation(
     pose_annotation: PoseAnnotation,
     header: Header,
 ) -> PoseStamped:
-    """Convert pose annotation to ROS PoseStamped message.
+    """
+    Convert pose annotation to ROS PoseStamped message.
 
     :param pose_annotation: Pose annotation to convert
     :param header: Header to use for stamped pose
@@ -157,7 +163,8 @@ def get_geometry_msgs_pose_stamped_from_position_annotation(
     position_annotation: PositionAnnotation,
     header: Header,
 ) -> PoseStamped:
-    """Convert position annotation to ROS PoseStamped message.
+    """
+    Convert position annotation to ROS PoseStamped message.
 
     Creates a PoseStamped with position from annotation and identity quaternion.
 
@@ -178,7 +185,8 @@ def get_geometry_msgs_pose_stamped_from_position_annotation(
 def get_transform_matrix_from_pose_annotation(
     pose_annotation: PoseAnnotation,
 ) -> npt.NDArray:
-    """Convert pose annotation to 4x4 transform matrix.
+    """
+    Convert pose annotation to 4x4 transform matrix.
 
     :param pose_annotation: Pose annotation to convert
     :return: 4x4 homogeneous transform matrix
@@ -208,7 +216,8 @@ def get_transform_matrix_from_pose_annotation(
 def get_o3d_obb_from_bounding_box_annotation(
     bounding_box_annotation: BoundingBox3DAnnotation,
 ) -> o3d.geometry.OrientedBoundingBox:
-    """Convert a bounding box annotation to an open3d oriented bounding box.
+    """
+    Convert a bounding box annotation to an open3d oriented bounding box.
 
     :param bounding_box_annotation: Bounding box annotation to convert
     :return: Open3D OrientedBoundingBox representation of bounding box annotation
@@ -229,7 +238,8 @@ def get_o3d_obb_from_bounding_box_annotation(
 def o3d_cam_intrinsics_from_ros_cam_info(
     cam_info: CameraInfo,
 ) -> o3d.camera.PinholeCameraIntrinsic:
-    """Convert ROS CameraInfo to Open3D camera intrinsics.
+    """
+    Convert ROS CameraInfo to Open3D camera intrinsics.
 
     :param cam_info: ROS camera info message
     :return: Open3D camera intrinsics
@@ -247,7 +257,8 @@ def o3d_cam_intrinsics_from_ros_cam_info(
 
 
 def convert_ros_to_cv_image(ros_image: Image) -> npt.NDArray:
-    """Convert ROS image message to OpenCV image.
+    """
+    Convert ROS image message to OpenCV image.
 
     :param ros_image: ROS image message
     :return: OpenCV image array
@@ -259,7 +270,8 @@ def convert_ros_to_cv_image(ros_image: Image) -> npt.NDArray:
 
 
 def convert_cv_to_ros_image(cv_image: npt.NDArray) -> Image:
-    """Convert OpenCV image to ROS image message.
+    """
+    Convert OpenCV image to ROS image message.
 
     :param cv_image: OpenCV image array
     :return: ROS image message

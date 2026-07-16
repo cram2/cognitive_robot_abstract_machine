@@ -51,9 +51,11 @@ if TYPE_CHECKING:
 @symbolic_function
 def stable(obj: Body) -> bool:
     """
-    Checks if an object is stable in the world. Stable meaning that its position will not change after simulating
-    physics in the World. This will be done by simulating the world for 10 seconds and comparing
-    the previous coordinates with the coordinates after the simulation.
+    Checks if an object is stable in the world.
+
+    Stable meaning that its position will not change after simulating physics in the
+    World. This will be done by simulating the world for 10 seconds and comparing the
+    previous coordinates with the coordinates after the simulation.
 
     :param obj: The object which should be checked
     :return: True if the given object is stable in the world False else
@@ -86,7 +88,8 @@ def contact(
 @symbolic_function
 def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
     """
-    Get all bodies and regions that are visible from the given camera using a segmentation mask.
+    Get all bodies and regions that are visible from the given camera using a
+    segmentation mask.
 
     :param camera: The camera for which the visible objects should be returned
     :return: A list of bodies/regions that are visible from the camera
@@ -121,16 +124,16 @@ def visible(camera: Camera, obj: KinematicStructureEntity) -> bool:
 @symbolic_function
 def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     """
-    Determines the bodies that occlude a given body in the scene as seen from a specified camera.
+    Determines the bodies that occlude a given body in the scene as seen from a
+    specified camera.
 
-    This function uses a ray-tracing approach to check occlusion. Every body that hides anything from the target body
-    is an occluding body.
+    This function uses a ray-tracing approach to check occlusion. Every body that hides
+    anything from the target body is an occluding body.
 
     :param camera: The camera for which the occluding bodies should be returned
     :param body: The body for which the occluding bodies should be returned
     :return: A list of bodies that are occluding the given body.
     """
-
     # get camera pose
     camera_pose = np.eye(4, dtype=float)
     camera_pose[:3, 3] = camera.root.global_transform.to_np()[:3, 3]
@@ -187,12 +190,14 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
 def reachable(pose: HomogeneousTransformationMatrix, root: Body, tip: Body) -> bool:
     """
     Checks if a end_effector can reach a given position.
+
     This is determined by inverse kinematics.
 
     :param pose: The pose to reach
     :param root: The root of the kinematic chain.
     :param tip: The threshold between the end effector and the position.
-    :return: True if the end effector is closer than the threshold to the target position, False in every other case
+    :return: True if the end effector is closer than the threshold to the target
+        position, False in every other case
     """
     try:
         root._world.compute_inverse_kinematics(
@@ -210,21 +215,20 @@ def compute_euclidean_planar_distance(
     body1: Body, body2: Body, ignore_dimension: Vector3
 ):
     """
-    Computes the Euclidean distance between two bodies in 2D space, ignoring a specific dimension
-    specified by the user. The ignored dimension is set to zero before the distance calculation. This
-    function can be used to handle scenarios where computations are restricted to certain spatial
-    planes.
+    Computes the Euclidean distance between two bodies in 2D space, ignoring a specific
+    dimension specified by the user. The ignored dimension is set to zero before the
+    distance calculation. This function can be used to handle scenarios where
+    computations are restricted to certain spatial planes.
 
-    :param body1: The first body to compute the distance from. It uses the global pose of the body
-                      to extract the position.
-    :param body2: The second body to compute the distance to. It also utilizes the global pose of
-                      the body to extract the position.
-    :param ignore_dimension: Specifies which dimension (x, y, or z) should be ignored in the
-                                     computation. The ignored dimension is set to zero for both
-                                     positions prior to calculating the distance.
-
-    :return: The Euclidean distance between the two bodies in the 2D plane after ignoring the
-               specified dimension.
+    :param body1: The first body to compute the distance from. It uses the global pose
+        of the body to extract the position.
+    :param body2: The second body to compute the distance to. It also utilizes the
+        global pose of the body to extract the position.
+    :param ignore_dimension: Specifies which dimension (x, y, or z) should be ignored in
+        the computation. The ignored dimension is set to zero for both positions prior
+        to calculating the distance.
+    :return: The Euclidean distance between the two bodies in the 2D plane after
+        ignoring the specified dimension.
     """
     body1_position = body1.global_pose.to_position()
     body2_position = body2.global_pose.to_position()
@@ -251,8 +255,9 @@ def is_supported_by(
 
     :param supported_body: Object that is supported
     :param supporting_body: Object that potentially supports the first object
-    :param max_intersection_height: Maximum height of the intersection between the two objects.
-    If the intersection is higher than this value, the check returns False due to unhandled clipping.
+    :param max_intersection_height: Maximum height of the intersection between the two
+        objects. If the intersection is higher than this value, the check returns False
+        due to unhandled clipping.
     :return: True if the second object is supported by the first object, False otherwise
     """
     if Below(
@@ -289,17 +294,17 @@ def is_supporting(supporting_body: Body, max_intersection_height: float = 0.1) -
     """
     Determine if any body in the world is supported by a given supporting body.
 
-    This function iterates over all bodies in the provided world and checks
-    if any of them are supported by the specified supporting body. The
-    support determination is performed using the helper function `is_supported_by`.
-    Bodies for which the computation fails are skipped.
+    This function iterates over all bodies in the provided world and checks if any of
+    them are supported by the specified supporting body. The support determination is
+    performed using the helper function `is_supported_by`. Bodies for which the
+    computation fails are skipped.
 
-    :param supporting_body: The body that is being checked to determine if it is supporting other bodies in the world.
-    :param max_intersection_height: The maximum allowable intersection
-    height for a body to be considered supported. Defaults to 0.1.
-
-    :return: True if any body in the world is supported by the supporting_body,
-    False otherwise.
+    :param supporting_body: The body that is being checked to determine if it is
+        supporting other bodies in the world.
+    :param max_intersection_height: The maximum allowable intersection height for a body
+        to be considered supported. Defaults to 0.1.
+    :return: True if any body in the world is supported by the supporting_body, False
+        otherwise.
     """
     for candidate in supporting_body._world.bodies_with_collision:
         if candidate is supporting_body:
@@ -313,8 +318,8 @@ def is_supporting(supporting_body: Body, max_intersection_height: float = 0.1) -
 @symbolic_function
 def is_body_in_region(body: Body, region: Region) -> float:
     """
-    Check if the body is in the region by computing the fraction of the body's
-    collision volume that lies inside the region's area volume.
+    Check if the body is in the region by computing the fraction of the body's collision
+    volume that lies inside the region's area volume.
 
     Implementation detail: both the body and region meshes are defined in their
     respective local frames; we must transform them into a common (world) frame
@@ -347,7 +352,9 @@ def is_body_in_region(body: Body, region: Region) -> float:
 class KinematicStructureEntitySpatialRelation(Symbol, ABC):
     """
     Base class for spatial relations between two KinematicStructureEntity instances.
-    Implementations typically compare the centers of mass computed from the KSE's collision geometry.
+
+    Implementations typically compare the centers of mass computed from the KSE's
+    collision geometry.
     """
 
     body: KinematicStructureEntity
@@ -395,14 +402,15 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
 
     def _signed_distance_along_direction(self, index: int) -> float:
         """
-        Calculate the spatial relation between self.point and self.other with respect to a given
-        reference point (self.point_of_semantic_annotation) and a specified axis index. This function computes the
-        signed distance along a specified direction derived from the reference point
-        to compare the positions.
+        Calculate the spatial relation between self.point and self.other with respect to
+        a given reference point (self.point_of_semantic_annotation) and a specified axis
+        index. This function computes the signed distance along a specified direction
+        derived from the reference point to compare the positions.
 
-        :param index: The index of the axis in the transformation matrix along which
-            the spatial relation is computed.
-        :return: The signed distance between the first and the second points along the given direction.
+        :param index: The index of the axis in the transformation matrix along which the
+            spatial relation is computed.
+        :return: The signed distance between the first and the second points along the
+            given direction.
         """
         ref_np = self.point_of_view.to_np()
         front_world = ref_np[:3, index]
@@ -422,7 +430,8 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
 @dataclass
 class LeftOf(ViewDependentSpatialRelation):
     """
-    The "left" direction is taken as the -Y axis of the given point of semantic_annotation.
+    The "left" direction is taken as the -Y axis of the given point of
+    semantic_annotation.
     """
 
     def __call__(self) -> bool:
@@ -433,7 +442,8 @@ class LeftOf(ViewDependentSpatialRelation):
 @dataclass
 class RightOf(ViewDependentSpatialRelation):
     """
-    The "right" direction is taken as the +Y axis of the given point of semantic_annotation.
+    The "right" direction is taken as the +Y axis of the given point of
+    semantic_annotation.
     """
 
     def __call__(self) -> bool:
@@ -444,7 +454,8 @@ class RightOf(ViewDependentSpatialRelation):
 @dataclass
 class Above(ViewDependentSpatialRelation):
     """
-    The "above" direction is taken as the +Z axis of the given point of semantic_annotation.
+    The "above" direction is taken as the +Z axis of the given point of
+    semantic_annotation.
     """
 
     def __call__(self) -> bool:
@@ -455,7 +466,8 @@ class Above(ViewDependentSpatialRelation):
 @dataclass
 class Below(ViewDependentSpatialRelation):
     """
-    The "below" direction is taken as the -Z axis of the given point of semantic_annotation.
+    The "below" direction is taken as the -Z axis of the given point of
+    semantic_annotation.
     """
 
     def __call__(self) -> bool:
@@ -466,7 +478,8 @@ class Below(ViewDependentSpatialRelation):
 @dataclass
 class Behind(ViewDependentSpatialRelation):
     """
-    The "behind" direction is defined as the -X axis of the given point of semantic annotation.
+    The "behind" direction is defined as the -X axis of the given point of semantic
+    annotation.
     """
 
     def __call__(self) -> bool:
@@ -477,7 +490,8 @@ class Behind(ViewDependentSpatialRelation):
 @dataclass
 class InFrontOf(ViewDependentSpatialRelation):
     """
-    The "in front of" direction is defined as the +X axis of the given point of semantic annotation.
+    The "in front of" direction is defined as the +X axis of the given point of semantic
+    annotation.
     """
 
     def __call__(self) -> bool:
@@ -577,10 +591,11 @@ def is_place_occupied(
     Checks if the given region (as a box at its pose) intersects with any collidable
     object in the world, excluding `allowed_bodies`.
 
-    The region is converted to a box mesh at the region pose and tested against
-    each body's world-aligned collision mesh using trimesh's collision manager.
+    The region is converted to a box mesh at the region pose and tested against each
+    body's world-aligned collision mesh using trimesh's collision manager.
 
-    :param box: The region (axis-aligned box in its own local frame with pose in `region.origin`).
+    :param box: The region (axis-aligned box in its own local frame with pose in
+        `region.origin`).
     :param world: The world providing bodies with enabled collisions.
     :param allowed_bodies: Bodies to ignore during the check.
     :return: True if any collision is found, False otherwise.

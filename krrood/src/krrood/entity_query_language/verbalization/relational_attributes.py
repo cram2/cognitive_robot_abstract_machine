@@ -1,12 +1,13 @@
 """
-Recognition of *relational* attribute names — a past participle plus a preposition (``assigned_to``,
-``owned_by``, ``cross_referenced_with``) — shared by every surface that renders a relation.
+Recognition of *relational* attribute names — a past participle plus a preposition
+(``assigned_to``, ``owned_by``, ``cross_referenced_with``) — shared by every surface
+that renders a relation.
 
-A relational hop reads as a relative clause (*"the Robot to which a Mission is assigned"*) or, in
-absence, as a passive verb (*"has not been assigned to any Robot"*), rather than the genitive
-*"the assigned_to of …"*. Keeping the recognizer here — above the lexicon, below the grammar — lets
-both navigation (``chain``) and absence (``conditions``) depend on it without depending on each
-other.
+A relational hop reads as a relative clause (*"the Robot to which a Mission is
+assigned"*) or, in absence, as a passive verb (*"has not been assigned to any Robot"*),
+rather than the genitive *"the assigned_to of …"*. Keeping the recognizer here — above
+the lexicon, below the grammar — lets both navigation (``chain``) and absence
+(``conditions``) depend on it without depending on each other.
 """
 
 from __future__ import annotations
@@ -28,15 +29,21 @@ _RELATIONAL_PREPOSITIONS = {preposition.text for preposition in Prepositions} - 
 
 @dataclass(frozen=True)
 class RelationVerb:
-    """A relational field's verb, split into its parts — so callers can either strand the
-    preposition (*"assigned to"*, used by absence) or pied-pipe it (*"to which … is assigned"*,
-    used by relational navigation)."""
+    """
+    A relational field's verb, split into its parts — so callers can either strand the
+    preposition (*"assigned to"*, used by absence) or pied-pipe it (*"to which … is
+    assigned"*, used by relational navigation).
+    """
 
     participle: str
-    """The past-participle verb word(s) (*"assigned"*, *"cross referenced"*)."""
+    """
+    The past-participle verb word(s) (*"assigned"*, *"cross referenced"*).
+    """
 
     preposition: str
-    """The trailing preposition (*"to"*, *"by"*, *"with"*)."""
+    """
+    The trailing preposition (*"to"*, *"by"*, *"with"*).
+    """
 
     @property
     def phrase(self) -> str:

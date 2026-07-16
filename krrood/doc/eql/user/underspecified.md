@@ -14,8 +14,9 @@ kernelspec:
 # Underspecified Queries and Generative Backends
 
 A match built with {py:func}`~krrood.entity_query_language.factories.an` is **selective by
-default**: `an(Type, domain=...)` selects from the given domain, and a domain-less `an(Type)`
-selects from the SymbolGraph (for `Symbol` types). To instead **construct new instances** from an
+default**: `an(Type)(...).from_(domain)` selects from the given domain, and a domain-less
+`an(Type)` selects from the SymbolGraph (for `Symbol` types). To instead **construct new
+instances** from an
 underspecified match, evaluate it with an explicit *generative backend* — either
 {py:class}`~krrood.entity_query_language.backends.ProbabilisticBackend` (samples a probabilistic
 model) or {py:class}`~krrood.entity_query_language.backends.EntityQueryLanguageGenerativeBackend`
@@ -37,9 +38,9 @@ Call `an(MyClass)` with a *type* (and no `domain`) — then immediately invoke t
 keyword arguments that constrain each field:
 
 ```python
-from krrood.entity_query_language.factories import an
+from krrood.entity_query_language.factories import an, a
 
-query = an(KRROODPosition)(x=..., y=..., z=...)
+query = a(KRROODPosition)(x=..., y=..., z=...)
 ```
 
 The returned object is a {py:class}`~krrood.entity_query_language.query.match.Match` and supports
@@ -69,7 +70,7 @@ as ordinary structural equality conditions over existing objects.
 ### Ellipsis (`...`) — free variable
 
 ```python
-query = an(KRROODPosition)(x=..., y=..., z=...)
+query = a(KRROODPosition)(x=..., y=..., z=...)
 ```
 
 An `Ellipsis` marks the field as *unconstrained*.  With the `ProbabilisticBackend`, the backend
@@ -86,7 +87,7 @@ instead of using `...`.
 ### Concrete literal — conditioning assignment
 
 ```python
-query = an(KRROODPosition)(x=0.5, y=..., z=...)
+query = a(KRROODPosition)(x=0.5, y=..., z=...)
 ```
 
 A concrete value becomes a **conditioning assignment**: the model is updated to
@@ -105,7 +106,7 @@ after the model has already been conditioned.
 ```python
 from krrood.entity_query_language.factories import variable
 
-query = an(KRROODPosition)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
+query = a(KRROODPosition)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
 ```
 
 A KRROOD {py:func}`~krrood.entity_query_language.factories.variable` passes the field's domain
@@ -139,8 +140,8 @@ condition is translated into a truncation event that carves a region out of the 
 joint distribution.
 
 ```python
-query = an(KRROODPose)(
-    position=an(KRROODPosition)(x=..., y=..., z=...),
+query = a(KRROODPose)(
+    position=a(KRROODPosition)(x=..., y=..., z=...),
     orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),  # ← kwargs: condition the model
 )
 query.where(query.variable.position.x > 0.5)   # ← .where(): truncate the conditioned distribution
@@ -178,7 +179,7 @@ class Position:
     z: float
 
 # All fields free — samples from the prior
-query = an(Position)(x=..., y=..., z=...)
+query = a(Position)(x=..., y=..., z=...)
 
 backend = ProbabilisticBackend(number_of_samples=5)
 positions = list(query.evaluate(backend=backend))
@@ -190,7 +191,7 @@ for p in positions:
 
 ```python
 # Fix x=0.5; sample y and z from P(y, z | x=0.5)
-query = an(Position)(x=0.5, y=..., z=...)
+query = a(Position)(x=0.5, y=..., z=...)
 positions = list(query.evaluate(backend=ProbabilisticBackend(number_of_samples=5)))
 assert all(p.x == 0.5 for p in positions)
 ```
@@ -199,7 +200,7 @@ assert all(p.x == 0.5 for p in positions)
 
 ```python
 # z is sampled only from {1, 2, 3}
-query = an(Position)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
+query = a(Position)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
 positions = list(query.evaluate(backend=ProbabilisticBackend(number_of_samples=5)))
 assert all(p.z in (1, 2, 3) for p in positions)
 ```
@@ -209,8 +210,8 @@ assert all(p.z in (1, 2, 3) for p in positions)
 ```python
 # Sample only poses where position.x > 0.5.
 # The orientation is fixed by conditioning (kwargs); the x constraint is a range filter (.where).
-query = an(Pose)(
-    position=an(Position)(x=..., y=..., z=...),
+query = a(Pose)(
+    position=a(Position)(x=..., y=..., z=...),
     orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
 )
 query.where(query.variable.position.x > 0.5)
@@ -225,10 +226,10 @@ Complex action types can be described by nesting multiple `an(...)` calls.
 Each level of nesting introduces its own field constraints independently:
 
 ```python
-query = an(NestedAction)(
+query = a(NestedAction)(
     obj=apple,                                         # condition: exactly this apple instance
-    pose=an(Pose)(
-        position=an(Position)(
+    pose=a(Pose)(
+        position=a(Position)(
             x=0.02,                                    # condition: x is exactly 0.02
             y=...,                                     # free
             z=...,                                     # free
@@ -279,11 +280,11 @@ with open("nested_action_model.json", "r") as f:
 registry = DictRegistry({NestedAction: learned_model})
 
 # Build the underspecified query as usual
-query = an(NestedAction)(
+query = a(NestedAction)(
     obj=Body(name="mug"),
-    pose=an(KRROODPose)(
-        position=an(KRROODPosition)(x=..., y=..., z=...),
-        orientation=an(KRROODOrientation)(x=..., y=..., z=..., w=...),
+    pose=a(KRROODPose)(
+        position=a(KRROODPosition)(x=..., y=..., z=...),
+        orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
     ),
 )
 

@@ -5,7 +5,11 @@ from dataclasses import dataclass, field
 
 from typing_extensions import (
     Optional,
-    Any, TYPE_CHECKING, ClassVar, List, Type,
+    Any,
+    TYPE_CHECKING,
+    ClassVar,
+    List,
+    Type,
 )
 
 from krrood.entity_query_language.backends import (
@@ -36,47 +40,53 @@ except ImportError as e:
 @dataclass
 class Context(PlanEntity):
     """
-    A dataclass for storing the context of a plan
+    A dataclass for storing the context of a plan.
     """
 
     world: World
     """
-    The world in which the plan is executed
+    The world in which the plan is executed.
     """
 
     robot: AbstractRobot
     """
-    The semantic robot annotation which should execute the plan
+    The semantic robot annotation which should execute the plan.
     """
 
     ros_node: Optional[rclpy.node.Node] = field(default=None)
     """
-    A ROS node that should be used for communication in this plan
+    A ROS node that should be used for communication in this plan.
     """
 
     evaluate_conditions: bool = field(default=True)
     """
-    Should pre -and postconditions of actions be evaluated in this plan
+    Should pre -and postconditions of actions be evaluated in this plan.
     """
 
     query_backend: QueryBackend = field(
         default_factory=EntityQueryLanguageGenerativeBackend
     )
     """
-    The backend used to answer queries about underspecified statements. Defaults to the
-    deterministic generative backend, since underspecified actions are constructed (generated).
+    The backend used to answer queries about underspecified statements.
+
+    Defaults to the deterministic generative backend, since underspecified actions are
+    constructed (generated).
     """
 
-    alternative_motion_mappings: List[Type[AlternativeMotion]] = field(default_factory=list)
+    alternative_motion_mappings: List[Type[AlternativeMotion]] = field(
+        default_factory=list
+    )
     """
-    The alternative motion mappings that are used to resolve motions in this plan. A motion is
-    replaced by an alternative motion from this list if the alternative matches the motion type,
-    the robot and the current execution type. If empty, motions use their default motion chart.
+    The alternative motion mappings that are used to resolve motions in this plan.
+
+    A motion is replaced by an alternative motion from this list if the alternative
+    matches the motion type, the robot and the current execution type. If empty, motions
+    use their default motion chart.
     """
 
     _debug: bool = field(default=False)
     """
-    Should debug information be printed or visualized
+    Should debug information be printed or visualized.
     """
 
     @property
@@ -93,18 +103,24 @@ class Context(PlanEntity):
         )
 
     @classmethod
-    def from_world(cls, world: World, plan: Plan = None, query_backend: Optional[QueryBackend] = None,
-                   alternative_motion_mappings: Optional[List[Type[AlternativeMotion]]] = None):
+    def from_world(
+        cls,
+        world: World,
+        plan: Plan = None,
+        query_backend: Optional[QueryBackend] = None,
+        alternative_motion_mappings: Optional[List[Type[AlternativeMotion]]] = None,
+    ):
         """
-        Create a context from a world by getting the first robot in the world. There is no super plan in this case.
+        Create a context from a world by getting the first robot in the world.
 
+        There is no super plan in this case.
         :param world: The world for which to create the context
         :param plan: The plan that manages this context
         :param query_backend: The query backend to use for answering queries
-        :param alternative_motion_mappings: The alternative motion mappings used to resolve motions
+        :param alternative_motion_mappings: The alternative motion mappings used to
+            resolve motions
         :return: A context with the first robot in the world and no super plan
         """
-
         if query_backend is None:
             query_backend = EntityQueryLanguageGenerativeBackend()
 
@@ -112,7 +128,7 @@ class Context(PlanEntity):
             world=world,
             robot=world.get_semantic_annotations_by_type(AbstractRobot)[0],
             query_backend=query_backend,
-            alternative_motion_mappings=alternative_motion_mappings or []
+            alternative_motion_mappings=alternative_motion_mappings or [],
         )
         if plan:
             plan.add_plan_entity(result)

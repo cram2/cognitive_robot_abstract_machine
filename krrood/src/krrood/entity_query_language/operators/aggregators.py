@@ -1,7 +1,8 @@
 """
 This module defines aggregator functions for the Entity Query Language.
 
-It contains classes for counting, summing, averaging, and finding extreme values in query results.
+It contains classes for counting, summing, averaging, and finding
+extreme values in query results.
 """
 
 from __future__ import annotations
@@ -40,6 +41,7 @@ from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVari
 if TYPE_CHECKING:
     from krrood.entity_query_language.query.query import Entity
     from krrood.entity_query_language.query.operations import GroupedBy
+    from krrood.entity_query_language.backends import QueryBackend
 
 
 IntOrFloat = int | float
@@ -51,15 +53,18 @@ A type representing a number, which can be either an integer or a float.
 @dataclass(eq=False, repr=False)
 class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
     """
-    Base class for aggregators. Aggregators are unary selectable expressions that take a single expression
-     as a child.
-    They aggregate the results of the child expression and evaluate to either a single value or a set of aggregated
-     values for each group when `grouped_by()` is used.
+    Base class for aggregators.
+
+    Aggregators are unary selectable expressions that take a single
+    expression as a child. They aggregate the results of the child
+    expression and evaluate to either a single value or a set of
+    aggregated  values for each group when `grouped_by()` is used.
     """
 
     _distinct_: bool = field(kw_only=True, default=False)
     """
-    Whether to consider only distinct values from the child results when applying the aggregation function.
+    Whether to consider only distinct values from the child results when
+    applying the aggregation function.
     """
 
     def __post_init__(self):
@@ -68,12 +73,13 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         super().__post_init__()
         self._var_ = self
 
-    def evaluate(self, backend=None) -> Iterator[T]:
+    def evaluate(self, backend: Optional[QueryBackend] = None) -> Iterator[T]:
         """
-        Wrap the aggregator in an entity and evaluate it (i.e., make a query with this aggregator as the selected
-        expression and evaluate it.).
+        Wrap the aggregator in an entity and evaluate it (i.e., make a query
+        with this aggregator as the selected expression and evaluate it.).
 
-        :param backend: The query backend to evaluate with; forwarded to the wrapping entity.
+        :param backend: The query backend to evaluate with; forwarded to
+            the wrapping entity.
         :return: An iterator over the aggregator results.
         """
         from krrood.entity_query_language.query.query import Entity
@@ -199,10 +205,12 @@ class CountAll(Count[T]):
 @dataclass(eq=False, repr=False)
 class CountRange(Count[T]):
     """
-    Count concrete matches and return an ``int`` when there is no uncertainty, or a closed
-    ``SimpleInterval`` when ``...`` (Ellipsis) values exist in the variable's domain.
+    Count concrete matches and return an ``int`` when there is no uncertainty,
+    or a closed ``SimpleInterval`` when ``...`` (Ellipsis) values exist in the
+    variable's domain.
 
-    If the domain contains no Ellipsis values a plain ``int`` is returned.
+    If the domain contains no Ellipsis values a plain ``int`` is
+    returned.
     """
 
     _original_child_: Optional[Selectable[T]] = field(init=False, default=None)
@@ -216,10 +224,12 @@ class CountRange(Count[T]):
     ) -> Iterator[Bindings]:
         """
         Count concrete matches and yield an ``int`` when the count is certain,
-        or a closed ``SimpleInterval`` when ellipsis values introduce uncertainty.
+        or a closed ``SimpleInterval`` when ellipsis values introduce
+        uncertainty.
 
         :param child_result: The result from the child expression.
-        :return: Bindings containing the count or the uncertainty interval.
+        :return: Bindings containing the count or the uncertainty
+            interval.
         """
         values = child_result.value
         ellipsis_in_result = sum(1 for value in values if value is ...)
@@ -245,32 +255,41 @@ class CountRange(Count[T]):
 
     def _count_ellipsis_in_domain_(self) -> int:
         """
-        Count the number of ellipsis values in the original child expression's domain.
+        Count the number of ellipsis values in the original child expression's
+        domain.
 
-        :return: The number of ellipsis values in the domain, or zero if there is no child.
+        :return: The number of ellipsis values in the domain, or zero if
+            there is no child.
         """
         if self._original_child_ is None:
             return 0
         return sum(
-            1 for result in self._original_child_._evaluate_(None) if result.value is ...
+            1
+            for result in self._original_child_._evaluate_(None)
+            if result.value is ...
         )
 
 
 @dataclass(eq=False, repr=False)
 class EntityAggregator(Aggregator[T], ABC):
     """
-    Entity aggregators are aggregators where the child (the entity to be aggregated) is a selectable expression. Also,
-     If given, make use of the key function to extract the value to be aggregated from the child result.
+    Entity aggregators are aggregators where the child (the entity to be
+    aggregated) is a selectable expression.
+
+    Also, If given, make use of the key function to extract the value to
+    be aggregated from the child result.
     """
 
     _child_: Selectable[T]
     """
     The child entity to be aggregated.
     """
+
     _default_value_: Optional[T] = field(kw_only=True, default=None)
     """
     The default value to be returned if the child results are empty.
     """
+
     _key_function_: Optional[Callable[[Any], Any]] = field(kw_only=True, default=None)
     """
     An optional function that extracts the value to be used in the aggregation.
@@ -342,8 +361,10 @@ class Average(Sum):
 @dataclass(eq=False, repr=False)
 class Extreme(EntityAggregator[T], ABC):
     """
-    Find and return the extreme value among the child results. If given, make use of the key function to extract
-    the value to be compared.
+    Find and return the extreme value among the child results.
+
+    If given, make use of the key function to extract the value to be
+    compared.
     """
 
     def _apply_aggregation_function_and_get_bindings_(
@@ -358,8 +379,10 @@ class Extreme(EntityAggregator[T], ABC):
 @dataclass(eq=False, repr=False)
 class Max(Extreme[T]):
     """
-    Find and return the maximum value among the child results. If given, make use of the key function to extract
-     the value to be compared.
+    Find and return the maximum value among the child results.
+
+    If given, make use of the key function to extract the value to be
+    compared.
     """
 
     def aggregation_function(self, values: Iterable) -> Iterator[T]:
@@ -369,8 +392,10 @@ class Max(Extreme[T]):
 @dataclass(eq=False, repr=False)
 class Min(Extreme[T]):
     """
-    Find and return the minimum value among the child results. If given, make use of the key function to extract
-     the value to be compared.
+    Find and return the minimum value among the child results.
+
+    If given, make use of the key function to extract the value to be
+    compared.
     """
 
     def aggregation_function(self, values: Iterable) -> Iterator[T]:
@@ -380,8 +405,10 @@ class Min(Extreme[T]):
 @dataclass(eq=False, repr=False)
 class MultiMode(Extreme[T]):
     """
-    Find and return all the equivalent mode values among the child results. Similar to `statistics.multimode`, see
-     its documentation for more details: https://docs.python.org/3/library/statistics.html#statistics.multimode.
+    Find and return all the equivalent mode values among the child results.
+
+    Similar to `statistics.multimode`, see
+    its documentation for more details: https://docs.python.org/3/library/statistics.html#statistics.multimode.
     """
 
     def aggregation_function(self, values: Iterable) -> Iterator[T]:
@@ -393,8 +420,10 @@ class MultiMode(Extreme[T]):
 @dataclass(eq=False, repr=False)
 class Mode(Extreme[T]):
     """
-    Find and return the mode value among the child results. Same as {py:class}`MultiMode`, but only returns the
-    first mode value found.
+    Find and return the mode value among the child results.
+
+    Same as {py:class}`MultiMode`, but only returns the first mode value
+    found.
     """
 
     def aggregation_function(self, values: Iterable) -> Iterator[T]:

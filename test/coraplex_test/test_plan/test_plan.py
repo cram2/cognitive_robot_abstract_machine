@@ -26,6 +26,7 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkAr
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import (
     variable_from,
+    a,
     an,
     variable,
 )
@@ -48,7 +49,9 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix,
 
 @pytest.fixture(scope="session")
 def urdf_context():
-    """Build a fresh URDF-based world and context for plan graph unit tests."""
+    """
+    Build a fresh URDF-based world and context for plan graph unit tests.
+    """
     Plan.current_plan = None
     world = URDFParser.from_file(
         os.path.join(
@@ -108,7 +111,6 @@ def test_add_edge_with_layer_index():
     """
     Test that the layer index is correctly set when adding an edge.
     """
-
     root = PlanNode()
     plan = Plan()
     plan.add_node(root)
@@ -127,8 +129,8 @@ def test_add_edge_with_layer_index():
 
 def test_neighbours_at_edges_return_none():
     """
-    The outermost siblings have no neighbour on the outer side, which must be
-    reported as ``None`` rather than raising ``IndexError``.
+    The outermost siblings have no neighbour on the outer side, which must be reported
+    as ``None`` rather than raising ``IndexError``.
     """
     root = PlanNode()
     plan = Plan()
@@ -146,8 +148,8 @@ def test_neighbours_at_edges_return_none():
 
 def test_simplify_keeps_designators_with_different_parameters():
     """
-    ``DesignatorNode.simplify`` may only merge a child whose designator has the
-    same type *and* the same parameters; differing parameters must be preserved.
+    ``DesignatorNode.simplify`` may only merge a child whose designator has the same
+    type *and* the same parameters; differing parameters must be preserved.
     """
     plan = Plan()
     parent = ActionNode(designator=MoveTorsoAction(TorsoState.HIGH))
@@ -181,8 +183,9 @@ def test_plan_all_parents():
 
 def test_path_after_node_removal():
     """
-    Removing a node leaves a hole in the rustworkx index space, so a remaining
-    node can end up with an index that is no longer smaller than the node count.
+    Removing a node leaves a hole in the rustworkx index space, so a remaining node can
+    end up with an index that is no longer smaller than the node count.
+
     ``path``/``depth`` must keep working in that case (they previously relied on
     ``rx.all_shortest_paths``, which panics on non-contiguous indices).
     """
@@ -438,10 +441,11 @@ def _torso_position(world):
 
 def test_sequence_runs_all_motions_without_interrupt(immutable_model_world):
     """
-    Control for the interrupt tests: without an interrupt every motion in the
-    sequence is executed, so the torso ends at the target of the *last* motion.
-    The robot starts in the LOW configuration, so a final HIGH motion proves the
-    second motion actually ran.
+    Control for the interrupt tests: without an interrupt every motion in the sequence
+    is executed, so the torso ends at the target of the *last* motion.
+
+    The robot starts in the LOW configuration, so a final HIGH motion proves the second
+    motion actually ran.
     """
     world, robot_view, context = immutable_model_world
 
@@ -490,13 +494,13 @@ def test_interrupt_finishes_active_motion_and_skips_the_rest(immutable_model_wor
 
 def test_pause_holds_active_motion_until_resumed(immutable_model_world):
     """
-    Pausing a node holds the motion it originates from: while paused the active
-    motion does not progress, and once resumed it runs to completion.
+    Pausing a node holds the motion it originates from: while paused the active motion
+    does not progress, and once resumed it runs to completion.
 
-    A leading delay gives the controller time to pause the motion's subtree
-    *before* the motion starts ticking; the controller then waits well past the
-    point at which the motion would otherwise have finished and checks that the
-    torso has not moved, before resuming it.
+    A leading delay gives the controller time to pause the motion's subtree *before* the
+    motion starts ticking; the controller then waits well past the point at which the
+    motion would otherwise have finished and checks that the torso has not moved, before
+    resuming it.
     """
     world, robot_view, context = immutable_model_world
     start_position = _torso_position(world)
@@ -530,19 +534,20 @@ def test_pause_holds_active_motion_until_resumed(immutable_model_world):
 
 def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     """
-    Parameterize a SequentialPlan using krrood parameterizer, create a fully-factorized distribution and
-    assert the correctness of sampled values after conditioning and truncation.
+    Parameterize a SequentialPlan using krrood parameterizer, create a fully- factorized
+    distribution and assert the correctness of sampled values after conditioning and
+    truncation.
     """
     world, robot_view, context = apartment_world_pr2_copy_with_context
     context.evaluate_conditions = False
 
-    target_location = an(PoseMapping.from_point_mapping_quaternion_mapping)(
-        position=an(Point3Mapping)(x=..., y=..., z=0.0, reference_frame=None),
+    target_location = a(PoseMapping.from_point_mapping_quaternion_mapping)(
+        position=a(Point3Mapping)(x=..., y=..., z=0.0, reference_frame=None),
         orientation=QuaternionMapping(x=0, y=0, z=0, w=1, reference_frame=None),
         reference_frame=variable_from([robot_view.root]),
     )
 
-    navigate_action = an(NavigateAction)(
+    navigate_action = a(NavigateAction)(
         target_location=target_location,
     )
     # navigate_action.resolve()
@@ -569,10 +574,10 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
 
     milk_variable = variable_from([milk])
 
-    pick_up_description = an(PickUpAction)(
+    pick_up_description = a(PickUpAction)(
         object_designator=milk_variable,
         arm=...,
-        grasp_description=an(GraspDescription)(
+        grasp_description=a(GraspDescription)(
             approach_direction=...,
             vertical_alignment=...,
             rotate_gripper=...,
@@ -609,10 +614,11 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
 
 def test_conditions_reference_surviving_action_node_after_merge(immutable_model_world):
     """
-    Expanding an action mounts a fresh action node whose conditions reference it,
-    and simplification merges that node into the equivalent node already in the
-    plan. After the merge every condition must reference the surviving node, not
-    the discarded one, otherwise the dangling node leaks into serialization.
+    Expanding an action mounts a fresh action node whose conditions reference it, and
+    simplification merges that node into the equivalent node already in the plan.
+
+    After the merge every condition must reference the surviving node, not the discarded
+    one, otherwise the dangling node leaks into serialization.
     """
     world, robot_view, context = immutable_model_world
 

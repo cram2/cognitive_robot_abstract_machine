@@ -102,7 +102,9 @@ def toggle_off(state_var: str):
 
 
 def _check_type(value, expected_type):
-    """Check if value matches expected_type, handling Union, List, etc."""
+    """
+    Check if value matches expected_type, handling Union, List, etc.
+    """
     # Handle None case
     if value is None:
         return expected_type is type(None) or (
@@ -169,7 +171,9 @@ def _check_type(value, expected_type):
 
 
 def validate_types(cls):
-    """Class decorator that adds type validation to dataclasses."""
+    """
+    Class decorator that adds type validation to dataclasses.
+    """
     original_post_init = getattr(cls, "__post_init__", None)
 
     def __post_init__(self):
@@ -202,5 +206,7 @@ def validate_types(cls):
 
 
 def validated_dataclass(cls):
-    """Combines @dataclass and @validate_types for convenience."""
+    """
+    Combines @dataclass and @validate_types for convenience.
+    """
     return validate_types(dataclass(cls))

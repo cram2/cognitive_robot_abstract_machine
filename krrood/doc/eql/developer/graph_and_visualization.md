@@ -74,10 +74,10 @@ class ExampleRobot:
 robots = [ExampleRobot("R2D2", 100), ExampleRobot("C3PO", 0)]
 
 # Define a complex nested query
-query = an(ExampleRobot, domain=robots)(name="R2D2", battery=100)
+query = an(ExampleRobot)(name="R2D2", battery=100).from_(robots)
 
-# Visualize
-query_graph = QueryGraph(query)
+# Visualize (QueryGraph takes the lowered selection expression, not the Match builder)
+query_graph = QueryGraph(query.expression)
 
 # Note: This requires rustworkx and matplotlib
 # query_graph.visualize()

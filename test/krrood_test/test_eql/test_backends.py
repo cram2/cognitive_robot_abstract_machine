@@ -13,9 +13,13 @@ from krrood.entity_query_language.backends import (
     ProbabilisticBackend,
 )
 from krrood.entity_query_language.core.variable import Literal
+from krrood.entity_query_language.exceptions import (
+    SelectiveBackendCannotResolveEllipsisMatch,
+)
 from krrood.entity_query_language.factories import (
     variable,
     entity,
+    a,
     an,
     variable_from,
 )
@@ -30,6 +34,7 @@ from random_events.variable import Symbolic
 from ..dataset.example_classes import (
     KRROODPose,
     KRROODPosition,
+    KRROODPositions,
     KRROODOrientation,
     Atom,
     Element,
@@ -44,11 +49,11 @@ def test_nested_action():
 
     apple = Apple("apple", 7)
 
-    prob_q = an(NestedAction)(
+    prob_q = a(NestedAction)(
         obj=variable(Apple, domain=[apple]),
-        pose=an(KRROODPose)(
-            position=an(KRROODPosition)(x=0.02, y=..., z=...),
-            orientation=an(KRROODOrientation)(
+        pose=a(KRROODPose)(
+            position=a(KRROODPosition)(x=0.02, y=..., z=...),
+            orientation=a(KRROODOrientation)(
                 x=..., y=..., z=..., w=variable(float, domain=[0.0, 1.0])
             ),
         ),
@@ -117,7 +122,7 @@ def test_selective_query_multiple_backends(session, database):
 
 
 def test_probabilistic_backend_with_symbolic_expression():
-    prob_q = an(KRROODPosition)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
+    prob_q = a(KRROODPosition)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
     parameters = UnderspecifiedParameters(prob_q)
     assert parameters.variables["KRROODPosition.z"] == Symbolic(
         name="KRROODPosition.z", domain=Set.from_iterable([1, 2, 3])
@@ -125,7 +130,7 @@ def test_probabilistic_backend_with_symbolic_expression():
 
 
 def test_underspecified_parameters_with_partly_symbolic_expression():
-    prob_q = an(KRROODPosition)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
+    prob_q = a(KRROODPosition)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
     parameters = UnderspecifiedParameters(prob_q)
     variables = parameters.variables
     assert len(variables) == 3
@@ -156,9 +161,9 @@ def test_underspecified_parameters_with_full_symbolic_expression():
 
 
 def test_underspecified_parameters_with_only_underspecified():
-    prob_q = an(KRROODPose)(
-        position=an(KRROODPosition)(x=..., y=..., z=...),
-        orientation=an(KRROODOrientation)(x=..., y=..., z=..., w=...),
+    prob_q = a(KRROODPose)(
+        position=a(KRROODPosition)(x=..., y=..., z=...),
+        orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
     )
     parameters = UnderspecifiedParameters(prob_q)
     variables = parameters.variables
@@ -167,7 +172,7 @@ def test_underspecified_parameters_with_only_underspecified():
 
 
 def test_underspecified_parameters_with_only_literals():
-    prob_q = an(KRROODPose)(
+    prob_q = a(KRROODPose)(
         position=KRROODPosition(1, 2, 3),
         orientation=KRROODOrientation(0, 0, 0, 1),
     )
@@ -193,8 +198,8 @@ def test_enum_value_as_literal():
 
 
 def test_probabilistic_query_backend():
-    prob_q = an(KRROODPose)(
-        position=an(KRROODPosition)(x=..., y=..., z=...),
+    prob_q = a(KRROODPose)(
+        position=a(KRROODPosition)(x=..., y=..., z=...),
         orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     )
     prob_q.where(prob_q.variable.position.x > 0.5)
@@ -222,3 +227,33 @@ def test_generative_eql_backend():
     for result in results:
         assert isinstance(result.element, Element)
         assert result.type > result.charge
+
+
+def test_selective_backend_rejects_match_with_ellipsis_attribute():
+    q = a(KRROODPosition)(x=..., y=1.0, z=2.0)
+    with pytest.raises(SelectiveBackendCannotResolveEllipsisMatch):
+        list(q.evaluate(backend=EntityQueryLanguageBackend()))
+
+
+def test_selective_backend_rejects_match_with_nested_ellipsis_attribute():
+    q = a(KRROODPose)(
+        position=a(KRROODPosition)(x=..., y=1.0, z=2.0),
+        orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
+    )
+    with pytest.raises(SelectiveBackendCannotResolveEllipsisMatch):
+        list(q.evaluate(backend=EntityQueryLanguageBackend()))
+
+
+def test_selective_backend_rejects_match_with_ellipsis_element_in_plain_list():
+    q = a(KRROODPositions)(
+        positions=[KRROODPosition(1, 2, 3)],
+        some_strings=["a", ..., "c"],
+    )
+    with pytest.raises(SelectiveBackendCannotResolveEllipsisMatch):
+        list(q.evaluate(backend=EntityQueryLanguageBackend()))
+
+
+def test_selective_backend_accepts_match_without_ellipsis_attribute():
+    apple = Apple("apple", 7)
+    q = an(Apple)(name="apple", size=7).from_([apple])
+    assert list(q.evaluate(backend=EntityQueryLanguageBackend())) == [apple]

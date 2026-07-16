@@ -1,10 +1,10 @@
 """
-Tests for the REAL/SIMULATED branch of ``GiskardExecutable.motion_state_chart``
-(see ``coraplex/src/coraplex/plans/executables.py``).
+Tests for the REAL/SIMULATED branch of ``GiskardExecutable.motion_state_chart`` (see
+``coraplex/src/coraplex/plans/executables.py``).
 
 On the real robot, tasks are wrapped in a single ``Sequence`` + ``EndMotion``; in
-simulation, tasks are added individually and get pause/interrupt monitors and
-pre-/post-condition monitors wired in.
+simulation, tasks are added individually and get pause/interrupt monitors and pre-/post-
+condition monitors wired in.
 """
 
 import pytest
@@ -27,8 +27,10 @@ from coraplex.robot_plans.actions.core.pick_up import ReachAction
 
 @pytest.fixture
 def reach_action_executable(immutable_model_world):
-    """A real, 2-motion ``GiskardExecutable`` with pre-/post-conditions, built the
-    same way ``test_merge_motions`` in ``test_graph_parsing.py`` does."""
+    """
+    A real, 2-motion ``GiskardExecutable`` with pre-/post-conditions, built the same way
+    ``test_merge_motions`` in ``test_graph_parsing.py`` does.
+    """
     world, view, context = immutable_model_world
     world.get_body_by_name("milk.stl").parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(2, 1.5, 0.7, 0, 0, 0)

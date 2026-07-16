@@ -14,7 +14,8 @@ from probabilistic_model.probabilistic_model import ProbabilisticModel
 @dataclass
 class ModelRegistry(ABC):
     """
-    A registry that selects probabilistic models for given underspecified parameters of match-queries.
+    A registry that selects probabilistic models for given underspecified parameters of
+    match-queries.
     """
 
     @abstractmethod
@@ -53,8 +54,9 @@ class DictRegistry(ModelRegistry):
 @dataclass
 class RelationalCircuitRegistry(ModelRegistry):
     """
-    A registry that grounds a RelationalProbabilisticCircuit for the queried statement and
-    aligns its variable names to the UnderspecifiedParameters convention before returning.
+    A registry that grounds a RelationalProbabilisticCircuit for the queried statement
+    and aligns its variable names to the UnderspecifiedParameters convention before
+    returning.
     """
 
     relational_probabilistic_circuit: RelationalProbabilisticCircuit

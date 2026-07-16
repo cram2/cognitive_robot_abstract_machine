@@ -39,10 +39,12 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class DiscourseView(Protocol):
-    """The narrow slice of discourse information the coreference pass consumes.
+    """
+    The narrow slice of discourse information the coreference pass consumes.
 
-    The pass depends on this, not on ``QueryPlan`` or the planners (ISP/DIP): it only needs to know
-    whether a fragment's source node opens a discourse scope, and who its focus referent is.
+    The pass depends on this, not on ``QueryPlan`` or the planners (ISP/DIP): it only
+    needs to know whether a fragment's source node opens a discourse scope, and who its
+    focus referent is.
     """
 
     def is_scope(self, source: Optional[FoldNode]) -> bool: ...
@@ -53,13 +55,14 @@ class DiscourseView(Protocol):
 
 
 class DiscourseScopeRule(SpecificityRule):
-    """A construct that opens a discourse scope, and who its focus referent is.
+    """
+    A construct that opens a discourse scope, and who its focus referent is.
 
-    Both a query (its WHERE subject is in focus, so *"its salary"*) and a quantified conditional
-    (its bound variable is in focus, so *"its battery"* / *"their batteries"*) introduce a referent
-    that a pronoun inside their body resolves to. Each is one alternative here, selected by
-    construct, so a new scope-opening construct is a new subclass — the projection loop never grows a
-    branch (open/closed).
+    Both a query (its WHERE subject is in focus, so *"its salary"*) and a quantified
+    conditional (its bound variable is in focus, so *"its battery"* / *"their
+    batteries"*) introduce a referent that a pronoun inside their body resolves to. Each
+    is one alternative here, selected by construct, so a new scope-opening construct is
+    a new subclass — the projection loop never grows a branch (open/closed).
     """
 
     construct: ClassVar[type]
@@ -161,24 +164,30 @@ class QuantifierScope(DiscourseScopeRule):
 @dataclass(frozen=True)
 class DiscourseModel:
     """
-    The focus referent of every discourse scope, projected once via the :class:`DiscourseScopeRule`
-    family.
+    The focus referent of every discourse scope, projected once via the
+    :class:`DiscourseScopeRule` family.
 
-    A scope's focus — the referent a possessive pronoun resolves to (*"its"*/*"their"*) — is a
-    *what to say* fact each scope-opening construct fixes: the aggregation source population or WHERE
-    subject for a query (and nothing for a set-of), the bound variable for a quantifier. Every such
-    decision lives here, derived from the read model, so neither the rules nor the coreference pass
-    re-derive it.
+    A scope's focus — the referent a possessive pronoun resolves to (*"its"*/*"their"*)
+    — is a *what to say* fact each scope-opening construct fixes: the aggregation source
+    population or WHERE subject for a query (and nothing for a set-of), the bound
+    variable for a quantifier. Every such decision lives here, derived from the read
+    model, so neither the rules nor the coreference pass re-derive it.
     """
 
     _focus_by_scope: Dict[uuid.UUID, Optional[uuid.UUID]]
-    """The focus referent id of each scope, keyed by the scope node's id (``None`` when the scope
-    has no single subject, e.g. a set-of)."""
+    """
+    The focus referent id of each scope, keyed by the scope node's id (``None`` when the
+    scope has no single subject, e.g. a set-of).
+    """
 
     _selected_quantities: FrozenSet[uuid.UUID] = frozenset()
-    """Node ids of the quantities a query *selects* — an aggregation's measured attribute (the
-    ``battery`` behind ``average(m.assigned_to.battery)``). A later mention of one (a WHERE on that
-    same attribute) reduces to a bare *"the battery"*."""
+    """
+    Node ids of the quantities a query *selects* — an aggregation's measured attribute
+    (the ``battery`` behind ``average(m.assigned_to.battery)``).
+
+    A later mention of one (a WHERE on that same attribute) reduces to a bare *"the
+    battery"*.
+    """
 
     @classmethod
     def from_expression(
@@ -257,4 +266,6 @@ class DiscourseModel:
 
 
 EMPTY_DISCOURSE = DiscourseModel({})
-"""A discourse model with no scopes — for local sub-tree realisation (opaque templates)."""
+"""
+A discourse model with no scopes — for local sub-tree realisation (opaque templates).
+"""

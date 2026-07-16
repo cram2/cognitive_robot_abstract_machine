@@ -9,13 +9,18 @@ from robokudo.identifier import BBIdentifier
 
 class QueryHandler(object):
     """
-    QueryHandler provides an interface to interact with the ROS Action-based query interface.
-    This wrapper eases the use of the various Blackboard variables devoted to the communication with the query interface.
+    QueryHandler provides an interface to interact with the ROS Action-based query
+    interface.
+
+    This wrapper eases the use of the various Blackboard variables devoted to the
+    communication with the query interface.
     """
 
     @staticmethod
     def init_feedback_queue() -> None:
-        """Initializes the feedback queue on the Blackboard."""
+        """
+        Initializes the feedback queue on the Blackboard.
+        """
         blackboard = Blackboard()
         try:
             feedback_queue = blackboard.get(BBIdentifier.QUERY_FEEDBACK)
@@ -27,7 +32,9 @@ class QueryHandler(object):
 
     @staticmethod
     def get_feedback_queue() -> Queue:
-        """Retrieves and returns the feedback queue from the Blackboard."""
+        """
+        Retrieves and returns the feedback queue from the Blackboard.
+        """
         QueryHandler.init_feedback_queue()
 
         blackboard = Blackboard()
@@ -35,7 +42,8 @@ class QueryHandler(object):
 
     @staticmethod
     def send_feedback(feedback: Query.Feedback) -> None:
-        """Add a feedback part of the Query msg to the feedback queue, ready to be sent.
+        """
+        Add a feedback part of the Query msg to the feedback queue, ready to be sent.
 
         :param feedback: The feedback message to send.
         """
@@ -44,7 +52,8 @@ class QueryHandler(object):
 
     @staticmethod
     def send_feedback_str(feedback_str: str) -> None:
-        """Add a simple string to the feedback to the feedback queue, ready to be sent.
+        """
+        Add a simple string to the feedback to the feedback queue, ready to be sent.
 
         :param feedback_str: The string to send as feedback.
         """
@@ -54,7 +63,8 @@ class QueryHandler(object):
 
     @staticmethod
     def send_answer(result: Query.Result) -> None:
-        """Raise a standard RoboKudo Query Result as a query answer to the blackboard.
+        """
+        Raise a standard RoboKudo Query Result as a query answer to the blackboard.
 
         :param result: The result to raise to the blackboard.
         """
@@ -68,7 +78,8 @@ class QueryHandler(object):
 
     @staticmethod
     def send_arbitrary_answer(result: Any) -> None:
-        """Raise any data as a query answer to the blackboard.
+        """
+        Raise any data as a query answer to the blackboard.
 
         :param result: The data to raise to the blackboard.
         """
@@ -77,7 +88,8 @@ class QueryHandler(object):
 
     @staticmethod
     def preempt_requested() -> bool:
-        """Checks whether a preempt request is pending on the blackboard.
+        """
+        Checks whether a preempt request is pending on the blackboard.
 
         :return: True if a preempt request is pending, False otherwise.
         """
@@ -90,6 +102,8 @@ class QueryHandler(object):
 
     @staticmethod
     def acknowledge_preempt_request() -> None:
-        """Acknowledges the preempt request on the blackboard."""
+        """
+        Acknowledges the preempt request on the blackboard.
+        """
         blackboard = Blackboard()
         blackboard.set(BBIdentifier.QUERY_PREEMPT_ACK, True)

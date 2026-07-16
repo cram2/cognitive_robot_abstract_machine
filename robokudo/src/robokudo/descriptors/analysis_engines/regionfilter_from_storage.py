@@ -1,4 +1,5 @@
-"""Analysis engine for region-based filtering using world descriptors.
+"""
+Analysis engine for region-based filtering using world descriptors.
 
 This module provides an analysis engine that demonstrates how to filter point
 cloud data based on predefined regions from world descriptors. It processes stored
@@ -32,7 +33,8 @@ from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for region-based point cloud filtering.
+    """
+    Analysis engine for region-based point cloud filtering.
 
     This class implements a pipeline that filters point cloud data based on
     predefined regions from world descriptors. It processes stored camera data
@@ -53,14 +55,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "regionfilter_from_storage"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline for region-based point cloud filtering.
+        """
+        Create a pipeline for region-based point cloud filtering.
 
         This method constructs a processing pipeline that applies region-based
         filtering to point cloud data. The regions are defined in world descriptors

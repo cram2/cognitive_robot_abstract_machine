@@ -27,7 +27,7 @@ class Synchronization(Sequence):
 
     def _number_of_synchronisation_behaviors(self) -> int:
         """
-        this is only for testing
+        This is only for testing.
         """
         result = 0
         for child in self.children:

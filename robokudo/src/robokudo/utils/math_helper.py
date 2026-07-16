@@ -1,10 +1,10 @@
-"""3D geometry math utilities for RoboKudo.
+"""
+3D geometry math utilities for RoboKudo.
 
 This module provides utilities for 3D geometric calculations.
 
-:module: math_helper
-:synopsis: 3D geometric calculations and utilities
-:moduleauthor: RoboKudo Team
+:module: math_helper :synopsis: 3D geometric calculations and utilities :moduleauthor:
+RoboKudo Team
 """
 
 from robokudo.utils.transform import get_rotation_matrix_from_q
@@ -122,7 +122,8 @@ def compute_line_intersection_point(
     sphere_center: Tuple[float, float, float],
     sphere_radius: float,
 ) -> Optional[List[float]]:
-    """Compute the intersection points between a sphere and a line segment.
+    """
+    Compute the intersection points between a sphere and a line segment.
 
     :param point1: First point of the line (x, y, z)
     :param point2: Second point of the line (x, y, z)
@@ -233,12 +234,13 @@ def compute_direction_vector_angle(
 ) -> float:
     """
     Computes the angle of a direction vector in degrees relative to the floor.
+
     The angle is computed as the arctangent of the y and x components of the vector.
     :param direction_vector: A 3D vector (numpy array) representing the direction.
-    :param floor: A 3D vector (numpy array) representing the floor normal. Default is (0, 1, 0).
+    :param floor: A 3D vector (numpy array) representing the floor normal. Default is
+        (0, 1, 0).
     :return: Angle in degrees.
     """
-
     if np.allclose(direction_vector, 0):
         raise ValueError("Direction vector is zero.")
     normalized_floor = floor / np.linalg.norm(floor)

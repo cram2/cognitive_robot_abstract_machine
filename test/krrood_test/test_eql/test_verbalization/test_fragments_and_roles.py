@@ -1,10 +1,10 @@
 """
 VerbalizationFragment-structure tests.
 
-These tests verify that verbalization produces properly typed VerbalizationFragment trees —
-specifically that semantic roles (VARIABLE, ATTRIBUTE, KEYWORD, …) are preserved
-inside constraint clauses, binding phrases, grouped-by, ordered-by, and set_of
-output.  They complement the plain-text regression tests in test_verbalization.py.
+These tests verify that verbalization produces properly typed VerbalizationFragment
+trees — specifically that semantic roles (VARIABLE, ATTRIBUTE, KEYWORD, …) are preserved
+inside constraint clauses, binding phrases, grouped-by, ordered-by, and set_of output.
+They complement the plain-text regression tests in test_verbalization.py.
 """
 
 from __future__ import annotations
@@ -50,7 +50,9 @@ from ...dataset.department_and_employee import Department, Employee
 def _collect_role_fragments(
     frag: VerbalizationFragment, role: SemanticRole
 ) -> list[RoleFragment]:
-    """Recursively collect all RoleFragments with the given role."""
+    """
+    Recursively collect all RoleFragments with the given role.
+    """
     found: list[RoleFragment] = []
     _walk(frag, role, found)
     return found
@@ -72,7 +74,9 @@ def _walk(
 
 
 def _all_texts(frag: VerbalizationFragment) -> list[str]:
-    """Collect all leaf text values from a fragment tree."""
+    """
+    Collect all leaf text values from a fragment tree.
+    """
     texts: list[str] = []
     _walk_texts(frag, texts)
     return texts
@@ -95,11 +99,13 @@ def _walk_texts(frag: VerbalizationFragment, accumulator: list[str]) -> None:
 
 
 def test_constraint_fragment_preserves_variable_role(doors_and_drawers_world):
-    """'such that' clause must contain VARIABLE-role fragments, not plain WordFragments."""
+    """
+    'such that' clause must contain VARIABLE-role fragments, not plain WordFragments.
+    """
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = an(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer = inference(Drawer)(container=fc.expression.parent)
 
     frag = EQLVerbalizer().build(drawer)
@@ -116,11 +122,13 @@ def test_constraint_fragment_preserves_variable_role(doors_and_drawers_world):
 
 
 def test_constraint_fragment_preserves_attribute_role(doors_and_drawers_world):
-    """Attribute names in the 'such that' clause must be ATTRIBUTE-role fragments."""
+    """
+    Attribute names in the 'such that' clause must be ATTRIBUTE-role fragments.
+    """
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = an(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer = inference(Drawer)(
         container=fc.expression.parent, handle=fc.expression.child
     )
@@ -138,11 +146,13 @@ def test_constraint_fragment_preserves_attribute_role(doors_and_drawers_world):
 
 
 def test_binding_override_replaces_entity_ref_in_constraint(doors_and_drawers_world):
-    """The 'such that' clause must use field-reference paths, not raw entity names."""
+    """
+    The 'such that' clause must use field-reference paths, not raw entity names.
+    """
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = an(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer = inference(Drawer)(
         container=fc.expression.parent, handle=fc.expression.child
     )
@@ -162,7 +172,9 @@ def test_binding_override_replaces_entity_ref_in_constraint(doors_and_drawers_wo
 
 
 def test_where_keyword_has_keyword_role():
-    """'where' in an InstantiatedVariable binding must carry KEYWORD semantic role."""
+    """
+    'where' in an InstantiatedVariable binding must carry KEYWORD semantic role.
+    """
 
     @dataclass
     class Box:
@@ -183,11 +195,13 @@ def test_where_keyword_has_keyword_role():
 
 
 def test_such_that_keyword_has_keyword_role(doors_and_drawers_world):
-    """'such that' in the deferred-constraint clause must carry KEYWORD role."""
+    """
+    'such that' in the deferred-constraint clause must carry KEYWORD role.
+    """
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = an(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer = inference(Drawer)(container=fc.expression.parent)
 
     frag = EQLVerbalizer().build(drawer)
@@ -203,7 +217,9 @@ def test_such_that_keyword_has_keyword_role(doors_and_drawers_world):
 
 
 def test_grouped_by_vars_are_role_fragments(departments_and_employees_fixture):
-    """Variables inside a grouped-by clause must be VARIABLE-role fragments."""
+    """
+    Variables inside a grouped-by clause must be VARIABLE-role fragments.
+    """
     _, _ = departments_and_employees_fixture
     emp = variable(Employee, domain=None)
     avg_salary = eql.average(emp.salary)
@@ -226,7 +242,10 @@ def test_grouped_by_vars_are_role_fragments(departments_and_employees_fixture):
 
 
 def test_ordered_by_direction_fragment(handles_and_containers_world):
-    """The direction word in ordered-by must come from the ordering-range vocabulary (not a bare string)."""
+    """
+    The direction word in ordered-by must come from the ordering-range vocabulary (not a
+    bare string).
+    """
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
     drawer = flat_variable(cabinet.drawers)
@@ -267,7 +286,9 @@ def _collect_word_leaves(frag: VerbalizationFragment, accumulator: list[str]) ->
 
 
 def test_set_of_vars_are_role_fragments(departments_and_employees_fixture):
-    """Selected variables in a set_of query must be VARIABLE-role fragments."""
+    """
+    Selected variables in a set_of query must be VARIABLE-role fragments.
+    """
     _, _ = departments_and_employees_fixture
     emp = variable(Employee, domain=None)
     dept = emp.department
@@ -287,12 +308,14 @@ def test_set_of_vars_are_role_fragments(departments_and_employees_fixture):
 
 
 def test_where_clause_with_instantiated_var_preserves_roles(doors_and_drawers_world):
-    """WHERE clause on an entity query whose selected var is InstantiatedVariable
-    must preserve semantic roles (not be collapsed to a plain WordFragment)."""
+    """
+    WHERE clause on an entity query whose selected var is InstantiatedVariable must
+    preserve semantic roles (not be collapsed to a plain WordFragment).
+    """
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = an(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer_var = inference(Drawer)(
         container=fc.expression.parent, handle=fc.expression.child
     )
@@ -315,7 +338,9 @@ def test_where_clause_with_instantiated_var_preserves_roles(doors_and_drawers_wo
 
 
 def test_double_nested_constraint_field_refs(doors_and_drawers_world):
-    """Wrapper(drawer=Drawer(...)) — the such-that clause uses field-ref paths."""
+    """
+    Wrapper(drawer=Drawer(...)) — the such-that clause uses field-ref paths.
+    """
 
     @dataclass
     class Wrapper:
@@ -324,7 +349,7 @@ def test_double_nested_constraint_field_refs(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = an(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer_var = inference(Drawer)(
         container=fc.expression.parent, handle=fc.expression.child
     )

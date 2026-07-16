@@ -42,8 +42,11 @@ T = TypeVar("T")
 @dataclass
 class Plan:
     """
-    Represents a plan structure, typically a tree, which can be changed at any point in time. Performing the plan will
-    traverse the plan structure in depth first order and perform each PlanNode
+    Represents a plan structure, typically a tree, which can be changed at any point in
+    time.
+
+    Performing the plan will traverse the plan structure in depth first order and
+    perform each PlanNode
     """
 
     context: Optional[Context] = None
@@ -75,6 +78,7 @@ class Plan:
     def validate(self):
         """
         Check that the plan as constructed so far is valid.
+
         A plan is valid if it is a tree.
         """
         if not (
@@ -112,7 +116,7 @@ class Plan:
     @property
     def all_nodes(self) -> List[PlanNode]:
         """
-        All nodes that are part of this plan
+        All nodes that are part of this plan.
         """
         return self.plan_graph.nodes()
 
@@ -128,8 +132,9 @@ class Plan:
 
     def merge_nodes(self, node1: PlanNode, node2: PlanNode):
         """
-        Merges two nodes into one. The node2 will be removed and all its children will be added to node1.
+        Merges two nodes into one.
 
+        The node2 will be removed and all its children will be added to node1.
         :param node1: Node which will remain in the plan
         :param node2: Node which will be removed from the plan
         """
@@ -139,8 +144,9 @@ class Plan:
 
     def remove_node(self, node_for_removal: PlanNode):
         """
-        Removes a node from the plan. If the node is not in the plan, it will be ignored.
+        Removes a node from the plan.
 
+        If the node is not in the plan, it will be ignored.
         :param node_for_removal: Node to be removed
         """
         if node_for_removal.plan is self:
@@ -152,8 +158,9 @@ class Plan:
 
     def add_node(self, node: PlanNode):
         """
-        Adds a node to the plan. The node will not be connected to any other node of the plan.
+        Adds a node to the plan.
 
+        The node will not be connected to any other node of the plan.
         :param node: Node to be added
         """
         if node.plan is self:
@@ -167,16 +174,17 @@ class Plan:
         self, source: PlanNode, target: PlanNode, target_index: Optional[int] = None
     ):
         """
-        Adds an edge to the plan. Nodes that are not in the plan will be added to the plan.
+        Adds an edge to the plan.
 
+        Nodes that are not in the plan will be added to the plan.
         :param source: Origin node of the edge
         :param target: Target node of the edge
         :param target_index: The index of the target node in the source nodes children.
-        If not target_index is given, the target node will be appended to the source's children.
-        If the target_index is given, the target node will be inserted at the given index in the source's children and
-        the later children are shifted to the right.
+            If not target_index is given, the target node will be appended to the
+            source's children. If the target_index is given, the target node will be
+            inserted at the given index in the source's children and the later children
+            are shifted to the right.
         """
-
         if source.plan is not self:
             self.add_node(source)
         if target.plan is not self:
@@ -207,8 +215,9 @@ class Plan:
         edges: Iterable[Tuple[PlanNode, PlanNode]],
     ):
         """
-        Adds edges to the plan from an iterable of tuples. If one or both nodes are not in the plan, they will be added to the plan.
+        Adds edges to the plan from an iterable of tuples.
 
+        If one or both nodes are not in the plan, they will be added to the plan.
         :param edges: Iterable of tuples of nodes to be added
         """
         for u, v in edges:
@@ -228,7 +237,8 @@ class Plan:
         Inserts a node below the given node.
 
         :param insert_node: The node to be inserted
-        :param insert_below: A node of the plan below which the given node should be added
+        :param insert_below: A node of the plan below which the given node should be
+            added
         """
         self.add_edge(insert_below, insert_node)
 
@@ -259,13 +269,12 @@ class Plan:
         :return: A list of lists where each list represents a layer
         """
         layers = rx.layers(self.plan_graph, [self.root.index], index_output=False)
-        return [
-            sorted(layer, key=lambda node: node.layer_index) for layer in layers
-        ]
+        return [sorted(layer, key=lambda node: node.layer_index) for layer in layers]
 
     def _migrate_nodes_from_plan(self, other: Plan) -> PlanNode:
         """
         Steal all nodes from another plan and add them to this plan.
+
         After this the other plan will be empty.
 
         :param other: The plan to steal nodes from
@@ -289,6 +298,7 @@ class Plan:
     def simplify(self):
         """
         Simplifies the plan by merging language nodes that are semantically equivalent.
+
         This modifies the plan in-place.
         """
         for _, successors in reversed(
@@ -301,7 +311,7 @@ class Plan:
 
     def plot(self, layout: str = "bfs"):
         """
-        Plots the plan in an interactive browser window
+        Plots the plan in an interactive browser window.
 
         :param layout: The layout of the plot
         """
@@ -319,6 +329,7 @@ class Plan:
     def prepare_for_replay(self):
         """
         Prepare the worlds context for a replay.
+
         Sets the worlds context to the initial world and update its robot.
         """
         self.context.world = deepcopy(self.initial_world)

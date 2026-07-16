@@ -12,7 +12,8 @@ from krrood.utils import run_black_on_file, module_and_class_name, is_dynamic_cl
 @dataclass
 class DataclassRenderer:
     """
-    Rendering definition to write dataclasses that have been created in memory into a python module.
+    Rendering definition to write dataclasses that have been created in memory into a
+    python module.
 
     .. note:: Fields are not rendered yet.
     """
@@ -25,6 +26,7 @@ class DataclassRenderer:
     imports: set[str] = field(default_factory=set, init=False)
     """
     The imports that need to be added to the module.
+
     They are calculated from the dataclass.
     """
 
@@ -48,7 +50,8 @@ class DataclassRenderer:
 @dataclass
 class ModuleRenderer:
     """
-    Rendering definition to write dataclasses that have been created in memory into a python module.
+    Rendering definition to write dataclasses that have been created in memory into a
+    python module.
     """
 
     classes: List[DataclassRenderer] = field(default_factory=list)
@@ -58,7 +61,7 @@ class ModuleRenderer:
 
     imports: Set[str] = field(default_factory=set)
     """
-    Imports collected from all classes
+    Imports collected from all classes.
     """
 
     def _update_imports(self):

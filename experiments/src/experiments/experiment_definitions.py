@@ -17,8 +17,8 @@ from krrood.class_diagrams.attribute_introspector import (
 @dataclass
 class MeanAndStandardDeviation:
     """
-    Class that represents a mean and standard deviation for tables that will be directly rendered as
-    mean +- standard deviation.
+    Class that represents a mean and standard deviation for tables that will be directly
+    rendered as mean +- standard deviation.
 
     Use this in experiment results when you want to render a mean +- standard deviation.
     """
@@ -49,12 +49,14 @@ class MeanAndStandardDeviation:
 class ExperimentResult:
     """
     Class for results from experiments.
-    Use this when you want to create a table of results (measurements) from experiments for scientific articles.
+
+    Use this when you want to create a table of results (measurements) from experiments
+    for scientific articles.
 
     This class is like a single row in a table of experiments.
 
-    Assumptions made here are that there are only built in like fields or one-to-one relationships with other
-    ExperimentResult classes.
+    Assumptions made here are that there are only built in like fields or one-to-one
+    relationships with other ExperimentResult classes.
     """
 
     @classmethod
@@ -84,9 +86,11 @@ class ExperimentResult:
 @dataclass
 class ExperimentsTable:
     """
-    A collection of experiments ready to be presented as a table in a scientific article.
+    A collection of experiments ready to be presented as a table in a scientific
+    article.
 
-    This class assumes that all rows in the table have the same type and are a subclass of ExperimentResult.
+    This class assumes that all rows in the table have the same type and are a subclass
+    of ExperimentResult.
     """
 
     experiments: list[ExperimentResult]
@@ -121,11 +125,15 @@ class TypstRenderer:
     """
 
     def render_row(self, row: ExperimentResult) -> str:
-        """Renders the cells of a single row in Typst format."""
+        """
+        Renders the cells of a single row in Typst format.
+        """
         return ", ".join([f"[{v}]" for v in row.get_column_values()])
 
     def render_table(self) -> str:
-        """Renders the entire ExperimentsTable into a valid Typst #table markup string."""
+        """
+        Renders the entire ExperimentsTable into a valid Typst #table markup string.
+        """
         row_class = self.experiments_table.row_class
 
         # Handle empty table edge-case gracefully

@@ -46,7 +46,8 @@ class TracyVelocityInterface(RobotInterfaceConfig):
 
 
 class WorldWithTracyConfig(WorldWithFixedRobot):
-    """Minimal Tracy world config analogous to WorldWithPR2Config.
+    """
+    Minimal Tracy world config analogous to WorldWithPR2Config.
 
     - Fixed-base robot (no drive joint)
     - Accepts URDF via argument; if not provided, reads from ROS parameter server

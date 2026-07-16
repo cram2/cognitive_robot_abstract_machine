@@ -1,6 +1,8 @@
 """
-Grammar rules for attribute / index / call chains — one guarded :class:`PhraseRule` per surface
-form, dispatched by ``select``. The guards are mutually exclusive, so at most one fires and no
+Grammar rules for attribute / index / call chains — one guarded :class:`PhraseRule` per
+surface form, dispatched by ``select``.
+
+The guards are mutually exclusive, so at most one fires and no
 ordering between them is needed: the precedence *"the bare-plural noun phrase wins over the
 predicative"* lives in :meth:`~krrood.entity_query_language.verbalization.grammar.chain.planner.ChainPlan.renders_as_plural_attribute`,
 which both the plural and boolean rules consult. The guarded forms outrank the unguarded possessive
@@ -26,7 +28,8 @@ from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule im
 
 
 class PluralChainAttributeRule(PhraseRule):
-    """Plural single-attribute chain → bare plural *"attributes of Roots"*.
+    """
+    Plural single-attribute chain → bare plural *"attributes of Roots"*.
 
     >>> verbalize_expression(sum(variable(Robot, []).battery))
     'the sum of batteries of Robots'
@@ -61,8 +64,9 @@ class PluralChainAttributeRule(PhraseRule):
 
 
 class BooleanAttributeChainRule(PhraseRule):
-    """Boolean-terminal chain → predicative *"<navigation> is <attribute>"* (unless the bare-plural
-    attribute form takes precedence).
+    """
+    Boolean-terminal chain → predicative *"<navigation> is <attribute>"* (unless the
+    bare-plural attribute form takes precedence).
 
     >>> verbalize_expression(variable(Task, []).completed)
     'a Task is completed'
@@ -99,7 +103,8 @@ class BooleanAttributeChainRule(PhraseRule):
 
 
 class PossessiveChainRule(PhraseRule):
-    """Any attribute / index / call chain → possessive path *"the attribute of the Root"*
+    """
+    Any attribute / index / call chain → possessive path *"the attribute of the Root"*
     (the unguarded fallback form).
 
     >>> verbalize_expression(variable(Task, []).name)

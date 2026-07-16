@@ -1,8 +1,8 @@
 """
 Predicates and symbolic function utilities for the Entity Query Language.
 
-This module defines predicate classes for boolean checks and a decorator to build symbolic expressions
-from regular Python functions when variables are present.
+This module defines predicate classes for boolean checks and a decorator to build
+symbolic expressions from regular Python functions when variables are present.
 """
 
 from __future__ import annotations
@@ -42,6 +42,7 @@ from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
 )
 from krrood.entity_query_language.core.base_expressions import Selectable
+from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.entity_query_language.utils import camel_case_to_words
 from krrood.patterns.code_parsing_utils import (
     get_accessed_attribute_name_in_return_statement_of_property,
@@ -53,11 +54,12 @@ def symbolic_function(
     function: Callable[..., T],
 ) -> Union[Callable[..., Variable[T]], T]:
     """
-    Function decorator that constructs a symbolic expression representing the function call
-     when inside a symbolic_rule context.
+    Function decorator that constructs a symbolic expression representing the function
+    call when inside a symbolic_rule context.
 
-    When symbolic mode is active, calling the method returns a Call instance which is a SymbolicExpression bound to
-    representing the method call that is not evaluated until the evaluate() method is called on the query/rule.
+    When symbolic mode is active, calling the method returns a Call instance which is a
+    SymbolicExpression bound to representing the method call that is not evaluated until
+    the evaluate() method is called on the query/rule.
 
     :param function: The function to decorate.
     :return: The decorated function.
@@ -76,21 +78,47 @@ def symbolic_function(
     return wrapper
 
 
+def symbolic_callable_to_function(
+    symbolic_callable: Type[SymbolicCallable],
+) -> Callable[..., Any]:
+    """:return: a function that calls *symbolic_callable* -- the class-form counterpart of the
+    :func:`symbolic_function` decorator.
+
+    It returns a symbolic expression when any argument is a variable (so it composes in a query) and
+    the directly computed value otherwise. Binding an existing function name to
+    ``symbolic_callable_to_function(TheClass)`` lets a migration to the class form keep that name's call behaviour
+    unchanged -- the logic moves into the class's :meth:`__call__` and the name just constructs it.
+    """
+
+    def call(*args: Any, **kwargs: Any) -> Any:
+        result = symbolic_callable(*args, **kwargs)
+        return result() if isinstance(result, symbolic_callable) else result
+
+    return call
+
+
 @dataclass(frozen=True)
 class VerbalizationField:
-    """One predicate field as ``_verbalization_fragment_`` sees it.
+    """
+    One predicate field as ``_verbalization_fragment_`` sees it.
 
-    It carries both the field's already-rendered (and source-linked) :attr:`fragment` and the raw
-    :attr:`value` bound to it (a :class:`Literal`'s value unwrapped). A part-of-speech element takes
-    whichever it needs — :class:`Noun` uses the fragment, :class:`OneOf` uses the value — so the
-    author just passes ``fields[name]`` and the right thing happens, never an explicit accessor.
+    It carries both the field's already-rendered (and source-linked) :attr:`fragment`
+    and the raw :attr:`value` bound to it (a :class:`Literal`'s value unwrapped). A
+    part-of-speech element takes whichever it needs — :class:`Noun` uses the fragment,
+    :class:`OneOf` uses the value — so the author just passes ``fields[name]`` and the
+    right thing happens, never an explicit accessor.
     """
 
     fragment: VerbalizationFragment
-    """The field's rendered, source-linked fragment — what :class:`Noun` uses."""
+    """
+    The field's rendered, source-linked fragment — what :class:`Noun` uses.
+    """
 
     value: Any
-    """The raw Python value bound to the field (a literal's value) — what :class:`OneOf` enumerates."""
+    """
+    The raw Python value bound to the field (a literal's value) — what :class:`OneOf`
+    enumerates.
+    """
 
     def as_fragment(self) -> VerbalizationFragment:
         """:return: the field's rendered fragment, so a :class:`VerbalizationField` is a clause constituent like
@@ -101,18 +129,24 @@ class VerbalizationField:
 
 @dataclass(frozen=True)
 class RenderedFields(Mapping):
-    """The arguments passed to :meth:`Verbalizable._verbalization_fragment_`.
+    """
+    The arguments passed to :meth:`Verbalizable._verbalization_fragment_`.
 
-    A mapping of *field name → :class:`VerbalizationField`*. Each ``fields["x"]`` carries both the rendered
-    fragment and the raw value, so it can be passed straight to a part-of-speech element — ``Noun``
-    takes the fragment, ``OneOf`` takes the value — without the author choosing between them.
+    A mapping of *field name → :class:`VerbalizationField`*. Each ``fields["x"]``
+    carries both the rendered fragment and the raw value, so it can be passed straight
+    to a part-of-speech element — ``Noun`` takes the fragment, ``OneOf`` takes the value
+    — without the author choosing between them.
     """
 
     fragments: "Mapping[str, VerbalizationFragment]"
-    """The rendered fragment for each field, keyed by field name."""
+    """
+    The rendered fragment for each field, keyed by field name.
+    """
 
     raw: "Mapping[str, SymbolicExpression]"
-    """The raw child expression for each field, keyed by field name."""
+    """
+    The raw child expression for each field, keyed by field name.
+    """
 
     def __getitem__(self, field_name: str) -> VerbalizationField:
         raw = self.raw[field_name]
@@ -129,15 +163,17 @@ class RenderedFields(Mapping):
 @dataclass(eq=False)
 class Verbalizable(ABC):
     """
-    A mixin for classes that want to add custom verbalization, such that when a query that is using them is verbalized,
-    the final output text is more correct or intuitivie.
+    A mixin for classes that want to add custom verbalization, such that when a query
+    that is using them is verbalized, the final output text is more correct or
+    intuitivie.
     """
 
     @classmethod
     @abstractmethod
     def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
         """
-        Structured verbalization for this predicate — a required clause (no string fallback).
+        Structured verbalization for this predicate — a required clause (no string
+        fallback).
 
         Build the clause from the typed part-of-speech vocabulary
         (:func:`~…vocabulary.parts_of_speech.clause` with ``Noun`` / ``Verb`` / ``Copula`` /
@@ -168,14 +204,21 @@ class Verbalizable(ABC):
 
 
 @dataclass(eq=False)
-class Predicate(Symbol, Verbalizable, ABC):
+class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
     """
-    The super predicate class that represents a filtration operation or asserts a relation.
+    A user-defined, self-verbalizing symbolic operation.
+
+    It is called with arguments, is represented as an :class:`InstantiatedVariable` in a
+    query when any argument is symbolic, and renders itself through its required
+    :meth:`Verbalizable._verbalization_fragment_`. :class:`Predicate` (a boolean
+    operation) and :class:`SymbolicFunction` (a value operation) are its two concrete
+    kinds, so the symbolic-construction machinery lives here once rather than being
+    duplicated in each.
     """
 
     _cache_instances_: ClassVar[bool] = False
     """
-    Predicates should not be cached for now as they are not persisting.
+    Instances are not cached -- they do not persist.
     """
 
     def __new__(cls, *args, **kwargs):
@@ -190,25 +233,51 @@ class Predicate(Symbol, Verbalizable, ABC):
         return super().__new__(cls)
 
     @classmethod
-    def _construct_normally_(cls, **kwargs) -> Predicate:
+    def _construct_normally_(cls, **kwargs) -> SymbolicCallable:
         """
-        Construct a concrete predicate instance directly, bypassing the symbolic ``__new__`` check.
+        Construct a concrete instance directly, bypassing the symbolic ``__new__``
+        redirect.
 
         Normally, calling ``cls(**kwargs)`` when any kwarg is a :class:`Selectable` redirects
         construction to an :class:`~krrood.entity_query_language.core.variable.InstantiatedVariable`
         so the call can be represented as a symbolic expression in a query graph.  During evaluation,
         however, the bound values themselves may be :class:`Selectable` objects (e.g. in a
         meta-query that reasons about EQL nodes).  In that case the redirect is wrong — we want the
-        real predicate instance so its :meth:`__call__` can be evaluated immediately.
+        real instance so its :meth:`__call__` can be evaluated immediately.
 
         :meth:`_construct_normally_` is the escape hatch for that situation.  It calls
         ``object.__new__`` directly (skipping ``__new__`` entirely) and then ``__init__``, so the
-        caller always receives a fully initialised concrete predicate regardless of what the kwargs
+        caller always receives a fully initialised concrete instance regardless of what the kwargs
         contain.
         """
         instance = object.__new__(cls)
         instance.__init__(**kwargs)
         return instance
+
+    @classmethod
+    def _bound_value_(cls, **kwargs) -> Any:
+        """:return: the value this operation contributes to a query result when its arguments have
+        concrete values -- the constructed instance itself by default (a :class:`Predicate`'s truth is
+        then read from that instance). A value operation overrides this to its COMPUTED value.
+
+        ..note:: This is the class-form counterpart of calling a ``@symbolic_function``: for a function
+            the query binds ``function(**values)``; for a callable class it binds this.
+        """
+        return cls._construct_normally_(**kwargs)
+
+    @abstractmethod
+    def __call__(self) -> Any:
+        """
+        Evaluate the operation for the supplied values.
+        """
+
+
+@dataclass(eq=False)
+class Predicate(SymbolicCallable, ABC):
+    """
+    The super predicate class that represents a filtration operation or asserts a
+    relation.
+    """
 
     @abstractmethod
     def __call__(self) -> bool:
@@ -224,11 +293,39 @@ class Predicate(Symbol, Verbalizable, ABC):
 
 
 @dataclass(eq=False)
+class SymbolicFunction(SymbolicCallable, ABC):
+    """
+    A user-defined operation that computes a value, with its own verbalization.
+
+    Like :class:`Predicate` it is a self-verbalizing symbolic callable, but its :meth:`__call__`
+    returns a value (not a truth value), so its :meth:`Verbalizable._verbalization_fragment_` names
+    that value as a noun phrase rather than a clause. When the class name itself reads as the value
+    (``Length`` → *"the length of a list"*), the fragment is a one-liner over
+    :meth:`~…vocabulary.parts_of_speech.FunctionVerbalizationTemplates.possessive` read off ``cls.__name__``.
+    """
+
+    @classmethod
+    def _bound_value_(cls, **kwargs) -> Any:
+        """:return: the COMPUTED value -- a value operation is constructed AND called, so a query binds
+        what it computes (exactly as a ``@symbolic_function`` is called), not the instance.
+        """
+        return cls._construct_normally_(**kwargs)()
+
+    @abstractmethod
+    def __call__(self) -> Any:
+        """
+        Compute the value for the supplied arguments.
+        """
+
+
+@dataclass(eq=False)
 class Triple(Predicate):
     """
     A Triple is a type predicate that represents a relation between two entities.
-    To know if your predicate is a Triple or not ask yourself can I say "subject" "predicate_name" "object" and it
-    makes sense? if so then yes. Check the verbalization function below as a reference.
+
+    To know if your predicate is a Triple or not ask yourself can I say
+    "subject" "predicate_name" "object" and it makes sense? if so then
+    yes. Check the verbalization function below as a reference.
     """
 
     @property
@@ -285,17 +382,19 @@ class Triple(Predicate):
 @dataclass(eq=False)
 class HasType(Triple):
     """
-    Represents a predicate to check if a given variable is an instance of a specified type.
+    Represents a predicate to check if a given variable is an instance of a specified
+    type.
 
-    This class is used to evaluate whether the domain value belongs to a given type by leveraging
-    Python's built-in `isinstance` functionality. It provides methods to retrieve the domain and
-    range values and perform direct checks.
+    This class is used to evaluate whether the domain value belongs to a given type by
+    leveraging Python's built-in `isinstance` functionality. It provides methods to
+    retrieve the domain and range values and perform direct checks.
     """
 
     variable: Any
     """
     The variable whose type is being checked.
     """
+
     types_: Type
     """
     The type or tuple of types against which the `variable` is validated.
@@ -324,19 +423,19 @@ class HasType(Triple):
             clause,
             Copula,
             Noun,
-            Or,
+            DisjunctivePhrase,
         )
 
         # "<variable> is of type A, B, or C" -- the admissible types are said DISJUNCTIVELY
         # (``isinstance`` over a tuple holds for ANY one of them, so "and" would claim an impossible
-        # conjunction). The listing is the vocabulary's :class:`Or` element, not a bespoke tail;
-        # "type" is a bare noun ("of type", not "of a type").
+        # conjunction). The listing is the vocabulary's :class:`DisjunctivePhrase` element, not a
+        # bespoke tail; "type" is a bare noun ("of type", not "of a type").
         return clause(
             Noun(fields["variable"]),
             Copula(),
             Prepositions.OF,
             Noun.bare("type"),
-            Or(fields["types_"]),
+            DisjunctivePhrase(fields["types_"]),
         )
 
 
@@ -345,11 +444,11 @@ class HasTypes(HasType):
     """
     Represents a specialized data structure holding multiple types.
 
-    This class is a data container designed to store and manage a tuple of
-    types. It inherits from the `HasType` class and extends its functionality
-    to handle multiple types efficiently. The primary goal of this class is to
-    allow structured representation and access to a collection of type
-    information with equality comparison explicitly disabled.
+    This class is a data container designed to store and manage a tuple of types. It
+    inherits from the `HasType` class and extends its functionality to handle multiple
+    types efficiently. The primary goal of this class is to allow structured
+    representation and access to a collection of type information with equality
+    comparison explicitly disabled.
     """
 
     types_: Tuple[Type, ...]
@@ -358,13 +457,37 @@ class HasTypes(HasType):
     """
 
 
-@symbolic_function
-def length(iterable: Sized) -> int:
+@dataclass(eq=False)
+class Length(SymbolicFunction):
     """
-    :param iterable: The iterable.
-    :return: The length of the iterable.
+    The number of items in an iterable, as a value operation.
+
+    Reads as the name-based noun phrase *"the length of <iterable>"*.
     """
-    return len(iterable)
+
+    iterable: Sized
+    """
+    The iterable whose length is computed.
+    """
+
+    def __call__(self) -> int:
+        return len(self.iterable)
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            FunctionVerbalizationTemplates,
+        )
+
+        return FunctionVerbalizationTemplates.possessive(cls, *fields.values())
+
+
+length = symbolic_callable_to_function(Length)
+"""
+Backward-compatible functional form of :class:`Length` (keeps the ``length(iterable)``
+call).
+"""
 
 
 def _any_of_the_kwargs_is_a_variable(bindings: Dict[str, Any]) -> bool:
@@ -382,10 +505,36 @@ class Is(Predicate):
     """
 
     first_entity: Any
-    """The first entity"""
+    """
+    The first entity.
+    """
 
     second_entity: Any
-    """The second entity."""
+    """
+    The second entity.
+    """
 
     def __call__(self) -> bool:
         return self.first_entity is self.second_entity
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """:return: the clause *"<first_entity> is the same object as <second_entity>"* — the two
+        operands hold when they are the same object in memory."""
+        # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
+        from krrood.entity_query_language.verbalization.vocabulary.english import (
+            Prepositions,
+        )
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            clause,
+            Copula,
+            Noun,
+        )
+
+        return clause(
+            Noun(fields["first_entity"]),
+            Copula(),
+            Noun.the("same object"),
+            Prepositions.AS,
+            Noun(fields["second_entity"]),
+        )

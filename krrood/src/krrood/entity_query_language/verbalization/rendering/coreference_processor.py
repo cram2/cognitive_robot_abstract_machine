@@ -40,14 +40,21 @@ from krrood.entity_query_language.verbalization.rendering.passes import Realizat
 
 @dataclass
 class SubjectFrame:
-    """One entry of the coreference pass's subject stack — the current pronoun-eligible subject."""
+    """
+    One entry of the coreference pass's subject stack — the current pronoun-
+    eligible subject.
+    """
 
     subject_id: Optional[uuid.UUID]
     """The subject's referent id, or ``None`` for a scope with no single subject (e.g. ``SetOf``)."""
 
     number: GrammaticalNumber = GrammaticalNumber.SINGULAR
-    """The subject's grammatical number — selects *"its"* (singular) vs. *"their"* (plural). Filled
-    from the subject's own noun phrase when the pass walks it (rules supply no number)."""
+    """
+    The subject's grammatical number — selects *"its"* (singular) vs.
+
+    *"their"* (plural). Filled from the subject's own noun phrase when
+    the pass walks it (rules supply no number).
+    """
 
 
 @dataclass
@@ -81,30 +88,47 @@ class CoreferenceProcessor(RealizationPass):
     """
 
     discourse: DiscourseView = EMPTY_DISCOURSE
-    """The focus-per-scope view, consulted to open a scope at a query-sourced fragment."""
+    """
+    The focus-per-scope view, consulted to open a scope at a query-sourced
+    fragment.
+    """
 
     numbered_labels: Dict[uuid.UUID, str] = field(default_factory=dict)
-    """Disambiguation numbers (*"Robot 1"*) for referents the rules cannot label themselves — a
-    relational referent's relative clause is built in the microplanner, with no access to the
-    referring service, so the number is stamped on here instead."""
+    """
+    Disambiguation numbers (*"Robot 1"*) for referents the rules cannot label
+    themselves — a relational referent's relative clause is built in the
+    microplanner, with no access to the referring service, so the number is
+    stamped on here instead.
+    """
 
     previously_introduced_referents: Iterable[uuid.UUID] = ()
-    """Referents introduced by *prior* builds sharing the same context, so the same expression
-    verbalized twice against one context reads *"a Robot"* then *"the Robot"* — treated as
-    already-mentioned before the walk begins."""
+    """
+    Referents introduced by *prior* builds sharing the same context, so the
+    same expression verbalized twice against one context reads *"a Robot"* then
+    *"the Robot"* — treated as already-mentioned before the walk begins.
+    """
 
     _seen: Set[uuid.UUID] = field(init=False, default_factory=set)
-    """Referent ids already mentioned at the current point of the walk."""
+    """
+    Referent ids already mentioned at the current point of the walk.
+    """
 
     _subject_stack: List[SubjectFrame] = field(init=False, default_factory=list)
-    """Stack of :class:`SubjectFrame` entries — the number selects *"its"*/*"their"*."""
+    """
+    Stack of :class:`SubjectFrame` entries — the number selects
+    *"its"*/*"their"*.
+    """
 
     _center: Optional[uuid.UUID] = field(init=False, default=None)
-    """The local centre — the grammatical subject of the immediately preceding clause (see
-    :meth:`_chain_topic`). The next chain's attribute on that referent pronominalises to *"its …"*;
-    a clause about something else (or one headed by an attribute) clears it, so *"its"* binds only
-    to the referent that was the subject just before (centering theory, Grosz/Joshi/Weinstein
-    1995)."""
+    """
+    The local centre — the grammatical subject of the immediately preceding
+    clause (see :meth:`_chain_topic`).
+
+    The next chain's attribute on that referent pronominalises to *"its
+    …"*; a clause about something else (or one headed by an attribute)
+    clears it, so *"its"* binds only to the referent that was the
+    subject just before (centering theory, Grosz/Joshi/Weinstein 1995).
+    """
 
     def process(self, fragment: VerbalizationFragment) -> VerbalizationFragment:
         """
@@ -283,8 +307,10 @@ class CoreferenceProcessor(RealizationPass):
         )
 
     _FINITE_ROLES = (SemanticRole.OPERATOR, SemanticRole.VERB)
-    """The clause roles a finite predicate agrees through — the copula / comparison operator and a
-    lexical verb."""
+    """
+    The clause roles a finite predicate agrees through — the copula /
+    comparison operator and a lexical verb.
+    """
 
     @staticmethod
     def _agree_finite(
@@ -319,7 +345,7 @@ class CoreferenceProcessor(RealizationPass):
         spell-out choice :meth:`_possessive_chain` makes for a navigation chain, but for a coordinated
         attribute list whose owner has no further hops (e.g. a *"predict"* point on the selection).
 
-        >>> verbalize_expression(an(Robot)(name="R2", battery=...))
+        >>> verbalize_expression(a(Robot)(name="R2", battery=...))
         "Generate a Robot and predict its battery value given that its name is 'R2'"
         """
         if self._owner_is_subject(owned):

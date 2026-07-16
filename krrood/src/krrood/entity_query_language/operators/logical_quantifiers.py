@@ -1,8 +1,8 @@
 """
 Logical quantifiers for the Entity Query Language.
 
-This module provides quantified conditionals such as universal (ForAll) and existential (Exists) operators
-that evaluate conditions over the values of a variable.
+This module provides quantified conditionals such as universal (ForAll) and existential
+(Exists) operators that evaluate conditions over the values of a variable.
 """
 
 from __future__ import annotations
@@ -22,8 +22,10 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 @dataclass(eq=False, repr=False)
 class QuantifiedConditional(LogicalBinaryOperator, ABC):
     """
-    This is the super class of the universal, and existential conditional operators. It is a binary logical operator
-    that has a quantified variable and a condition on the values of that variable.
+    This is the super class of the universal, and existential conditional operators.
+
+    It is a binary logical operator that has a quantified variable and a condition on
+    the values of that variable.
     """
 
     @property
@@ -38,8 +40,11 @@ class QuantifiedConditional(LogicalBinaryOperator, ABC):
 @dataclass(eq=False, repr=False)
 class ForAll(QuantifiedConditional):
     """
-    This operator is the universal conditional operator. It returns bindings that satisfy the condition for all the
-    values of the quantified variable. It is efficient as it ignores the bindings that don't satisfy the condition.
+    This operator is the universal conditional operator.
+
+    It returns bindings that satisfy the condition for all the values of the quantified
+    variable. It is efficient as it ignores the bindings that don't satisfy the
+    condition.
     """
 
     @cached_property
@@ -107,9 +112,10 @@ class ForAll(QuantifiedConditional):
 @dataclass(eq=False, repr=False)
 class Exists(QuantifiedConditional):
     """
-    An existential checker that checks if a condition holds for any value of the variable given, the benefit
-    of this is that it returns True if the condition holds for any value without
-    getting all the condition values that hold for one specific value of the variable.
+    An existential checker that checks if a condition holds for any value of the
+    variable given, the benefit of this is that it returns True if the condition holds
+    for any value without getting all the condition values that hold for one specific
+    value of the variable.
     """
 
     def _evaluate__(

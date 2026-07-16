@@ -1,4 +1,7 @@
-"""Unit tests for the curated mass-noun lexicon used to drop the article before uncountable nouns."""
+"""
+Unit tests for the curated mass-noun lexicon used to drop the article before uncountable
+nouns.
+"""
 
 from __future__ import annotations
 
@@ -30,8 +33,11 @@ def test_lexicon_is_overridable_for_a_domain():
 
 
 def test_expanded_lexicon_covers_common_mass_nouns():
-    """The curated lexicon spans the everyday mass nouns: materials, substances, abstractions, and
-    collective/activity nouns that take no plural and no indefinite article."""
+    """
+    The curated lexicon spans the everyday mass nouns: materials, substances,
+    abstractions, and collective/activity nouns that take no plural and no indefinite
+    article.
+    """
     countability = NounCountability()
     for mass_noun in (
         "wood",
@@ -67,8 +73,10 @@ def test_expanded_lexicon_covers_common_mass_nouns():
 
 
 def test_dual_sense_nouns_stay_countable():
-    """A noun with a dominant countable sense is left countable so it is not wrongly stripped of its
-    article."""
+    """
+    A noun with a dominant countable sense is left countable so it is not wrongly
+    stripped of its article.
+    """
     countability = NounCountability()
     for countable_noun in ("battery", "department", "robot", "table", "report"):
         assert not countability.is_uncountable(countable_noun), countable_noun

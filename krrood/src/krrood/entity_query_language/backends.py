@@ -17,6 +17,7 @@ from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.exceptions import (
     NoSolutionFound,
     GenerativeBackendQueryIsNotUnderspecifiedVariable,
+    SelectiveBackendCannotResolveEllipsisMatch,
     UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration,
 )
 from krrood.entity_query_language.factories import entity, set_of, variable
@@ -38,13 +39,18 @@ T = TypeVar("T")
 class QueryBackend(ABC):
     """
     Base class for all query backends.
+
     Query backends are objects that answer queries by different means.
     """
 
     opening_directive: ClassVar[Optional[Directive]] = None
-    """The opening verb a verbalization uses when this backend evaluates the expression (``None`` keeps
-    the query-type default). A backend declares its own performative so the verbalization layer never
-    inspects concrete backend types."""
+    """
+    The opening verb a verbalization uses when this backend evaluates the expression
+    (``None`` keeps the query-type default).
+
+    A backend declares its own performative so the verbalization layer never inspects
+    concrete backend types.
+    """
 
     @abstractmethod
     def evaluate(self, expression: Evaluable) -> Iterable[T]:
@@ -60,23 +66,37 @@ class QueryBackend(ABC):
 class SelectiveBackend(QueryBackend, ABC):
     """
     Selective backends are backends that select elements from existing data.
+
     These can take any query as input.
     """
 
     opening_directive: ClassVar[Optional[Directive]] = Directive.FIND
-    """Selecting from existing data reads as *"Find …"*."""
+    """
+    Selecting from existing data reads as *"Find …"*.
+    """
+
+    def evaluate(self, expression: Evaluable) -> Iterable[T]:
+        if isinstance(expression, Match) and expression.has_ellipsis_attributes:
+            raise SelectiveBackendCannotResolveEllipsisMatch(expression)
+        yield from self._evaluate(expression)
+
+    @abstractmethod
+    def _evaluate(self, expression: Evaluable) -> Iterable[T]: ...
 
 
 @dataclass
 class GenerativeBackend(QueryBackend, ABC):
     """
     Generative backends are backends that generate new elements.
+
     Generative backends have to take match expressions as input, since they need to construct new objects, and currently
     {py:class}`~krrood.entity_query_language.query.match.Match` is the only way to do so.
     """
 
     opening_directive: ClassVar[Optional[Directive]] = Directive.GENERATE
-    """Generating new elements reads as *"Generate …"*."""
+    """
+    Generating new elements reads as *"Generate …"*.
+    """
 
     def evaluate(self, expression: Evaluable) -> Iterable[T]:
         if not isinstance(expression, Match):
@@ -98,7 +118,7 @@ class SQLAlchemyBackend(SelectiveBackend):
     The session maker used for the database interactions.
     """
 
-    def evaluate(self, expression: Query) -> Iterable:
+    def _evaluate(self, expression: Query) -> Iterable:
         session = self.session_maker()
         translator = eql_to_sql(expression, session)
         yield from translator.evaluate()
@@ -107,22 +127,23 @@ class SQLAlchemyBackend(SelectiveBackend):
 @dataclass
 class EntityQueryLanguageBackend(SelectiveBackend):
     """
-    A backend that selects elements in this python process. This is just ordinary EQL: each
-    expression evaluates itself natively (queries and matches both select over their domains).
+    A backend that selects elements in this python process.
+
+    This is just ordinary EQL: each expression evaluates itself natively (queries and matches both select over their domains).
     Constructing new instances is the job of a :class:`GenerativeBackend`.
     """
 
-    def evaluate(self, expression: Evaluable) -> Iterable:
+    def _evaluate(self, expression: Evaluable) -> Iterable:
         yield from expression._evaluate_natively_()
 
 
 @dataclass
 class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
     """
-    A generative backend that constructs new instances deterministically: it treats a match's
-    unspecified leaves as variables, enumerates every combination over their (discrete) domains,
-    constructs an instance per combination via the type's constructor, and keeps those that
-    satisfy the match's ``where`` conditions.
+    A generative backend that constructs new instances deterministically: it treats a
+    match's unspecified leaves as variables, enumerates every combination over their
+    (discrete) domains, constructs an instance per combination via the type's
+    constructor, and keeps those that satisfy the match's ``where`` conditions.
     """
 
     def _evaluate(self, expression: Match[T]) -> Iterable[T]:
@@ -168,8 +189,8 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
         attribute_match: AttributeMatch,
     ) -> Selectable:
         """
-        Convert an attribute match into a variable to enumerate, handling ellipsis assignments
-        for enum fields and concrete values.
+        Convert an attribute match into a variable to enumerate, handling ellipsis
+        assignments for enum fields and concrete values.
 
         :param attribute_match: The attribute match to convert.
         :return: A variable (or symbolic expression) representing the attribute match.
@@ -195,7 +216,7 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
         Construct instances from the given match and enumerable variables.
 
         :param expression: The match expression to construct instances from.
-        :param variables: The variables to enumerate, keyed by access-path name.
+        :param variables: The variables to enumerate, keyed by access- path name.
         :return: A generator yielding an instance per variable combination.
         """
         all_combinations = set_of(*variables.values())
@@ -210,17 +231,20 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
 @dataclass
 class ProbabilisticBackend(GenerativeBackend):
     """
-    A backend that generates elements from a tractable probabilistic model using a model registry.
+    A backend that generates elements from a tractable probabilistic model using a model
+    registry.
     """
 
     model_registry: ModelRegistry = field(default_factory=FullyFactorizedRegistry)
     """
-    A model registry that can be used to resolve match statements to probabilistic models.
+    A model registry that can be used to resolve match statements to probabilistic
+    models.
     """
 
     number_of_samples: int = field(kw_only=True, default=50)
     """
     The number of samples to generate.
+
     This is only used if the query does not specify a limit.
     """
 

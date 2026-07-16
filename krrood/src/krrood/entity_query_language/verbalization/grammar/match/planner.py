@@ -10,7 +10,7 @@ from krrood.entity_query_language.core.expression_structure import walk_chain
 from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.operators.comparator import Comparator
-from krrood.entity_query_language.query.match import Match, is_underspecified
+from krrood.entity_query_language.query.match import Match
 from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
 from krrood.entity_query_language.verbalization.microplanning.coordination import (
     group_by_owner,
@@ -19,43 +19,59 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
 
 @dataclass(frozen=True)
 class AttributeAssignment:
-    """One ``object.attribute == value`` equality from a match's construction pattern."""
+    """
+    One ``object.attribute == value`` equality from a match's construction pattern.
+    """
 
     attribute: Attribute
-    """The matched attribute (``position.x``)."""
+    """
+    The matched attribute (``position.x``).
+    """
 
     value: SymbolicExpression
-    """The value the attribute is equated to."""
+    """
+    The value the attribute is equated to.
+    """
 
     is_predicted: bool
-    """``True`` when the value is ``...`` (Ellipsis) — the attribute is to be generated, verbalised
-    as *"predict …"* rather than an equality."""
+    """
+    ``True`` when the value is ``...`` (Ellipsis) — the attribute is to be generated,
+    verbalised as *"predict …"* rather than an equality.
+    """
 
     comparator: Comparator
-    """The source ``attribute == value`` equality, so an ungrouped concrete assignment can be said
-    through the shared comparator-predicate path (and pronominalised by coreference) rather than a
-    hand-built genitive."""
+    """
+    The source ``attribute == value`` equality, so an ungrouped concrete assignment can
+    be said through the shared comparator-predicate path (and pronominalised by
+    coreference) rather than a hand-built genitive.
+    """
 
 
 @dataclass(frozen=True)
 class AttributeGroup:
-    """The equality assignments that share one object — e.g. the *x*, *y*, *z* of one position —
-    so they can be aggregated into *"x, y, and z of the position are 1, 2, and 3 respectively"*.
+    """
+    The equality assignments that share one object — e.g. the *x*, *y*, *z* of one
+    position — so they can be aggregated into *"x, y, and z of the position are 1, 2,
+    and 3 respectively"*.
     """
 
     object: SymbolicExpression
-    """The object whose attributes these are — the selection itself for a direct attribute, or a
-    sub-object chain (``pose.position``) for a nested match's attributes."""
+    """
+    The object whose attributes these are — the selection itself for a direct attribute,
+    or a sub-object chain (``pose.position``) for a nested match's attributes.
+    """
 
     assignments: List[AttributeAssignment]
-    """The attribute assignments on *object*, in construction order."""
+    """
+    The attribute assignments on *object*, in construction order.
+    """
 
     @property
     def concrete(self) -> List[AttributeAssignment]:
         """:return: The assignments with a concrete value (the *"given that …"* part).
 
         >>> from krrood.entity_query_language.verbalization.grammar.match.planner import MatchPlanner
-        >>> plan = MatchPlanner(an(Robot)(name="R2", battery=...)).plan()
+        >>> plan = MatchPlanner(a(Robot)(name="R2", battery=...)).plan()
         >>> len(plan.groups[0].concrete)
         1
         """
@@ -66,7 +82,7 @@ class AttributeGroup:
         """:return: The Ellipsis assignments (the *"predict …"* part).
 
         >>> from krrood.entity_query_language.verbalization.grammar.match.planner import MatchPlanner
-        >>> plan = MatchPlanner(an(Robot)(name="R2", battery=...)).plan()
+        >>> plan = MatchPlanner(a(Robot)(name="R2", battery=...)).plan()
         >>> len(plan.groups[0].predicted)
         1
         """
@@ -75,45 +91,62 @@ class AttributeGroup:
 
 @dataclass(frozen=True)
 class MatchPlan:
-    """The *what to say* decomposition of a match: whether it is generative, what it selects, the
-    grouped construction-pattern equalities, and the free ``where`` conditions."""
+    """
+    The *what to say* decomposition of a match: what it selects, the grouped
+    construction-pattern equalities, and the free ``where`` conditions.
 
-    underspecified: bool
-    """``True`` ⇒ a generative request (*"Generate"*); ``False`` ⇒ a domain search (*"Find"*)."""
+    A match carries no selective/generative distinction of its own — a domain-less match can
+    still resolve selectively via the ``SymbolGraph`` (see :func:`~krrood.entity_query_language.factories.variable`)
+    — so the opening verb is decided solely by the backend given to ``verbalize_expression``
+    (:class:`~krrood.entity_query_language.verbalization.context.MicroplanningServices.performative_override`),
+    defaulting to *"Generate"* when none is given. See :class:`MatchAssembler`.
+    """
 
     selection: SymbolicExpression
-    """The variable the match constructs/selects."""
+    """
+    The variable the match constructs/selects.
+    """
 
     groups: List[AttributeGroup]
-    """Single-hop construction equalities, grouped by their object."""
+    """
+    Single-hop construction equalities, grouped by their object.
+    """
 
     other_conditions: List[SymbolicExpression]
-    """Construction conditions that don't group (multi-hop chains, type filters); rendered as
-    individual *"given that"* points."""
+    """
+    Construction conditions that don't group (multi-hop chains, type filters); rendered
+    as individual *"given that"* points.
+    """
 
     where_conditions: List[SymbolicExpression]
-    """The conditions added via ``.where(...)``. The plan only classifies them as the ``where``
-    part; deciding how to say a list of conditions (including folding bound pairs into a *between*)
-    belongs to the condition verbalizer, not here."""
+    """
+    The conditions added via ``.where(...)``.
+
+    The plan only classifies them as the ``where`` part; deciding how to say a list of
+    conditions (including folding bound pairs into a *between*) belongs to the condition
+    verbalizer, not here.
+    """
 
 
 @dataclass
 class MatchPlanner(Planner[Match, MatchPlan]):
     """
-    Decompose a ``Match`` into a ``MatchPlan``: split the construction-pattern equalities (which
-    become *"given that"*) from the ``where`` conditions, and aggregate the single-hop equalities by
-    their object so related attributes (a position's x/y/z) verbalise together.
+    Decompose a ``Match`` into a ``MatchPlan``: split the construction-pattern
+    equalities (which become *"given that"*) from the ``where`` conditions, and
+    aggregate the single-hop equalities by their object so related attributes
+    (a position's x/y/z) verbalise together.
 
     Reference: :cite:t:`reiter2000building` — content determination + aggregation (microplanning).
 
-    >>> MatchPlanner(an(Robot)(name="R2", battery=80)).plan().underspecified
-    True
+    >>> plan = MatchPlanner(a(Robot)(name="R2", battery=80)).plan()
+    >>> len(plan.groups), len(plan.groups[0].assignments)
+    (1, 2)
     """
 
     def plan(self) -> MatchPlan:
         """:return: The match plan.
 
-        >>> plan = MatchPlanner(an(Robot)(name="R2", battery=80)).plan()
+        >>> plan = MatchPlanner(a(Robot)(name="R2", battery=80)).plan()
         >>> (type(plan.selection).__name__, len(plan.groups))
         ('Variable', 1)
         """
@@ -129,7 +162,6 @@ class MatchPlanner(Planner[Match, MatchPlan]):
             for group in owner_groups
         ]
         return MatchPlan(
-            underspecified=is_underspecified(match),
             selection=match.variable,
             groups=groups,
             other_conditions=other,

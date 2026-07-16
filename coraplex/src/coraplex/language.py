@@ -41,13 +41,14 @@ logger = logging.getLogger(__name__)
 class LanguageNode(PlanNode, ABC):
     """
     Base class for language nodes in a plan.
-    Language nodes are nodes that are not directly executable, but manage the execution of their children in a certain
-    way.
+
+    Language nodes are nodes that are not directly executable, but manage the execution
+    of their children in a certain way.
     """
 
     motion_state_chart_template: Type[Goal] = field(kw_only=True, default=Sequence)
     """
-    Giskard template which this language expression translates to
+    Giskard template which this language expression translates to.
     """
 
     def simplify(self):
@@ -79,9 +80,9 @@ class LanguageNode(PlanNode, ABC):
 
     def parse_with_non_giskard_executable(self) -> Executable:
         """
-        Build an executable whose execution list keeps non-giskard executables
-        (model changes, deferred underspecified nodes) as sequential boundaries,
-        merging only the consecutive giskard executables between them.
+        Build an executable whose execution list keeps non-giskard executables (model
+        changes, deferred underspecified nodes) as sequential boundaries, merging only
+        the consecutive giskard executables between them.
         """
         child_executables = [node.parse() for node in self.children]
 
@@ -138,7 +139,9 @@ class ExecutesInParallel(LanguageNode, ABC):
 @dataclass
 class SequentialNode(ExecutesSequentially):
     """
-    Executes all children sequentially. Any failure is immediately raised.
+    Executes all children sequentially.
+
+    Any failure is immediately raised.
     """
 
     motion_state_chart_template = Sequence
@@ -147,7 +150,9 @@ class SequentialNode(ExecutesSequentially):
 @dataclass
 class ParallelNode(ExecutesInParallel):
     """
-    Executes all children in parallel by creating a thread per children and executing them in the respective thread.
+    Executes all children in parallel by creating a thread per children and executing
+    them in the respective thread.
+
     All exceptions are raised after all children have finished.
     """
 
@@ -179,7 +184,8 @@ class RepeatNode(ExecutesSequentially):
 @dataclass(eq=False)
 class MonitorNode(ExecutesSequentially):
     """
-    Monitors a Language Expression and interrupts it when the given condition is evaluated to True.
+    Monitors a Language Expression and interrupts it when the given condition is
+    evaluated to True.
 
     Behaviour:
         Monitors start a new Thread which checks the condition while performing the nodes below it. Monitors can have
@@ -262,6 +268,7 @@ class TryInOrderNode(ExecutesSequentially):
 class TryAllNode(ExecutesInParallel):
     """
     Executes all children in parallel.
+
     Only raise a failure if all children fail.
     """
 
@@ -278,6 +285,7 @@ class TryAllNode(ExecutesInParallel):
 class CodeNode(LanguageNode):
     """
     Executable function in a plan.
+
     This class' primary purpose is for debugging and testing.
     """
 

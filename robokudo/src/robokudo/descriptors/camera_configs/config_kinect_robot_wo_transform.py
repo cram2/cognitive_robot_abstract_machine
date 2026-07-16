@@ -7,7 +7,8 @@ from robokudo.descriptors.camera_configs.config_kinect_robot import KinectCamera
 
 @dataclass(slots=True)
 class KinectWoTfCameraConfig(KinectCameraConfig):
-    """Configuration class for a Kinect camera setup without transform lookup.
+    """
+    Configuration class for a Kinect camera setup without transform lookup.
 
     This class defines the configuration parameters for a Kinect camera in a robotic
     setup, similar to config_kinect_robot.py but with viewpoint lookup disabled.
@@ -19,7 +20,11 @@ class KinectWoTfCameraConfig(KinectCameraConfig):
     """
 
     registry_name: ClassVar[str] = "kinect_wo_tf"
-    """Overwrite KinectCameraConfig"""
+    """
+    Overwrite KinectCameraConfig.
+    """
 
     lookup_viewpoint: bool = False
-    """Overwrite KinectCameraConfig"""
+    """
+    Overwrite KinectCameraConfig.
+    """

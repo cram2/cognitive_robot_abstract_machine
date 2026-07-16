@@ -101,7 +101,6 @@ class MJCFParser:
 
         :return: The World object representing the MJCF scene.
         """
-
         worldbody: mujoco.MjsBody = self.spec.worldbody
         with self.world.modify_world():
             self.parse_equalities()
@@ -359,7 +358,8 @@ class MJCFParser:
 
         :param parent_name: The name of the parent body.
         :param child_name: The name of the child body.
-        :param mujoco_joint: The Mujoco joint to parse. If None, a fixed connection is created.
+        :param mujoco_joint: The Mujoco joint to parse. If None, a fixed connection is
+            created.
         """
         parent_body = self.world.get_kinematic_structure_entity_by_name(parent_name)
         child_body = self.world.get_kinematic_structure_entity_by_name(child_name)
@@ -477,9 +477,9 @@ class MJCFParser:
                 )
             else:
                 lower_limits = DerivativeMap()
-                lower_limits.position = mujoco_joint.range[0]
+                lower_limits.position = float(mujoco_joint.range[0])
                 upper_limits = DerivativeMap()
-                upper_limits.position = mujoco_joint.range[1]
+                upper_limits.position = float(mujoco_joint.range[1])
                 dof = DegreeOfFreedom(
                     name=PrefixedName(dof_name),
                     limits=DegreeOfFreedomLimits(

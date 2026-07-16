@@ -20,12 +20,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.habitats  of type Habitat."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.habitats  of
+    type Habitat.
+    """
     # Write your code here
     return case.species == "mammal" and case.aquatic == 0
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -50,12 +53,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.habitats  of type Habitat."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.habitats  of
+    type Habitat.
+    """
     # Write your code here
     return case.species == "fish"
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -80,12 +86,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.habitats  of type Habitat."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.habitats  of
+    type Habitat.
+    """
     # Write your code here
     return case.species == "bird" and case.legs > 0
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -110,12 +119,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.habitats  of type Habitat."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.habitats  of
+    type Habitat.
+    """
     # Write your code here
     return case.species == "molusc" and case.aquatic == 0
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -140,9 +152,12 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.habitats  of type Habitat."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.habitats  of
+    type Habitat.
+    """
     # Write your code here
     return case.species == "molusc" and case.aquatic == 1
 
 
-"===New Answer==="
+'===New Answer==='

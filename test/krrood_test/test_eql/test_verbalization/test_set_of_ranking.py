@@ -76,8 +76,10 @@ def test_attributes_of_different_owners_do_not_fold():
 
 
 def test_non_grouped_aggregation_reads_as_a_report():
-    """An aggregation set-of with no GROUP BY is a calculation, so it opens with *"Report"* (not
-    *"Find"*) and carries no *"for each"* frame."""
+    """
+    An aggregation set-of with no GROUP BY is a calculation, so it opens with *"Report"*
+    (not *"Find"*) and carries no *"for each"* frame.
+    """
     e = variable(Employee, [])
     text = verbalize_expression(a(set_of(eql.sum(e.salary))))
     assert text == "Report the sum of salaries of Employees"
@@ -85,9 +87,11 @@ def test_non_grouped_aggregation_reads_as_a_report():
 
 
 def test_grouped_aggregation_reads_as_a_for_each_report():
-    """A grouped aggregation set-of is a report, not a search: it fronts the grouping as
-    *"For each <key>, report …"*, names the key bare (no *"of the Employee"*), and drops the
-    redundant key column."""
+    """
+    A grouped aggregation set-of is a report, not a search: it fronts the grouping as
+    *"For each <key>, report …"*, names the key bare (no *"of the Employee"*), and drops
+    the redundant key column.
+    """
     e = variable(Employee, [])
     text = verbalize_expression(
         a(set_of(e.department, eql.sum(e.salary)).grouped_by(e.department))
@@ -98,7 +102,9 @@ def test_grouped_aggregation_reads_as_a_for_each_report():
 
 
 def test_multi_root_set_of_does_not_pronominalise():
-    """Two distinct root variables → no single focus → no pronoun, full chains kept."""
+    """
+    Two distinct root variables → no single focus → no pronoun, full chains kept.
+    """
     e1 = variable(Employee, [])
     e2 = variable(Employee, [])
     text = verbalize_expression(a(set_of(e1.department, e2.salary)))
@@ -107,7 +113,9 @@ def test_multi_root_set_of_does_not_pronominalise():
 
 
 def test_unlimited_ordered_set_of_reports_pronominalised():
-    """An unranked ordered set-of reports the plural population, pronominalised to "their"."""
+    """
+    An unranked ordered set-of reports the plural population, pronominalised to "their".
+    """
     e = variable(Employee, [])
     text = verbalize_expression(a(set_of(e).ordered_by(e.salary, descending=True)))
     assert text == "Report Employees ordered by their salaries from highest to lowest"
@@ -177,9 +185,13 @@ def _top_revenue_month_query(*, by_year: bool = False):
 
 
 def test_grouped_aggregation_limit_one_ranks_the_aggregate():
-    """A grouped aggregation taking the single highest group identifies the winner by the value it
-    is ranked by — 'with the highest <aggregate>' — names the entity first so the body pronominalises
-    to it, and reduces the aggregate to 'the sum' on its second mention. Never restates the grouping.
+    """
+    A grouped aggregation taking the single highest group identifies the winner by the
+    value it is ranked by — 'with the highest <aggregate>' — names the entity first so
+    the body pronominalises to it, and reduces the aggregate to 'the sum' on its second
+    mention.
+
+    Never restates the grouping.
     """
     text = verbalize_expression(_top_revenue_month_query())
     assert text == (
@@ -191,7 +203,9 @@ def test_grouped_aggregation_limit_one_ranks_the_aggregate():
 
 
 def test_grouped_aggregation_limit_one_folds_co_owned_keys():
-    """Co-owned group keys (year, month of the same begin) fold into one genitive."""
+    """
+    Co-owned group keys (year, month of the same begin) fold into one genitive.
+    """
     text = verbalize_expression(_top_revenue_month_query(by_year=True))
     assert text == (
         "For the ProfitAndLossStatement "
@@ -202,7 +216,9 @@ def test_grouped_aggregation_limit_one_folds_co_owned_keys():
 
 
 def test_grouped_aggregation_limit_one_ascending_is_lowest():
-    """Ascending limit(1) reads as the lowest of the ranked aggregate."""
+    """
+    Ascending limit(1) reads as the lowest of the ranked aggregate.
+    """
     pnl = variable(ProfitAndLossStatement, domain=None)
     query = a(
         set_of(pnl.period.begin.month, eql.sum(pnl.revenue.money.amount))
@@ -216,8 +232,10 @@ def test_grouped_aggregation_limit_one_ascending_is_lowest():
 
 
 def test_ranked_report_reduces_only_the_ranked_aggregate():
-    """With two aggregates selected, only the one the query is ranked by is named in the frame and so
-    reduces to 'the sum' in the body; the unranked aggregate keeps its full description.
+    """
+    With two aggregates selected, only the one the query is ranked by is named in the
+    frame and so reduces to 'the sum' in the body; the unranked aggregate keeps its full
+    description.
     """
     pnl = variable(ProfitAndLossStatement, domain=None)
     ranked = eql.sum(pnl.revenue.money.amount)
@@ -238,8 +256,10 @@ def test_ranked_report_reduces_only_the_ranked_aggregate():
 
 
 def test_ranked_report_generalises_to_the_average_aggregate():
-    """The aggregate-ranked framing is not sum-specific: ranking by an average names 'the highest
-    average …' and reduces it to 'the average' in the body."""
+    """
+    The aggregate-ranked framing is not sum-specific: ranking by an average names 'the
+    highest average …' and reduces it to 'the average' in the body.
+    """
     pnl = variable(ProfitAndLossStatement, domain=None)
     average = eql.average(pnl.revenue.money.amount)
     query = a(

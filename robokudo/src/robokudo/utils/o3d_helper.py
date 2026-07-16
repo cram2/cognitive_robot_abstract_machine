@@ -1,4 +1,5 @@
-"""Open3D helper utilities for Robokudo.
+"""
+Open3D helper utilities for Robokudo.
 
 This module provides helper functions for working with Open3D geometries and cameras.
 It supports:
@@ -41,10 +42,11 @@ def put_obb_on_target_obb(
     input_obb: o3d.geometry.OrientedBoundingBox,
     target_obb: o3d.geometry.OrientedBoundingBox,
 ) -> o3d.geometry.OrientedBoundingBox:
-    """Place one oriented bounding box on top of another.
+    """
+    Place one oriented bounding box on top of another.
 
-    Places input_obb on top of target_obb by aligning their centers and
-    adjusting height based on extents. Assumes positive Z is up.
+    Places input_obb on top of target_obb by aligning their centers and adjusting height
+    based on extents. Assumes positive Z is up.
 
     :param input_obb: Bounding box to place
     :param target_obb: Target bounding box to place on
@@ -65,7 +67,8 @@ def transform_obb_relative_to_obb_center(
     target_obb: o3d.geometry.OrientedBoundingBox,
     transform_matrix: npt.NDArray,
 ) -> o3d.geometry.OrientedBoundingBox:
-    """Transform a bounding box relative to another's center.
+    """
+    Transform a bounding box relative to another's center.
 
     :param input_obb: Bounding box to transform
     :param target_obb: Reference bounding box
@@ -88,7 +91,8 @@ def transform_obb_relative_to_obb_center(
 def get_obb_from_size_and_transform(
     bb_size: npt.NDArray, transform_matrix: npt.NDArray
 ) -> o3d.geometry.OrientedBoundingBox:
-    """Create an oriented bounding box from size and transform.
+    """
+    Create an oriented bounding box from size and transform.
 
     :param bb_size: Numpy array with 3 elements for BoundingBox size in X,Y,Z
     :param transform_matrix: 4x4 numpy array
@@ -104,7 +108,8 @@ def get_obb_from_size_and_transform(
 def get_2d_corner_points_from_3d_bb(
     cas: CAS, object_bb: o3d.geometry.OrientedBoundingBox
 ) -> cv2t.Rect:
-    """Project 3D bounding box corners to 2D image points.
+    """
+    Project 3D bounding box corners to 2D image points.
 
     :param cas: CAS containing camera parameters
     :param object_bb: 3D bounding box to project
@@ -133,7 +138,9 @@ def get_2d_corner_points_from_3d_bb(
 def project_points_to_image(
     cas: CAS, points_cam: npt.NDArray
 ) -> Tuple[npt.NDArray, npt.NDArray]:
-    """Project 3D camera-frame points to 2D image pixels and validity mask."""
+    """
+    Project 3D camera-frame points to 2D image pixels and validity mask.
+    """
     pc_cam_intrinsics = cas.get(CASViews.PC_CAM_INTRINSIC)
     k = pc_cam_intrinsics.intrinsic_matrix
     uvd = points_cam @ k.T
@@ -158,7 +165,9 @@ def draw_mesh_wireframe_on_image(
     color: Tuple[int, int, int] = (0, 255, 0),
     thickness: int = 1,
 ) -> None:
-    """Draw the mesh wireframe by projecting its edges into the image."""
+    """
+    Draw the mesh wireframe by projecting its edges into the image.
+    """
     tm = mesh_shape.mesh.copy()
     tm.apply_transform(mesh_shape.origin.to_np())
     tm.apply_transform(object_transform)
@@ -200,7 +209,8 @@ def get_2d_bounding_rect_from_3d_bb(
 def draw_wireframe_of_obb_into_image(
     cas: CAS, image: npt.NDArray, obb: o3d.geometry.OrientedBoundingBox
 ) -> None:
-    """Draw 3D bounding box wireframe on image.
+    """
+    Draw 3D bounding box wireframe on image.
 
     Projects 3D box edges to image plane and draws lines.
 
@@ -238,17 +248,18 @@ def get_mask_from_pointcloud(
     crop_to_ref: bool = None,
 ) -> npt.NDArray:
     """
-    Generate a binary mask image by projecting the input_cloud to the ref_image mask
+    Generate a binary mask image by projecting the input_cloud to the ref_image mask.
 
     :param input_cloud: 3d points which should be projected to the result mask image
     :param ref_image: A reference image for the dimensionality of the mask
     :param cam_intrinsics: Camera intrinsics that have been used to generate input_cloud
-    :param mask_scale_factor: If your color and depth image size mismatches,
-    you might have to scale your depth-based mask image to the dimensions of your color image.
-    Please provide that factor here. Example: Kinect has 1280x images were as the depth images are only 640x .
-    This would require a scale factor of 2.0
-    :param crop_to_ref: This is usually set to True, if mask_scale_factor has been set. Crop the result of the scale
-    operation to the size of ref_image (0:height) and (0:width)
+    :param mask_scale_factor: If your color and depth image size mismatches, you might
+        have to scale your depth-based mask image to the dimensions of your color image.
+        Please provide that factor here. Example: Kinect has 1280x images were as the
+        depth images are only 640x . This would require a scale factor of 2.0
+    :param crop_to_ref: This is usually set to True, if mask_scale_factor has been set.
+        Crop the result of the scale operation to the size of ref_image (0:height) and
+        (0:width)
     :return: A binary mask image for OpenCV
     """
     K = cam_intrinsics.intrinsic_matrix
@@ -315,7 +326,8 @@ def scale_o3d_cam_intrinsics(
 def concatenate_clouds(
     clouds: List[o3d.geometry.PointCloud],
 ) -> o3d.geometry.PointCloud:
-    """Combine multiple point clouds into one.
+    """
+    Combine multiple point clouds into one.
 
     Concatenates points and colors from input clouds.
 
@@ -340,7 +352,8 @@ def get_cloud_from_rgb_depth_and_mask(
     depth_truncate: float = 9.0,
     mask_true_val: int = 255,
 ) -> o3d.geometry.PointCloud:
-    """Create point cloud from RGB-D images and mask.
+    """
+    Create point cloud from RGB-D images and mask.
 
     Generate a pointcloud from an object mask, rgb and depth image.
     Important: The depth_image will be changed when executing this function. Provide a copy if necessary.
@@ -379,7 +392,8 @@ def create_line_for_visualization(
     target: Tuple[float, float, float],
     color: Tuple[float, float, float],
 ) -> o3d.geometry.LineSet:
-    """Create a LineSet that you can use to visualize a line between two points
+    """
+    Create a LineSet that you can use to visualize a line between two points.
 
     :param origin: 3 element list: [x,y,z]
     :param target: 3 element list: [x,y,z]
@@ -398,7 +412,8 @@ def create_line_for_visualization(
 def create_sphere_from_translation(
     origin: npt.NDArray, color: Tuple[float, float, float], radius: float
 ) -> o3d.geometry.TriangleMesh:
-    """Create an o3d sphere for visualization.
+    """
+    Create an o3d sphere for visualization.
 
     :param origin: 3d translation vector
     :param color: 3 element list with entries 0-1 for RGB
@@ -413,8 +428,8 @@ def create_sphere_from_translation(
 
 def trimesh_to_o3d_mesh(mesh: trimesh.Trimesh) -> o3d.geometry.TriangleMesh:
     """
-    Convert the standard mesh representation of semantic_digital_twin (trimesh) to a type that the
-    O3DVisualizer can show.
+    Convert the standard mesh representation of semantic_digital_twin (trimesh) to a
+    type that the O3DVisualizer can show.
 
     :param mesh: The mesh to convert
     :return: An open3d compatible triangle mesh

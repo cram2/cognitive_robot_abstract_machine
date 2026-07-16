@@ -24,8 +24,10 @@ class GraspBar(Task):
     def __post_init__(self):
         """
         Like a CartesianPose but with more freedom.
-        tip_link is allowed to be at any point along bar_axis, that is without bar_center +/- bar_length.
-        It will align tip_grasp_axis with bar_axis, but allows rotation around it.
+
+        tip_link is allowed to be at any point along bar_axis, that is without
+        bar_center +/- bar_length. It will align tip_grasp_axis with bar_axis, but
+        allows rotation around it.
         :param root_link: root link of the kinematic chain
         :param tip_link: tip link of the kinematic chain
         :param tip_grasp_axis: axis of tip_link that will be aligned with bar_axis

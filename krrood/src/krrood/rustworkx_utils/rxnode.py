@@ -126,8 +126,11 @@ class RWXNode:
         filename: str = "pdf_graph.pdf",
         title: str = "Directed Query Graph (Top to Bottom)",
     ):
-        """Render a rooted, top-to-bottom directed graph.
-        Delegates to a dedicated visualizer class to keep this method small and reusable.
+        """
+        Render a rooted, top-to-bottom directed graph.
+
+        Delegates to a dedicated visualizer class to keep this method small and
+        reusable.
         """
         visualizer = GraphVisualizer(
             node=self,

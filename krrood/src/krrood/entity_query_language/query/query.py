@@ -1,8 +1,9 @@
 """
 Query abstractions for the Entity Query Language.
 
-This module implements query composition and evaluation, including selection, filtering, grouping, ordering,
-distinct handling, and quantification over symbolic expressions.
+This module implements query composition and evaluation, including
+selection, filtering, grouping, ordering, distinct handling, and
+quantification over symbolic expressions.
 """
 
 from __future__ import annotations
@@ -87,6 +88,7 @@ from krrood.entity_query_language.utils import (
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.factories import ConditionType
+    from krrood.entity_query_language.backends import QueryBackend
 
 ResultMapping = Callable[[Iterator[OperationResult]], Iterator[OperationResult]]
 """
@@ -168,8 +170,9 @@ class Query(
     ABC,
 ):
     """
-    Describes the queried object(s), could be a query over a single variable or a set of variables,
-    also describes the condition(s)/properties of the queried object(s).
+    Describes the queried object(s), could be a query over a single variable or
+    a set of variables, also describes the condition(s)/properties of the
+    queried object(s).
     """
 
     _selected_variables_: Tuple[Selectable, ...] = field(
@@ -178,34 +181,43 @@ class Query(
     """
     The variables that are selected by the query.
     """
+
     _distinct_on: Tuple[Selectable, ...] = field(default_factory=tuple, init=False)
     """
     Parameters for distinct results of the query.
     """
+
     _results_mapping: List[ResultMapping] = field(init=False, default_factory=list)
     """
-    Mapping functions that map the results of the query to a new set of results.
+    Mapping functions that map the results of the query to a new set of
+    results.
     """
+
     _seen_results: Optional[SeenSet] = field(init=False, default=None)
     """
     A set of seen results, used when distinct is called in the query.
     """
+
     _where_builder_: Optional[WhereBuilder] = field(init=False, default=None)
     """
     The builder for the `Where` expression of the query.
     """
+
     _grouped_by_builder_: Optional[GroupedByBuilder] = field(init=False, default=None)
     """
     The builder for the `GroupedBy` expression of the query.
     """
+
     _having_builder_: Optional[HavingBuilder] = field(init=False, default=None)
     """
     The builder for the `Having` expression of the query.
     """
+
     _ordered_by_builder_: Optional[OrderedByBuilder] = field(default=None, init=False)
     """
     The ordering specification applied as a pipeline stage, if the query is ordered.
     """
+
     _quantifier_builder_: Optional[QuantifierBuilder] = field(default=None, init=False)
     """
     The quantification specification applied as a pipeline stage. Defaults to `An`, which accepts all
@@ -250,15 +262,17 @@ class Query(
         self.__dict__.pop("_group_", None)
         self.__dict__.pop("_distinct_on_ids_", None)
 
-    def evaluate(self, backend=None) -> Iterator:
+    def evaluate(self, backend: Optional[QueryBackend] = None) -> Iterator:
         """
-        Evaluate the query using the given backend, returning an iterator over the results.
+        Evaluate the query using the given backend, returning an iterator over
+        the results.
 
         Builds the query eagerly so that ``evaluate`` consistently marks it as built regardless of
         when the returned iterator is consumed; ``build`` is idempotent.
 
-        :param backend: The query backend to evaluate with. Defaults to the
-            ``EntityQueryLanguageBackend`` (native python evaluation).
+        :param backend: The query backend to evaluate with. Defaults to
+            the ``EntityQueryLanguageBackend`` (native python
+            evaluation).
         """
         self.build()
         return super().evaluate(backend)
@@ -277,9 +291,11 @@ class Query(
     @modifies_query_structure
     def where(self, *conditions: ConditionType) -> Self:
         """
-        Set the conditions that describe the query object. The conditions are chained using AND.
+        Set the conditions that describe the query object.
 
-        :param conditions: The conditions that describe the query object.
+        The conditions are chained using AND.
+        :param conditions: The conditions that describe the query
+            object.
         :return: This query.
         """
         if self._where_builder_ is None:
@@ -291,9 +307,11 @@ class Query(
     @modifies_query_structure
     def having(self, *conditions: ConditionType) -> Self:
         """
-        Set the conditions that describe the query object. The conditions are chained using AND.
+        Set the conditions that describe the query object.
 
-        :param conditions: The conditions that describe the query object.
+        The conditions are chained using AND.
+        :param conditions: The conditions that describe the query
+            object.
         :return: This query.
         """
         if self._having_builder_ is None:
@@ -310,11 +328,14 @@ class Query(
         key: Optional[Callable] = None,
     ) -> Self:
         """
-        Order the results by the given variable, using the given key function in descending or ascending order.
+        Order the results by the given variable, using the given key function
+        in descending or ascending order.
 
         :param variable: The variable to order by.
-        :param descending: Whether to order the results in descending order.
-        :param key: A function to extract the key from the variable value.
+        :param descending: Whether to order the results in descending
+            order.
+        :param key: A function to extract the key from the variable
+            value.
         """
         self._ordered_by_builder_ = OrderedByBuilder(
             self, variable, descending=descending, key=key
@@ -344,7 +365,8 @@ class Query(
         """
         Specify the variables to group the results by.
 
-        :param variables_to_group_by: The variables to group the results by.
+        :param variables_to_group_by: The variables to group the results
+            by.
         :return: This query.
         """
         self._grouped_by_builder_ = GroupedByBuilder(self, variables_to_group_by)
@@ -370,10 +392,12 @@ class Query(
         quantification_constraint: Optional[ResultQuantificationConstraint] = None,
     ) -> Self:
         """
-        Specify the quantifier type and constraint for the query results, also build the query.
+        Specify the quantifier type and constraint for the query results, also
+        build the query.
 
         :param quantifier_type: The type of the quantifier to be used.
-        :param quantification_constraint: The constraint to apply to the quantifier.
+        :param quantification_constraint: The constraint to apply to the
+            quantifier.
         :return: This query.
         """
         self._quantifier_builder_ = QuantifierBuilder(
@@ -383,7 +407,8 @@ class Query(
 
     def __enter__(self):
         """
-        Make sure the query is built before entering the context manager for rule trees.
+        Make sure the query is built before entering the context manager for
+        rule trees.
         """
         self.build()
         expression = self._conditions_root_
@@ -657,7 +682,8 @@ class Query(
 
     def _update_res_with_distinct_on_variables_(self, res: Dict[int, Any]):
         """
-        Update the result dictionary with values from distinct-on variables if not already present.
+        Update the result dictionary with values from distinct-on variables if
+        not already present.
 
         :param res: The result dictionary to update.
         """
@@ -703,7 +729,8 @@ class Query(
             variable_: SymbolicExpression,
         ):
             """
-            Update the aggregated and non-aggregated variable collections based on the given variable.
+            Update the aggregated and non-aggregated variable collections based
+            on the given variable.
 
             :param variable_: The variable to check.
             """
@@ -743,13 +770,17 @@ class Query(
         self, results: Iterator[OperationResult]
     ) -> Iterable[OperationResult]:
         """
-        Process and transform an iterable of results based on predefined mappings and ordering.
+        Process and transform an iterable of results based on predefined
+        mappings and ordering.
 
-        This method applies a sequence of result transformations defined in the instance,
-        using a series of mappings to modify the results.
+        This method applies a sequence of result transformations defined
+        in the instance, using a series of mappings to modify the
+        results.
 
-        :param results: An iterable containing dictionaries that represent the initial result set to be transformed.
-        :return: An iterable containing dictionaries that represent the transformed data.
+        :param results: An iterable containing dictionaries that
+            represent the initial result set to be transformed.
+        :return: An iterable containing dictionaries that represent the
+            transformed data.
         """
         for result_mapping in self._results_mapping:
             results = result_mapping(results)
@@ -911,10 +942,12 @@ class Entity(Query[T]):
         self, group_key_root_ids: Set[uuid.UUID]
     ) -> List[SymbolicExpression]:
         """
-        When the selection is an :class:`InstantiatedVariable`, its aggregated fields are the child
-        variables not rooted in a group key; otherwise the generic per-selection rule applies.
+        When the selection is an :class:`InstantiatedVariable`, its aggregated
+        fields are the child variables not rooted in a group key; otherwise the
+        generic per-selection rule applies.
 
-        :param group_key_root_ids: The chain-root variable ids of the GROUP BY keys.
+        :param group_key_root_ids: The chain-root variable ids of the
+            GROUP BY keys.
         :return: The selected expressions aggregated over those keys.
         """
         selected = self.selected_variable

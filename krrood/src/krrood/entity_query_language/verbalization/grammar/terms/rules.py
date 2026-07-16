@@ -57,7 +57,9 @@ _PRIMITIVE_VALUE_TYPES = (int, float, str, bool)
 
 
 class VariableRule(PhraseRule):
-    """*"a/an Robot"* (first mention), *"the Robot"* (subsequent), or *"Robot N"* (numbered).
+    """
+    *"a/an Robot"* (first mention), *"the Robot"* (subsequent), or *"Robot N"*
+    (numbered).
 
     >>> verbalize_expression(variable(Robot, []))
     'a Robot'
@@ -109,8 +111,9 @@ class VariableRule(PhraseRule):
 
     @staticmethod
     def _plural(node: Variable, context: RuleContext) -> VerbalizationFragment:
-        """Bare plural variable noun phrase (*"Robots"*); the determiner phase drops the article and
-        the morphology pass inflects the head.
+        """
+        Bare plural variable noun phrase (*"Robots"*); the determiner phase drops the
+        article and the morphology pass inflects the head.
 
         A numbered label (*"Robot 2"*) is surface-final — kept singular and bare; a plain type
         name is a plural indefinite noun phrase (the concord table renders it bare-then-pluralised).
@@ -134,8 +137,10 @@ class VariableRule(PhraseRule):
 
 
 class LiteralRule(PhraseRule):
-    """A literal value (e.g. ``42``, ``"hello"``, ``True``), or *"a specific <Type>"* for a concrete
-    object literal — we mean its identity, and its ``repr`` can be arbitrarily large.
+    """
+    A literal value (e.g. ``42``, ``"hello"``, ``True``), or *"a specific <Type>"* for a
+    concrete object literal — we mean its identity, and its ``repr`` can be arbitrarily
+    large.
 
     >>> verbalize_expression(variable(Robot, []).battery == 42)
     'the battery of a Robot is 42'
@@ -265,7 +270,8 @@ class LiteralRule(PhraseRule):
 
 
 class ExternalVariableRule(PhraseRule):
-    """*"a/an TypeName"* for an opaque externally-set variable (no coreference).
+    """
+    *"a/an TypeName"* for an opaque externally-set variable (no coreference).
 
     >>> verbalize_expression(ExternallySetVariable(_type_=Robot))
     'a Robot'
@@ -282,7 +288,8 @@ class ExternalVariableRule(PhraseRule):
 
 
 class FlatVariableRule(PhraseRule):
-    """A transparent SetOf wrapper → unwrap to its child (forwarding the requested number).
+    """
+    A transparent SetOf wrapper → unwrap to its child (forwarding the requested number).
 
     >>> verbalize_expression(FlatVariable(_child_=variable(Worker, []).tasks))
     'the tasks of a Worker'

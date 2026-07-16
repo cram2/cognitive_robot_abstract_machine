@@ -11,6 +11,7 @@ from typing_extensions import (
     Any,
     TYPE_CHECKING,
     Optional,
+    Callable,
     Type,
 )
 
@@ -44,14 +45,17 @@ class CaseReasoner:
     """
     The case instance on which the reasoning is performed.
     """
+
     result: Optional[ReasoningResult] = field(init=False, default=None)
     """
     The latest result of the :py:meth:`reason` call.
     """
+
     model_directory: str = field(default_factory=lambda: dirname(__file__))
     """
     The directory where the rdr model folder is located.
     """
+
     rdrs: ClassVar[CaseRDRs] = CaseRDRs()
     """
     This is a collection of ripple down rules reasoners that infer case attributes.
@@ -75,9 +79,11 @@ class CaseReasoner:
 
     def reason(self) -> Dict[str, Any]:
         """
-        Perform rule-based reasoning on the current semantic annotation and infer all possible concepts.
+        Perform rule-based reasoning on the current semantic annotation and infer all
+        possible concepts.
 
-        :return: The inferred concepts as a dictionary mapping concept name to all inferred values of that concept.
+        :return: The inferred concepts as a dictionary mapping concept name to all
+            inferred values of that concept.
         """
         self.result = self.rdr.classify(self.case, modify_case=True)
         return self.result
@@ -88,20 +94,30 @@ class CaseReasoner:
         attribute_types: List[Type[Any]],
         mutually_exclusive: bool,
         update_existing_rules: bool = False,
+        case_factory: Optional[Callable] = None,
+        scenario: Optional[Callable] = None,
     ) -> None:
         """
         Fit the semantic annotation RDR to the required attribute types.
 
         :param attribute_name: The attribute name that the RDR should be fitted to.
-        :param attribute_types: A list of attribute types that the RDR should be fitted to.
-        :param mutually_exclusive: whether the attribute values are mutually exclusive or not.
-        :param update_existing_rules: If True, existing rules of the given types will be updated with new rules,
-         else they will be skipped.
+        :param attribute_types: A list of attribute types that the RDR should be fitted
+            to.
+        :param mutually_exclusive: whether the attribute values are mutually exclusive
+            or not.
+        :param update_existing_rules: If True, existing rules of the given types will be
+            updated with new rules, else they will be skipped.
+        :param case_factory: Optional callable that can be used to recreate the case
+            object.
+        :param scenario: Optional callable that represents the test method or scenario
+            that is being executed.
         """
         case_query = CaseQuery(
             self.case,
             attribute_name,
             tuple(attribute_types),
             mutually_exclusive,
+            case_factory=case_factory,
+            scenario=scenario,
         )
         self.rdr.fit_case(case_query, update_existing_rules=update_existing_rules)

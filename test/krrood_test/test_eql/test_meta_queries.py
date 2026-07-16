@@ -7,7 +7,7 @@ verified against the known rule structure.
 Drawer rule (DoorsAndDrawersWorld):
     handle         = variable(Handle, world.bodies)
     prismatic_conn = variable(PrismaticConnection, world.connections)
-    fixed_conn     = an(FixedConnection)(
+    fixed_conn     = a(FixedConnection)(
                          parent=prismatic_conn.child, child=handle).from_(world.connections)
     rule           = inference(Drawer)(container=fixed_conn.parent, handle=fixed_conn.child)
   Conditions: fixed_conn.parent == prismatic_conn.child  AND  fixed_conn.child == handle
@@ -33,6 +33,7 @@ from krrood.entity_query_language.explanation.explanation import (
 from krrood.entity_query_language.factories import (
     entity,
     variable,
+    a,
     an,
     inference,
 )
@@ -61,9 +62,9 @@ def drawer_explanation(doors_and_drawers_world) -> InferenceExplanation:
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_conn = variable(PrismaticConnection, world.connections)
-    fixed_conn = an(FixedConnection)(
-        parent=prismatic_conn.child, child=handle
-    ).from_(world.connections)
+    fixed_conn = a(FixedConnection)(parent=prismatic_conn.child, child=handle).from_(
+        world.connections
+    )
     drawers = inference(Drawer)(
         container=fixed_conn.expression.parent, handle=fixed_conn.expression.child
     ).tolist()

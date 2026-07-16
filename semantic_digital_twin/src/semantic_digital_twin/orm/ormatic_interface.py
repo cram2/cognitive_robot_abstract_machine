@@ -18,7 +18,6 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 import builtins
 import enum
 import krrood.adapters.json_serializer
-import krrood.entity_query_language.orm.model
 import krrood.ormatic.custom_types
 import krrood.ormatic.data_access_objects.alternative_mappings
 import krrood.ormatic.type_dict
@@ -32,6 +31,23 @@ import semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semanti
 import semantic_digital_twin.adapters.partnet_mobility_dataset.loader
 import semantic_digital_twin.adapters.partnet_mobility_dataset.semantic_annotations
 import semantic_digital_twin.adapters.procthor.procthor_parser
+import semantic_digital_twin.adapters.robocasa_dataset.exceptions
+import semantic_digital_twin.adapters.robocasa_dataset.loader
+import semantic_digital_twin.adapters.robocasa_dataset.semantics
+import semantic_digital_twin.adapters.ros.messages
+import semantic_digital_twin.adapters.ros.msg_converter
+import semantic_digital_twin.adapters.ros.ros2_to_semdt_converters
+import semantic_digital_twin.adapters.ros.ros_msg_serializer
+import semantic_digital_twin.adapters.ros.semdt_to_ros2_converters
+import semantic_digital_twin.adapters.ros.tf_publisher
+import semantic_digital_twin.adapters.ros.tfwrapper
+import semantic_digital_twin.adapters.ros.visualization.collision_viz_marker
+import semantic_digital_twin.adapters.ros.visualization.exceptions
+import semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer
+import semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher
+import semantic_digital_twin.adapters.ros.visualization.viz_marker
+import semantic_digital_twin.adapters.ros.world_fetcher
+import semantic_digital_twin.adapters.ros.world_synchronizer
 import semantic_digital_twin.adapters.sage_10k_dataset.loader
 import semantic_digital_twin.adapters.sage_10k_dataset.schema
 import semantic_digital_twin.adapters.urdf
@@ -123,21 +139,40 @@ class Base(DeclarativeBase):
 
 
 # Association tables for many-to-many relationships
-class SymbolGraphMappingDAO_instances_association(Base, AssociationDataAccessObject):
-    __tablename__ = "_81067648797638488542008423406786912563441407992272678641741406"
+class RoboCasaTaskDAO_manipulated_objects_association(
+    Base, AssociationDataAccessObject
+):
+    __tablename__ = "_90043455320627873600492019169457595086263654644357312483802927"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    source_symbolgraphmappingdao_id: Mapped[int] = mapped_column(
-        ForeignKey("SymbolGraphMappingDAO.database_id")
+    source_robocasataskdao_id: Mapped[int] = mapped_column(
+        ForeignKey("RoboCasaTaskDAO.database_id")
     )
-    target_wrappedinstancemappingdao_id: Mapped[int] = mapped_column(
-        ForeignKey("WrappedInstanceMappingDAO.database_id")
+    target_bodydao_id: Mapped[int] = mapped_column(ForeignKey("BodyDAO.database_id"))
+
+    target: Mapped[BodyDAO] = relationship(
+        "BodyDAO", foreign_keys=[target_bodydao_id], lazy="selectin"
     )
 
-    target: Mapped[WrappedInstanceMappingDAO] = relationship(
-        "WrappedInstanceMappingDAO",
-        foreign_keys=[target_wrappedinstancemappingdao_id],
+
+class WorldModelSnapshotDAO_modifications_association(
+    Base, AssociationDataAccessObject
+):
+    __tablename__ = "_24698704726108595078964782894919771941347483550905452311408919"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_worldmodelsnapshotdao_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldModelSnapshotDAO.database_id")
+    )
+    target_worldmodelmodificationblockdao_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldModelModificationBlockDAO.database_id")
+    )
+
+    target: Mapped[WorldModelModificationBlockDAO] = relationship(
+        "WorldModelModificationBlockDAO",
+        foreign_keys=[target_worldmodelmodificationblockdao_id],
         lazy="selectin",
     )
 
@@ -741,6 +776,48 @@ class ConnectionDAO_simulator_additional_properties_association(
     target: Mapped[SimulatorAdditionalPropertyDAO] = relationship(
         "SimulatorAdditionalPropertyDAO",
         foreign_keys=[target_simulatoradditionalpropertydao_id],
+        lazy="selectin",
+    )
+
+
+class TfPublisherModelCallbackDAO_ignored_kinematic_structure_entities_association(
+    Base, AssociationDataAccessObject
+):
+    __tablename__ = "_81194114849190998785115027879032778576443272100015680570805548"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_tfpublishermodelcallbackdao_id: Mapped[int] = mapped_column(
+        ForeignKey("TfPublisherModelCallbackDAO.database_id")
+    )
+    target_kinematicstructureentitydao_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id")
+    )
+
+    target: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        foreign_keys=[target_kinematicstructureentitydao_id],
+        lazy="selectin",
+    )
+
+
+class TFPublisherDAO_ignored_kinematic_structure_entities_association(
+    Base, AssociationDataAccessObject
+):
+    __tablename__ = "_10847423734993281096727992810714124032814938791878717524770991"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_tfpublisherdao_id: Mapped[int] = mapped_column(
+        ForeignKey("TFPublisherDAO.database_id")
+    )
+    target_kinematicstructureentitydao_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id")
+    )
+
+    target: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        foreign_keys=[target_kinematicstructureentitydao_id],
         lazy="selectin",
     )
 
@@ -1724,6 +1801,21 @@ class DrawerDAO_objects_association(Base, AssociationDataAccessObject):
     )
 
 
+class MicrowaveDAO_doors_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_35812101388176730312141457055540524846783346443279015104871397"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_microwavedao_id: Mapped[int] = mapped_column(
+        ForeignKey("MicrowaveDAO.database_id")
+    )
+    target_doordao_id: Mapped[int] = mapped_column(ForeignKey("DoorDAO.database_id"))
+
+    target: Mapped[DoorDAO] = relationship(
+        "DoorDAO", foreign_keys=[target_doordao_id], lazy="selectin"
+    )
+
+
 class OvenDAO_doors_association(Base, AssociationDataAccessObject):
     __tablename__ = "_72178414233444022749970370294566120725055259122277198987950863"
 
@@ -1866,37 +1958,6 @@ class FunctionMappingDAO(
     )
     class_name: Mapped[typing.Optional[builtins.str]] = mapped_column(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-
-class SymbolGraphMappingDAO(
-    Base, DataAccessObject[krrood.entity_query_language.orm.model.SymbolGraphMapping]
-):
-    __tablename__ = "SymbolGraphMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    instances: Mapped[builtins.list[SymbolGraphMappingDAO_instances_association]] = (
-        relationship(
-            "SymbolGraphMappingDAO_instances_association",
-            collection_class=builtins.list,
-            cascade="all, delete-orphan",
-            foreign_keys="[SymbolGraphMappingDAO_instances_association.source_symbolgraphmappingdao_id]",
-            lazy="selectin",
-        )
-    )
-
-
-class WrappedInstanceMappingDAO(
-    Base,
-    DataAccessObject[krrood.entity_query_language.orm.model.WrappedInstanceMapping],
-):
-    __tablename__ = "WrappedInstanceMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
     )
 
 
@@ -3560,6 +3621,1374 @@ class ProcthorWallDAO(
     wall_thickness: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
 
+class RoboCasaApplianceNotFoundErrorDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.robocasa_dataset.exceptions.RoboCasaApplianceNotFoundError
+    ],
+):
+    __tablename__ = "RoboCasaApplianceNotFoundErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    category: Mapped[
+        semantic_digital_twin.adapters.robocasa_dataset.semantics.RoboCasaKitchenApplianceCategory
+    ] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
+
+
+class RoboCasaObjectAssetsNotFoundErrorDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.robocasa_dataset.exceptions.RoboCasaObjectAssetsNotFoundError
+    ],
+):
+    __tablename__ = "RoboCasaObjectAssetsNotFoundErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    category: Mapped[
+        semantic_digital_twin.adapters.robocasa_dataset.semantics.RoboCasaObjectCategory
+    ] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
+    objects_directory: Mapped[pathlib.Path] = mapped_column(
+        krrood.ormatic.custom_types.PathType, nullable=False, use_existing_column=True
+    )
+
+
+class RoboCasaObjectHasNoCollisionErrorDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.robocasa_dataset.exceptions.RoboCasaObjectHasNoCollisionError
+    ],
+):
+    __tablename__ = "RoboCasaObjectHasNoCollisionErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    category: Mapped[
+        semantic_digital_twin.adapters.robocasa_dataset.semantics.RoboCasaObjectCategory
+    ] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
+
+
+class RoboCasaObjectInstanceIndexErrorDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.robocasa_dataset.exceptions.RoboCasaObjectInstanceIndexError
+    ],
+):
+    __tablename__ = "RoboCasaObjectInstanceIndexErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    requested_instance_index: Mapped[builtins.int] = mapped_column(
+        use_existing_column=True
+    )
+    available_instance_count: Mapped[builtins.int] = mapped_column(
+        use_existing_column=True
+    )
+
+    category: Mapped[
+        semantic_digital_twin.adapters.robocasa_dataset.semantics.RoboCasaObjectCategory
+    ] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
+    objects_directory: Mapped[pathlib.Path] = mapped_column(
+        krrood.ormatic.custom_types.PathType, nullable=False, use_existing_column=True
+    )
+
+
+class RoboCasaTaskNotFoundErrorDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.robocasa_dataset.exceptions.RoboCasaTaskNotFoundError
+    ],
+):
+    __tablename__ = "RoboCasaTaskNotFoundErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    task_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    available_task_names: Mapped[typing.List[builtins.str]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+
+class RoboCasaDatasetLoaderDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.robocasa_dataset.loader.RoboCasaDatasetLoader
+    ],
+):
+    __tablename__ = "RoboCasaDatasetLoaderDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    directory: Mapped[pathlib.Path] = mapped_column(
+        krrood.ormatic.custom_types.PathType, nullable=False, use_existing_column=True
+    )
+
+    kitchen_appliance_annotator_id: Mapped[int] = mapped_column(
+        ForeignKey("RoboCasaKitchenApplianceResolverDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    object_annotator_id: Mapped[int] = mapped_column(
+        ForeignKey("RoboCasaObjectResolverDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    kitchen_appliance_annotator: Mapped[RoboCasaKitchenApplianceResolverDAO] = (
+        relationship(
+            "RoboCasaKitchenApplianceResolverDAO",
+            uselist=False,
+            foreign_keys=[kitchen_appliance_annotator_id],
+            post_update=True,
+        )
+    )
+    object_annotator: Mapped[RoboCasaObjectResolverDAO] = relationship(
+        "RoboCasaObjectResolverDAO",
+        uselist=False,
+        foreign_keys=[object_annotator_id],
+        post_update=True,
+    )
+
+
+class RoboCasaTaskDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.robocasa_dataset.loader.RoboCasaTask
+    ],
+):
+    __tablename__ = "RoboCasaTaskDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    instruction: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    robot_base_pose_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "HomogeneousTransformationMatrixMappingDAO.database_id", use_alter=True
+        ),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+    manipulated_objects: Mapped[
+        builtins.list[RoboCasaTaskDAO_manipulated_objects_association]
+    ] = relationship(
+        "RoboCasaTaskDAO_manipulated_objects_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[RoboCasaTaskDAO_manipulated_objects_association.source_robocasataskdao_id]",
+        lazy="selectin",
+    )
+    robot_base_pose: Mapped[HomogeneousTransformationMatrixMappingDAO] = relationship(
+        "HomogeneousTransformationMatrixMappingDAO",
+        uselist=False,
+        foreign_keys=[robot_base_pose_id],
+        post_update=True,
+    )
+
+
+class RoboCasaCategoryResolverDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.robocasa_dataset.semantics.RoboCasaCategoryResolver
+    ],
+):
+    __tablename__ = "RoboCasaCategoryResolverDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "RoboCasaCategoryResolverDAO",
+    }
+
+
+class RoboCasaKitchenApplianceResolverDAO(
+    RoboCasaCategoryResolverDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.robocasa_dataset.semantics.RoboCasaKitchenApplianceResolver
+    ],
+):
+    __tablename__ = "RoboCasaKitchenApplianceResolverDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoboCasaCategoryResolverDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "RoboCasaKitchenApplianceResolverDAO",
+        "inherit_condition": database_id == RoboCasaCategoryResolverDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class RoboCasaObjectResolverDAO(
+    RoboCasaCategoryResolverDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.robocasa_dataset.semantics.RoboCasaObjectResolver
+    ],
+):
+    __tablename__ = "RoboCasaObjectResolverDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoboCasaCategoryResolverDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "RoboCasaObjectResolverDAO",
+        "inherit_condition": database_id == RoboCasaCategoryResolverDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class AcknowledgmentDAO(
+    Base, DataAccessObject[semantic_digital_twin.adapters.ros.messages.Acknowledgment]
+):
+    __tablename__ = "AcknowledgmentDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    publication_event_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+
+    node_meta_data_id: Mapped[int] = mapped_column(
+        ForeignKey("MetaDataDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    node_meta_data: Mapped[MetaDataDAO] = relationship(
+        "MetaDataDAO", uselist=False, foreign_keys=[node_meta_data_id], post_update=True
+    )
+
+
+class MessageDAO(
+    Base, DataAccessObject[semantic_digital_twin.adapters.ros.messages.Message]
+):
+    __tablename__ = "MessageDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    publication_event_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    meta_data_id: Mapped[int] = mapped_column(
+        ForeignKey("MetaDataDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    meta_data: Mapped[MetaDataDAO] = relationship(
+        "MetaDataDAO", uselist=False, foreign_keys=[meta_data_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "MessageDAO",
+    }
+
+
+class LoadModelDAO(
+    MessageDAO, DataAccessObject[semantic_digital_twin.adapters.ros.messages.LoadModel]
+):
+    __tablename__ = "LoadModelDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MessageDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    primary_key: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "LoadModelDAO",
+        "inherit_condition": database_id == MessageDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MetaDataDAO(
+    Base, DataAccessObject[semantic_digital_twin.adapters.ros.messages.MetaData]
+):
+    __tablename__ = "MetaDataDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    node_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    process_id: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+
+
+class ModificationBlockDAO(
+    MessageDAO,
+    DataAccessObject[semantic_digital_twin.adapters.ros.messages.ModificationBlock],
+):
+    __tablename__ = "ModificationBlockDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MessageDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    modifications_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldModelModificationBlockDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    modifications: Mapped[WorldModelModificationBlockDAO] = relationship(
+        "WorldModelModificationBlockDAO",
+        uselist=False,
+        foreign_keys=[modifications_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ModificationBlockDAO",
+        "inherit_condition": database_id == MessageDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class WorldModelSnapshotDAO(
+    Base,
+    DataAccessObject[semantic_digital_twin.adapters.ros.messages.WorldModelSnapshot],
+):
+    __tablename__ = "WorldModelSnapshotDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    ids: Mapped[typing.List[uuid.UUID]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+    states: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    modifications: Mapped[
+        builtins.list[WorldModelSnapshotDAO_modifications_association]
+    ] = relationship(
+        "WorldModelSnapshotDAO_modifications_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[WorldModelSnapshotDAO_modifications_association.source_worldmodelsnapshotdao_id]",
+        lazy="selectin",
+    )
+
+
+class WorldStateUpdateDAO(
+    MessageDAO,
+    DataAccessObject[semantic_digital_twin.adapters.ros.messages.WorldStateUpdate],
+):
+    __tablename__ = "WorldStateUpdateDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MessageDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    ids: Mapped[typing.List[uuid.UUID]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+    states: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "WorldStateUpdateDAO",
+        "inherit_condition": database_id == MessageDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class WorldUpdateDAO(
+    MessageDAO,
+    DataAccessObject[semantic_digital_twin.adapters.ros.messages.WorldUpdate],
+):
+    __tablename__ = "WorldUpdateDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MessageDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    modification_block_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("ModificationBlockDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    state_update_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("WorldStateUpdateDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    modification_block: Mapped[ModificationBlockDAO] = relationship(
+        "ModificationBlockDAO",
+        uselist=False,
+        foreign_keys=[modification_block_id],
+        post_update=True,
+    )
+    state_update: Mapped[WorldStateUpdateDAO] = relationship(
+        "WorldStateUpdateDAO",
+        uselist=False,
+        foreign_keys=[state_update_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "WorldUpdateDAO",
+        "inherit_condition": database_id == MessageDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class ROS2ConversionErrorDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.msg_converter.ROS2ConversionError
+    ],
+):
+    __tablename__ = "ROS2ConversionErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "ROS2ConversionErrorDAO",
+    }
+
+
+class CannotConvertRos2ToSemDTErrorDAO(
+    ROS2ConversionErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.msg_converter.CannotConvertRos2ToSemDTError
+    ],
+):
+    __tablename__ = "CannotConvertRos2ToSemDTErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ROS2ConversionErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    data_type: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CannotConvertRos2ToSemDTErrorDAO",
+        "inherit_condition": database_id == ROS2ConversionErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class CannotConvertSemDTToRos2ErrorDAO(
+    ROS2ConversionErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.msg_converter.CannotConvertSemDTToRos2Error
+    ],
+):
+    __tablename__ = "CannotConvertSemDTToRos2ErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ROS2ConversionErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    data_type: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CannotConvertSemDTToRos2ErrorDAO",
+        "inherit_condition": database_id == ROS2ConversionErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class Ros2ToSemDTConverterDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.msg_converter.Ros2ToSemDTConverter
+    ],
+):
+    __tablename__ = "Ros2ToSemDTConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "Ros2ToSemDTConverterDAO",
+    }
+
+
+class SemDTToRos2ConverterDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.msg_converter.SemDTToRos2Converter
+    ],
+):
+    __tablename__ = "SemDTToRos2ConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "SemDTToRos2ConverterDAO",
+    }
+
+
+class ColorToSemDTConverterDAO(
+    Ros2ToSemDTConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.ColorToSemDTConverter
+    ],
+):
+    __tablename__ = "ColorToSemDTConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Ros2ToSemDTConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ColorToSemDTConverterDAO",
+        "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class CubeMarkerToSemDTConverterDAO(
+    Ros2ToSemDTConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.CubeMarkerToSemDTConverter
+    ],
+):
+    __tablename__ = "CubeMarkerToSemDTConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Ros2ToSemDTConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CubeMarkerToSemDTConverterDAO",
+        "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class CylinderMarkerToSemDTConverterDAO(
+    Ros2ToSemDTConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.CylinderMarkerToSemDTConverter
+    ],
+):
+    __tablename__ = "CylinderMarkerToSemDTConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Ros2ToSemDTConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CylinderMarkerToSemDTConverterDAO",
+        "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MeshMarkerToSemDTConverterDAO(
+    Ros2ToSemDTConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.MeshMarkerToSemDTConverter
+    ],
+):
+    __tablename__ = "MeshMarkerToSemDTConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Ros2ToSemDTConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MeshMarkerToSemDTConverterDAO",
+        "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PointStampedToSemDTConverterDAO(
+    Ros2ToSemDTConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.PointStampedToSemDTConverter
+    ],
+):
+    __tablename__ = "PointStampedToSemDTConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Ros2ToSemDTConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PointStampedToSemDTConverterDAO",
+        "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PoseStampedToSemDTConverterDAO(
+    Ros2ToSemDTConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.PoseStampedToSemDTConverter
+    ],
+):
+    __tablename__ = "PoseStampedToSemDTConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Ros2ToSemDTConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PoseStampedToSemDTConverterDAO",
+        "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PoseToSemDTConverterDAO(
+    Ros2ToSemDTConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.PoseToSemDTConverter
+    ],
+):
+    __tablename__ = "PoseToSemDTConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Ros2ToSemDTConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PoseToSemDTConverterDAO",
+        "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class QuaternionToSemDTConverterDAO(
+    Ros2ToSemDTConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.QuaternionToSemDTConverter
+    ],
+):
+    __tablename__ = "QuaternionToSemDTConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Ros2ToSemDTConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "QuaternionToSemDTConverterDAO",
+        "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class SphereMarkerToSemDTConverterDAO(
+    Ros2ToSemDTConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.SphereMarkerToSemDTConverter
+    ],
+):
+    __tablename__ = "SphereMarkerToSemDTConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Ros2ToSemDTConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SphereMarkerToSemDTConverterDAO",
+        "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class TransformStampedToSemDTConverterDAO(
+    Ros2ToSemDTConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.TransformStampedToSemDTConverter
+    ],
+):
+    __tablename__ = "TransformStampedToSemDTConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Ros2ToSemDTConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "TransformStampedToSemDTConverterDAO",
+        "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class Vector3StampedToSemDTConverterDAO(
+    Ros2ToSemDTConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.Vector3StampedToSemDTConverter
+    ],
+):
+    __tablename__ = "Vector3StampedToSemDTConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Ros2ToSemDTConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Vector3StampedToSemDTConverterDAO",
+        "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class DurationJSONSerializerDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.ros_msg_serializer.DurationJSONSerializer
+    ],
+):
+    __tablename__ = "DurationJSONSerializerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class QoSProfileJSONSerializerDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.ros_msg_serializer.QoSProfileJSONSerializer
+    ],
+):
+    __tablename__ = "QoSProfileJSONSerializerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class Ros2MessageJSONSerializerDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.ros_msg_serializer.Ros2MessageJSONSerializer
+    ],
+):
+    __tablename__ = "Ros2MessageJSONSerializerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class ColorToRos2ConverterDAO(
+    SemDTToRos2ConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.ColorToRos2Converter
+    ],
+):
+    __tablename__ = "ColorToRos2ConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SemDTToRos2ConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ColorToRos2ConverterDAO",
+        "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class HomogeneousTransformationMatrixToRos2ConverterDAO(
+    SemDTToRos2ConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.HomogeneousTransformationMatrixToRos2Converter
+    ],
+):
+    __tablename__ = "HomogeneousTransformationMatrixToRos2ConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SemDTToRos2ConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "HomogeneousTransformationMatrixToRos2ConverterDAO",
+        "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class Point3ToRos2ConverterDAO(
+    SemDTToRos2ConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.Point3ToRos2Converter
+    ],
+):
+    __tablename__ = "Point3ToRos2ConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SemDTToRos2ConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Point3ToRos2ConverterDAO",
+        "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PoseToRos2ConverterDAO(
+    SemDTToRos2ConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.PoseToRos2Converter
+    ],
+):
+    __tablename__ = "PoseToRos2ConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SemDTToRos2ConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PoseToRos2ConverterDAO",
+        "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PoseToRos2StampedConverterDAO(
+    SemDTToRos2ConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.PoseToRos2StampedConverter
+    ],
+):
+    __tablename__ = "PoseToRos2StampedConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SemDTToRos2ConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PoseToRos2StampedConverterDAO",
+        "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class QuaternionToRos2ConverterDAO(
+    SemDTToRos2ConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.QuaternionToRos2Converter
+    ],
+):
+    __tablename__ = "QuaternionToRos2ConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SemDTToRos2ConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "QuaternionToRos2ConverterDAO",
+        "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class ShapeToRos2ConverterDAO(
+    SemDTToRos2ConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.ShapeToRos2Converter
+    ],
+):
+    __tablename__ = "ShapeToRos2ConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SemDTToRos2ConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ShapeToRos2ConverterDAO",
+        "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class BoxToRos2ConverterDAO(
+    ShapeToRos2ConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.BoxToRos2Converter
+    ],
+):
+    __tablename__ = "BoxToRos2ConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ShapeToRos2ConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "BoxToRos2ConverterDAO",
+        "inherit_condition": database_id == ShapeToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class CylinderToRos2ConverterDAO(
+    ShapeToRos2ConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.CylinderToRos2Converter
+    ],
+):
+    __tablename__ = "CylinderToRos2ConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ShapeToRos2ConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CylinderToRos2ConverterDAO",
+        "inherit_condition": database_id == ShapeToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class FileMeshToRos2ConverterDAO(
+    ShapeToRos2ConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.FileMeshToRos2Converter
+    ],
+):
+    __tablename__ = "FileMeshToRos2ConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ShapeToRos2ConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "FileMeshToRos2ConverterDAO",
+        "inherit_condition": database_id == ShapeToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class SphereToRos2ConverterDAO(
+    ShapeToRos2ConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.SphereToRos2Converter
+    ],
+):
+    __tablename__ = "SphereToRos2ConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ShapeToRos2ConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SphereToRos2ConverterDAO",
+        "inherit_condition": database_id == ShapeToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class Vector3ToRos2ConverterDAO(
+    SemDTToRos2ConverterDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.Vector3ToRos2Converter
+    ],
+):
+    __tablename__ = "Vector3ToRos2ConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SemDTToRos2ConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Vector3ToRos2ConverterDAO",
+        "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class TFWrapperDAO(
+    Base, DataAccessObject[semantic_digital_twin.adapters.ros.tfwrapper.TFWrapper]
+):
+    __tablename__ = "TFWrapperDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class CannotRenderSpatialTypeErrorDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.exceptions.CannotRenderSpatialTypeError
+    ],
+):
+    __tablename__ = "CannotRenderSpatialTypeErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    spatial_type_type: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+
+class WorldNotResolvableErrorDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.exceptions.WorldNotResolvableError
+    ],
+):
+    __tablename__ = "WorldNotResolvableErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    spatial_type_id: Mapped[int] = mapped_column(
+        ForeignKey("SpatialTypeDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    spatial_type: Mapped[SpatialTypeDAO] = relationship(
+        "SpatialTypeDAO",
+        uselist=False,
+        foreign_keys=[spatial_type_id],
+        post_update=True,
+    )
+
+
+class SpatialTypeMarkerRendererDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer.SpatialTypeMarkerRenderer
+    ],
+):
+    __tablename__ = "SpatialTypeMarkerRendererDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "SpatialTypeMarkerRendererDAO",
+    }
+
+
+class Point3MarkerRendererDAO(
+    SpatialTypeMarkerRendererDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer.Point3MarkerRenderer
+    ],
+):
+    __tablename__ = "Point3MarkerRendererDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SpatialTypeMarkerRendererDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Point3MarkerRendererDAO",
+        "inherit_condition": database_id == SpatialTypeMarkerRendererDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PoseLikeMarkerRendererDAO(
+    SpatialTypeMarkerRendererDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer.PoseLikeMarkerRenderer
+    ],
+):
+    __tablename__ = "PoseLikeMarkerRendererDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SpatialTypeMarkerRendererDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PoseLikeMarkerRendererDAO",
+        "inherit_condition": database_id == SpatialTypeMarkerRendererDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class SpatialTypeVisualizationDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer.SpatialTypeVisualization
+    ],
+):
+    __tablename__ = "SpatialTypeVisualizationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    namespace: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    marker_id_offset: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    lifetime_seconds: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    arrow_length: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    sphere_diameter: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    spatial_type_id: Mapped[int] = mapped_column(
+        ForeignKey("SpatialTypeDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    color_id: Mapped[int] = mapped_column(
+        ForeignKey("ColorDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    spatial_type: Mapped[SpatialTypeDAO] = relationship(
+        "SpatialTypeDAO",
+        uselist=False,
+        foreign_keys=[spatial_type_id],
+        post_update=True,
+    )
+    color: Mapped[ColorDAO] = relationship(
+        "ColorDAO", uselist=False, foreign_keys=[color_id], post_update=True
+    )
+
+
+class Vector3MarkerRendererDAO(
+    SpatialTypeMarkerRendererDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer.Vector3MarkerRenderer
+    ],
+):
+    __tablename__ = "Vector3MarkerRendererDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SpatialTypeMarkerRendererDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Vector3MarkerRendererDAO",
+        "inherit_condition": database_id == SpatialTypeMarkerRendererDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MarkerIdentityDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher.MarkerIdentity
+    ],
+):
+    __tablename__ = "MarkerIdentityDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    namespace: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    marker_id: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+
+class FetchWorldServerDAO(
+    Base,
+    DataAccessObject[semantic_digital_twin.adapters.ros.world_fetcher.FetchWorldServer],
+):
+    __tablename__ = "FetchWorldServerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    service_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+
+
+class NoServiceFoundErrorDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.world_fetcher.NoServiceFoundError
+    ],
+):
+    __tablename__ = "NoServiceFoundErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    service_suffix: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+
 class Sage10kDatasetLoaderDAO(
     Base,
     DataAccessObject[
@@ -4149,6 +5578,46 @@ class CollisionConsumerDAO(
     __mapper_args__ = {
         "polymorphic_on": "polymorphic_type",
         "polymorphic_identity": "CollisionConsumerDAO",
+    }
+
+
+class CollisionVisualizationMarkerPublisherDAO(
+    CollisionConsumerDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.collision_viz_marker.CollisionVisualizationMarkerPublisher
+    ],
+):
+    __tablename__ = "CollisionVisualizationMarkerPublisherDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(CollisionConsumerDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    topic_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    namespace: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    throttle: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    line_width: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CollisionVisualizationMarkerPublisherDAO",
+        "inherit_condition": database_id == CollisionConsumerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7792,6 +9261,19 @@ class HasRobotPartsDAO(
     }
 
 
+class IsPartWholeRelationshipDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.mixins.IsPartWholeRelationship
+    ],
+):
+    __tablename__ = "IsPartWholeRelationshipDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
 class IsPerceivableDAO(
     Base,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.IsPerceivable],
@@ -9535,6 +11017,59 @@ class WorldEntityWithClassBasedIDDAO(
     }
 
 
+class SynchronizerDAO(
+    WorldEntityWithClassBasedIDDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.world_synchronizer.Synchronizer
+    ],
+):
+    __tablename__ = "SynchronizerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldEntityWithClassBasedIDDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    topic_name: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    synchronous: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    acknowledge_topic_name: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    wait_for_synchronization_timeout: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SynchronizerDAO",
+        "inherit_condition": database_id == WorldEntityWithClassBasedIDDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class ModelReloadSynchronizerDAO(
+    SynchronizerDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.world_synchronizer.ModelReloadSynchronizer
+    ],
+):
+    __tablename__ = "ModelReloadSynchronizerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SynchronizerDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ModelReloadSynchronizerDAO",
+        "inherit_condition": database_id == SynchronizerDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class CallbackDAO(
     WorldEntityWithClassBasedIDDAO,
     DataAccessObject[semantic_digital_twin.callbacks.callback.Callback],
@@ -9618,6 +11153,73 @@ class MujocoSynchronizerDAO(
     }
 
 
+class TfPublisherModelCallbackDAO(
+    ModelChangeCallbackDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.tf_publisher.TfPublisherModelCallback
+    ],
+):
+    __tablename__ = "TfPublisherModelCallbackDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ModelChangeCallbackDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    ignored_kinematic_structure_entities: Mapped[
+        builtins.set[
+            TfPublisherModelCallbackDAO_ignored_kinematic_structure_entities_association
+        ]
+    ] = relationship(
+        "TfPublisherModelCallbackDAO_ignored_kinematic_structure_entities_association",
+        collection_class=builtins.set,
+        cascade="all, delete-orphan",
+        foreign_keys="[TfPublisherModelCallbackDAO_ignored_kinematic_structure_entities_association.source_tfpublishermodelcallbackdao_id]",
+        lazy="selectin",
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "TfPublisherModelCallbackDAO",
+        "inherit_condition": database_id == ModelChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class VizMarkerPublisherDAO(
+    ModelChangeCallbackDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.viz_marker.VizMarkerPublisher
+    ],
+):
+    __tablename__ = "VizMarkerPublisherDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ModelChangeCallbackDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    topic_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    alpha: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    shape_source: Mapped[
+        semantic_digital_twin.adapters.ros.visualization.viz_marker.ShapeSource
+    ] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "VizMarkerPublisherDAO",
+        "inherit_condition": database_id == ModelChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class StateChangeCallbackDAO(
     CallbackDAO,
     DataAccessObject[semantic_digital_twin.callbacks.callback.StateChangeCallback],
@@ -9663,6 +11265,91 @@ class _MultiSimStateCallbackDAO(
     __mapper_args__ = {
         "polymorphic_identity": "_MultiSimStateCallbackDAO",
         "inherit_condition": database_id == StateChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class TFPublisherDAO(
+    StateChangeCallbackDAO,
+    DataAccessObject[semantic_digital_twin.adapters.ros.tf_publisher.TFPublisher],
+):
+    __tablename__ = "TFPublisherDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(StateChangeCallbackDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    tf_topic: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    throttle_state_updates: Mapped[builtins.int] = mapped_column(
+        use_existing_column=True
+    )
+
+    ignored_kinematic_structure_entities: Mapped[
+        builtins.set[TFPublisherDAO_ignored_kinematic_structure_entities_association]
+    ] = relationship(
+        "TFPublisherDAO_ignored_kinematic_structure_entities_association",
+        collection_class=builtins.set,
+        cascade="all, delete-orphan",
+        foreign_keys="[TFPublisherDAO_ignored_kinematic_structure_entities_association.source_tfpublisherdao_id]",
+        lazy="selectin",
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "TFPublisherDAO",
+        "inherit_condition": database_id == StateChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class SpatialTypePublisherDAO(
+    StateChangeCallbackDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher.SpatialTypePublisher
+    ],
+):
+    __tablename__ = "SpatialTypePublisherDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(StateChangeCallbackDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    topic_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SpatialTypePublisherDAO",
+        "inherit_condition": database_id == StateChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class WorldSynchronizerDAO(
+    SynchronizerDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.world_synchronizer.WorldSynchronizer
+    ],
+):
+    __tablename__ = "WorldSynchronizerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SynchronizerDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    synchronize_model: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    synchronize_state: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "WorldSynchronizerDAO",
+        "inherit_condition": database_id == SynchronizerDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -17003,6 +18690,27 @@ class ClothDAO(
     }
 
 
+class CoffeeMachineDAO(
+    HasRootBodyDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.CoffeeMachine
+    ],
+):
+    __tablename__ = "CoffeeMachineDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CoffeeMachineDAO",
+        "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class CookingContainerDAO(
     HasRootBodyDAO,
     DataAccessObject[
@@ -17851,6 +19559,27 @@ class HandleDAO(
     }
 
 
+class HoodDAO(
+    HasRootBodyDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Hood
+    ],
+):
+    __tablename__ = "HoodDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "HoodDAO",
+        "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class HouseplantDAO(
     HasRootBodyDAO,
     DataAccessObject[
@@ -18032,6 +19761,35 @@ class HingeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HingeDAO",
         "inherit_condition": database_id == MechanicalJointDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MicrowaveDAO(
+    IsStorageSpaceDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Microwave
+    ],
+):
+    __tablename__ = "MicrowaveDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(IsStorageSpaceDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    doors: Mapped[builtins.list[MicrowaveDAO_doors_association]] = relationship(
+        "MicrowaveDAO_doors_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[MicrowaveDAO_doors_association.source_microwavedao_id]",
+        lazy="selectin",
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MicrowaveDAO",
+        "inherit_condition": database_id == IsStorageSpaceDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -19056,6 +20814,27 @@ class SideTableDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SideTableDAO",
         "inherit_condition": database_id == TableDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class ToasterDAO(
+    HasRootBodyDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Toaster
+    ],
+):
+    __tablename__ = "ToasterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ToasterDAO",
+        "inherit_condition": database_id == HasRootBodyDAO.database_id,
         "polymorphic_load": "selectin",
     }
 

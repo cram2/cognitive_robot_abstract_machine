@@ -14,7 +14,7 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 @dataclass
 class MoveMotion(BaseMotion):
     """
-    Moves the robot to a designated location
+    Moves the robot to a designated location.
     """
 
     target: Pose
@@ -24,7 +24,7 @@ class MoveMotion(BaseMotion):
 
     keep_joint_states: bool = False
     """
-    Keep the joint states of the robot during/at the end of the motion
+    Keep the joint states of the robot during/at the end of the motion.
     """
 
     def perform(self):

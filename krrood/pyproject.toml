@@ -37,6 +37,7 @@ classifiers = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0,<8.0.0",
+    "mypy>=1.8",
 ]
 
 [project.urls]

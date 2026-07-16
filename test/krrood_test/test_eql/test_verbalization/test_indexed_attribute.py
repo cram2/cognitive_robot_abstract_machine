@@ -1,7 +1,7 @@
 """
-Tests for indexed-collection attributes: an integer subscript folds its ordinal into the collection
-noun, which singularizes — *"the first task of a Worker"* rather than *"the first of the tasks of a
-Worker"*.
+Tests for indexed-collection attributes: an integer subscript folds its ordinal into the
+collection noun, which singularizes — *"the first task of a Worker"* rather than *"the
+first of the tasks of a Worker"*.
 """
 
 from __future__ import annotations

@@ -32,8 +32,9 @@ if TYPE_CHECKING:
 @dataclass
 class ConstraintCollection:
     """
-    Holds the equality and inequality constraints of a motion task and groups them by the
-    enforcement strategy that turns them into the rows of the final quadratic program.
+    Holds the equality and inequality constraints of a motion task and groups them by
+    the enforcement strategy that turns them into the rows of the final quadratic
+    program.
     """
 
     _constraints: list[GiskardConstraint] = field(default_factory=list, init=False)
@@ -85,7 +86,8 @@ class ConstraintCollection:
 
     def merge(self, name_prefix: str, other: ConstraintCollection) -> None:
         """
-        Adds the constraints of another collection, prefixing their names to keep them unique.
+        Adds the constraints of another collection, prefixing their names to keep them
+        unique.
         """
         for constraint in other._constraints:
             constraint.name = f"{name_prefix}/{constraint.name}"
@@ -96,7 +98,8 @@ class ConstraintCollection:
         """
         Appends a constraint, assigning it an index-based name if it has none.
 
-        :raises DuplicateNameException: if a constraint with the same name already exists.
+        :raises DuplicateNameException: if a constraint with the same name already
+            exists.
         """
         constraint.name = constraint.name or f"{len(self._constraints)}"
         existing_names = {c.name for c in self._constraints}
@@ -126,7 +129,8 @@ class ConstraintCollection:
 
     def link_to_motion_statechart_node(self, node: MotionStatechartNode) -> None:
         """
-        Scales every constraint weight so it is only active while the given node is running.
+        Scales every constraint weight so it is only active while the given node is
+        running.
         """
         for constraint in self._constraints:
             is_running = sm.if_eq(
@@ -148,17 +152,22 @@ class ConstraintCollection:
         upper_slack_limit: sm.ScalarData = LargeNumber,
     ) -> None:
         """
-        Add a task constraint to the motion problem. This should be used for most constraints.
-        It will not strictly stick to the reference velocity, but requires only a single constraint in the final
+        Add a task constraint to the motion problem.
+
+        This should be used for most constraints. It will not strictly stick to the
+        reference velocity, but requires only a single constraint in the final
         optimization problem and is therefore faster.
-        :param reference_velocity: used by Giskard to limit the error and normalize the weight, will not be strictly
-                                    enforced.
+        :param reference_velocity: used by Giskard to limit the error and normalize the
+            weight, will not be strictly enforced.
         :param task_expression: defines the task function
         :param equality_bound: goal for the derivative of task_expression
         :param quadratic_weight: how expensive it is to violate this constraint
-        :param name: give this constraint a name, required if you add more than one in the same goal
-        :param lower_slack_limit: how much the lower error can be violated, don't use unless you know what you are doing
-        :param upper_slack_limit: how much the upper error can be violated, don't use unless you know what you are doing
+        :param name: give this constraint a name, required if you add more than one in
+            the same goal
+        :param lower_slack_limit: how much the lower error can be violated, don't use
+            unless you know what you are doing
+        :param upper_slack_limit: how much the upper error can be violated, don't use
+            unless you know what you are doing
         """
         if task_expression.shape != (1, 1):
             raise InvalidConstraintExpressionShapeError(list(task_expression.shape))
@@ -195,18 +204,23 @@ class ConstraintCollection:
         upper_slack_limit: sm.ScalarData = LargeNumber,
     ) -> None:
         """
-        Add a task constraint to the motion problem. This should be used for most constraints.
-        It will not strictly stick to the reference velocity, but requires only a single constraint in the final
+        Add a task constraint to the motion problem.
+
+        This should be used for most constraints. It will not strictly stick to the
+        reference velocity, but requires only a single constraint in the final
         optimization problem and is therefore faster.
-        :param reference_velocity: used by Giskard to limit the error and normalize the weight, will not be strictly
-                                    enforced.
+        :param reference_velocity: used by Giskard to limit the error and normalize the
+            weight, will not be strictly enforced.
         :param lower_error: lower bound for the error of expression
         :param upper_error: upper bound for the error of expression
         :param quadratic_weight:
         :param task_expression: defines the task function
-        :param name: give this constraint a name, required if you add more than one in the same goal
-        :param lower_slack_limit: how much the lower error can be violated, don't use unless you know what you are doing
-        :param upper_slack_limit: how much the upper error can be violated, don't use unless you know what you are doing
+        :param name: give this constraint a name, required if you add more than one in
+            the same goal
+        :param lower_slack_limit: how much the lower error can be violated, don't use
+            unless you know what you are doing
+        :param upper_slack_limit: how much the upper error can be violated, don't use
+            unless you know what you are doing
         """
         if task_expression.shape != (1, 1):
             raise InvalidConstraintExpressionShapeError(list(task_expression.shape))
@@ -242,18 +256,20 @@ class ConstraintCollection:
         upper_slack_limit: sm.ScalarData = LargeNumber,
     ) -> None:
         """
-        Add a velocity constraint. Internally, this will be converted into multiple constraints, to ensure that the
+        Add a velocity constraint.
+
+        Internally, this will be converted into multiple constraints, to ensure that the
         velocity stays within the given bounds.
         :param lower_velocity_limit:
         :param upper_velocity_limit:
         :param quadratic_weight:
         :param task_expression:
-        :param velocity_limit: Used for normalizing the expression, like reference_velocity, must be positive
+        :param velocity_limit: Used for normalizing the expression, like
+            reference_velocity, must be positive
         :param name:
         :param lower_slack_limit:
         :param upper_slack_limit:
         """
-
         constraint = GiskardInequalityConstraint(
             name=name,
             enforcement_strategy=VelocityStrategy,
@@ -279,17 +295,19 @@ class ConstraintCollection:
         upper_slack_limit: sm.ScalarData = LargeNumber,
     ) -> None:
         """
-        Add a velocity constraint. Internally, this will be converted into multiple constraints, to ensure that the
+        Add a velocity constraint.
+
+        Internally, this will be converted into multiple constraints, to ensure that the
         velocity stays within the given bounds.
         :param velocity_goal:
         :param quadratic_weight:
         :param task_expression:
-        :param velocity_limit: Used for normalizing the expression, like reference_velocity, must be positive
+        :param velocity_limit: Used for normalizing the expression, like
+            reference_velocity, must be positive
         :param name:
         :param lower_slack_limit:
         :param upper_slack_limit:
         """
-
         constraint = GiskardEqualityConstraint(
             name=name,
             enforcement_strategy=VelocityStrategy,

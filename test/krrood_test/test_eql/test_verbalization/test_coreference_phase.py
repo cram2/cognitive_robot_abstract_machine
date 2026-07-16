@@ -1,11 +1,11 @@
 """
-Unit tests for the CoreferenceProcessor — the document-order pass that resolves referring
-noun phrases (first / repeat / pronoun).
+Unit tests for the CoreferenceProcessor — the document-order pass that resolves
+referring noun phrases (first / repeat / pronoun).
 
-A discourse scope is opened not by a marker but by a fragment's ``source`` (the query node it was
-built from): the pass asks the :class:`DiscourseModel` who the focus of that scope is. The
-``_scope`` helper mirrors that — it stamps a child with a stand-in query node and pairs it with a
-matching discourse model.
+A discourse scope is opened not by a marker but by a fragment's ``source`` (the query
+node it was built from): the pass asks the :class:`DiscourseModel` who the focus of that
+scope is. The ``_scope`` helper mirrors that — it stamps a child with a stand-in query
+node and pairs it with a matching discourse model.
 """
 
 from __future__ import annotations
@@ -44,11 +44,13 @@ from ...dataset.minimal_symbolic_expression import MinimalSymbolicExpression
 
 
 def _scope(child: VerbalizationFragment, focus_id):
-    """Make *child* a discourse scope with focus *focus_id* — a query-sourced fragment plus the
-    matching discourse model (``focus_id=None`` for a scope with no single subject).
+    """
+    Make *child* a discourse scope with focus *focus_id* — a query-sourced fragment plus
+    the matching discourse model (``focus_id=None`` for a scope with no single subject).
 
-    The source is a real query-node stand-in carrying an ``_id_`` (what the discourse model keys
-    on)."""
+    The source is a real query-node stand-in carrying an ``_id_`` (what the discourse
+    model keys on).
+    """
     node = MinimalSymbolicExpression()
     return replace(child, source=node), DiscourseModel({node._id_: focus_id})
 
@@ -95,7 +97,9 @@ def test_recurses_into_noun_phrase_modifiers():
 
 
 def _realise(fragment, discourse=EMPTY_DISCOURSE) -> str:
-    """Coreference then determiner phase → plain text (the pipeline's first two stages)."""
+    """
+    Coreference then determiner phase → plain text (the pipeline's first two stages).
+    """
     resolved = CoreferenceProcessor(discourse=discourse).process(fragment)
     return flatten_fragment_to_plain_text(DeterminerProcessor().process(resolved))
 
@@ -215,7 +219,9 @@ def test_chain_not_rooted_at_subject_is_possessive():
 
 
 def test_chain_rooted_at_plural_subject_pronominalises_with_their():
-    """A plural-subject scope (e.g. an aggregation source population) yields *"their …"*."""
+    """
+    A plural-subject scope (e.g. an aggregation source population) yields *"their …"*.
+    """
     rid = uuid.uuid4()
     chain = PossessiveChain(
         parts=[_attr_part("battery")],
@@ -237,7 +243,10 @@ def test_chain_rooted_at_plural_subject_pronominalises_with_their():
 
 
 def _scalar_part(name):
-    """A scalar-valued hop — a leaf that distributes over a plural subject (*"their batteries"*)."""
+    """
+    A scalar-valued hop — a leaf that distributes over a plural subject (*"their
+    batteries"*).
+    """
     return PathStep(name, None, is_scalar_value=True)
 
 
@@ -257,8 +266,10 @@ def _operator_numbers(fragment: VerbalizationFragment) -> list:
 
 
 def _quantified_clause(chain_parts, *, subject_number: GrammaticalNumber):
-    """A *"<subject>, <chain> is high"* shape — a population intro (the scope focus) followed by a
-    subject-led predicate whose singular-built copula must agree with the realised subject.
+    """
+    A *"<subject>, <chain> is high"* shape — a population intro (the scope focus)
+    followed by a subject-led predicate whose singular-built copula must agree with the
+    realised subject.
     """
     rid = uuid.uuid4()
     intro = NounPhrase(head=_noun("Robot"), number=subject_number, referent_id=rid)
@@ -273,9 +284,13 @@ def _quantified_clause(chain_parts, *, subject_number: GrammaticalNumber):
 
 
 def test_copula_agrees_plural_when_a_scalar_leaf_distributes():
-    """A single scalar hop distributes over the plural population (*"their batteries"*), so the
-    clause's singular-built copula is re-tagged plural — the morphology pass then realises *"are"*.
-    The agreement is decided here, where the population reading is, not pre-baked into the rule.
+    """
+    A single scalar hop distributes over the plural population (*"their batteries"*), so
+    the clause's singular-built copula is re-tagged plural — the morphology pass then
+    realises *"are"*.
+
+    The agreement is decided here, where the population reading is, not pre-baked into
+    the rule.
     """
     scoped, discourse = _quantified_clause(
         [_scalar_part("battery")], subject_number=GrammaticalNumber.PLURAL
@@ -285,9 +300,11 @@ def test_copula_agrees_plural_when_a_scalar_leaf_distributes():
 
 
 def test_copula_stays_singular_for_a_deeper_head_chain():
-    """A two-hop chain heads on an inner genitive that does not distribute (*"the amount of their
-    amount_details"*), so the copula stays singular even under a plural subject — the rule keys off
-    the realised head, not the bare presence of a plural scope."""
+    """
+    A two-hop chain heads on an inner genitive that does not distribute (*"the amount of
+    their amount_details"*), so the copula stays singular even under a plural subject —
+    the rule keys off the realised head, not the bare presence of a plural scope.
+    """
     scoped, discourse = _quantified_clause(
         [_attr_part("amount_details"), _scalar_part("amount")],
         subject_number=GrammaticalNumber.PLURAL,
@@ -297,8 +314,10 @@ def test_copula_stays_singular_for_a_deeper_head_chain():
 
 
 def test_copula_untouched_for_a_singular_subject():
-    """A singular-subject scope leaves the copula singular: every plain predicate is unaffected, so
-    this never disturbs the existing singular cases."""
+    """
+    A singular-subject scope leaves the copula singular: every plain predicate is
+    unaffected, so this never disturbs the existing singular cases.
+    """
     scoped, discourse = _quantified_clause(
         [_scalar_part("battery")], subject_number=GrammaticalNumber.SINGULAR
     )

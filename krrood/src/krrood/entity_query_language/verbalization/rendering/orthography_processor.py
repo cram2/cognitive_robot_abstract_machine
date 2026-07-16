@@ -17,7 +17,8 @@ from krrood.entity_query_language.verbalization.rendering.passes import Realizat
 
 class OrthographyProcessor(RealizationPass):
     """
-    Remove the space adjacent to glued punctuation in every ``PhraseFragment`` (idempotent).
+    Remove the space adjacent to glued punctuation in every ``PhraseFragment``
+    (idempotent).
 
     Rules emit punctuation as ordinary, normally-separated tokens carrying a spacing feature (``,``
     / ``)`` hug the preceding token; ``(`` hugs the following one). This pass walks each phrase

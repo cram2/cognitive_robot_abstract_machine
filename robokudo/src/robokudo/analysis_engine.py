@@ -15,7 +15,8 @@ specific robotic tasks or pipelines.
 
 
 class AnalysisEngineInterface(Protocol):
-    """Protocol defining the interface for Analysis Engines.
+    """
+    Protocol defining the interface for Analysis Engines.
 
     This interface must be implemented by all Analysis Engines in RoboKudo.
     Each Analysis Engine provides a behavior tree implementation for a specific
@@ -30,14 +31,16 @@ class AnalysisEngineInterface(Protocol):
     """
 
     def name(self) -> str:
-        """Get the name of this Analysis Engine.
+        """
+        Get the name of this Analysis Engine.
 
         :return: The unique name identifying this Analysis Engine
         """
         pass
 
     def implementation(self) -> Behaviour:
-        """Get the behavior tree implementation for this Analysis Engine.
+        """
+        Get the behavior tree implementation for this Analysis Engine.
 
         :return: The root node of the behavior tree implementing this engine
         """
@@ -46,9 +49,10 @@ class AnalysisEngineInterface(Protocol):
 
 class SubtreeInterface(AnalysisEngineInterface):
     """
-    Analysis Engines often contain reusable components which are used across different use cases.
-    To represent these parts, use the SubtreeInterface and create a subclass.
-    Similarly to an AnalysisEngine, return the py_trees.Behaviour in the implementation method.
+    Analysis Engines often contain reusable components which are used across different
+    use cases. To represent these parts, use the SubtreeInterface and create a subclass.
+    Similarly to an AnalysisEngine, return the py_trees.Behaviour in the implementation
+    method.
 
     To provide semantic difference,
     """

@@ -82,10 +82,12 @@ class RerunModelCallback(ModelChangeCallback):
         if not bodies:
             return
         body_fks = [
-            HomogeneousTransformationMatrix()
-            if body == self._world.root
-            else self._world.compose_forward_kinematics_expression(
-                self._world.root, body
+            (
+                HomogeneousTransformationMatrix()
+                if body == self._world.root
+                else self._world.compose_forward_kinematics_expression(
+                    self._world.root, body
+                )
             )
             for body in bodies
         ]

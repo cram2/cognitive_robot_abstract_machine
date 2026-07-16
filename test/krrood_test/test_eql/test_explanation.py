@@ -21,6 +21,7 @@ from krrood.entity_query_language.factories import (
     or_,
     not_,
     variable,
+    a,
     an,
 )
 from krrood.entity_query_language.operators.comparator import Comparator
@@ -47,7 +48,8 @@ class Item(Symbol):
 
 def test_explain_inference_basic():
     """
-    Test that explain_inference correctly records and retrieves the stack for a simple inference.
+    Test that explain_inference correctly records and retrieves the stack for a simple
+    inference.
     """
     # 1. Define the query
     # The stack captured should point here
@@ -72,7 +74,8 @@ def test_explain_inference_basic():
 
 def test_explain_inference_nested():
     """
-    Test that explain_inference correctly records and retrieves the stack through nested function calls.
+    Test that explain_inference correctly records and retrieves the stack through nested
+    function calls.
     """
 
     def create_person_query(name):
@@ -106,7 +109,8 @@ def test_explain_inference_nested():
 
 def test_explain_inference_multiple_instances():
     """
-    Test that different instances from the same inference variable have the same stack in their explanation.
+    Test that different instances from the same inference variable have the same stack
+    in their explanation.
     """
     from krrood.entity_query_language.factories import variable_from
 
@@ -136,7 +140,8 @@ def test_explain_inference_multiple_instances():
 
 def test_explain_inference_deeply_nested():
     """
-    Test that explain_inference correctly records and retrieves the stack through deeply nested function calls.
+    Test that explain_inference correctly records and retrieves the stack through deeply
+    nested function calls.
     """
 
     def level_4(name):
@@ -255,20 +260,26 @@ def test_robust_monitoring_check():
 
 
 def _get_true_results(query: Query):
-    """Build, evaluate a query and return only the true raw OperationResults."""
+    """
+    Build, evaluate a query and return only the true raw OperationResults.
+    """
     query.build()
     raw_results = list(query._evaluate_())
     return [r for r in raw_results if r.is_true]
 
 
 def _get_satisfied_names(ids, condition_root):
-    """Get expression names from satisfied condition IDs by traversing the condition tree."""
+    """
+    Get expression names from satisfied condition IDs by traversing the condition tree.
+    """
     all_cond = [condition_root] + list(condition_root._descendants_)
     return {e._name_ for e in all_cond if e._id_ in ids}
 
 
 def test_satisfied_conditions_simple():
-    """A single Comparator condition tracks its ID as satisfied."""
+    """
+    A single Comparator condition tracks its ID as satisfied.
+    """
     val = variable_from([6, 3])
     query = entity(val).where(val > 5)
 
@@ -281,7 +292,9 @@ def test_satisfied_conditions_simple():
 
 
 def test_satisfied_conditions_and_both_true():
-    """AND with both children true: AND and both comparators are satisfied."""
+    """
+    AND with both children true: AND and both comparators are satisfied.
+    """
     val = variable_from([6])
     query = entity(val).where(and_(val > 5, val < 10))
 
@@ -301,7 +314,9 @@ def test_satisfied_conditions_and_both_true():
 
 
 def test_satisfied_conditions_and_short_circuit():
-    """AND short-circuits when left is false: only the false comparator recorded."""
+    """
+    AND short-circuits when left is false: only the false comparator recorded.
+    """
     val = variable_from([3])
     query = entity(val).where(and_(val > 5, val < 10))
 
@@ -311,7 +326,9 @@ def test_satisfied_conditions_and_short_circuit():
 
 
 def test_satisfied_conditions_or_first_true():
-    """OR with first child true: short-circuits, right never evaluated."""
+    """
+    OR with first child true: short-circuits, right never evaluated.
+    """
     val = variable_from([6])
     query = entity(val).where(or_(val > 5, val < 0))
 
@@ -329,7 +346,9 @@ def test_satisfied_conditions_or_first_true():
 
 
 def test_satisfied_conditions_or_fallback():
-    """OR with first false, second true: both children evaluated, OR satisfied."""
+    """
+    OR with first false, second true: both children evaluated, OR satisfied.
+    """
     val = variable_from([3])
     query = entity(val).where(or_(val > 5, val < 10))
 
@@ -348,7 +367,9 @@ def test_satisfied_conditions_or_fallback():
 
 
 def test_satisfied_conditions_not():
-    """Not inverts satisfaction: Not is satisfied when its child is false."""
+    """
+    Not inverts satisfaction: Not is satisfied when its child is false.
+    """
     val = variable_from([3])
     query = entity(val).where(not_(val > 5))
 
@@ -366,7 +387,9 @@ def test_satisfied_conditions_not():
 
 
 def test_satisfied_conditions_nested_and_or():
-    """Nested and_(x > 5, or_(x < 2, x == 3)) with x=3: test tree structure."""
+    """
+    Nested and_(x > 5, or_(x < 2, x == 3)) with x=3: test tree structure.
+    """
     val = variable_from([3])
     query = entity(val).where(and_(val > 5, or_(val < 2, val == 3)))
 
@@ -376,7 +399,9 @@ def test_satisfied_conditions_nested_and_or():
 
 
 def test_satisfied_conditions_nested_and_or_satisfied():
-    """Nested and_(x > 5, or_(x < 10, x == -1)) with x=6: AND and OR satisfied."""
+    """
+    Nested and_(x > 5, or_(x < 10, x == -1)) with x=6: AND and OR satisfied.
+    """
     val = variable_from([6])
     query = entity(val).where(and_(val > 5, or_(val < 10, val == -1)))
 
@@ -396,7 +421,9 @@ def test_satisfied_conditions_nested_and_or_satisfied():
 
 
 def test_satisfied_conditions_no_where():
-    """Query without where clause: satisfied_condition_ids is None."""
+    """
+    Query without where clause: satisfied_condition_ids is None.
+    """
     val = variable_from([1, 2])
     query = entity(val)
 
@@ -412,7 +439,9 @@ def test_satisfied_conditions_no_where():
 
 
 def test_condition_graph_pipeline_simple():
-    """explain_inference → condition_graph() for a simple satisfied condition."""
+    """
+    explain_inference → condition_graph() for a simple satisfied condition.
+    """
     val = variable_from([6])
     query = entity(inference(Item)(value=val)).where(val > 5)
     results = list(query.evaluate())
@@ -431,7 +460,9 @@ def test_condition_graph_pipeline_simple():
 
 
 def test_condition_graph_pipeline_nested_and_or():
-    """explain_inference → condition_graph() with nested AND/OR tree."""
+    """
+    explain_inference → condition_graph() with nested AND/OR tree.
+    """
     val = variable_from([6])
     query = entity(inference(Item)(value=val)).where(
         and_(val > 5, or_(val < 10, val == -1))
@@ -456,7 +487,9 @@ def test_condition_graph_pipeline_nested_and_or():
 
 
 def test_condition_graph_pipeline_not():
-    """explain_inference → condition_graph() with Not condition."""
+    """
+    explain_inference → condition_graph() with Not condition.
+    """
     val = variable_from([3])
     query = entity(inference(Item)(value=val)).where(not_(val > 5))
     results = list(query.evaluate())
@@ -475,7 +508,9 @@ def test_condition_graph_pipeline_not():
 
 
 def test_condition_graph_pipeline_no_conditions():
-    """explain_inference → condition_graph() returns None when no conditions exist."""
+    """
+    explain_inference → condition_graph() returns None when no conditions exist.
+    """
     val = variable_from([1, 2])
     query = entity(inference(Item)(value=val))
     results = list(query.evaluate())
@@ -488,7 +523,9 @@ def test_condition_graph_pipeline_no_conditions():
 
 
 def test_condition_graph_pipeline_or_short_circuit():
-    """OR short-circuits: satisfied comparator recorded, short-circuited one is not."""
+    """
+    OR short-circuits: satisfied comparator recorded, short-circuited one is not.
+    """
     val = variable_from([6])
     query = entity(inference(Item)(value=val)).where(or_(val > 5, val < 10))
     results = list(query.evaluate())
@@ -508,7 +545,9 @@ def test_condition_graph_pipeline_or_short_circuit():
 
 
 def test_condition_graph_pipeline_complex():
-    """Deeply nested AND/OR/NOT with val=5: inner AND short-circuited by OR."""
+    """
+    Deeply nested AND/OR/NOT with val=5: inner AND short-circuited by OR.
+    """
     val = variable_from([5])
     query = entity(inference(Item)(value=val)).where(
         and_(val > 0, or_(not_(val == 2), and_(val < 10, val > 1)))
@@ -546,7 +585,9 @@ def test_condition_graph_pipeline_complex():
 
 
 def test_condition_graph_pipeline_multiple_results():
-    """Each result from val=[1,6,11] with val>5 has correct satisfaction."""
+    """
+    Each result from val=[1,6,11] with val>5 has correct satisfaction.
+    """
     val = variable_from([1, 6, 11])
     query = entity(inference(Item)(value=val)).where(val > 5)
     results = list(query.evaluate())
@@ -569,7 +610,9 @@ def test_condition_graph_pipeline_multiple_results():
 
 
 def test_condition_graph_pipeline_non_symbol():
-    """explain_inference returns None for non-Symbol values (e.g. plain int)."""
+    """
+    explain_inference returns None for non-Symbol values (e.g. plain int).
+    """
     val = variable_from([6])
     query = entity(val).where(val > 5)
     results = list(query.evaluate())
@@ -584,7 +627,9 @@ def test_condition_graph_pipeline_non_symbol():
 
 
 def test_query_graph_satisfaction_colors():
-    """Unsatisfied nodes get red borders; satisfied nodes keep full color and no border."""
+    """
+    Unsatisfied nodes get red borders; satisfied nodes keep full color and no border.
+    """
     from krrood.entity_query_language.query_graph import ColorLegend
 
     val = variable_from([6])
@@ -628,7 +673,9 @@ def test_query_graph_satisfaction_colors():
 
 
 def test_query_graph_faded_subtree_propagation():
-    """Descendants only reachable through an unsatisfied node are also faded."""
+    """
+    Descendants only reachable through an unsatisfied node are also faded.
+    """
     val = variable_from([6])
     # or_(val > 5, val < 10): val > 5 satisfied, val < 10 short-circuited
     query = entity(inference(Item)(value=val)).where(or_(val > 5, val < 10))
@@ -659,7 +706,9 @@ def test_query_graph_faded_subtree_propagation():
 
 
 def test_query_graph_satisfaction_colors_all_satisfied():
-    """When all condition nodes are satisfied, none should be faded."""
+    """
+    When all condition nodes are satisfied, none should be faded.
+    """
     from krrood.entity_query_language.query_graph import ColorLegend
 
     val = variable_from([6])
@@ -687,7 +736,9 @@ def test_query_graph_satisfaction_colors_all_satisfied():
 
 
 def test_explanation_condition_graph_and_visualize():
-    """InferenceExplanation.condition_graph() creates correct QueryGraph."""
+    """
+    InferenceExplanation.condition_graph() creates correct QueryGraph.
+    """
     val = variable_from([6])
     query = entity(inference(Item)(value=val)).where(
         or_(and_(val > 5, val < 10), val == 11)
@@ -750,8 +801,8 @@ def test_nested_rule_meta_queries(drawer_rule):
 
 def test_explanation_lifecycle_tied_to_instance():
     """
-    InferenceExplanation must not keep the inferred instance (or its World) alive
-    after all external references are released.
+    InferenceExplanation must not keep the inferred instance (or its World) alive after
+    all external references are released.
 
     The world is created directly inside a helper closure so that no pytest fixture
     machinery holds an external strong reference — pytest keeps fixture return-values
@@ -769,11 +820,12 @@ def test_explanation_lifecycle_tied_to_instance():
 
         handle = variable(Handle, world.bodies)
         prismatic_connection = variable(PrismaticConnection, world.connections)
-        fixed_connection = an(FixedConnection)(
+        fixed_connection = a(FixedConnection)(
             parent=prismatic_connection.child, child=handle
         ).from_(world.connections)
         drawers = inference(Drawer)(
-            container=fixed_connection.expression.parent, handle=fixed_connection.expression.child
+            container=fixed_connection.expression.parent,
+            handle=fixed_connection.expression.child,
         ).tolist()
         assert drawers, "Need at least one inferred Drawer for this test"
 
@@ -806,9 +858,10 @@ def drawer_rule(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_connection = variable(PrismaticConnection, world.connections)
-    fixed_connection = an(FixedConnection)(
+    fixed_connection = a(FixedConnection)(
         parent=prismatic_connection.child, child=handle
     ).from_(world.connections)
     return inference(Drawer)(
-        container=fixed_connection.expression.parent, handle=fixed_connection.expression.child
+        container=fixed_connection.expression.parent,
+        handle=fixed_connection.expression.child,
     )

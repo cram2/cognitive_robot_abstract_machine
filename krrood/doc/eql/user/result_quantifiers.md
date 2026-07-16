@@ -19,7 +19,7 @@ constraint is enforced as a stage of the query's result pipeline during executio
 ```{note}
 `an()` and `the()` dispatch on their argument. Given a **symbolic expression** (an `entity(...)`,
 `set_of(...)`, variable or attribute) they act as the result quantifiers described on this page.
-Given a **type** (e.g. `an(Robot)` / `an(Robot, domain=...)`) they instead build a structural match —
+Given a **type** (e.g. `a(Robot)` / `a(Robot)(...).from_(domain)`) they instead build a structural match —
 see [Structural Pattern Matching](match.md). A raw variable/attribute is automatically wrapped with
 `entity(...)`, so `an(robot_variable)` is equivalent to `an(entity(robot_variable))`.
 ```

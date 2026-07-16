@@ -65,21 +65,25 @@ FunctionData = Tuple[Optional[List[str]], Optional[Dict[str, Callable]]]
 
 class TemplateFileCreator:
     """
-    A class to create a rule template file for a given case and prompt for the user to edit it.
+    A class to create a rule template file for a given case and prompt for the user to
+    edit it.
     """
 
     temp_file_path: Optional[str] = None
     """
     The path to the temporary file that is created for the user to edit.
     """
+
     port: int = int(os.environ.get("RDR_EDITOR_PORT", 8080))
     """
     The port to use for the code-server.
     """
+
     process: Optional[subprocess.Popen] = None
     """
     The process of the code-server.
     """
+
     all_code_lines: Optional[List[str]] = None
     """
     The list of all code lines in the function in the temporary file.
@@ -342,8 +346,9 @@ class TemplateFileCreator:
         :param file_path: The path to the file to load.
         :param func_name: The name of the function to load.
         :param print_func: The function to use for printing messages.
-        :return: A tuple containing the function source code and the function object as a dictionary
-        with the function name as the key and the function object as the value.
+        :return: A tuple containing the function source code and the function object as
+            a dictionary with the function name as the key and the function object as
+            the value.
         """
         if not file_path:
             print_func(

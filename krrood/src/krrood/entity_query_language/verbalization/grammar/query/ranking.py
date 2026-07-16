@@ -34,29 +34,40 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 
 @dataclass(frozen=True)
 class RankingRequest:
-    """A query's ranking together with the selection type label — the input a ranking form reads."""
+    """
+    A query's ranking together with the selection type label — the input a ranking form
+    reads.
+    """
 
     plan: RankingPlan
-    """The ``limit`` (+ ordering) decomposition."""
+    """
+    The ``limit`` (+ ordering) decomposition.
+    """
 
 
 @dataclass(frozen=True)
 class RankingSurface:
-    """The placed pieces of a ranking phrase, for the selection noun phrase to carry.
+    """
+    The placed pieces of a ranking phrase, for the selection noun phrase to carry.
 
     The selection noun is built around these: ``"the"`` + *pre_head* + head (in *number*) +
     *modifiers* — e.g. ``"the"`` + ``"top three"`` + ``"Employees"`` + ``"by salary"``.
     """
 
     pre_head: Optional[VerbalizationFragment]
-    """The qualifier between the determiner and the head (*"first two"* / *"top three"* /
-    *"highest"*), or ``None`` (the attribute-superlative form carries it as a modifier instead)."""
+    """
+    The qualifier between the determiner and the head (*"first two"* / *"top three"* /
+    *"highest"*), or ``None`` (the attribute-superlative form carries it as a modifier
+    instead).
+    """
 
     number: GrammaticalNumber
     """The head's grammatical number — ``SINGULAR`` for *n = 1*, ``PLURAL`` for *n > 1*."""
 
     modifiers: List[VerbalizationFragment]
-    """Post-nominal modifiers — *"with the highest salary"* / *"by salary"* — or empty."""
+    """
+    Post-nominal modifiers — *"with the highest salary"* / *"by salary"* — or empty.
+    """
 
 
 def _quality(direction: SortDirection, n: int) -> RankingWords:

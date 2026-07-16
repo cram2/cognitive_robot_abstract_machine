@@ -51,19 +51,27 @@ class SmallCircuitTestCast(unittest.TestCase):
         prod2.add_subcircuit(sum5)
 
         d_x1 = leaf(
-            UniformDistribution(variable=self.x, interval=SimpleInterval.from_data(0, 1)),
+            UniformDistribution(
+                variable=self.x, interval=SimpleInterval.from_data(0, 1)
+            ),
             probabilistic_circuit=model,
         )
         d_x2 = leaf(
-            UniformDistribution(variable=self.x, interval=SimpleInterval.from_data(2, 3)),
+            UniformDistribution(
+                variable=self.x, interval=SimpleInterval.from_data(2, 3)
+            ),
             probabilistic_circuit=model,
         )
         d_y1 = leaf(
-            UniformDistribution(variable=self.y, interval=SimpleInterval.from_data(0, 1)),
+            UniformDistribution(
+                variable=self.y, interval=SimpleInterval.from_data(0, 1)
+            ),
             probabilistic_circuit=model,
         )
         d_y2 = leaf(
-            UniformDistribution(variable=self.y, interval=SimpleInterval.from_data(3, 4)),
+            UniformDistribution(
+                variable=self.y, interval=SimpleInterval.from_data(3, 4)
+            ),
             probabilistic_circuit=model,
         )
 
@@ -137,7 +145,9 @@ class SymbolicPlottingTestCase(unittest.TestCase):
         probabilities[int(SymbolEnum.A)] = 7 / 20
         probabilities[int(SymbolEnum.B)] = 13 / 20
         cls.model = ProbabilisticCircuit()
-        l1 = UnivariateDiscreteLeaf(SymbolicDistribution(variable=cls.x, probabilities=probabilities))
+        l1 = UnivariateDiscreteLeaf(
+            SymbolicDistribution(variable=cls.x, probabilities=probabilities)
+        )
         cls.model.add_node(l1)
 
     def test_plot(self):
@@ -181,11 +191,20 @@ class DiracMixtureConditioningTestCase(unittest.TestCase):
         cls.model = ProbabilisticCircuit()
         root = SumUnit(probabilistic_circuit=cls.model)
         root.add_subcircuit(
-            leaf(UniformDistribution(variable=cls.x, interval=SimpleInterval.from_data(0, 1.0)), cls.model),
+            leaf(
+                UniformDistribution(
+                    variable=cls.x, interval=SimpleInterval.from_data(0, 1.0)
+                ),
+                cls.model,
+            ),
             np.log(0.5),
         )
         root.add_subcircuit(
-            leaf(DiracDeltaDistribution(variable=cls.x, location=0.5, density_cap=2.0), cls.model), np.log(0.5)
+            leaf(
+                DiracDeltaDistribution(variable=cls.x, location=0.5, density_cap=2.0),
+                cls.model,
+            ),
+            np.log(0.5),
         )
 
     def test_conditioning(self):
@@ -243,10 +262,30 @@ class ConditioningTestCase(unittest.TestCase):
         p1 = ProductUnit(probabilistic_circuit=model)
         p2 = ProductUnit(probabilistic_circuit=model)
 
-        u1 = leaf(UniformDistribution(variable=cls.x, interval=SimpleInterval.from_data(0, 1.0)), model)
-        u2 = leaf(UniformDistribution(variable=cls.x, interval=SimpleInterval.from_data(0.0, 2)), model)
-        u3 = leaf(UniformDistribution(variable=cls.y, interval=SimpleInterval.from_data(0, 1)), model)
-        u4 = leaf(UniformDistribution(variable=cls.y, interval=SimpleInterval.from_data(0.0, 2)), model)
+        u1 = leaf(
+            UniformDistribution(
+                variable=cls.x, interval=SimpleInterval.from_data(0, 1.0)
+            ),
+            model,
+        )
+        u2 = leaf(
+            UniformDistribution(
+                variable=cls.x, interval=SimpleInterval.from_data(0.0, 2)
+            ),
+            model,
+        )
+        u3 = leaf(
+            UniformDistribution(
+                variable=cls.y, interval=SimpleInterval.from_data(0, 1)
+            ),
+            model,
+        )
+        u4 = leaf(
+            UniformDistribution(
+                variable=cls.y, interval=SimpleInterval.from_data(0.0, 2)
+            ),
+            model,
+        )
 
         s1.add_subcircuit(p1, np.log(0.5))
         s1.add_subcircuit(p2, np.log(0.5))
@@ -268,7 +307,9 @@ class ConditioningTestCase(unittest.TestCase):
 
         conditioned_marginal = model.marginal([self.y])
 
-        probability_event = SimpleEvent.from_data({self.y: closed(0.0, 1.0)}).as_composite_set()
+        probability_event = SimpleEvent.from_data(
+            {self.y: closed(0.0, 1.0)}
+        ).as_composite_set()
 
         p_marginal = marginal.probability(probability_event)
         p_conditioned_marginal = conditioned_marginal.probability(probability_event)
@@ -328,8 +369,8 @@ def test_subset_of_integer_variables_expectation():
 
 class MixedLeafTruncationTestCase(unittest.TestCase):
     """
-    Truncation over a composite event must work for circuits with mixed
-    (continuous + discrete) leaves.
+    Truncation over a composite event must work for circuits with mixed (continuous +
+    discrete) leaves.
     """
 
     x = Continuous("x")
@@ -341,29 +382,49 @@ class MixedLeafTruncationTestCase(unittest.TestCase):
 
         first_component = ProductUnit(probabilistic_circuit=circuit)
         first_component.add_subcircuit(
-            leaf(UniformDistribution(closed(0.0, 1.0).simple_sets[0], variable=self.x), circuit)
+            leaf(
+                UniformDistribution(closed(0.0, 1.0).simple_sets[0], variable=self.x),
+                circuit,
+            )
         )
         first_component.add_subcircuit(
-            leaf(IntegerDistribution(variable=self.n,
-                                     probabilities=MissingDict(float, {0: 0.5, 1: 0.3, 2: 0.2})), circuit)
+            leaf(
+                IntegerDistribution(
+                    variable=self.n,
+                    probabilities=MissingDict(float, {0: 0.5, 1: 0.3, 2: 0.2}),
+                ),
+                circuit,
+            )
         )
         root.add_subcircuit(first_component, np.log(0.6))
 
         second_component = ProductUnit(probabilistic_circuit=circuit)
         second_component.add_subcircuit(
-            leaf(UniformDistribution(closed(0.5, 2.0).simple_sets[0], variable=self.x), circuit)
+            leaf(
+                UniformDistribution(closed(0.5, 2.0).simple_sets[0], variable=self.x),
+                circuit,
+            )
         )
         second_component.add_subcircuit(
-            leaf(IntegerDistribution(variable=self.n,
-                                     probabilities=MissingDict(float, {1: 0.4, 2: 0.4, 3: 0.2})), circuit)
+            leaf(
+                IntegerDistribution(
+                    variable=self.n,
+                    probabilities=MissingDict(float, {1: 0.4, 2: 0.4, 3: 0.2}),
+                ),
+                circuit,
+            )
         )
         root.add_subcircuit(second_component, np.log(0.4))
         return circuit
 
     def composite_event(self) -> Event:
         return (
-            SimpleEvent.from_data({self.x: closed(0.0, 0.7), self.n: closed(0, 1)}).as_composite_set()
-            | SimpleEvent.from_data({self.x: closed(1.0, 1.8), self.n: closed(2, 3)}).as_composite_set()
+            SimpleEvent.from_data(
+                {self.x: closed(0.0, 0.7), self.n: closed(0, 1)}
+            ).as_composite_set()
+            | SimpleEvent.from_data(
+                {self.x: closed(1.0, 1.8), self.n: closed(2, 3)}
+            ).as_composite_set()
         )
 
     def test_truncation_log_probability_matches_event_probability(self):

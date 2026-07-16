@@ -41,7 +41,10 @@ class RobotInterfaceConfig(ABC):
     @abstractmethod
     def setup(self):
         """
-        Implement this method to configure how Giskard can talk to the robot using it's self. methods.
+        Implement this method to configure how Giskard can talk to the robot using it's
+        self.
+
+        methods.
         """
 
     @property
@@ -92,7 +95,7 @@ class RobotInterfaceConfig(ABC):
 
     def sync_joint_state_topic(self, topic_name: str, group_name: Optional[str] = None):
         """
-        Tell Giskard to sync the world state with a joint state topic
+        Tell Giskard to sync the world state with a joint state topic.
         """
         if group_name is None:
             group_name = self.robot.name
@@ -115,10 +118,12 @@ class RobotInterfaceConfig(ABC):
     ):
         """
         Tell Giskard how it can control an odom joint of the robot.
+
         :param cmd_vel_topic: a Twist topic
-        :param track_only_velocity: The tracking mode. If true, any position error is not considered which makes
-                                    the tracking smoother but less accurate.
-        :param joint: omni or diff drive joint. Doesn't need to be specified if there is only one.
+        :param track_only_velocity: The tracking mode. If true, any position error is
+            not considered which makes the tracking smoother but less accurate.
+        :param joint: omni or diff drive joint. Doesn't need to be specified if there is
+            only one.
         """
         if cmd_vel_topic is None:
             cmd_vel_topic = search_for_unique_subscriber_of_type(Twist)
@@ -152,11 +157,13 @@ class RobotInterfaceConfig(ABC):
         path_tolerance: Dict[Derivatives, float] = None,
     ):
         """
-        Connect Giskard to a follow joint trajectory server. It will automatically figure out which joints are offered
-        and can be controlled.
+        Connect Giskard to a follow joint trajectory server.
+
+        It will automatically figure out which joints are offered and can be controlled.
         :param namespace: namespace of the action server
         :param group_name: set if there are multiple robots
-        :param fill_velocity_values: whether to fill the velocity entries in the message send to the robot
+        :param fill_velocity_values: whether to fill the velocity entries in the message
+            send to the robot
         """
         if group_name is None:
             group_name = self.world.robot_name
@@ -240,8 +247,11 @@ class RobotInterfaceConfig(ABC):
 
     def add_joint_velocity_controller(self, namespaces: List[str]):
         """
-        For closed loop mode. Tell Giskard how it can send velocities to joints.
-        :param namespaces: A list of namespaces where Giskard can find the topics and rosparams.
+        For closed loop mode.
+
+        Tell Giskard how it can send velocities to joints.
+        :param namespaces: A list of namespaces where Giskard can find the topics and
+            rosparams.
         """
         self.tree.control_loop_branch.send_controls.add_joint_velocity_controllers(
             namespaces
@@ -254,10 +264,12 @@ class RobotInterfaceConfig(ABC):
         minimum_valid_velocity: float = 0.0,
     ):
         """
-        For closed loop mode. Tell Giskard how it can send velocities for a group of connections.
-        :param minimum_valid_velocity: minimum magnitude that small non-prismatic, non-finger
-                                       joint velocities are raised to so the hardware moves.
-                                       ``0.0`` disables clamping.
+        For closed loop mode.
+
+        Tell Giskard how it can send velocities for a group of connections.
+        :param minimum_valid_velocity: minimum magnitude that small non-prismatic, non-
+            finger joint velocities are raised to so the hardware moves. ``0.0``
+            disables clamping.
         """
         controlled_connections: List[Connection] = []
         for i in range(len(connections)):

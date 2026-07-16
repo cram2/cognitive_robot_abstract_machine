@@ -7,19 +7,24 @@ from typing_extensions import ClassVar, Dict, List, Optional, Type, TypeVar, Sel
 
 @dataclass
 class FieldMetadata:
-    """Krrood-specific metadata carried inside a dataclass field's ``metadata`` mapping.
+    """
+    Krrood-specific metadata carried inside a dataclass field's ``metadata`` mapping.
 
-    A field carries a single :class:`FieldMetadata` under :attr:`METADATA_KEY` (attach it with
-    :meth:`as_dict`). Specific metadata classes are held as sub-metadatas in :attr:`other_metadata` and
-    read back by type via :meth:`get_metadata_by_type`.
+    A field carries a single :class:`FieldMetadata` under :attr:`METADATA_KEY` (attach
+    it with :meth:`as_dict`). Specific metadata classes are held as sub-metadatas in
+    :attr:`other_metadata` and read back by type via :meth:`get_metadata_by_type`.
     """
 
     METADATA_KEY: ClassVar[str] = "krrood_field_metadata"
-    """The key this metadata is stored under inside a field's ``metadata`` mapping."""
+    """
+    The key this metadata is stored under inside a field's ``metadata`` mapping.
+    """
 
     other_metadata: List[FieldMetadata] = field(default_factory=list)
-    """The typed sub-metadatas this field carries (e.g. :class:`GrammarMetadata`), retrieved by type
-    via :meth:`get_metadata_by_type`."""
+    """
+    The typed sub-metadatas this field carries (e.g. :class:`GrammarMetadata`),
+    retrieved by type via :meth:`get_metadata_by_type`.
+    """
 
     def as_dict(self) -> Dict[str, FieldMetadata]:
         """:return: a dataclass-field ``metadata`` mapping carrying this metadata under
@@ -64,12 +69,18 @@ A type that is a subclass of :class:`FieldMetadata`.
 
 @dataclass
 class GrammarMetadata(FieldMetadata):
-    """Grammar / verbalization hints for a field."""
+    """
+    Grammar / verbalization hints for a field.
+    """
 
     is_identifying_field: bool = False
-    """``True`` when this field identifies its instance for verbalization
-    (*"a specific <Type> with <field> '<value>'"*)."""
+    """
+    ``True`` when this field identifies its instance for verbalization (*"a specific
+    <Type> with <field> '<value>'"*).
+    """
 
     display_name: Optional[str] = None
-    """Surface word to use for this field when verbalized, in place of its attribute name
-    (*"beginning"* for a field named ``begin``); ``None`` keeps the attribute name."""
+    """
+    Surface word to use for this field when verbalized, in place of its attribute name
+    (*"beginning"* for a field named ``begin``); ``None`` keeps the attribute name.
+    """

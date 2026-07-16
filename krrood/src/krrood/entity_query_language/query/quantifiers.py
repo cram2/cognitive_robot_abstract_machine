@@ -1,8 +1,8 @@
 """
 Result quantifiers and constraints for the Entity Query Language.
 
-This module defines quantifiers that control how many results are acceptable (e.g., an/the) and the
-constraints used to evaluate result counts.
+This module defines quantifiers that control how many results are acceptable (e.g.,
+an/the) and the constraints used to evaluate result counts.
 """
 
 from __future__ import annotations
@@ -37,7 +37,8 @@ class ResultQuantificationConstraint(ABC):
         done: bool,
     ) -> None:
         """
-        Check if the constraint is satisfied, if not, raise a QuantificationNotSatisfiedError exception.
+        Check if the constraint is satisfied, if not, raise a
+        QuantificationNotSatisfiedError exception.
 
         :param number_of_solutions: The current number of solutions.
         :param quantified_expression: The query expression being quantified. This will be mentioned in errors.

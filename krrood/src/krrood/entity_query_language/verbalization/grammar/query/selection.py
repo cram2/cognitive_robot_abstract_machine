@@ -1,14 +1,15 @@
 """
 Rendering a query's *selection* — the variables / columns it selects — into prose.
 
-A selection is said differently by shape: natural Oxford-comma prose *"a, b, and c"* (no code-like
-brackets), a parenthesised tuple *"(a, b)"* for a ranked set-of whose *"top three"* pre-head needs
-the tuple grouped, or a plural population *"Employees"* for an ordered report. Contiguous attributes
-of one owner fold into a shared genitive (*"the department and salary of an Employee"*) via the
-shared :func:`~…coordination.group_consecutive_by_owner` aggregation primitive.
+A selection is said differently by shape: natural Oxford-comma prose *"a, b, and c"* (no
+code-like brackets), a parenthesised tuple *"(a, b)"* for a ranked set-of whose *"top
+three"* pre-head needs the tuple grouped, or a plural population *"Employees"* for an
+ordered report. Contiguous attributes of one owner fold into a shared genitive (*"the
+department and salary of an Employee"*) via the shared
+:func:`~…coordination.group_consecutive_by_owner` aggregation primitive.
 
-Split out of :class:`~…query.assembler.QueryAssembler` so the selection-rendering responsibility is
-its own cohesive collaborator (the assembler delegates to it).
+Split out of :class:`~…query.assembler.QueryAssembler` so the selection-rendering
+responsibility is its own cohesive collaborator (the assembler delegates to it).
 """
 
 from __future__ import annotations
@@ -78,7 +79,9 @@ class SelectionAssembler:
     """
 
     context: RuleContext
-    """The per-node context (recursion entry and microplanning services)."""
+    """
+    The per-node context (recursion entry and microplanning services).
+    """
 
     def prose(
         self,

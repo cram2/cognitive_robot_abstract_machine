@@ -19,13 +19,12 @@ logger = logging.getLogger(__name__)
 @dataclass(eq=False)
 class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
     """
-    Callback is an abstract base class (ABC)
-    reacting to changes in the associated `_world`.
-    It provides a flexible mechanism for subclasses to implement custom behaviors to be triggered
-    whenever a change occurs.
+    Callback is an abstract base class (ABC) reacting to changes in the associated
+    `_world`. It provides a flexible mechanism for subclasses to implement custom
+    behaviors to be triggered whenever a change occurs.
 
-    The primary purpose of this class is to encapsulate logic that needs to be
-    executed as a response to certain events or changes within the `_world` object.
+    The primary purpose of this class is to encapsulate logic that needs to be executed
+    as a response to certain events or changes within the `_world` object.
     """
 
     _is_paused = False
@@ -35,7 +34,10 @@ class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
 
     def stop(self):
         """
-        Stop the callback. Should be overridden by the Subclasses. Subclasses should call super().stop() after their own cleanup.
+        Stop the callback.
+
+        Should be overridden by the Subclasses. Subclasses should call super().stop()
+        after their own cleanup.
         """
         pass
 

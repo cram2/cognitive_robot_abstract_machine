@@ -1,9 +1,10 @@
 """
 Tests for equality-induced referent unification and relational-identity collapse.
 
-An ``==`` constraint that identifies a variable with a relational hop (``m.assigned_to == r``) is
-said as the active relational predicate (*"it is assigned to a Mission"*), and the two referents are
-counted as one entity so the subject reads *"a Robot"* rather than *"Robot 1"* / *"Robot 2"*.
+An ``==`` constraint that identifies a variable with a relational hop (``m.assigned_to
+== r``) is said as the active relational predicate (*"it is assigned to a Mission"*),
+and the two referents are counted as one entity so the subject reads *"a Robot"* rather
+than *"Robot 1"* / *"Robot 2"*.
 """
 
 from __future__ import annotations
@@ -14,8 +15,10 @@ from krrood.entity_query_language.verbalization.pipeline import verbalize_expres
 
 
 def test_relational_identity_collapses_to_active_predicate():
-    """When the identified entity also carries a restriction, the binding and the restriction fold
-    into one relative clause on the subject noun (the restriction nested onto the entity).
+    """
+    When the identified entity also carries a restriction, the binding and the
+    restriction fold into one relative clause on the subject noun (the restriction
+    nested onto the entity).
     """
     robot, mission = variable(Robot, []), variable(Mission, [])
     query = an(entity(robot).where(mission.assigned_to == robot, mission.priority > 2))

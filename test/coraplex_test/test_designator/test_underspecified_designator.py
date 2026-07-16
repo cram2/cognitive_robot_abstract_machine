@@ -2,7 +2,7 @@ from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
     ProbabilisticBackend,
 )
-from krrood.entity_query_language.factories import an, variable_from
+from krrood.entity_query_language.factories import a, an, variable_from
 from coraplex.datastructures.enums import (
     Arms,
     ApproachDirection,
@@ -22,12 +22,14 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 def test_underspecified_action(apartment_world_pr2_copy_with_context):
     """
-    Test that an underspecified action resolves to a concrete candidate and parses
-    into an executable. Execution is deferred to parse().execute(), so performing the
-    node only expands it; the resolved candidate is not performed here.
+    Test that an underspecified action resolves to a concrete candidate and parses into
+    an executable.
+
+    Execution is deferred to parse().execute(), so performing the node only expands it;
+    the resolved candidate is not performed here.
     """
     world, robot, context = apartment_world_pr2_copy_with_context
-    action = an(NavigateAction)(
+    action = a(NavigateAction)(
         target_location=variable_from(
             [
                 Pose.from_xyz_quaternion(1, -1, 0, reference_frame=world.root),
@@ -55,13 +57,15 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
 def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_context):
     """
     Test that an underspecified action resolves and parses when a factory for a spatial
-    type is used with ellipsis. Execution is deferred to parse().execute(), so performing
-    the node only expands it; the resolved candidate is not performed here.
+    type is used with ellipsis.
+
+    Execution is deferred to parse().execute(), so performing the node only expands it;
+    the resolved candidate is not performed here.
     """
     world, robot, context = apartment_world_pr2_copy_with_context
     context.query_backend = ProbabilisticBackend()
-    action = an(NavigateAction)(
-        target_location=an(Pose.from_xyz_rpy)(
+    action = a(NavigateAction)(
+        target_location=a(Pose.from_xyz_rpy)(
             x=...,
             y=...,
             z=0.0,
@@ -85,7 +89,7 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
 
 def test_underspecified_language(apartment_world_pr2_copy_with_context):
     """
-    Test that entire plans can be underspecified
+    Test that entire plans can be underspecified.
     """
     world, robot, context = apartment_world_pr2_copy_with_context
     grasp_description = GraspDescription(
@@ -95,7 +99,7 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
     )
     plan_generator = an(sequential, target_type=SequentialNode)(
         children=[
-            an(NavigateAction)(
+            a(NavigateAction)(
                 target_location=(
                     target_locations := variable_from(
                         [
@@ -110,7 +114,7 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
                 ),
                 keep_joint_states=True,
             ),
-            an(PickUpAction)(
+            a(PickUpAction)(
                 arm=...,
                 grasp_description=grasp_description,
                 object_designator=world.get_body_by_name("milk.stl"),
