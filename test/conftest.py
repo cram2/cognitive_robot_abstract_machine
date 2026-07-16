@@ -479,7 +479,13 @@ def tracy_world():
 
 @pytest.fixture(scope="session")
 def xarm5_world():
-    xarm5_parser = URDFParser.from_file(file_path=XArm5.get_ros_file_path())
+    try:
+        xarm5_parser = URDFParser.from_file(
+            file_path=XArm5.get_ros_file_path(),
+            mappings=XArm5.get_xacro_mappings(),
+        )
+    except ParsingError as error:
+        pytest.skip(f"xarm_description not available: {error}")
     world_with_xarm5 = xarm5_parser.parse()
     XArm5.from_world(world_with_xarm5)
     return world_with_xarm5

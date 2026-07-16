@@ -6,12 +6,13 @@ camera. Mirrors the structure of the other robots in this package (see ``pr2.py`
 ``stretch.py``): each part is a leaf-first class implementing the three abstract
 methods, and the robot class ties them together.
 
-.. note:: The robot description ships with this package under
-   ``resources/xarm_description`` (URDF and meshes), and the self-collision matrix
-   under ``resources/collision_configs/xarm5.srdf``. ``get_ros_file_path`` registers
-   the shipped description on ``ROS_PACKAGE_PATH`` so its ``package://`` references
-   resolve without a ROS installation; an ``xarm_description`` package already
-   present in the environment takes precedence.
+.. note:: The robot description comes from the ``xarm_description`` package of the
+   official ``xarm_ros2`` repository, which the workspace setup
+   (``.github/docker/setup_workspace.py``) clones stripped down to that single
+   package. Its device xacro is parameterized, so it must be expanded with
+   :meth:`XArm5.get_xacro_mappings` (the xArm 5 is not the default model). The
+   self-collision matrix ships with this package under
+   ``resources/collision_configs/xarm5.srdf``.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ import os
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
-from typing import List, Self
+from typing import Dict, List, Self
 
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
@@ -141,24 +142,15 @@ class XArm5(AbstractRobot, HasOneArm[XArm5Arm], HasSensors[XArm5Camera]):
 
     @classmethod
     def get_ros_file_path(cls) -> str:
+        return "package://xarm_description/urdf/xarm_device.urdf.xacro"
+
+    @classmethod
+    def get_xacro_mappings(cls) -> Dict[str, str]:
         """
-        Return the URDF location of the shipped ``xarm_description`` package,
-        registering it on ``ROS_PACKAGE_PATH`` so the URDF and its mesh
-        references resolve without a ROS installation.
+        Return the xacro substitution arguments that select the xArm 5 from the
+        parameterized device description (its defaults describe the 7-DoF model).
         """
-        shipped_description = os.path.join(
-            Path(files("semantic_digital_twin")).parent.parent,
-            "resources",
-            "xarm_description",
-        )
-        search_path = os.environ.get("ROS_PACKAGE_PATH", "")
-        if shipped_description not in search_path.split(":"):
-            os.environ["ROS_PACKAGE_PATH"] = (
-                f"{search_path}:{shipped_description}"
-                if search_path
-                else shipped_description
-            )
-        return "package://xarm_description/urdf/xarm5.urdf"
+        return {"robot_type": "xarm", "dof": "5"}
 
     @classmethod
     def _get_root_body_name(cls) -> str:

@@ -17,7 +17,9 @@ def main():
     rospy.node.declare_parameters(
         namespace="", parameters=[("robot_description", Parameter.Type.STRING)]
     )
-    robot_description = load_xacro(XArm5.get_ros_file_path())
+    robot_description = load_xacro(
+        XArm5.get_ros_file_path(), mappings=XArm5.get_xacro_mappings()
+    )
 
     giskard = Giskard(
         world_config=WorldWithXArm5Config(urdf=robot_description),

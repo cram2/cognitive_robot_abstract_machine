@@ -45,7 +45,9 @@ class XArm5Tester(GiskardTester):
         self.map = self.api.world.root
 
     def setup_giskard(self) -> Giskard:
-        robot_desc = load_xacro(XArm5.get_ros_file_path())
+        robot_desc = load_xacro(
+            XArm5.get_ros_file_path(), mappings=XArm5.get_xacro_mappings()
+        )
         return Giskard(
             world_config=WorldWithXArm5Config(urdf=robot_desc),
             robot_interface_config=XArm5StandAloneRobotInterfaceConfig(),

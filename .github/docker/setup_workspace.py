@@ -272,6 +272,24 @@ def main():
             "iai_weiss_wpg_300-120-gripper",
             ["griplink"],
         ),
+        Repository(
+            "https://github.com/xArm-Developer/xarm_ros2.git",
+            "jazzy",
+            "xarm_ros2",
+            [
+                "demo",
+                "thirdparty",
+                "uf_ros_lib",
+                "xarm_api",
+                "xarm_controller",
+                "xarm_gazebo",
+                "xarm_moveit_config",
+                "xarm_moveit_servo",
+                "xarm_msgs",
+                "xarm_planner",
+                "xarm_sdk",
+            ],
+        ),
     ]
 
     for repo in repos:
