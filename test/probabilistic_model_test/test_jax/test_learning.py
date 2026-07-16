@@ -115,7 +115,7 @@ def test_jax_structural_learning():
     pruned_circuit = prune_circuit_eflow(
         circuit,
         dummy_data,
-        tau=0.6,
+        prune_fraction=0.5,
     )
 
     assert pruned_circuit is not None

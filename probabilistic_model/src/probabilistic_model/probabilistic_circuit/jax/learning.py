@@ -97,18 +97,21 @@ def _duplicate_parent_rows(
         axis=0,
     )
 
-    noise = (
-        jax.random.normal(
+    noise_factor = (
+        1.0
+        + jax.random.normal(
             key,
             shape=cloned_weights.data.shape,
         )
         * noise_scale
     )
 
+    log_noise_factor = jnp.log(noise_factor)
+
     new_data = jnp.concatenate(
         [
             cloned_weights.data,
-            cloned_weights.data + noise,
+            cloned_weights.data + log_noise_factor,
         ],
         axis=0,
     )
@@ -130,7 +133,7 @@ def _duplicate_parent_rows(
 
 
 def prune_circuit_eflow(
-    circuit: ProbabilisticCircuit, data: jax.Array, tau: float
+    circuit: ProbabilisticCircuit, data: jax.Array, prune_fraction: float
 ) -> ProbabilisticCircuit:
     """
     EFLOW Pruning Algorithm: Evaluates edge flows, identifies redundant edges
@@ -162,7 +165,21 @@ def prune_circuit_eflow(
                 mean_edge_flows = mean_flows_list[log_weight_matrix_index]
                 log_weight_matrix_index += 1
                 # Boolean mask: True to keep the edge, False to prune it
-                keep_mask = mean_edge_flows >= tau
+                number_of_edges = mean_edge_flows.shape[0]
+
+                number_to_prune = int(prune_fraction * number_of_edges)
+
+                if number_to_prune > 0:
+                    threshold_index = jnp.argsort(mean_edge_flows)[number_to_prune - 1]
+
+                    threshold = mean_edge_flows[threshold_index]
+
+                    keep_mask = mean_edge_flows > threshold
+                else:
+                    keep_mask = jnp.ones_like(
+                        mean_edge_flows,
+                        dtype=bool,
+                    )
 
                 # Clone BCOO to avoid unexpected side effects in JAX memory management
                 cloned_weights = copy_bcoo(log_weights)
