@@ -8,27 +8,35 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import is_dataclass
 from textwrap import dedent, indent
-from typing_extensions import Tuple, Dict
+from sqlalchemy.orm import DeclarativeBase as SQLTable
+from typing_extensions import Any, Tuple, Dict
 
 from typing_extensions import Optional, TYPE_CHECKING, List
 
 from krrood.ripple_down_rules.datastructures.callable_expression import (
     CallableExpression,
 )
-from krrood.ripple_down_rules.datastructures.case import show_current_and_corner_cases
+from krrood.ripple_down_rules.datastructures.case import (
+    create_case,
+    show_current_and_corner_cases,
+)
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 from krrood.ripple_down_rules.datastructures.enums import PromptFor
 from krrood.ripple_down_rules.exceptions import (
+    NoDistinguishingAttributeFound,
     NoSavePathFoundForExpertAnswers,
     NoLoadPathFoundForExpertAnswers,
+    OracleCannotInferConclusionWithoutTarget,
 )
 from krrood.ripple_down_rules.user_interface.template_file_creator import (
     TemplateFileCreator,
 )
 from krrood.ripple_down_rules.utils import (
+    dataclass_to_dict,
     extract_function_or_class_file,
     get_imports_from_scope,
     get_class_file_path,
+    row_to_dict,
 )
 from krrood.utils import get_scope_from_imports
 
@@ -60,6 +68,11 @@ class Expert(ABC):
     use_loaded_answers: bool = False
     """
     A flag to indicate if the expert should use loaded answers or not.
+    """
+
+    answer_delimiter: str = "'===New Answer==='"
+    """
+    The marker written between consecutive answers in a saved Python answers file.
     """
 
     def __init__(
@@ -187,7 +200,9 @@ class Expert(ABC):
                     imports = ""
                 if func_source is None:
                     func_source = "pass  # No user input provided for this case.\n"
-                f.write(imports + func_source + "\n" + "\n\n\n'===New Answer==='\n\n\n")
+                f.write(
+                    imports + func_source + "\n\n\n\n" + self.answer_delimiter + "\n\n\n"
+                )
 
     def load_answers(self, path: Optional[str] = None):
         """
@@ -218,16 +233,25 @@ class Expert(ABC):
         """
         Load the expert answers from a Python file.
 
+        Splits on the bare delimiter marker rather than an exact run of surrounding
+        blank lines, since a formatter (e.g. black/docformatter) trimming trailing blank
+        lines at end of file would otherwise leave the delimiter after the last answer
+        without its usual trailing blank lines, silently dropping that last answer.
+
         :param path: The path to load the answers from.
         """
         file_path = path + ".py"
         with open(file_path, "r") as f:
-            all_answers = f.read().split("\n\n\n'===New Answer==='\n\n\n")[:-1]
+            content = f.read()
+        all_answers = [
+            answer.strip()
+            for answer in content.split(self.answer_delimiter)
+            if answer.strip()
+        ]
         all_function_sources = extract_function_or_class_file(
             file_path, [], as_list=True
         )
         for i, answer in enumerate(all_answers):
-            answer = answer.strip("\n").strip()
             if "def " not in answer and "pass" in answer:
                 self.all_expert_answers.append(({}, None))
                 continue
@@ -481,3 +505,103 @@ class Human(Expert):
             sys.exit()
         case_query.target = expression
         return expression
+
+
+class Oracle(Expert):
+    """
+    A programmatic expert that answers ripple-down-rule queries by comparing a case's
+    attributes with those of the corner case it conflicts with, instead of asking a
+    human or replaying pre-recorded answers.
+
+    Every case query fit against this expert must already carry a known target value:
+    the oracle never guesses a conclusion, it only ever describes which of the case's
+    simple (bool/int/float/str) attributes single it out from the corner case, mirroring
+    how a human expert would compare two rows of a table and point at the column that
+    differs.
+    """
+
+    simple_attribute_value_types: Tuple[type, ...] = (bool, int, float, str, type(None))
+    """
+    The attribute value types the oracle is willing to build a differentiating condition
+    from.
+    """
+
+    def ask_for_conditions(
+        self, case_query: CaseQuery, last_evaluated_rule: Optional[Rule] = None
+    ) -> CallableExpression:
+        condition_source = self._differentiating_condition_source(
+            case_query, last_evaluated_rule
+        )
+        condition = CallableExpression(condition_source, bool, scope=case_query.scope)
+        self.all_expert_answers.append((condition.scope, condition_source))
+        case_query.conditions = condition
+        return condition
+
+    def ask_for_conclusion(self, case_query: CaseQuery) -> Optional[CallableExpression]:
+        if case_query._target is None:
+            raise OracleCannotInferConclusionWithoutTarget(case_query)
+        return case_query.target
+
+    def _differentiating_condition_source(
+        self, case_query: CaseQuery, last_evaluated_rule: Optional[Rule]
+    ) -> str:
+        """
+        Build the source of a condition that is true for the case in the given case
+        query, and, if a corner case is available, false for that corner case.
+
+        :param case_query: The case query containing the case to build a condition for.
+        :param last_evaluated_rule: The last evaluated rule, whose corner case (if any)
+            the built condition must exclude.
+        :return: The source code of a ``return`` statement usable as a
+            :class:`CallableExpression`.
+        """
+        corner_case = (
+            last_evaluated_rule.corner_case if last_evaluated_rule is not None else None
+        )
+        if corner_case is None:
+            return "return True"
+        attribute_name, attribute_value = self._first_distinguishing_attribute(
+            case_query.case, corner_case, exclude={case_query.attribute_name.lower()}
+        )
+        return f"return case.{attribute_name} == {attribute_value!r}"
+
+    def _first_distinguishing_attribute(
+        self, case: Any, corner_case: Any, exclude: set
+    ) -> Tuple[str, Any]:
+        """
+        Find the first simple attribute that differs between a case and its corner case.
+
+        :param case: The case to classify.
+        :param corner_case: The corner case to differentiate the case from.
+        :param exclude: Attribute names to never consider, such as the attribute the
+            case query is trying to determine a value for.
+        :return: The name and value of the first differing simple attribute, taken from
+            ``case``.
+        :raises NoDistinguishingAttributeFound: if no such attribute exists.
+        """
+        case_attributes = self._attribute_dict(case)
+        corner_case_attributes = self._attribute_dict(corner_case)
+        for name, value in case_attributes.items():
+            if name in exclude or not isinstance(
+                value, self.simple_attribute_value_types
+            ):
+                continue
+            if corner_case_attributes.get(name, object()) != value:
+                return name, value
+        raise NoDistinguishingAttributeFound(case, corner_case)
+
+    @staticmethod
+    def _attribute_dict(obj: Any) -> Dict[str, Any]:
+        """
+        Get a name-to-value mapping of an object's attributes, regardless of whether it
+        is a SQLAlchemy mapped instance, a dataclass, or any other object.
+
+        :param obj: The object to get the attributes of.
+        :return: The name-to-value mapping of the object's attributes.
+        """
+        if isinstance(obj, SQLTable):
+            return row_to_dict(obj)
+        elif is_dataclass(obj):
+            return dataclass_to_dict(obj)
+        else:
+            return dict(create_case(obj).items())

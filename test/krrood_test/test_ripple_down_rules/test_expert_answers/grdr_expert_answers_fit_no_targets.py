@@ -28,7 +28,7 @@ def animal_habitats_of_type_habitat(case: DataFrame) -> List[Habitat]:
     return habitats
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -62,7 +62,7 @@ def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
     return is_a_mammal
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type, Union
@@ -95,7 +95,7 @@ def animal_habitats_of_type_habitat(case: DataFrame) -> List[Habitat]:
     return habitats
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -129,7 +129,7 @@ def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
     return is_aquatic
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type, Union
@@ -162,7 +162,7 @@ def animal_habitats_of_type_habitat(case: DataFrame) -> List[Habitat]:
     return habitats
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -197,7 +197,7 @@ def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
     return is_a_bird and has_legs
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type, Union
@@ -230,7 +230,7 @@ def animal_habitats_of_type_habitat(case: DataFrame) -> List[Habitat]:
     return habitats
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -265,7 +265,7 @@ def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
     return is_a_molusc and is_not_aquatic
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type, Union
@@ -298,7 +298,7 @@ def animal_habitats_of_type_habitat(case: DataFrame) -> List[Habitat]:
     return habitats
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -334,4 +334,4 @@ def conditions_for_animal_habitats_of_type_habitat(case: DataFrame) -> bool:
     return is_a_molusc and is_aquatic and has_legs
 
 
-"===New Answer==="
+'===New Answer==='
