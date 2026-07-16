@@ -70,7 +70,6 @@ def test_assignments_for_conditioning():
 
 def test_union_types_easy():
     prob_q = a(KRROODPosition)(x=..., y=..., z=...)
-    prob_q.resolve()
     prob_q.where(
         prob_q.variable.x < 5.0,
     )
@@ -81,7 +80,6 @@ def test_union_types_easy():
 
 def test_union_types():
     prob_q = a(KRROODPosition)(x=..., y=..., z=variable(int, domain=[10, 20]))
-    prob_q.resolve()
     prob_q.where(prob_q.variable.x < 5.0)
 
     parameters = UnderspecifiedParameters(prob_q)

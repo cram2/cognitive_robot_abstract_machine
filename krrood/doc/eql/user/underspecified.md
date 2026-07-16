@@ -44,8 +44,10 @@ query = a(KRROODPosition)(x=..., y=..., z=...)
 ```
 
 The returned object is a {py:class}`~krrood.entity_query_language.query.match.Match` and supports
-the `.where()`, `.resolve()`, and nesting patterns. Use `the(MyClass)` instead of `an(MyClass)`
-when exactly one solution is expected.
+`.where()` and nesting patterns. Its subject variable is available immediately as
+`query.variable`, so you can reference it in `.where()` conditions without a separate
+`.resolve()` call. Use `the(MyClass)` instead of `an(MyClass)` when exactly one solution is
+expected.
 
 ---
 
@@ -142,7 +144,6 @@ query = a(KRROODPose)(
     position=a(KRROODPosition)(x=..., y=..., z=...),
     orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),  # ← kwargs: condition the model
 )
-query.resolve()
 query.where(query.variable.position.x > 0.5)   # ← .where(): truncate the conditioned distribution
 ```
 
@@ -213,7 +214,6 @@ query = a(Pose)(
     position=a(Position)(x=..., y=..., z=...),
     orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
 )
-query.resolve()
 query.where(query.variable.position.x > 0.5)
 
 poses = list(query.evaluate(backend=ProbabilisticBackend(number_of_samples=10)))

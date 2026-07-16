@@ -297,12 +297,11 @@ class SymbolicFunction(SymbolicCallable, ABC):
     """
     A user-defined operation that computes a value, with its own verbalization.
 
-    Like :class:`Predicate` it is a self-verbalizing symbolic callable, but its
-    :meth:`__call__` returns a value (not a truth value), so its
-    :meth:`Verbalizable._verbalization_fragment_` names that value as a noun phrase
-    rather than a clause. Subclass it when the default *"the <name> of <arguments>"*
-    reading produced by the :func:`symbolic_function` decorator is not the surface you
-    want; for a plain value function the decorator remains the simplest form.
+    Like :class:`Predicate` it is a self-verbalizing symbolic callable, but its :meth:`__call__`
+    returns a value (not a truth value), so its :meth:`Verbalizable._verbalization_fragment_` names
+    that value as a noun phrase rather than a clause. When the class name itself reads as the value
+    (``Length`` → *"the length of a list"*), the fragment is a one-liner over
+    :meth:`~…vocabulary.parts_of_speech.FunctionVerbalizationTemplates.possessive` read off ``cls.__name__``.
     """
 
     @classmethod
@@ -424,19 +423,19 @@ class HasType(Triple):
             clause,
             Copula,
             Noun,
-            Or,
+            DisjunctivePhrase,
         )
 
         # "<variable> is of type A, B, or C" -- the admissible types are said DISJUNCTIVELY
         # (``isinstance`` over a tuple holds for ANY one of them, so "and" would claim an impossible
-        # conjunction). The listing is the vocabulary's :class:`Or` element, not a bespoke tail;
-        # "type" is a bare noun ("of type", not "of a type").
+        # conjunction). The listing is the vocabulary's :class:`DisjunctivePhrase` element, not a
+        # bespoke tail; "type" is a bare noun ("of type", not "of a type").
         return clause(
             Noun(fields["variable"]),
             Copula(),
             Prepositions.OF,
             Noun.bare("type"),
-            Or(fields["types_"]),
+            DisjunctivePhrase(fields["types_"]),
         )
 
 
@@ -462,6 +461,8 @@ class HasTypes(HasType):
 class Length(SymbolicFunction):
     """
     The number of items in an iterable, as a value operation.
+
+    Reads as the name-based noun phrase *"the length of <iterable>"*.
     """
 
     iterable: Sized
@@ -476,10 +477,10 @@ class Length(SymbolicFunction):
     def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
         # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            function_as_phrase,
+            FunctionVerbalizationTemplates,
         )
 
-        return function_as_phrase(cls.__name__, *fields.values())
+        return FunctionVerbalizationTemplates.possessive(cls, *fields.values())
 
 
 length = symbolic_callable_to_function(Length)
@@ -515,3 +516,25 @@ class Is(Predicate):
 
     def __call__(self) -> bool:
         return self.first_entity is self.second_entity
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """:return: the clause *"<first_entity> is the same object as <second_entity>"* — the two
+        operands hold when they are the same object in memory."""
+        # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
+        from krrood.entity_query_language.verbalization.vocabulary.english import (
+            Prepositions,
+        )
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            clause,
+            Copula,
+            Noun,
+        )
+
+        return clause(
+            Noun(fields["first_entity"]),
+            Copula(),
+            Noun.the("same object"),
+            Prepositions.AS,
+            Noun(fields["second_entity"]),
+        )

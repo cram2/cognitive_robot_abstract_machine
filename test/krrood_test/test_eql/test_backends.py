@@ -202,7 +202,6 @@ def test_probabilistic_query_backend():
         position=a(KRROODPosition)(x=..., y=..., z=...),
         orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     )
-    prob_q.resolve()
     prob_q.where(prob_q.variable.position.x > 0.5)
 
     pm_backend = ProbabilisticBackend(number_of_samples=10)
@@ -220,7 +219,8 @@ def test_generative_eql_backend():
         charge=variable_from([0.0, 1.0, 2.0]),
         timestamp=datetime.datetime.now(),
     )
-    q.resolve()
+    # No explicit resolve(): the subject variable is available as soon as the pattern is
+    # specified, so where() can reference it directly.
     q.where(q.variable.type > q.variable.charge)
     results = list(q.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
     assert len(results) == 6

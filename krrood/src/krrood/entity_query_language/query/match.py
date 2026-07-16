@@ -36,6 +36,7 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     SymbolicExpression,
 )
+from krrood.entity_query_language.core.helpers import _resolve_domain
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
     FlatVariable,
@@ -286,6 +287,11 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         Update the match with new keyword arguments to constrain the type we are
         matching with.
 
+        Eagerly creates the match's subject variable so it can be referenced in ``where``
+        conditions immediately (lowering the pattern into conditions stays lazy, tracked by
+        ``resolved``). If this match is later nested under a parent, the parent overwrites
+        the subject with its own attribute during resolution.
+
         :param kwargs: The keyword arguments to match against.
         :return: The current match instance after updating it with the new keyword
             arguments.
@@ -294,6 +300,8 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
             raise CalledMatchMultipleTimes(self)
         self.kwargs = kwargs
         self._has_been_called = True
+        if self.variable is None:
+            self.create_or_update_variable()
         return self
 
     @property
@@ -306,7 +314,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         if self._expression is not None:
             return self._expression
 
-        if self.variable is None:
+        if not self.resolved:
             self.resolve()
         entity_ = entity(self.variable)
         if self.conditions:
@@ -404,14 +412,27 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         if variable is not None:
             self.variable = variable
         elif self.variable is None:
-            self.create_variable()
+            self.create_or_update_variable()
 
         self.parent = parent
 
-    def create_variable(self):
-        from krrood.entity_query_language.factories import variable
+    def create_or_update_variable(self):
+        """
+        Create the subject variable from this match's current type and domain.
 
-        self.variable = variable(self.type, domain=self.domain)
+        If a subject variable already exists (``from_`` re-scoping the domain after
+        ``__call__`` eagerly created one), its domain is updated in place instead of
+        replacing the variable outright: conditions built earlier against ``self.variable``
+        (for example from an already-recorded ``where``) reference that same object, so
+        replacing it would silently orphan them from the re-scoped domain.
+        """
+        if self.variable is None:
+            from krrood.entity_query_language.factories import variable
+
+            self.variable = variable(self.type, domain=self.domain)
+            return
+
+        self.variable._update_domain_(_resolve_domain(self.type, self.domain))
 
     def _evaluate_natively_(self) -> Iterator:
         """
@@ -487,10 +508,18 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         get the lowered selection query when you need symbolic attribute access (``.parent`` /
         ``.child``), ``the(...)`` or ``set_of(...)``.
 
+        .. note::
+            ``__call__`` eagerly creates a subject variable before the domain is known (and with
+            no domain that is a SymbolGraph-wide variable for Symbol types). ``create_or_update_variable``
+            re-scopes that same variable's domain in place (see its docstring) rather than
+            replacing it, so a ``where`` recorded before this call keeps referencing the correct,
+            now domain-scoped, variable.
+
         :param domain: The instances the match ranges over.
         :return: This match, for chaining.
         """
         self.domain = domain
+        self.create_or_update_variable()
         return self
 
     def _update_kwargs_from_literal_values(self):
@@ -571,8 +600,9 @@ class AttributeMatch(AbstractMatchExpression[T]):
         Resolve the attribute assignment by creating the conditions and applying the
         necessary mappings to the attribute.
         """
-        if not isinstance(self.assigned_value, AbstractMatchExpression) or (
-            self.assigned_value.variable or self.assigned_value.resolved
+        if (
+            not isinstance(self.assigned_value, AbstractMatchExpression)
+            or self.assigned_value.resolved
         ):
             self.conditions.append(self.attribute == self.assigned_variable)
             return

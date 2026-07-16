@@ -1,0 +1,233 @@
+{
+    "_type": "ripple_down_rules.rdr.GeneralRDR",
+    "start_rules": {
+        "output_": {
+            "_type": "ripple_down_rules.rdr.SingleClassRDR",
+            "start_rule": {
+                "_type": "ripple_down_rules.rules.SingleClassRule",
+                "conditions": {
+                    "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                    "user_input": "def _get_value(case):\n    def conditions_for_insertion_detector_hole_insertion_verifier(self_: InsertionDetector, hole: PhysicalBody, event: InterferenceEvent, output_: bool) -> bool:\n        \"\"\"Get conditions on whether it's possible to conclude a value for InsertionDetector_hole_insertion_verifier.output_  of type .\"\"\"\n        hole_bbox = hole.get_axis_aligned_bounding_box()\n        hole_max_z = hole_bbox.max_z\n        obj_bbox = event.tracked_object.get_axis_aligned_bounding_box()\n        obj_max = obj_bbox.max_z\n        if obj_max <= hole_max_z + 1e-3:\n            return True\n        else:\n            return False\n    return conditions_for_insertion_detector_hole_insertion_verifier(**case)\n    ",
+                    "conclusion_type": [
+                        "builtins.bool"
+                    ],
+                    "scope": {
+                        "SimpleEvent": "random_events.product_algebra.SimpleEvent",
+                        "Case": "ripple_down_rules.datastructures.case.Case",
+                        "AxisAlignedBoundingBox": "pycram.datastructures.dataclasses.AxisAlignedBoundingBox",
+                        "InsertionEvent": "segmind.datastructures.events.InsertionEvent",
+                        "InterferenceEvent": "segmind.datastructures.events.InterferenceEvent",
+                        "PickUpEvent": "segmind.datastructures.events.PickUpEvent",
+                        "Dict": "typing.Dict",
+                        "Optional": "typing.Optional",
+                        "Union": "typing.Union",
+                        "NoneType": "builtins.NoneType",
+                        "InsertionDetector": "segmind.detectors.spatial_relation_detector.InsertionDetector",
+                        "PhysicalBody": "pycram.datastructures.world_entity.PhysicalBody",
+                        "is_object_supported_by_container_body": "segmind.utils.is_object_supported_by_container_body"
+                    },
+                    "conclusion": {
+                        "_type": "builtins.NoneType",
+                        "value": null
+                    },
+                    "mutually_exclusive": true
+                },
+                "conclusion": {
+                    "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                    "user_input": "def _get_value(case):\n    def insertion_detector_hole_insertion_verifier(self_: InsertionDetector, hole: PhysicalBody, event: InterferenceEvent, output_: bool) -> bool:\n        \"\"\"Get possible value(s) for InsertionDetector_hole_insertion_verifier.output_  of type .\"\"\"\n        return True\n    return insertion_detector_hole_insertion_verifier(**case)\n    ",
+                    "conclusion_type": [
+                        "builtins.bool"
+                    ],
+                    "scope": {
+                        "SimpleEvent": "random_events.product_algebra.SimpleEvent",
+                        "Case": "ripple_down_rules.datastructures.case.Case",
+                        "AxisAlignedBoundingBox": "pycram.datastructures.dataclasses.AxisAlignedBoundingBox",
+                        "InsertionEvent": "segmind.datastructures.events.InsertionEvent",
+                        "InterferenceEvent": "segmind.datastructures.events.InterferenceEvent",
+                        "PickUpEvent": "segmind.datastructures.events.PickUpEvent",
+                        "Dict": "typing.Dict",
+                        "Optional": "typing.Optional",
+                        "Union": "typing.Union",
+                        "NoneType": "builtins.NoneType",
+                        "InsertionDetector": "segmind.detectors.spatial_relation_detector.InsertionDetector",
+                        "PhysicalBody": "pycram.datastructures.world_entity.PhysicalBody",
+                        "is_object_supported_by_container_body": "segmind.utils.is_object_supported_by_container_body"
+                    },
+                    "conclusion": {
+                        "_type": "builtins.NoneType",
+                        "value": null
+                    },
+                    "mutually_exclusive": true
+                },
+                "parent": null,
+                "corner_case": {
+                    "_type": "ripple_down_rules.datastructures.case.Case",
+                    "self_": null,
+                    "hole": null,
+                    "event": null,
+                    "output_": null,
+                    "_id": 140500062508288,
+                    "_obj_type": "builtins.dict",
+                    "_name": "InsertionDetector_hole_insertion_verifier"
+                },
+                "conclusion_name": "output_",
+                "weight": null,
+                "uid": "38355037295796650033371896063976531277",
+                "refinement": {
+                    "_type": "ripple_down_rules.rules.SingleClassRule",
+                    "conditions": {
+                        "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                        "user_input": "def _get_value(case):\n    def conditions_for_insertion_detector_hole_insertion_verifier(self_: InsertionDetector, hole: PhysicalBody, event: InterferenceEvent, output_: bool) -> bool:\n        \"\"\"Get conditions on whether it's possible to conclude a value for InsertionDetector_hole_insertion_verifier.output_  of type .\"\"\"\n        return True\n    return conditions_for_insertion_detector_hole_insertion_verifier(**case)\n    ",
+                        "conclusion_type": [
+                            "builtins.bool"
+                        ],
+                        "scope": {
+                            "SimpleEvent": "random_events.product_algebra.SimpleEvent",
+                            "Case": "ripple_down_rules.datastructures.case.Case",
+                            "AxisAlignedBoundingBox": "pycram.datastructures.dataclasses.AxisAlignedBoundingBox",
+                            "InsertionEvent": "segmind.datastructures.events.InsertionEvent",
+                            "InterferenceEvent": "segmind.datastructures.events.InterferenceEvent",
+                            "PickUpEvent": "segmind.datastructures.events.PickUpEvent",
+                            "Dict": "typing.Dict",
+                            "Optional": "typing.Optional",
+                            "Union": "typing.Union",
+                            "NoneType": "builtins.NoneType",
+                            "InsertionDetector": "segmind.detectors.spatial_relation_detector.InsertionDetector",
+                            "PhysicalBody": "pycram.datastructures.world_entity.PhysicalBody",
+                            "is_object_supported_by_container_body": "segmind.utils.is_object_supported_by_container_body"
+                        },
+                        "conclusion": {
+                            "_type": "builtins.NoneType",
+                            "value": null
+                        },
+                        "mutually_exclusive": true
+                    },
+                    "conclusion": {
+                        "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                        "user_input": "def _get_value(case):\n    def insertion_detector_hole_insertion_verifier(self_: InsertionDetector, hole: PhysicalBody, event: InterferenceEvent, output_: bool) -> bool:\n        \"\"\"Get possible value(s) for InsertionDetector_hole_insertion_verifier.output_  of type .\"\"\"\n        return True\n    return insertion_detector_hole_insertion_verifier(**case)\n    ",
+                        "conclusion_type": [
+                            "builtins.bool"
+                        ],
+                        "scope": {
+                            "SimpleEvent": "random_events.product_algebra.SimpleEvent",
+                            "Case": "ripple_down_rules.datastructures.case.Case",
+                            "AxisAlignedBoundingBox": "pycram.datastructures.dataclasses.AxisAlignedBoundingBox",
+                            "InsertionEvent": "segmind.datastructures.events.InsertionEvent",
+                            "InterferenceEvent": "segmind.datastructures.events.InterferenceEvent",
+                            "PickUpEvent": "segmind.datastructures.events.PickUpEvent",
+                            "Dict": "typing.Dict",
+                            "Optional": "typing.Optional",
+                            "Union": "typing.Union",
+                            "NoneType": "builtins.NoneType",
+                            "InsertionDetector": "segmind.detectors.spatial_relation_detector.InsertionDetector",
+                            "PhysicalBody": "pycram.datastructures.world_entity.PhysicalBody",
+                            "is_object_supported_by_container_body": "segmind.utils.is_object_supported_by_container_body"
+                        },
+                        "conclusion": {
+                            "_type": "builtins.NoneType",
+                            "value": null
+                        },
+                        "mutually_exclusive": true
+                    },
+                    "parent": null,
+                    "corner_case": {
+                        "_type": "ripple_down_rules.datastructures.case.Case",
+                        "self_": null,
+                        "hole": null,
+                        "event": null,
+                        "output_": false,
+                        "_id": 140167537882368,
+                        "_obj_type": "builtins.dict",
+                        "_name": "InsertionDetector_hole_insertion_verifier"
+                    },
+                    "conclusion_name": null,
+                    "weight": "except if",
+                    "uid": "21738774625860220488991060484462427733",
+                    "refinement": {
+                        "_type": "ripple_down_rules.rules.SingleClassRule",
+                        "conditions": {
+                            "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                            "user_input": "def _get_value(case):\n    def conditions_for_insertion_detector_hole_insertion_verifier(self_: InsertionDetector, hole: PhysicalBody, event: InterferenceEvent, output_: bool) -> bool:\n        \"\"\"Get conditions on whether it's possible to conclude a value for InsertionDetector_hole_insertion_verifier.output_  of type .\"\"\"\n        latest_insertion = event.object_tracker.get_latest_event_of_type(InsertionEvent)\n        if latest_insertion is None:\n            return False\n        latest_pickup = event.object_tracker.get_first_event_of_type_after_event(PickUpEvent, latest_insertion)\n        no_pick_up = latest_pickup is None\n        latest_insertion_before_this_insertion = event.object_tracker.get_first_event_of_type_before_event(InsertionEvent, latest_insertion)\n        if latest_insertion_before_this_insertion is None:\n            return no_pick_up\n        elif abs(latest_insertion.timestamp - latest_insertion_before_this_insertion.timestamp) < 0.5:\n            return True\n        else:\n            return no_pick_up\n    return conditions_for_insertion_detector_hole_insertion_verifier(**case)\n    ",
+                            "conclusion_type": [
+                                "builtins.bool"
+                            ],
+                            "scope": {
+                                "SimpleEvent": "random_events.product_algebra.SimpleEvent",
+                                "Case": "ripple_down_rules.datastructures.case.Case",
+                                "AxisAlignedBoundingBox": "pycram.datastructures.dataclasses.AxisAlignedBoundingBox",
+                                "InsertionEvent": "segmind.datastructures.events.InsertionEvent",
+                                "InterferenceEvent": "segmind.datastructures.events.InterferenceEvent",
+                                "PickUpEvent": "segmind.datastructures.events.PickUpEvent",
+                                "Dict": "typing.Dict",
+                                "Optional": "typing.Optional",
+                                "Union": "typing.Union",
+                                "NoneType": "builtins.NoneType",
+                                "InsertionDetector": "segmind.detectors.spatial_relation_detector.InsertionDetector",
+                                "PhysicalBody": "pycram.datastructures.world_entity.PhysicalBody",
+                                "is_object_supported_by_container_body": "segmind.utils.is_object_supported_by_container_body"
+                            },
+                            "conclusion": {
+                                "_type": "builtins.NoneType",
+                                "value": null
+                            },
+                            "mutually_exclusive": true
+                        },
+                        "conclusion": {
+                            "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                            "user_input": "def _get_value(case):\n    def insertion_detector_hole_insertion_verifier(self_: InsertionDetector, hole: PhysicalBody, event: InterferenceEvent, output_: bool) -> bool:\n        \"\"\"Get possible value(s) for InsertionDetector_hole_insertion_verifier.output_  of type .\"\"\"\n        return False\n    return insertion_detector_hole_insertion_verifier(**case)\n    ",
+                            "conclusion_type": [
+                                "builtins.bool"
+                            ],
+                            "scope": {
+                                "SimpleEvent": "random_events.product_algebra.SimpleEvent",
+                                "Case": "ripple_down_rules.datastructures.case.Case",
+                                "AxisAlignedBoundingBox": "pycram.datastructures.dataclasses.AxisAlignedBoundingBox",
+                                "InsertionEvent": "segmind.datastructures.events.InsertionEvent",
+                                "InterferenceEvent": "segmind.datastructures.events.InterferenceEvent",
+                                "PickUpEvent": "segmind.datastructures.events.PickUpEvent",
+                                "Dict": "typing.Dict",
+                                "Optional": "typing.Optional",
+                                "Union": "typing.Union",
+                                "NoneType": "builtins.NoneType",
+                                "InsertionDetector": "segmind.detectors.spatial_relation_detector.InsertionDetector",
+                                "PhysicalBody": "pycram.datastructures.world_entity.PhysicalBody",
+                                "is_object_supported_by_container_body": "segmind.utils.is_object_supported_by_container_body"
+                            },
+                            "conclusion": {
+                                "_type": "builtins.NoneType",
+                                "value": null
+                            },
+                            "mutually_exclusive": true
+                        },
+                        "parent": null,
+                        "corner_case": {
+                            "_type": "ripple_down_rules.datastructures.case.Case",
+                            "self_": null,
+                            "hole": null,
+                            "event": null,
+                            "output_": true,
+                            "_id": 139785553017728,
+                            "_obj_type": "builtins.dict",
+                            "_name": "InsertionDetector_hole_insertion_verifier"
+                        },
+                        "conclusion_name": null,
+                        "weight": "except if",
+                        "uid": "313966059252436144481394373657043070884",
+                        "refinement": null,
+                        "alternative": null
+                    },
+                    "alternative": null
+                },
+                "alternative": null
+            },
+            "generated_python_file_name": "insertion_detector_hole_insertion_verifier_output__scrdr",
+            "name": "output_",
+            "case_type": "typing.Dict",
+            "case_name": "InsertionDetector_hole_insertion_verifier"
+        }
+    },
+    "generated_python_file_name": "insertion_detector_hole_insertion_verifier_rdr",
+    "name": "output_",
+    "case_type": "typing.Dict",
+    "case_name": "InsertionDetector_hole_insertion_verifier"
+}
