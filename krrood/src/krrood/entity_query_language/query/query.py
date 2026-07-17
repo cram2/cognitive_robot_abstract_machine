@@ -17,6 +17,7 @@ from functools import cached_property, wraps
 from typing_extensions import (
     Iterable,
     Any,
+    ClassVar,
     Optional,
     Type,
     Dict,
@@ -95,11 +96,6 @@ ResultMapping = Callable[[Iterator[OperationResult]], Iterator[OperationResult]]
 A function that maps the results of a query to a new set of results.
 """
 
-_STREAM_EXHAUSTED = object()
-"""
-Sentinel distinguishing a genuinely exhausted source from a ``None`` result.
-"""
-
 
 @dataclass
 class CachedResultStream:
@@ -110,6 +106,11 @@ class CachedResultStream:
     iterated many times — once per outer row that reaches an uncorrelated subquery — while the
     underlying computation runs at most once. Filling lazily preserves short-circuiting for callers
     that stop early.
+    """
+
+    _STREAM_EXHAUSTED: ClassVar[object] = object()
+    """
+    Sentinel distinguishing a genuinely exhausted source from a ``None`` result.
     """
 
     _source: Iterator[OperationResult]
@@ -127,6 +128,9 @@ class CachedResultStream:
 
     def __iter__(self) -> Iterator[OperationResult]:
         index = 0
+        # Not ``while not self._exhausted``: an already-exhausted stream must still replay its
+        # buffer to later iterators, so the loop always runs and the exhaustion guard below only
+        # stops the pulling of new items, not the replay of buffered ones.
         while True:
             if index < len(self._buffer):
                 yield self._buffer[index]
@@ -137,8 +141,8 @@ class CachedResultStream:
             # Sentinel form of next() rather than try/except StopIteration: this method is a
             # generator, and per PEP 479 a StopIteration raised inside it would surface as a
             # RuntimeError instead of ending iteration.
-            next_item = next(self._source, _STREAM_EXHAUSTED)
-            if next_item is _STREAM_EXHAUSTED:
+            next_item = next(self._source, self._STREAM_EXHAUSTED)
+            if next_item is self._STREAM_EXHAUSTED:
                 self._exhausted = True
                 return
             self._buffer.append(next_item)

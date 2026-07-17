@@ -108,7 +108,9 @@ class UnsupportedQuantifierError(EQLTranslationError, TypeError):
     """
 
     quantifier_type: Type[ResultQuantifier]
-    """The result-quantifier kind that has no evaluation strategy."""
+    """
+    The result-quantifier kind that has no evaluation strategy.
+    """
 
     def error_message(self) -> str:
         return f"Unsupported quantifier: {self.quantifier_type}"
@@ -580,7 +582,9 @@ class EQLTranslator:
 
     @property
     def quantifier_type(self) -> Type[ResultQuantifier]:
-        """The result-quantifier kind (``An``/``The``) requested by the query."""
+        """
+        :return: The result-quantifier kind (``An`` / ``The``) requested by the query.
+        """
         return self.eql_query._quantifier_builder_.type
 
     @property

@@ -1,16 +1,16 @@
 """
 Composable result-stream transformers for the Entity Query Language.
 
-A query produces a stream of result rows from its cartesian product; ordering and quantification are
-expressed as :class:`ResultTransformer` stages applied to that stream. A query owns an ordered list of
-transformers and runs them in sequence, so each stage stays single-responsibility and the query node
-itself stays thin and inspectable.
+A query produces a stream of result rows from its cartesian product; ordering and
+quantification are expressed as :class:`ResultTransformer` stages applied to that
+stream. A query owns an ordered list of transformers and runs them in sequence, so each
+stage stays single-responsibility and the query node itself stays thin and inspectable.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from typing_extensions import Any, Callable, Iterator, Optional, TYPE_CHECKING
 
@@ -28,7 +28,8 @@ if TYPE_CHECKING:
 @dataclass
 class ResultTransformer(ABC):
     """
-    A single stage in a query's result pipeline that maps a stream of result rows to another stream.
+    A single stage in a query's result pipeline that maps a stream of result rows to
+    another stream.
     """
 
     @abstractmethod
@@ -39,7 +40,6 @@ class ResultTransformer(ABC):
         :param results: The incoming result rows.
         :return: The transformed result rows.
         """
-        ...
 
 
 @dataclass
@@ -56,9 +56,11 @@ class Ordering(ResultTransformer):
     """
     Whether to order the results in descending order.
     """
+
     key: Optional[Callable] = None
     """
-    An optional function extracting the comparison key from the ordering variable's value.
+    An optional function extracting the comparison key from the ordering variable's
+    value.
     """
 
     def transform(
@@ -85,20 +87,22 @@ class Ordering(ResultTransformer):
 @dataclass
 class Quantification(ResultTransformer):
     """
-    Enforces a query's result-count constraint (``an``/``the`` and custom quantifications), passing
-    rows through while asserting the constraint is satisfied.
+    Enforces a query's result-count constraint (``an``/``the`` and custom
+    quantifications), passing rows through while asserting the constraint is satisfied.
     """
 
     quantifier_type: type
     """
-    The quantifier kind (``An`` / ``The``) this stage enforces, kept so the pipeline stays
-    inspectable.
+    The quantifier kind (``An`` / ``The``) this stage enforces, kept so the pipeline
+    stays inspectable.
     """
+
     constraint: Optional[ResultQuantificationConstraint] = None
     """
     The result-count constraint to enforce, or ``None`` to accept any number of results.
     """
-    owner: Optional[Any] = field(default=None)
+
+    owner: Optional[Any] = None
     """
     The query this stage quantifies, reported in quantification errors.
     """
