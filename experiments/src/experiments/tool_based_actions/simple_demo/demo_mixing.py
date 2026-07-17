@@ -3,8 +3,9 @@ Mixing demo: a PR2 mixes the contents of a bowl on the apartment kitchen counter
 with a whisk mounted on its right gripper.
 """
 
-from demo_world import (
+from experiments.tool_based_actions.simple_demo.demo_world import (
     BASE_POSITION_XYZ,
+    BOWL_COLOR,
     MIX_MOUNT,
     TARGET_POSITION_XYZ,
     attach_tool,
@@ -34,7 +35,7 @@ from coraplex.testing import setup_world
 
 world = setup_world()
 
-bowl_world = parse_object("bowl.stl")
+bowl_world = parse_object("bowl.stl", color=BOWL_COLOR)
 with world.modify_world():
     world.merge_world_at_pose(
         bowl_world,
@@ -42,6 +43,18 @@ with world.modify_world():
             *TARGET_POSITION_XYZ, reference_frame=world.root
         ),
     )
+try:
+    import rclpy
+
+    rclpy.init()
+    from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+        VizMarkerPublisher,
+    )
+
+    node = rclpy.create_node("viz_marker")
+    v = VizMarkerPublisher(_world=world, node=node).with_tf_publisher()
+except ImportError:
+    node = None
 
 pr2 = PR2.from_world(world)
 context = Context(world=world, robot=pr2, _debug=False, ros_node=None)

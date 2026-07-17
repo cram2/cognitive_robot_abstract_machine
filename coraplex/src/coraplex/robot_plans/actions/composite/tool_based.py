@@ -24,6 +24,7 @@ from coraplex.datastructures.enums import (
     CuttingTechnique,
     MixingPattern,
     MovementType,
+    SlicingPriority,
     WipingTechnique,
 )
 from coraplex.exceptions import (
@@ -34,6 +35,7 @@ from coraplex.exceptions import (
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.base import ActionDescription
+from coraplex.view_manager import ViewManager
 from coraplex.robot_plans.actions.composite.tool_motion_sequences import (
     DEFAULT_SAMPLE_DT,
     MotionSegment,
@@ -210,13 +212,20 @@ class CuttingAction(ToolMotionAction):
     """
     The cutting technique to use.
     """
-    slice_thickness: float = 0.03
+    slice_thickness: Optional[float] = None
     """
-    Target slice thickness in meters used to place the cut anchors.
+    Target slice thickness in meters, controlling the spacing between cut anchors.
+    Derived from ``num_cuts_x`` and the object size if None.
     """
-    num_cuts_x: int = 1
+    num_cuts_x: Optional[int] = None
     """
-    Number of cut passes distributed across the object's local X axis.
+    Number of cut passes along the object's local X axis. Derived from
+    ``slice_thickness`` and the object size if None.
+    """
+    slicing_priority: SlicingPriority = SlicingPriority.THICKNESS
+    """
+    Parameter that is kept when ``slice_thickness`` and ``num_cuts_x`` do not both
+    fit the object.
     """
 
     def _build_motion_sequence(self) -> MotionSequence:
@@ -225,6 +234,7 @@ class CuttingAction(ToolMotionAction):
             technique=self.technique,
             slice_thickness=self.slice_thickness,
             num_cuts_x=self.num_cuts_x,
+            slicing_priority=self.slicing_priority,
         )
 
     def _motion_frame(self) -> HomogeneousTransformationMatrix:
@@ -365,9 +375,10 @@ class PouringAction(FullBodyControlledAction):
     Robot-relative side of the target container to pour from. Defaults to the arm, so
     one-arm robots can still use either side's pouring geometry.
     """
-    pour_side_offset_m: float = 0.10
+    pour_side_offset_m: float = 0.0
     """
-    Lateral TCP offset in meters from the target container's center.
+    Extra lateral offset in meters of the pour point from the target container's
+    center.
     """
     pour_approach_offset_m: float = 0.0
     """
@@ -384,12 +395,20 @@ class PouringAction(FullBodyControlledAction):
             return self.arm
         return self.pour_side
 
-    def _held_object_height_m(self) -> float:
+    def _mouth_height_above_tool_frame_m(self) -> float:
         """
-        :return: The height of the held source container in meters.
+        :return: Height in meters of the source container's opening above the arm's
+            tool frame, measured along the tool frame's z axis.
         """
+        tool_frame = ViewManager.get_end_effector_view(self.arm, self.robot).tool_frame
+        tool_frame_T_source = self.world.compute_forward_kinematics_np(
+            tool_frame, self.source_container.root
+        )
         mins, maxs = body_local_aabb(self.source_container.root, use_visual=True)
-        return max(float(maxs[2] - mins[2]), 0.0)
+        mouth_in_source = np.array(
+            [0.5 * (mins[0] + maxs[0]), 0.5 * (mins[1] + maxs[1]), maxs[2], 1.0]
+        )
+        return float((tool_frame_T_source @ mouth_in_source)[2])
 
     def _approach_direction(
         self, target_pose: Pose, robot_pose: Pose
@@ -438,9 +457,9 @@ class PouringAction(FullBodyControlledAction):
         robot_right_y = -approach_x
         side_sign = 1.0 if pour_side == Arms.RIGHT else -1.0
 
-        side_offset = float(self.pour_side_offset_m) + (
-            0.7 * self._held_object_height_m()
-        )
+        side_offset = float(self.pour_side_offset_m) + math.sin(
+            self.TILT_ANGLE_RAD
+        ) * max(self._mouth_height_above_tool_frame_m(), 0.0)
         approach_offset = float(self.pour_approach_offset_m)
 
         pour_x = (

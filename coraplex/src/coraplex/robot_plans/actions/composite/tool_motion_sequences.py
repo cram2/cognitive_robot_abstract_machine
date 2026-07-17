@@ -9,9 +9,11 @@ from semantic_digital_twin.world_description.world_entity import Body
 from coraplex.datastructures.enums import (
     CuttingTechnique,
     MixingPattern,
+    SlicingPriority,
     WipingTechnique,
 )
 from dataclasses import dataclass
+from typing_extensions import ClassVar
 
 DEFAULT_SAMPLE_DT = 0.01
 """
@@ -609,21 +611,111 @@ def build_surface_sequence(
     )
 
 
+@dataclass
+class SliceAnchorPlacement:
+    """
+    Places cut anchors along an axis interval from a requested slice thickness and
+    number of cuts.
+
+    Anchors are spaced by the slice thickness, starting one thickness after the
+    interval start, so every slice between two neighbouring cuts (and before the first
+    cut) has the requested thickness. A parameter left as ``None`` is derived from the
+    other one and the interval length.
+
+    .. note:: If both parameters are requested but do not fit the interval together,
+        :attr:`priority` decides which one is kept while the other is adjusted.
+    """
+
+    interval_start: float
+    """
+    Lower bound of the usable cutting interval in meters.
+    """
+    interval_end: float
+    """
+    Upper bound of the usable cutting interval in meters.
+    """
+    slice_thickness: Optional[float] = None
+    """
+    Requested thickness of each slice in meters. Derived from :attr:`number_of_cuts`
+    if None.
+    """
+    number_of_cuts: Optional[int] = None
+    """
+    Requested number of cuts. Derived from :attr:`slice_thickness` if None.
+    """
+    priority: SlicingPriority = SlicingPriority.THICKNESS
+    """
+    Parameter that is kept when the requested thickness and number of cuts conflict.
+    """
+
+    DEFAULT_SLICE_THICKNESS: ClassVar[float] = 0.03
+    """
+    Slice thickness in meters used when neither parameter is requested.
+    """
+
+    MINIMUM_SLICE_THICKNESS: ClassVar[float] = 1e-4
+    """
+    Lower bound on the slice thickness in meters to keep anchors distinct.
+    """
+
+    def compute_anchor_positions(self) -> List[float]:
+        """
+        :return: The anchor positions along the axis, ordered from interval start to
+            interval end.
+        """
+        usable_length = max(0.0, self.interval_end - self.interval_start)
+        thickness, count = self._resolve_parameters(usable_length)
+        return [
+            self.interval_start + cut_index * thickness
+            for cut_index in range(1, count + 1)
+        ]
+
+    def _resolve_parameters(self, usable_length: float) -> Tuple[float, int]:
+        """
+        :param usable_length: Length of the usable cutting interval in meters.
+        :return: The feasible ``(slice_thickness, number_of_cuts)`` pair after filling
+            in missing parameters and applying :attr:`priority` on conflicts.
+        """
+        thickness = self.slice_thickness
+        count = self.number_of_cuts
+        if thickness is None and count is None:
+            thickness = self.DEFAULT_SLICE_THICKNESS
+            count = 1
+        if count is None:
+            count = int(usable_length / max(thickness, self.MINIMUM_SLICE_THICKNESS))
+        if thickness is None:
+            thickness = usable_length / max(count, 1)
+        thickness = max(float(thickness), self.MINIMUM_SLICE_THICKNESS)
+        count = max(1, int(count))
+        if count * thickness > usable_length + 1e-9:
+            if self.priority is SlicingPriority.THICKNESS:
+                count = max(1, int(usable_length / thickness))
+            else:
+                thickness = usable_length / count
+        thickness = min(thickness, usable_length)
+        return thickness, count
+
+
 def build_cutting_sequence(
     food_body: Body,
     technique: CuttingTechnique = CuttingTechnique.SAW,
-    slice_thickness: float = 0.03,
-    num_cuts_x: int = 1,
+    slice_thickness: Optional[float] = None,
+    num_cuts_x: Optional[int] = None,
     reference_size: float = 0.10,
+    slicing_priority: SlicingPriority = SlicingPriority.THICKNESS,
 ) -> MotionSequence:
     """
     Build a cutting sequence sized to a food object.
 
     :param food_body: The object to cut.
     :param technique: The cutting technique to use.
-    :param slice_thickness: Thickness of each slice in meters.
-    :param num_cuts_x: Number of cuts along the object's X axis.
+    :param slice_thickness: Thickness of each slice in meters. Derived from
+        ``num_cuts_x`` if None.
+    :param num_cuts_x: Number of cuts along the object's X axis. Derived from
+        ``slice_thickness`` if None.
     :param reference_size: Reference size in meters that scales the motion duration.
+    :param slicing_priority: Parameter that is kept when ``slice_thickness`` and
+        ``num_cuts_x`` do not both fit the object.
     :return: The cutting motion sequence in the food object's frame.
     """
     mins, maxs = body_local_aabb(food_body, use_visual=True)
@@ -642,21 +734,17 @@ def build_cutting_sequence(
     z_cut = mins[2] + cut_floor_clearance
     center_y = 0.5 * (mins[1] + maxs[1])
 
-    usable_x = max(0.0, size_x - 2.0 * margin_x)
-    requested_thickness = max(float(slice_thickness), 1e-4)
-    x_anchor = mins[0] + margin_x + min(0.5 * requested_thickness, 0.5 * usable_x)
-    x_max_anchor = maxs[0] - margin_x - min(0.5 * requested_thickness, 0.5 * usable_x)
-
-    number_of_cuts = max(1, int(num_cuts_x))
     if technique is CuttingTechnique.HALVING:
         x_anchors = [0.5 * (mins[0] + maxs[0])]
         z_cut = 0.5 * (mins[2] + maxs[2])
-    elif number_of_cuts == 1:
-        x_anchors = [x_anchor]
-    elif x_max_anchor <= x_anchor:
-        x_anchors = [x_anchor] * number_of_cuts
     else:
-        x_anchors = np.linspace(x_anchor, x_max_anchor, number_of_cuts).tolist()
+        x_anchors = SliceAnchorPlacement(
+            interval_start=mins[0] + margin_x,
+            interval_end=maxs[0] - margin_x,
+            slice_thickness=slice_thickness,
+            number_of_cuts=num_cuts_x,
+            priority=slicing_priority,
+        ).compute_anchor_positions()
 
     y_min = mins[1] + margin_y
     y_max = maxs[1] - margin_y

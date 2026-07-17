@@ -3,7 +3,11 @@ Wiping demo: a PR2 wipes a patch of the apartment kitchen counter with a sponge
 mounted on its right gripper.
 """
 
-from demo_world import BASE_POSITION_XYZ, TARGET_POSITION_XYZ, attach_sponge
+from experiments.tool_based_actions.simple_demo.demo_world import (
+    BASE_POSITION_XYZ,
+    TARGET_POSITION_XYZ,
+    attach_sponge,
+)
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Sponge
@@ -23,6 +27,19 @@ from coraplex.robot_plans.actions.core.robot_body import (
 from coraplex.testing import setup_world
 
 world = setup_world()
+
+try:
+    import rclpy
+
+    rclpy.init()
+    from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+        VizMarkerPublisher,
+    )
+
+    node = rclpy.create_node("viz_marker")
+    v = VizMarkerPublisher(_world=world, node=node).with_tf_publisher()
+except ImportError:
+    node = None
 
 pr2 = PR2.from_world(world)
 context = Context(world=world, robot=pr2, _debug=False, ros_node=None)

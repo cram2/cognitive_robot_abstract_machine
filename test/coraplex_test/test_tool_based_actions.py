@@ -13,6 +13,7 @@ from coraplex.robot_plans.actions.composite.tool_based import (
     WipingAction,
 )
 from coraplex.robot_plans.motions.gripper import MoveTCPWaypointsAlignedMotion
+from coraplex.view_manager import ViewManager
 from krrood.ormatic.data_access_objects.helper import to_dao
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -183,6 +184,50 @@ def test_pouring_action_poses_tilt_and_mirror(tool_action_world):
         np.array([float(left_pre_pose.x), float(left_pre_pose.y)]) - container_position
     )
     np.testing.assert_allclose(left_offset, -right_offset, atol=1e-9)
+
+
+def _attach_box_to_gripper(world, robot, name, size, mount_z):
+    shape_collection = ShapeCollection([Box(scale=Scale(*size))])
+    body = Body(
+        name=PrefixedName(name), collision=shape_collection, visual=shape_collection
+    )
+    tool_frame = ViewManager.get_end_effector_view(Arms.RIGHT, robot).tool_frame
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body)
+        world.add_connection(
+            FixedConnection(
+                parent=tool_frame,
+                child=body,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    z=mount_z, reference_frame=tool_frame
+                ),
+            )
+        )
+    return body
+
+
+def test_pouring_action_pour_point_lands_on_target_container_center(
+    tool_action_world,
+):
+    world, robot, context, container, tool_body = tool_action_world
+    held_source = _attach_box_to_gripper(
+        world, robot, "held_pour_source", (0.04, 0.04, 0.2), -0.08
+    )
+    cup = Cup(root=held_source)
+
+    action = PouringAction(
+        target_container=container, source_container=cup, arm=Arms.RIGHT
+    )
+    sequential([action], context)
+    _, pour_pose = action._pour_poses()
+
+    tool_frame = ViewManager.get_end_effector_view(Arms.RIGHT, robot).tool_frame
+    tool_frame_T_source = world.compute_forward_kinematics_np(tool_frame, held_source)
+    mouth_in_tool_frame = tool_frame_T_source @ np.array([0.0, 0.0, 0.1, 1.0])
+    mouth_in_world = pour_pose.to_homogeneous_matrix().to_np() @ mouth_in_tool_frame
+
+    assert mouth_in_world[0] == pytest.approx(float(container.global_pose.x), abs=1e-6)
+    assert mouth_in_world[1] == pytest.approx(float(container.global_pose.y), abs=1e-6)
 
 
 def test_mixing_action_orm_roundtrip(tool_action_world, coraplex_testing_session):

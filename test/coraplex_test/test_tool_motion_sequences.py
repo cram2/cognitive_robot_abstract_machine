@@ -4,12 +4,14 @@ import pytest
 from coraplex.datastructures.enums import (
     CuttingTechnique,
     MixingPattern,
+    SlicingPriority,
     WipingTechnique,
 )
 from coraplex.robot_plans.actions.composite.tool_motion_sequences import (
     DEFAULT_SAMPLE_DT,
     MotionSegment,
     MotionSequence,
+    SliceAnchorPlacement,
     _constrain_to_convex_hull_xy,
     body_local_aabb,
     build_container_sequence,
@@ -87,6 +89,84 @@ def test_cutting_sequence_has_three_phases_per_cut(box_body):
         box_body, technique=CuttingTechnique.SAW, num_cuts_x=2
     )
     assert len(sequence.phases) == 6
+
+
+def test_slice_anchors_thickness_only_derives_cut_count():
+    placement = SliceAnchorPlacement(
+        interval_start=0.0, interval_end=0.18, slice_thickness=0.05
+    )
+    np.testing.assert_allclose(
+        placement.compute_anchor_positions(), [0.05, 0.10, 0.15]
+    )
+
+
+def test_slice_anchors_cut_count_only_fills_interval():
+    placement = SliceAnchorPlacement(
+        interval_start=0.0, interval_end=0.18, number_of_cuts=4
+    )
+    np.testing.assert_allclose(
+        placement.compute_anchor_positions(), [0.045, 0.09, 0.135, 0.18]
+    )
+
+
+def test_slice_anchors_use_both_parameters_when_they_fit():
+    placement = SliceAnchorPlacement(
+        interval_start=0.0,
+        interval_end=0.18,
+        slice_thickness=0.05,
+        number_of_cuts=1,
+    )
+    np.testing.assert_allclose(placement.compute_anchor_positions(), [0.05])
+
+
+def test_slice_anchors_thickness_priority_reduces_cut_count():
+    placement = SliceAnchorPlacement(
+        interval_start=0.0,
+        interval_end=0.18,
+        slice_thickness=0.05,
+        number_of_cuts=20,
+        priority=SlicingPriority.THICKNESS,
+    )
+    np.testing.assert_allclose(
+        placement.compute_anchor_positions(), [0.05, 0.10, 0.15]
+    )
+
+
+def test_slice_anchors_cut_count_priority_shrinks_thickness():
+    placement = SliceAnchorPlacement(
+        interval_start=0.0,
+        interval_end=0.18,
+        slice_thickness=5.0,
+        number_of_cuts=20,
+        priority=SlicingPriority.CUT_COUNT,
+    )
+    anchor_positions = placement.compute_anchor_positions()
+    assert len(anchor_positions) == 20
+    np.testing.assert_allclose(np.diff(anchor_positions), 0.009)
+    assert anchor_positions[-1] == pytest.approx(0.18)
+
+
+def test_slice_anchors_oversized_thickness_clamps_to_single_cut():
+    placement = SliceAnchorPlacement(
+        interval_start=0.0,
+        interval_end=0.18,
+        slice_thickness=5.0,
+        priority=SlicingPriority.THICKNESS,
+    )
+    np.testing.assert_allclose(placement.compute_anchor_positions(), [0.18])
+
+
+def test_cutting_sequence_spaces_cuts_by_slice_thickness(box_body):
+    sequence = build_cutting_sequence(
+        box_body,
+        technique=CuttingTechnique.SLICE,
+        slice_thickness=0.05,
+        num_cuts_x=2,
+    )
+    _, points, _ = _sample(sequence)
+
+    # usable X interval starts at -0.1 + margin of 0.01
+    np.testing.assert_allclose(np.unique(points[:, 0]), [-0.04, 0.01], atol=1e-9)
 
 
 def test_surface_sequence_stays_inside_xy_bounds(box_body):

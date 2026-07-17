@@ -323,6 +323,22 @@ class CuttingTechnique(Enum):
     """
 
 
+class SlicingPriority(Enum):
+    """
+    Decides which slicing parameter is kept when the requested slice thickness and
+    number of cuts cannot both fit the object.
+    """
+
+    THICKNESS = auto()
+    """
+    Keep the requested slice thickness and reduce the number of cuts to fit.
+    """
+    CUT_COUNT = auto()
+    """
+    Keep the requested number of cuts and shrink the slice thickness to fit.
+    """
+
+
 class WipingTechnique(Enum):
     """
     Enum for the techniques of wiping a surface.

@@ -3,8 +3,9 @@ Cutting demo: a PR2 slices a bread on the apartment kitchen counter with a knife
 mounted on its right gripper.
 """
 
-from demo_world import (
+from experiments.tool_based_actions.simple_demo.demo_world import (
     BASE_POSITION_XYZ,
+    BREAD_COLOR,
     CUT_MOUNT,
     TARGET_POSITION_XYZ,
     attach_tool,
@@ -34,7 +35,7 @@ from coraplex.testing import setup_world
 
 world = setup_world()
 
-bread_world = parse_object("bread.stl")
+bread_world = parse_object("bread.stl", color=BREAD_COLOR)
 with world.modify_world():
     world.merge_world_at_pose(
         bread_world,
@@ -42,7 +43,19 @@ with world.modify_world():
             *TARGET_POSITION_XYZ, reference_frame=world.root
         ),
     )
+try:
+    import rclpy
 
+    rclpy.init()
+    from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+        VizMarkerPublisher,
+    )
+
+    node = rclpy.create_node("viz_marker")
+    v = VizMarkerPublisher(_world=world, node=node).with_tf_publisher()
+except ImportError:
+    node = None
+print(world.root)
 pr2 = PR2.from_world(world)
 context = Context(world=world, robot=pr2, _debug=False, ros_node=None)
 
@@ -70,6 +83,8 @@ plan = sequential(
             arm=Arms.RIGHT,
             tool=knife,
             technique=CuttingTechnique.SLICE,
+            num_cuts_x=3,
+            slice_thickness=0.03,
         ),
     ],
     context=context,
