@@ -10,6 +10,7 @@ from typing_extensions import Any, ClassVar, Dict, List, TYPE_CHECKING, Tuple
 from krrood.rustworkx_utils.graph_visualizer_base import (
     GraphLayout,
     GraphVisualizerBase,
+    GraphLayoutOptions,
 )
 
 if TYPE_CHECKING:
@@ -21,100 +22,34 @@ VisNode = Dict[str, Any]
 VisEdge = Dict[str, Any]
 """A single vis-network edge."""
 
-LayoutOptions = Dict[str, Any]
-"""The option mapping passed to vis-network's ``Network`` constructor."""
 
 DEFAULT_BORDER_COLOR = "#888888"
 """The border color used for nodes and edges when no border color is given."""
 
-_LAYOUT_OPTIONS: Dict[GraphLayout, LayoutOptions] = {
-    GraphLayout.SPRING: {
-        "physics": {"enabled": True, "stabilization": {"enabled": True, "iterations": 200}},
-    },
-    GraphLayout.LAYERED: {
-        "layout": {
-            "hierarchical": {"direction": "UD", "sortMethod": "directed", "nodeSpacing": 150}
+
+LAYOUT_OPTIONS = GraphLayoutOptions(
+    layout_options={
+        GraphLayout.SPRING: {
+            "physics": {
+                "enabled": True,
+                "stabilization": {"enabled": True, "iterations": 200},
+            },
         },
-        "physics": {"enabled": False},
-    },
-    GraphLayout.PHYSICS: {
-        "physics": {"enabled": True, "stabilization": {"enabled": False}},
-    },
-}
-"""The vis-network layout and physics options used for each :class:`GraphLayout`."""
-
-_PAGE_TEMPLATE = """<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>{{ title }}</title>
-<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
-<style>
-  html, body { margin: 0; height: 100%; font-family: sans-serif; }
-  #container { display: flex; height: 100vh; }
-  #network { flex: 3; background: #000000; }
-  #details { flex: 1; padding: 1rem; overflow: auto; border-left: 1px solid #ccc; }
-  #details h3 { margin-top: 0; }
-</style>
-</head>
-<body>
-<div id="container">
-  <div id="network"></div>
-  <div id="details"><i>Click a node to see its details</i></div>
-</div>
-<script>
-const layoutOptions = {{ layout_options_json | safe }};
-const nodes = new vis.DataSet([]);
-const edges = new vis.DataSet([]);
-const network = new vis.Network(
-  document.getElementById("network"),
-  { nodes: nodes, edges: edges },
-  Object.assign(
-    {
-      nodes: { shape: "dot", size: 15, font: { color: "#ffffff" } },
-      edges: { color: "#888888", arrows: "to" },
-    },
-    layoutOptions
-  )
-);
-
-function escapeHtml(text) {
-  const holder = document.createElement("div");
-  holder.textContent = text;
-  return holder.innerHTML;
-}
-
-async function refresh() {
-  const response = await fetch("graph");
-  const payload = await response.json();
-
-  const currentNodeIds = new Set(payload.nodes.map((node) => node.id));
-  const currentEdgeIds = new Set(payload.edges.map((edge) => edge.id));
-
-  nodes.update(payload.nodes);
-  edges.update(payload.edges);
-
-  nodes.getIds().forEach((id) => { if (!currentNodeIds.has(id)) { nodes.remove(id); } });
-  edges.getIds().forEach((id) => { if (!currentEdgeIds.has(id)) { edges.remove(id); } });
-}
-
-network.on("click", async (params) => {
-  if (params.nodes.length === 0) { return; }
-  const nodeId = params.nodes[0];
-  const response = await fetch("node/" + nodeId);
-  const payload = await response.json();
-  const lines = payload.details.map((line) => "<p>" + escapeHtml(line) + "</p>").join("");
-  document.getElementById("details").innerHTML =
-    "<h3>" + escapeHtml(nodes.get(nodeId).label) + "</h3>" + lines;
-});
-
-refresh();
-setInterval(refresh, {{ interval_ms }});
-</script>
-</body>
-</html>
-"""
-"""The single-page vis-network front-end that polls the graph and shows node details on click."""
+        GraphLayout.LAYERED: {
+            "layout": {
+                "hierarchical": {
+                    "direction": "UD",
+                    "sortMethod": "directed",
+                    "nodeSpacing": 150,
+                }
+            },
+            "physics": {"enabled": False},
+        },
+        GraphLayout.PHYSICS: {
+            "physics": {"enabled": True, "stabilization": {"enabled": False}},
+        },
+    }
+)
 
 
 @dataclass
@@ -161,35 +96,38 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
             for source, target in self.graph.edge_list()
         ]
 
-    def visnetwork_layout_options(self) -> LayoutOptions:
-        """
-        :return: The vis-network layout and physics options for the configured layout.
-        """
-        return _LAYOUT_OPTIONS[self.layout]
-
     def build_application(self) -> Flask:
         """
         :return: The Flask application serving the page and the graph and node endpoints.
         """
-        from flask import Flask, jsonify, render_template_string
+        from flask import Flask, jsonify, render_template
 
         application = Flask(__name__)
 
         @application.route("/")
         def index() -> str:
-            return render_template_string(
-                _PAGE_TEMPLATE,
+            """
+            Index page of the flask app that renders the jinja template and presents it
+            """
+            return render_template(
+                "visnetwork_graph_visualizer.jinja",
                 title=self.title,
-                layout_options_json=json.dumps(self.visnetwork_layout_options()),
+                layout_options_json=json.dumps(LAYOUT_OPTIONS.get_options(self.layout)),
                 interval_ms=int(self.refresh_interval_seconds * 1000),
             )
 
         @application.route("/graph")
         def graph():
+            """
+            Entry function of the flask app serving the graph and node endpoints.
+            """
             return jsonify(nodes=self.graph_nodes(), edges=self.graph_edges())
 
         @application.route("/node/<int:node_index>")
         def node(node_index: int):
+            """
+            Called for each node to parse the node details to json
+            """
             return jsonify(details=self.node_details(node_index))
 
         return application

@@ -37,11 +37,9 @@ from krrood.entity_query_language.core.mapped_variable import (
 )
 from krrood.entity_query_language.operators.comparator import Comparator
 
-from krrood.rustworkx_utils import (
-    GraphVisualizer,
-    RWXNode as RXUtilsNode,
-    ColorLegend as RXUtilsColorLegend,
-)
+from krrood.rustworkx_utils.graph_visualizer import GraphVisualizer
+from krrood.rustworkx_utils.rxnode import RWXNode as RXUtilsNode
+from krrood.rustworkx_utils.utils import ColorLegend as RXUtilsColorLegend
 
 import rustworkx as rx
 

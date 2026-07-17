@@ -16,9 +16,6 @@ from krrood.rustworkx_utils.graph_visualizer_base import (
 if TYPE_CHECKING:
     import plotly.graph_objects as go
 
-# Re-exported so callers and tests can import the layout enum from this module.
-__all__ = ["GraphLayout", "InteractiveGraphVisualizer"]
-
 NodePosition = Tuple[float, float]
 """A node's two-dimensional position in the drawing."""
 
@@ -89,13 +86,17 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
     def _layered_positions(self) -> Dict[int, NodePosition]:
         """Top-to-bottom positions grouped by distance from the source nodes."""
         source_indices = [
-            index for index in self.graph.node_indices() if self.graph.in_degree(index) == 0
+            index
+            for index in self.graph.node_indices()
+            if self.graph.in_degree(index) == 0
         ]
         if not source_indices:
             return self._spring_positions()
 
         positions: Dict[int, NodePosition] = {}
-        for depth, layer in enumerate(rx.layers(self.graph, source_indices, index_output=True)):
+        for depth, layer in enumerate(
+            rx.layers(self.graph, source_indices, index_output=True)
+        ):
             for position_in_layer, index in enumerate(layer):
                 positions[index] = (float(position_in_layer), float(-depth))
         return positions
@@ -177,12 +178,22 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
             ],
         )
 
-        @application.callback(Output("graph", "figure"), Input("refresh", "n_intervals"))
+        @application.callback(
+            Output("graph", "figure"), Input("refresh", "n_intervals")
+        )
         def refresh_figure(_):
+            """
+            Updates the plot if new nodes or edges are added or removed.
+            """
             return self.build_figure()
 
-        @application.callback(Output("details", "children"), Input("graph", "clickData"))
+        @application.callback(
+            Output("details", "children"), Input("graph", "clickData")
+        )
         def show_details(click_data):
+            """
+            Shows the details panel for the current selection.
+            """
             if click_data is None:
                 return self._render_details()
             self._selected_details = self.node_details(
@@ -193,7 +204,9 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
         return application
 
     def _render_details(self) -> List[Any]:
-        """The children of the details panel for the current selection."""
+        """The children of the details panel for the current selection.
+        :return: The children of the details panel for the current selection.
+        """
         from dash import html
 
         if not self._selected_details:

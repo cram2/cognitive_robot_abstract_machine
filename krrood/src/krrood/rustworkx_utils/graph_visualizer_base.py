@@ -6,7 +6,16 @@ from dataclasses import dataclass
 from enum import Enum, auto
 
 import rustworkx as rx
-from typing_extensions import Any, Callable, ClassVar, List, Optional, Tuple, Union
+from typing_extensions import (
+    Any,
+    Callable,
+    ClassVar,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    Dict,
+)
 
 RustworkxGraph = Union[rx.PyDiGraph, rx.PyGraph]
 """A directed or undirected rustworkx graph."""
@@ -63,6 +72,21 @@ def describe_by_repr(payload: Any) -> List[str]:
 
 
 @dataclass
+class GraphLayoutOptions:
+
+    layout_options: Dict[GraphLayout, Dict[str, Any]]
+    """
+    Additional options for each layout that are needed by the specific graph library.
+    """
+
+    def get_options(self, layout: GraphLayout) -> Dict[str, Any]:
+        return self.layout_options.get(layout, {})
+
+    def add_new_options(self, layout: GraphLayout, options: Dict[str, Any]) -> None:
+        self.layout_options[layout] = options
+
+
+@dataclass
 class GraphVisualizerBase(ABC):
     """Common interface and node access for the live rustworkx graph visualizers.
 
@@ -78,7 +102,7 @@ class GraphVisualizerBase(ABC):
     graph: RustworkxGraph
     """The live graph to display; re-read whenever the drawing is refreshed."""
 
-    info_getter: Callable[[Any], List[str]] = describe_by_repr
+    information_getter: Callable[[Any], List[str]] = describe_by_repr
     """Maps a node payload to the detail lines shown when the node is clicked."""
 
     label_getter: Callable[[Any], str] = label_by_string
@@ -148,7 +172,7 @@ class GraphVisualizerBase(ABC):
         :param node_index: The rustworkx index of the clicked node.
         :return: The detail lines describing the node's payload.
         """
-        return self.info_getter(self.graph[node_index])
+        return self.information_getter(self.graph[node_index])
 
     @classmethod
     def check_dependencies(cls) -> None:

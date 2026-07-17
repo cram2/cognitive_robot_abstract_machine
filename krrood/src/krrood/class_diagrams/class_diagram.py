@@ -24,7 +24,7 @@ from krrood.utils import (
 )
 
 try:
-    from krrood.rustworkx_utils import RWXNode
+    from krrood.rustworkx_utils.rxnode import RWXNode
 except ImportError:
     RWXNode = None
 from typing_extensions import (

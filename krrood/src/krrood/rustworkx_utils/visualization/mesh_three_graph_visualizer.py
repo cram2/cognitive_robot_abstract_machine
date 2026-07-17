@@ -112,6 +112,9 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
 
         @application.route("/mesh/<int:node_index>.glb")
         def mesh_glb(node_index: int):
+            """
+            Called for each node to convert the mesh attached to it to glb
+            """
             glb_bytes = self._mesh_glb(node_index)
             if glb_bytes is None:
                 return Response(status=404)

@@ -53,7 +53,7 @@ from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier
 from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
-from krrood.rustworkx_utils import RWXNode
+from krrood.rustworkx_utils.rxnode import RWXNode
 from krrood.symbol_graph.helpers import get_field_type_endpoint
 
 if TYPE_CHECKING:

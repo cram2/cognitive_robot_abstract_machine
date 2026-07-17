@@ -10,6 +10,7 @@ import rustworkx as rx
 from krrood.rustworkx_utils.graph_visualizer_base import GraphLayout
 from krrood.rustworkx_utils.visualization.three_graph_visualizer import (
     ThreeGraphVisualizer,
+    LAYOUT_OPTIONS,
 )
 
 
@@ -35,7 +36,7 @@ def named_visualizer(graph: rx.PyDiGraph, **overrides) -> ThreeGraphVisualizer:
     return ThreeGraphVisualizer(
         graph=graph,
         label_getter=lambda payload: payload.name,
-        info_getter=lambda payload: [f"name: {payload.name}"],
+        information_getter=lambda payload: [f"name: {payload.name}"],
         **overrides,
     )
 
@@ -227,25 +228,25 @@ class TestLayout:
     def test_layered_layout_uses_the_built_in_dag_mode(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.LAYERED)
 
-        options = visualizer.three_layout_options()
+        options = LAYOUT_OPTIONS.get_options(visualizer.layout)
         assert options["dagMode"] == "td"
 
     def test_physics_layout_keeps_the_simulation_running_forever(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.PHYSICS)
 
-        options = visualizer.three_layout_options()
+        options = LAYOUT_OPTIONS.get_options(visualizer.layout)
         assert math.isinf(options["cooldownTicks"])
 
     def test_spring_layout_settles_and_stops(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.SPRING)
 
-        options = visualizer.three_layout_options()
+        options = LAYOUT_OPTIONS.get_options(visualizer.layout)
         assert options["cooldownTicks"] < math.inf
 
     def test_fixed_layout_runs_just_enough_ticks_to_apply_pinned_positions(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.FIXED)
 
-        options = visualizer.three_layout_options()
+        options = LAYOUT_OPTIONS.get_options(visualizer.layout)
         assert 0 < options["cooldownTicks"] < math.inf
 
 

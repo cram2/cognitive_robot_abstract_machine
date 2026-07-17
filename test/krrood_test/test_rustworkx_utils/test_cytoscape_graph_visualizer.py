@@ -6,8 +6,9 @@ from dataclasses import dataclass
 import pytest
 import rustworkx as rx
 
-from rustworkx_utils.visualization.cytoscape_graph_visualizer import (
+from krrood.rustworkx_utils.visualization.cytoscape_graph_visualizer import (
     CytoscapeGraphVisualizer,
+    LAYOUT_OPTIONS,
 )
 from krrood.rustworkx_utils.graph_visualizer_base import GraphLayout
 
@@ -34,7 +35,7 @@ def named_visualizer(graph: rx.PyDiGraph, **overrides) -> CytoscapeGraphVisualiz
     return CytoscapeGraphVisualizer(
         graph=graph,
         label_getter=lambda payload: payload.name,
-        info_getter=lambda payload: [f"name: {payload.name}"],
+        information_getter=lambda payload: [f"name: {payload.name}"],
         **overrides,
     )
 
@@ -146,12 +147,12 @@ class TestLayout:
     def test_layered_layout_maps_to_a_hierarchical_cytoscape_layout(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.LAYERED)
 
-        assert visualizer.cytoscape_layout_name() == "breadthfirst"
+        assert LAYOUT_OPTIONS.get_options(visualizer.layout)["name"] == "breadthfirst"
 
     def test_physics_layout_runs_a_continuous_force_simulation(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.PHYSICS)
 
-        options = visualizer.cytoscape_layout_options()
+        options = LAYOUT_OPTIONS.get_options(visualizer.layout)
         assert options["name"] == "cola"
         assert options["infinite"] is True
 

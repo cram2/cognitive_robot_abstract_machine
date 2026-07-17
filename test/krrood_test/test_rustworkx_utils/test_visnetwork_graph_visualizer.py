@@ -7,8 +7,9 @@ import pytest
 import rustworkx as rx
 
 from krrood.rustworkx_utils.graph_visualizer_base import GraphLayout
-from rustworkx_utils.visualization.visnetwork_graph_visualizer import (
+from krrood.rustworkx_utils.visualization.visnetwork_graph_visualizer import (
     VisNetworkGraphVisualizer,
+    LAYOUT_OPTIONS,
 )
 
 
@@ -34,7 +35,7 @@ def named_visualizer(graph: rx.PyDiGraph, **overrides) -> VisNetworkGraphVisuali
     return VisNetworkGraphVisualizer(
         graph=graph,
         label_getter=lambda payload: payload.name,
-        info_getter=lambda payload: [f"name: {payload.name}"],
+        information_getter=lambda payload: [f"name: {payload.name}"],
         **overrides,
     )
 
@@ -131,21 +132,21 @@ class TestLayout:
     def test_layered_layout_maps_to_a_hierarchical_layout(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.LAYERED)
 
-        options = visualizer.visnetwork_layout_options()
+        options = LAYOUT_OPTIONS.get_options(visualizer.layout)
         assert options["layout"]["hierarchical"]["direction"] == "UD"
         assert options["physics"]["enabled"] is False
 
     def test_physics_layout_keeps_the_simulation_running(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.PHYSICS)
 
-        options = visualizer.visnetwork_layout_options()
+        options = LAYOUT_OPTIONS.get_options(visualizer.layout)
         assert options["physics"]["enabled"] is True
         assert options["physics"]["stabilization"]["enabled"] is False
 
     def test_spring_layout_stabilizes_and_stops(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.SPRING)
 
-        options = visualizer.visnetwork_layout_options()
+        options = LAYOUT_OPTIONS.get_options(visualizer.layout)
         assert options["physics"]["enabled"] is True
         assert options["physics"]["stabilization"]["enabled"] is True
 

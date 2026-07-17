@@ -5,7 +5,7 @@ import pytest
 from krrood.entity_query_language.query_graph import QueryGraph
 
 try:
-    from krrood.rustworkx_utils import GraphVisualizer
+    from krrood.rustworkx_utils.graph_visualizer import GraphVisualizer
 except ImportError:
     GraphVisualizer = None
 

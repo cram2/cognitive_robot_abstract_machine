@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import pytest
 import rustworkx as rx
 
-from rustworkx_utils.visualization.interactive_graph_visualizer import (
+from krrood.rustworkx_utils.visualization.interactive_graph_visualizer import (
     GraphLayout,
     InteractiveGraphVisualizer,
 )
@@ -34,7 +34,7 @@ def named_visualizer(graph: rx.PyDiGraph, **overrides) -> InteractiveGraphVisual
     return InteractiveGraphVisualizer(
         graph=graph,
         label_getter=lambda payload: payload.name,
-        info_getter=lambda payload: [f"name: {payload.name}"],
+        information_getter=lambda payload: [f"name: {payload.name}"],
         **overrides,
     )
 
