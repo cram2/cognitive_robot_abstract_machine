@@ -8,7 +8,7 @@ import pytest
 import rustworkx as rx
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.visualization.mesh_three_graph_visualizer import (
+from krrood.rustworkx_utils.visualization.mesh_three_graph_visualizer import (
     MeshThreeGraphVisualizer,
 )
 from semantic_digital_twin.world_description.geometry import Sphere
@@ -25,8 +25,16 @@ def body_graph(*bodies: Body) -> rx.PyDiGraph:
     return graph
 
 
+def body_visual_mesh(payload):
+    """The combined visual mesh of a ``Body`` payload, or ``None`` otherwise."""
+    if not isinstance(payload, Body) or not payload.visual:
+        return None
+    return payload.visual.combined_mesh
+
+
 def named_visualizer(graph: rx.PyDiGraph, **overrides) -> MeshThreeGraphVisualizer:
     """A visualizer that labels bodies by their name."""
+    overrides.setdefault("mesh_getter", body_visual_mesh)
     return MeshThreeGraphVisualizer(
         graph=graph,
         label_getter=lambda payload: getattr(payload, "name", payload),
@@ -46,19 +54,19 @@ class TestNodeMesh:
     def test_body_with_visual_shapes_has_a_mesh(self):
         visualizer = named_visualizer(body_graph(body_with_visual_sphere("a")))
 
-        assert visualizer._node_mesh(0) is not None
+        assert visualizer.mesh_getter(visualizer.graph[0]) is not None
 
     def test_body_without_visual_shapes_has_no_mesh(self):
         visualizer = named_visualizer(body_graph(body_without_visual("a")))
 
-        assert visualizer._node_mesh(0) is None
+        assert visualizer.mesh_getter(visualizer.graph[0]) is None
 
     def test_non_body_payload_has_no_mesh(self):
         graph = rx.PyDiGraph()
         graph.add_node("not a body")
         visualizer = named_visualizer(graph)
 
-        assert visualizer._node_mesh(0) is None
+        assert visualizer.mesh_getter(visualizer.graph[0]) is None
 
 
 class TestGraphNodes:
@@ -113,7 +121,7 @@ class TestMeshGlbCaching:
     def test_concurrent_requests_export_the_same_mesh_only_once(self):
         visualizer = named_visualizer(body_graph(body_with_visual_sphere("a")))
         export_calls = []
-        mesh = visualizer._node_mesh(0)
+        mesh = visualizer.mesh_getter(visualizer.graph[0])
         original_export = mesh.export
 
         def counting_export(*args, **kwargs):
@@ -121,7 +129,7 @@ class TestMeshGlbCaching:
             time.sleep(0.05)  # widen the race window so overlapping calls are likely
             return original_export(*args, **kwargs)
 
-        visualizer._node_mesh = lambda node_index: mesh
+        visualizer.mesh_getter = lambda payload: mesh
         mesh.export = counting_export
 
         threads = [
@@ -137,9 +145,11 @@ class TestMeshGlbCaching:
 
 class TestMeshEndpoint:
     def test_returns_a_glb_for_a_node_with_a_mesh(self):
-        client = named_visualizer(
-            body_graph(body_with_visual_sphere("a"))
-        ).build_application().test_client()
+        client = (
+            named_visualizer(body_graph(body_with_visual_sphere("a")))
+            .build_application()
+            .test_client()
+        )
 
         response = client.get("/mesh/0.glb")
 
@@ -148,9 +158,11 @@ class TestMeshEndpoint:
         assert response.data[:4] == b"glTF"
 
     def test_returns_404_for_a_node_without_a_mesh(self):
-        client = named_visualizer(
-            body_graph(body_without_visual("a"))
-        ).build_application().test_client()
+        client = (
+            named_visualizer(body_graph(body_without_visual("a")))
+            .build_application()
+            .test_client()
+        )
 
         response = client.get("/mesh/0.glb")
 
@@ -166,9 +178,11 @@ class TestExtraHead:
         assert "GLTFLoader" in head
 
     def test_head_scripts_are_rendered_before_the_main_script(self):
-        client = named_visualizer(
-            body_graph(body_with_visual_sphere("a"))
-        ).build_application().test_client()
+        client = (
+            named_visualizer(body_graph(body_with_visual_sphere("a")))
+            .build_application()
+            .test_client()
+        )
 
         page = client.get("/").data.decode()
         assert page.index("GLTFLoader") < page.index("nodeThreeObject")
@@ -183,9 +197,11 @@ class TestExtraScript:
         assert "nodeThreeObject" in script
 
     def test_animation_loop_is_appended_to_the_rendered_page(self):
-        client = named_visualizer(
-            body_graph(body_with_visual_sphere("a"))
-        ).build_application().test_client()
+        client = (
+            named_visualizer(body_graph(body_with_visual_sphere("a")))
+            .build_application()
+            .test_client()
+        )
 
         page = client.get("/").data
         assert b"meshUrl" in page
@@ -208,20 +224,26 @@ class TestExtraScript:
         visualizer = named_visualizer(body_graph(body_with_visual_sphere("a")))
 
         script = visualizer.extra_script()
-        loader_callback = script[script.index("loader.load(") : script.index("function spin(")]
+        loader_callback = script[
+            script.index("loader.load(") : script.index("function spin(")
+        ]
         assert "THREE.DoubleSide" in loader_callback
 
     def test_loaded_meshes_are_not_forced_fully_metallic(self):
         visualizer = named_visualizer(body_graph(body_with_visual_sphere("a")))
 
         script = visualizer.extra_script()
-        loader_callback = script[script.index("loader.load(") : script.index("function spin(")]
+        loader_callback = script[
+            script.index("loader.load(") : script.index("function spin(")
+        ]
         assert "material.metalness = 0" in loader_callback
 
 
 class TestCheckDependencies:
     @pytest.mark.parametrize("missing_module", ["flask", "trimesh"])
-    def test_raises_when_a_required_module_is_missing(self, monkeypatch, missing_module):
+    def test_raises_when_a_required_module_is_missing(
+        self, monkeypatch, missing_module
+    ):
         original_find_spec = importlib.util.find_spec
 
         def find_spec_without_module(name, *args, **kwargs):

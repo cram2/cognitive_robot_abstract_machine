@@ -201,24 +201,6 @@ class TestExtensionHooks:
         page = client.get("/").data
         assert b'"selector": "node[image]"' in page
 
-    def test_register_additional_routes_is_called_with_the_application(self):
-        calls = []
-
-        class RoutedVisualizer(CytoscapeGraphVisualizer):
-            def register_additional_routes(self, application):
-                calls.append(application)
-
-                @application.route("/extra")
-                def extra():
-                    return "extra"
-
-        client = (
-            RoutedVisualizer(graph=chain_graph(["a"])).build_application().test_client()
-        )
-
-        assert client.get("/extra").data == b"extra"
-        assert len(calls) == 1
-
     def test_extra_script_defaults_to_empty(self):
         visualizer = named_visualizer(chain_graph(["a"]))
 

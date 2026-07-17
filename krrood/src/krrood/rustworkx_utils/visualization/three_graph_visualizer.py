@@ -129,12 +129,6 @@ const graph = ForceGraph3D()(document.getElementById("graph"))
 
 Object.keys(layoutOptions).forEach((key) => { graph[key](layoutOptions[key]); });
 
-// Always-visible node labels, positioned every frame by projecting each node's 3D position to
-// screen space. This borrows 3d-force-graph's own internal Vector3 class (via an existing
-// Object3D's .position, which was constructed by that same internal copy) instead of constructing
-// one from a separately loaded three.js: 3d-force-graph bundles its own three.js without exposing
-// it globally, and a separately loaded, mismatched copy can be incompatible with what it renders
-// (confirmed the hard way with a Sprite-based label - the shaders didn't match and nothing drew).
 const ProjectionVector3 = graph.scene().position.constructor;
 const labelElements = new Map();
 
@@ -206,16 +200,14 @@ async function refresh() {
 
   if (structureChanged) {
     // Only rebuild the graph (which restarts the force simulation) when nodes or links were
-    // actually added or removed; calling graphData() on every poll regardless of whether anything
-    // changed made the whole graph visibly "pop" and resettle once a second.
+    // actually added or removed;
     graph.graphData(payload);
     knownNodeIds.clear();
     currentNodeIds.forEach((id) => knownNodeIds.add(id));
     knownLinkIds.clear();
     currentLinkIds.forEach((id) => knownLinkIds.add(id));
   } else {
-    // Update fields (color, label, ...) on the existing, already-simulated node objects in place,
-    // without touching their position/velocity or restarting the simulation.
+    // Update fields (color, label, ...) on the existing, already-simulated node objects in place
     const nodesById = new Map(graph.graphData().nodes.map((node) => [node.id, node]));
     payload.nodes.forEach((updatedNode) => {
       const existingNode = nodesById.get(updatedNode.id);

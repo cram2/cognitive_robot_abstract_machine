@@ -8,7 +8,9 @@ import pytest
 import rustworkx as rx
 
 from krrood.rustworkx_utils.graph_visualizer_base import GraphLayout
-from rustworkx_utils.visualization.three_graph_visualizer import ThreeGraphVisualizer
+from krrood.rustworkx_utils.visualization.three_graph_visualizer import (
+    ThreeGraphVisualizer,
+)
 
 
 @dataclass

@@ -8,15 +8,15 @@ from krrood.rustworkx_utils.graph_visualizer_base import (
     GraphVisualizerBackend,
     GraphVisualizerBase,
 )
-from rustworkx_utils.visualization.interactive_graph_visualizer import (
+from krrood.rustworkx_utils.visualization.interactive_graph_visualizer import (
     InteractiveGraphVisualizer,
 )
-from rustworkx_utils.visualization.cytoscape_graph_visualizer import (
+from krrood.rustworkx_utils.visualization.cytoscape_graph_visualizer import (
     CytoscapeGraphVisualizer,
 )
-from rustworkx_utils.visualization.visnetwork_graph_visualizer import (
+from krrood.rustworkx_utils.visualization.visnetwork_graph_visualizer import (
     VisNetworkGraphVisualizer,
 )
-from rustworkx_utils.visualization.three_graph_visualizer import (
+from krrood.rustworkx_utils.visualization.three_graph_visualizer import (
     ThreeGraphVisualizer,
 )

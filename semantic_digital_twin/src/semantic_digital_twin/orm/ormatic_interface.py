@@ -101,8 +101,6 @@ import semantic_digital_twin.spatial_computations.ik_solver
 import semantic_digital_twin.spatial_types.derivatives
 import semantic_digital_twin.spatial_types.spatial_types
 import semantic_digital_twin.utils
-import semantic_digital_twin.visualization.mesh_cytoscape_graph_visualizer
-import semantic_digital_twin.visualization.mesh_three_graph_visualizer
 import semantic_digital_twin.world
 import semantic_digital_twin.world_description.connection_properties
 import semantic_digital_twin.world_description.connections
@@ -9834,66 +9832,6 @@ class MockedRCLPYDAO(Base, DataAccessObject[semantic_digital_twin.utils.MockedRC
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-
-class MeshCytoscapeGraphVisualizerDAO(
-    Base,
-    DataAccessObject[
-        semantic_digital_twin.visualization.mesh_cytoscape_graph_visualizer.MeshCytoscapeGraphVisualizer
-    ],
-):
-    __tablename__ = "MeshCytoscapeGraphVisualizerDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    title: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-    refresh_interval_seconds: Mapped[builtins.float] = mapped_column(
-        use_existing_column=True
-    )
-    port: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-    open_browser: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
-
-    layout: Mapped[krrood.rustworkx_utils.graph_visualizer_base.GraphLayout] = (
-        mapped_column(
-            krrood.ormatic.custom_types.PolymorphicEnumType,
-            nullable=False,
-            use_existing_column=True,
-        )
-    )
-
-
-class MeshThreeGraphVisualizerDAO(
-    Base,
-    DataAccessObject[
-        semantic_digital_twin.visualization.mesh_three_graph_visualizer.MeshThreeGraphVisualizer
-    ],
-):
-    __tablename__ = "MeshThreeGraphVisualizerDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    title: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-    refresh_interval_seconds: Mapped[builtins.float] = mapped_column(
-        use_existing_column=True
-    )
-    port: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-    open_browser: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
-
-    layout: Mapped[krrood.rustworkx_utils.graph_visualizer_base.GraphLayout] = (
-        mapped_column(
-            krrood.ormatic.custom_types.PolymorphicEnumType,
-            nullable=False,
-            use_existing_column=True,
-        )
     )
 
 

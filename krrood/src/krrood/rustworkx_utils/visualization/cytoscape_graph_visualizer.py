@@ -254,7 +254,13 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
         """
         elements = [self._node_element(index) for index in self.graph.node_indices()]
         elements += [
-            {"data": {"id": f"{source}-{target}", "source": str(source), "target": str(target)}}
+            {
+                "data": {
+                    "id": f"{source}-{target}",
+                    "source": str(source),
+                    "target": str(target),
+                }
+            }
             for source, target in self.graph.edge_list()
         ]
         return elements
@@ -278,16 +284,6 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
             without overriding the whole page template.
         """
         return []
-
-    def register_additional_routes(self, application: Flask) -> None:
-        """
-        Register extra Flask routes on ``application``, called once from :meth:`build_application`.
-
-        The default implementation does nothing; subclasses override this to serve extra per-node
-        resources (for example images referenced by :meth:`extra_node_styles`).
-
-        :param application: The Flask application to add routes to.
-        """
 
     def extra_script(self) -> str:
         """
@@ -324,7 +320,6 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
         def node(node_index: int):
             return jsonify(details=self.node_details(node_index))
 
-        self.register_additional_routes(application)
         return application
 
     def run(self) -> None:

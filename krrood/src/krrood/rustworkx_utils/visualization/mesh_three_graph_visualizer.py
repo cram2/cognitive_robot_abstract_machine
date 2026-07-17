@@ -4,10 +4,19 @@ import threading
 from dataclasses import dataclass, field
 
 import trimesh
-from typing_extensions import Any, ClassVar, Dict, Optional, Tuple, TYPE_CHECKING
+from typing_extensions import (
+    Any,
+    ClassVar,
+    Dict,
+    Optional,
+    Tuple,
+    TYPE_CHECKING,
+    Callable,
+)
 
-from rustworkx_utils.visualization.three_graph_visualizer import ThreeGraphVisualizer
-from semantic_digital_twin.world_description.world_entity import Body
+from krrood.rustworkx_utils.visualization.three_graph_visualizer import (
+    ThreeGraphVisualizer,
+)
 
 if TYPE_CHECKING:
     from flask import Flask
@@ -77,6 +86,11 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
     )
     """Serializes GLB export across concurrently handled requests; see the class note."""
 
+    mesh_getter: Callable[[Any], Optional[trimesh.Trimesh]] = field(kw_only=True)
+    """
+    Method to extract the mesh from a node
+    """
+
     def node_extra_data(self, node_index: int) -> Dict[str, Any]:
         """
         :param node_index: The rustworkx index of the node.
@@ -84,7 +98,7 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
             :class:`~semantic_digital_twin.world_description.world_entity.Body` has visual geometry,
             for the browser to load and spin; empty otherwise.
         """
-        if self._node_mesh(node_index) is None:
+        if self.mesh_getter(self.graph[node_index]) is None:
             return {}
         return {"meshUrl": f"mesh/{node_index}.glb"}
 
@@ -94,7 +108,6 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
 
         :param application: The Flask application to add the route to.
         """
-        super().register_additional_routes(application)
         from flask import Response
 
         @application.route("/mesh/<int:node_index>.glb")
@@ -205,16 +218,6 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
 }})();
 """
 
-    def _node_mesh(self, node_index: int) -> Optional[trimesh.Trimesh]:
-        """
-        :param node_index: The rustworkx index of the node.
-        :return: The node's combined visual mesh, or ``None`` if it has no visual geometry.
-        """
-        payload = self.graph[node_index]
-        if not isinstance(payload, Body) or not payload.visual:
-            return None
-        return payload.visual.combined_mesh
-
     def _mesh_glb(self, node_index: int) -> Optional[bytes]:
         """
         :param node_index: The rustworkx index of the node.
@@ -225,7 +228,7 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
             return self._mesh_glb_cache[node_index]
         with self._mesh_export_lock:
             if node_index not in self._mesh_glb_cache:
-                mesh = self._node_mesh(node_index)
+                mesh = self.mesh_getter(self.graph[node_index])
                 self._mesh_glb_cache[node_index] = (
                     None if mesh is None else mesh.export(file_type="glb")
                 )
