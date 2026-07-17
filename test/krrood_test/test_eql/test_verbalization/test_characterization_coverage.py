@@ -63,7 +63,7 @@ def test_range_fold_coexists_with_an_unrelated_conjunct():
                 )
             )
         )
-        == "Find a Robot whose battery is between 10 and 90, such that the Robot is operational"
+        == "Find a Robot whose battery is between 10 and 90, such that it is operational"
     )
 
 
@@ -84,7 +84,7 @@ def test_and_nested_inside_or_keeps_both_connectives():
         )
     ) == (
         "Find a Robot such that its battery is greater than 50, "
-        "and the Robot is operational, or its battery is less than 5"
+        "and it is operational, or its battery is less than 5"
     )
 
 

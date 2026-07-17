@@ -89,6 +89,47 @@ def is_past_participle(word: str) -> bool:
     )
 
 
+#: Suffixes that mark an English word as adjectival. A best-effort shape test — not a POS tagger —
+#: used only as the fallback after the deterministic :func:`is_past_participle` check.
+_ADJECTIVAL_SUFFIXES = (
+    "ic",
+    "al",
+    "ous",
+    "ive",
+    "able",
+    "ible",
+    "ent",
+    "ant",
+    "ary",
+    "ful",
+    "less",
+    "ish",
+    "ing",
+    "ed",
+)
+
+
+def is_likely_adjective(word: str) -> bool:
+    """
+    :param word: A single English word.
+    :return: ``True`` when *word*'s ending marks it as adjectival (*"operational"*, *"aquatic"*,
+        *"venomous"*), else ``False``.
+
+    A best-effort suffix heuristic, not a part-of-speech tagger: offline tools cannot reliably
+    identify a general adjective, so a suffix-less adjective (*"airborne"*) is a genuine miss that a
+    caller corrects with an explicit hint. Use it only as a fallback after the deterministic
+    :func:`is_past_participle` test.
+
+    >>> is_likely_adjective("operational")
+    True
+    >>> is_likely_adjective("venomous")
+    True
+    >>> is_likely_adjective("milk")
+    False
+    """
+    return word.lower().endswith(_ADJECTIVAL_SUFFIXES)
+
+
 def third_person_singular(lemma: str) -> str:
     """
     :param lemma: A verb in its base (lemma) form.

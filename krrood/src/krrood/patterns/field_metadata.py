@@ -4,6 +4,8 @@ from dataclasses import field, fields, dataclass, is_dataclass
 
 from typing_extensions import ClassVar, Dict, List, Optional, Type, TypeVar, Self
 
+from krrood.patterns.boolean_predicate import BooleanPredicateSpec
+
 
 @dataclass
 class FieldMetadata:
@@ -83,4 +85,12 @@ class GrammarMetadata(FieldMetadata):
     """
     Surface word to use for this field when verbalized, in place of its attribute name
     (*"beginning"* for a field named ``begin``); ``None`` keeps the attribute name.
+    """
+
+    boolean_predicate: Optional[BooleanPredicateSpec] = None
+    """
+    How a boolean field reads as a predicate — *"has milk"* / *"produces milk"* / *"is
+    operational"* — overriding the default heuristic.
+
+    ``None`` lets the verbalizer infer the form from the attribute name's shape.
     """

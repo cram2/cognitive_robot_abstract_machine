@@ -5,9 +5,13 @@ from krrood.entity_query_language.core.mapped_variable import (
     MappedVariable,
 )
 from krrood.entity_query_language.core.variable import Variable
+from krrood.entity_query_language.verbalization.attribute_predicates import (
+    boolean_alternative_clause,
+    boolean_predicate_clause,
+    resolve_boolean_predicate,
+)
 from krrood.entity_query_language.verbalization.fragments.base import (
     NounPhrase,
-    PhraseFragment,
     PossessiveChain,
     RoleFragment,
     VerbalizationFragment,
@@ -27,9 +31,6 @@ from krrood.entity_query_language.verbalization.microplanning.possessive import 
     possessive_path,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
-    Conjunctions,
-    Copulas,
-    Logicals,
     Prepositions,
 )
 
@@ -129,14 +130,24 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         :param plan: The analysed chain (a boolean terminal — see
             :attr:`ChainPlan.is_boolean_terminal`).
         :param negated: Whether to negate the predicative.
-        :return: The predicative *"<navigation> is [not] <attribute>"*.
+        :return: The predicative clause for the boolean attribute, in the form its field declares
+            (or the shape heuristic infers): *"<navigation> has milk"* / *"is operational"* /
+            *"produces milk"*, negated via do-support / copula suppletion.
 
         >>> verbalize_expression(variable(Robot, []).operational)
         'a Robot is operational'
         """
-        navigation_fragment, attribute_fragment = self._boolean_parts(plan)
-        copula = Copulas.IS_NOT.as_fragment() if negated else Copulas.IS.as_fragment()
-        return PhraseFragment(parts=[navigation_fragment, copula, attribute_fragment])
+        navigation_fragment, terminal = self._boolean_navigation(plan)
+        spec = resolve_boolean_predicate(
+            terminal._owner_class_, terminal._attribute_name_
+        )
+        return boolean_predicate_clause(
+            navigation_fragment,
+            spec,
+            terminal._owner_class_,
+            terminal._attribute_name_,
+            negated=negated,
+        )
 
     def boolean_alternative(self, plan: ChainPlan) -> VerbalizationFragment:
         """
@@ -148,22 +159,21 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         >>> verbalize_expression(variable(Task, []).completed == variable(bool, [True, False]))
         'a Task is either completed or not'
         """
-        navigation_fragment, attribute_fragment = self._boolean_parts(plan)
-        return PhraseFragment(
-            parts=[
-                navigation_fragment,
-                Copulas.IS.as_fragment(),
-                Logicals.EITHER.as_fragment(),
-                attribute_fragment,
-                Conjunctions.OR.as_fragment(),
-                Logicals.NOT.as_fragment(),
-            ]
+        navigation_fragment, terminal = self._boolean_navigation(plan)
+        spec = resolve_boolean_predicate(
+            terminal._owner_class_, terminal._attribute_name_
+        )
+        return boolean_alternative_clause(
+            navigation_fragment,
+            spec,
+            terminal._owner_class_,
+            terminal._attribute_name_,
         )
 
-    def _boolean_parts(self, plan: ChainPlan) -> tuple:
-        """:return: ``(navigation_fragment, attribute_fragment)`` for a boolean-terminal chain — the
-        navigation prefix and the terminal attribute noun, shared by the predicative and the
-        open-alternative forms.
+    def _boolean_navigation(self, plan: ChainPlan) -> tuple:
+        """:return: ``(navigation_fragment, terminal)`` for a boolean-terminal chain — the navigation
+        prefix and the terminal attribute node, shared by the predicative and the open-alternative
+        forms.
 
         The prefix is the chain minus its boolean terminal, recursed through the standard grammar
         (``terminal._child_``) rather than re-rendered here: it is itself a navigable referent, so
@@ -176,6 +186,4 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         """
         terminal = plan.chain[-1]
         navigation_fragment = self.context.child(terminal._child_, inline=True)
-        return navigation_fragment, RoleFragment.for_attribute(
-            terminal._owner_class_, terminal._attribute_name_
-        )
+        return navigation_fragment, terminal
