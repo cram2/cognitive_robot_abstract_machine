@@ -11,8 +11,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List
 
-from krrood.patterns.boolean_predicate import AdjectivalPredicate
-from krrood.patterns.field_metadata import FieldMetadata, GrammarMetadata
+from krrood.entity_query_language.verbalization.boolean_predicate import (
+    AdjectivalPredicate,
+)
+from krrood.entity_query_language.verbalization.grammar_metadata import GrammarMetadata
+from krrood.patterns.field_metadata import FieldMetadata
 
 import krrood.entity_query_language.factories as eql
 from krrood.entity_query_language.factories import (

@@ -18,8 +18,11 @@ from __future__ import annotations
 import datetime
 from dataclasses import dataclass, field
 
-from krrood.patterns.boolean_predicate import AdjectivalPredicate
-from krrood.patterns.field_metadata import FieldMetadata, GrammarMetadata
+from krrood.entity_query_language.verbalization.boolean_predicate import (
+    AdjectivalPredicate,
+)
+from krrood.entity_query_language.verbalization.grammar_metadata import GrammarMetadata
+from krrood.patterns.field_metadata import FieldMetadata
 from typing import Any
 from typing_extensions import List
 

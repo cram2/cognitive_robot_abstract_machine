@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.grammar.conditions.placement import (
         ConditionForm,
     )
-    from krrood.patterns.boolean_predicate import BooleanPredicateSpec
 
 
 @dataclass
@@ -102,28 +101,6 @@ class UnverbalizableExpressionError(DataclassException):
     def suggest_correction(self) -> str:
         return (
             "Add a PhraseRule in the construct's grammar/<construct>/rules.py module."
-        )
-
-
-@dataclass
-class UnknownBooleanPredicateError(DataclassException):
-    """
-    A boolean-predicate spec has no realizer — a coverage gap surfaced when a new
-    :class:`~krrood.patterns.boolean_predicate.BooleanPredicateSpec` subtype is added
-    without a matching :class:`~krrood.entity_query_language.verbalization.attribute_pre
-    dicates.AttributePredicateRealizer`.
-    """
-
-    spec: "BooleanPredicateSpec"
-    """The predicate spec whose type maps to no realizer."""
-
-    def error_message(self) -> str:
-        return f"No realizer for boolean-predicate spec {type(self.spec).__name__!r}."
-
-    def suggest_correction(self) -> str:
-        return (
-            "Add an AttributePredicateRealizer subclass whose `spec_type` is that spec, in "
-            "verbalization/attribute_predicates.py."
         )
 
 

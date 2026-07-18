@@ -138,15 +138,9 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         'a Robot is operational'
         """
         navigation_fragment, terminal = self._boolean_navigation(plan)
-        spec = resolve_boolean_predicate(
-            terminal._owner_class_, terminal._attribute_name_
-        )
+        predicate = resolve_boolean_predicate(terminal)
         return boolean_predicate_clause(
-            navigation_fragment,
-            spec,
-            terminal._owner_class_,
-            terminal._attribute_name_,
-            negated=negated,
+            navigation_fragment, predicate, terminal, negated=negated
         )
 
     def boolean_alternative(self, plan: ChainPlan) -> VerbalizationFragment:
@@ -160,15 +154,8 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         'a Task is either completed or not'
         """
         navigation_fragment, terminal = self._boolean_navigation(plan)
-        spec = resolve_boolean_predicate(
-            terminal._owner_class_, terminal._attribute_name_
-        )
-        return boolean_alternative_clause(
-            navigation_fragment,
-            spec,
-            terminal._owner_class_,
-            terminal._attribute_name_,
-        )
+        predicate = resolve_boolean_predicate(terminal)
+        return boolean_alternative_clause(navigation_fragment, predicate, terminal)
 
     def _boolean_navigation(self, plan: ChainPlan) -> tuple:
         """:return: ``(navigation_fragment, terminal)`` for a boolean-terminal chain — the navigation

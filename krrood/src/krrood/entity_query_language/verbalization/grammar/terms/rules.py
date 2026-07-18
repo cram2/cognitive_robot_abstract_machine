@@ -19,7 +19,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     PhraseFragment,
     RoleFragment,
 )
-from krrood.patterns.field_metadata import FieldMetadata, GrammarMetadata
+from krrood.entity_query_language.verbalization.grammar_metadata import GrammarMetadata
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
     GrammaticalNumber,

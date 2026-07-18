@@ -3,50 +3,42 @@ Tests for boolean-attribute predicate verbalization:
 :mod:`krrood.entity_query_language.verbalization.attribute_predicates`.
 
 A boolean attribute reads as a predicate whose form is declared per field
-(:class:`~krrood.patterns.boolean_predicate.BooleanPredicateSpec`) or inferred from the attribute
-name's shape: possessive (*"has milk"*), adjectival (*"is operational"*), or verbal (*"produces
-milk"*). Negation is derived — do-support / copula suppletion — never re-templated.
+(:class:`~krrood.entity_query_language.verbalization.boolean_predicate.BooleanPredicate`) or inferred
+from the attribute name's shape: possessive (*"has milk"*), adjectival (*"is operational"*), or verbal
+(*"produces milk"*). Negation is derived — do-support / copula suppletion — never re-templated.
 
 The mimic dataclasses are named after the predicate shape they exercise, not any external class.
 """
 
 from __future__ import annotations
 
-import os
-import subprocess
-import sys
 from dataclasses import dataclass, field
-
-import pytest
 
 from krrood.entity_query_language.factories import for_all, variable
 from krrood.entity_query_language.verbalization.attribute_predicates import (
-    boolean_predicate_clause,
     default_boolean_predicate,
     resolve_boolean_predicate,
 )
-from krrood.entity_query_language.verbalization.exceptions import (
-    UnknownBooleanPredicateError,
-)
-from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
-from krrood.patterns.boolean_predicate import (
+from krrood.entity_query_language.verbalization.boolean_predicate import (
     AdjectivalPredicate,
-    Article,
-    BooleanPredicateSpec,
+    BooleanPredicate,
     PossessivePredicate,
     VerbalPredicate,
 )
-from krrood.patterns.field_metadata import FieldMetadata, GrammarMetadata
+from krrood.entity_query_language.verbalization.fragments.features import Definiteness
+from krrood.entity_query_language.verbalization.grammar_metadata import GrammarMetadata
+from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
+from krrood.patterns.field_metadata import FieldMetadata
 
 
-def _predicate(spec: BooleanPredicateSpec) -> object:
+def _predicate(predicate: BooleanPredicate) -> object:
     """
-    A boolean dataclass field declaring *spec* as its predicate form.
+    A boolean dataclass field declaring *predicate* as its predicate form.
     """
     return field(
         default=False,
         metadata=FieldMetadata(
-            other_metadata=[GrammarMetadata(boolean_predicate=spec)]
+            other_metadata=[GrammarMetadata(boolean_predicate=predicate)]
         ).as_dict(),
     )
 
@@ -70,7 +62,9 @@ class _DeclaredForms:
     """
 
     milk: bool = _predicate(PossessivePredicate())
-    backbone: bool = _predicate(PossessivePredicate(article=Article.INDEFINITE))
+    backbone: bool = _predicate(
+        PossessivePredicate(definiteness=Definiteness.INDEFINITE)
+    )
     glands: bool = _predicate(PossessivePredicate(noun="mammary glands"))
     reachable: bool = _predicate(AdjectivalPredicate(adjective="within reach"))
     secretes_milk: bool = _predicate(
@@ -94,8 +88,17 @@ def test_adjective_suffix_name_defaults_to_adjectival():
     assert isinstance(default_boolean_predicate("operational"), AdjectivalPredicate)
 
 
-def test_declared_spec_overrides_the_heuristic():
-    assert resolve_boolean_predicate(_DeclaredForms, "milk") == PossessivePredicate()
+def test_declared_predicate_overrides_the_heuristic():
+    animal = variable(_DeclaredForms, [])
+    assert resolve_boolean_predicate(animal.milk) == PossessivePredicate()
+
+
+def test_verbs_are_never_inferred_only_declared():
+    # A verb cannot be told from a noun by shape, so the heuristic never guesses a verbal reading.
+    assert not isinstance(default_boolean_predicate("secretes_milk"), VerbalPredicate)
+    # A verbal reading is reachable only when the field declares it.
+    animal = variable(_DeclaredForms, [])
+    assert isinstance(resolve_boolean_predicate(animal.secretes_milk), VerbalPredicate)
 
 
 # %% Inferred surfaces (no metadata)
@@ -215,14 +218,18 @@ def test_adjectival_agrees_with_a_plural_subject():
 
 
 def test_open_domain_possessive_alternative():
+    # Do-support fronts "either" before the whole verb phrase ("either has milk or not"), because the
+    # auxiliary differs between the two polarities ("has" / "does not have").
     animal = variable(_DeclaredForms, [])
     assert (
         verbalize_expression(animal.milk == variable(bool, [True, False]))
-        == "a _DeclaredForms has either milk or not"
+        == "a _DeclaredForms either has milk or not"
     )
 
 
 def test_open_domain_adjectival_alternative():
+    # The copula is shared across both polarities ("is" / "is not"), so "either" sits after it and
+    # only the complement is coordinated.
     animal = variable(_InferredForms, [])
     assert (
         verbalize_expression(animal.operational == variable(bool, [True, False]))
@@ -230,40 +237,17 @@ def test_open_domain_adjectival_alternative():
     )
 
 
-# %% Fail-loud on an unrealizable spec
-
-
-@dataclass(frozen=True)
-class _UnrealizablePredicate(BooleanPredicateSpec):
-    """
-    A spec with no registered realizer, to prove the coverage gap fails loudly.
-    """
-
-
-class _SubjectStub:
-    """
-    A minimal clause subject stand-in (the raise happens before it is used).
-    """
-
-    def as_fragment(self):
-        return self
-
-
-def test_unknown_spec_raises():
-    with pytest.raises(UnknownBooleanPredicateError):
-        boolean_predicate_clause(
-            _SubjectStub(), _UnrealizablePredicate(), _DeclaredForms, "milk"
-        )
-
-
-# %% Layering: the patterns spec must not pull in the verbalization subsystem
-
-
-def test_patterns_spec_has_no_verbalization_dependency():
-    code = (
-        "import sys, krrood.patterns.boolean_predicate;"
-        "leaked = [m for m in sys.modules "
-        "if m.startswith('krrood.entity_query_language.verbalization')];"
-        "assert not leaked, leaked"
+def test_open_domain_verbal_alternative():
+    animal = variable(_DeclaredForms, [])
+    assert (
+        verbalize_expression(animal.secretes_milk == variable(bool, [True, False]))
+        == "a _DeclaredForms either secretes milk or not"
     )
-    subprocess.run([sys.executable, "-c", code], check=True, env={**os.environ})
+
+
+def test_open_domain_intransitive_verb_alternative():
+    animal = variable(_DeclaredForms, [])
+    assert (
+        verbalize_expression(animal.breathes == variable(bool, [True, False]))
+        == "a _DeclaredForms either breathes or not"
+    )

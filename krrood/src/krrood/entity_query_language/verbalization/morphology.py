@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import enum
+
 import inflect
 from lemminflect import getInflection, getLemma
 
@@ -89,24 +91,28 @@ def is_past_participle(word: str) -> bool:
     )
 
 
-#: Suffixes that mark an English word as adjectival. A best-effort shape test — not a POS tagger —
-#: used only as the fallback after the deterministic :func:`is_past_participle` check.
-_ADJECTIVAL_SUFFIXES = (
-    "ic",
-    "al",
-    "ous",
-    "ive",
-    "able",
-    "ible",
-    "ent",
-    "ant",
-    "ary",
-    "ful",
-    "less",
-    "ish",
-    "ing",
-    "ed",
-)
+class AdjectivalSuffix(enum.StrEnum):
+    """
+    Word endings that mark an English word as adjectival.
+
+    A best-effort shape test — not a part-of-speech tagger — used only as the fallback after the
+    deterministic :func:`is_past_participle` check.
+    """
+
+    IC = "ic"
+    AL = "al"
+    OUS = "ous"
+    IVE = "ive"
+    ABLE = "able"
+    IBLE = "ible"
+    ENT = "ent"
+    ANT = "ant"
+    ARY = "ary"
+    FUL = "ful"
+    LESS = "less"
+    ISH = "ish"
+    ING = "ing"
+    ED = "ed"
 
 
 def is_likely_adjective(word: str) -> bool:
@@ -127,7 +133,7 @@ def is_likely_adjective(word: str) -> bool:
     >>> is_likely_adjective("milk")
     False
     """
-    return word.lower().endswith(_ADJECTIVAL_SUFFIXES)
+    return word.lower().endswith(tuple(AdjectivalSuffix))
 
 
 def third_person_singular(lemma: str) -> str:
