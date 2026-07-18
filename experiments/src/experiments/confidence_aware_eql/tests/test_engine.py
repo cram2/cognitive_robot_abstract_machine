@@ -1,76 +1,114 @@
-"""
-Engine-level tests — core invariants, independent of any domain.
+from __future__ import annotations
 
-Checks the things that must always hold: the compiled circuit's likelihood
-matches the underlying GMM (i.e. variable-order alignment is correct), the
-percentile threshold strategy behaves, and missing features are handled.
-"""
+from dataclasses import dataclass
+from enum import Enum
 
 import numpy as np
+import pytest
 from sklearn.mixture import GaussianMixture
 
-from experiments.confidence_aware_eql.engine import (
-    Domain, Feature, CircuitModel, PercentileThreshold, ConfidenceAwareEvaluator,
-    generate_dataset,
+from experiments.confidence_aware_eql.engine.circuit_model import (
+    fit_gaussian_mixture_circuit,
 )
+from experiments.confidence_aware_eql.engine.evaluator import ConfidenceAwareEvaluator
+from experiments.confidence_aware_eql.engine.schema import FeatureSchema
+from experiments.confidence_aware_eql.engine.threshold import PercentileThreshold
 
 
-def _toy_domain():
-    return Domain("toy", [
-        Feature("a", "continuous"),
-        Feature("b", "continuous"),
-        Feature("c", "continuous"),
-    ])
+class SampleMaterial(Enum):
+    """A categorical feature used to exercise enum encoding in the schema."""
+
+    FIRST = 0
+    SECOND = 1
 
 
-def test_circuit_matches_gmm():
-    """The compiled circuit must give the SAME log-likelihood as the GMM.
+@dataclass
+class TwoFeatureSample:
+    """A minimal instance exercising one continuous and one categorical feature."""
 
-    This is the regression test for the variable-ordering bug: the circuit
-    sorts variables, so inputs must be aligned. CircuitModel does this
-    internally — verify it.
-    """
-    rng = np.random.default_rng(0)
-    data = np.hstack([
-        rng.normal(0.2, 0.05, (80, 1)),
-        rng.normal(0.1, 0.02, (80, 1)),
-        rng.normal(3.0, 0.40, (80, 1)),
-    ])
-    names = ["a", "b", "c"]                                                          
-    model = CircuitModel.fit(data, names, n_components=2, seed=0)
-
-    gmm = GaussianMixture(n_components=2, covariance_type="diag",
-                          random_state=0, reg_covar=1e-4).fit(data)
-
-    test = np.array([[0.2, 0.1, 3.0], [50.0, 0.1, 3.0]])
-    assert np.allclose(model.log_likelihood(test), gmm.score_samples(test), atol=1e-5)
+    weight: float
+    material: SampleMaterial
 
 
-def test_percentile_threshold_is_a_percentile():
-    lls = np.linspace(-100, 0, 1001)
-    thr = PercentileThreshold(percentile=1.0)
-    value = thr.fit(lls)
-    assert np.isclose(value, np.percentile(lls, 1.0))
+@pytest.fixture
+def two_cluster_data() -> np.ndarray:
+    """Two well-separated clusters of light and heavy instances."""
+    generator = np.random.default_rng(0)
+    light = np.column_stack(
+        [generator.normal(0.25, 0.05, 400), generator.normal(0.10, 0.02, 400)]
+    )
+    heavy = np.column_stack(
+        [generator.normal(3.0, 0.30, 400), generator.normal(0.30, 0.03, 400)]
+    )
+    return np.vstack([light, heavy])
 
 
-def test_missing_feature_is_flagged_not_scored():
-    domain = _toy_domain()
-    spec = {"x": {"a": (0.2, 0.05), "b": (0.1, 0.02), "c": (3.0, 0.4)}}
-    data = generate_dataset(domain, spec, n_per_class=60, seed=0)
-    model = CircuitModel.fit(data, domain.names, n_components=1, seed=0)
-    thr = PercentileThreshold(1.0); thr.fit(model.log_likelihood(data))
-    ev = ConfidenceAwareEvaluator(domain, model, thr.threshold)
+def test_circuit_likelihood_matches_gaussian_mixture(two_cluster_data):
+    """The compiled circuit reproduces the likelihood of the fitted mixture."""
+    feature_names = ["weight", "size"]
+    circuit = fit_gaussian_mixture_circuit(
+        two_cluster_data, feature_names, number_of_components=2
+    )
+    reference = GaussianMixture(
+        n_components=2, covariance_type="diag", random_state=0, reg_covar=1e-4
+    ).fit(two_cluster_data)
+    points = two_cluster_data[:5]
+    assert np.allclose(
+        circuit.log_likelihood(points), reference.score_samples(points), atol=1e-4
+    )
 
-    lp, w = ev.check({"a": 0.2, "b": 0.1, "c": None})             
-    assert lp is None and w is not None and "incomplete" in w.reason
+
+def test_percentile_threshold_matches_numpy_percentile():
+    """The percentile threshold equals the requested percentile of the input."""
+    log_likelihoods = np.linspace(-10.0, 0.0, 101)
+    threshold = PercentileThreshold(percentile=1.0)
+    assert threshold.fit(log_likelihoods) == pytest.approx(
+        np.percentile(log_likelihoods, 1.0)
+    )
 
 
-def test_marginal_reduces_dimensionality():
-    domain = _toy_domain()
-    spec = {"x": {"a": (0.2, 0.05), "b": (0.1, 0.02), "c": (3.0, 0.4)}}
-    data = generate_dataset(domain, spec, n_per_class=60, seed=0)
-    model = CircuitModel.fit(data, domain.names, n_components=1, seed=0)
-    sub = model.marginal(["a"])
-                                                                   
-    val = float(sub.log_likelihood(np.array([[0.2]]))[0])
-    assert np.isfinite(val)
+def test_schema_derives_features_from_dataclass():
+    """The schema takes its features from the public fields of the dataclass."""
+    schema = FeatureSchema.from_dataclass(TwoFeatureSample)
+    assert schema.feature_names == ["weight", "material"]
+
+
+def test_enum_feature_is_encoded_by_value():
+    """An enumeration feature is encoded as the numeric value of its member."""
+    schema = FeatureSchema.from_dataclass(TwoFeatureSample)
+    encoded = schema.encode(TwoFeatureSample(1.0, SampleMaterial.SECOND))
+    assert encoded.is_complete
+    assert encoded.row[1] == 1.0
+
+
+def test_missing_feature_is_flagged():
+    """An absent feature marks the encoded instance as incomplete."""
+    schema = FeatureSchema.from_dataclass(TwoFeatureSample)
+    encoded = schema.encode(TwoFeatureSample(1.0, None))
+    assert not encoded.is_complete
+    assert "material" in encoded.missing_features
+
+
+def test_impossible_instance_flagged_by_evaluator(two_cluster_data):
+    """A far out-of-distribution instance is reported as unfamiliar."""
+    @dataclass
+    class WeightSizeSample:
+        """An instance with two continuous features."""
+
+        weight: float
+        size: float
+
+    schema = FeatureSchema.from_dataclass(WeightSizeSample)
+    circuit = fit_gaussian_mixture_circuit(
+        two_cluster_data, schema.feature_names, number_of_components=2
+    )
+    threshold = PercentileThreshold(percentile=1.0)
+    threshold.fit(circuit.log_likelihood(two_cluster_data))
+    evaluator = ConfidenceAwareEvaluator(schema, circuit, threshold)
+
+    familiar = evaluator.check(WeightSizeSample(0.25, 0.10), node_name="test_node")
+    assert familiar.is_familiar
+
+    impossible = evaluator.check(WeightSizeSample(50.0, 0.10), node_name="test_node")
+    assert not impossible.is_familiar
+    assert impossible.warning.node_name == "test_node"

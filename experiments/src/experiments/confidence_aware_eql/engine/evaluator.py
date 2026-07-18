@@ -1,63 +1,71 @@
-"""
-ConfidenceAwareEvaluator — score an object and (maybe) warn.
+from __future__ import annotations
 
-Given a Domain, a fitted CircuitModel, and a threshold, `check()`:
-  1. encodes the object (reporting a missing/unknown feature -> warn), then
-  2. runs a full-evidence log_likelihood query, then
-  3. compares to the threshold and records an UnfamiliarSampleWarning if below.
+from dataclasses import dataclass
 
-`node_name` is carried on every warning for traceability. In the standalone
-demo there is a single check site; when wired into an EQL rule tree, the same
-call is made per node with that node's name (and, later, a marginal/conditional
-view for contextual scoring).
-"""
+from typing_extensions import Optional
 
-from dataclasses import dataclass, field
-from typing_extensions import Dict, List, Optional, Tuple
-import numpy as np
+from experiments.confidence_aware_eql.engine.circuit_model import GaussianMixtureCircuit
+from experiments.confidence_aware_eql.engine.schema import FeatureSchema
+from experiments.confidence_aware_eql.engine.threshold import FamiliarityThreshold
+from experiments.confidence_aware_eql.exceptions import UnfamiliarSampleWarning
 
-from .domain import Domain
-from .circuit_model import CircuitModel
-from .warning import UnfamiliarSampleWarning
+
+@dataclass
+class FamiliarityResult:
+    """The outcome of checking one instance against the learned distribution."""
+
+    log_likelihood: Optional[float]
+    """Log-likelihood of the instance, or ``None`` when it could not be scored."""
+
+    warning: Optional[UnfamiliarSampleWarning]
+    """The warning raised for an unfamiliar instance, or ``None`` when familiar."""
+
+    @property
+    def is_familiar(self) -> bool:
+        """Whether the instance was accepted as familiar."""
+        return self.warning is None
 
 
 @dataclass
 class ConfidenceAwareEvaluator:
-    domain: Domain
-    model: CircuitModel
-    threshold: float
-    warnings: List[UnfamiliarSampleWarning] = field(default_factory=list)
+    """Scores instances and flags those unlikely under the learned distribution.
 
-    def check(self, obj: Dict, node_name: str = "root") -> Tuple[Optional[float], Optional[UnfamiliarSampleWarning]]:
-        """Score one object dict. Returns (log_p, warning_or_None).
+    The evaluator encodes an instance through its schema, computes the
+    log-likelihood with the compiled circuit, and returns a
+    :class:`FamiliarityResult` carrying a warning when the instance is incomplete
+    or falls below the fitted threshold.
+    """
 
-        log_p is None when the object could not be scored (missing features).
-        The warning (if any) is also appended to self.warnings.
+    schema: FeatureSchema
+    """The feature schema used to encode instances."""
+
+    circuit: GaussianMixtureCircuit
+    """The compiled probabilistic circuit scoring encoded instances."""
+
+    threshold: FamiliarityThreshold
+    """The fitted cutoff separating familiar from unfamiliar instances."""
+
+    def check(self, instance: object, node_name: str) -> FamiliarityResult:
+        """Check one instance and report whether it is familiar.
+
+        :param instance: The instance whose features are read by the schema.
+        :param node_name: Name of the rule node performing the check, recorded on
+            any warning for traceability.
         """
-        row, missing = self.domain.encode_row(obj)
+        encoded = self.schema.encode(instance)
+        if not encoded.is_complete:
+            reason = f"incomplete features {encoded.missing_features}"
+            return FamiliarityResult(None, UnfamiliarSampleWarning(node_name, reason))
 
-        if missing:
-            w = UnfamiliarSampleWarning(
-                node_name=node_name, log_p=None,
-                reason=f"incomplete features {missing} (missing/unknown tag)",
-            )
-            self.warnings.append(w)
-            return None, w
+        log_likelihood = float(self.circuit.log_likelihood(encoded.row)[0])
+        if self.threshold.is_familiar(log_likelihood):
+            return FamiliarityResult(log_likelihood, None)
 
-        log_p = float(self.model.log_likelihood(row)[0])
-        if log_p < self.threshold:
-            w = UnfamiliarSampleWarning(
-                node_name=node_name, log_p=log_p,
-                reason=f"log P(x)={log_p:.2f} < threshold {self.threshold:.2f}",
-            )
-            self.warnings.append(w)
-            return log_p, w
-
-        return log_p, None
-
-    def is_familiar(self, obj: Dict) -> bool:
-        log_p, w = self.check(obj, node_name="_probe_")
-                                          
-        if self.warnings and self.warnings[-1].node_name == "_probe_":
-            self.warnings.pop()
-        return w is None
+        reason = (
+            f"log-likelihood {log_likelihood:.2f} below threshold "
+            f"{self.threshold.value:.2f}"
+        )
+        return FamiliarityResult(
+            log_likelihood,
+            UnfamiliarSampleWarning(node_name, reason, log_likelihood),
+        )

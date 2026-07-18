@@ -1,50 +1,58 @@
-"""
-Threshold strategies — choose the familiarity threshold FROM data.
+from __future__ import annotations
 
-Instead of a magic number, we derive the threshold from the log-likelihoods the
-fitted circuit assigns to the (familiar) training objects. Two interchangeable
-strategies are provided; both expose .fit(train_log_likelihoods) -> threshold.
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 
-PercentileThreshold(p):
-    threshold = p-th percentile of training log-likelihoods.
-    Interpretation: about p% of genuinely-familiar objects will fall below it,
-    i.e. p is (approximately) the expected false-positive rate. Set p=1.0 for a
-    ~1% false alarm budget. This makes the threshold explainable and tunable.
-
-StdDevThreshold(k):
-    threshold = mean - k * std of training log-likelihoods.
-    A Gaussian-tail style cutoff; flags objects k standard deviations less
-    likely than the average familiar object.
-"""
-
-from dataclasses import dataclass
 import numpy as np
 
 
 @dataclass
-class PercentileThreshold:
-    percentile: float = 1.0
-    threshold: float = None
+class FamiliarityThreshold(ABC):
+    """A configurable cutoff separating familiar from unfamiliar instances.
 
-    def fit(self, train_log_likelihoods) -> float:
-        lls = np.asarray(train_log_likelihoods, dtype=float)
-        self.threshold = float(np.percentile(lls, self.percentile))
-        return self.threshold
+    A threshold is fitted from the log-likelihoods of the training instances and
+    then compares any future instance's log-likelihood against the learned value.
+    """
 
-    def describe(self) -> str:
-        return (f"PercentileThreshold(p={self.percentile}) "
-                f"-> {self.threshold:.2f} (~{self.percentile:.1f}% expected false positives)")
+    value: float = field(init=False, default=0.0)
+    """The fitted log-likelihood cutoff; instances below this are unfamiliar."""
+
+    @abstractmethod
+    def fit(self, training_log_likelihoods: np.ndarray) -> float:
+        """Learn the cutoff from the training log-likelihoods and return it."""
+
+    def is_familiar(self, log_likelihood: float) -> bool:
+        """Whether a log-likelihood is at or above the fitted cutoff."""
+        return log_likelihood >= self.value
 
 
 @dataclass
-class StdDevThreshold:
-    k: float = 3.0
-    threshold: float = None
+class PercentileThreshold(FamiliarityThreshold):
+    """Places the cutoff at a low percentile of the training log-likelihoods.
 
-    def fit(self, train_log_likelihoods) -> float:
-        lls = np.asarray(train_log_likelihoods, dtype=float)
-        self.threshold = float(lls.mean() - self.k * lls.std())
-        return self.threshold
+    Choosing the first percentile budgets roughly one percent of familiar
+    instances to be flagged, which bounds the false-positive rate directly.
+    """
 
-    def describe(self) -> str:
-        return f"StdDevThreshold(k={self.k}) -> {self.threshold:.2f} (mean - {self.k}*std)"
+    percentile: float = 1.0
+    """The percentile of training log-likelihoods used as the cutoff."""
+
+    def fit(self, training_log_likelihoods: np.ndarray) -> float:
+        """Set the cutoff to the configured percentile of the training values."""
+        self.value = float(np.percentile(training_log_likelihoods, self.percentile))
+        return self.value
+
+
+@dataclass
+class StandardDeviationThreshold(FamiliarityThreshold):
+    """Places the cutoff a number of standard deviations below the mean."""
+
+    number_of_standard_deviations: float = 3.0
+    """How many standard deviations below the mean the cutoff sits."""
+
+    def fit(self, training_log_likelihoods: np.ndarray) -> float:
+        """Set the cutoff below the mean of the training values."""
+        mean = float(np.mean(training_log_likelihoods))
+        standard_deviation = float(np.std(training_log_likelihoods))
+        self.value = mean - self.number_of_standard_deviations * standard_deviation
+        return self.value

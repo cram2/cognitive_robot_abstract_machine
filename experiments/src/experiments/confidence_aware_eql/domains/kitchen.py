@@ -1,36 +1,36 @@
-"""Kitchen domain."""
+from dataclasses import dataclass
+from enum import Enum
 
-from experiments.confidence_aware_eql.engine import Domain, Feature
+from krrood.symbol_graph.symbol_graph import Symbol
 
-DOMAIN = Domain("kitchen", [
-    Feature("weight", "continuous"),
-    Feature("size", "continuous"),
-    Feature("material", "categorical",
-            categories={"ceramic": 0, "glass": 1, "metal": 2, "plastic": 3}),
-])
 
-                                                                           
-SPEC = {
-    "cup":     {"weight": (0.25, 0.05), "size": (0.10, 0.02), "material": "ceramic"},
-    "glass":   {"weight": (0.30, 0.05), "size": (0.12, 0.02), "material": "glass"},
-    "plate":   {"weight": (0.60, 0.10), "size": (0.24, 0.02), "material": "ceramic"},
-    "pitcher": {"weight": (2.50, 0.30), "size": (0.25, 0.03), "material": "glass"},
-    "pot":     {"weight": (3.00, 0.40), "size": (0.30, 0.03), "material": "metal"},
-}
+class Material(Enum):
+    """The material a kitchen object is made of."""
 
-FAMILIAR = [
-    ("normal_cup",     {"weight": 0.22, "size": 0.10, "material": "ceramic"}),
-    ("normal_pitcher", {"weight": 2.50, "size": 0.25, "material": "glass"}),
-    ("normal_pot",     {"weight": 3.00, "size": 0.30, "material": "metal"}),
-]
+    CERAMIC = 0
+    """Fired clay, used for cups and plates."""
 
-ANOMALOUS = [
-    ("impossible_cup", {"weight": 50.0, "size": 0.10, "material": "glass"}),               
-    ("heavy_plate",    {"weight": 40.0, "size": 0.24, "material": "ceramic"}),
-    ("tiny_anvil",     {"weight": 25.0, "size": 0.05, "material": "metal"}),
-]
+    GLASS = 1
+    """Transparent glass, used for pitchers and drinking glasses."""
 
-INCOMPLETE = [
-    ("no_material", {"weight": 0.30, "size": 0.09, "material": None}),
-    ("unknown_mat", {"weight": 0.30, "size": 0.09, "material": "uranium"}),                  
-]
+    METAL = 2
+    """Metal, used for pots and pans."""
+
+
+@dataclass(unsafe_hash=True)
+class KitchenObject(Symbol):
+    """A graspable kitchen object described by the features a robot reasons about.
+
+    The fields are the features the confidence check scores: mass, characteristic
+    size, and material. Being a :class:`Symbol` lets the same object take part in
+    entity-query-language rule evaluation.
+    """
+
+    weight: float
+    """Mass of the object in kilograms."""
+
+    size: float
+    """Characteristic dimension of the object in metres."""
+
+    material: Material
+    """The material the object is made of."""

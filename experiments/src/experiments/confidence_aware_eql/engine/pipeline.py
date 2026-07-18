@@ -1,58 +1,54 @@
-"""
-pipeline.py — the generalized pipeline, written ONCE.
+from __future__ import annotations
 
-build_evaluator(): data -> learned circuit -> data-driven threshold -> evaluator.
-evaluate_detection(): held-out detection-rate / false-positive-rate.
+from dataclasses import dataclass
 
-Both the CLI runner and the test suite call these, so the pipeline logic lives
-in exactly one place. Adding a domain never touches this file.
-"""
+from typing_extensions import List, Type
 
-from typing_extensions import Tuple
-import numpy as np
-
-from .domain import Domain
-from .circuit_model import CircuitModel
-from .threshold import PercentileThreshold
-from .evaluator import ConfidenceAwareEvaluator
-from .datasets import generate_dataset, sample_objects
-
-
-def build_evaluator(domain: Domain, spec: dict, *, percentile: float = 1.0,
-                    n_per_class: int = 80, seed: int = 0, n_components="auto"):
-    """Run steps 2–4 for a domain and return (evaluator, model, strategy, data)."""
-    data = generate_dataset(domain, spec, n_per_class=n_per_class, seed=seed)
-    model = CircuitModel.fit(data, domain.names, n_components=n_components, seed=seed)
-    strategy = PercentileThreshold(percentile=percentile)
-    strategy.fit(model.log_likelihood(data))
-    evaluator = ConfidenceAwareEvaluator(domain, model, strategy.threshold)
-    return evaluator, model, strategy, data
+from experiments.confidence_aware_eql.engine.circuit_model import (
+    GaussianMixtureCircuit,
+    fit_gaussian_mixture_circuit,
+)
+from experiments.confidence_aware_eql.engine.evaluator import ConfidenceAwareEvaluator
+from experiments.confidence_aware_eql.engine.schema import FeatureSchema
+from experiments.confidence_aware_eql.engine.threshold import (
+    FamiliarityThreshold,
+    PercentileThreshold,
+)
+from experiments.confidence_aware_eql.engine.training import TrainingSampler
 
 
-def _first_continuous(domain: Domain) -> str:
-    for f in domain.features:
-        if f.kind == "continuous":
-            return f.name
-    return domain.features[0].name
+@dataclass
+class ConfidenceModelBuilder:
+    """Assembles a confidence-aware evaluator from a domain's training sampler.
 
-
-def evaluate_detection(evaluator: ConfidenceAwareEvaluator, domain: Domain, spec: dict,
-                       *, n: int = 200, seed: int = 7,
-                       anomaly_range: Tuple[float, float] = (20.0, 80.0)) -> Tuple[float, float]:
-    """Return (detection_rate, false_positive_rate) on freshly sampled held-out sets.
-
-    Anomalies are familiar objects with their first continuous feature pushed to
-    an implausible value (default 20–80, e.g. weight in kg).
+    The builder derives the feature schema from the instance class, samples
+    familiar training instances, fits a Gaussian mixture circuit, and fits a
+    familiarity threshold on the training log-likelihoods.
     """
-    corrupt = _first_continuous(domain)
-    familiar = sample_objects(domain, spec, n=n, seed=seed)
-    rng = np.random.default_rng(seed + 100)
-    anomalies = []
-    for o in sample_objects(domain, spec, n=n, seed=seed + 1):
-        bad = dict(o)
-        bad[corrupt] = float(rng.uniform(*anomaly_range))
-        anomalies.append(bad)
 
-    fp = sum(0 if evaluator.is_familiar(o) else 1 for o in familiar) / len(familiar)
-    tp = sum(1 if not evaluator.is_familiar(o) else 0 for o in anomalies) / len(anomalies)
-    return tp, fp
+    instance_class: Type
+    """The dataclass whose instances the evaluator will score."""
+
+    sampler: TrainingSampler
+    """The source of familiar training instances."""
+
+    instances_per_prototype: int = 80
+    """How many instances to draw around each prototype."""
+
+    random_seed: int = 0
+    """Seed used for sampling and mixture fitting."""
+
+    def build(
+        self, threshold: FamiliarityThreshold = None
+    ) -> ConfidenceAwareEvaluator:
+        """Build and return a fitted confidence-aware evaluator."""
+        if threshold is None:
+            threshold = PercentileThreshold(percentile=1.0)
+        schema = FeatureSchema.from_dataclass(self.instance_class)
+        instances = self.sampler.sample(self.instances_per_prototype, self.random_seed)
+        training_matrix = self.sampler.encode_all(schema, instances)
+        circuit = fit_gaussian_mixture_circuit(
+            training_matrix, schema.feature_names, random_seed=self.random_seed
+        )
+        threshold.fit(circuit.log_likelihood(training_matrix))
+        return ConfidenceAwareEvaluator(schema, circuit, threshold)

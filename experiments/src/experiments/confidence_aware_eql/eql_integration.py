@@ -1,77 +1,70 @@
-"""
-eql_integration.py — plug the confidence check into KRROOD's EQL evaluation.
-
-KRROOD's EQL fires events while it walks a rule tree, through the public
-``EvaluationObserver`` interface. We subclass it: every time a node is entered,
-we run an out-of-distribution check on the object being evaluated and collect a
-warning if it is unfamiliar. NOTHING in KRROOD is modified — we register the
-observer through ``set_evaluation_context`` (the same public mechanism the
-repo's monitoring experiments use).
-
-NOTE (validate after install): the exact way to pull the "object under
-evaluation" out of ``sources`` depends on KRROOD's binding structure at runtime.
-``object_extractor`` is therefore a small pluggable function you finalise once
-you can print a real ``sources`` object. Everything else is the standard,
-documented observer wiring.
-"""
-
 from dataclasses import dataclass, field
-from typing_extensions import Callable, List, Optional, Dict, Any
 
-from krrood.entity_query_language.evaluation_context import (
-    EvaluationObserver,
-    EvaluationContext,
-    set_evaluation_context,
-)
+from typing_extensions import Any, List, Optional, Type
 
-from .engine.evaluator import ConfidenceAwareEvaluator
-from .engine.warning import UnfamiliarSampleWarning
+from krrood.entity_query_language.evaluation_context import EvaluationObserver
 
-
-                                                                                 
-                                                                               
-ObjectExtractor = Callable[[Any, Any], Optional[Dict]]
+from experiments.confidence_aware_eql.engine.evaluator import ConfidenceAwareEvaluator
+from experiments.confidence_aware_eql.exceptions import UnfamiliarSampleWarning
 
 
 @dataclass
-class ConfidenceObserver(EvaluationObserver):
-    """Runs an OOD check on each evaluated node and records warnings."""
+class ConfidenceAwareEvaluationObserver(EvaluationObserver):
+    """Runs a familiarity check at every node of an entity-query-language tree.
+
+    The observer is registered on an evaluation context so that the query engine
+    notifies it as each node of the rule tree is entered. For every node it
+    recovers the instance currently bound to the query variable and scores it
+    with the confidence evaluator. Instances that are unfamiliar produce an
+    :class:`UnfamiliarSampleWarning` naming the node that rejected them, so the
+    deterministic result of the rule tree can be accompanied by an explicit
+    statement of doubt.
+    """
 
     evaluator: ConfidenceAwareEvaluator
-    object_extractor: ObjectExtractor
+    """The evaluator scoring each bound instance."""
+
+    instance_class: Type
+    """The class of the instances that should be checked."""
+
     warnings: List[UnfamiliarSampleWarning] = field(default_factory=list)
-    seen: set = field(default_factory=set)
+    """Warnings collected during the evaluation, in the order they were raised."""
 
-    def on_evaluate_enter(self, expression, sources=None) -> None:
-        obj = self.object_extractor(expression, sources)
-        if obj is None:
+    _checked_nodes: set = field(default_factory=set, repr=False)
+    """Instance and node pairs already checked, preventing duplicate warnings."""
+
+    def on_evaluate_enter(self, expression: Any, sources: Optional[Any] = None) -> None:
+        """Check the instance bound at the node the query engine is entering."""
+        instance = self._bound_instance(sources)
+        if instance is None:
             return
 
-        node_name = getattr(expression, "name", None) or type(expression).__name__
-
-                                                                         
-        key = (id(obj) if not isinstance(obj, dict) else tuple(sorted(obj.items())), node_name)
-        if key in self.seen:
+        node_name = self._node_name(expression)
+        identity = (id(instance), node_name)
+        if identity in self._checked_nodes:
             return
-        self.seen.add(key)
+        self._checked_nodes.add(identity)
 
-        _, warning = self.evaluator.check(obj, node_name=node_name)
-        if warning is not None:
-            self.warnings.append(warning)
+        result = self.evaluator.check(instance, node_name=node_name)
+        if result.warning is not None:
+            self.warnings.append(result.warning)
 
+    def _bound_instance(self, sources: Optional[Any]) -> Optional[Any]:
+        """Return the instance bound in the operation result, if there is one."""
+        if sources is None:
+            return None
+        bindings = getattr(sources, "bindings", None)
+        if not bindings:
+            return None
+        for value in bindings.values():
+            if isinstance(value, self.instance_class):
+                return value
+        return None
 
-def run_with_confidence(query, evaluator: ConfidenceAwareEvaluator,
-                        object_extractor: ObjectExtractor):
-    """Evaluate an EQL query while checking confidence at each node.
-
-    Returns (results, warnings). The deterministic EQL results are unchanged;
-    warnings is the list of UnfamiliarSampleWarning raised during the walk.
-    """
-    observer = ConfidenceObserver(evaluator=evaluator, object_extractor=object_extractor)
-    context = EvaluationContext(observers=[observer])
-    token = set_evaluation_context(context)
-    try:
-        results = list(query.evaluate())
-    finally:
-        set_evaluation_context(None)                                                    
-    return results, observer.warnings
+    @staticmethod
+    def _node_name(expression: Any) -> str:
+        """Return a readable name for the rule-tree node being evaluated."""
+        name = getattr(expression, "name", None)
+        if name:
+            return str(name)
+        return type(expression).__name__
