@@ -5,7 +5,7 @@ from typing_extensions import Dict, Iterable, List, Optional, Set, Tuple
 import uuid
 
 from krrood.entity_query_language.verbalization.fragments.base import (
-    agree_finite,
+    apply_subject_verb_agreement,
     Clause,
     map_structural_children,
     NounPhrase,
@@ -271,7 +271,8 @@ class CoreferenceProcessor(RealizationPass):
             return rebuilt if rebuilt is not None else clause
         pronoun = Pronouns.nominative(number).as_fragment()
         agreed_rest = [
-            agree_finite(self._walk(part), number) for part in clause.parts[1:]
+            apply_subject_verb_agreement(self._walk(part), number)
+            for part in clause.parts[1:]
         ]
         return replace(clause, parts=[pronoun, *agreed_rest])
 
@@ -302,7 +303,7 @@ class CoreferenceProcessor(RealizationPass):
         """
         return replace(
             clause,
-            parts=[agree_finite(part, number) for part in clause.parts],
+            parts=[apply_subject_verb_agreement(part, number) for part in clause.parts],
         )
 
     def _owned_attributes(self, owned: OwnedAttributes) -> VerbalizationFragment:

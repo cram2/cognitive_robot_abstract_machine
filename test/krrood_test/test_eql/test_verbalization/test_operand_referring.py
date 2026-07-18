@@ -21,6 +21,7 @@ from krrood.entity_query_language.factories import an, entity, for_all, variable
 from krrood.entity_query_language.predicate import Predicate, SymbolicFunction
 from krrood.entity_query_language.verbalization.microplanning.referring import (
     operand_head_noun,
+    ParentEdge,
 )
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 from krrood.entity_query_language.verbalization.vocabulary.english import Prepositions
@@ -203,19 +204,19 @@ def test_informative_type_wins_over_field_metadata():
     metadata is a fallback for an uninformative type, not an override.
     """
     parent = MetadataNamed(variable(Marker, []))
-    edges = [(parent, "burning_thing")]
+    edges = [ParentEdge(parent, "burning_thing")]
     assert operand_head_noun(variable(Marker, []), edges) == "Marker"
 
 
 def test_uninformative_type_falls_through_to_field_metadata():
     parent = MetadataNamed(variable(object, []))
-    edges = [(parent, "burning_thing")]
+    edges = [ParentEdge(parent, "burning_thing")]
     assert operand_head_noun(variable(object, []), edges) == "torch"
 
 
 def test_uninformative_type_falls_through_to_field_name():
     parent = UntypedRole(variable(object, []))
-    edges = [(parent, "location")]
+    edges = [ParentEdge(parent, "location")]
     assert operand_head_noun(variable(object, []), edges) == "location"
 
 
@@ -230,7 +231,7 @@ def test_reused_operand_ignores_field_context():
     resort) applies.
     """
     parent = UntypedRole(variable(object, []))
-    edges = [(parent, "location"), (parent, "location")]
+    edges = [ParentEdge(parent, "location"), ParentEdge(parent, "location")]
     assert operand_head_noun(variable(object, []), edges) == "object"
 
 

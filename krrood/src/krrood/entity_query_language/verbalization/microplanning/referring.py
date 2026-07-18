@@ -76,14 +76,30 @@ def referring_noun_with_restrictions(
 # %% Operand head-noun resolution
 
 
+@dataclass(frozen=True)
+class ParentEdge:
+    """
+    One structural edge from a child node up to a parent it is reachable through in an expression
+    graph.
+    """
+
+    parent: SymbolicExpression
+    """The parent node this edge descends from."""
+
+    field_name: Optional[str] = None
+    """The declared predicate field the child fills on *parent*, when *parent* is an
+    :class:`InstantiatedVariable` and this edge is one of its declared fields; ``None`` for every
+    other structural edge."""
+
+
 def _child_edges_by_id(
     expression: SymbolicExpression,
-) -> Dict[uuid.UUID, List[Tuple[SymbolicExpression, Optional[str]]]]:
-    """:return: every node's parent edges in *expression* — ``(parent, field_name)`` pairs, the
-    field name set only when the parent is an :class:`InstantiatedVariable` and the edge is one of
-    its declared fields (so the same variable filling two fields on one predicate is two distinct
-    edges, via :attr:`InstantiatedVariable._child_vars_`; every other structural edge carries no
-    field name).
+) -> Dict[uuid.UUID, List[ParentEdge]]:
+    """:return: every node's parent edges in *expression*, keyed by the child's ``_id_``. A
+    :class:`ParentEdge`'s field name is set only when the parent is an :class:`InstantiatedVariable`
+    and the edge is one of its declared fields (so the same variable filling two fields on one
+    predicate is two distinct edges, via :attr:`InstantiatedVariable._child_vars_`; every other
+    structural edge carries no field name).
 
     Used to tell an operand that fills exactly one predicate field, and appears nowhere else, from
     a variable also referenced elsewhere (a query subject, an ``==``-constrained pair) — the
@@ -93,9 +109,7 @@ def _child_edges_by_id(
     shared node once per reachable path, so a parent reached twice would otherwise double-count
     its own child edges.
     """
-    edges: Dict[uuid.UUID, List[Tuple[SymbolicExpression, Optional[str]]]] = (
-        defaultdict(list)
-    )
+    edges: Dict[uuid.UUID, List[ParentEdge]] = defaultdict(list)
     visited_parents: Set[uuid.UUID] = set()
     for node in expression._all_expressions_:
         if node._id_ in visited_parents:
@@ -103,16 +117,14 @@ def _child_edges_by_id(
         visited_parents.add(node._id_)
         if isinstance(node, InstantiatedVariable):
             for field_name, child in node._child_vars_.items():
-                edges[child._id_].append((node, field_name))
+                edges[child._id_].append(ParentEdge(node, field_name))
         else:
             for child in node._children_:
-                edges[child._id_].append((node, None))
+                edges[child._id_].append(ParentEdge(node))
     return edges
 
 
-def _sole_predicate_field(
-    edges: List[Tuple[SymbolicExpression, Optional[str]]],
-) -> Optional[Tuple[type, str]]:
+def _sole_predicate_field(edges: List[ParentEdge]) -> Optional[Tuple[type, str]]:
     """:return: ``(predicate_class, field_name)`` when *edges* is exactly one edge and that edge is
     a named predicate field, else ``None``. This is the structural (not heuristic) condition for
     treating a variable as an anonymous operand of that one field: it must be reachable through
@@ -120,15 +132,13 @@ def _sole_predicate_field(
     """
     if len(edges) != 1:
         return None
-    parent, field_name = edges[0]
-    if field_name is None or not isinstance(parent, InstantiatedVariable):
+    edge = edges[0]
+    if edge.field_name is None or not isinstance(edge.parent, InstantiatedVariable):
         return None
-    return parent._type_, field_name
+    return edge.parent._type_, edge.field_name
 
 
-def operand_head_noun(
-    node: Variable, edges: List[Tuple[SymbolicExpression, Optional[str]]]
-) -> str:
+def operand_head_noun(node: Variable, edges: List[ParentEdge]) -> str:
     """:return: the head noun naming *node*, resolved in order of decreasing specificity:
 
     1. *node*'s own type noun, when its type is informative (a concrete class other than the bare
@@ -154,6 +164,31 @@ def operand_head_noun(
 
     >>> operand_head_noun(variable(Robot, []), [])
     'Robot'
+
+    A sole predicate field only ever supplies a noun once the type gives none — a typed operand
+    keeps its type noun even filling a field of ``IsReachable`` (whose ``location`` field is
+    declared ``object``, an uninformative type on its own):
+
+    >>> reachable = IsReachable(variable(Robot, []))
+    >>> operand_head_noun(variable(Robot, []), [ParentEdge(reachable, "location")])
+    'Robot'
+
+    An untyped (``object``) operand falls through: to the field's declared
+    :attr:`~krrood.patterns.field_metadata.GrammarMetadata.display_name` when one is set, else to
+    the field name itself, else to ``"object"`` once there is no sole field to name it by:
+
+    >>> operand_head_noun(variable(object, []), [ParentEdge(reachable, "location")])
+    'location'
+    >>> operand_head_noun(variable(object, []), [])
+    'object'
+
+    A variable reachable through more than one edge is not a sole predicate operand, so it never
+    reads a field name — only its type, or ``"object"`` as the last resort:
+
+    >>> operand_head_noun(
+    ...     variable(object, []), [ParentEdge(reachable, "location"), ParentEdge(reachable, "location")]
+    ... )
+    'object'
     """
     type_ = node._type_
     if isinstance(type_, type) and type_ is not object:
@@ -184,8 +219,9 @@ class Distinguisher:
     other"*."""
 
     ordinal: Optional[int] = None
-    """The 1-based position (≥ 2) of a member of a same-noun group of three or more — realised as
-    an ordinal word (*"a second …"*, *"the third …"*)."""
+    """A member's position within a same-noun group of three or more, counting the first member as
+    position 1 — so a value of 2 realises as an ordinal word (*"a second …"*), 3 as *"a third
+    …"*, and so on."""
 
 
 @dataclass
@@ -221,8 +257,8 @@ class DistinguisherIndex:
     """How many distinct canonicals share each noun."""
 
     _assigned_position: Dict[uuid.UUID, int] = field(default_factory=dict, repr=False)
-    """Each canonical's 0-based position within its noun group, filled lazily on first
-    encounter."""
+    """Each canonical's position within its noun group, counting the first member as position 0,
+    filled lazily on first encounter."""
 
     _next_position: Dict[str, int] = field(default_factory=dict, repr=False)
     """The next unassigned position for each noun group."""
@@ -436,7 +472,10 @@ class ReferringExpressions:
     def _is_relational_referent(node: SymbolicExpression) -> bool:
         """:return: whether *node* is a relational attribute hop (a verb-named hop such as
         ``assigned_to``, whose relative clause names a distinct entity that must be told apart
-        from other same-noun entities)."""
+        from other same-noun entities).
+
+        :param node: The expression node to test.
+        """
         return (
             isinstance(node, Attribute)
             and relational_verb(node._attribute_name_) is not None
@@ -446,7 +485,10 @@ class ReferringExpressions:
     def _is_numberable(node: SymbolicExpression) -> bool:
         """:return: whether *node* denotes a numberable entity — a (non-literal) variable, or a
         relational attribute hop. Independent of *which* noun it resolves to
-        (:meth:`_resolve_head_noun`) — used where only entity identity matters."""
+        (:meth:`_resolve_head_noun`) — used where only entity identity matters.
+
+        :param node: The expression node to test.
+        """
         if isinstance(node, Variable) and not isinstance(node, Literal):
             return True
         return ReferringExpressions._is_relational_referent(node)
@@ -460,6 +502,11 @@ class ReferringExpressions:
         operand-aware resolution (:func:`operand_head_noun`) for a (non-literal) variable, or the
         *value* type noun for a relational attribute. ``None`` for anything that does not denote a
         numberable entity.
+
+        :param node: The expression node to resolve a head noun for.
+        :param edges_by_id: Every node's parent edges in the same expression, from
+            :func:`_child_edges_by_id` — looked up for *node* and passed on to
+            :func:`operand_head_noun`.
 
         >>> ReferringExpressions._resolve_head_noun(variable(Robot, []), {})
         'Robot'
