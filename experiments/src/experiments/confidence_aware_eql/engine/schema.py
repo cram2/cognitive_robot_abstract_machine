@@ -4,9 +4,8 @@ from dataclasses import dataclass, field, fields
 from enum import Enum
 
 import numpy as np
-from typing_extensions import Dict, List, Optional, Type
-
-from experiments.confidence_aware_eql.engine.feature import Feature, FeatureKind
+from random_events.variable import Continuous
+from typing_extensions import List, Optional, Type
 
 
 @dataclass
@@ -17,7 +16,7 @@ class EncodedInstance:
     """Feature values in schema order, or ``None`` when the instance is incomplete."""
 
     missing_features: List[str] = field(default_factory=list)
-    """Names of features that were absent or carried an unrecognised value."""
+    """Names of features that were absent on the instance."""
 
     @property
     def is_complete(self) -> bool:
@@ -27,21 +26,23 @@ class EncodedInstance:
 
 @dataclass
 class FeatureSchema:
-    """The ordered features that describe one kind of instance.
+    """The ordered random variables that describe one kind of instance.
 
-    A schema is derived from a dataclass whose public fields are the features:
-    floating-point fields become continuous features and enumeration fields
-    become categorical features. The schema then encodes instances of that class
-    into the numeric rows the probabilistic circuit consumes.
+    A schema is derived from a dataclass whose public fields are the features.
+    Each field becomes a :class:`random_events.variable.Continuous` variable, so
+    the variables used for encoding are exactly the ones the probabilistic
+    circuit is built over. Enumeration fields are encoded by the numeric value of
+    their member, which keeps the whole feature vector continuous and therefore
+    representable by the Gaussian mixture.
     """
 
-    features: List[Feature]
-    """The features in the order used for encoding."""
+    variables: List[Continuous]
+    """The random variables of the schema, in the order used for encoding."""
 
     @property
     def feature_names(self) -> List[str]:
-        """The feature names in schema order."""
-        return [feature.name for feature in self.features]
+        """The variable names in schema order."""
+        return [variable.name for variable in self.variables]
 
     @classmethod
     def from_dataclass(cls, instance_class: Type) -> FeatureSchema:
@@ -49,42 +50,38 @@ class FeatureSchema:
 
         Fields whose names begin with an underscore are treated as internal and
         excluded, so framework-injected attributes never become features.
+
+        :param instance_class: The dataclass whose fields describe the features.
         """
-        features = [
-            cls._feature_from_field(field_definition.name, field_definition.type)
+        variables = [
+            Continuous(field_definition.name)
             for field_definition in fields(instance_class)
             if not field_definition.name.startswith("_")
         ]
-        return cls(features)
+        return cls(variables)
 
     def encode(self, instance: object) -> EncodedInstance:
         """Encode an instance into a numeric row in schema order.
 
         A feature is recorded as missing when its attribute is ``None``, so an
         incomplete instance is reported rather than silently mis-encoded.
+
+        :param instance: The instance whose attributes are read by name.
         """
         missing_features: List[str] = []
         values: List[float] = []
-        for feature in self.features:
-            value = getattr(instance, feature.name)
+        for variable in self.variables:
+            value = getattr(instance, variable.name)
             if value is None:
-                missing_features.append(feature.name)
+                missing_features.append(variable.name)
                 continue
-            values.append(self._encode_value(feature, value))
+            values.append(self._encode_value(value))
         if missing_features:
             return EncodedInstance(row=None, missing_features=missing_features)
         return EncodedInstance(row=np.array(values, dtype=float))
 
     @staticmethod
-    def _feature_from_field(name: str, field_type: type) -> Feature:
-        """Build a feature from a dataclass field's name and type."""
-        if isinstance(field_type, type) and issubclass(field_type, Enum):
-            categories = {member.name: float(member.value) for member in field_type}
-            return Feature(name, FeatureKind.CATEGORICAL, categories)
-        return Feature(name, FeatureKind.CONTINUOUS)
-
-    @staticmethod
-    def _encode_value(feature: Feature, value: object) -> float:
+    def _encode_value(value: object) -> float:
         """Encode a single attribute value to its numeric representation."""
         if isinstance(value, Enum):
             return float(value.value)

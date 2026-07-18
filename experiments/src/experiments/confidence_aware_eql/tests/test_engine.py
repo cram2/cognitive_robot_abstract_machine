@@ -68,7 +68,7 @@ def test_percentile_threshold_matches_numpy_percentile():
 
 
 def test_schema_derives_features_from_dataclass():
-    """The schema takes its features from the public fields of the dataclass."""
+    """The schema takes its variables from the public fields of the dataclass."""
     schema = FeatureSchema.from_dataclass(TwoFeatureSample)
     assert schema.feature_names == ["weight", "material"]
 
