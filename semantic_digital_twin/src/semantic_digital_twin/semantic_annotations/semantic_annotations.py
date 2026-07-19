@@ -1016,7 +1016,7 @@ class WallPanel(HasRootBody):
 
 
 @dataclass(eq=False)
-class Potato(Produce): ...
+class Potato(Vegetable): ...
 
 
 @dataclass(eq=False)

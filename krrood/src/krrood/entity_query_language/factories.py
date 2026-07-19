@@ -35,6 +35,7 @@ from krrood.entity_query_language.core.mapped_variable import (
 )
 from krrood.entity_query_language.core.variable import (
     DomainType,
+    Literal,
     ExternallySetVariable,
 )
 from krrood.entity_query_language.enums import DomainSource
@@ -83,6 +84,8 @@ from krrood.entity_query_language.rules.conclusion_selector import (
     Alternative,
     Next,
 )
+from krrood.entity_query_language.utils import is_iterable
+from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
 
 ConditionType = Union[SymbolicExpression, bool, Predicate, TruthValueOperator]
 """
@@ -945,6 +948,10 @@ class NodeChildren(SymbolicFunction):
 node_children = symbolic_callable_to_function(NodeChildren)
 
 
+
+
+
+
 @dataclass(eq=False)
 class AttributeOwnerClass(SymbolicFunction):
     """
@@ -1098,3 +1105,12 @@ class RuntimeType(SymbolicFunction):
 
 
 type_ = symbolic_callable_to_function(RuntimeType)
+@symbolic_function
+def type_(obj: Any):
+    """
+    Determines the type of the given object.
+
+    :param obj: The object whose type is to be determined.
+    :return: The type of the given object.
+    """
+    return type(obj)

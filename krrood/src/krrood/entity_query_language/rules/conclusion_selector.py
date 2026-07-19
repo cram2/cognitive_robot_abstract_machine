@@ -43,7 +43,7 @@ class ConclusionSelector(TruthValueOperator, ABC):
     def create_and_update_rule_tree(
         cls,
         *conditions: ConditionType,
-    ) -> Self:
+    ) -> SymbolicExpression:
         """
         Create a new RDR rule (e.g., Refinement, Alternative, Next) and add it to the
         current rule tree.

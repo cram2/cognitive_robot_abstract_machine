@@ -95,11 +95,6 @@ ResultMapping = Callable[[Iterator[OperationResult]], Iterator[OperationResult]]
 A function that maps the results of a query to a new set of results.
 """
 
-_STREAM_EXHAUSTED = object()
-"""
-Sentinel distinguishing a genuinely exhausted source from a ``None`` result.
-"""
-
 
 @dataclass
 class CachedResultStream:
@@ -126,7 +121,12 @@ class CachedResultStream:
     """
 
     def __iter__(self) -> Iterator[OperationResult]:
+        # Sentinel distinguishing a genuinely exhausted source from a ``None`` result.
+        stream_exhausted = object()
         index = 0
+        # Not ``while not self._exhausted``: an already-exhausted stream must still replay its
+        # buffer to later iterators, so the loop always runs and the exhaustion guard below only
+        # stops the pulling of new items, not the replay of buffered ones.
         while True:
             if index < len(self._buffer):
                 yield self._buffer[index]
@@ -137,8 +137,8 @@ class CachedResultStream:
             # Sentinel form of next() rather than try/except StopIteration: this method is a
             # generator, and per PEP 479 a StopIteration raised inside it would surface as a
             # RuntimeError instead of ending iteration.
-            next_item = next(self._source, _STREAM_EXHAUSTED)
-            if next_item is _STREAM_EXHAUSTED:
+            next_item = next(self._source, stream_exhausted)
+            if next_item is stream_exhausted:
                 self._exhausted = True
                 return
             self._buffer.append(next_item)
