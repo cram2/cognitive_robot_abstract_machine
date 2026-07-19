@@ -5,10 +5,10 @@ from pathlib import Path
 
 from typing_extensions import List, Optional, Union
 
+from semantic_digital_twin.adapters.multi_sim import MujocoCamera
 from semantic_digital_twin.adapters.mujoco_video_recording import (
     MujocoVideoRecorder,
     VideoResolution,
-    write_video,
 )
 
 from coraplex.exceptions import PlanNotYetPerformedError
@@ -67,10 +67,11 @@ class PlanVideoRecorder:
     )
     """The pixel resolution of the captured frames."""
 
-    camera_name: Optional[str] = None
+    camera: Optional[MujocoCamera] = None
     """
-    The name of an existing MuJoCo camera to record from. If ``None``, a fixed overview
-    camera framing the world's bounding box is attached automatically.
+    An existing camera, already attached to :attr:`plan`'s world, to record from. If
+    ``None``, a fixed overview camera framing the world's bounding box is attached
+    automatically.
     """
 
     def record(self, output_path: Union[str, Path]) -> RenderedPlanVideo:
@@ -89,7 +90,7 @@ class PlanVideoRecorder:
             world=self.plan.world,
             frames_per_second=self.frames_per_second,
             resolution=self.resolution,
-            camera_name=self.camera_name,
+            camera=self.camera,
         )
         recorder.start()
         try:
@@ -97,10 +98,12 @@ class PlanVideoRecorder:
         finally:
             recorded_video = recorder.stop()
 
-        video_path = write_video(recorded_video, Path(output_path))
+        video_path = recorded_video.write(Path(output_path))
         return RenderedPlanVideo(video_path=video_path, captions=captions)
 
-    def _replay_with_captions(self, recorder: MujocoVideoRecorder) -> List[ActionCaption]:
+    def _replay_with_captions(
+        self, recorder: MujocoVideoRecorder
+    ) -> List[ActionCaption]:
         """
         Performs every leaf node of :attr:`plan`, mirroring :meth:`Plan.replay`'s traversal,
         while recording the video-timeline span of each node.

@@ -1294,17 +1294,19 @@ class EmptyWorldVideoRecordingError(VideoRecordingError):
     """
 
     def error_message(self) -> str:
-        return f"Cannot compute an overview camera for {self.world}: it has no geometry."
+        return (
+            f"Cannot compute an overview camera for {self.world}: it has no geometry."
+        )
 
     def suggest_correction(self) -> str:
-        return "add at least one body with geometry to the world, or pass an explicit camera_name."
+        return "add at least one body with geometry to the world, or pass an explicit camera."
 
 
 @dataclass
 class EmptyVideoRecordingError(VideoRecordingError):
     """
-    Raised when :func:`~semantic_digital_twin.adapters.mujoco_video_recording.write_video`
-    is called with a recording that has no frames.
+    Raised when :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.RecordedVideo.write`
+    is called on a recording that has no frames.
     """
 
     output_path: Path

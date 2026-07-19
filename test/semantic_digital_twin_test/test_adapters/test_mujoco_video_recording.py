@@ -17,7 +17,6 @@ from semantic_digital_twin.adapters.mujoco_video_recording import (
     RecordedVideo,
     VideoResolution,
     overview_camera_pose,
-    write_video,
 )
 from semantic_digital_twin.exceptions import (
     EmptyVideoRecordingError,
@@ -73,31 +72,34 @@ def test_overview_camera_pose_looks_at_the_bounding_box_center():
 
 
 # --------------------------------------------------------------------------- #
-# write_video - encoding, no simulator needed
+# RecordedVideo - encoding and derived timestamps, no simulator needed
 # --------------------------------------------------------------------------- #
 
 
-def test_write_video_round_trips_frame_count_and_shape(tmp_path):
-    frames = [
-        (np.random.rand(48, 64, 3) * 255).astype(np.uint8) for _ in range(5)
-    ]
-    recorded_video = RecordedVideo(
-        frames=frames, frame_timestamps=list(range(5)), frames_per_second=30
-    )
+def test_recorded_video_write_round_trips_frame_count_and_shape(tmp_path):
+    frames = [(np.random.rand(48, 64, 3) * 255).astype(np.uint8) for _ in range(5)]
+    recorded_video = RecordedVideo(frames=frames, frames_per_second=30)
     output_path = tmp_path / "video.mp4"
 
-    result_path = write_video(recorded_video, output_path)
+    result_path = recorded_video.write(output_path)
 
     assert result_path == output_path
     assert output_path.exists()
     assert output_path.stat().st_size > 0
 
 
-def test_write_video_raises_on_empty_recording(tmp_path):
-    recorded_video = RecordedVideo(frames=[], frame_timestamps=[], frames_per_second=30)
+def test_recorded_video_write_raises_on_empty_recording(tmp_path):
+    recorded_video = RecordedVideo(frames=[], frames_per_second=30)
 
     with pytest.raises(EmptyVideoRecordingError):
-        write_video(recorded_video, tmp_path / "video.mp4")
+        recorded_video.write(tmp_path / "video.mp4")
+
+
+def test_recorded_video_frame_timestamps_are_derived_from_frames_per_second():
+    frames = [(np.random.rand(4, 4, 3) * 255).astype(np.uint8) for _ in range(4)]
+    recorded_video = RecordedVideo(frames=frames, frames_per_second=8)
+
+    assert recorded_video.frame_timestamps == pytest.approx([0.0, 0.125, 0.25, 0.375])
 
 
 # --------------------------------------------------------------------------- #
@@ -152,7 +154,9 @@ def test_recorder_captures_frames_at_the_configured_resolution(ray_test_world):
 
 
 @requires_mujoco_ci
-def test_frame_timestamps_are_positions_on_the_encoded_videos_own_timeline(ray_test_world):
+def test_frame_timestamps_are_positions_on_the_encoded_videos_own_timeline(
+    ray_test_world,
+):
     world, *_ = ray_test_world
     recorder = MujocoVideoRecorder(
         world=world, frames_per_second=10, capture_every_n_state_changes=50
@@ -176,7 +180,9 @@ def test_captured_frame_count_tracks_frames_kept_so_far(ray_test_world):
 
     recorder.start()
     try:
-        assert recorder.captured_frame_count == 1  # the initial frame captured by start()
+        assert (
+            recorder.captured_frame_count == 1
+        )  # the initial frame captured by start()
         recorder.advance_simulation(duration=0.5)
         assert recorder.captured_frame_count >= 1
         frame_count_before_stop = recorder.captured_frame_count
