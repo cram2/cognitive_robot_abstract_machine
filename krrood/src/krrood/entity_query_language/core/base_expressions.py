@@ -56,6 +56,7 @@ A dictionary for expressions' bindings in EQL that maps the expression's unique
 identifier to its value.
 """
 
+
 @dataclass(eq=False)
 class SymbolicExpression(ABC):
     """
@@ -286,7 +287,11 @@ class SymbolicExpression(ABC):
         Filter/ConclusionSelector directly owning me" find it regardless of which parent is primary.
         """
         return next(
-            (parent for parent in reversed(self._parents_) if isinstance(parent, types)),
+            (
+                parent
+                for parent in reversed(self._parents_)
+                if isinstance(parent, types)
+            ),
             None,
         )
 
@@ -441,7 +446,7 @@ class SymbolicExpression(ABC):
         return current_result
 
     def conclusions_of_type(
-            self, conclusion_type: Type[ConclusionType]
+        self, conclusion_type: Type[ConclusionType]
     ) -> List[ConclusionType]:
         """:return: The conclusions attached to this expression that are instances of *conclusion_type*."""
         return [
@@ -652,8 +657,7 @@ class SymbolicExpression(ABC):
             by walking the subtree.
         """
         return any(
-            isinstance(descendant, expression_type)
-            for descendant in self._descendants_
+            isinstance(descendant, expression_type) for descendant in self._descendants_
         )
 
     @classmethod
@@ -846,8 +850,10 @@ class TruthValueOperator(SymbolicExpression, ABC):
         for result in child._evaluate_(sources):
             if result.has_value:
                 yield OperationResult(
-                    result.bindings, result.is_condition_false,
-                    result.operand, result.previous_operation_result,
+                    result.bindings,
+                    result.is_condition_false,
+                    result.operand,
+                    result.previous_operation_result,
                 )
             else:
                 yield result
@@ -900,6 +906,8 @@ class Filter(DerivedExpression, TruthValueOperator, ABC):
     @property
     def _name_(self):
         return self.__class__.__name__
+
+
 @dataclass
 class OperationResult:
     """
@@ -916,10 +924,12 @@ class OperationResult:
     Whether the operation resulted in a false value (i.e., The operation condition was
     not satisfied)
     """
+
     operand: Optional[SymbolicExpression] = None
     """
     The operand that produced the result.
     """
+
     previous_operation_result: Optional[OperationResult] = None
     """
     The result of the operation that was evaluated before this one.
@@ -968,15 +978,13 @@ class OperationResult:
     @property
     def is_condition_false(self) -> bool:
         """
-        Canonical condition-truth rule used by :meth:`~krrood.entity_query_language.core
-        .base_expressions.TruthValueOperator._evaluate_child_as_condition_` and :meth:`~
-        krrood.entity_query_language.core.base_expressions.SymbolicExpression._evaluate_
-        conclusions_and_update_bindings_`.
+        The canonical condition-truth rule: for expressions that bind a direct value
+        (``Attribute``, ``Comparator``, ``Variable``, …) truth is derived from the
+        value's boolean content.
 
-        For expressions that bind a direct value (``Attribute``, ``Comparator``,
-        ``Variable``, …) truth is derived from the value's boolean content.  For logical
-        operators that manage their own ``is_false`` flag (``NOT``, ``AND``, ``OR``, …)
-        and produce no direct value, the flag is used as-is.
+        For logical operators that manage their own
+        ``is_false`` flag (``NOT``, ``AND``, ``OR``, …) and produce no direct value, the
+        flag is used as-is.
         """
         if self.has_value:
             return not (
@@ -1026,6 +1034,8 @@ class OperationResult:
             and self.operand == other.operand
             and self.previous_operation_result == other.previous_operation_result
         )
+
+
 class UnificationDict(UserDict):
     """
     A dictionary which maps all expressions that are on a single variable to the
