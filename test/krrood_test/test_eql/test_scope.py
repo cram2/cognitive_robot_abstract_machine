@@ -36,8 +36,8 @@ MODULE_LEVEL_SENTINEL = "module_global_value"
 def test_stack_frame_scope_not_captured_by_default():
     fi = inspect.stack()[0]
     frame = StackFrame.from_frame_info(fi)
-    assert frame.global_ns is None
-    assert frame.local_ns is None
+    assert frame.global_namespace is None
+    assert frame.local_namespace is None
     assert frame.scope == {}
 
 
@@ -46,9 +46,9 @@ def test_stack_frame_scope_captured_when_requested():
     fi = inspect.stack()[0]
     frame = StackFrame.from_frame_info(fi, capture_scope=True)
 
-    assert frame.local_ns is not None and frame.global_ns is not None
-    assert frame.local_ns["local_token"] == "local_value"
-    assert frame.global_ns["MODULE_LEVEL_SENTINEL"] == "module_global_value"
+    assert frame.local_namespace is not None and frame.global_namespace is not None
+    assert frame.local_namespace["local_token"] == "local_value"
+    assert frame.global_namespace["MODULE_LEVEL_SENTINEL"] == "module_global_value"
     # locals win over globals in the merged view
     assert frame.scope["local_token"] == "local_value"
     assert frame.scope["MODULE_LEVEL_SENTINEL"] == "module_global_value"
@@ -58,14 +58,14 @@ def test_stack_frame_scope_is_a_copy_not_live_reference():
     fi = inspect.stack()[0]
     frame = StackFrame.from_frame_info(fi, capture_scope=True)
     # Mutating the snapshot must not touch the real globals.
-    frame.global_ns["MODULE_LEVEL_SENTINEL"] = "mutated"
+    frame.global_namespace["MODULE_LEVEL_SENTINEL"] = "mutated"
     assert MODULE_LEVEL_SENTINEL == "module_global_value"
 
 
 def test_stack_frame_positional_construction_still_works():
     # Pre-existing call sites construct StackFrame positionally with 7 args.
     frame = StackFrame("f.py", 1, "fn", None, None, None, "mod")
-    assert frame.global_ns is None and frame.local_ns is None
+    assert frame.global_namespace is None and frame.local_namespace is None
 
 
 # ---------------------------------------------------------------------------

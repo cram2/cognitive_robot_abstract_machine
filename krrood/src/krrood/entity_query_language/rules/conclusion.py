@@ -20,12 +20,8 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     BinaryExpression,
 )
-from krrood.entity_query_language.core.variable import Literal, Variable
-
-
-def _unwrap(value: Any) -> Any:
-    """Unwrap a :class:`Literal` wrapper to get the raw value."""
-    return value._value_ if isinstance(value, Literal) else value
+from krrood.entity_query_language.core.helpers import unwrap_if_literal
+from krrood.entity_query_language.core.variable import Variable
 
 
 @dataclass(eq=False)
@@ -63,10 +59,10 @@ class Conclusion(BinaryExpression, ABC):
             return NotImplemented
         if self.left._id_ != other.left._id_:
             return False
-        return _unwrap(self.right) == _unwrap(other.right)
+        return unwrap_if_literal(self.right) == unwrap_if_literal(other.right)
 
     def __hash__(self):
-        return hash((self.left._id_, _unwrap(self.right)))
+        return hash((self.left._id_, unwrap_if_literal(self.right)))
 
     @property
     def value(self) -> Any:
@@ -75,7 +71,7 @@ class Conclusion(BinaryExpression, ABC):
     @property
     def unwrapped_value(self) -> Any:
         """:return: The right-hand value with any :class:`Literal` wrapper removed."""
-        return _unwrap(self.right)
+        return unwrap_if_literal(self.right)
 
     @property
     def _name_(self) -> str:
@@ -104,4 +100,6 @@ class Add(Conclusion):
 
 
 ConclusionType = TypeVar("ConclusionType", bound=Conclusion)
-"""Type variable bound to :class:`Conclusion` for typed conclusion lookups."""
+"""
+Type variable bound to :class:`Conclusion` for typed conclusion lookups.
+"""
