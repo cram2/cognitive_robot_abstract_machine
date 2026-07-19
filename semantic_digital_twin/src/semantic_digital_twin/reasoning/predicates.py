@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC
 from copy import deepcopy
 from dataclasses import dataclass
+from typing import Optional, Any
 
 import numpy as np
 import trimesh.boolean
@@ -20,6 +21,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Noun,
     Verb,
 )
+from krrood.inheritance_path_length import inheritance_path_length
 from random_events.interval import Interval
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
@@ -28,7 +30,7 @@ from semantic_digital_twin.spatial_computations.ik_solver import (
     UnreachableException,
 )
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from semantic_digital_twin.spatial_types import Vector3, Point3
+from semantic_digital_twin.spatial_types import Vector3, Point3, math
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose,
@@ -38,7 +40,7 @@ from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     Region,
-    KinematicStructureEntity,
+    KinematicStructureEntity, SemanticAnnotation,
 )
 
 if TYPE_CHECKING:

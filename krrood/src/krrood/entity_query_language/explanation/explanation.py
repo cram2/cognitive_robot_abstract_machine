@@ -25,7 +25,6 @@ from krrood.entity_query_language.core.mapped_variable import (
 from krrood.entity_query_language.core.variable import InstantiatedVariable
 from krrood.entity_query_language.factories import (
     and_,
-    attribute_owner_class,
     contains,
     entity,
     exists,

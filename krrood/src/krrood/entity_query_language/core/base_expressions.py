@@ -598,6 +598,11 @@ class SymbolicExpression(ABC):
         share variables, and rule trees share whole subtrees) is yielded only on its first visit.
         Without this a naive walk revisits shared subtrees once per path, which compounds into an
         exponential traversal on deep rule trees.
+
+        Does not recurse into ``ResultQuantifier`` children so that inner query
+        subtrees remain isolated from outer query traversals (that isolation is
+        provided by :class:`~krrood.entity_query_language.query.query.Query`'s own
+        ``_descendants_`` override).
         """
         yield from self._iter_descendants_(set())
 
