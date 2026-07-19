@@ -11,6 +11,7 @@ from coraplex.plans.failures import PlanFailure
 
 if TYPE_CHECKING:
     from coraplex.plans.designator import Designator
+    from coraplex.plans.plan import Plan
     from coraplex.robot_plans.actions.base import ActionDescription
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
     from semantic_digital_twin.world_description.world_entity import (
@@ -110,3 +111,22 @@ class UnknownExecutionType(DataclassException):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class PlanNotYetPerformedError(DataclassException):
+    """
+    Raised when rendering a video of a plan is requested before the plan was ever performed,
+    i.e. before it has an ``initial_world`` snapshot to replay from.
+    """
+
+    plan: Plan
+    """
+    The plan that was never performed.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.plan} was never performed, there is no initial world to replay from."
+
+    def suggest_correction(self) -> str:
+        return "call plan.perform() at least once before recording a video of it."

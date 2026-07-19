@@ -1,6 +1,7 @@
 from __future__ import annotations, absolute_import
 
 from dataclasses import dataclass, field, Field
+from pathlib import Path
 from typing import Dict, Set, Any
 from uuid import UUID
 
@@ -1232,3 +1233,111 @@ class MujocoEntityNotFoundError(MujocoError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class VideoRecordingError(MultiSimError):
+    """
+    Base class for all :class:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder`
+    exceptions.
+    """
+
+
+@dataclass
+class VideoRecordingAlreadyStartedError(VideoRecordingError):
+    """
+    Raised when :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder.start`
+    is called on a recorder that is already recording.
+    """
+
+    world: World
+    """
+    The world the recorder is already recording.
+    """
+
+    def error_message(self) -> str:
+        return f"Video recording for {self.world} was already started."
+
+    def suggest_correction(self) -> str:
+        return "call stop() before starting a new recording."
+
+
+@dataclass
+class VideoRecordingNotStartedError(VideoRecordingError):
+    """
+    Raised when :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder.stop`
+    is called on a recorder that was never started.
+    """
+
+    world: World
+    """
+    The world the recorder was supposed to be recording.
+    """
+
+    def error_message(self) -> str:
+        return f"Video recording for {self.world} was never started."
+
+    def suggest_correction(self) -> str:
+        return "call start() before stop()."
+
+
+@dataclass
+class EmptyWorldVideoRecordingError(VideoRecordingError):
+    """
+    Raised when a default overview camera cannot be computed because the world has no
+    geometry to frame.
+    """
+
+    world: World
+    """
+    The world that has no geometry.
+    """
+
+    def error_message(self) -> str:
+        return f"Cannot compute an overview camera for {self.world}: it has no geometry."
+
+    def suggest_correction(self) -> str:
+        return "add at least one body with geometry to the world, or pass an explicit camera_name."
+
+
+@dataclass
+class EmptyVideoRecordingError(VideoRecordingError):
+    """
+    Raised when :func:`~semantic_digital_twin.adapters.mujoco_video_recording.write_video`
+    is called with a recording that has no frames.
+    """
+
+    output_path: Path
+    """
+    The path the (empty) video was supposed to be written to.
+    """
+
+    def error_message(self) -> str:
+        return f"Cannot write a video to {self.output_path}: no frames were captured."
+
+    def suggest_correction(self) -> str:
+        return "call start() and let the recorder run for at least one frame period before stop()."
+
+
+@dataclass
+class InvalidVideoRecordingRateError(VideoRecordingError):
+    """
+    Raised when a :class:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder`
+    is configured with a non-positive rate.
+    """
+
+    field_name: str
+    """
+    The name of the misconfigured field.
+    """
+
+    value: int
+    """
+    The non-positive value that was given.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.field_name} must be positive, got {self.value}."
+
+    def suggest_correction(self) -> str:
+        return "use a positive integer."
