@@ -46,6 +46,7 @@ from semantic_digital_twin.robots.icub3 import ICub3
 from semantic_digital_twin.robots.justin import Justin
 from semantic_digital_twin.robots.mmp_dresden import MMPDresden
 from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
+from semantic_digital_twin.robots.xarm5 import XArm5
 
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
@@ -474,6 +475,20 @@ def tracy_world():
     world_with_tracy = tracy_parser.parse()
     Tracy.from_world(world_with_tracy)
     return world_with_tracy
+
+
+@pytest.fixture(scope="session")
+def xarm5_world():
+    try:
+        xarm5_parser = URDFParser.from_file(
+            file_path=XArm5.get_ros_file_path(),
+            mappings=XArm5.get_xacro_mappings(),
+        )
+    except ParsingError as error:
+        pytest.skip(f"xarm_description not available: {error}")
+    world_with_xarm5 = xarm5_parser.parse()
+    XArm5.from_world(world_with_xarm5)
+    return world_with_xarm5
 
 
 @pytest.fixture(scope="session")

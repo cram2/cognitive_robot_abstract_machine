@@ -135,9 +135,10 @@ class URDFParser:
         file_path: str,
         prefix: Optional[str] = None,
         path_resolver: Optional[PathResolver] = None,
+        mappings: Optional[Dict[str, str]] = None,
     ) -> URDFParser:
         if file_path.endswith(".xacro"):
-            return cls.from_xacro(file_path, prefix)
+            return cls.from_xacro(file_path, prefix, mappings=mappings)
 
         path_resolver = path_resolver or CompositePathResolver()
 

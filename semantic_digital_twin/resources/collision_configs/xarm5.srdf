@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SRDF for the bare 5-DoF UFACTORY xArm 5 (no gripper).
+
+  Derived from xarm_ros2/xarm_moveit_config/srdf/_xarm5_macro.srdf.xacro with
+  add_gripper=false and prefix="" (i.e. the base-arm case). The <disable_collisions>
+  matrix is the part CRAM's SelfCollisionMatrixRule.from_collision_srdf consumes;
+  the <group>/<group_state> entries make this a valid, MoveIt-usable SRDF as well.
+-->
+<robot name="UF_ROBOT">
+  <!-- The planning group: the 5 revolute joints of the arm. -->
+  <group name="xarm5">
+    <joint name="world_joint" />
+    <joint name="joint1" />
+    <joint name="joint2" />
+    <joint name="joint3" />
+    <joint name="joint4" />
+    <joint name="joint5" />
+    <joint name="joint_eef" />
+  </group>
+
+  <!-- Named configurations. -->
+  <group_state name="home" group="xarm5">
+    <joint name="joint1" value="0" />
+    <joint name="joint2" value="0" />
+    <joint name="joint3" value="0" />
+    <joint name="joint4" value="0" />
+    <joint name="joint5" value="0" />
+  </group_state>
+  <group_state name="hold-up" group="xarm5">
+    <joint name="joint1" value="0" />
+    <joint name="joint2" value="0" />
+    <joint name="joint3" value="0" />
+    <joint name="joint4" value="-1.5708" />
+    <joint name="joint5" value="0" />
+  </group_state>
+
+  <!-- Self-collision matrix: link pairs that never need to be checked. -->
+  <disable_collisions link1="link1" link2="link2" reason="Adjacent" />
+  <disable_collisions link1="link1" link2="link_base" reason="Adjacent" />
+  <disable_collisions link1="link2" link2="link3" reason="Adjacent" />
+  <disable_collisions link1="link2" link2="link4" reason="Never" />
+  <disable_collisions link1="link2" link2="link5" reason="Never" />
+  <disable_collisions link1="link2" link2="link_base" reason="Never" />
+  <disable_collisions link1="link3" link2="link4" reason="Adjacent" />
+  <disable_collisions link1="link3" link2="link5" reason="Never" />
+  <disable_collisions link1="link4" link2="link5" reason="Adjacent" />
+  <disable_collisions link1="link5" link2="link_eef" reason="Adjacent" />
+</robot>

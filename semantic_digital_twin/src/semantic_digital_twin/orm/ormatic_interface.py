@@ -92,6 +92,7 @@ import semantic_digital_twin.robots.stretch
 import semantic_digital_twin.robots.tiago
 import semantic_digital_twin.robots.tracy
 import semantic_digital_twin.robots.unitree_g1
+import semantic_digital_twin.robots.xarm5
 import semantic_digital_twin.semantic_annotations.mixins
 import semantic_digital_twin.semantic_annotations.natural_language
 import semantic_digital_twin.semantic_annotations.position_descriptions
@@ -1683,6 +1684,36 @@ class TracyDAO_sensors_association(Base, AssociationDataAccessObject):
 
     target: Mapped[TracyCameraDAO] = relationship(
         "TracyCameraDAO", foreign_keys=[target_tracycameradao_id], lazy="selectin"
+    )
+
+
+class XArm5DAO_sensors_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_85067370209940660411182389199206306087831808655047148260854531"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_xarm5dao_id: Mapped[int] = mapped_column(ForeignKey("XArm5DAO.database_id"))
+    target_xarm5cameradao_id: Mapped[int] = mapped_column(
+        ForeignKey("XArm5CameraDAO.database_id")
+    )
+
+    target: Mapped[XArm5CameraDAO] = relationship(
+        "XArm5CameraDAO", foreign_keys=[target_xarm5cameradao_id], lazy="selectin"
+    )
+
+
+class XArm5DAO_arms_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_29399804252294771538799467549456730126105674674402142264957568"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_xarm5dao_id: Mapped[int] = mapped_column(ForeignKey("XArm5DAO.database_id"))
+    target_xarm5armdao_id: Mapped[int] = mapped_column(
+        ForeignKey("XArm5ArmDAO.database_id")
+    )
+
+    target: Mapped[XArm5ArmDAO] = relationship(
+        "XArm5ArmDAO", foreign_keys=[target_xarm5armdao_id], lazy="selectin"
     )
 
 
@@ -17702,6 +17733,69 @@ class UnitreeG1TorsoDAO(
     }
 
 
+class XArm5ArmDAO(
+    ArmDAO, DataAccessObject[semantic_digital_twin.robots.xarm5.XArm5Arm]
+):
+    __tablename__ = "XArm5ArmDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ArmDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    end_effector_id: Mapped[int] = mapped_column(
+        ForeignKey("XArm5GripperDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    end_effector: Mapped[XArm5GripperDAO] = relationship(
+        "XArm5GripperDAO",
+        uselist=False,
+        foreign_keys=[end_effector_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "XArm5ArmDAO",
+        "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class XArm5CameraDAO(
+    CameraDAO, DataAccessObject[semantic_digital_twin.robots.xarm5.XArm5Camera]
+):
+    __tablename__ = "XArm5CameraDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(CameraDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "XArm5CameraDAO",
+        "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class XArm5GripperDAO(
+    EndEffectorDAO, DataAccessObject[semantic_digital_twin.robots.xarm5.XArm5Gripper]
+):
+    __tablename__ = "XArm5GripperDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(EndEffectorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "XArm5GripperDAO",
+        "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class HasRootRegionDAO(
     HasRootKinematicStructureEntityDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasRootRegion],
@@ -18524,6 +18618,39 @@ class UnitreeG1DAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1DAO",
+        "inherit_condition": database_id == AbstractRobotDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class XArm5DAO(
+    AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.xarm5.XArm5]
+):
+    __tablename__ = "XArm5DAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(AbstractRobotDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    sensors: Mapped[builtins.list[XArm5DAO_sensors_association]] = relationship(
+        "XArm5DAO_sensors_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[XArm5DAO_sensors_association.source_xarm5dao_id]",
+        lazy="selectin",
+    )
+    arms: Mapped[builtins.list[XArm5DAO_arms_association]] = relationship(
+        "XArm5DAO_arms_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[XArm5DAO_arms_association.source_xarm5dao_id]",
+        lazy="selectin",
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "XArm5DAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
         "polymorphic_load": "selectin",
     }
