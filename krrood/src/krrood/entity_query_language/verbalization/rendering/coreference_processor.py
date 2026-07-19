@@ -518,9 +518,6 @@ class CoreferenceProcessor(RealizationPass):
 
         :return: The resolved referring noun phrase (first / repeat), or the non-referring noun
             phrase rebuilt around its recursed children.
-
-        Disambiguation is :meth:`_distinguished`'s own doctest to demonstrate — see there for a
-        worked example.
         """
         if noun_phrase.referent_id is None:
             return self._rebuilt(noun_phrase)
