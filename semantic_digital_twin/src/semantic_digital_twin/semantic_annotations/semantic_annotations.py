@@ -4,7 +4,7 @@ from abc import ABC
 from dataclasses import dataclass, field
 from typing import Iterable, Optional, Self, Tuple, TYPE_CHECKING
 
-from typing_extensions import List, Type
+from typing_extensions import List, Type, Dict
 
 from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math import symbolic_math
@@ -38,6 +38,7 @@ from semantic_digital_twin.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
     Vector3,
+    RotationMatrix,
 )
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -432,6 +433,90 @@ class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMechanicalJoint):
     @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.Z()
+
+
+@dataclass
+class Elevator(HasRootBody):
+    """
+    An elevator in the world, consists of three walls a floor, double doors for entering and a prismatic drive that moves
+    the elevator to other floors.
+    """
+
+    doors: DoubleDoor = field(kw_only=True, default=None)
+    """
+    Double doors through which one can access the elevator
+    """
+
+    drive: Slider = field(kw_only=True, default=None)
+    """
+    Prismatic drive that moves the elevator to other floors.
+    """
+
+    walls: List[Wall] = field(kw_only=True, default=None)
+    """
+    Other 3 walls of the elevator cabin, besides the double doors. 
+    """
+
+    floor: Floor = field(kw_only=True, default=None)
+    """
+    Floor of the elevator cabin
+    """
+
+    anker_point: Body = field(kw_only=True, default=None)
+    """
+    root point below the elevtaor from which the elevator is driving up
+    """
+
+    floor_positions: Dict[str, float] = field(kw_only=True, default=None, init=False)
+    """
+    Positions of the drive which corresponds to the floor the elevator can reach. 
+    """
+
+    @classmethod
+    def create_with_new_bodies_in_world(
+        cls, name: PrefixedName, world: World, scale: Scale
+    ):
+        door1 = Door.create_with_new_body_in_world(
+            name=PrefixedName("Door1"), world=world
+        )
+        door2 = Door.create_with_new_body_in_world(
+            name=PrefixedName("Door2"), world=world
+        )
+
+        double_door = DoubleDoor(door_0=door1, door_1=door2)
+
+        floor = Floor.create_with_new_body_in_world(
+            name=PrefixedName("Floor"), world=world, scale=scale.xy
+        )
+
+        anker = Body(name=PrefixedName("Anker"))
+
+        drive = PrismaticConnection.create_with_dofs(
+            world=world, parent=anker, child=floor.root
+        )
+
+        slider = Slider.create_with_new_body_in_world(
+            name=PrefixedName("drive"), world=world, active_axis=Vector3(0, 0, 1)
+        )
+
+        walls = []
+        rotation = RotationMatrix()
+        for i in range(3):
+            rotation * RotationMatrix.from_rpy(0, 0, i * 90)
+            transform = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                Point3(0, 0, 0), rotation, reference_frame=floor.root
+            )
+            walls.append(
+                Wall.create_with_new_body_in_world(
+                    name=PrefixedName(f"wall{i}"),
+                    world=world,
+                    world_root_T_self=transform,
+                )
+            )
+
+        return cls(
+            doors=double_door, drive=slider, walls=walls, floor=floor, root=anker
+        )
 
 
 ############################### subclasses to Furniture
