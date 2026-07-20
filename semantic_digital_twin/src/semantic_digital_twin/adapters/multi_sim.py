@@ -98,14 +98,7 @@ class GeomVisibilityAndCollisionType(IntEnum):
     """
     Enumeration of geometric visibility and collision attributes.
 
-    - Use VISIBLE_AND_COLLIDABLE_2 for geometries that should be both visible and collidable;
-      this is the group this project's own MuJoCo writer emits for that case, and the only one
-      its MJCF reader treats as visible-and-collidable, so it round-trips.
-    - VISIBLE_AND_COLLIDABLE_1 (group 0) is *not* treated as visible by the reader: group 0 is
-      the conventional MuJoCo/robosuite default/collision-only group (used, for example, for
-      RoboCasa's collision-decomposition proxy geoms, which carry arbitrary debug colors and
-      are not meant to be rendered). Kept in this enum only to name the group number; this
-      project's writer never emits it.
+    - Use VISIBLE_AND_COLLIDABLE_1 or VISIBLE_AND_COLLIDABLE_2 for geometries that should be both visible and collidable. These two values are equivalent and can be used for grouping.
     - Use ONLY_VISIBLE for geometries that are visible but not collidable (URDF: <visual>).
     - Use ONLY_COLLIDABLE for geometries that are collidable but not visible (URDF: <collision>).
     - UNDEFINED_1 and UNDEFINED_2 are placeholders used only when parsing from MuJoCo, and are treated as invisible by default.
@@ -116,14 +109,12 @@ class GeomVisibilityAndCollisionType(IntEnum):
 
     VISIBLE_AND_COLLIDABLE_1 = 0
     """
-    The conventional MuJoCo/robosuite default/collision-only group; not treated as visible when
-    reading MJCF (see class docstring). Named here only so the group number has a label.
+    Geometry is both visible and collidable (variant 1).
     """
 
     VISIBLE_AND_COLLIDABLE_2 = 1
     """
-    Geometry is both visible and collidable; this is the group this project's writer emits and
-    its reader recognizes for that case.
+    Geometry is both visible and collidable (variant 2).
     """
 
     ONLY_VISIBLE = 2
@@ -1116,7 +1107,7 @@ class MujocoGeomConverter(MujocoConverter, ShapeConverter, ABC):
         is_collidable = kwargs.get("collidable", True)
         if is_visible and is_collidable:
             shape_props["group"] = (
-                GeomVisibilityAndCollisionType.VISIBLE_AND_COLLIDABLE_2
+                GeomVisibilityAndCollisionType.VISIBLE_AND_COLLIDABLE_1
             )
         elif is_visible and not is_collidable:
             shape_props["contype"] = 0
@@ -2514,6 +2505,14 @@ class MujocoSynchronizer(MultiSimSynchronizer):
     entity_converter: Type[EntityConverter] = field(default=MujocoConverter)
     entity_spawner: Type[EntitySpawner] = field(default=MujocoEntitySpawner)
 
+    UNTHROTTLED_SYNC_RATE_HZ: ClassVar[float] = float("inf")
+    """
+    Assign this to :attr:`sync_rate_hz` to sync on every single call, i.e. to not throttle the
+    *sim → world* direction at all: since ``1 / sync_rate_hz`` is then exactly ``0.0``, the
+    "less than 1 / sync_rate_hz seconds elapsed" skip condition in :meth:`_sim_to_world` can
+    never trigger. Distinct from ``sync_rate_hz <= 0``, which disables that direction entirely.
+    """
+
     sync_rate_hz: float = 30
     """
     Throttle (in wall-clock Hz) for the *sim → world* direction: how often
@@ -2527,7 +2526,8 @@ class MujocoSynchronizer(MultiSimSynchronizer):
     produced by the simulator (gravity, contacts, actuator dynamics, etc.).
     The opposite *world → sim* direction (driven by ``_on_state_change``) is
     independent of this setting and continues to push ``world.state`` changes
-    into MuJoCo regardless.
+    into MuJoCo regardless. Set to :attr:`UNTHROTTLED_SYNC_RATE_HZ` for the
+    opposite extreme: sync on every call, with no throttling at all.
     """
 
     _last_sync_time: float = field(init=False, default=0.0, repr=False)

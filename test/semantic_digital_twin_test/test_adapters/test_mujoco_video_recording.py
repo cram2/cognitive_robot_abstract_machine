@@ -20,11 +20,13 @@ from semantic_digital_twin.adapters.mujoco_video_recording import (
 )
 from semantic_digital_twin.exceptions import (
     EmptyVideoRecordingError,
+    EmptyWorldVideoRecordingError,
     InvalidVideoRecordingRateError,
     VideoRecordingAlreadyStartedError,
     VideoRecordingNotStartedError,
 )
 from semantic_digital_twin.testing import ray_test_world
+from semantic_digital_twin.world import World
 
 only_run_test_in_CI = os.environ.get("CI", "false").lower() == "false"
 requires_mujoco_ci = pytest.mark.skipif(
@@ -113,6 +115,24 @@ def test_stop_without_start_raises(ray_test_world):
 
     with pytest.raises(VideoRecordingNotStartedError):
         recorder.stop()
+
+
+def test_default_camera_is_resolved_at_construction_not_at_start(ray_test_world):
+    """
+    The default overview camera is attached as soon as the recorder is constructed, not
+    lazily on start(): a caller that never starts the recorder still gets a fully resolved
+    camera, and a world without any geometry to frame fails fast at construction instead of
+    only once start() is later called.
+    """
+    world, *_ = ray_test_world
+    recorder = MujocoVideoRecorder(world=world)
+
+    assert recorder.camera is not None
+
+
+def test_constructing_a_recorder_for_an_empty_world_raises():
+    with pytest.raises(EmptyWorldVideoRecordingError):
+        MujocoVideoRecorder(world=World())
 
 
 def test_non_positive_frames_per_second_raises(ray_test_world):

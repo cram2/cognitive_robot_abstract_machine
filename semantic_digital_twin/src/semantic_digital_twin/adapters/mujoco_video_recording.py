@@ -9,7 +9,11 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 from typing_extensions import List, Optional, Tuple
 
-from semantic_digital_twin.adapters.multi_sim import MujocoCamera, MujocoSim
+from semantic_digital_twin.adapters.multi_sim import (
+    MujocoCamera,
+    MujocoSim,
+    MujocoSynchronizer,
+)
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.exceptions import (
     EmptyVideoRecordingError,
@@ -178,8 +182,8 @@ class MujocoVideoRecorder:
     camera: Optional[MujocoCamera] = None
     """
     An existing camera, already attached to :attr:`world`, to record from. If ``None``, a
-    fixed overview camera framing the world's bounding box is attached automatically when
-    recording starts.
+    fixed overview camera framing the world's bounding box is attached automatically on
+    construction, and this field is replaced with it.
     """
 
     _multi_sim: Optional[MujocoSim] = field(init=False, default=None, repr=False)
@@ -200,8 +204,8 @@ class MujocoVideoRecorder:
         init=False, default=None, repr=False
     )
     """
-    The overview camera :meth:`start` attached to :attr:`world`, if :attr:`camera` was
-    ``None``; removed again by :meth:`stop` so repeated recordings of the same world don't
+    The overview camera construction attached to :attr:`world`, if :attr:`camera` was not
+    given; removed again by :meth:`stop` so repeated recordings of the same world don't
     accumulate same-named cameras.
     """
 
@@ -215,11 +219,14 @@ class MujocoVideoRecorder:
                 field_name="capture_every_n_state_changes",
                 value=self.capture_every_n_state_changes,
             )
+        if self.camera is None:
+            self._auto_attached_camera = self._attach_overview_camera()
+            self.camera = self._auto_attached_camera
 
     def start(self) -> None:
         """
-        Attaches a default camera if none was given, builds a headless MuJoCo mirror of
-        :attr:`world`, and starts capturing a frame on every subsequent state change.
+        Builds a headless MuJoCo mirror of :attr:`world` and starts capturing a frame on
+        every subsequent state change.
 
         The mirror's own physics stepping is not run in a background thread: for a world
         driven by a plan, MuJoCo only needs to mirror the poses Giskard already computed
@@ -230,15 +237,13 @@ class MujocoVideoRecorder:
         if self._multi_sim is not None:
             raise VideoRecordingAlreadyStartedError(world=self.world)
 
-        if self.camera is None:
-            self._auto_attached_camera = self._attach_overview_camera()
-            self.camera = self._auto_attached_camera
-
         self._multi_sim = MujocoSim(world=self.world, headless=True)
         # The synchronizer throttles its own sim -> world sync (and thus notify_state_change)
         # to a wall-clock rate; advance_simulation() steps in a tight loop with no wall-clock
-        # pacing of its own, so that throttle must be disabled or most steps would go unseen.
-        self._multi_sim.synchronizer.sync_rate_hz = float("inf")
+        # pacing of its own, so it must be unthrottled or most steps would go unseen.
+        self._multi_sim.synchronizer.sync_rate_hz = (
+            MujocoSynchronizer.UNTHROTTLED_SYNC_RATE_HZ
+        )
         self._multi_sim.simulator.start(
             simulate_in_thread=False, render_in_thread=False
         )

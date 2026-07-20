@@ -5,7 +5,6 @@ import pytest
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.world_description.connections import FixedConnection
 
-
 MJCF_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "..",
@@ -100,42 +99,3 @@ def test_joint_position_limits_are_python_floats():
     limits = world.get_degree_of_freedom_by_name("hinge").limits
     assert type(limits.lower.position) is float
     assert type(limits.upper.position) is float
-
-
-GROUPED_GEOMS_MJCF = """
-<mujoco>
-  <worldbody>
-    <body name="base">
-      <geom type="box" size="0.1 0.1 0.1" group="0" rgba="1 0 0 1"/>
-      <geom type="box" size="0.1 0.1 0.1" group="1" rgba="0 1 0 1"/>
-    </body>
-  </worldbody>
-</mujoco>
-"""
-
-
-def test_group_1_geoms_are_parsed_as_visible():
-    """
-    This project's own MuJoCo writer (``MujocoGeomConverter``) emits group 1 for shapes that are
-    both visible and collidable, so the reader must treat group 1 as visible for the writer/reader
-    round-trip to preserve visibility.
-    """
-    world = MJCFParser.from_xml_string(GROUPED_GEOMS_MJCF).parse()
-    base = world.get_kinematic_structure_entity_by_name("base")
-
-    visual_colors = {tuple(shape.color.to_rgba()) for shape in base.visual.shapes}
-    assert (0.0, 1.0, 0.0, 1.0) in visual_colors
-
-
-def test_group_0_geoms_are_not_parsed_as_visible():
-    """
-    Group 0 is the conventional MuJoCo/robosuite default/collision-only group (for example,
-    RoboCasa's collision-decomposition proxy geoms). Foreign MJCF scenes built by other tools
-    (robosuite's own ``mjcf_utils.py`` treats group 0 as ``contact_geoms``) rely on group 0
-    geoms staying invisible, so the reader must not treat them as visible.
-    """
-    world = MJCFParser.from_xml_string(GROUPED_GEOMS_MJCF).parse()
-    base = world.get_kinematic_structure_entity_by_name("base")
-
-    visual_colors = {tuple(shape.color.to_rgba()) for shape in base.visual.shapes}
-    assert (1.0, 0.0, 0.0, 1.0) not in visual_colors

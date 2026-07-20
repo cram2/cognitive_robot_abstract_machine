@@ -145,6 +145,7 @@ class MJCFParser:
             if mujoco_geom.contype != 0 or mujoco_geom.conaffinity != 0:
                 collisions.append(shape)
             if mujoco_geom.group in [
+                GeomVisibilityAndCollisionType.VISIBLE_AND_COLLIDABLE_1,
                 GeomVisibilityAndCollisionType.VISIBLE_AND_COLLIDABLE_2,
                 GeomVisibilityAndCollisionType.ONLY_VISIBLE,
             ]:
