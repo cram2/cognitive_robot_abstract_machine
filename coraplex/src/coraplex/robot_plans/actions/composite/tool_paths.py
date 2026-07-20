@@ -672,6 +672,8 @@ def build_surface_path(
             )
         ]
     )
+
+
 @dataclass
 class SliceAnchorPlacement:
     """

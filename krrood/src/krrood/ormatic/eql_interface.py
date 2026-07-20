@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing_extensions import Callable, List, Any, Optional
+from typing_extensions import Callable, List, Any, Optional, Type
 import operator
 
 import sqlalchemy.inspection
@@ -24,7 +24,7 @@ from krrood.entity_query_language.query.query import (
     SetOf,
     UnificationDict,
 )
-from krrood.entity_query_language.query.operations import Where, OrderedBy
+from krrood.entity_query_language.query.operations import Where
 from krrood.entity_query_language.query.quantifiers import ResultQuantifier, An, The
 from krrood.entity_query_language.operators.core_logical_operators import AND, OR, Not
 from krrood.entity_query_language.operators.logical_quantifiers import (
@@ -107,11 +107,13 @@ class UnsupportedQuantifierError(EQLTranslationError, TypeError):
     Raised when an EQL result quantifier cannot be evaluated.
     """
 
-    quantifier: ResultQuantifier
-    """The quantifier expression that has no evaluation strategy."""
+    quantifier_type: Type[ResultQuantifier]
+    """
+    The result-quantifier kind that has no evaluation strategy.
+    """
 
     def error_message(self) -> str:
-        return f"Unsupported quantifier: {type(self.quantifier)}"
+        return f"Unsupported quantifier: {self.quantifier_type}"
 
     def suggest_correction(self) -> str:
         return "Wrap the query in a supported quantifier: an() or the()."
@@ -579,11 +581,11 @@ class EQLTranslator:
     join_manager: JoinManager = field(default_factory=JoinManager)
 
     @property
-    def quantifier(self) -> ResultQuantifier:
+    def quantifier_type(self) -> Type[ResultQuantifier]:
         """
-        Get the quantifier from the query.
+        :return: The result-quantifier kind (``An`` / ``The``) requested by the query.
         """
-        return self.eql_query._quantifier_expression_
+        return self.eql_query._quantifier_builder_.type
 
     @property
     def select_like(self) -> Query:
@@ -810,9 +812,8 @@ class EQLTranslator:
                 col = col.desc()
             self.sql_query = self.sql_query.order_by(col)
 
-        quantifier = self.eql_query._quantifier_expression_
-        if quantifier is not None and quantifier._limit_ is not None:
-            self.sql_query = self.sql_query.limit(quantifier._limit_)
+        if self.eql_query._limit_ is not None:
+            self.sql_query = self.sql_query.limit(self.eql_query._limit_)
 
         if self.eql_query._distinct_on:
             self.sql_query = self.sql_query.distinct()
@@ -832,13 +833,13 @@ class EQLTranslator:
 
         bound_query = self.session.scalars(self.sql_query)
 
-        if isinstance(self.quantifier, The):
+        if issubclass(self.quantifier_type, The):
             return bound_query.one()
 
-        elif isinstance(self.quantifier, An):
+        elif issubclass(self.quantifier_type, An):
             return bound_query.all()
 
-        raise UnsupportedQuantifierError(self.quantifier)
+        raise UnsupportedQuantifierError(self.quantifier_type)
 
     def _evaluate_set_of(self) -> List[Any]:
         """
@@ -902,8 +903,6 @@ class EQLTranslator:
                 return self.translate_query(query.condition)
             case CaseWhen():
                 return self.translate_case_when(query)
-            case ResultQuantifier():
-                return None
             case Variable():
                 return None
             case _:

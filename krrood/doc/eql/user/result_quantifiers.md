@@ -13,8 +13,8 @@ kernelspec:
 
 # Result Quantifiers
 
-Result quantifiers are used to specify the expected number of results for a query. They wrap a query and enforce
-constraints on its cardinality during execution.
+Result quantifiers are used to specify the expected number of results for a query. The cardinality
+constraint is enforced as a stage of the query's result pipeline during execution.
 
 ```{note}
 `an()` and `the()` dispatch on their argument. Given a **symbolic expression** (an `entity(...)`,

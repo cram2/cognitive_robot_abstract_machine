@@ -180,15 +180,27 @@ class Count(Aggregator[T]):
 class CountAll(Count[T]):
     """
     Count all results per group.
+
+    Unlike :class:`Count`, this aggregator has no child expression. The per-group row count is
+    computed and injected by the enclosing
+    :class:`~krrood.entity_query_language.query.operations.GroupedBy` under this aggregator's
+    identifier, and this node merely surfaces that already-bound value. Because building a query
+    never has to wire a child onto it, a shared ``count_all`` can be embedded in several queries
+    without one corrupting another.
     """
 
     _child_: Optional[GroupedBy] = field(init=False, default=None)
     """
-    The child expression to be counted which is the GroupedBy Operation, this
-    will count of all results per group.
-
-    It is set later during the query build process.
+    Always ``None``; the count of all rows per group is supplied by the grouping rather than by
+    aggregating a child expression.
     """
+
+    def _evaluate__(self, sources: OperationResult) -> Iterator[OperationResult]:
+        """
+        Surface the per-group row count that the grouping already bound to this aggregator's
+        identifier.
+        """
+        yield OperationResult(sources.bindings, False, self)
 
 
 @dataclass(eq=False, repr=False)

@@ -329,7 +329,11 @@ class MoveTCPWaypointsAlignedMotion(BaseMotion):
         )
         if isinstance(self.robot, Justin):
             tasks.append(self._upright_torso_task(tip_link, root_link))
-        motion_statechart_nodes = self._only_allow_gripper_collision_rules(self.arm)
+        motion_statechart_nodes = (
+            self._only_allow_gripper_collision_rules(self.arm)
+            if self.allow_gripper_collision
+            else []
+        )
         motion_statechart_nodes.append(Parallel(tasks))
         return Parallel(motion_statechart_nodes)
 

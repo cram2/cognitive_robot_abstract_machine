@@ -22,8 +22,8 @@ keywords=["robotics", "perception"]
 dynamic = ["version", "dependencies"]
 
 [project.urls]
-"Source" = 'https://gitlab.informatik.uni-bremen.de/robokudo/'
-"Bug Tracker" = 'https://gitlab.informatik.uni-bremen.de/robokudo/robokudo/-/issues'
+"Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
+"Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]  # list of folders that contain the packages (["."] by default)

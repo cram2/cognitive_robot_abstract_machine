@@ -13,7 +13,10 @@ from experiments.tool_based_actions.simple_demo.demo_world import (
 )
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl, Cup
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Bowl,
+    PouringCup,
+)
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
@@ -58,7 +61,7 @@ def main() -> None:
     )
     bowl_body = world.get_body_by_name("bowl.stl")
 
-    cup = Cup(root=cup_body)
+    cup = PouringCup(root=cup_body)
     with world.modify_world():
         world.add_semantic_annotations([Bowl(root=bowl_body), cup])
 

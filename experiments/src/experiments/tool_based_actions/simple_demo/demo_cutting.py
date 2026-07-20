@@ -16,7 +16,7 @@ from semantic_digital_twin.datastructures.definitions import GripperState, Torso
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Bread,
-    Knife,
+    CuttingKnife,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -61,7 +61,7 @@ def main() -> None:
     )
     bread_body = world.get_body_by_name("bread.stl")
 
-    knife = Knife(root=knife_body)
+    knife = CuttingKnife(root=knife_body)
     with world.modify_world():
         world.add_semantic_annotations([Bread(root=bread_body), knife])
 

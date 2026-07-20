@@ -431,7 +431,6 @@ class DoubleDoor(SemanticAnnotation):
 
 @dataclass(eq=False)
 class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMechanicalJoint):
-
     @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.Z()
@@ -462,7 +461,7 @@ class CounterTop(Furniture, HasSupportingSurface, HasSink):
 
 
 @dataclass(eq=False)
-class Cabinet(Furniture, HasCaseAsRootBody, HasHandle, HasDoors, HasDrawers):
+class Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers):
     @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.NEGATIVE_X()
@@ -490,7 +489,6 @@ class Wardrobe(Cabinet): ...
 
 @dataclass(eq=False)
 class Floor(HasSupportingSurface):
-
     @classmethod
     def create_with_new_body_in_world(
         cls,
@@ -1019,7 +1017,7 @@ class WallPanel(HasRootBody):
 
 
 @dataclass(eq=False)
-class Potato(Produce): ...
+class Potato(Vegetable): ...
 
 
 @dataclass(eq=False)
@@ -1303,7 +1301,7 @@ class Whisk(ToolWithHandle):
 
 
 @dataclass(eq=False)
-class Knife(ToolWithHandle):
+class CuttingKnife(ToolWithHandle):
     """
     A knife for cutting food objects.
     """
@@ -1322,7 +1320,7 @@ class Knife(ToolWithHandle):
 
 
 @dataclass(eq=False)
-class Cup(Tool):
+class PouringCup(Tool):
     """
     A cup for pouring liquids into containers.
     """
@@ -1340,6 +1338,9 @@ class Cup(Tool):
 class Sponge(Tool):
     """
     A sponge for wiping surfaces.
+
+    .. note:: The sponge is grasped so its local Z axis points away from the gripper,
+        which is why its alignments use negative Z normals unlike the other tools.
     """
 
     def tool_alignment(self, target: Union[Body, Pose]) -> List[AlignmentPair]:

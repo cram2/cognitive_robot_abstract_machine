@@ -29495,6 +29495,31 @@ class DrinkingContainerDAO(
     }
 
 
+class CupDAO(
+    DrinkingContainerDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Cup
+    ],
+):
+    __tablename__ = "CupDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(DrinkingContainerDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CupDAO",
+        "inherit_condition": database_id == DrinkingContainerDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class DroneDAO(
     HasRootBodyDAO,
     DataAccessObject[
@@ -30153,6 +30178,25 @@ class KettleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KettleDAO",
         "inherit_condition": database_id == CookingContainerDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class KnifeDAO(
+    CuttleryDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Knife
+    ],
+):
+    __tablename__ = "KnifeDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(CuttleryDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "KnifeDAO",
+        "inherit_condition": database_id == CuttleryDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -31395,20 +31439,20 @@ class ToolDAO(
     }
 
 
-class CupDAO(
+class PouringCupDAO(
     ToolDAO,
     DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Cup
+        semantic_digital_twin.semantic_annotations.semantic_annotations.PouringCup
     ],
 ):
-    __tablename__ = "CupDAO"
+    __tablename__ = "PouringCupDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(ToolDAO.database_id), primary_key=True, use_existing_column=True
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "CupDAO",
+        "polymorphic_identity": "PouringCupDAO",
         "inherit_condition": database_id == ToolDAO.database_id,
         "polymorphic_load": "selectin",
     }
@@ -31462,13 +31506,13 @@ class ToolWithHandleDAO(
     }
 
 
-class KnifeDAO(
+class CuttingKnifeDAO(
     ToolWithHandleDAO,
     DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Knife
+        semantic_digital_twin.semantic_annotations.semantic_annotations.CuttingKnife
     ],
 ):
-    __tablename__ = "KnifeDAO"
+    __tablename__ = "CuttingKnifeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(ToolWithHandleDAO.database_id),
@@ -31477,7 +31521,7 @@ class KnifeDAO(
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "KnifeDAO",
+        "polymorphic_identity": "CuttingKnifeDAO",
         "inherit_condition": database_id == ToolWithHandleDAO.database_id,
         "polymorphic_load": "selectin",
     }

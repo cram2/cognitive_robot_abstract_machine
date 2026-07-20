@@ -13,7 +13,7 @@ from functools import wraps
 
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
-from typing_extensions import Callable, Union, Any, Optional
+from typing_extensions import Any, Callable, Optional
 
 from robokudo.identifier import BBIdentifier
 
@@ -93,7 +93,7 @@ def clear_blackboard_exception() -> None:
 
 def catch_and_raise_to_blackboard(
     function: Callable[[...], Any],
-) -> Union[Status, Callable]:
+) -> Callable[None, Status]:
     """
     Catch and store exceptions in blackboard.
 

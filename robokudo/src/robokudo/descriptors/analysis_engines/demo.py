@@ -25,7 +25,9 @@ from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -80,7 +82,9 @@ class AnalysisEngine(AnalysisEngineInterface):
             The pipeline includes commented-out options for adding triggers
             and slow processing simulation, which can be useful for debugging.
         """
-        kinect_config = CrDescriptorFactory.create_descriptor("kinect_wo_tf")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            "kinect_wo_tf"
+        )
 
         seq = Pipeline("RWPipeline")
         seq.add_children(

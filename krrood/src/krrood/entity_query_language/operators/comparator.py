@@ -19,7 +19,6 @@ from typing_extensions import (
     Optional,
     Tuple,
     Iterable,
-    TYPE_CHECKING,
 )
 
 from krrood.entity_query_language.core.base_expressions import (
@@ -103,13 +102,11 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
     def _optimize_operands_order_(
         self, sources: Optional[OperationResult]
     ) -> Tuple[SymbolicExpression, SymbolicExpression]:
-        from krrood.entity_query_language.query.quantifiers import The
-
-        left_has_the = any(isinstance(desc, The) for desc in self.left._descendants_)
-        right_has_the = any(isinstance(desc, The) for desc in self.right._descendants_)
-        if left_has_the and not right_has_the:
+        left_is_definite = self._operand_contains_definite_query_(self.left)
+        right_is_definite = self._operand_contains_definite_query_(self.right)
+        if left_is_definite and not right_is_definite:
             return self.left, self.right
-        elif not left_has_the and right_has_the:
+        if right_is_definite and not left_is_definite:
             return self.right, self.left
         if sources is not None and any(
             v._id_ in sources.bindings for v in self.right._unique_variables_
@@ -117,6 +114,22 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
             return self.right, self.left
         else:
             return self.left, self.right
+
+    @staticmethod
+    def _operand_contains_definite_query_(operand: SymbolicExpression) -> bool:
+        """
+        :param operand: A comparator operand.
+        :return: Whether the operand is, or contains, a definite (``the``) query, which yields a
+            single result and is worth evaluating first.
+        """
+        from krrood.entity_query_language.query.query import Query
+        from krrood.entity_query_language.query.quantifiers import The
+
+        return any(
+            isinstance(expression, Query)
+            and issubclass(expression._quantifier_builder_.type, The)
+            for expression in (operand, *operand._descendants_)
+        )
 
 
 def not_contains(container, item) -> bool:

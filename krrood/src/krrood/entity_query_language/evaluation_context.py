@@ -14,7 +14,16 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 
 from ordered_set import OrderedSet
-from typing_extensions import Iterator, List, Optional, Tuple, TYPE_CHECKING
+from typing_extensions import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    TYPE_CHECKING,
+)
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import (
@@ -160,6 +169,68 @@ class EvaluatedExpressionIds:
 
 
 @dataclass
+class OutermostQueryClaim:
+    """
+    Tracks which compiled query node is the outermost query for the current evaluation
+    pass.
+
+    A query node is the scope that isolates a nested subquery from its surrounding
+    bindings. The first compiled query node to evaluate during a pass is the outermost
+    one; any other compiled query node that evaluates during the same pass is nested
+    inside it.
+    """
+
+    _query_id: Optional[uuid.UUID] = field(default=None, init=False)
+    """
+    Identifier of the query node that claimed the outermost role, or ``None`` before any
+    node has.
+    """
+
+    def is_nested(self, query_id: uuid.UUID) -> bool:
+        """
+        Claim *query_id* as the outermost query if none is claimed yet, then report
+        whether *query_id* is nested inside some other, already-claimed outermost query.
+
+        :param query_id: The compiled query node's identifier.
+        :return: Whether *query_id* is a nested subquery (``True``) or the outermost
+            query (``False``).
+        """
+        if self._query_id is None:
+            self._query_id = query_id
+        return self._query_id != query_id
+
+
+@dataclass
+class SubqueryResultCache:
+    """
+    Caches an uncorrelated subquery's result stream per query node for one evaluation
+    pass.
+
+    So a subquery reached from many outer rows is computed once and its cached stream is
+    replayed to each of them, instead of recomputing it on every outer row.
+    """
+
+    _streams: Dict[uuid.UUID, Any] = field(default_factory=dict, init=False)
+    """
+    Cached result stream keyed by the compiled query node's identifier.
+    """
+
+    def get_or_create(self, query_id: uuid.UUID, factory: Callable[[], Any]) -> Any:
+        """
+        Return the cached stream for *query_id*, creating it via *factory* if not
+        already cached.
+
+        :param query_id: The compiled query node's identifier.
+        :param factory: Called at most once to build the stream if it isn't already
+            cached.
+        :return: The cached stream for *query_id*.
+        """
+        if query_id not in self._streams:
+            self._streams[query_id] = factory()
+        return self._streams[query_id]
+
+
+@dataclass
 class EvaluationContext:
     """
     Carries observer state through the evaluation pipeline.
@@ -188,6 +259,21 @@ class EvaluationContext:
     """
     The satisfied condition-expression ids for the current evaluation iteration, or
     ``None`` if unset.
+    """
+
+    outermost_query_claim: OutermostQueryClaim = field(
+        default_factory=OutermostQueryClaim
+    )
+    """
+    Tracks which compiled query node is the outermost query for the current evaluation
+    pass.
+    """
+
+    subquery_result_cache: SubqueryResultCache = field(
+        default_factory=SubqueryResultCache
+    )
+    """
+    Caches each nested subquery's result stream for the current evaluation pass.
     """
 
     def on_evaluate_enter(

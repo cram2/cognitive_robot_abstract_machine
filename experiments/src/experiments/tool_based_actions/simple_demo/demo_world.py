@@ -76,6 +76,7 @@ SPONGE_COLOR = Color(0.95, 0.85, 0.3)
 Yellowish color for the sponge.
 """
 
+
 def parse_object(stl_file_name: str, color: Optional[Color] = None) -> World:
     """
     :param stl_file_name: Name of the mesh file in the demo resources.

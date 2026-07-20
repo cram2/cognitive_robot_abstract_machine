@@ -18,7 +18,6 @@ if TYPE_CHECKING:
         Query,
     )
     from krrood.entity_query_language.query.operations import GroupedBy
-    from krrood.entity_query_language.query.quantifiers import ResultQuantifier
     from krrood.entity_query_language.operators.aggregators import Aggregator
     from krrood.entity_query_language.query.builders import GroupedByBuilder
     from krrood.entity_query_language.core.base_expressions import (
@@ -45,9 +44,9 @@ class QuantificationNotSatisfiedError(DataclassException, ABC):
     For further details, see :doc:`/krrood/doc/eql/result_quantifiers`.
     """
 
-    expression: ResultQuantifier
+    expression: SymbolicExpression
     """
-    The result quantifier expression where the error occurred.
+    The query expression whose result count violated the quantification constraint.
     """
     expected_number: int
     """

@@ -372,6 +372,7 @@ class WipingAction(ToolMotionAction):
         except MotionDidNotFinish:
             if not self._tool_reached_final_waypoint():
                 raise
+
     def _tool_reached_final_waypoint(self) -> bool:
         """
         :return: True if the tool's root ended up within the success tolerance of the
@@ -385,6 +386,8 @@ class WipingAction(ToolMotionAction):
         goal_xyz = np.asarray(goal_point.to_np(), dtype=float).reshape(-1)[:3]
         distance = float(np.linalg.norm(tool_xyz - goal_xyz))
         return distance <= float(self.final_waypoint_success_tolerance)
+
+
 @dataclass(kw_only=True)
 class PouringAction(FullBodyControlledAction):
     """

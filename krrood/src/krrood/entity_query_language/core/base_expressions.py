@@ -14,6 +14,7 @@ from copy import copy
 from dataclasses import dataclass, field
 from functools import cached_property
 from uuid import UUID
+from functools import cached_property, lru_cache
 
 from ordered_set import OrderedSet
 from typing_extensions import (
@@ -236,20 +237,32 @@ class SymbolicExpression(ABC):
             v if isinstance(v, SymbolicExpression) else Literal(_value_=v)
             for v in children
         ]
-        for v in children:
-            v._parent_ = self
-        return tuple(v._expression_ for v in children)
+        embedded_children = tuple(v._as_embeddable_child_(self) for v in children)
+        for child in embedded_children:
+            child._parent_ = self
+        return embedded_children
+
+    def _as_embeddable_child_(self, parent: SymbolicExpression) -> SymbolicExpression:
+        """
+        :param parent: The expression about to take this expression as a child.
+        :return: The node that should be stored as ``parent``'s child, defaulting to this
+            expression's compiled form. Subclasses whose compiled form is mutable and shared (for
+            example :class:`~krrood.entity_query_language.query.query.Query`) override this to embed
+            an immutable snapshot instead.
+        """
+        return self._expression_
 
     def _ensure_children_ids_are_cached_(self, *children: SymbolicExpression) -> None:
         """
-        Ensure that the IDs of the provided children expressions are cached within the current expression.
+        Ensure that the IDs of the provided children expressions, and all of their own descendants,
+        are cached within the current expression.
 
         :param children: The children expressions to cache IDs for.
         """
         for child in children:
             if child._id_ not in self._expression_id_cache_:
                 self._expression_id_cache_[child._id_] = child
-                child._ensure_children_ids_are_cached_(*child._children_)
+                self._ensure_children_ids_are_cached_(*child._children_)
 
     def _process_result_(self, result: OperationResult) -> Any:
         """
@@ -434,13 +447,10 @@ class SymbolicExpression(ABC):
         """
         from krrood.entity_query_language.query.query import Query
 
-        root = self._root_
-        root_query = None
-        for descendant in root._descendants_:
-            if isinstance(descendant, Query):
-                root_query = descendant
-                break
-        return root_query
+        for expression in self._all_expressions_:
+            if isinstance(expression, Query):
+                return expression
+        return None
 
     @property
     @abstractmethod
@@ -462,6 +472,9 @@ class SymbolicExpression(ABC):
     def _descendants_(self) -> Iterator[SymbolicExpression]:
         """
         :return: All descendants of this symbolic expression in children first, then depth-first by subtree order.
+
+        Does not recurse into ``ResultQuantifier`` children so that inner query
+        subtrees remain isolated from outer query traversals.
         """
         yield from self._children_
         for child in self._children_:
@@ -830,7 +843,7 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
     A variable that is used if the child class to this class want to provide a variable to be tracked other than 
     itself, this is specially useful for child classes that holds a variable instead of being a variable and want
      to delegate the variable behaviour to the variable it has instead.
-    For example, this is the case for the ResultQuantifiers & QueryDescriptors that operate on a single selected
+    For example, this is the case for queries and derived references that operate on a single selected
     variable.
     """
 
