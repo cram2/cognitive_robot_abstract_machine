@@ -7,16 +7,14 @@ RoboCasa ships kitchens as robosuite/MuJoCo assets. This demo drives the
 adapter to compose one such kitchen, parse it into CRAM's semantic world model, and
 report the bodies and semantic annotations the adapter attached (cabinets, drawers,
 handles, doors, ...). With ``--robot`` it also spawns a PR2 at a counter and has it pick
-up an apple resting on the counter surface, with ``--visualize`` it publishes the
-world as RViz markers so the kitchen can be inspected visually, and with
-``--record-video PATH`` it renders a video of the pick-up plan to PATH.
+up an apple resting on the counter surface, and with ``--visualize`` it publishes the
+world as RViz markers so the kitchen can be inspected visually.
 
 Run with (the ``experiments`` package must be importable)::
 
     python -m experiments.robocasa_kitchen_demo
     python -m experiments.robocasa_kitchen_demo --layout LAYOUT005 --style STYLE003
     python -m experiments.robocasa_kitchen_demo --robot --visualize
-    python -m experiments.robocasa_kitchen_demo --record-video /tmp/pickup.mp4
 
 .. note::
     The kitchen assets must be downloaded once via
@@ -31,7 +29,6 @@ import logging
 import math
 import threading
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Callable, List, Optional
 
 from robocasa.models.scenes.scene_registry import LayoutType, StyleType
@@ -42,8 +39,6 @@ from coraplex.datastructures.grasp import GraspDescription
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.plans.failures import PlanFailure
-from coraplex.plans.plan import Plan
-from coraplex.plans.plan_video_recorder import PlanVideoRecorder
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.robot_body import (
     MoveTorsoAction,
@@ -307,7 +302,7 @@ def _spawn_robot_and_prepare_pick_up(
     world: World,
     standoff_distance: float = 0.55,
     edge_inset: float = 0.15,
-) -> Callable[[], Optional[Plan]]:
+) -> Callable[[], None]:
     """
     Spawn a PR2 at a kitchen counter with an apple resting on the counter
     surface, and return a callable that performs the pick-up.
@@ -327,9 +322,7 @@ def _spawn_robot_and_prepare_pick_up(
     :param world: The kitchen world to spawn the robot into, modified in place.
     :param standoff_distance: How far in front of the counter edge the robot stands.
     :param edge_inset: How far in from the counter edge the apple is placed.
-    :return: A callable that performs the pick-up plan, reports the outcome, and returns
-        the performed plan (or ``None`` if it failed) so the caller can e.g. render a video
-        of it.
+    :return: A callable that performs the pick-up plan and reports the outcome.
     """
     surface = _counter_top_surface(world, _largest_counter_top(world))
 
@@ -394,7 +387,7 @@ def _spawn_robot_and_prepare_pick_up(
         context=context,
     ).plan
 
-    def perform() -> Optional[Plan]:
+    def perform() -> None:
         height_before = world.compute_forward_kinematics(world.root, apple).to_np()[
             2, 3
         ]
@@ -404,12 +397,11 @@ def _spawn_robot_and_prepare_pick_up(
                 plan.perform()
         except PlanFailure as failure:
             logger.warning("Robot could not complete the pick-up: %s", failure)
-            return None
+            return
         height_after = world.compute_forward_kinematics(world.root, apple).to_np()[2, 3]
         lift = float(height_after - height_before)
         outcome = "PICKED UP" if lift > 0.01 else "not lifted"
         logger.info("Apple lifted by %.3f m -> %s", lift, outcome)
-        return plan
 
     return perform
 
@@ -462,12 +454,6 @@ def _parse_arguments() -> argparse.Namespace:
         action="store_true",
         help="Spawn a PR2 at a counter and have it pick up an apple off it (requires coraplex).",
     )
-    parser.add_argument(
-        "--record-video",
-        metavar="PATH",
-        default=None,
-        help="Render a video of the pick-up plan to PATH (implies --robot).",
-    )
     return parser.parse_args()
 
 
@@ -475,8 +461,7 @@ def main() -> None:
     """
     Load a RoboCasa kitchen, report a summary of its bodies and semantic
     annotations, optionally spawn a PR2 that picks up an apple off a counter,
-    optionally publish the scene to RViz, and optionally render a video of the
-    pick-up plan.
+    and optionally publish the scene to RViz.
     """
     logging.basicConfig(level=logging.INFO)
     arguments = _parse_arguments()
@@ -490,19 +475,14 @@ def main() -> None:
     # Spawn the robot (a one-off topology change) before starting the publisher, then start the
     # publisher, then perform the plan: this way the publisher is already live and shows the robot
     # moving instead of only the final state.
-    spawn_robot = arguments.robot or arguments.record_video is not None
-    perform_pick_up = _spawn_robot_and_prepare_pick_up(world) if spawn_robot else None
+    perform_pick_up = (
+        _spawn_robot_and_prepare_pick_up(world) if arguments.robot else None
+    )
 
     spinner = _start_rviz_publisher(world) if arguments.visualize else None
 
-    plan = perform_pick_up() if perform_pick_up is not None else None
-
-    if arguments.record_video is not None:
-        if plan is None:
-            logger.warning("Pick-up plan did not complete; skipping video recording.")
-        else:
-            rendered_video = PlanVideoRecorder(plan).record(Path(arguments.record_video))
-            logger.info("Recorded plan video to %s", rendered_video.video_path)
+    if perform_pick_up is not None:
+        perform_pick_up()
 
     if spinner is not None:
         logger.info("Press Ctrl+C to stop.")
