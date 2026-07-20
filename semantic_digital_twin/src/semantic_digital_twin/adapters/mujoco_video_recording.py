@@ -238,11 +238,13 @@ class MujocoVideoRecorder:
         if self._multi_sim is not None:
             raise VideoRecordingAlreadyStartedError(world=self.world)
 
-        # Offscreen frame capture needs a headless MuJoCo GL backend; without a rendering
-        # backend selected, mujoco.Renderer aborts because no OpenGL context exists (e.g. on
-        # a display-less CI machine). EGL renders headlessly without a window; setdefault
-        # leaves an explicit MUJOCO_GL choice (e.g. a working display, or osmesa) untouched.
-        os.environ.setdefault("MUJOCO_GL", "egl")
+        # Offscreen frame capture needs a headless MuJoCo GL backend. A windowed backend
+        # (GLFW, MuJoCo's default when a display is present) cannot create a context on a
+        # display-less CI machine, so mujoco.Renderer aborts with no OpenGL context. Force EGL,
+        # which renders headlessly without a window, unless a headless backend was already
+        # explicitly requested (EGL or OSMesa).
+        if os.environ.get("MUJOCO_GL", "").lower() not in ("egl", "osmesa"):
+            os.environ["MUJOCO_GL"] = "egl"
 
         self._multi_sim = MujocoSim(world=self.world, headless=True)
         # The synchronizer throttles its own sim -> world sync (and thus notify_state_change)
