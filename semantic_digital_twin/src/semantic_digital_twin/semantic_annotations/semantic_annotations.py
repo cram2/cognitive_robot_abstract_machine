@@ -486,11 +486,6 @@ class Elevator(HasRootBody):
     Positions of the drive which corresponds to the floor the elevator can reach.
     """
 
-    scale: Scale = field(kw_only=True, default=None, init=False)
-    """
-    Dimensions of the elevator
-    """
-
     @classmethod
     def create_with_new_bodies_in_world(
         cls, name: PrefixedName, world: World, scale: Scale
@@ -511,8 +506,6 @@ class Elevator(HasRootBody):
                 active_axis=Vector3.Z(),
             )
 
-            # Splice the drive between the anchor and the floor:
-            # world.root -Fixed-> anker -Prismatic-> slider.root -Fixed-> floor.root
             world.move_branch(slider.root, anker)
             world.move_branch(floor.root, slider.root)
 
@@ -603,7 +596,6 @@ class Elevator(HasRootBody):
             elevator.walls = walls
             elevator.floor = floor
             elevator.anker_point = anker
-            elevator.scale = scale
 
         return elevator
 
@@ -612,11 +604,11 @@ class Elevator(HasRootBody):
         Opens the elevator doors
         """
         self.doors.door_0.mechanical_joint.root.parent_connection.position = (
-            self.scale.y
-        ) / 2
+            self.doors.door_0.scale.y
+        )
         self.doors.door_1.mechanical_joint.root.parent_connection.position = (
-            self.scale.y
-        ) / 2
+            self.doors.door_1.scale.y
+        )
 
     def close(self):
         """
