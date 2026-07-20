@@ -7,17 +7,6 @@ from typing import Tuple
 
 import numpy as np
 import trimesh
-from typing_extensions import (
-    TYPE_CHECKING,
-    Generic,
-    List,
-    Optional,
-    Self,
-    Set,
-    Type,
-    TypeVar,
-)
-
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.factories import variable_from, entity, variable, an
@@ -36,18 +25,17 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     leaf,
 )
 from random_events.product_algebra import Event
-from random_events.set import Set as RandomEventsSets
-from random_events.variable import Symbolic
-from random_events.product_algebra import Event
 from random_events.set import Set as EventSet
 from random_events.variable import Symbolic
 from typing_extensions import (
     TYPE_CHECKING,
+    Generic,
     List,
     Optional,
     Self,
     Set,
     Type,
+    TypeVar,
 )
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName

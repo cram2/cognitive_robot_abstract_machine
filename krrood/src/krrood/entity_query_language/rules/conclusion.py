@@ -11,7 +11,7 @@ from abc import ABC
 from dataclasses import dataclass
 from functools import cached_property
 
-from typing_extensions import Any, List, Iterable
+from typing_extensions import Any, List, Iterable, TypeVar
 
 from krrood.entity_query_language.core.base_expressions import (
     Bindings,
@@ -20,6 +20,7 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     BinaryExpression,
 )
+from krrood.entity_query_language.core.helpers import unwrap_if_literal
 from krrood.entity_query_language.core.variable import Variable
 
 
@@ -53,9 +54,24 @@ class Conclusion(BinaryExpression, ABC):
     def variable(self) -> Selectable:
         return self.left
 
+    def __eq__(self, other):
+        if not isinstance(other, Conclusion):
+            return NotImplemented
+        if self.left._id_ != other.left._id_:
+            return False
+        return unwrap_if_literal(self.right) == unwrap_if_literal(other.right)
+
+    def __hash__(self):
+        return hash((self.left._id_, unwrap_if_literal(self.right)))
+
     @property
     def value(self) -> Any:
         return self.right
+
+    @property
+    def unwrapped_value(self) -> Any:
+        """:return: The right-hand value with any :class:`Literal` wrapper removed."""
+        return unwrap_if_literal(self.right)
 
     @property
     def _name_(self) -> str:
@@ -81,3 +97,9 @@ class Add(Conclusion):
         v = next(self.value._evaluate_(sources)).value
         new_bindings = sources.bindings | {self.variable._id_: v}
         yield OperationResult(new_bindings, False, self, sources)
+
+
+ConclusionType = TypeVar("ConclusionType", bound=Conclusion)
+"""
+Type variable bound to :class:`Conclusion` for typed conclusion lookups.
+"""

@@ -12,6 +12,7 @@ from krrood.entity_query_language.factories import (
     deduced_variable,
     add,
 )
+from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.core.base_expressions import OperationResult
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.rules.conclusion import Add
@@ -511,6 +512,67 @@ def test_doc_example(rule_tree_doc_example_connections, alternative_code, result
     results = query.tolist()
     assert len(results) == len(result_set)
     assert set(results) == result_set
+
+
+def test_conclusions_of_type_returns_matching_conclusions(handles_and_containers_world):
+    """``conclusions_of_type`` returns the attached conclusions of the requested subtype."""
+    world = handles_and_containers_world
+    container = variable(Container, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+    prismatic_connection = variable(PrismaticConnection, domain=world.connections)
+    drawers = variable(Drawer, domain=[])
+    condition = and_(
+        container == fixed_connection.parent,
+        handle == fixed_connection.child,
+        container == prismatic_connection.child,
+    )
+
+    with condition:
+        added = Add(drawers, inference(Drawer)(handle=handle, container=container))
+
+    assert condition.conclusions_of_type(Add) == [added]
+
+
+def test_conclusions_of_type_is_empty_without_matching_conclusions(
+    handles_and_containers_world,
+):
+    """``conclusions_of_type`` returns an empty list on an expression with no such conclusions."""
+    world = handles_and_containers_world
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+
+    assert fixed_connection.conclusions_of_type(Add) == []
+
+
+def test_unwrapped_value_strips_literal_wrapper(handles_and_containers_world):
+    """``unwrapped_value`` returns the raw value behind a :class:`Literal` right-hand side."""
+    world = handles_and_containers_world
+    container = variable(Container, domain=world.bodies)
+    drawers = variable(Drawer, domain=[])
+    literal = Literal(_value_="drawer-value")
+    condition = container == container
+
+    with condition:
+        added = Add(drawers, literal)
+
+    assert added.unwrapped_value == "drawer-value"
+
+
+def test_unwrapped_value_returns_non_literal_right_unchanged(
+    handles_and_containers_world,
+):
+    """``unwrapped_value`` returns the right-hand expression unchanged when it is not a literal."""
+    world = handles_and_containers_world
+    container = variable(Container, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    drawers = variable(Drawer, domain=[])
+    condition = container == container
+
+    with condition:
+        conclusion_value = inference(Drawer)(handle=handle, container=container)
+        added = Add(drawers, conclusion_value)
+
+    assert added.unwrapped_value is conclusion_value
 
 
 def test_rule_tree_anchors_when_where_condition_is_reused_in_a_sibling():

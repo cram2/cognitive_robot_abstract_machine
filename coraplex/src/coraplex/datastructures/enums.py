@@ -323,3 +323,115 @@ class MonitorBehavior(Enum):
     """
     Resume the task when the condition is met.
     """
+
+
+class CuttingTechnique(Enum):
+    """
+    Enum for the techniques of cutting an object.
+    """
+
+    SLICE = auto()
+    """
+    Cut the object into slices of equal thickness.
+    """
+    SAW = auto()
+    """
+    Cut with a repeated back-and-forth sawing motion.
+    """
+    HALVING = auto()
+    """
+    Cut the object into two halves.
+    """
+
+
+class SlicingPriority(Enum):
+    """
+    Decides which slicing parameter is kept when the requested slice thickness and
+    number of cuts cannot both fit the object.
+    """
+
+    THICKNESS = auto()
+    """
+    Keep the requested slice thickness and reduce the number of cuts to fit.
+    """
+    CUT_COUNT = auto()
+    """
+    Keep the requested number of cuts and shrink the slice thickness to fit.
+    """
+
+
+class ToolPathSegmentKind(Enum):
+    """
+    Enum for the geometric pattern a tool path segment follows.
+    """
+
+    APPROACH = auto()
+    """
+    Vertical approach from above onto the object.
+    """
+    DESCEND = auto()
+    """
+    Straight downward cut into the object.
+    """
+    SAW = auto()
+    """
+    Oscillatory shear motion with increasing depth.
+    """
+    RETRACT = auto()
+    """
+    Vertical retraction away from the object.
+    """
+    SPIRAL = auto()
+    """
+    Planar spiral with growing radius.
+    """
+    STIR = auto()
+    """
+    Continuous circular stirring loop.
+    """
+    SHEAR = auto()
+    """
+    Planar oscillatory shear at constant depth.
+    """
+    RASTER = auto()
+    """
+    Planar raster scan covering a rectangle.
+    """
+    SWEEP = auto()
+    """
+    Sinusoidal sweep along one axis.
+    """
+
+
+class WipingTechnique(Enum):
+    """
+    Enum for the techniques of wiping a surface.
+    """
+
+    WIPE = auto()
+    """
+    Wipe along a spiral covering the surface.
+    """
+    SHEAR = auto()
+    """
+    Wipe with an oscillatory shear motion.
+    """
+    SPREAD = auto()
+    """
+    Spread along straight lanes covering the surface.
+    """
+
+
+class MixingPattern(Enum):
+    """
+    Enum for the motion patterns of mixing the contents of a container.
+    """
+
+    SPIRAL = auto()
+    """
+    Mix along an outward spiral.
+    """
+    STIR = auto()
+    """
+    Mix along circular stirring laps.
+    """

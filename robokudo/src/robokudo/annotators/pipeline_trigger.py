@@ -33,7 +33,7 @@ class PipelineTrigger(BaseAnnotator):
         """
         Initialize the pipeline trigger.
 
-        :param name: Name of this annotator instance, defaults to "PipelineTrigger"
+        :param name: Name of this annotator instance
         """
         super().__init__(name)
 

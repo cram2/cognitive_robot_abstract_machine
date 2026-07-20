@@ -37,7 +37,6 @@ from krrood.entity_query_language.exceptions import (
 )
 from krrood.entity_query_language.utils import T
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
-from random_events.interval import SimpleInterval, Bound
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.query.query import Entity
@@ -240,6 +239,11 @@ class CountRange(Count[T]):
         if ellipsis_count == 0:
             yield {self._id_: concrete_count}
         else:
+            # This import is added here to prevent global dependency on random-events which
+            # is not installable currently on Windows, and is only needed here. Until the Windows problem is Solved
+            # it is recommended to leave this here.
+            from random_events.interval import SimpleInterval, Bound
+
             yield {
                 self._id_: SimpleInterval.from_data(
                     concrete_count,

@@ -6,7 +6,7 @@ from typing_extensions import TYPE_CHECKING, Type, List
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from krrood.entity_query_language.factories import ConditionType, get_false_statements
 from krrood.exceptions import DataclassException
-from coraplex.datastructures.enums import ExecutionType
+from coraplex.datastructures.enums import Arms, ExecutionType
 from coraplex.plans.failures import PlanFailure
 
 if TYPE_CHECKING:
@@ -64,6 +64,65 @@ class TipLinkDoesNotMatchAnyArm(DataclassException):
 
     def suggest_correction(self) -> str:
         return "ensure the tip_link is the tool frame of one of the robot's arms."
+
+
+@dataclass
+class MissingWaypoints(DataclassException):
+    """
+    Raised when a waypoint motion or tool action produced no waypoints to follow.
+    """
+
+    instance: Designator
+    """
+    The designator that has no waypoints.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.instance} has no waypoints to follow."
+
+    def suggest_correction(self) -> str:
+        return "ensure the motion sequence samples at least one point."
+
+
+@dataclass
+class WipingTargetMissing(DataclassException):
+    """
+    Raised when a wiping action is created without a surface to wipe.
+    """
+
+    instance: Designator
+    """
+    The wiping action that has no target.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.instance} has neither a container nor a target pose."
+
+    def suggest_correction(self) -> str:
+        return "provide either a container body or a target pose to wipe."
+
+
+@dataclass
+class MissingToolFrame(DataclassException):
+    """
+    Raised when no tool frame is available for the requested arm.
+    """
+
+    arm: Arms
+    """
+    The arm whose tool frame was requested.
+    """
+
+    robot: AbstractRobot
+    """
+    The robot whose arm was searched.
+    """
+
+    def error_message(self) -> str:
+        return f"no tool frame available for arm {self.arm} of {self.robot}"
+
+    def suggest_correction(self) -> str:
+        return "ensure the arm's end effector defines a tool frame."
 
 
 @dataclass

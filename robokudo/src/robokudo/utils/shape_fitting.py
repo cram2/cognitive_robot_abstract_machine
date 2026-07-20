@@ -94,6 +94,27 @@ class CylinderInitializationSettings:
     inlier_polishing_iterations: int
 
 
+@dataclass(frozen=True)
+class FixedAxisCylinderRadiusFit:
+    """
+    Radius, residuals, and inliers for a fixed-axis cylinder refit.
+    """
+
+    radius: float
+    absolute_residuals: np.ndarray
+    inlier_indices: np.ndarray
+
+
+@dataclass(frozen=True)
+class FixedAxisCylinderExtent:
+    """
+    Finite cylinder extent for a fixed-axis cylinder refit.
+    """
+
+    axis_center: np.ndarray
+    height: float
+
+
 def sphere_residuals(parameters: np.ndarray, points: np.ndarray) -> np.ndarray:
     """
     Compute sphere residuals for optimization.
@@ -455,6 +476,221 @@ def _build_cylinder_fit_from_parameters(
     )
 
 
+def refit_cylinder_with_fixed_axis(
+    points: np.ndarray,
+    fixed_axis_direction: np.ndarray,
+    constraints: CylinderFitConstraints,
+    min_inlier_ratio: float,
+) -> Optional[CylinderFit]:
+    """
+    Refit cylinder radius and finite height while keeping axis direction fixed.
+    """
+    if len(points) < 8:
+        return None
+
+    axis_direction = _normalize_vector(fixed_axis_direction)
+    axis_point = points.mean(axis=0)
+
+    radius_fit = _fit_fixed_axis_cylinder_radius(
+        points=points,
+        axis_point=axis_point,
+        axis_direction=axis_direction,
+        constraints=constraints,
+    )
+    if radius_fit is None:
+        return None
+
+    extent = _fixed_axis_cylinder_extent(
+        points=points,
+        axis_point=axis_point,
+        axis_direction=axis_direction,
+        max_height=constraints.max_height,
+    )
+    if extent is None:
+        return None
+
+    if not _fixed_axis_cylinder_passes_geometry_limits(
+        points=points,
+        inlier_indices=radius_fit.inlier_indices,
+        radius=radius_fit.radius,
+        axis_center=extent.axis_center,
+        axis_direction=axis_direction,
+        constraints=constraints,
+    ):
+        return None
+
+    inlier_ratio = float(len(radius_fit.inlier_indices) / len(points))
+    if inlier_ratio < min_inlier_ratio:
+        return None
+
+    return _fixed_axis_cylinder_fit_from_measurements(
+        axis_center=extent.axis_center,
+        axis_direction=axis_direction,
+        radius_fit=radius_fit,
+        height=extent.height,
+        point_count=len(points),
+        distance_threshold=constraints.distance_threshold,
+    )
+
+
+def _fit_fixed_axis_cylinder_radius(
+    points: np.ndarray,
+    axis_point: np.ndarray,
+    axis_direction: np.ndarray,
+    constraints: CylinderFitConstraints,
+) -> Optional[FixedAxisCylinderRadiusFit]:
+    """
+    Fit and polish cylinder radius for a fixed axis.
+    """
+    point_offsets = points - axis_point
+    projected_offsets = np.outer(point_offsets @ axis_direction, axis_direction)
+    radial_offsets = point_offsets - projected_offsets
+    radial_distances = np.linalg.norm(radial_offsets, axis=1)
+
+    radius = float(np.median(radial_distances))
+    if radius <= 1e-9:
+        return None
+    if radius > constraints.max_radius:
+        return None
+
+    absolute_residuals, inlier_indices = _fixed_axis_cylinder_inliers(
+        radial_distances=radial_distances,
+        radius=radius,
+        distance_threshold=constraints.distance_threshold,
+    )
+    if len(inlier_indices) < 8:
+        return None
+
+    refined_radius = float(np.median(radial_distances[inlier_indices]))
+    if refined_radius <= 1e-9:
+        return None
+
+    absolute_residuals, inlier_indices = _fixed_axis_cylinder_inliers(
+        radial_distances=radial_distances,
+        radius=refined_radius,
+        distance_threshold=constraints.distance_threshold,
+    )
+    if len(inlier_indices) < 8:
+        return None
+
+    return FixedAxisCylinderRadiusFit(
+        radius=refined_radius,
+        absolute_residuals=absolute_residuals,
+        inlier_indices=inlier_indices,
+    )
+
+
+def _fixed_axis_cylinder_inliers(
+    radial_distances: np.ndarray, radius: float, distance_threshold: float
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Return absolute residuals and inliers for a fixed cylinder radius.
+    """
+    absolute_residuals = np.abs(radial_distances - radius)
+    inlier_indices = np.where(absolute_residuals <= distance_threshold)[0]
+    return absolute_residuals, inlier_indices
+
+
+def _fixed_axis_cylinder_extent(
+    points: np.ndarray,
+    axis_point: np.ndarray,
+    axis_direction: np.ndarray,
+    max_height: float,
+) -> Optional[FixedAxisCylinderExtent]:
+    """
+    Return finite height and center along a fixed cylinder axis.
+    """
+    axis_coordinates = (points - axis_point) @ axis_direction
+    minimum_axis_coordinate = float(axis_coordinates.min())
+    maximum_axis_coordinate = float(axis_coordinates.max())
+    height = max(maximum_axis_coordinate - minimum_axis_coordinate, 1e-6)
+    if height > max_height:
+        return None
+
+    axis_center = axis_point + axis_direction * (
+        0.5 * (maximum_axis_coordinate + minimum_axis_coordinate)
+    )
+    return FixedAxisCylinderExtent(
+        axis_center=axis_center,
+        height=float(height),
+    )
+
+
+def _fixed_axis_cylinder_passes_geometry_limits(
+    points: np.ndarray,
+    inlier_indices: np.ndarray,
+    radius: float,
+    axis_center: np.ndarray,
+    axis_direction: np.ndarray,
+    constraints: CylinderFitConstraints,
+) -> bool:
+    """
+    Return whether a fixed-axis cylinder passes configured geometry gates.
+    """
+    bbox_diagonal = float(np.linalg.norm(points.max(axis=0) - points.min(axis=0)))
+    if bbox_diagonal > 1e-9:
+        if radius / bbox_diagonal > constraints.max_radius_to_bbox_diagonal_ratio:
+            return False
+
+        point_centroid = points.mean(axis=0)
+        center_distance = float(np.linalg.norm(axis_center - point_centroid))
+        if (
+            center_distance / bbox_diagonal
+            > constraints.max_axis_center_distance_to_bbox_diagonal_ratio
+        ):
+            return False
+
+    cross_section_max_extent = _cross_section_max_extent(
+        points=points[inlier_indices],
+        axis_center=axis_center,
+        axis_direction=axis_direction,
+    )
+    if cross_section_max_extent > 1e-9:
+        if (
+            radius / cross_section_max_extent
+            > constraints.max_radius_to_cross_section_extent_ratio
+        ):
+            return False
+
+    return True
+
+
+def _fixed_axis_cylinder_fit_from_measurements(
+    axis_center: np.ndarray,
+    axis_direction: np.ndarray,
+    radius_fit: FixedAxisCylinderRadiusFit,
+    height: float,
+    point_count: int,
+    distance_threshold: float,
+) -> CylinderFit:
+    """
+    Build a fixed-axis cylinder fit from accepted measurements.
+    """
+    inlier_ratio = float(len(radius_fit.inlier_indices) / point_count)
+    root_mean_square_error = float(
+        np.sqrt(
+            np.mean(np.square(radius_fit.absolute_residuals[radius_fit.inlier_indices]))
+        )
+    )
+    score = compute_fit_score(
+        inlier_ratio=inlier_ratio,
+        root_mean_square_error=root_mean_square_error,
+        distance_threshold=distance_threshold,
+        complexity_penalty=0.02,
+    )
+
+    return CylinderFit(
+        axis_center=axis_center.astype(np.float64),
+        axis_direction=axis_direction.astype(np.float64),
+        radius=radius_fit.radius,
+        height=float(height),
+        inlier_indices=radius_fit.inlier_indices.astype(np.int64),
+        inlier_ratio=inlier_ratio,
+        root_mean_square_error=root_mean_square_error,
+        score=score,
+    )
+
+
 def _generate_cylinder_initial_parameter_sets(
     points: np.ndarray,
     constraints: CylinderFitConstraints,
@@ -736,6 +972,70 @@ def fit_cuboid(
         center=center,
         rotation_matrix=rotation_matrix,
         extents=extents,
+        inlier_indices=inlier_indices.astype(np.int64),
+        inlier_ratio=inlier_ratio,
+        root_mean_square_error=root_mean_square_error,
+        score=score,
+    )
+
+
+def refit_cuboid_with_fixed_orientation(
+    points: np.ndarray,
+    fixed_rotation_matrix: np.ndarray,
+    extent_support_indices: np.ndarray,
+    distance_threshold: float,
+    max_extent: float = np.inf,
+    min_inlier_ratio: float = 0.0,
+) -> Optional[CuboidFit]:
+    """
+    Refit cuboid center and extents while keeping rotation fixed.
+    """
+    if len(points) < 8:
+        return None
+
+    if len(extent_support_indices) >= 8:
+        extent_support_points = points[extent_support_indices]
+    else:
+        extent_support_points = points
+
+    projected_support_points = extent_support_points @ fixed_rotation_matrix
+    minimum_coordinates = projected_support_points.min(axis=0)
+    maximum_coordinates = projected_support_points.max(axis=0)
+    extents = np.maximum(maximum_coordinates - minimum_coordinates, 1e-6)
+    if np.any(extents > max_extent):
+        return None
+
+    center_local_coordinates = 0.5 * (minimum_coordinates + maximum_coordinates)
+    center = center_local_coordinates @ fixed_rotation_matrix.T
+
+    surface_distances = point_to_oriented_box_surface_distance(
+        points=points,
+        center=center.astype(np.float64),
+        rotation_matrix=fixed_rotation_matrix.astype(np.float64),
+        extents=extents.astype(np.float64),
+    )
+    inlier_indices = np.where(surface_distances <= distance_threshold)[0]
+    if len(inlier_indices) < 8:
+        return None
+
+    inlier_ratio = float(len(inlier_indices) / len(points))
+    if inlier_ratio < min_inlier_ratio:
+        return None
+
+    root_mean_square_error = float(
+        np.sqrt(np.mean(np.square(surface_distances[inlier_indices])))
+    )
+    score = compute_fit_score(
+        inlier_ratio=inlier_ratio,
+        root_mean_square_error=root_mean_square_error,
+        distance_threshold=distance_threshold,
+        complexity_penalty=0.02,
+    )
+
+    return CuboidFit(
+        center=center.astype(np.float64),
+        rotation_matrix=fixed_rotation_matrix.astype(np.float64),
+        extents=extents.astype(np.float64),
         inlier_indices=inlier_indices.astype(np.int64),
         inlier_ratio=inlier_ratio,
         root_mean_square_error=root_mean_square_error,

@@ -19,6 +19,7 @@ from typing_extensions import Callable, Type, Optional
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CAS
+from robokudo.exceptions import CASCheckConfigurationError, CASCheckFailed
 from robokudo.types.scene import ObjectHypothesis
 
 
@@ -44,18 +45,15 @@ class CASCheckFunc(BaseAnnotator):
         """
         Initialize the CAS condition checker.
 
-        :param name: Name of this node in the behavior tree, defaults to "CASCheckFunc"
-        :param func: Function that evaluates CAS conditions, must return bool, defaults
-            to None
+        :param name: Name of this node in the behavior tree
+        :param func: Function that evaluates CAS conditions, must return bool
         :param raise_with_str: Error message to raise on failure, empty string disables
-            raising, defaults to ""
-        :raises Exception: If func is None
+            raising
+        :raises CASCheckConfigurationError: If func is None
         """
         super(CASCheckFunc, self).__init__(name=name)
         if func is None:
-            raise Exception(
-                "CASCheckFunc needs a function to work properly. Please pass 'func'."
-            )
+            raise CASCheckConfigurationError(component_name=name)
         self.func = func
         self.raise_with_str = raise_with_str
 
@@ -64,14 +62,14 @@ class CASCheckFunc(BaseAnnotator):
         Check the CAS condition.
 
         :return: SUCCESS if condition is True, FAILURE if False
-        :raises Exception: If raise_with_str is set and condition is False
+        :raises CASCheckFailed: If raise_with_str is set and condition is False
         """
         cas = self.get_cas()
         if self.func(cas):
             return Status.SUCCESS
         else:
             if self.raise_with_str != "":
-                raise Exception(self.raise_with_str)
+                raise CASCheckFailed(reason=self.raise_with_str)
             else:
                 return Status.FAILURE
 
@@ -108,11 +106,11 @@ class CASCheckAnnotationTypeExists(CASCheckFunc):
         """
         Initialize annotation type checker.
 
-        :param name: Name of this node in the behavior tree, defaults to
-            "CASCheckAnnotationTypeExists"
-        :param annotation_type: Type of annotation to check for, defaults to None
+        :param name: Name of this node in the behavior tree
+        :param annotation_type: Type of annotation to check for
         :param raise_with_str: Error message to raise on failure, empty string disables
-            raising, defaults to ""
+            raising. This is useful in scenarios where you want to raise an error which
+            will be sent via the Query Interface to the caller.
         """
         func = functools.partial(any_of_type_present, annotation_type)
         super(CASCheckAnnotationTypeExists, self).__init__(
@@ -137,10 +135,9 @@ class CASCheckOHExists(CASCheckAnnotationTypeExists):
         """
         Initialize ObjectHypothesis checker.
 
-        :param name: Name of this node in the behavior tree, defaults to
-            "CASCheckOHExists"
+        :param name: Name of this node in the behavior tree
         :param raise_with_str: Error message to raise on failure, empty string disables
-            raising, defaults to ""
+            raising
         """
         super(CASCheckOHExists, self).__init__(
             name=name, annotation_type=ObjectHypothesis, raise_with_str=raise_with_str

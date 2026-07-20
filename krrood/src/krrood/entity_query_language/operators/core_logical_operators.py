@@ -55,9 +55,12 @@ class Not(LogicalOperator, UnaryExpression):
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
 
-        for v in self._evaluate_child_as_condition_(self._child_, sources):
-            is_false = v.is_true
-            yield OperationResult(v.bindings, is_false, self)
+        for child_result in self._evaluate_child_as_condition_(self._child_, sources):
+            is_false = child_result.is_true
+            # Include child_result as previous so the satisfaction-tracking chain extends
+            # through the negated child's evaluation, keeping ancestor conditions
+            # reachable in the result chain.
+            yield OperationResult(child_result.bindings, is_false, self, child_result)
 
 
 @dataclass(eq=False, repr=False)

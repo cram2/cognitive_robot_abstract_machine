@@ -20,7 +20,7 @@ import numba
 import numpy as np
 import numpy.ma
 from py_trees.common import Status
-from typing_extensions import Type, Dict, Tuple, List, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, Dict, List, Tuple, Type
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
@@ -121,14 +121,14 @@ class ClusterColorAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ClusterColorAnnotator",
-        descriptor: "ClusterColorAnnotator.Descriptor" = Descriptor(),
+        descriptor: ClusterColorAnnotator.Descriptor | None = None,
     ) -> None:
         """
         Default construction.
 
         Minimal one-time init!
-        :param name: Name of the annotator instance, defaults to "ClusterColorAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of the annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

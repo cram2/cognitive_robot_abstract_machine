@@ -15,22 +15,21 @@ The module is primarily used for:
 * Development and debugging
 """
 
+import json
 import pathlib
 import re
-import json
-
-import cv2
-import ament_index_python.packages
-
-from typing_extensions import Any, Dict, List, Optional, TypeVar
-
+import warnings
 from pathlib import Path
 
-from robokudo.cas import CASViews, CAS
+import ament_index_python.packages
+import cv2
+from typing_extensions import Any, Dict, List, Optional, TypeVar
+
+from robokudo.cas import CAS, CASViews
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.utils.type_conversion import (
-    ros_cam_info_from_dict,
-    o3d_cam_intrinsics_from_ros_cam_info,
+    o3d_camera_intrinsics_from_ros_camera_info,
+    ros_camera_info_from_dict,
 )
 
 T = TypeVar("T")
@@ -65,7 +64,7 @@ class FileReaderInterface(CameraInterface):
             self,
             data: Optional[Dict[str, Dict[str, Any]]] = None,
             data_sequence: Optional[List[str]] = None,
-        ):
+        ) -> None:
             """Initialize the dictionary iterator.
 
             :param data: Dictionary containing the data, defaults to empty dict
@@ -129,6 +128,15 @@ class FileReaderInterface(CameraInterface):
         """
         super().__init__(camera_config)
 
+        if camera_config.lookup_viewpoint:
+            warnings.warn(
+                "FileReaderInterface does not support live TF transform lookup. "
+                "lookup_viewpoint=True will be ignored; configure "
+                "static_camera_transform_enabled=True to write a transform into the CAS.",
+                UserWarning,
+                stacklevel=2,
+            )
+
         self.initialized: bool = False
         """Whether the interface was successfully initialized"""
 
@@ -189,7 +197,7 @@ class FileReaderInterface(CameraInterface):
         for file_path in file_paths_found:
             # Lookup the timestamp from the filename. Match also by the prefix, but ignore it by having a capture
             # group for the actual timestamp with '()'
-            # Additionally, capture the 'type' of the data (e.g. color, depth, cam_info, etc.)
+            # Additionally, capture the stored data suffix (e.g. color, depth, cam_info, etc.)
             regexp_result = re.search(
                 rf"{self.filename_prefix}([0-9\.]+)_(.*)\.", file_path.name
             )
@@ -215,11 +223,11 @@ class FileReaderInterface(CameraInterface):
                 if data is None:
                     raise Exception(f"OpenCV couldn't read {str(file_path)}")
                 self.loaded_data[matched_timestamp][matched_data_type] = data
-            elif matched_data_type == CASViews.CAM_INFO:
+            elif matched_data_type == CASViews.CAMERA_INFO:
                 with open(str(file_path)) as fp:
-                    cam_info_json = json.load(fp)
+                    camera_info_json = json.load(fp)
                     self.loaded_data[matched_timestamp][matched_data_type] = (
-                        ros_cam_info_from_dict(cam_info_json)
+                        ros_camera_info_from_dict(camera_info_json)
                     )
 
         # Initialize the main datastructure that we use to access the data
@@ -275,13 +283,14 @@ class RGBDFileReaderInterface(FileReaderInterface):
         cas.set(CASViews.COLOR_IMAGE, data[CASViews.COLOR_IMAGE])
         cas.set(CASViews.DEPTH_IMAGE, data[CASViews.DEPTH_IMAGE])
 
-        cam_info = data[CASViews.CAM_INFO]
+        camera_info = data[CASViews.CAMERA_INFO]
         if self.camera_config.kinect_height_fix_mode:
-            cam_info.height = 960  # Kinect hack ...
-        cas.set(CASViews.CAM_INFO, cam_info)
+            camera_info.height = 960  # Kinect hack ...
+        cas.set(CASViews.CAMERA_INFO, camera_info)
 
         cas.set(
-            CASViews.CAM_INTRINSIC,
-            o3d_cam_intrinsics_from_ros_cam_info(data[CASViews.CAM_INFO]),
+            CASViews.CAMERA_INTRINSIC,
+            o3d_camera_intrinsics_from_ros_camera_info(data[CASViews.CAMERA_INFO]),
         )
         cas.set(CASViews.COLOR2DEPTH_RATIO, self.camera_config.color2depth_ratio)
+        self.store_static_camera_transform_if_configured(cas)

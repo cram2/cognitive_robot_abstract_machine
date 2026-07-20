@@ -11,7 +11,12 @@ import numpy as np
 import robokudo.cas
 from robokudo import world as rk_world
 from robokudo.cas import CAS, CASViews
+from robokudo.descriptors.camera_configs.config_mongodb_playback import (
+    MongoCameraConfig,
+)
+from robokudo.exceptions import StoredCameraTransformFrameMetadataMissing
 from robokudo.io.storage import Storage
+from robokudo.io.storage_reader_interface import StorageReaderInterface
 from robokudo.types.cv import ImageROI
 from robokudo.types.scene import ObjectHypothesis
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -290,7 +295,7 @@ class TestStorage:
         with pytest.raises(TypeError):
             Storage.generate_dict_from_real_cas(cas)
 
-    def test_cam_to_world_transform_roundtrip_preserves_world_references(
+    def test_camera_to_world_transform_roundtrip_preserves_world_references(
         self, storage_instance, cas_data
     ):
         world_frame = f"map_{uuid.uuid4().hex[:8]}"
@@ -315,7 +320,7 @@ class TestStorage:
             child_frame=camera_body,
             reference_frame=world_body,
         )
-        cas_data.set(CASViews.CAM_TO_WORLD_TRANSFORM, transform)
+        cas_data.camera_to_world_transform = transform
 
         result = store_cas_in_storage(storage_instance, cas_data)
         assert result.acknowledged
@@ -324,11 +329,26 @@ class TestStorage:
             {"_id": result.inserted_id}
         )
         assert retrieved_cas_record is not None
+        transform_view_document = storage_instance.db[
+            Storage.VIEW_COLLECTION_NAME
+        ].find_one(
+            {
+                "_id": retrieved_cas_record["view_ids"][
+                    CASViews.CAMERA_TO_WORLD_TRANSFORM
+                ]
+            }
+        )
+        assert transform_view_document["metadata"]["reference_frame_name"] == str(
+            world_body.name
+        )
+        assert transform_view_document["metadata"]["child_frame_name"] == str(
+            camera_body.name
+        )
 
         retrieved_cas_record["views"] = {}
         storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record)
         restored_transform = retrieved_cas_record["views"][
-            CASViews.CAM_TO_WORLD_TRANSFORM
+            CASViews.CAMERA_TO_WORLD_TRANSFORM
         ]
 
         assert isinstance(restored_transform, HomogeneousTransformationMatrix)
@@ -337,3 +357,77 @@ class TestStorage:
         assert restored_transform.reference_frame is not None
         assert str(restored_transform.child_frame.name) == str(camera_body.name)
         assert str(restored_transform.reference_frame.name) == str(world_body.name)
+
+    def test_storage_reader_rebinds_camera_to_world_transform_to_running_world(
+        self, storage_instance, cas_data
+    ):
+        stored_world_frame = f"stored_map_{uuid.uuid4().hex[:8]}"
+        stored_camera_frame = f"stored_camera_{uuid.uuid4().hex[:8]}"
+
+        rk_world.init_world_with_entity_tracker()
+        rk_world.setup_world_for_camera_frame(
+            world_frame=stored_world_frame,
+            camera_frame=stored_camera_frame,
+        )
+        stored_world = rk_world.world_instance()
+        stored_world_body = stored_world.get_body_by_name(stored_world_frame)
+        stored_camera_body = stored_world.get_body_by_name(stored_camera_frame)
+        transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=0.4,
+            pos_y=0.5,
+            pos_z=0.6,
+            quat_x=0.0,
+            quat_y=0.0,
+            quat_z=0.0,
+            quat_w=1.0,
+            child_frame=stored_camera_body,
+            reference_frame=stored_world_body,
+        )
+        cas_data.camera_to_world_transform = transform
+
+        result = store_cas_in_storage(storage_instance, cas_data)
+        assert result.acknowledged
+        retrieved_cas_record = storage_instance.db.cas.find_one(
+            {"_id": result.inserted_id}
+        )
+        assert retrieved_cas_record is not None
+
+        rk_world.init_world_with_entity_tracker()
+        running_world = rk_world.world_instance()
+        assert len(running_world.bodies) == 0
+
+        reader = StorageReaderInterface(
+            MongoCameraConfig(db_name=storage_instance.db_name)
+        )
+        retrieved_cas_record["views"] = {}
+        storage_instance.load_views_from_mongo_in_cas(
+            retrieved_cas_record,
+            excluded_view_names={CASViews.CAMERA_TO_WORLD_TRANSFORM},
+        )
+        reader._restore_camera_to_world_transform(retrieved_cas_record)
+
+        restored_transform = retrieved_cas_record["views"][
+            CASViews.CAMERA_TO_WORLD_TRANSFORM
+        ]
+        assert isinstance(restored_transform, HomogeneousTransformationMatrix)
+        np.testing.assert_allclose(restored_transform.to_np(), transform.to_np())
+        assert restored_transform.reference_frame is running_world.get_body_by_name(
+            stored_world_frame
+        )
+        assert restored_transform.child_frame is running_world.get_body_by_name(
+            stored_camera_frame
+        )
+        assert len(running_world.get_bodies_by_name(stored_world_frame)) == 1
+        assert len(running_world.get_bodies_by_name(stored_camera_frame)) == 1
+
+    def test_storage_reader_raises_custom_error_when_camera_transform_frame_metadata_is_missing(
+        self,
+    ):
+        reader = StorageReaderInterface.__new__(StorageReaderInterface)
+        view_document = {
+            "payload": {},
+            "metadata": {},
+        }
+
+        with pytest.raises(StoredCameraTransformFrameMetadataMissing):
+            reader._decode_stored_camera_to_world_transform(view_document, {})

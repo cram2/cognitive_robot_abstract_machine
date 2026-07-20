@@ -23,7 +23,9 @@ from robokudo.annotators.object_hypothesis_visualizer import ObjectHypothesisVis
 
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -74,7 +76,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         # device = "/home/user_name/Pictures/my_image.jpg"
         # device = "https://raw.githubusercontent.com/cram2/coraplex/refs/heads/dev/doc/images/boxy.gif"
 
-        cv_config = CrDescriptorFactory.create_descriptor(
+        cv_config = CollectionReaderDescriptorFactory.create_descriptor(
             "opencv",
             device=device,
             loop_mode=1,
