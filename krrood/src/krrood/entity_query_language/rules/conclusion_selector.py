@@ -56,8 +56,10 @@ class ConclusionSelector(TruthValueOperator, ABC):
         ``with`` context. For dynamic growth without a ``with`` context, use
         :meth:`insert_at` with an explicit anchor.
 
-        :param conditions: Conditions to chain with AND to create the new condition expression.
-        :returns: The conditions root after attaching the new condition to the rule tree.
+        :param conditions: Conditions to chain with AND to create the new condition
+            expression.
+        :returns: The conditions root after attaching the new condition to the rule
+            tree.
         """
         return cls.insert_at(cls._get_current_context_condition(), *conditions)
 
@@ -66,7 +68,7 @@ class ConclusionSelector(TruthValueOperator, ABC):
         cls,
         anchor: SymbolicExpression,
         *conditions: ConditionType,
-    ) -> Self:
+    ) -> SymbolicExpression:
         """
         Attach a new branch to ``anchor`` without relying on the ``with`` context stack.
 
@@ -85,13 +87,19 @@ class ConclusionSelector(TruthValueOperator, ABC):
         """
         cleaned_conditions = []
         for condition in conditions:
-            if isinstance(condition, SymbolicExpression) and condition._parent_ is not None:
+            if (
+                isinstance(condition, SymbolicExpression)
+                and condition._parent_ is not None
+            ):
                 condition = condition._node_for_new_position_()
             cleaned_conditions.append(condition)
         new_condition = chained_logic(AND, *cleaned_conditions)
         # A single condition returned directly by chained_logic may still carry a parent from the
         # pre-cleaning step; detach again if needed — idempotent for a parentless node.
-        if isinstance(new_condition, SymbolicExpression) and new_condition._parent_ is not None:
+        if (
+            isinstance(new_condition, SymbolicExpression)
+            and new_condition._parent_ is not None
+        ):
             new_condition = new_condition._node_for_new_position_()
 
         # Splice above the anchor's structural parent — a ConclusionSelector for a node already
@@ -271,7 +279,9 @@ class Next(EQLUnion, ConclusionSelector):
     ) -> Iterable[OperationResult]:
         for child in self._operation_children_:
             for child_result in self._evaluate_child_as_condition_(child, sources):
-                output = OperationResult(child_result.bindings, child_result.is_false, self, child_result)
+                output = OperationResult(
+                    child_result.bindings, child_result.is_false, self, child_result
+                )
                 if output.is_true:
                     self._conclusions_.update(child_result.operand._conclusions_)
                 yield output

@@ -695,6 +695,9 @@ class SelfReferentialInsertionError(DataclassException):
     """
 
     anchor: SymbolicExpression = field(kw_only=True)
+    """
+    The existing rule-tree node that the new condition would have been spliced onto.
+    """
 
     def error_message(self) -> str:
         return (
