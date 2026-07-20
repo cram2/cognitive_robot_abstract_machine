@@ -476,7 +476,7 @@ class Elevator(HasRootBody):
 
     anker_point: Body = field(kw_only=True, default=None)
     """
-    root point below the elevtaor from which the elevator is driving up
+    root point below the elevator from which the elevator is driving up
     """
 
     floor_positions: Dict[str, float] = field(
