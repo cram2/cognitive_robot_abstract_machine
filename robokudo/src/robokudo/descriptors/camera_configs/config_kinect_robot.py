@@ -47,7 +47,7 @@ class KinectCameraConfig(
     Overwrite RGBDComponent.
     """
 
-    topic_cam_info: str = "/kinect_head/rgb/camera_info"
+    topic_camera_info: str = "/kinect_head/rgb/camera_info"
     """
     Overwrite RGBDComponent.
     """

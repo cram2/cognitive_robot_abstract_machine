@@ -33,3 +33,8 @@ class MongoCameraConfig(BaseCameraConfig, WorldDescriptorComponent):
     """
     Name of the MongoDB database to read from.
     """
+
+    restore_annotations: bool = False
+    """
+    Whether to restore stored CAS annotations during playback.
+    """

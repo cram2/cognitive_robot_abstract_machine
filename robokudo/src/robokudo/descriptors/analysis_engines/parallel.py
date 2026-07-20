@@ -27,7 +27,9 @@ from robokudo.annotators.pipeline_trigger import PipelineTrigger
 from robokudo.annotators.testing import SlowAnnotator
 from robokudo.tree_components.better_parallel import Parallel, ParallelPolicy
 from robokudo.pipeline import Pipeline
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -79,7 +81,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with parallel processing
         """
-        kinect_config = CrDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
 
         seq = Pipeline("RWPipeline")
         # parallel = py_trees.composites.Parallel()

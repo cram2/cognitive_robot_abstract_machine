@@ -37,7 +37,7 @@ class TiagoCameraConfig(
 
     topic_depth: str = "/xtion/depth_registered/image_raw/compressedDepth"
 
-    topic_cam_info: str = "/xtion/rgb/camera_info"
+    topic_camera_info: str = "/xtion/rgb/camera_info"
 
     topic_color: str = "/xtion/rgb/image_raw/compressed"
 

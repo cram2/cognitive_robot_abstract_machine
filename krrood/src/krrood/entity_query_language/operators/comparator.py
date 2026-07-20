@@ -93,11 +93,12 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
         ):
             left_value = make_set(left_value)
             right_value = make_set(right_value)
-        res = self.operation(left_value, right_value)
-        is_false = not res
+        comparison_result = self.operation(left_value, right_value)
         bindings = copy(child_result.bindings)
-        bindings[self._id_] = res
-        return OperationResult(bindings, is_false, self, child_result)
+        bindings[self._id_] = comparison_result
+        return OperationResult(
+            bindings, operand=self, previous_operation_result=child_result
+        )
 
     def _optimize_operands_order_(
         self, sources: Optional[OperationResult]

@@ -81,12 +81,12 @@ class OpenCVCameraConfig(BaseCameraConfig):
     Flag to update global depth parameters.
     """
 
-    cam_info: Dict[str, Any] = None
+    camera_info: Dict[str, Any] = None
     """
     Camera config as dict.
     """
 
-    cam_intrinsic = None
+    camera_intrinsic = None
     """
     Camera intrinsic parameters.
     """
@@ -97,7 +97,7 @@ class OpenCVCameraConfig(BaseCameraConfig):
     the factor for (x, y).
     """
 
-    viewpoint_cam_to_world = None
+    viewpoint_camera_to_world = None
     """
     Camera to world transformation.
     """

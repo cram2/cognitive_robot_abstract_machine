@@ -9,6 +9,7 @@ circular dependency chain it carries.
 from __future__ import annotations
 
 import uuid
+import weakref
 from abc import ABC
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -22,6 +23,7 @@ from typing_extensions import (
     List,
     Optional,
     Tuple,
+    Type,
     TYPE_CHECKING,
 )
 
@@ -240,7 +242,25 @@ class EvaluationContext:
     """
     List of observers to notify of evaluation events.
     """
+    subtree_containment_cache: Dict[
+        Tuple[uuid.UUID, Type[SymbolicExpression]], bool
+    ] = field(default_factory=dict)
+    """
+    Memoizes, per ``(node id, expression type)``, whether a node's subtree contains a descendant of
+    that type — a structural fact constant for the duration of an evaluation, so the hot path answers
+    it once instead of re-walking the subtree on every step.
+    """
+    expression_index_cache: Dict[
+        uuid.UUID, weakref.WeakValueDictionary[uuid.UUID, SymbolicExpression]
+    ] = field(default_factory=dict)
+    """
+    Memoizes, per tree-root id, an ``id -> node`` index built once per evaluation and reused for
+    every lookup instead of re-scanning the tree.
 
+    ..warning:: The index holds nodes only through weak references. A context can be captured past
+        its evaluation (for example by an inference explanation); strong references here would pin
+        the whole query tree and its variables' domains.
+    """
     active_conditions_root: ActiveConditionsRoot = field(
         default_factory=ActiveConditionsRoot
     )

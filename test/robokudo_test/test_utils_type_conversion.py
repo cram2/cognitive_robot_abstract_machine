@@ -7,32 +7,32 @@ import open3d as o3d
 
 from robokudo.types.annotation import PoseAnnotation, PositionAnnotation
 from robokudo.utils.type_conversion import (
-    ros_cam_info_to_dict,
-    ros_cam_info_from_dict,
+    ros_camera_info_to_dict,
+    ros_camera_info_from_dict,
     get_geometry_msgs_pose_from_pose_annotation,
     get_geometry_msgs_pose_from_position_annotation,
     get_geometry_msgs_pose_stamped_from_pose_annotation,
     get_geometry_msgs_pose_stamped_from_position_annotation,
     get_transform_matrix_from_pose_annotation,
-    o3d_cam_intrinsics_from_ros_cam_info,
+    o3d_camera_intrinsics_from_ros_camera_info,
 )
 
 
 class TestUtilsTypeConversion(object):
-    def test_ros_cam_info_to_dict(self):
-        kinect_cam_info = sensor_msgs.msg.CameraInfo()
-        kinect_cam_info.width = 1024
-        kinect_cam_info.height = 1280
-        kinect_cam_info.k[0] = 1050.0
-        kinect_cam_info.k[2] = 1050.0
-        kinect_cam_info.k[4] = 639.5
-        kinect_cam_info.k[5] = 479.5
+    def test_ros_camera_info_to_dict(self):
+        kinect_camera_info = sensor_msgs.msg.CameraInfo()
+        kinect_camera_info.width = 1024
+        kinect_camera_info.height = 1280
+        kinect_camera_info.k[0] = 1050.0
+        kinect_camera_info.k[2] = 1050.0
+        kinect_camera_info.k[4] = 639.5
+        kinect_camera_info.k[5] = 479.5
 
-        cam_info_dict = ros_cam_info_to_dict(kinect_cam_info)
+        camera_info_dict = ros_camera_info_to_dict(kinect_camera_info)
 
-        assert cam_info_dict["width"] == 1024
-        assert cam_info_dict["height"] == 1280
-        assert cam_info_dict["k"] == [
+        assert camera_info_dict["width"] == 1024
+        assert camera_info_dict["height"] == 1280
+        assert camera_info_dict["k"] == [
             1050.0,
             0.0,
             1050.0,
@@ -44,8 +44,8 @@ class TestUtilsTypeConversion(object):
             0.0,
         ]
 
-    def test_ros_cam_info_from_dict(self):
-        cam_info_dict = {
+    def test_ros_camera_info_from_dict(self):
+        camera_info_dict = {
             "header": {"frame_id": "camera_link", "stamp": {"secs": 100, "nsecs": 100}},
             "width": 1024,
             "height": 1280,
@@ -64,56 +64,56 @@ class TestUtilsTypeConversion(object):
             },
         }
 
-        kinect_cam_info = ros_cam_info_from_dict(cam_info_dict)
+        kinect_camera_info = ros_camera_info_from_dict(camera_info_dict)
 
-        assert kinect_cam_info.header.frame_id == "camera_link"
-        assert kinect_cam_info.header.stamp.sec == 100
-        assert kinect_cam_info.header.stamp.nanosec == 100
+        assert kinect_camera_info.header.frame_id == "camera_link"
+        assert kinect_camera_info.header.stamp.sec == 100
+        assert kinect_camera_info.header.stamp.nanosec == 100
 
-        assert kinect_cam_info.width == 1024
-        assert kinect_cam_info.height == 1280
-        assert np.all(cam_info_dict["K"] == kinect_cam_info.k)
-        assert np.all(cam_info_dict["D"] == kinect_cam_info.d)
-        assert np.all(cam_info_dict["P"] == kinect_cam_info.p)
+        assert kinect_camera_info.width == 1024
+        assert kinect_camera_info.height == 1280
+        assert np.all(camera_info_dict["K"] == kinect_camera_info.k)
+        assert np.all(camera_info_dict["D"] == kinect_camera_info.d)
+        assert np.all(camera_info_dict["P"] == kinect_camera_info.p)
 
-        assert kinect_cam_info.binning_x == 2.0
-        assert kinect_cam_info.binning_y == 2.0
+        assert kinect_camera_info.binning_x == 2.0
+        assert kinect_camera_info.binning_y == 2.0
 
-        assert kinect_cam_info.roi.x_offset == 5
-        assert kinect_cam_info.roi.y_offset == 10
-        assert kinect_cam_info.roi.height == 15
-        assert kinect_cam_info.roi.width == 20
-        assert kinect_cam_info.roi.do_rectify == True
+        assert kinect_camera_info.roi.x_offset == 5
+        assert kinect_camera_info.roi.y_offset == 10
+        assert kinect_camera_info.roi.height == 15
+        assert kinect_camera_info.roi.width == 20
+        assert kinect_camera_info.roi.do_rectify == True
 
-    def test_ros_cam_info_from_dict_header_frame_id_only(self):
-        cam_info_dict = {"header": {"frame_id": "camera_link"}}
+    def test_ros_camera_info_from_dict_header_frame_id_only(self):
+        camera_info_dict = {"header": {"frame_id": "camera_link"}}
 
-        kinect_cam_info = ros_cam_info_from_dict(cam_info_dict)
+        kinect_camera_info = ros_camera_info_from_dict(camera_info_dict)
 
-        assert isinstance(kinect_cam_info, sensor_msgs.msg.CameraInfo)
-        assert kinect_cam_info.header.frame_id == "camera_link"
+        assert isinstance(kinect_camera_info, sensor_msgs.msg.CameraInfo)
+        assert kinect_camera_info.header.frame_id == "camera_link"
 
-    def test_ros_cam_info_from_dict_header_stamp_only(self):
-        cam_info_dict = {"header": {"stamp": {"secs": 100, "nsecs": 100}}}
+    def test_ros_camera_info_from_dict_header_stamp_only(self):
+        camera_info_dict = {"header": {"stamp": {"secs": 100, "nsecs": 100}}}
 
-        kinect_cam_info = ros_cam_info_from_dict(cam_info_dict)
+        kinect_camera_info = ros_camera_info_from_dict(camera_info_dict)
 
-        assert isinstance(kinect_cam_info, sensor_msgs.msg.CameraInfo)
-        assert kinect_cam_info.header.stamp.sec == 100
-        assert kinect_cam_info.header.stamp.nanosec == 100
+        assert isinstance(kinect_camera_info, sensor_msgs.msg.CameraInfo)
+        assert kinect_camera_info.header.stamp.sec == 100
+        assert kinect_camera_info.header.stamp.nanosec == 100
 
-    def test_ros_cam_info_from_dict_empty_dict(self):
-        kinect_cam_info = ros_cam_info_from_dict({})
-        assert isinstance(kinect_cam_info, sensor_msgs.msg.CameraInfo)
+    def test_ros_camera_info_from_dict_empty_dict(self):
+        kinect_camera_info = ros_camera_info_from_dict({})
+        assert isinstance(kinect_camera_info, sensor_msgs.msg.CameraInfo)
 
-    def test_ros_cam_info_from_dict_invalid_dict(self):
-        cam_info_dict = {
+    def test_ros_camera_info_from_dict_invalid_dict(self):
+        camera_info_dict = {
             "header": {"invalid_key": "invalid_value"},
             "invalid_key": "invalid_value",
             "roi": {"invalid_key": "invalid_value"},
         }
-        kinect_cam_info = ros_cam_info_from_dict(cam_info_dict)
-        assert isinstance(kinect_cam_info, sensor_msgs.msg.CameraInfo)
+        kinect_camera_info = ros_camera_info_from_dict(camera_info_dict)
+        assert isinstance(kinect_camera_info, sensor_msgs.msg.CameraInfo)
 
     def test_get_geometry_msgs_pose_from_position_annotation(self):
         position_ann = PositionAnnotation()
@@ -210,21 +210,21 @@ class TestUtilsTypeConversion(object):
         )
         assert np.allclose(transform_matrix[:3, 3], pose_ann.translation)
 
-    def test_o3d_cam_intrinsics_from_ros_cam_info(self):
-        kinect_cam_info = sensor_msgs.msg.CameraInfo()
-        kinect_cam_info.width = 1024
-        kinect_cam_info.height = 1280
-        kinect_cam_info.k[0] = 1050.0
-        kinect_cam_info.k[2] = 1050.0
-        kinect_cam_info.k[4] = 639.5
-        kinect_cam_info.k[5] = 479.5
+    def test_o3d_camera_intrinsics_from_ros_camera_info(self):
+        kinect_camera_info = sensor_msgs.msg.CameraInfo()
+        kinect_camera_info.width = 1024
+        kinect_camera_info.height = 1280
+        kinect_camera_info.k[0] = 1050.0
+        kinect_camera_info.k[2] = 1050.0
+        kinect_camera_info.k[4] = 639.5
+        kinect_camera_info.k[5] = 479.5
 
-        o3d_intrinsics = o3d_cam_intrinsics_from_ros_cam_info(kinect_cam_info)
+        o3d_intrinsics = o3d_camera_intrinsics_from_ros_camera_info(kinect_camera_info)
 
         assert isinstance(o3d_intrinsics, o3d.camera.PinholeCameraIntrinsic)
-        assert o3d_intrinsics.width == kinect_cam_info.width
-        assert o3d_intrinsics.height == kinect_cam_info.height
-        assert o3d_intrinsics.intrinsic_matrix[0][0] == kinect_cam_info.k[0]
-        assert o3d_intrinsics.intrinsic_matrix[0][2] == kinect_cam_info.k[2]
-        assert o3d_intrinsics.intrinsic_matrix[1][1] == kinect_cam_info.k[4]
-        assert o3d_intrinsics.intrinsic_matrix[1][2] == kinect_cam_info.k[5]
+        assert o3d_intrinsics.width == kinect_camera_info.width
+        assert o3d_intrinsics.height == kinect_camera_info.height
+        assert o3d_intrinsics.intrinsic_matrix[0][0] == kinect_camera_info.k[0]
+        assert o3d_intrinsics.intrinsic_matrix[0][2] == kinect_camera_info.k[2]
+        assert o3d_intrinsics.intrinsic_matrix[1][1] == kinect_camera_info.k[4]
+        assert o3d_intrinsics.intrinsic_matrix[1][2] == kinect_camera_info.k[5]
