@@ -83,21 +83,21 @@ def region_obb(
     return obb
 
 
-def region_obb_in_cam_coordinates(
+def region_obb_in_camera_coordinates(
     world: World,
     region: Region,
-    world_T_cam: Union[np.ndarray, HomogeneousTransformationMatrix],
+    world_T_camera: Union[np.ndarray, HomogeneousTransformationMatrix],
 ) -> o3d.geometry.OrientedBoundingBox:
     """
-    Transform region OBB to camera frame using world_to_cam matrix.
+    Transform region OBB to camera frame using world_to_camera matrix.
     """
     obb = region_obb(region, world=world)
-    if isinstance(world_T_cam, HomogeneousTransformationMatrix):
-        R = world_T_cam.to_rotation_matrix().to_np()
-        t = world_T_cam.to_position().to_np()
+    if isinstance(world_T_camera, HomogeneousTransformationMatrix):
+        R = world_T_camera.to_rotation_matrix().to_np()
+        t = world_T_camera.to_position().to_np()
     else:
-        R = world_T_cam[:3, :3]
-        t = world_T_cam[:3, 3]
+        R = world_T_camera[:3, :3]
+        t = world_T_camera[:3, 3]
     obb.rotate(R, center=(0, 0, 0))
     obb.translate(t)
     return obb

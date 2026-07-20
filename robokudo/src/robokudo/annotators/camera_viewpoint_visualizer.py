@@ -6,7 +6,6 @@ in 3D space using Open3D.
 """
 
 import open3d as o3d
-
 from py_trees.common import Status
 
 import robokudo.utils.annotator_helper
@@ -30,8 +29,7 @@ class CameraViewpointVisualizer(BaseAnnotator):
         """
         Initialize the camera viewpoint visualizer.
 
-        :param name: Name of the annotator instance, defaults to
-            "CameraViewpointVisualizer"
+        :param name: Name of the annotator instance
         """
         super().__init__(name)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
@@ -45,12 +43,12 @@ class CameraViewpointVisualizer(BaseAnnotator):
         * A coordinate frame representing the world reference frame
         * The current point cloud data
 
-        :return: SUCCESS if visualization was created, FAILURE if cam to world transform not found
+        :return: SUCCESS if visualization was created, FAILURE if camera to world transform not found
         :raises AssertionError: If viewpoint transform is of a wrong type
         """
         try:
-            world_to_cam_transform = (
-                robokudo.utils.annotator_helper.get_world_to_cam_transform_matrix(
+            world_to_camera_transform = (
+                robokudo.utils.annotator_helper.get_world_to_camera_transform_matrix(
                     self.get_cas()
                 )
             )
@@ -60,7 +58,7 @@ class CameraViewpointVisualizer(BaseAnnotator):
 
         cloud = self.get_cas().get(CASViews.CLOUD)
         world_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2)
-        world_frame.transform(world_to_cam_transform)
+        world_frame.transform(world_to_camera_transform)
 
         geometries = [
             {"name": "World frame", "geometry": world_frame},

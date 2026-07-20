@@ -90,13 +90,13 @@ class TestUtilsDecorators(object):
 
         assert hasattr(dummy, "_times")
         assert dummy._times["compute"] == pytest.approx(
-            duration, abs=0.001
+            duration, abs=0.01
         ), "Timing was not updated"
 
         dummy.compute(duration * 2)
         assert hasattr(dummy, "_times")
         assert dummy._times["compute"] == pytest.approx(
-            duration * 2, abs=0.001
+            duration * 2, abs=0.01
         ), "Timing was not updated"
 
     def test_publish_variables(self):

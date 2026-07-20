@@ -16,6 +16,8 @@ This module provides base classes for implementing annotators in RoboKudo.
     * Action client integration
 """
 
+from __future__ import annotations
+
 import logging
 import threading
 import time
@@ -26,17 +28,26 @@ from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from sensor_msgs.msg import JointState
-from typing_extensions import Union, List, Dict, Callable, Tuple, Type, Optional, Any
+from typing_extensions import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
+import robokudo.pipeline  # Work around circular import
 from robokudo.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.annotators.outputs import (
-    AnnotatorOutputs,
     AnnotatorOutputPerPipelineMap,
+    AnnotatorOutputs,
     AnnotatorOutputStruct,
 )
 from robokudo.cas import CAS, CASViews
 from robokudo.defs import PACKAGE_NAME
-import robokudo.pipeline  # Work around circular import
 from robokudo.types.core import Annotation
 from robokudo.utils.tree import find_parent_of_type
 
@@ -125,7 +136,7 @@ class BaseAnnotator(Behaviour):
     def __init__(
         self,
         name: str = "Annotator",
-        descriptor: "BaseAnnotator.Descriptor" = Descriptor(),
+        descriptor: Optional[BaseAnnotator.Descriptor] = None,
         ros_pkg_name: str = PACKAGE_NAME,
     ) -> None:
         """
@@ -138,6 +149,9 @@ class BaseAnnotator(Behaviour):
         :param ros_pkg_name: Name of the ROS package
         """
         super().__init__(name)
+        if descriptor is None:
+            descriptor = self.Descriptor()
+
         # self.rk_logger = get_logger(ros_pkg_name)
         self.rk_logger = logging.getLogger(ros_pkg_name)
 
@@ -220,7 +234,7 @@ class BaseAnnotator(Behaviour):
         """
         return self.get_parent_pipeline().cas
 
-    def get_parent_pipeline(self) -> Optional["robokudo.pipeline.Pipeline"]:
+    def get_parent_pipeline(self) -> Optional[robokudo.pipeline.Pipeline]:
         """
         Get the pipeline containing this annotator.
 
@@ -327,7 +341,7 @@ class BaseAnnotator(Behaviour):
         for content in analysis_scope:
             # CASViews are string values
             if isinstance(content, str):
-                if content not in CASViews.__dict__.values():
+                if content not in CASViews:
                     self.rk_logger.warning(
                         "You have passed a string that is not defining a valid CASView from robokudo.cas.CASViews"
                     )
@@ -360,8 +374,7 @@ class BaseAnnotator(Behaviour):
         Record timing information for a function.
 
         :param value: The timing value to record
-        :param func: The function name to associate with the timing, defaults to
-            "update"
+        :param func: The function name to associate with the timing
         """
         timing_dict = getattr(self, "_times")
         timing_dict[func] = value
@@ -438,7 +451,7 @@ class BaseAnnotator(Behaviour):
             # Create a joint state message to have a common data structure for all values
             msg = JointState()
             msg.header.stamp = (
-                self.get_cas().get(CASViews.CAM_INFO).header.stamp
+                self.get_cas().get(CASViews.CAMERA_INFO).header.stamp
             )  # This is always the time of recording the data.
 
             # msg.header.stamp = rospy.Time(self.get_cas().timestamp) # This might be the current time!
@@ -466,7 +479,7 @@ class Worker(object):
         Initialize the worker.
 
         :param fn: The function to execute
-        :param args: Arguments to pass to the function, defaults to ()
+        :param args: Arguments to pass to the function
         """
         self.future: Future = Future()
         self._fn: Callable = fn
@@ -476,7 +489,7 @@ class Worker(object):
         """
         Start executing the function in a separate thread.
 
-        :param callback: Function to call when execution completes, defaults to None
+        :param callback: Function to call when execution completes
         """
         self._callback = callback
         self.future.set_running_or_notify_cancel()
@@ -509,14 +522,13 @@ class ThreadedAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ThreadedAnnotator",
-        descriptor: BaseAnnotator.Descriptor = BaseAnnotator.Descriptor(),
+        descriptor: Optional[BaseAnnotator.Descriptor] = None,
     ) -> None:
         """
         Initialize the ThreadedAnnotator.
 
-        :param name: Name of the annotator instance, defaults to "ThreadedAnnotator"
-        :param descriptor: Configuration descriptor, defaults to
-            BaseAnnotator.Descriptor()
+        :param name: Name of the annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

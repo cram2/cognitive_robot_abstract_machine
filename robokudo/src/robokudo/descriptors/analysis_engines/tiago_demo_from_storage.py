@@ -34,7 +34,9 @@ from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 from robokudo.tree_components.better_parallel import Parallel, ParallelPolicy
 
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -95,7 +97,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with parallel processing
         """
-        cr_storage_config = CrDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
         pre = Sequence("Preprocessing")
         pre.add_children(

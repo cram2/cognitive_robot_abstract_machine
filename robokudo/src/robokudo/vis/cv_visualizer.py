@@ -11,6 +11,8 @@ It handles:
 * Pipeline state visualization
 """
 
+from __future__ import annotations
+
 import subprocess
 import sys
 
@@ -177,7 +179,7 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
             cv_visualizer_for_key.indicate_termination_var = True
 
     @staticmethod
-    def get_gui_handler_for_detected_key() -> Optional["CVVisualizer"]:
+    def get_gui_handler_for_detected_key() -> Optional[CVVisualizer]:
         """
         Get the visualizer instance for the focused window.
 

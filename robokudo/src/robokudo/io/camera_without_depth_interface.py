@@ -192,17 +192,15 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
 
         # update additional (fake) data
         depth = self.camera_config.depth
-        cam_info = self.camera_config.cam_info
-        cam_intrinsic = self.camera_config.cam_intrinsic
+        camera_info = self.camera_config.camera_info
+        camera_intrinsic = self.camera_config.camera_intrinsic
         color2depth_ratio = self.camera_config.color2depth_ratio
-        viewpoint_cam_to_world = self.camera_config.viewpoint_cam_to_world
 
         if self.camera_config.update_global_with_depth_parameter:
             AnnotatorPredefinedParameters.global_with_depth = depth is not None
 
         cas.set(CASViews.COLOR_IMAGE, color)
         cas.set(CASViews.DEPTH_IMAGE, depth)
-        cas.set(CASViews.CAM_INFO, cam_info)
-        cas.set(CASViews.CAM_INTRINSIC, cam_intrinsic)
+        cas.set(CASViews.CAMERA_INFO, camera_info)
+        cas.set(CASViews.CAMERA_INTRINSIC, camera_intrinsic)
         cas.set(CASViews.COLOR2DEPTH_RATIO, color2depth_ratio)
-        # cas.set(CASViews.VIEWPOINT_CAM_TO_WORLD, viewpoint_cam_to_world) # This shouldn't be set if it's not available

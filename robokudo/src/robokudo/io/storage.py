@@ -76,57 +76,6 @@ class Storage:
 
         return MongoClient(host=mongo_host, port=mongo_port)
 
-    @DeprecationWarning  # Use ListReader instead for better pymongo compatibility across versions
-    class Reader:
-        """
-        Deprecated cursor-based MongoDB reader.
-
-        .. deprecated:: Use ListReader instead for better pymongo compatibility
-        """
-
-        def __init__(self, db_name: str) -> None:
-            """
-            Initialize the reader.
-
-            :param db_name: Name of the MongoDB database
-            """
-            client = Storage.instantiate_mongo_client()
-
-            self.db_reader = client[db_name]
-            self.reset_cursor()
-
-        def reset_cursor(self) -> None:
-            """
-            Reset the cursor to the start of the collection.
-            """
-            self.cursor = self.db_reader.cas.find()
-
-        def collection_has_frames(self) -> bool:
-            """
-            Check if collection has any frames.
-
-            :return: True if frames exist, False otherwise
-            """
-            return self.db_reader.cas.find().alive
-
-        def cursor_has_frames(self) -> bool:
-            """
-            Check if cursor has more frames.
-
-            :return: True if more frames exist, False otherwise
-            """
-            return self.cursor.alive
-
-        def get_next_frame(self) -> Optional[dict]:
-            """
-            Get the next frame from the cursor.
-
-            :return: Next frame data or None if no more frames
-            """
-            if not self.cursor_has_frames():
-                return None
-            return self.cursor.next()
-
     class ListReader:
         """
         List-based MongoDB reader.
@@ -258,15 +207,24 @@ class Storage:
 
             cas_dict["view_ids"][view_name] = result.inserted_id
 
-    def load_views_from_mongo_in_cas(self, cas_document: Dict[str, Any]) -> None:
+    def load_views_from_mongo_in_cas(
+        self,
+        cas_document: Dict[str, Any],
+        excluded_view_names: Optional[set[str]] = None,
+    ) -> None:
         """
         Load views from MongoDB into a CAS document.
 
         Retrieve and decode each persisted view referenced in ``view_ids``.
 
         :param cas_document: CAS document to update with loaded views
+        :param excluded_view_names: View names to leave undecoded for caller-specific
+            handling.
         """
+        excluded_view_names = excluded_view_names or set()
         for expected_view_name, view_id in cas_document["view_ids"].items():
+            if expected_view_name in excluded_view_names:
+                continue
             view_document = self.db[Storage.VIEW_COLLECTION_NAME].find_one(
                 {"_id": view_id}
             )
