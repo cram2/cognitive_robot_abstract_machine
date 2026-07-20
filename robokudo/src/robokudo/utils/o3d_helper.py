@@ -116,9 +116,9 @@ def get_2d_corner_points_from_3d_bb(
     :return: Array of 2D corner points
     """
     # Create the 2D Boundingbox/ROI based on the OBB
-    pc_cam_intrinsics = cas.get(CASViews.PC_CAM_INTRINSIC)
-    assert isinstance(pc_cam_intrinsics, o3d.camera.PinholeCameraIntrinsic)
-    k = pc_cam_intrinsics.intrinsic_matrix
+    pointcloud_camera_intrinsics = cas.get(CASViews.POINTCLOUD_CAMERA_INTRINSIC)
+    assert isinstance(pointcloud_camera_intrinsics, o3d.camera.PinholeCameraIntrinsic)
+    k = pointcloud_camera_intrinsics.intrinsic_matrix
     corner_points = np.asarray(object_bb.get_box_points())
     uvd = corner_points @ k.T
     if np.any(uvd[:, 2] == 0):
@@ -136,14 +136,14 @@ def get_2d_corner_points_from_3d_bb(
 
 
 def project_points_to_image(
-    cas: CAS, points_cam: npt.NDArray
+    cas: CAS, points_camera: npt.NDArray
 ) -> Tuple[npt.NDArray, npt.NDArray]:
     """
     Project 3D camera-frame points to 2D image pixels and validity mask.
     """
-    pc_cam_intrinsics = cas.get(CASViews.PC_CAM_INTRINSIC)
-    k = pc_cam_intrinsics.intrinsic_matrix
-    uvd = points_cam @ k.T
+    pointcloud_camera_intrinsics = cas.get(CASViews.POINTCLOUD_CAMERA_INTRINSIC)
+    k = pointcloud_camera_intrinsics.intrinsic_matrix
+    uvd = points_camera @ k.T
     z = uvd[:, 2]
     valid = z > 1e-6
     u = (uvd[valid, 0] / z[valid]).astype(int)
@@ -243,7 +243,7 @@ def draw_wireframe_of_obb_into_image(
 def get_mask_from_pointcloud(
     input_cloud: o3d.geometry.PointCloud,
     ref_image: npt.NDArray,
-    cam_intrinsics: o3d.camera.PinholeCameraIntrinsic,
+    camera_intrinsics: o3d.camera.PinholeCameraIntrinsic,
     mask_scale_factor: float = None,
     crop_to_ref: bool = None,
 ) -> npt.NDArray:
@@ -252,7 +252,8 @@ def get_mask_from_pointcloud(
 
     :param input_cloud: 3d points which should be projected to the result mask image
     :param ref_image: A reference image for the dimensionality of the mask
-    :param cam_intrinsics: Camera intrinsics that have been used to generate input_cloud
+    :param camera_intrinsics: Camera intrinsics that have been used to generate
+        input_cloud
     :param mask_scale_factor: If your color and depth image size mismatches, you might
         have to scale your depth-based mask image to the dimensions of your color image.
         Please provide that factor here. Example: Kinect has 1280x images were as the
@@ -262,7 +263,7 @@ def get_mask_from_pointcloud(
         (0:width)
     :return: A binary mask image for OpenCV
     """
-    K = cam_intrinsics.intrinsic_matrix
+    K = camera_intrinsics.intrinsic_matrix
 
     cropped_3d_points = np.asarray(input_cloud.points)
 
@@ -294,33 +295,33 @@ def get_mask_from_pointcloud(
     return mask
 
 
-def scale_o3d_cam_intrinsics(
-    cam_intrinsic: o3d.camera.PinholeCameraIntrinsic, scalex: float, scaley: float
+def scale_o3d_camera_intrinsics(
+    camera_intrinsic: o3d.camera.PinholeCameraIntrinsic, scalex: float, scaley: float
 ) -> o3d.camera.PinholeCameraIntrinsic:
     """Scale camera intrinsics by x and y factors.
 
-    Create and return a new cam intrinsic by scaling an input cam_intrinsic
+    Create and return a new camera intrinsic by scaling an input camera_intrinsic
     based on a scale factor scalex and scaley.
     Scaling will be done by multipling the factors with the relevant properties.
     Example: new_height = height * scaley
 
-    :param cam_intrinsic: Original camera intrinsics
+    :param camera_intrinsic: Original camera intrinsics
     :param scalex: Scale factor for width/x
     :param scaley: Scale factor for height/y
     :return: Scaled camera intrinsics
     """
-    new_cam_intrinsic = o3d.camera.PinholeCameraIntrinsic()
+    new_camera_intrinsic = o3d.camera.PinholeCameraIntrinsic()
 
-    width = int(cam_intrinsic.width * scalex)
-    height = int(cam_intrinsic.height * scaley)
-    fx = cam_intrinsic.intrinsic_matrix[0][0] * scalex
-    cx = cam_intrinsic.intrinsic_matrix[0][2] * scalex
-    fy = cam_intrinsic.intrinsic_matrix[1][1] * scaley
-    cy = cam_intrinsic.intrinsic_matrix[1][2] * scaley
+    width = int(camera_intrinsic.width * scalex)
+    height = int(camera_intrinsic.height * scaley)
+    fx = camera_intrinsic.intrinsic_matrix[0][0] * scalex
+    cx = camera_intrinsic.intrinsic_matrix[0][2] * scalex
+    fy = camera_intrinsic.intrinsic_matrix[1][1] * scaley
+    cy = camera_intrinsic.intrinsic_matrix[1][2] * scaley
 
-    new_cam_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
+    new_camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
 
-    return new_cam_intrinsic
+    return new_camera_intrinsic
 
 
 def concatenate_clouds(
@@ -348,7 +349,7 @@ def get_cloud_from_rgb_depth_and_mask(
     rgb_image: npt.NDArray,
     depth_image: npt.NDArray,
     mask: npt.NDArray,
-    cam_intrinsics: o3d.camera.PinholeCameraIntrinsic,
+    camera_intrinsics: o3d.camera.PinholeCameraIntrinsic,
     depth_truncate: float = 9.0,
     mask_true_val: int = 255,
 ) -> o3d.geometry.PointCloud:
@@ -365,7 +366,7 @@ def get_cloud_from_rgb_depth_and_mask(
     :param rgb_image: An image in RGB order. Please note that cv2 normally uses BGR order. So you have to convert first.
     :param depth_image: A depth image
     :param mask: a numpy array of dtype np.uint8
-    :param cam_intrinsics: Camera intrinsics for the rgb and depth image
+    :param camera_intrinsics: Camera intrinsics for the rgb and depth image
     :param depth_truncate: During cloud creation, ignore points beyond this many meters
     :param mask_true_val: If the 'mask' contains a value equal to 'max_true_val', the corresponding value in 'depth'
     will be included. Otherwise, it will be set to 0.
@@ -384,7 +385,7 @@ def get_cloud_from_rgb_depth_and_mask(
         o3d_color, o3d_depth, convert_rgb_to_intensity=False, depth_trunc=depth_truncate
     )
 
-    return o3d.geometry.PointCloud.create_from_rgbd_image(rgbd_image, cam_intrinsics)
+    return o3d.geometry.PointCloud.create_from_rgbd_image(rgbd_image, camera_intrinsics)
 
 
 def create_line_for_visualization(

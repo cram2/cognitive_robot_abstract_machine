@@ -19,6 +19,7 @@ import numpy as np
 from typing_extensions import TYPE_CHECKING, Tuple
 
 from robokudo.cas import CASViews
+from robokudo.exceptions import ColorToDepthRatioMissing
 from robokudo.types.cv import ImageROI
 
 if TYPE_CHECKING:
@@ -77,12 +78,14 @@ def get_scaled_color_image_for_depth_image(
     :param color_image: The color image to be adjusted
     :return: A resized copy of the color image if a resize necessary. Otherwise, the
         unchanged color_image is returned.
-    :raises RuntimeError: If color-to-depth ratio not set in CAS
+    :raises ColorToDepthRatioMissing: If color-to-depth ratio not set in CAS
     """
     color2depth_ratio = cas.get(CASViews.COLOR2DEPTH_RATIO)
 
     if not color2depth_ratio:
-        raise RuntimeError("No Color to Depth Ratio set. Can't continue.")
+        raise ColorToDepthRatioMissing(
+            operation="scale color image to depth image resolution"
+        )
 
     if color2depth_ratio == (1, 1):
         resized_color = color_image
@@ -109,10 +112,10 @@ def get_scale_coordinates(
     :param color2depth_ratio: Scale factors (x_scale, y_scale)
     :param coordinates: Input coordinates (x, y)
     :return: Scaled coordinates
-    :raises RuntimeError: If color-to-depth ratio not provided
+    :raises ColorToDepthRatioMissing: If color-to-depth ratio not provided
     """
     if not color2depth_ratio:
-        raise RuntimeError("No Color to Depth Ratio set. Can't continue.")
+        raise ColorToDepthRatioMissing(operation="scale coordinates")
 
     if color2depth_ratio == (1, 1):
         return coordinates

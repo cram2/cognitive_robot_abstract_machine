@@ -60,8 +60,8 @@ class TestUtilsAnnotationConversion(object):
         # tf = StampedTransform()
         # tf.rotation = (-0.5, 0.5, -0.5, 0.5)
         # tf.translation = (0.5, 0.5, 0.5)
-        # cas.set(CASViews.VIEWPOINT_CAM_TO_WORLD, tf)
-        cas.cam_to_world_transform = (
+        # cas.set(CASViews.VIEWPOINT_CAMERA_TO_WORLD, tf)
+        cas.camera_to_world_transform = (
             HomogeneousTransformationMatrix.from_xyz_quaternion(
                 pos_x=0.5,
                 pos_y=0.5,
@@ -73,17 +73,17 @@ class TestUtilsAnnotationConversion(object):
             )
         )
 
-        kinect_cam_info = sensor_msgs.msg.CameraInfo()
-        kinect_cam_info.header.frame_id = "some_weird_non_default_frame_id"
-        kinect_cam_info.header.stamp.sec = np.random.randint(sys.maxsize)
-        kinect_cam_info.header.stamp.nanosec = np.random.randint(sys.maxsize)
-        kinect_cam_info.width = 1024
-        kinect_cam_info.height = 1280
-        kinect_cam_info.k[0] = 1050.0
-        kinect_cam_info.k[2] = 1050.0
-        kinect_cam_info.k[4] = 639.5
-        kinect_cam_info.k[5] = 479.5
-        cas.set(CASViews.CAM_INFO, kinect_cam_info)
+        kinect_camera_info = sensor_msgs.msg.CameraInfo()
+        kinect_camera_info.header.frame_id = "some_weird_non_default_frame_id"
+        kinect_camera_info.header.stamp.sec = np.random.randint(sys.maxsize)
+        kinect_camera_info.header.stamp.nanosec = np.random.randint(sys.maxsize)
+        kinect_camera_info.width = 1024
+        kinect_camera_info.height = 1280
+        kinect_camera_info.k[0] = 1050.0
+        kinect_camera_info.k[2] = 1050.0
+        kinect_camera_info.k[4] = 639.5
+        kinect_camera_info.k[5] = 479.5
+        cas.set(CASViews.CAMERA_INFO, kinect_camera_info)
         return cas
 
     def test_pose_annotation_to_stamped_pose_annotation_can_convert(self):
@@ -214,10 +214,10 @@ class TestUtilsAnnotationConversion(object):
         assert converter.can_convert(PoseAnnotation()) == True
         assert converter.can_convert(Annotation()) == False
 
-    def test_pose_2_od_converter_convert_in_cam(self, cas_with_tf: CAS):
-        # cas_with_tf.set(CASViews.VIEWPOINT_CAM_TO_WORLD, None)
-        cas_with_tf.cam_to_world_transform = None
-        kinect_cam_info = cas_with_tf.get(CASViews.CAM_INFO)
+    def test_pose_2_od_converter_convert_in_camera(self, cas_with_tf: CAS):
+        # cas_with_tf.set(CASViews.VIEWPOINT_CAMERA_TO_WORLD, None)
+        cas_with_tf.camera_to_world_transform = None
+        kinect_camera_info = cas_with_tf.get(CASViews.CAMERA_INFO)
 
         od = ObjectDesignator()
 
@@ -232,8 +232,8 @@ class TestUtilsAnnotationConversion(object):
 
         assert len(od.pose) == 1
         pose: PoseStamped = od.pose[0]
-        assert pose.header.frame_id == kinect_cam_info.header.frame_id
-        assert pose.header.stamp.sec == kinect_cam_info.header.stamp.sec
+        assert pose.header.frame_id == kinect_camera_info.header.frame_id
+        assert pose.header.stamp.sec == kinect_camera_info.header.stamp.sec
         assert (
             pose.header.stamp.nanosec == 0
         )  # TODO: Nanoseconds are ignored in RoboKudo?
@@ -246,8 +246,10 @@ class TestUtilsAnnotationConversion(object):
         assert pose.pose.orientation.w == pose_annotation.rotation[3]
 
     def test_pose_2_od_converter_convert_in_world(self, cas_with_tf: CAS):
-        cam_to_world_quat = cas_with_tf.cam_to_world_transform.to_quaternion().to_list()
-        kinect_cam_info = cas_with_tf.get(CASViews.CAM_INFO)
+        camera_to_world_quat = (
+            cas_with_tf.camera_to_world_transform.to_quaternion().to_list()
+        )
+        kinect_camera_info = cas_with_tf.get(CASViews.CAMERA_INFO)
 
         od = ObjectDesignator()
 
@@ -261,13 +263,13 @@ class TestUtilsAnnotationConversion(object):
         converter.convert(pose_annotation, cas_with_tf, od)
 
         new_rotation = (
-            R.from_quat(cam_to_world_quat) * R.from_quat(pose_annotation.rotation)
+            R.from_quat(camera_to_world_quat) * R.from_quat(pose_annotation.rotation)
         ).as_quat(True)
 
         assert len(od.pose) == 1
         pose: PoseStamped = od.pose[0]
         assert pose.header.frame_id == "map"
-        assert pose.header.stamp.sec == kinect_cam_info.header.stamp.sec
+        assert pose.header.stamp.sec == kinect_camera_info.header.stamp.sec
         assert (
             pose.header.stamp.nanosec == 0
         )  # TODO: Nanoseconds are ignored in RoboKudo?
@@ -289,7 +291,9 @@ class TestUtilsAnnotationConversion(object):
         assert converter.can_convert(other_ann) == False
 
     def test_position_2_od_converter_convert(self, cas_with_tf: CAS):
-        cam_to_world_quat = cas_with_tf.cam_to_world_transform.to_quaternion().to_list()
+        camera_to_world_quat = (
+            cas_with_tf.camera_to_world_transform.to_quaternion().to_list()
+        )
 
         od = ObjectDesignator()
 
@@ -313,7 +317,7 @@ class TestUtilsAnnotationConversion(object):
                 pose.pose.orientation.z,
                 pose.pose.orientation.w,
             ],
-            cam_to_world_quat,
+            camera_to_world_quat,
         )
 
     def test_stamped_position_2_od_converter_can_convert(self):
@@ -322,7 +326,9 @@ class TestUtilsAnnotationConversion(object):
         assert converter.can_convert(Annotation()) == False
 
     def test_stamped_position_2_od_converter_convert(self, cas_with_tf: CAS):
-        cam_to_world_quat = cas_with_tf.cam_to_world_transform.to_quaternion().to_list()
+        camera_to_world_quat = (
+            cas_with_tf.camera_to_world_transform.to_quaternion().to_list()
+        )
         od = ObjectDesignator()
 
         converter = StampedPosition2ODConverter()
@@ -350,7 +356,7 @@ class TestUtilsAnnotationConversion(object):
                 pose.pose.orientation.z,
                 pose.pose.orientation.w,
             ],
-            cam_to_world_quat,
+            camera_to_world_quat,
         )
 
     def test_bounding_box_3d_for_shape_size_converter_can_convert(self):

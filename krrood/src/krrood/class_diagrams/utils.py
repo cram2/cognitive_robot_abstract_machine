@@ -4,6 +4,8 @@ import builtins
 import inspect
 import os
 import sys
+import types
+import typing
 from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
@@ -20,11 +22,17 @@ from typing_extensions import (
     Type,
     TypeVar,
     TypeVarTuple,
+    get_origin,
 )
 
 from krrood import logger
 from krrood.class_diagrams.exceptions import CouldNotResolveType
-from krrood.utils import ensure_hashable, get_scope_from_imports, is_builtin_type
+from krrood.utils import (
+    ensure_hashable,
+    get_scope_from_imports,
+    get_full_class_name,
+    is_builtin_type,
+)
 
 
 def classes_of_module(module) -> List[Type]:
@@ -122,6 +130,15 @@ def is_builtin_class(clazz: Type) -> bool:
     :return: Whether *clazz* is defined in the ``builtins`` module.
     """
     return clazz.__module__ == "builtins"
+
+
+def is_union_annotation(annotation: Any) -> bool:
+    """
+    :param annotation: A type annotation to inspect.
+    :return: Whether ``annotation`` is a ``typing.Union[...]`` or a ``X | Y`` union.
+    """
+    origin = get_origin(annotation)
+    return origin is typing.Union or origin is getattr(types, "UnionType", None)
 
 
 def is_external_module(module) -> bool:
@@ -313,7 +330,11 @@ def get_type_hints_of_object(
                 f"Could not get type hints for {object_} due to TypeError: {type_error}. This may be caused by a type"
                 f" hint that cannot be resolved."
             )
-            raise
+            raise CouldNotResolveType(
+                repr(object_),
+                extra_information=f"Could not get type hints for {object_} due to TypeError: {type_error}. This may be"
+                f" caused by a type hint that cannot be resolved.",
+            ) from type_error
     return type_hints
 
 
@@ -412,7 +433,7 @@ def get_object_by_name_from_another_object_in_same_module(
     :param name: The name of the type to get.
     :param object_: The object to get the type from.
     :return: The object with the given name.
-    :raises CouldNotResolveType: If the type cannot be resolved.
+    :raises CouldNotResolveType: If the object cannot be resolved.
     """
     module = inspect.getmodule(object_)
     if module is not None and hasattr(module, name):
@@ -445,3 +466,18 @@ def get_object_by_name_from_another_object_in_same_module(
         extra_information=f"Could not find {name} in {source_path}, could be a deprecated import statement or "
         f"a type defined in a module that is not imported in the source file.",
     )
+
+
+def get_class_unique_name(cls: type) -> str:
+    """
+    Returns a unique identifier for a class based on its source file and qualified name.
+
+    :param cls: The class.
+    :return: The unique name of the class
+    """
+    try:
+        source_file = os.path.abspath(inspect.getfile(cls))
+        return f"{source_file}.{cls.__qualname__}"
+    except (TypeError, OSError):
+        # Fallback for built-in classes or classes defined in the REPL
+        return get_full_class_name(cls)

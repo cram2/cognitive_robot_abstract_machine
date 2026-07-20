@@ -22,7 +22,9 @@ from robokudo.pipeline import Pipeline
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.object_hypothesis_visualizer import ObjectHypothesisVisualizer
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -66,7 +68,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             Make sure to store some annotated data in the MongoDB database
             before running this pipeline, or it will not display anything.
         """
-        cr_storage_config = CrDescriptorFactory.create_descriptor(
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
             "mongo", db_name="store_with_annotations"
         )
 

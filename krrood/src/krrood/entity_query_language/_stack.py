@@ -13,7 +13,7 @@ import linecache
 import sys
 from dataclasses import dataclass
 from types import FrameType
-from typing_extensions import Callable, List, Optional
+from typing_extensions import Callable, List, Optional, Any, Dict
 
 
 @dataclass
@@ -53,6 +53,17 @@ class StackFrame:
     """
     Dotted module name (string, not ``ModuleType``) to avoid reference leaks.
     """
+    global_namespace: Optional[Dict[str, Any]] = None
+    """
+    Shallow snapshot of the frame's ``f_globals``, or ``None`` when scope was not
+    captured.
+    """
+
+    local_namespace: Optional[Dict[str, Any]] = None
+    """
+    Shallow snapshot of the frame's ``f_locals``, or ``None`` when scope was not
+    captured.
+    """
 
     @property
     def is_method(self) -> bool:
@@ -61,13 +72,33 @@ class StackFrame:
         """
         return self.class_object is not None
 
+    @property
+    def scope(self) -> Dict[str, Any]:
+        """
+        Merged ``{**globals, **locals}`` snapshot (locals win).
+
+        Empty if scope was not captured.
+        """
+        merged: Dict[str, Any] = {}
+        if self.global_namespace:
+            merged.update(self.global_namespace)
+        if self.local_namespace:
+            merged.update(self.local_namespace)
+        return merged
+
     @classmethod
-    def from_frame_info(cls, frame_info: inspect.FrameInfo) -> StackFrame:
+    def from_frame_info(
+        cls, frame_info: inspect.FrameInfo, capture_scope: bool = False
+    ) -> StackFrame:
         """
         Eagerly extract all data from a live ``FrameInfo`` and drop the frame reference.
 
         Must be called while the frame is still on the call stack so that
         ``f_locals`` is populated.
+
+        :param frame_info: The live frame info to extract from.
+        :param capture_scope: When True, also snapshot shallow copies of the frame's
+            ``f_globals`` and ``f_locals`` so the frame's namespace survives the frame.
         """
         snippet = (
             frame_info.code_context[0].strip() if frame_info.code_context else None
@@ -78,10 +109,13 @@ class StackFrame:
             lineno=frame_info.lineno,
             function_name=frame_info.function,
             code_snippet=snippet,
+            capture_scope=capture_scope,
         )
 
     @classmethod
-    def from_raw_frame(cls, frame: FrameType) -> StackFrame:
+    def from_raw_frame(
+        cls, frame: FrameType, capture_scope: bool = False
+    ) -> StackFrame:
         """
         Eagerly extract all data from a live frame object and drop the frame reference.
 
@@ -91,6 +125,8 @@ class StackFrame:
         ``f_locals`` is populated.
 
         :param frame: The live frame to extract data from.
+        :param capture_scope: When True, also snapshot shallow copies of the frame's
+            ``f_globals``
         :return: A self-contained :class:`StackFrame`.
         """
         filename = frame.f_code.co_filename
@@ -102,6 +138,7 @@ class StackFrame:
             lineno=lineno,
             function_name=frame.f_code.co_name,
             code_snippet=snippet,
+            capture_scope=capture_scope,
         )
 
     @classmethod
@@ -113,6 +150,7 @@ class StackFrame:
         lineno: int,
         function_name: str,
         code_snippet: Optional[str],
+        capture_scope: bool = False,
     ) -> StackFrame:
         """
         Build a :class:`StackFrame` from a live frame and its already-extracted location
@@ -128,6 +166,8 @@ class StackFrame:
         :param lineno: Line number within the source file.
         :param function_name: Name of the function or method.
         :param code_snippet: One stripped source line, or ``None`` if unavailable.
+        :param capture_scope: When True, also snapshot shallow copies of the frame's
+            ``f_globals``
         :return: The constructed :class:`StackFrame`.
         """
         instance = frame.f_locals.get("self", None)
@@ -145,6 +185,8 @@ class StackFrame:
             class_object=owner_class,
             function_object=resolved_function,
             module_name=frame.f_globals.get("__name__"),
+            global_namespace=dict(frame.f_globals) if capture_scope else None,
+            local_namespace=dict(frame.f_locals) if capture_scope else None,
         )
 
 

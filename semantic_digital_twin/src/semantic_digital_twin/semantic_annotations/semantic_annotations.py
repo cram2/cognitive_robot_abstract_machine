@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Iterable, Optional, Self, Tuple, TYPE_CHECKING
+from typing import Iterable, Optional, Self, Tuple, TYPE_CHECKING, Union
 
+import numpy as np
 from typing_extensions import List, Type
 
 from krrood.ormatic.utils import classproperty
+from semantic_digital_twin.datastructures.alignment import AlignmentPair
 from krrood.symbolic_math import symbolic_math
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
@@ -39,6 +41,7 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
@@ -428,7 +431,6 @@ class DoubleDoor(SemanticAnnotation):
 
 @dataclass(eq=False)
 class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMechanicalJoint):
-
     @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.Z()
@@ -459,7 +461,7 @@ class CounterTop(Furniture, HasSupportingSurface, HasSink):
 
 
 @dataclass(eq=False)
-class Cabinet(Furniture, HasCaseAsRootBody, HasHandle, HasDoors, HasDrawers):
+class Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers):
     @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.NEGATIVE_X()
@@ -487,7 +489,6 @@ class Wardrobe(Cabinet): ...
 
 @dataclass(eq=False)
 class Floor(HasSupportingSurface):
-
     @classmethod
     def create_with_new_body_in_world(
         cls,
@@ -1200,6 +1201,176 @@ class Cooktop(HasRootBody):
     """
     A cooktop surface for cooking.
     """
+
+
+@dataclass(eq=False)
+class Tool(HasRootBody, ABC):
+    """
+    A tool that is held by a robot's end effector to act on other bodies.
+    """
+
+    def _end_effector_name(self) -> PrefixedName:
+        """
+        :return: The name of the body that acts as the tool's tip, derived from the
+            tool's root name.
+        """
+        root_name = self.root.name
+        return PrefixedName(f"{root_name.name}_end_effector", root_name.prefix)
+
+    def _find_end_effector_body(self) -> Optional[Body]:
+        if self.root._world is None:
+            return None
+
+        end_effector_name = self._end_effector_name()
+        for body in self.root._world.bodies:
+            if (
+                body.name == end_effector_name
+                or body.name.name == end_effector_name.name
+            ):
+                return body
+        return None
+
+    def get_tool_frame(self) -> Body:
+        """
+        :return: The body acting as the tool's tip, or the tool's root if no dedicated
+            tip body exists.
+        """
+        end_effector = self._find_end_effector_body()
+        if end_effector is None:
+            return self.root
+        return end_effector
+
+    @abstractmethod
+    def tool_alignment(self, target: Union[Body, Pose]) -> List[AlignmentPair]:
+        """
+        :param target: The body or pose the tool acts on.
+        :return: The normal pairs that must stay aligned while the tool acts on the
+            target.
+        """
+
+
+@dataclass(eq=False)
+class ToolWithHandle(Tool, HasHandle, ABC):
+    """
+    A tool held by its handle, acting through a tip body located ahead of its root.
+
+    If the tip body does not exist yet, it is created and rigidly connected to the
+    tool's root.
+    """
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.root._world is None:
+            return
+        if self._find_end_effector_body() is not None:
+            return
+        self._create_end_effector_body()
+
+    def _create_end_effector_body(self):
+        world = self.root._world
+        tip_body = Body(name=self._end_effector_name())
+        with world.modify_world():
+            world.add_kinematic_structure_entity(tip_body)
+            world.add_connection(
+                FixedConnection(
+                    parent=self.root,
+                    child=tip_body,
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=0.1,
+                        y=0.0,
+                        z=0.0,
+                        reference_frame=self.root,
+                    ),
+                )
+            )
+
+
+@dataclass(eq=False)
+class Whisk(ToolWithHandle):
+    """
+    A whisk for mixing the contents of containers.
+    """
+
+    def tool_alignment(self, target: Union[Body, Pose]) -> List[AlignmentPair]:
+        return [
+            AlignmentPair(
+                tip_normal=Vector3(-1, 0, 0, reference_frame=self.root),
+                goal_normal=Vector3(0, 0, 1, reference_frame=target),
+            )
+        ]
+
+
+@dataclass(eq=False)
+class CuttingKnife(ToolWithHandle):
+    """
+    A knife for cutting food objects.
+    """
+
+    def tool_alignment(self, target: Union[Body, Pose]) -> List[AlignmentPair]:
+        return [
+            AlignmentPair(
+                tip_normal=Vector3(1, 0, 0, reference_frame=self.root),
+                goal_normal=Vector3(0, 1, 0, reference_frame=target),
+            ),
+            AlignmentPair(
+                tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
+                goal_normal=Vector3(0, 0, 1, reference_frame=target),
+            ),
+        ]
+
+
+@dataclass(eq=False)
+class PouringCup(Tool):
+    """
+    A cup for pouring liquids into containers.
+    """
+
+    def tool_alignment(self, target: Union[Body, Pose]) -> List[AlignmentPair]:
+        return [
+            AlignmentPair(
+                tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
+                goal_normal=Vector3(0, 0, 1, reference_frame=target),
+            )
+        ]
+
+
+@dataclass(eq=False)
+class Sponge(Tool):
+    """
+    A sponge for wiping surfaces.
+
+    .. note:: The sponge is grasped so its local Z axis points away from the gripper,
+        which is why its alignments use negative Z normals unlike the other tools.
+    """
+
+    def tool_alignment(self, target: Union[Body, Pose]) -> List[AlignmentPair]:
+        if isinstance(target, Body):
+            return [
+                AlignmentPair(
+                    tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
+                    goal_normal=Vector3(0, 0, -1, reference_frame=target),
+                )
+            ]
+        return [
+            AlignmentPair(
+                tip_normal=Vector3(0, 0, -1, reference_frame=self.root),
+                goal_normal=self._pose_surface_normal(target),
+            )
+        ]
+
+    def _pose_surface_normal(self, pose: Pose) -> Vector3:
+        """
+        :param pose: The pose whose surface normal is computed.
+        :return: The pose's local Z axis expressed in the pose's reference frame.
+        """
+        reference_frame = (
+            pose.reference_frame if pose.reference_frame is not None else self.root
+        )
+        rotation = pose.to_rotation_matrix().to_np()[:3, :3]
+        return Vector3.from_iterable(
+            rotation @ np.array([0.0, 0.0, 1.0]),
+            reference_frame=reference_frame,
+        )
 
 
 @dataclass(eq=False)

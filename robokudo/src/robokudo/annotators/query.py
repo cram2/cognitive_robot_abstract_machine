@@ -27,53 +27,53 @@ import rclpy
 from geometry_msgs.msg import PoseStamped
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
-from rclpy.action import GoalResponse, CancelResponse
-from rclpy.action.server import ServerGoalHandle, ActionServer
+from rclpy.action import CancelResponse, GoalResponse
+from rclpy.action.server import ActionServer, ServerGoalHandle
 from rclpy.node import Node
+from robokudo_msgs.action import Query
 from robokudo_msgs.msg import ObjectDesignator
 from typing_extensions import Any, Optional, Type
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.defs import PACKAGE_NAME, LOGGING_IDENTIFIER_QUERY
+from robokudo.defs import LOGGING_IDENTIFIER_QUERY, PACKAGE_NAME
 from robokudo.identifier import BBIdentifier
 from robokudo.types.annotation import (
-    SemanticColor,
+    BoundingBox3DAnnotation,
     Classification,
-    PoseAnnotation,
-    StampedPoseAnnotation,
-    PositionAnnotation,
-    StampedPositionAnnotation,
-    Shape,
     Cuboid,
     Cylinder,
-    Sphere,
     LocationAnnotation,
-    BoundingBox3DAnnotation,
+    PoseAnnotation,
+    PositionAnnotation,
+    SemanticColor,
+    Shape,
+    Sphere,
+    StampedPoseAnnotation,
+    StampedPositionAnnotation,
 )
 from robokudo.types.cv import BoundingBox3D
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotation_conversion import (
-    SemanticColor2ODConverter,
-    Classification2ODConverter,
-    StampedPose2ODConverter,
     BoundingBox3DForShapeSizeConverter,
-    Pose2ODConverter,
-    Position2ODConverter,
-    StampedPosition2ODConverter,
-    Shape2ODConverter,
+    Classification2ODConverter,
     Cuboid2ODConverter,
     Cylinder2ODConverter,
-    Sphere2ODConverter,
     Location2ODConverter,
+    Pose2ODConverter,
+    Position2ODConverter,
+    SemanticColor2ODConverter,
+    Shape2ODConverter,
+    Sphere2ODConverter,
+    StampedPose2ODConverter,
+    StampedPosition2ODConverter,
 )
 from robokudo.utils.error_handling import (
-    has_blackboard_exception,
-    get_blackboard_exception,
     clear_blackboard_exception,
+    get_blackboard_exception,
+    has_blackboard_exception,
 )
-from robokudo.utils.query import QueryHandler
-from robokudo_msgs.action import Query
+from robokudo.utils.query import ObjectHypothesisQueryMatcher, QueryHandler
 
 
 class QueryAnnotator(BaseAnnotator):
@@ -90,7 +90,7 @@ class QueryAnnotator(BaseAnnotator):
         """
         Initialize the query annotator.
 
-        :param name: Annotator name, defaults to "QueryAnnotator"
+        :param name: Annotator name
         """
         super().__init__(name=name)
 
@@ -238,7 +238,7 @@ class QueryReply(BaseAnnotator):
         """
         Initialize query reply generator.
 
-        :param name: Annotator name, defaults to "QueryReply"
+        :param name: Annotator name
         """
         super().__init__(name=name)
 
@@ -289,11 +289,21 @@ class GenerateQueryResult(BaseAnnotator):
     pick the information up and send it as a query reply.
     """
 
-    def __init__(self, name: str = "GenerateQueryResult"):
-        """
-        Initialize query result generator.
+    class Descriptor(BaseAnnotator.Descriptor):
+        class Parameters:
+            def __init__(self) -> None:
+                self.filter_by_query: bool = False
+                """Only return ObjectHypotheses matching requested query attributes."""
 
-        :param name: Annotator name, defaults to "GenerateQueryResult"
+        parameters = Parameters()
+
+    def __init__(
+        self, name: str = "GenerateQueryResult", descriptor: Optional[Descriptor] = None
+    ) -> None:
+        """Initialize query result generator.
+
+        :param name: Annotator name
+        :param descriptor: Annotator configuration descriptor
         """
         self.rk_logger = logging.getLogger(PACKAGE_NAME)
 
@@ -325,8 +335,9 @@ class GenerateQueryResult(BaseAnnotator):
             BoundingBox3D: self.bb_size_converter,
             BoundingBox3DAnnotation: self.bb_size_converter,
         }
+        self.query_matcher = ObjectHypothesisQueryMatcher()
 
-        super().__init__(name=name)
+        super().__init__(name=name, descriptor=descriptor)
 
     def update(self) -> Status:
         """
@@ -349,11 +360,22 @@ class GenerateQueryResult(BaseAnnotator):
         cas = self.get_cas()
         annotations = cas.annotations
         object_hypotheses_count = 0
+        skipped_object_hypotheses_count = 0
         query_result = []
         result = Query.Result()
+        requested_object = None
+        if self.descriptor.parameters.filter_by_query and cas.contains(CASViews.QUERY):
+            query = cas.get(CASViews.QUERY)
+            requested_object = query.obj
 
         for annotation in annotations:
             if not isinstance(annotation, ObjectHypothesis):
+                continue
+
+            if requested_object is not None and not self.query_matcher.matches(
+                annotation, requested_object
+            ):
+                skipped_object_hypotheses_count += 1
                 continue
 
             object_designator = ObjectDesignator()
@@ -383,7 +405,8 @@ class GenerateQueryResult(BaseAnnotator):
         QueryHandler.send_answer(result)
 
         self.feedback_message = (
-            f"Send result for {object_hypotheses_count} object hypotheses"
+            f"Send result for {object_hypotheses_count} object hypotheses "
+            f"({skipped_object_hypotheses_count} filtered by query)"
         )
         return Status.SUCCESS
 

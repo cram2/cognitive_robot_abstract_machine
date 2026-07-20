@@ -19,23 +19,25 @@ The module is used for:
 """
 
 from __future__ import annotations
+
 from timeit import default_timer
 
 from py_trees.common import Status
-from typing_extensions import List, TYPE_CHECKING
+from semantic_digital_twin.world_description.world_entity import Region
+from typing_extensions import TYPE_CHECKING, List
 
-from robokudo.annotators.core import ThreadedAnnotator, BaseAnnotator
+import robokudo.world as rk_world
+from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.types.annotation import LocationAnnotation
 from robokudo.types.scene import ObjectHypothesis
-from robokudo.utils.annotator_helper import get_world_to_cam_transform_matrix
+from robokudo.utils.annotator_helper import get_world_to_camera_transform_matrix
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
-import robokudo.world as rk_world
-from robokudo.utils.region import region_obb_in_cam_coordinates
-from semantic_digital_twin.world_description.world_entity import Region
+from robokudo.utils.region import region_obb_in_camera_coordinates
 
 if TYPE_CHECKING:
-    import numpy.typing as npt
     from collections.abc import Iterable
+
+    import numpy.typing as npt
 
 
 class LocationAnnotator(ThreadedAnnotator):
@@ -76,19 +78,19 @@ class LocationAnnotator(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "LocationAnnotator",
-        descriptor: "LocationAnnotator.Descriptor" = Descriptor(),
+        descriptor: LocationAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the location annotator.
 
-        :param name: Annotator name, defaults to "LocationAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Annotator name
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name=name, descriptor=descriptor)
 
     def add_location_in_object_hypotheses(
         self,
         region: Region,
-        world_to_cam_transform_matrix: npt.NDArray,
+        world_to_camera_transform_matrix: npt.NDArray,
         object_hypotheses: Iterable[ObjectHypothesis],
     ) -> None:
         """Add location annotations to objects within a region.
@@ -101,12 +103,12 @@ class LocationAnnotator(ThreadedAnnotator):
         * Creates location annotation if above threshold
 
         :param region: Semantic map region entry
-        :param world_to_cam_transform_matrix: Transform from world to camera frame
+        :param world_to_camera_transform_matrix: Transform from world to camera frame
         :param object_hypotheses: List of object hypotheses to check
         """
         runtime_world = rk_world.world_instance()
-        obb = region_obb_in_cam_coordinates(
-            runtime_world, region, world_to_cam_transform_matrix
+        obb = region_obb_in_camera_coordinates(
+            runtime_world, region, world_to_camera_transform_matrix
         )
         for object_hypothesis in object_hypotheses:
             # Extract the indices of an object that lies inside the region
@@ -147,7 +149,7 @@ class LocationAnnotator(ThreadedAnnotator):
         active_regions = {str(region.name): region for region in regions}
         # TODO Filter active regions by FRUSTUM CULLING
 
-        world_to_cam_transform_matrix = get_world_to_cam_transform_matrix(
+        world_to_camera_transform_matrix = get_world_to_camera_transform_matrix(
             self.get_cas()
         )
         object_hypotheses = self.get_cas().filter_annotations_by_type(ObjectHypothesis)
@@ -157,14 +159,14 @@ class LocationAnnotator(ThreadedAnnotator):
             if len(self.descriptor.parameters.desired_regions) == 0:
                 self.add_location_in_object_hypotheses(
                     region,
-                    world_to_cam_transform_matrix,
+                    world_to_camera_transform_matrix,
                     object_hypotheses,
                 )
 
             elif region_name in self.descriptor.parameters.desired_regions:
                 self.add_location_in_object_hypotheses(
                     region,
-                    world_to_cam_transform_matrix,
+                    world_to_camera_transform_matrix,
                     object_hypotheses,
                 )
 

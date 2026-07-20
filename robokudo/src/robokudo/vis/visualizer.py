@@ -10,10 +10,12 @@ for RoboKudo pipeline visualization. It implements:
 * Common visualization utilities
 """
 
+from __future__ import annotations
+
 import logging
 
 from py_trees.blackboard import Blackboard
-from typing_extensions import List, Any, Optional, Set, Type
+from typing_extensions import Any, List, Optional, Set, Type
 
 from robokudo.annotators.outputs import AnnotatorOutputs
 from robokudo.defs import PACKAGE_NAME
@@ -45,9 +47,9 @@ class Visualizer(object):
 
         def __init__(self) -> None:
             """Initialize the observable object."""
-            self._observers: List["Visualizer.Observer"] = []
+            self._observers: List[Visualizer.Observer] = []
 
-        def register_observer(self, observer: "Visualizer.Observer") -> None:
+        def register_observer(self, observer: Visualizer.Observer) -> None:
             """Register an observer to receive notifications.
 
             :param observer: The observer to register
@@ -66,7 +68,7 @@ class Visualizer(object):
         """
 
         def notify(
-            self, observable: "Visualizer.Observable", *args: Any, **kwargs: Any
+            self, observable: Visualizer.Observable, *args: Any, **kwargs: Any
         ) -> None:
             """Handle notification of state changes.
 
@@ -102,13 +104,13 @@ class Visualizer(object):
             self.active_annotator_i: int = 0
             """ Index of currently active annotator """
 
-    instances: List["Visualizer"] = []
+    instances: List[Visualizer] = []
     """List of all active visualizer instances"""
 
     def __init__(
         self,
         pipeline: Pipeline,
-        shared_visualizer_state: Optional["Visualizer.SharedState"] = None,
+        shared_visualizer_state: Optional[Visualizer.SharedState] = None,
     ) -> None:
         """Initialize the visualizer.
 
@@ -124,7 +126,7 @@ class Visualizer(object):
         self.indicate_termination_var: bool = False
         """Flag indicating if visualization should terminate"""
 
-        self.shared_visualizer_state: Optional["Visualizer.SharedState"] = (
+        self.shared_visualizer_state: Optional[Visualizer.SharedState] = (
             shared_visualizer_state
         )
         """Shared state object for coordinating between visualizers"""
@@ -187,8 +189,8 @@ class Visualizer(object):
     def new_visualizer_instance(
         cls,
         pipeline: Pipeline,
-        shared_visualizer_state: Optional["Visualizer.SharedState"] = None,
-    ) -> "Visualizer":
+        shared_visualizer_state: Optional[Visualizer.SharedState] = None,
+    ) -> Visualizer:
         """Create and register a new visualizer instance.
 
         :param pipeline: Pipeline to visualize

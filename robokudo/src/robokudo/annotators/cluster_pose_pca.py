@@ -57,8 +57,7 @@ class ClusterPosePCAAnnotator(BaseAnnotator):
         """
         Initialize the PCA pose estimator.
 
-        :param name: Name of this annotator instance, defaults to
-            "ClusterPosePCAAnnotator"
+        :param name: Name of this annotator instance
         """
         super().__init__(name)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

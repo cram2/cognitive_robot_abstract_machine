@@ -1381,6 +1381,22 @@ def test_accessing_a_dunder_attribute_symbolically_raises_a_helpful_error():
     assert getattr(var, "__name__", "fallback") == "fallback"
 
 
+def test_descendants_yields_each_shared_node_only_once():
+    """A node reachable by more than one path is a descendant once, not once per path.
+
+    ``and_(v > 1, v < 3)`` makes ``v`` a child of both comparators, so a naive
+    depth-first walk revisits ``v`` (and, in a rule tree, every shared subtree)
+    once per path. On a deep rule-tree DAG this compounds into an exponential
+    traversal that stalls fitting, so ``_descendants_`` must yield every node at
+    most once.
+    """
+    var = variable(int, [1, 2, 3])
+    entity(var).where(and_(var > 1, var < 3))
+    descendant_ids = [descendant._id_ for descendant in var._root_._descendants_]
+
+    assert len(descendant_ids) == len(set(descendant_ids))
+
+
 def test_root_caches_all_descendant_ids_for_nested_queries():
     """
     Test that the root of a query has all descendant IDs in its _expression_id_cache_,

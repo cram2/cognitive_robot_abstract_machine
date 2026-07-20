@@ -14,7 +14,9 @@ from robokudo.annotators.static_object_detector import (
 from robokudo.annotators.world_descriptor_bootstrap import (
     WorldDescriptorBootstrapAnnotator,
 )
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
@@ -22,7 +24,7 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         return "static_detector_world_descriptor_from_storage"
 
     def implementation(self):
-        cr_storage_config = CrDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
         bootstrap = WorldDescriptorBootstrapAnnotator.Descriptor()
         bootstrap.parameters.world_descriptor_name = "world_iai_kitchen20"
