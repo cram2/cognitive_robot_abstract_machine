@@ -1718,6 +1718,21 @@ class DishwasherDAO_doors_association(Base, AssociationDataAccessObject):
     )
 
 
+class ElevatorDAO_walls_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_59170266076295778846035508626926687853491307429945258783126961"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_elevatordao_id: Mapped[int] = mapped_column(
+        ForeignKey("ElevatorDAO.database_id")
+    )
+    target_walldao_id: Mapped[int] = mapped_column(ForeignKey("WallDAO.database_id"))
+
+    target: Mapped[WallDAO] = relationship(
+        "WallDAO", foreign_keys=[target_walldao_id], lazy="selectin"
+    )
+
+
 class CabinetDAO_drawers_association(Base, AssociationDataAccessObject):
     __tablename__ = "_78935730707677584132340042205919980093565313221522547522363462"
 
@@ -18995,6 +19010,68 @@ class DroneDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "DroneDAO",
+        "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class ElevatorDAO(
+    HasRootBodyDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Elevator
+    ],
+):
+    __tablename__ = "ElevatorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    doors_id: Mapped[int] = mapped_column(
+        ForeignKey("DoubleDoorDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    drive_id: Mapped[int] = mapped_column(
+        ForeignKey("SliderDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    floor_id: Mapped[int] = mapped_column(
+        ForeignKey("FloorDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    anker_point_id: Mapped[int] = mapped_column(
+        ForeignKey("BodyDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    doors: Mapped[DoubleDoorDAO] = relationship(
+        "DoubleDoorDAO", uselist=False, foreign_keys=[doors_id], post_update=True
+    )
+    drive: Mapped[SliderDAO] = relationship(
+        "SliderDAO", uselist=False, foreign_keys=[drive_id], post_update=True
+    )
+    walls: Mapped[builtins.list[ElevatorDAO_walls_association]] = relationship(
+        "ElevatorDAO_walls_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[ElevatorDAO_walls_association.source_elevatordao_id]",
+        lazy="selectin",
+    )
+    floor: Mapped[FloorDAO] = relationship(
+        "FloorDAO", uselist=False, foreign_keys=[floor_id], post_update=True
+    )
+    anker_point: Mapped[BodyDAO] = relationship(
+        "BodyDAO", uselist=False, foreign_keys=[anker_point_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ElevatorDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
         "polymorphic_load": "selectin",
     }

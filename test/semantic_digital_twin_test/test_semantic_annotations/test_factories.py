@@ -33,6 +33,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
 from krrood.patterns.field_metadata import FieldMetadata
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     DoubleDoor,
+    Elevator,
     Floor,
     Cup,
     Cabinet,
@@ -362,6 +363,126 @@ class TestFactories(unittest.TestCase):
         self.assertEqual(len(semantic_wall_annotations), 1)
         self.assertTrue(isinstance(wall.root.parent_connection, FixedConnection))
         self.assertEqual(wall, semantic_wall_annotations[0])
+
+    def test_elevator_factory_creates_and_registers(self):
+        world = World()
+        root = Body(name=PrefixedName("root"))
+        with world.modify_world():
+            world.add_body(root)
+        with world.modify_world():
+            elevator = Elevator.create_with_new_bodies_in_world(
+                name=PrefixedName("elevator"),
+                world=world,
+                scale=Scale(1.5, 1.0, 2.2),
+            )
+
+        semantic_elevator_annotations = world.get_semantic_annotations_by_type(
+            Elevator
+        )
+        self.assertEqual(len(semantic_elevator_annotations), 1)
+        self.assertEqual(elevator, semantic_elevator_annotations[0])
+        self.assertTrue(isinstance(elevator.root.parent_connection, FixedConnection))
+        self.assertEqual(world.root, elevator.root.parent_kinematic_structure_entity)
+        self.assertIs(elevator.anker_point, elevator.root)
+        self.assertEqual(elevator.floor_positions, {})
+
+    def test_elevator_factory_wires_prismatic_drive_between_anker_and_floor(self):
+        world = World()
+        root = Body(name=PrefixedName("root"))
+        with world.modify_world():
+            world.add_body(root)
+        with world.modify_world():
+            elevator = Elevator.create_with_new_bodies_in_world(
+                name=PrefixedName("elevator"),
+                world=world,
+                scale=Scale(1.5, 1.0, 2.2),
+            )
+
+        self.assertTrue(
+            isinstance(elevator.drive.root.parent_connection, PrismaticConnection)
+        )
+        self.assertEqual(
+            elevator.anker_point,
+            elevator.drive.root.parent_kinematic_structure_entity,
+        )
+        self.assertTrue(
+            isinstance(elevator.floor.root.parent_connection, FixedConnection)
+        )
+        self.assertEqual(
+            elevator.drive.root,
+            elevator.floor.root.parent_kinematic_structure_entity,
+        )
+
+    def test_elevator_factory_mounts_walls_and_doors_on_floor(self):
+        world = World()
+        root = Body(name=PrefixedName("root"))
+        with world.modify_world():
+            world.add_body(root)
+        with world.modify_world():
+            elevator = Elevator.create_with_new_bodies_in_world(
+                name=PrefixedName("elevator"),
+                world=world,
+                scale=Scale(1.5, 1.0, 2.2),
+            )
+
+        self.assertEqual(len(elevator.walls), 3)
+        for wall in elevator.walls:
+            self.assertEqual(
+                elevator.floor.root, wall.root.parent_kinematic_structure_entity
+            )
+        self.assertEqual(
+            elevator.doors.door_0.mechanical_joint.root,
+            elevator.doors.door_0.root.parent_kinematic_structure_entity,
+        )
+        self.assertEqual(
+            elevator.doors.door_1.mechanical_joint.root,
+            elevator.doors.door_1.root.parent_kinematic_structure_entity,
+        )
+        semantic_double_door_annotations = world.get_semantic_annotations_by_type(
+            DoubleDoor
+        )
+        self.assertIn(elevator.doors, semantic_double_door_annotations)
+
+    def test_elevator_factory_connects_doors_with_sliders(self):
+        world = World()
+        root = Body(name=PrefixedName("root"))
+        with world.modify_world():
+            world.add_body(root)
+        with world.modify_world():
+            elevator = Elevator.create_with_new_bodies_in_world(
+                name=PrefixedName("elevator"),
+                world=world,
+                scale=Scale(1.5, 1.0, 2.2),
+            )
+
+        for door in (elevator.doors.door_0, elevator.doors.door_1):
+            self.assertTrue(isinstance(door.mechanical_joint, Slider))
+            self.assertTrue(
+                isinstance(
+                    door.mechanical_joint.root.parent_connection, PrismaticConnection
+                )
+            )
+            self.assertEqual(
+                elevator.floor.root,
+                door.mechanical_joint.root.parent_kinematic_structure_entity,
+            )
+            self.assertEqual(
+                door.mechanical_joint.root,
+                door.root.parent_kinematic_structure_entity,
+            )
+
+    def test_elevator_factory_invalid_scale_raises(self):
+        world = World()
+        root = Body(name=PrefixedName("root"))
+        with world.modify_world():
+            world.add_body(root)
+        with world.modify_world():
+            with pytest.raises(InvalidPlaneDimensions):
+                Elevator.create_with_new_bodies_in_world(
+                    name=PrefixedName("elevator"),
+                    world=world,
+                    scale=Scale(0.02, 0.02, 0.02),
+                )
 
     def test_aperture_factory(self):
         world = World()
