@@ -23,8 +23,10 @@ def test_verbalizable_predicate_renders_affirmatively():
 
 
 def test_wrapping_not_negates_the_predicate_inline():
-    """A ``Not`` over a verbalizable predicate flips its copula in place rather than wrapping the
-    whole clause in *"not (...)"*."""
+    """
+    A ``Not`` over a verbalizable predicate flips its copula in place rather than
+    wrapping the whole clause in *"not (...)"*.
+    """
     assert (
         verbalize_expression(Not(IsReachable(variable(Robot, []))))
         == "a Robot is not reachable"

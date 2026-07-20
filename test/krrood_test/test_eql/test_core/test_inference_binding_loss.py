@@ -38,7 +38,9 @@ class Outer:
 
 
 def test_inner_var_reachable_without_intermediate_query():
-    """Without a Query wrapper, the inner variable's _id_ is in all_bindings."""
+    """
+    Without a Query wrapper, the inner variable's _id_ is in all_bindings.
+    """
     val = variable_from([2, 3])
     inner_expr = inference(Inner)(value=val)  # InstantiatedVariable, has _id_
 
@@ -66,9 +68,9 @@ def test_inner_var_reachable_without_intermediate_query():
 def test_inner_var_reachable_through_query_wrapper_after_fix():
     """
     After fixing Variable to link sources as previous_operation_result and all_bindings
-    to traverse the full previous chain, val._id_ and inner_expr._id_ are now
-    reachable even when an intermediate Query (with slim bindings) sits between them
-    and the outer result.
+    to traverse the full previous chain, val._id_ and inner_expr._id_ are now reachable
+    even when an intermediate Query (with slim bindings) sits between them and the outer
+    result.
 
     This fixes the failure in test_explain_inferred_semantic_annotations where
     condition.left._child_._id_ (FixedConnection variable) was missing from

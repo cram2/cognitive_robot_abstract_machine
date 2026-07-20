@@ -242,18 +242,25 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         return cls(text=value_phrase(value), role=SemanticRole.LITERAL)
 
     @classmethod
-    def for_member(cls, value: Any) -> RoleFragment:
-        """Build a fragment for one admissible member of a set or disjunction: a class renders as a
-        source-linked type reference (:meth:`for_type`), any other value as a literal
-        (:meth:`for_literal`). Lets the set/disjunction elements render members uniformly without
-        branching on whether they are types.
+    def for_value(cls, value: Any) -> RoleFragment:
+        """Render an arbitrary Python value to a fragment, picking the right kind automatically: a
+        class becomes a source-linked type reference (:meth:`for_type`, *"Robot"* linked to its
+        definition), anything else a plain literal (:meth:`for_literal`, *"42"*).
 
-        >>> RoleFragment.for_member(int).text
+        Use this — rather than choosing :meth:`for_type` or :meth:`for_literal` yourself — when the
+        value's kind is not known statically, i.e. when rendering the elements of a listing that may
+        hold either types or literals (:class:`~…vocabulary.parts_of_speech.DisjunctivePhrase` /
+        :class:`~…vocabulary.parts_of_speech.OneOf`). Prefer :meth:`for_literal` directly when the
+        value is always a literal.
+
+        >>> RoleFragment.for_value(int).text
         'Integer'
-        >>> RoleFragment.for_member(42).text
+        >>> RoleFragment.for_value(42).text
         '42'
         """
-        return cls.for_type(value) if isinstance(value, type) else cls.for_literal(value)
+        return (
+            cls.for_type(value) if isinstance(value, type) else cls.for_literal(value)
+        )
 
     @classmethod
     def for_operator(cls, label: str) -> RoleFragment:

@@ -64,13 +64,17 @@ class _Sensor:
 
 @dataclass
 class _SensorChild(_Sensor):
-    """Subclass to verify MRO walking (kept for potential future use)."""
+    """
+    Subclass to verify MRO walking (kept for potential future use).
+    """
 
     extra: str
 
 
 class _ConstantResolver:
-    """Stub resolver that always returns the same URL, for isolation."""
+    """
+    Stub resolver that always returns the same URL, for isolation.
+    """
 
     def __init__(self, url: str = "http://example.com/source") -> None:
         self._url = url
@@ -80,7 +84,9 @@ class _ConstantResolver:
 
 
 class _NoneResolver:
-    """Stub resolver that always returns None (no link available)."""
+    """
+    Stub resolver that always returns None (no link available).
+    """
 
     def resolve(self, ref: SourceReference) -> Optional[str]:
         return None
@@ -160,7 +166,9 @@ def test_autoapi_resolver_module_path_uses_slashes():
 
 
 def test_autoapi_resolver_no_warning_when_html_root_not_set(caplog):
-    """Without html_root, resolve() never logs a warning."""
+    """
+    Without html_root, resolve() never logs a warning.
+    """
     import logging
 
     r = AutoAPIResolver(base_url="https://docs.example.com")
@@ -170,7 +178,9 @@ def test_autoapi_resolver_no_warning_when_html_root_not_set(caplog):
 
 
 def test_autoapi_resolver_warns_when_local_page_missing(tmp_path):
-    """When html_root is set and the AutoAPI page is absent, a WARNING is logged."""
+    """
+    When html_root is set and the AutoAPI page is absent, a WARNING is logged.
+    """
     from unittest.mock import patch as _patch
     import krrood.entity_query_language.verbalization.rendering.source_link_resolver as _slr
 
@@ -183,7 +193,9 @@ def test_autoapi_resolver_warns_when_local_page_missing(tmp_path):
 
 
 def test_autoapi_resolver_no_warning_when_page_exists(tmp_path):
-    """When the AutoAPI page exists on disk, no WARNING is logged."""
+    """
+    When the AutoAPI page exists on disk, no WARNING is logged.
+    """
     from unittest.mock import patch as _patch
     import krrood.entity_query_language.verbalization.rendering.source_link_resolver as _slr
 
@@ -205,12 +217,14 @@ def test_autoapi_resolver_no_warning_when_page_exists(tmp_path):
 
 @pytest.fixture(scope="session")
 def built_example_domain_autoapi(tmp_path_factory) -> Path:
-    """Build the Sphinx AutoAPI HTML for ``example_domain`` into a tmp dir and return the HTML root.
+    """
+    Build the Sphinx AutoAPI HTML for ``example_domain`` into a tmp dir and return the
+    HTML root.
 
     Only ``example_domain`` is mirrored (into its real
-    ``krrood/entity_query_language/verbalization`` package path) so the build is fast yet faithful:
-    the generated page path and anchor ids are exactly those of a full docs build, which is what the
-    resolver's URLs must point at.
+    ``krrood/entity_query_language/verbalization`` package path) so the build is fast
+    yet faithful: the generated page path and anchor ids are exactly those of a full
+    docs build, which is what the resolver's URLs must point at.
     """
     pytest.importorskip("sphinx.application")
     pytest.importorskip("autoapi")
@@ -266,8 +280,10 @@ def built_example_domain_autoapi(tmp_path_factory) -> Path:
 def test_resolver_url_points_to_existing_page_and_anchor(
     built_example_domain_autoapi, reference
 ):
-    """The page and ``#anchor`` the resolver builds must exist in the real AutoAPI output \u2014 the
-    regression guard for the resolver's path/anchor scheme."""
+    """
+    The page and ``#anchor`` the resolver builds must exist in the real AutoAPI output
+    \u2014 the regression guard for the resolver's path/anchor scheme.
+    """
     html_root = built_example_domain_autoapi
     resolver = AutoAPIResolver(base_url=str(html_root), html_root=html_root)
     url = resolver.resolve(reference)
@@ -281,8 +297,10 @@ def test_resolver_url_points_to_existing_page_and_anchor(
 
 
 def test_in_site_docs_links_resolve_within_built_site(built_example_domain_autoapi):
-    """End-to-end regression for the 404: a verbalization rendered with the in-site resolver (as the
-    docs use it) produces relative links whose targets exist relative to the page's location.
+    """
+    End-to-end regression for the 404: a verbalization rendered with the in-site
+    resolver (as the docs use it) produces relative links whose targets exist relative
+    to the page's location.
     """
     html_root = built_example_domain_autoapi
     resolver = AutoAPIResolver.for_in_site_docs()  # base_url="../.."
@@ -322,7 +340,10 @@ def test_for_in_site_docs_emits_relative_url():
 
 
 def test_for_package_builds_localhost_resolver(tmp_path):
-    """for_package wires the base URL to the IDE server and points html_root at doc/_build/html."""
+    """
+    for_package wires the base URL to the IDE server and points html_root at
+    doc/_build/html.
+    """
     import types
     import krrood.entity_query_language.verbalization.rendering.source_link_resolver as _slr
 
@@ -351,7 +372,9 @@ def test_autoapi_resolver_for_package_unknown_package_raises():
 
 
 def test_autoapi_resolver_for_package_missing_docs_raises(tmp_path):
-    """for_package raises FileNotFoundError when doc/_build/html is absent."""
+    """
+    for_package raises FileNotFoundError when doc/_build/html is absent.
+    """
     import types
     import krrood.entity_query_language.verbalization.rendering.source_link_resolver as _slr
 
@@ -525,8 +548,10 @@ def test_pipeline_html_without_resolver_no_anchor_tags():
 
 
 def test_type_valued_literal_is_hyperlinked():
-    """A bare class used as a value (e.g. the type argument of a predicate) links to its source like
-    a type reference, rather than rendering as an un-linkable literal."""
+    """
+    A bare class used as a value (e.g. the type argument of a predicate) links to its
+    source like a type reference, rather than rendering as an un-linkable literal.
+    """
     from krrood.entity_query_language.core.variable import Literal
 
     resolver = _ConstantResolver("http://example.com/sensor")
@@ -538,7 +563,9 @@ def test_type_valued_literal_is_hyperlinked():
 
 
 def test_each_type_in_a_tuple_literal_is_hyperlinked():
-    """A tuple of admissible types lists each member as a linked type reference."""
+    """
+    A tuple of admissible types lists each member as a linked type reference.
+    """
     from krrood.entity_query_language.core.variable import Literal
 
     @dataclass
@@ -572,7 +599,7 @@ def test_pipeline_ansi_with_resolver_no_osc8_logs_warning_and_no_osc8():
     resolver = _ConstantResolver("http://example.com/sensor")
     env = {"VTE_VERSION": "", "TERM_PROGRAM": "unknown", "TERM": "xterm"}
     with patch.dict("os.environ", env, clear=False):
-        with _patch.object(pipeline_mod._log, "warning") as mock_warn:
+        with _patch.object(pipeline_mod.logger, "warning") as mock_warn:
             text = VerbalizationPipeline.ansi(link_resolver=resolver).verbalize(
                 an(entity(r))
             )
@@ -585,7 +612,9 @@ def test_pipeline_ansi_with_resolver_no_osc8_logs_warning_and_no_osc8():
 
 
 def _collect_source_refs(fragment: VerbalizationFragment) -> list[SourceReference]:
-    """Recursively collect all non-None SourceReference values from a fragment tree."""
+    """
+    Recursively collect all non-None SourceReference values from a fragment tree.
+    """
     match fragment:
         case RoleFragment(source_reference=ref) if ref is not None:
             return [ref]
@@ -633,7 +662,9 @@ def test_comparator_fragment_has_both_class_and_attr_refs():
 
 
 def test_display_opens_browser_outside_jupyter():
-    """Outside Jupyter, display() writes a temp HTML file and calls webbrowser.open."""
+    """
+    Outside Jupyter, display() writes a temp HTML file and calls webbrowser.open.
+    """
     from unittest.mock import patch as _patch
     import krrood.entity_query_language.verbalization.pipeline as pipeline_mod
 
@@ -650,7 +681,9 @@ def test_display_opens_browser_outside_jupyter():
 
 
 def test_display_writes_full_html_page_to_temp_file():
-    """The temp file written by display() is a complete HTML document."""
+    """
+    The temp file written by display() is a complete HTML document.
+    """
     from unittest.mock import patch as _patch
     import krrood.entity_query_language.verbalization.pipeline as pipeline_mod
 
@@ -675,7 +708,9 @@ def test_display_writes_full_html_page_to_temp_file():
 
 
 def test_display_in_jupyter_calls_ipython_display():
-    """Inside a Jupyter session, display() calls IPython.display.HTML."""
+    """
+    Inside a Jupyter session, display() calls IPython.display.HTML.
+    """
     from unittest.mock import MagicMock, patch as _patch
     import krrood.entity_query_language.verbalization.pipeline as pipeline_mod
 
@@ -701,7 +736,9 @@ def test_display_in_jupyter_calls_ipython_display():
 
 
 def test_display_fragment_works_like_display():
-    """display_fragment() accepts a pre-built fragment instead of an expression."""
+    """
+    display_fragment() accepts a pre-built fragment instead of an expression.
+    """
     from unittest.mock import patch as _patch
     import krrood.entity_query_language.verbalization.pipeline as pipeline_mod
 
@@ -717,7 +754,9 @@ def test_display_fragment_works_like_display():
 
 
 def test_display_html_page_has_dark_background_style():
-    """The browser-fallback page includes the dark-background stylesheet."""
+    """
+    The browser-fallback page includes the dark-background stylesheet.
+    """
     from unittest.mock import patch as _patch
     import krrood.entity_query_language.verbalization.pipeline as pipeline_mod
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing_extensions import Callable, List, Any, Optional
+from typing_extensions import Callable, List, Any, Optional, Type
 import operator
 
 import sqlalchemy.inspection
@@ -24,7 +24,7 @@ from krrood.entity_query_language.query.query import (
     SetOf,
     UnificationDict,
 )
-from krrood.entity_query_language.query.operations import Where, OrderedBy
+from krrood.entity_query_language.query.operations import Where
 from krrood.entity_query_language.query.quantifiers import ResultQuantifier, An, The
 from krrood.entity_query_language.operators.core_logical_operators import AND, OR, Not
 from krrood.entity_query_language.operators.logical_quantifiers import (
@@ -55,7 +55,10 @@ from krrood.ormatic.exceptions import (
 
 @dataclass
 class EQLTranslationError(DataclassException):
-    """Base class for errors raised when an EQL expression cannot be translated into SQLAlchemy."""
+    """
+    Base class for errors raised when an EQL expression cannot be translated into
+    SQLAlchemy.
+    """
 
     def suggest_correction(self) -> str:
         return ""
@@ -63,7 +66,9 @@ class EQLTranslationError(DataclassException):
 
 @dataclass
 class UnsupportedQueryTypeError(EQLTranslationError, TypeError):
-    """Raised when an EQL expression node has no SQLAlchemy translation."""
+    """
+    Raised when an EQL expression node has no SQLAlchemy translation.
+    """
 
     query: SymbolicExpression
     """The EQL expression node whose type is not supported."""
@@ -80,7 +85,9 @@ class UnsupportedQueryTypeError(EQLTranslationError, TypeError):
 
 @dataclass
 class UnsupportedOperatorError(EQLTranslationError, TypeError):
-    """Raised when an EQL operator has no SQLAlchemy translation."""
+    """
+    Raised when an EQL operator has no SQLAlchemy translation.
+    """
 
     operation: Callable[[Any, Any], bool]
     """The operator callable that could not be mapped to a SQLAlchemy expression."""
@@ -96,13 +103,17 @@ class UnsupportedOperatorError(EQLTranslationError, TypeError):
 
 @dataclass
 class UnsupportedQuantifierError(EQLTranslationError, TypeError):
-    """Raised when an EQL result quantifier cannot be evaluated."""
+    """
+    Raised when an EQL result quantifier cannot be evaluated.
+    """
 
-    quantifier: ResultQuantifier
-    """The quantifier expression that has no evaluation strategy."""
+    quantifier_type: Type[ResultQuantifier]
+    """
+    The result-quantifier kind that has no evaluation strategy.
+    """
 
     def error_message(self) -> str:
-        return f"Unsupported quantifier: {type(self.quantifier)}"
+        return f"Unsupported quantifier: {self.quantifier_type}"
 
     def suggest_correction(self) -> str:
         return "Wrap the query in a supported quantifier: an() or the()."
@@ -110,12 +121,18 @@ class UnsupportedQuantifierError(EQLTranslationError, TypeError):
 
 @dataclass
 class AttributeResolutionError(EQLTranslationError, ValueError):
-    """Base class for errors raised when an EQL attribute chain cannot be resolved to a column."""
+    """
+    Base class for errors raised when an EQL attribute chain cannot be resolved to a
+    column.
+    """
 
 
 @dataclass
 class AttributeChainRootHasNoTypeError(AttributeResolutionError):
-    """Raised when the root of an attribute chain carries no python type to resolve a DAO from."""
+    """
+    Raised when the root of an attribute chain carries no python type to resolve a DAO
+    from.
+    """
 
     attribute: Attribute
     """The attribute chain whose root variable has no associated class."""
@@ -131,13 +148,17 @@ class AttributeChainRootHasNoTypeError(AttributeResolutionError):
 
 @dataclass
 class DAOAttributeResolutionError(AttributeResolutionError):
-    """Base class for attribute resolution errors that reference a specific DAO attribute."""
+    """
+    Base class for attribute resolution errors that reference a specific DAO attribute.
+    """
 
     dao_class: type
     """The DAO class involved in the failed resolution."""
 
     attribute_name: str
-    """The attribute name that could not be resolved on the DAO class."""
+    """
+    The attribute name that could not be resolved on the DAO class.
+    """
 
     def mapped_column_names(self) -> List[str]:
         """
@@ -156,7 +177,9 @@ class DAOAttributeResolutionError(AttributeResolutionError):
 
 @dataclass
 class MissingRelationshipError(DAOAttributeResolutionError):
-    """Raised when an attribute chain hop expects a relationship the DAO does not define."""
+    """
+    Raised when an attribute chain hop expects a relationship the DAO does not define.
+    """
 
     def error_message(self) -> str:
         return f"No relationship '{self.attribute_name}' found on {self.dao_class.__name__}."
@@ -170,7 +193,10 @@ class MissingRelationshipError(DAOAttributeResolutionError):
 
 @dataclass
 class NonRelationshipInChainError(DAOAttributeResolutionError):
-    """Raised when a non-final attribute in a chain is a plain column rather than a relationship."""
+    """
+    Raised when a non-final attribute in a chain is a plain column rather than a
+    relationship.
+    """
 
     def error_message(self) -> str:
         return (
@@ -193,7 +219,9 @@ class NonRelationshipInChainError(DAOAttributeResolutionError):
 
 @dataclass
 class MissingColumnError(DAOAttributeResolutionError):
-    """Raised when the leaf of an attribute chain is not a column on the DAO."""
+    """
+    Raised when the leaf of an attribute chain is not a column on the DAO.
+    """
 
     def error_message(self) -> str:
         return f"Column '{self.attribute_name}' not found on {self.dao_class.__name__}."
@@ -204,13 +232,19 @@ class MissingColumnError(DAOAttributeResolutionError):
 
 @dataclass
 class EmptyAttributeChainError(AttributeResolutionError):
-    """Raised when an attribute chain yields no attribute names to walk."""
+    """
+    Raised when an attribute chain yields no attribute names to walk.
+    """
 
     dao_class: type
-    """The DAO class the empty chain started from."""
+    """
+    The DAO class the empty chain started from.
+    """
 
     attribute_names: List[str]
-    """The (empty) list of attribute names collected from the chain."""
+    """
+    The (empty) list of attribute names collected from the chain.
+    """
 
     def error_message(self) -> str:
         return (
@@ -221,7 +255,9 @@ class EmptyAttributeChainError(AttributeResolutionError):
 
 @dataclass
 class VariableTypeExtractor:
-    """Extracts underlying Variable and its python type from a leaf-like node."""
+    """
+    Extracts underlying Variable and its python type from a leaf-like node.
+    """
 
     def extract(self, node: Any) -> tuple[Optional[Variable], Optional[type]]:
         """
@@ -244,7 +280,9 @@ class VariableTypeExtractor:
 
 @dataclass
 class AttributeChainResolver:
-    """Resolves attribute chains for EQL Attribute expressions."""
+    """
+    Resolves attribute chains for EQL Attribute expressions.
+    """
 
     def extract_leaf_variable(self, attribute: Attribute) -> Any:
         """
@@ -277,7 +315,9 @@ class AttributeChainResolver:
 
 @dataclass
 class RelationshipResolver:
-    """Resolves relationships and foreign keys for DAO classes."""
+    """
+    Resolves relationships and foreign keys for DAO classes.
+    """
 
     def resolve_relationship_and_foreign_key(
         self, dao_class: type, attribute_name: str
@@ -329,7 +369,9 @@ class RelationshipResolver:
 
 @dataclass
 class OperatorMapper:
-    """Maps EQL operators to SQLAlchemy expressions."""
+    """
+    Maps EQL operators to SQLAlchemy expressions.
+    """
 
     def map_comparison_operator(self, operation: Any, left: Any, right: Any) -> Any:
         """
@@ -390,7 +432,9 @@ class OperatorMapper:
 
 @dataclass
 class DomainValueExtractor:
-    """Extracts values from EQL Variable/Literal domains."""
+    """
+    Extracts values from EQL Variable/Literal domains.
+    """
 
     session: Session
 
@@ -401,7 +445,6 @@ class DomainValueExtractor:
         :param literal_node: The Literal node
         :return: The extracted value(s)
         """
-
         if not hasattr(literal_node, "_domain_"):
             return (
                 literal_node.value if hasattr(literal_node, "value") else literal_node
@@ -470,11 +513,12 @@ class DomainValueExtractor:
 
 @dataclass
 class JoinManager:
-    """Manages JOIN operations for the EQL translator.
+    """
+    Manages JOIN operations for the EQL translator.
 
-    Tracks both which relationship paths have been joined and the SQLAlchemy
-    alias used for each path so that downstream column references can bind to
-    the correct FROM element without triggering implicit joins.
+    Tracks both which relationship paths have been joined and the SQLAlchemy alias used
+    for each path so that downstream column references can bind to the correct FROM
+    element without triggering implicit joins.
     """
 
     aliases_by_path: dict[tuple[type, str], Any] = field(default_factory=dict)
@@ -537,18 +581,24 @@ class EQLTranslator:
     join_manager: JoinManager = field(default_factory=JoinManager)
 
     @property
-    def quantifier(self) -> ResultQuantifier:
-        """Get the quantifier from the query."""
-        return self.eql_query._quantifier_expression_
+    def quantifier_type(self) -> Type[ResultQuantifier]:
+        """
+        :return: The result-quantifier kind (``An`` / ``The``) requested by the query.
+        """
+        return self.eql_query._quantifier_builder_.type
 
     @property
     def select_like(self) -> Query:
-        """Get the select-like expression from the query."""
+        """
+        Get the select-like expression from the query.
+        """
         return self.eql_query
 
     @property
     def root_condition(self) -> SymbolicExpression:
-        """Get the root condition from the query."""
+        """
+        Get the root condition from the query.
+        """
         return self.eql_query._conditions_root_
 
     @staticmethod
@@ -573,7 +623,9 @@ class EQLTranslator:
             raise UnsupportedQueryTypeError(self.eql_query)
 
     def _translate_entity(self) -> None:
-        """Translate the EQL query to SQL."""
+        """
+        Translate the EQL query to SQL.
+        """
         selected = self.select_like.selected_variable
         if isinstance(selected, Attribute):
             self._translate_entity_from_attribute(selected)
@@ -583,15 +635,18 @@ class EQLTranslator:
 
     def _translate_entity_from_attribute(self, attribute: Attribute) -> None:
         """
-        Translate ``entity(n.attr1.attr2...)`` when the selected variable is an attribute chain.
+        Translate ``entity(n.attr1.attr2...)`` when the selected variable is an
+        attribute chain.
 
         Walks every hop in the chain from the root DAO outward, building JOIN clauses
         via :meth:`_apply_relationship_join` so that path tracking is consistent with
         subsequent WHERE clause translations that traverse the same chain.
 
-        :param attribute: The outermost :class:`Attribute` node used as selected variable.
+        :param attribute: The outermost :class:`Attribute` node used as selected
+            variable.
         :raises NoDAOFoundForTypeError: When the root variable type has no DAO.
-        :raises MissingRelationshipError: When any hop in the chain is not a relationship.
+        :raises MissingRelationshipError: When any hop in the chain is not a
+            relationship.
         """
         attribute_names = self._collect_attribute_chain(attribute)
         base_class = self._extract_base_class(attribute)
@@ -663,6 +718,7 @@ class EQLTranslator:
     def _extract_dao_from_expression(self, expression: Any) -> Optional[type]:
         """
         Extract the base DAO class from an expression node.
+
         Handles Attribute chains and CaseWhen nodes.
         """
         if isinstance(expression, Attribute):
@@ -679,8 +735,8 @@ class EQLTranslator:
         """
         Extract a base DAO class by scanning the WHERE clause for variable types.
 
-        Used as a fallback when the selected expressions (e.g. ``count_all()``)
-        carry no DAO information of their own.
+        Used as a fallback when the selected expressions (e.g. ``count_all()``) carry no
+        DAO information of their own.
 
         :return: The first DAO class found in the WHERE clause, or None.
         """
@@ -722,7 +778,9 @@ class EQLTranslator:
         return None
 
     def _apply_clauses(self) -> None:
-        """Apply WHERE, GROUP BY, HAVING, ORDER BY and LIMIT to the SQL query."""
+        """
+        Apply WHERE, GROUP BY, HAVING, ORDER BY and LIMIT to the SQL query.
+        """
         if self.eql_query._where_expression_ is not None:
             conditions = self.translate_query(self.eql_query._where_expression_)
             if conditions is not None:
@@ -754,9 +812,8 @@ class EQLTranslator:
                 col = col.desc()
             self.sql_query = self.sql_query.order_by(col)
 
-        quantifier = self.eql_query._quantifier_expression_
-        if quantifier is not None and quantifier._limit_ is not None:
-            self.sql_query = self.sql_query.limit(quantifier._limit_)
+        if self.eql_query._limit_ is not None:
+            self.sql_query = self.sql_query.limit(self.eql_query._limit_)
 
         if self.eql_query._distinct_on:
             self.sql_query = self.sql_query.distinct()
@@ -765,9 +822,9 @@ class EQLTranslator:
         """
         Evaluate the translated SQL query.
 
-        For entity() queries, returns a list of DAO objects.
-        For set_of() queries with multiple variables, returns a list of dicts
-        mapping each EQL variable to its corresponding DAO object.
+        For entity() queries, returns a list of DAO objects. For set_of() queries with
+        multiple variables, returns a list of dicts mapping each EQL variable to its
+        corresponding DAO object.
 
         :return: Query results
         """
@@ -776,13 +833,13 @@ class EQLTranslator:
 
         bound_query = self.session.scalars(self.sql_query)
 
-        if isinstance(self.quantifier, The):
+        if issubclass(self.quantifier_type, The):
             return bound_query.one()
 
-        elif isinstance(self.quantifier, An):
+        elif issubclass(self.quantifier_type, An):
             return bound_query.all()
 
-        raise UnsupportedQuantifierError(self.quantifier)
+        raise UnsupportedQuantifierError(self.quantifier_type)
 
     def _evaluate_set_of(self) -> List[Any]:
         """
@@ -816,7 +873,9 @@ class EQLTranslator:
         ]
 
     def __iter__(self):
-        """Iterate over evaluation results."""
+        """
+        Iterate over evaluation results.
+        """
         yield from self.evaluate()
 
     def translate_query(self, query: SymbolicExpression) -> Optional[Any]:
@@ -826,7 +885,6 @@ class EQLTranslator:
         :param query: The EQL query expression
         :return: SQLAlchemy expression or None
         """
-
         match query:
             case AND():
                 return self.translate_and(query)
@@ -845,8 +903,6 @@ class EQLTranslator:
                 return self.translate_query(query.condition)
             case CaseWhen():
                 return self.translate_case_when(query)
-            case ResultQuantifier():
-                return None
             case Variable():
                 return None
             case _:
@@ -1276,12 +1332,12 @@ class EQLTranslator:
         """
         Apply a JOIN for a relationship if not already joined.
 
-        This uses an explicit SQLAlchemy alias for the relationship target and
-        joins using the relationship attribute itself, allowing SQLAlchemy to
-        derive the ON clause while still binding subsequent column references
-        to the correct FROM element. This mirrors the default Core/ORM behavior
-        for join(<entity>) that the tests compare against, but avoids implicit
-        joins by returning the alias for downstream attribute resolution.
+        This uses an explicit SQLAlchemy alias for the relationship target and joins
+        using the relationship attribute itself, allowing SQLAlchemy to derive the ON
+        clause while still binding subsequent column references to the correct FROM
+        element. This mirrors the default Core/ORM behavior for join(<entity>) that the
+        tests compare against, but avoids implicit joins by returning the alias for
+        downstream attribute resolution.
 
         :param dao_class: The DAO class where the relationship is defined
         :param attribute_name: The relationship attribute name on dao_class
@@ -1313,12 +1369,13 @@ class EQLTranslator:
 
     def _translate_exists(self, exists_node: EQLExists) -> Any:
         """
-        Translate an EQL :class:`~krrood.entity_query_language.operators.logical_quantifiers.Exists`
-        node into a SQLAlchemy correlated EXISTS subquery.
+        Translate an EQL
+        :class:`~krrood.entity_query_language.operators.logical_quantifiers.Exists` node
+        into a SQLAlchemy correlated EXISTS subquery.
 
-        The existential variable's type must map to a DAO class. Conditions in
-        the EXISTS body are translated without touching the outer query's JOINs
-        so that outer-variable references become correlated column references.
+        The existential variable's type must map to a DAO class. Conditions in the
+        EXISTS body are translated without touching the outer query's JOINs so that
+        outer-variable references become correlated column references.
 
         :param exists_node: The EQL Exists node (variable + condition).
         :return: A SQLAlchemy EXISTS expression.
@@ -1337,10 +1394,10 @@ class EQLTranslator:
         """
         Translate a condition expression for use inside an EXISTS subquery.
 
-        Unlike :meth:`translate_query`, this method does not mutate the outer
-        query's JOIN state. Attribute-to-variable comparisons produce direct
-        column comparisons (FK == PK) so that the outer variable acts as a
-        correlated reference rather than triggering a JOIN.
+        Unlike :meth:`translate_query`, this method does not mutate the outer query's
+        JOIN state. Attribute-to-variable comparisons produce direct column comparisons
+        (FK == PK) so that the outer variable acts as a correlated reference rather than
+        triggering a JOIN.
 
         :param condition: The EQL condition expression.
         :return: SQLAlchemy predicate or None.

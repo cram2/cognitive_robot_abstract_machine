@@ -28,7 +28,8 @@ from semantic_digital_twin.world_description.world_entity import (
 @dataclass(eq=False)
 class ForwardKinematicsManager(ModelChangeCallback):
     """
-    Visitor class for collection various forward kinematics expressions in a world model.
+    Visitor class for collection various forward kinematics expressions in a world
+    model.
 
     This class is designed to traverse a world, compute the forward kinematics transformations in batches for different
     use cases.
@@ -41,13 +42,17 @@ class ForwardKinematicsManager(ModelChangeCallback):
 
     forward_kinematics_for_all_bodies: np.ndarray = field(init=False, repr=False)
     """
-    A 2D array containing the stacked forward kinematics expressions for all bodies in the world.
-    Dimensions are ((number of bodies) * 4) x 4.
-    They are computed in batch for efficiency.
+    A 2D array containing the stacked forward kinematics expressions for all bodies in
+    the world.
+
+    Dimensions are ((number of bodies) * 4) x 4. They are computed in batch for
+    efficiency.
     """
+
     body_id_to_forward_kinematics_idx: Dict[UUID, int] = field(init=False, repr=False)
     """
-    Given a body id, returns the index of the first row in `forward_kinematics_for_all_bodies` that corresponds to that body.
+    Given a body id, returns the index of the first row in
+    `forward_kinematics_for_all_bodies` that corresponds to that body.
     """
 
     root_T_kse_expression_cache: Dict[UUID, HomogeneousTransformationMatrix] = field(
@@ -102,7 +107,9 @@ class ForwardKinematicsManager(ModelChangeCallback):
 
     def recompute(self) -> None:
         """
-        Clears cache and recomputes all forward kinematics. Should be called after a state update.
+        Clears cache and recomputes all forward kinematics.
+
+        Should be called after a state update.
         """
         clear_memoization_cache(self)
         self.forward_kinematics_for_all_bodies = self.compiled_all_fks.evaluate()
@@ -138,14 +145,17 @@ class ForwardKinematicsManager(ModelChangeCallback):
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> HomogeneousTransformationMatrix:
         """
-        Compute the forward kinematics from the root KinematicStructureEntity to the tip KinematicStructureEntity.
+        Compute the forward kinematics from the root KinematicStructureEntity to the tip
+        KinematicStructureEntity.
 
-        Calculate the transformation matrix representing the pose of the
-        tip KinematicStructureEntity relative to the root KinematicStructureEntity.
+        Calculate the transformation matrix representing the pose of the tip
+        KinematicStructureEntity relative to the root KinematicStructureEntity.
 
-        :param root: Root KinematicStructureEntity for which the kinematics are computed.
+        :param root: Root KinematicStructureEntity for which the kinematics are
+            computed.
         :param tip: Tip KinematicStructureEntity to which the kinematics are computed.
-        :return: Transformation matrix representing the relative pose of the tip KinematicStructureEntity with respect to the root KinematicStructureEntity.
+        :return: Transformation matrix representing the relative pose of the tip
+            KinematicStructureEntity with respect to the root KinematicStructureEntity.
         """
         return HomogeneousTransformationMatrix(
             data=self.compute_np(root, tip), reference_frame=root
@@ -158,12 +168,13 @@ class ForwardKinematicsManager(ModelChangeCallback):
         """
         Computes the forward kinematics from the root body to the tip body, root_T_tip.
 
-        This method computes the transformation matrix representing the pose of the
-        tip body relative to the root body, expressed as a numpy ndarray.
+        This method computes the transformation matrix representing the pose of the tip
+        body relative to the root body, expressed as a numpy ndarray.
 
         :param root: Root body for which the kinematics are computed.
         :param tip: Tip body to which the kinematics are computed.
-        :return: Transformation matrix representing the relative pose of the tip body with respect to the root body.
+        :return: Transformation matrix representing the relative pose of the tip body
+            with respect to the root body.
         """
         root = root.id
         tip = tip.id

@@ -20,8 +20,9 @@ from giskardpy.tree.blackboard_utils import raise_to_blackboard
 class AsyncBehavior(GiskardBehavior, Composite):
     """
     A composite that runs its children in a different thread.
-    Status is Running if all children are Running.
-    If one child returns either Success or Failure, this behavior will return it as well.
+
+    Status is Running if all children are Running. If one child returns either Success
+    or Failure, this behavior will return it as well.
     """
 
     def __init__(self, name: str, max_hz: Optional[float] = None):

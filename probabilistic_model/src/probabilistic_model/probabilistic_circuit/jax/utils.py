@@ -161,6 +161,7 @@ def sample_from_sparse_probabilities_csc(
 ) -> csc_array:
     """
     Sample from a sparse array of probabilities.
+
     Each row in the sparse array encodes a categorical probability distribution.
 
     :param probabilities: The sparse array of probabilities.

@@ -27,7 +27,7 @@ class PrePushDoor(Goal):
 
     def __post_init__(self):
         """
-        The objective is to push the object until desired rotation is reached
+        The objective is to push the object until desired rotation is reached.
         """
         object_joint_name = self.door_object.get_first_parent_connection_of_type(
             ActiveConnection1DOF

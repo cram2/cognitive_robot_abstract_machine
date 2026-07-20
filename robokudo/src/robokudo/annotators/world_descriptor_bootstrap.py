@@ -1,4 +1,6 @@
-"""Bootstrap static world descriptor content into the shared world."""
+"""
+Bootstrap static world descriptor content into the shared world.
+"""
 
 from __future__ import annotations
 
@@ -13,17 +15,25 @@ from robokudo.world_descriptor import BaseWorldDescriptor
 
 
 class WorldDescriptorBootstrapError(RuntimeError):
-    """Raised when world descriptor bootstrap fails."""
+    """
+    Raised when world descriptor bootstrap fails.
+    """
 
 
 class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
-    """Augment the current shared world with descriptor-defined entities."""
+    """
+    Augment the current shared world with descriptor-defined entities.
+    """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for world descriptor bootstrap."""
+        """
+        Configuration descriptor for world descriptor bootstrap.
+        """
 
         class Parameters:
-            """Parameters for world descriptor bootstrap."""
+            """
+            Parameters for world descriptor bootstrap.
+            """
 
             def __init__(self) -> None:
                 self.world_descriptor_ros_package: str = "robokudo"
@@ -36,13 +46,17 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
         name: str = "WorldDescriptorBootstrap",
         descriptor: "WorldDescriptorBootstrapAnnotator.Descriptor" = Descriptor(),
     ) -> None:
-        """Initialize the world descriptor bootstrap annotator."""
+        """
+        Initialize the world descriptor bootstrap annotator.
+        """
         super().__init__(name=name, descriptor=descriptor)
         self.module_loader = ModuleLoader()
         self._last_augmented_world_id: int | None = None
 
     def load_world_descriptor(self) -> BaseWorldDescriptor:
-        """Load the configured world descriptor module."""
+        """
+        Load the configured world descriptor module.
+        """
         ros_package = self.descriptor.parameters.world_descriptor_ros_package
         module_name = self.descriptor.parameters.world_descriptor_name
         try:
@@ -56,13 +70,17 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
             ) from error
 
     def _update_tracker_if_active(self) -> None:
-        """Keep tracker state synchronized after world augmentation."""
+        """
+        Keep tracker state synchronized after world augmentation.
+        """
         if rk_world.get_world_entity_tracker() is None:
             return
         rk_world.init_world_entity_tracker_from_world(rk_world.world_instance())
 
     def augment_world(self, world_descriptor: BaseWorldDescriptor) -> None:
-        """Merge descriptor entities into the current shared world."""
+        """
+        Merge descriptor entities into the current shared world.
+        """
         runtime_world = rk_world.world_instance()
         runtime_world_id = id(runtime_world)
 
@@ -80,7 +98,9 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
         self._last_augmented_world_id = runtime_world_id
 
     def update(self) -> Status:
-        """Load descriptor world and merge it into the current world."""
+        """
+        Load descriptor world and merge it into the current world.
+        """
         start_timer = default_timer()
         runtime_world_id = id(rk_world.world_instance())
         if self._last_augmented_world_id == runtime_world_id:

@@ -63,7 +63,10 @@ def test_single_hop_attr_rejects_multi_hop_and_other_subject():
 
 
 def test_is_concrete_object_literal_recognizer():
-    """A dataclass-instance literal is a concrete object; a primitive / class / ``None`` is not."""
+    """
+    A dataclass-instance literal is a concrete object; a primitive / class / ``None`` is
+    not.
+    """
 
     @dataclass
     class _Obj:
@@ -78,7 +81,9 @@ def test_is_concrete_object_literal_recognizer():
 
 
 def test_is_atomic_value_recognizer():
-    """A plain scalar literal is atomic (groupable); a concrete object / ``None`` is not."""
+    """
+    A plain scalar literal is atomic (groupable); a concrete object / ``None`` is not.
+    """
 
     @dataclass
     class _Obj:
@@ -160,7 +165,9 @@ def test_is_none_literal_recognizer():
 
 
 def test_is_past_participle_morphology():
-    """The participle check is morphological (dictionary + rules), not 'ends in -ed'."""
+    """
+    The participle check is morphological (dictionary + rules), not 'ends in -ed'.
+    """
     assert is_past_participle("assigned")  # regular
     assert is_past_participle("sent") and is_past_participle("written")  # irregular
     assert not is_past_participle("assign")  # base form
@@ -170,7 +177,10 @@ def test_is_past_participle_morphology():
 
 
 def test_relational_verb_phrase_recognizer():
-    """A relational field is *participle + preposition*; a noun ending in a preposition is not."""
+    """
+    A relational field is *participle + preposition*; a noun ending in a preposition is
+    not.
+    """
     assert relational_verb_phrase("assigned_to") == "assigned to"
     assert relational_verb_phrase("written_by") == "written by"  # irregular participle
     assert relational_verb_phrase("cross_referenced_with") == "cross referenced with"
@@ -183,7 +193,10 @@ def test_relational_verb_phrase_recognizer():
 
 
 def test_noun_attribute_eq_none_reads_as_has_no():
-    """A plain *noun* attribute ``== None`` reads *"<owner> has no <attribute>"*, not a value."""
+    """
+    A plain *noun* attribute ``== None`` reads *"<owner> has no <attribute>"*, not a
+    value.
+    """
     r = variable(_Robot, [])
     text = verbalize_expression(r.battery == None)
     assert "has no battery" in text
@@ -191,8 +204,10 @@ def test_noun_attribute_eq_none_reads_as_has_no():
 
 
 def test_relational_attribute_eq_none_reads_as_passive():
-    """A relational (participle + preposition) attribute ``== None`` reads as a passive verb naming
-    the related type — *"<owner> has not been <verb> <prep> any <Type>"* — not *"has no <field>"*.
+    """
+    A relational (participle + preposition) attribute ``== None`` reads as a passive
+    verb naming the related type — *"<owner> has not been <verb> <prep> any <Type>"* —
+    not *"has no <field>"*.
     """
     m = variable(_Mission, [])
     text = verbalize_expression(m.assigned_to == None)
@@ -201,7 +216,10 @@ def test_relational_attribute_eq_none_reads_as_passive():
 
 
 def test_relational_absence_handles_irregular_participle():
-    """An irregular participle (*written*) is recognised, and the related type is the field's type."""
+    """
+    An irregular participle (*written*) is recognised, and the related type is the
+    field's type.
+    """
     p = variable(_Parcel, [])
     assert "has not been shipped to any _Address" in verbalize_expression(
         p.shipped_to == None
@@ -212,8 +230,10 @@ def test_relational_absence_handles_irregular_participle():
 
 
 def test_noun_with_preposition_suffix_is_not_passivised():
-    """A noun that merely ends in a preposition (*color_in*) keeps *"has no …"* — its leading token
-    is not a participle."""
+    """
+    A noun that merely ends in a preposition (*color_in*) keeps *"has no …"* — its
+    leading token is not a participle.
+    """
     g = variable(_Gadget, [])
     text = verbalize_expression(g.color_in == None)
     assert "has no color_in" in text
@@ -221,21 +241,30 @@ def test_noun_with_preposition_suffix_is_not_passivised():
 
 
 def test_relational_absence_with_primitive_type_says_anything():
-    """When the related type is not a nameable class (here a primitive), the object is *"anything"*."""
+    """
+    When the related type is not a nameable class (here a primitive), the object is
+    *"anything"*.
+    """
     n = variable(_Note, [])
     text = verbalize_expression(n.located_in == None)
     assert "has not been located in anything" in text
 
 
 def test_bare_variable_eq_none_reads_as_does_not_exist():
-    """A bare variable ``== None`` (no attribute to name) reads *"<subject> does not exist"*."""
+    """
+    A bare variable ``== None`` (no attribute to name) reads *"<subject> does not
+    exist"*.
+    """
     r = variable(_Robot, [])
     text = verbalize_expression(r == None)
     assert "does not exist" in text
 
 
 def test_subject_where_relational_eq_none_is_standalone_not_whose():
-    """A subject ``where … == None`` is said as its own clause, never folded into *"whose"*."""
+    """
+    A subject ``where … == None`` is said as its own clause, never folded into
+    *"whose"*.
+    """
     m = variable(_Mission, [])
     text = verbalize_expression(an(entity(m).where(m.assigned_to == None)))
     assert "has not been assigned to any _Robot2" in text
@@ -246,7 +275,10 @@ def test_subject_where_relational_eq_none_is_standalone_not_whose():
 
 
 def test_primitive_domain_variable_lists_in_value_position():
-    """A primitive value-type variable in value position lists its candidates; a subject does not."""
+    """
+    A primitive value-type variable in value position lists its candidates; a subject
+    does not.
+    """
     r = variable(_Robot, [])
     text = verbalize_expression(r.battery == variable(int, [1, 2, 3]))
     assert "one of 1, 2, or 3" in text
@@ -255,12 +287,17 @@ def test_primitive_domain_variable_lists_in_value_position():
 
 
 def test_entity_domain_variable_not_listed():
-    """An entity-type variable's domain is the population and is never listed."""
+    """
+    An entity-type variable's domain is the population and is never listed.
+    """
     assert verbalize_expression(variable(_Robot, [])) == "a _Robot"
 
 
 def test_two_value_domain_drops_the_serial_comma():
-    """A two-candidate domain reads *"one of X or Y"* (no comma); three keep the serial comma."""
+    """
+    A two-candidate domain reads *"one of X or Y"* (no comma); three keep the serial
+    comma.
+    """
     r = variable(_Robot, [])
     assert "one of 1 or 2" in verbalize_expression(r.battery == variable(int, [1, 2]))
     assert "one of 1, 2, or 3" in verbalize_expression(
@@ -277,7 +314,10 @@ class _Coffee:
 
 
 def test_boolean_attribute_eq_true_is_predicative():
-    """``bool_attr == True`` folds into the predicate — *"is decaf"*, not *"is decaf is True"*."""
+    """
+    ``bool_attr == True`` folds into the predicate — *"is decaf"*, not *"is decaf is
+    True"*.
+    """
     c = variable(_Coffee, [])
     text = verbalize_expression(c.decaf == True)
     assert "is decaf" in text
@@ -286,7 +326,9 @@ def test_boolean_attribute_eq_true_is_predicative():
 
 
 def test_boolean_attribute_eq_false_is_negated_predicative():
-    """``bool_attr == False`` (and ``!= True``) read *"is not decaf"*."""
+    """
+    ``bool_attr == False`` (and ``!= True``) read *"is not decaf"*.
+    """
     c = variable(_Coffee, [])
     assert "is not decaf" in verbalize_expression(c.decaf == False)
     assert "is not decaf" in verbalize_expression(c.decaf != True)
@@ -294,7 +336,9 @@ def test_boolean_attribute_eq_false_is_negated_predicative():
 
 
 def test_boolean_attribute_open_domain_is_either_or_not():
-    """A bool attribute constrained to a domain holding both values leaves the value open."""
+    """
+    A bool attribute constrained to a domain holding both values leaves the value open.
+    """
     c = variable(_Coffee, [])
     text = verbalize_expression(c.decaf == variable(bool, [True, False]))
     assert "is either decaf or not" in text
@@ -335,7 +379,10 @@ class _Statement:
 
 
 def test_coindexed_equality_factors_to_have_the_same():
-    """The motivating example: two ``begin.X == end.X`` conditions fold to one natural clause."""
+    """
+    The motivating example: two ``begin.X == end.X`` conditions fold to one natural
+    clause.
+    """
     p = variable(_Statement, domain=None)
     query = a(
         set_of(p.period.begin.month, eql.average(p.revenue))
@@ -420,8 +467,10 @@ def test_coindexed_does_not_fold_inequality_operator():
 
 
 def test_coindexed_single_equality_is_factored():
-    """A lone co-indexed equality over sibling prefixes reads as the natural 'have the same' form —
-    the single-terminal case of the co-indexed fold."""
+    """
+    A lone co-indexed equality over sibling prefixes reads as the natural 'have the
+    same' form — the single-terminal case of the co-indexed fold.
+    """
     p = variable(_Statement, domain=None)
     query = a(
         set_of(p.period.begin.month)
@@ -477,8 +526,11 @@ def test_coindexed_factoring_in_subject_whose_path():
 
 
 def test_coindexed_lone_equality_folds_inside_each_or_arm():
-    """The lone-equality fold fires wherever a comparator is said, not only in conjunct lists: each
-    arm of an OR folds independently to its own natural 'have the same' clause."""
+    """
+    The lone-equality fold fires wherever a comparator is said, not only in conjunct
+    lists: each arm of an OR folds independently to its own natural 'have the same'
+    clause.
+    """
     p = variable(_Period, domain=None)
     query = an(
         entity(p).where(or_(p.begin.month == p.end.month, p.begin.year == p.end.year))
@@ -492,8 +544,10 @@ def test_coindexed_lone_equality_folds_inside_each_or_arm():
 
 
 def test_coindexed_negated_lone_equality_keeps_the_faithful_form():
-    """An outer negation disables the fold — 'NOT (begin.month == end.month)' must read as the
-    faithful negated comparison, never a negated 'have the same' (which would be ambiguous).
+    """
+    An outer negation disables the fold — 'NOT (begin.month == end.month)' must read as
+    the faithful negated comparison, never a negated 'have the same' (which would be
+    ambiguous).
     """
     p = variable(_Period, domain=None)
     query = an(entity(p).where(not_(p.begin.month == p.end.month)))
@@ -503,8 +557,10 @@ def test_coindexed_negated_lone_equality_keeps_the_faithful_form():
 
 
 def test_coindexed_lone_inequality_is_not_folded():
-    """The natural 'have the same' form covers equality only; a lone co-indexed '>' keeps the
-    faithful per-attribute comparison."""
+    """
+    The natural 'have the same' form covers equality only; a lone co-indexed '>' keeps
+    the faithful per-attribute comparison.
+    """
     p = variable(_Period, domain=None)
     query = an(entity(p).where(p.begin.month > p.end.month))
     text = verbalize_expression(query)

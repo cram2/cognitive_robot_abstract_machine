@@ -46,9 +46,9 @@ _MAX_RESPECTIVELY = 3
 
 class MatchAssembler(Assembler[Match, MatchPlan]):
     """
-    Realise a match into *"Find/Generate <selection> [, and predict its … values]"* with a
-    *"given that"* block (the construction pattern, attributes aggregated per object) and a
-    *"where"* block (the free conditions), each condition its own point.
+    Realise a match into *"Find/Generate <selection> [, and predict its … values]"* with
+    a *"given that"* block (the construction pattern, attributes aggregated per object)
+    and a *"where"* block (the free conditions), each condition its own point.
 
     The selection and every condition/value are recursed through ``context.child``, so the existing
     chain / comparator / coreference machinery renders them; this assembler only decides the
@@ -56,7 +56,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
 
     Reference: :cite:t:`gatt2009simplenlg` — surface realisation.
 
-    >>> verbalize_expression(underspecified(Robot)(name="R2", battery=80))
+    >>> verbalize_expression(a(Robot)(name="R2", battery=80))
     "Generate a Robot given that the name and battery of the Robot are 'R2' and 80 respectively"
     """
 
@@ -69,14 +69,16 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         :return: The match's block, sourced at the resolved query so the coreference pass scopes the
             selection as the discourse subject (*"its …"*).
 
-        >>> verbalize_expression(underspecified(Mission)(assigned_to=underspecified(Robot)(name="R2")))
+        >>> verbalize_expression(a(Mission)(assigned_to=a(Robot)(name="R2")))
         "Generate a Mission given that the name of the Robot to which it is assigned is 'R2'"
         """
         predict_groups = [group for group in plan.groups if group.predicted]
         inline_predict = self._inline_predict(predict_groups, plan)
 
         header_parts: List[VerbalizationFragment] = [
-            Directive.for_underspecified(plan.underspecified).as_fragment(),
+            (
+                self.context.services.performative_override or Directive.GENERATE
+            ).as_fragment(),
             self.context.child(plan.selection),
         ]
         if inline_predict is not None:
@@ -107,7 +109,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         predicted attributes are the selection's own (the simple case), else ``None`` (a *"predict"*
         block is used instead — see :meth:`_predict_block`).
 
-        >>> verbalize_expression(underspecified(Robot)(name="R2", battery=...))
+        >>> verbalize_expression(a(Robot)(name="R2", battery=...))
         "Generate a Robot and predict its battery value given that its name is 'R2'"
         """
         if len(predict_groups) != 1:
@@ -132,7 +134,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         """:return: The *"and predict"* block — one point per object whose attributes are generated
         (*"x, y, and z of its position"*, or *"its <attrs>"* for the selection's own).
 
-        >>> verbalize_expression(underspecified(Mission)(assigned_to=underspecified(Robot)(battery=...)))
+        >>> verbalize_expression(a(Mission)(assigned_to=a(Robot)(battery=...)))
         'Generate a Mission and predict the battery of the Robot to which it is assigned'
         """
         points = [self._predict_point(group, plan) for group in predict_groups]
@@ -151,7 +153,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         attributes or *"<attrs> of <object>"* (*"the x, y, and z of its position"*) for a sub-object;
         :meth:`_predict_block` wraps these under the shared *"and predict"* header.
 
-        >>> verbalize_expression(underspecified(Mission)(assigned_to=underspecified(Robot)(battery=...)))
+        >>> verbalize_expression(a(Mission)(assigned_to=a(Robot)(battery=...)))
         'Generate a Mission and predict the battery of the Robot to which it is assigned'
         """
         return self._owned_attributes(
@@ -168,7 +170,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         *"given that"* header over the per-group concrete points (here the single *"name and battery
         of the Robot are 'R2' and 80 respectively"* point) and any free-condition statements.
 
-        >>> verbalize_expression(underspecified(Robot)(name="R2", battery=80))
+        >>> verbalize_expression(a(Robot)(name="R2", battery=80))
         "Generate a Robot given that the name and battery of the Robot are 'R2' and 80 respectively"
         """
         points: List[VerbalizationFragment] = []
@@ -193,7 +195,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         ``None`` assignments their own *"the <object> has no <attrs>"* point (an absence flips
         subject/object and cannot fold into the coordination).
 
-        >>> verbalize_expression(underspecified(Robot)(name="R2", battery=None))
+        >>> verbalize_expression(a(Robot)(name="R2", battery=None))
         "Generate a Robot given that its name is 'R2', and the Robot has no battery"
         """
         present = [a for a in group.concrete if not is_none_literal(a.value)]
@@ -216,7 +218,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         when 2..:data:`_MAX_RESPECTIVELY` atomic values are present; otherwise every assignment stands
         alone (a lone value needs no *"respectively"*, and too many would be unreadable to zip).
 
-        >>> verbalize_expression(underspecified(Robot)(name="R2", battery=80, operational=True))
+        >>> verbalize_expression(a(Robot)(name="R2", battery=80, operational=True))
         "Generate a Robot given that the name, battery, and operational of the Robot are 'R2', 80, and True respectively"
         """
         atomic = [a for a in present if is_atomic_value(a.value)]
@@ -229,7 +231,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
     ) -> VerbalizationFragment:
         """:return: *"the <object> has no <attrs>"* for attributes assigned ``None``.
 
-        >>> verbalize_expression(underspecified(Mission)(priority=None))
+        >>> verbalize_expression(a(Mission)(priority=None))
         'Generate a Mission given that the Mission has no priority'
         """
         return PhraseFragment(
@@ -251,7 +253,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         not pass through here: they are said via the shared comparator-predicate path (see
         :meth:`_concrete_points`), so a lone assignment reads *"its name is 'R2'"*.
 
-        >>> verbalize_expression(underspecified(Robot)(name="R2", battery=80))
+        >>> verbalize_expression(a(Robot)(name="R2", battery=80))
         "Generate a Robot given that the name and battery of the Robot are 'R2' and 80 respectively"
         """
         value_list = oxford_comma(
@@ -275,7 +277,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         """:return: the definite genitive *"the <attrs> of <owner>"* the grouped *"respectively"*
         point's attributes take (*"the name and battery of the Robot"*).
 
-        >>> verbalize_expression(underspecified(Robot)(name="R2", battery=80))
+        >>> verbalize_expression(a(Robot)(name="R2", battery=80))
         "Generate a Robot given that the name and battery of the Robot are 'R2' and 80 respectively"
         """
         return PhraseFragment(
@@ -309,7 +311,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         assembler only knows it has a list of conditions to say, and hands them over; folding a
         bound pair into a *between* is the verbalizer's concern, not this one's.
 
-        >>> verbalize_expression(underspecified(Robot)(name="R2").where(variable(Robot, []).battery > 50))
+        >>> verbalize_expression(a(Robot)(name="R2").where(variable(Robot, []).battery > 50))
         "Generate Robot 1 given that the name of Robot 1 is 'R2', where the battery of Robot 2 is greater than 50"
         """
         if not plan.where_conditions:
@@ -330,7 +332,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         sentence; the *"of the Robot"*, the copula, the values, and *"respectively"* are added around
         it by :meth:`_group_point`.
 
-        >>> verbalize_expression(underspecified(Robot)(name="R2", battery=80))
+        >>> verbalize_expression(a(Robot)(name="R2", battery=80))
         "Generate a Robot given that the name and battery of the Robot are 'R2' and 80 respectively"
         """
         fragments = [

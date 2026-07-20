@@ -13,9 +13,9 @@ def make_dirac(variable, value) -> UnivariateDistribution:
     """
     Creates a Dirac distribution for a given variable and value.
 
-    This function constructs a Dirac distribution tailored to the type of
-    the input variable. It supports creating distributions for continuous,
-    symbolic, and integer variables.
+    This function constructs a Dirac distribution tailored to the type of the input
+    variable. It supports creating distributions for continuous, symbolic, and integer
+    variables.
 
     :param variable: The variable for which the Dirac distribution is created.
     :param value: The value at which the Dirac distribution is centered.

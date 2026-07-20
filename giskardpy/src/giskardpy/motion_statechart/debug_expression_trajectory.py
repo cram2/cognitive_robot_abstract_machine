@@ -27,13 +27,19 @@ class RecordedDebugExpression:
     """The debug expression whose value is recorded."""
 
     _free_variables: List[FloatVariable] = field(init=False)
-    """The free variables of the expression, resolved against the live world state."""
+    """
+    The free variables of the expression, resolved against the live world state.
+    """
 
     _compiled_function: CompiledFunction = field(init=False)
-    """The expression compiled once for efficient per-cycle evaluation."""
+    """
+    The expression compiled once for efficient per-cycle evaluation.
+    """
 
     _values: List[np.ndarray] = field(init=False, default_factory=list)
-    """The flattened expression value recorded for each control cycle."""
+    """
+    The flattened expression value recorded for each control cycle.
+    """
 
     def __post_init__(self):
         self._free_variables = self.debug_expression.expression.free_variables()
@@ -43,11 +49,15 @@ class RecordedDebugExpression:
 
     @property
     def name(self) -> str:
-        """The name of the recorded debug expression."""
+        """
+        The name of the recorded debug expression.
+        """
         return self.debug_expression.name
 
     def record(self) -> None:
-        """Evaluate the expression against the current world state and store the result."""
+        """
+        Evaluate the expression against the current world state and store the result.
+        """
         arguments = np.array(
             [variable.resolve() for variable in self._free_variables], dtype=np.float64
         )
@@ -55,7 +65,9 @@ class RecordedDebugExpression:
 
     @property
     def values(self) -> np.ndarray:
-        """The recorded values with shape ``(number_of_cycles, number_of_components)``."""
+        """
+        The recorded values with shape ``(number_of_cycles, number_of_components)``.
+        """
         return np.asarray(self._values)
 
 
@@ -66,16 +78,22 @@ class DebugExpressionTrajectory:
     """
 
     recorded_debug_expressions: List[RecordedDebugExpression]
-    """One recorder per debug expression that is tracked."""
+    """
+    One recorder per debug expression that is tracked.
+    """
 
     _times: List[float] = field(init=False, default_factory=list)
-    """The simulation time in seconds of each recorded control cycle."""
+    """
+    The simulation time in seconds of each recorded control cycle.
+    """
 
     @classmethod
     def from_debug_expressions(
         cls, debug_expressions: List[DebugExpression]
     ) -> DebugExpressionTrajectory:
-        """Create a trajectory that records the given debug expressions."""
+        """
+        Create a trajectory that records the given debug expressions.
+        """
         return cls(
             recorded_debug_expressions=[
                 RecordedDebugExpression(debug_expression)
@@ -100,5 +118,7 @@ class DebugExpressionTrajectory:
 
     @property
     def times(self) -> np.ndarray:
-        """The simulation time in seconds of each recorded control cycle."""
+        """
+        The simulation time in seconds of each recorded control cycle.
+        """
         return np.asarray(self._times)

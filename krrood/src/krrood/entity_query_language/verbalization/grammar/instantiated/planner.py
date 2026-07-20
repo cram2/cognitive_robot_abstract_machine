@@ -13,27 +13,41 @@ from krrood.entity_query_language.verbalization.grammar.framework.planner import
 
 @dataclass(frozen=True)
 class BindingPlan:
-    """One field binding of an InstantiatedVariable (number decided up front)."""
+    """
+    One field binding of an InstantiatedVariable (number decided up front).
+    """
 
     field_name: str
-    """The Python attribute name on the consequent type (e.g. ``"container"``)."""
+    """
+    The Python attribute name on the consequent type (e.g. ``"container"``).
+    """
 
     is_plural: bool
-    """``True`` when *field_name* is plural."""
+    """
+    ``True`` when *field_name* is plural.
+    """
 
     value: SymbolicExpression
-    """The EQL expression providing the field's value."""
+    """
+    The EQL expression providing the field's value.
+    """
 
 
 @dataclass(frozen=True)
 class InstantiatedPlan:
-    """Complete decomposition of an InstantiatedVariable (the plan)."""
+    """
+    Complete decomposition of an InstantiatedVariable (the plan).
+    """
 
     type_name: str
-    """Display name of the instantiated type (e.g. ``"Drawer"``)."""
+    """
+    Display name of the instantiated type (e.g. ``"Drawer"``).
+    """
 
     bindings: List[BindingPlan]
-    """Ordered field bindings."""
+    """
+    Ordered field bindings.
+    """
 
 
 @dataclass

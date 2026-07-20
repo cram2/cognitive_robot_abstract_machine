@@ -138,7 +138,7 @@ class FileUriResolver(PathResolver):
     def resolve(self, uri: str) -> str:
         if uri.startswith("file://"):
             if uri.startswith("file:///"):
-                path = uri[len("file://"):]  # absolute
+                path = uri[len("file://") :]  # absolute
             else:
                 path = uri.replace("file://", "", 1)  # relative
         else:

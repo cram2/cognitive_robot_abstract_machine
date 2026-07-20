@@ -19,9 +19,9 @@ AllElements: Tuple[Hashable]
 class SetElement(AbstractSimpleSet):
     """
     Represents a SetElement.
-    A SetElement consists of an element and all possible elements.
-    It is necessary to know of all possible elements to determine the index and complement of any element.
-    All elements are a tuple to preserve ordering.
+
+    A SetElement consists of an element and all possible elements. It is necessary to know of all possible elements to determine the index
+    and complement of any element. All elements are a tuple to preserve ordering.
 
     Beware that an empty set element is an invariant of this class and is represented by None.
     All elements are not consistent with invariants of this class.
@@ -51,7 +51,9 @@ class SetElement(AbstractSimpleSet):
     def from_data(cls, element: Hashable, all_elements: AllElements) -> Self:
         """
         Create a set element from data.
-        :param element: The element to create the set element from. If None, create an empty set element.
+
+        :param element: The element to create the set element from. If None, create an
+            empty set element.
         :param all_elements: The set of all elements.
         """
         instance = cls.__new__(cls)

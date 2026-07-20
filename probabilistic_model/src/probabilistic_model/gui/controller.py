@@ -32,7 +32,9 @@ class ModelController:
 
     def __post_init__(self):
         """
-        Initializes the controller. If a model is provided, sets it.
+        Initializes the controller.
+
+        If a model is provided, sets it.
         """
         if self.model:
             self.set_model(self.model)

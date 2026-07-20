@@ -578,7 +578,7 @@ def test_not_and_or_with_domain_mapping(handles_and_containers_world):
 
 def test_generate_with_using_decorated_predicate(handles_and_containers_world):
     """
-    Test that symbolic functions can be used inside and outside of queries
+    Test that symbolic functions can be used inside and outside of queries.
     """
     world = handles_and_containers_world
 
@@ -703,9 +703,11 @@ def test_select_predicate(handles_and_containers_world):
 
 def test_is_same_entity_predicate_in_query(handles_and_containers_world):
     """
-    ``IsSameEntity`` is a regular EQL predicate: used symbolically in a ``where`` clause it
-    is bound and evaluated by the query engine like any other predicate. Only the literal
-    target itself is the same entity as the target, so exactly one solution is returned.
+    ``IsSameEntity`` is a regular EQL predicate: used symbolically in a ``where`` clause
+    it is bound and evaluated by the query engine like any other predicate.
+
+    Only the literal target itself is the same entity as the target, so exactly one
+    solution is returned.
     """
     world = handles_and_containers_world
     target = world.bodies[0]
@@ -1197,12 +1199,16 @@ def test_recalling_where_statement_with_quantification(handles_and_containers_wo
     assert len(list(query.evaluate())) == 1
 
 
-def test_modifying_built_query_raises_error(handles_and_containers_world):
+def test_modifying_built_query_rebuilds(handles_and_containers_world):
     body = variable(Body, domain=handles_and_containers_world.bodies)
     query = entity(body).where(contains(body.name, "Handle"))
-    query.evaluate()
-    with pytest.raises(TryingToModifyAnAlreadyBuiltQuery):
-        query.where(contains(body.name, "1"))
+    results_before = list(query.evaluate())
+    # The query is no longer frozen after being built/evaluated: modifying it marks the compiled
+    # expression dirty and the next evaluation rebuilds it, reflecting the extra condition.
+    query.where(contains(body.name, "1"))
+    results_after = list(query.evaluate())
+    assert len(results_after) == 1
+    assert len(results_after) < len(results_before)
 
 
 def test_chain_evaluate_variables():
@@ -1233,6 +1239,91 @@ def test_subquery_independence():
     # test with an()
     query = an(entity(var1).where(var1 != an(entity(var1).where(var1 == 2))))
     assert query.tolist() == [1, 4, 3]
+
+
+def test_editing_and_rebuilding_original_after_embedding_leaves_subquery_snapshot_unchanged():
+    """Embedding a query as a subquery captures an immutable snapshot, so editing **and rebuilding**
+    the original afterwards does not retroactively change the already-embedded copy."""
+    var1 = variable(int, [1, 2, 3, 4])
+    inner = entity(var1).where(var1 == 2)
+    outer = an(entity(var1).where(var1 != an(inner)))
+
+    before = sorted(outer.tolist())
+    assert before == [1, 3, 4]
+
+    # Mutate the original inner query and rebuild it (rebuilding rewires the live query node, which
+    # would corrupt the embedded copy if it were shared rather than snapshotted).
+    inner.where(var1 == 3)
+    inner.tolist()
+
+    assert sorted(outer.tolist()) == before
+
+
+def test_editing_distinct_subquery_after_embedding_leaves_snapshot_unchanged():
+    """A subquery that uses distinct is still snapshotted on embedding, so editing and rebuilding the
+    original afterwards does not change the embedded copy."""
+    var1 = variable(int, [1, 2, 3, 4])
+    inner = entity(var1).where(var1 == 2).distinct()
+    outer = an(entity(var1).where(var1 != an(inner)))
+
+    before = sorted(outer.tolist())
+    assert before == [1, 3, 4]
+
+    inner.where(var1 == 3)
+    inner.tolist()
+
+    assert sorted(outer.tolist()) == before
+
+
+def test_embedding_a_count_all_subquery_does_not_corrupt_the_original():
+    """Embedding a ``count_all`` query must not corrupt it: re-evaluating the original after embedding
+    still produces correct results."""
+    group_variable = variable(int, [10, 20])
+    counted = set_of(group_variable, eql.count_all()).grouped_by(group_variable)
+
+    before = sorted(tuple(row.values()) for row in counted.tolist())
+
+    embedding = an(entity(counted))
+    embedding.tolist()
+
+    assert sorted(tuple(row.values()) for row in counted.tolist()) == before
+
+
+def test_editing_and_rebuilding_a_count_all_subquery_after_embedding_leaves_snapshot_unchanged():
+    """A ``count_all`` subquery is snapshotted on embedding like any other query, so editing **and
+    rebuilding** the original afterwards does not change the already-embedded copy."""
+    group_variable = variable(int, [10, 10, 20])
+    counted = set_of(group_variable, eql.count_all()).grouped_by(group_variable)
+    outer = an(entity(counted))
+
+    before = sorted(tuple(row.values()) for row in outer.tolist())
+    assert before == [(10, 2), (20, 1)]
+
+    counted.where(group_variable != 20)
+    counted.tolist()
+
+    assert sorted(tuple(row.values()) for row in outer.tolist()) == before
+
+
+def test_embedded_subquery_captures_the_current_product_and_shares_variable_leaves():
+    """The operand embedded for a subquery is the source's compiled product captured at embed time,
+    sharing variable leaves so derived references stay valid. A later edit rebuilds the source into a
+    new product, leaving the already-embedded operand frozen."""
+    var1 = variable(int, [1, 2, 3])
+    source = entity(var1).where(var1 == 2)
+
+    condition = var1 != an(source)
+    source.build()
+
+    embedded = condition.right
+    assert embedded is source._expression_
+    assert any(descendant is var1 for descendant in embedded._descendants_)
+
+    # Editing and rebuilding the source produces a new product; the embedded operand is unchanged.
+    source.where(var1 == 3)
+    source.build()
+    assert condition.right is embedded
+    assert source._expression_ is not embedded
 
 
 def test_first():
@@ -1266,11 +1357,14 @@ def test_type_availability_in_mapped_variables(handles_and_containers_world):
 
 
 def test_accessing_a_dunder_attribute_symbolically_raises_a_helpful_error():
-    """Dunder attribute access on a variable raises a helpful, AttributeError-compatible error.
+    """
+    Dunder attribute access on a variable raises a helpful, AttributeError-compatible
+    error.
 
-    It must remain an :class:`AttributeError` so that ``copy``/``pickle`` machinery probing optional
-    dunder hooks still treats it as a missing attribute, while its message points at
-    ``@symbolic_function`` as the correct way to reach a dunder-named member.
+    It must remain an :class:`AttributeError` so that ``copy``/``pickle`` machinery
+    probing optional dunder hooks still treats it as a missing attribute, while its
+    message points at ``@symbolic_function`` as the correct way to reach a dunder-named
+    member.
     """
     var = variable(int, [1, 2, 3])
 
@@ -1411,3 +1505,13 @@ def test_presentation_example():
     q = an(entity(r).where(r.battery > 50, not_(r.tasks[0].completed)))
     visualize_query_graph(q, figure_size=(20, 20), spacing_x=2, spacing_y=2)
     assert q.tolist() == [robots[2]]
+
+
+def test_empty_data_to_aggregator():
+    data = variable(int, [])
+    @symbolic_function
+    def x_value(x_):
+        return x_
+    key = lambda x: x_value(x)
+    min_ = entity(eql.min(data, key=key))
+    assert min_.tolist() == [None]

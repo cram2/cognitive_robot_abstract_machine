@@ -117,6 +117,7 @@ class LifeCycleState(State):
     def compile(self):
         """
         Compiles updater for life cycle states.
+
         1. Define state transitions based on current life cycle state and conditions.
         2. Combine all node state transitions into a single expression and compile it.
         3. Bind compiled function arguments to memory views of observation and life cycle state data.
@@ -321,12 +322,14 @@ class MotionStatechart(SubclassJSONSerializer):
 
     observation_state: ObservationState = field(init=False)
     """
-    Combined representation of the observation state of the motion statechart, to enable an efficient tick().
+    Combined representation of the observation state of the motion statechart, to enable
+    an efficient tick().
     """
 
     life_cycle_state: LifeCycleState = field(init=False)
     """
-    Combined representation of the life cycle state of the motion statechart, to enable an efficient tick().
+    Combined representation of the life cycle state of the motion statechart, to enable
+    an efficient tick().
     """
 
     history: StateHistory = field(default_factory=StateHistory, init=False)
@@ -340,8 +343,11 @@ class MotionStatechart(SubclassJSONSerializer):
 
     def create_structure_copy(self) -> MotionStatechart:
         """
-        Creates a copy of the motion statechart, where all nodes are MotionStatechartNodes or Goals.
-        This is useful if only the structure of the motion statechart is needed, for example, for visualization.
+        Creates a copy of the motion statechart, where all nodes are
+        MotionStatechartNodes or Goals.
+
+        This is useful if only the structure of the motion statechart is needed, for
+        example, for visualization.
         """
         motion_statechart_copy = MotionStatechart()
         # copy nodes in order to make sure index is correct
@@ -401,6 +407,7 @@ class MotionStatechart(SubclassJSONSerializer):
     def edges(self) -> List[TrinaryCondition]:
         """
         The edges of the underlying graph.
+
         .. warning:: This may return duplicate edges if a transition uses multiple nodes.
         """
         return self.rx_graph.edges()
@@ -414,7 +421,8 @@ class MotionStatechart(SubclassJSONSerializer):
 
     def add_node(self, node: MotionStatechartNode):
         """
-        Adds a node to the motion statechart and finalizes the initialization of the node.
+        Adds a node to the motion statechart and finalizes the initialization of the
+        node.
         """
         node.motion_statechart = self
         node.index = self.rx_graph.add_node(node)
@@ -487,7 +495,8 @@ class MotionStatechart(SubclassJSONSerializer):
 
     def _expand_goals(self, context: MotionStatechartContext):
         """
-        Triggers the expansion of all goals in the motion statechart and add its children to the motion statechart.
+        Triggers the expansion of all goals in the motion statechart and add its
+        children to the motion statechart.
         """
         for goal in self.get_nodes_by_type(Goal):
             self._expand_goal(goal, context=context)
@@ -554,6 +563,7 @@ class MotionStatechart(SubclassJSONSerializer):
     def tick(self, context: MotionStatechartContext):
         """
         Executes a single tick of the motion statechart.
+
         First the observation state is updated, then the life cycle state is updated.
         :param context: The context required to execute the tick.
         """

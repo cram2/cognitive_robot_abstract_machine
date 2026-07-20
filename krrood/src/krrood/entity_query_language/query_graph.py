@@ -11,8 +11,7 @@ from krrood.entity_query_language.rules.conclusion_selector import ConclusionSel
 from krrood.entity_query_language.query.query import (
     Query,
 )
-from krrood.entity_query_language.query.operations import OrderedBy, GroupedBy
-from krrood.entity_query_language.query.quantifiers import ResultQuantifier
+from krrood.entity_query_language.query.operations import GroupedBy
 from krrood.entity_query_language.operators.concatenation import Concatenation
 from krrood.entity_query_language.operators.aggregators import Aggregator
 from krrood.entity_query_language.operators.core_logical_operators import (
@@ -26,7 +25,6 @@ from krrood.entity_query_language.evaluation import is_condition_participant
 from krrood.entity_query_language.core.variable import (
     Variable,
     Literal,
-    InstantiatedVariable,
 )
 from krrood.entity_query_language.core.mapped_variable import (
     MappedVariable,
@@ -49,7 +47,8 @@ _UNSATISFIED_BORDER_COLOR: str = "red"
 
 
 def _is_faded_gate(node, satisfied_condition_ids: OrderedSet[UUID]) -> bool:
-    """Return True if *node* is an unsatisfied condition participant.
+    """
+    Return True if *node* is an unsatisfied condition participant.
 
     Such nodes act as "gates" that the BFS in
     :meth:`QueryGraph._propagate_faded_subtrees` refuses to traverse through.
@@ -72,16 +71,20 @@ class QueryGraph:
     """
     An expression representing the query.
     """
+
     satisfied_condition_ids: Optional[OrderedSet[UUID]] = None
     """
     Optional frozenset of satisfied condition UUIDs for coloring condition nodes.
+
     When provided, unsatisfied condition nodes are colored grey, while satisfied
     condition nodes keep their type-based color.
     """
+
     graph: rx.PyDAG = field(init=False, default_factory=rx.PyDAG)
     """
     The graph representation of the query, used for visualization and introspection.
     """
+
     expression_node_map: Dict[SymbolicExpression, QueryNode] = field(
         init=False, default_factory=dict
     )
@@ -101,7 +104,8 @@ class QueryGraph:
             self._propagate_faded_subtrees()
 
     def _propagate_faded_subtrees(self):
-        """Mark unsatisfied condition nodes and their exclusive descendants as faded.
+        """
+        Mark unsatisfied condition nodes and their exclusive descendants as faded.
 
         A node is faded when every path from the root to that node passes through
         at least one unsatisfied condition node.  We compute this by BFS from the
@@ -164,7 +168,7 @@ class QueryGraph:
         execution.
 
         :returns: The rendered visualization object.
-        :raises: `ModuleNotFoundError` If rustworkx_utils is not installed.
+        :raises:`ModuleNotFoundError` If rustworkx_utils is not installed.
         """
         visualizer = GraphVisualizer(
             node=self.expression_node_map[self.query._root_],
@@ -217,7 +221,8 @@ class QueryGraph:
         expression: Optional[SymbolicExpression] = None,
     ) -> QueryNode:
         """
-        Construct the graph representation of the query, used for visualization and introspection.
+        Construct the graph representation of the query, used for visualization and
+        introspection.
         """
         expression = expression if expression is not None else self.query._root_
 
@@ -238,7 +243,7 @@ class QueryGraph:
         )
         self.expression_node_map[expression] = node
 
-        if isinstance(expression, ResultQuantifier):
+        if isinstance(expression, Query):
             node.wrap_subtree = True
 
         self._add_children_to_graph(node)
@@ -270,7 +275,9 @@ class QueryGraph:
 @dataclass
 class ColorLegend(RXUtilsColorLegend):
     """
-    Represents a color legend entry for visualizing query graph nodes. Maps each expression type to a color.
+    Represents a color legend entry for visualizing query graph nodes.
+
+    Maps each expression type to a color.
     """
 
     @classmethod
@@ -282,14 +289,11 @@ class ColorLegend(RXUtilsColorLegend):
         name = expression.__class__.__name__
         color = "white"
         match expression:
-            case Filter() | OrderedBy() | GroupedBy():
+            case Filter() | GroupedBy():
                 color = "#17becf"
             case Aggregator():
                 name = "Aggregator"
                 color = "#F54927"
-            case ResultQuantifier():
-                name = "ResultQuantifier"
-                color = "#9467bd"
             case Query():
                 name = "QueryObjectDescriptor"
                 color = "#d62728"
@@ -322,13 +326,17 @@ class ColorLegend(RXUtilsColorLegend):
 @dataclass
 class QueryNode(RXUtilsNode):
     """
-    A node in the query graph. Overrides the default enclosed name to "Selected Variable".
+    A node in the query graph.
+
+    Overrides the default enclosed name to "Selected Variable".
     """
 
     enclosed_name: ClassVar[str] = "Selected Variable"
     is_satisfied: bool = field(default=False)
     """
-    True if this node's expression is a condition participant whose evaluation
-    result was True. Grounded directly on satisfied_condition_ids, not derived
-    from the faded propagation pass.
+    True if this node's expression is a condition participant whose evaluation result
+    was True.
+
+    Grounded directly on satisfied_condition_ids, not derived from the faded propagation
+    pass.
     """

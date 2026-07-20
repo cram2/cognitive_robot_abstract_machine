@@ -32,9 +32,11 @@ class MultinomialDistribution(ProbabilisticModel):
 
     probabilities: Optional[npt.NDArray] = field(default=None)
     """
-    The probability mass function. The dimensions correspond to the variables in the same order.
-    The first dimension indexes over the first variable and so on. If no probabilities are provided in the constructor,
-    the probabilities are initialized with ones.
+    The probability mass function.
+
+    The dimensions correspond to the variables in the same order. The first dimension
+    indexes over the first variable and so on. If no probabilities are provided in the
+    constructor, the probabilities are initialized with ones.
     """
 
     def __post_init__(self):
@@ -133,11 +135,11 @@ class MultinomialDistribution(ProbabilisticModel):
         return result
 
     def __eq__(self, other: Self) -> bool:
-        """Compare self with other and return the boolean result.
+        """
+        Compare self with other and return the boolean result.
 
-        Two discrete random variables are equal only if the probability mass
-        functions are equal and the order of dimensions are equal.
-
+        Two discrete random variables are equal only if the probability mass functions
+        are equal and the order of dimensions are equal.
         """
         return (
             isinstance(other, self.__class__)
@@ -196,7 +198,8 @@ class MultinomialDistribution(ProbabilisticModel):
 
     def indices_from_simple_event(self, event: SimpleEvent) -> Tuple[List[int], ...]:
         """
-        Calculate the indices that can be used to access the underlying probability array from a simple event.
+        Calculate the indices that can be used to access the underlying probability
+        array from a simple event.
 
         :param event: The simple event.
         :return: The indices.
@@ -233,12 +236,13 @@ class MultinomialDistribution(ProbabilisticModel):
 
     def as_probabilistic_circuit(self) -> SumUnit:
         """
-        Convert this distribution to a probabilistic circuit. A deterministic sum unit with decomposable children is
-        used to describe every state. The size of the circuit is equal to the size of `self.probabilities`.
+        Convert this distribution to a probabilistic circuit.
+
+        A deterministic sum unit with decomposable children is used to describe every
+        state. The size of the circuit is equal to the size of `self.probabilities`.
 
         :return: The distribution as a probabilistic circuit.
         """
-
         pc = ProbabilisticCircuit()
 
         # initialize the result as a deterministic sum unit
@@ -280,6 +284,7 @@ class MultinomialDistribution(ProbabilisticModel):
     def encode_full_evidence_event(self, event: Iterable) -> List[int]:
         """
         Encode a full evidence event into a list of integers.
+
         :param event: The event to encode.
         :return: The encoded event.
         """

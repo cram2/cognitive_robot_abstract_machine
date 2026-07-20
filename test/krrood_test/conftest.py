@@ -50,10 +50,9 @@ def generate_sqlalchemy_interface():
     """
     Generate the SQLAlchemy interface file before tests run.
 
-    This ensures the file exists before any imports attempt to use it,
-    solving krrood_test isolation issues when running all tests.
+    This ensures the file exists before any imports attempt to use it, solving
+    krrood_test isolation issues when running all tests.
     """
-
     # build the symbol graph
     SymbolGraph.clear()
     symbol_graph = SymbolGraph(packages=["krrood", "test.krrood"])
@@ -126,7 +125,6 @@ def pytest_configure(config):
     """
     Set log levels before krrood_test collection.
     """
-
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
     logging.getLogger("numpy").setLevel(logging.WARNING)
 

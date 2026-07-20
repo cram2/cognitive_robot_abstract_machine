@@ -137,11 +137,10 @@ class ResetStateContextManager:
     """
     A context manager for resetting the state of a given `World` instance.
 
-    This class is designed to allow operations to be performed on a `World`
-    object, ensuring that its state can be safely returned to its previous
-    condition upon leaving the context. The original state of the `World`
-    instance is restored even if an exception occurs within the context, and
-    the state change is notified.
+    This class is designed to allow operations to be performed on a `World` object,
+    ensuring that its state can be safely returned to its previous condition upon
+    leaving the context. The original state of the `World` instance is restored even if
+    an exception occurs within the context, and the state change is notified.
     """
 
     def __init__(self, world: World):
@@ -164,8 +163,9 @@ class ResetStateContextManager:
 class WorldModelUpdateContextManager:
     """
     Context manager for updating the state of a given `World` instance.
-    This class manages that updates to the world within the context of this class only trigger recomputations after all
-    desired updates have been performed.
+
+    This class manages that updates to the world within the context of this class only
+    trigger recomputations after all desired updates have been performed.
     """
 
     publish_changes: bool = True
@@ -180,7 +180,8 @@ class WorldModelUpdateContextManager:
 
     _id: UUID = field(default_factory=uuid.uuid4)
     """
-    Unique identifier for this context manager instance, used to track active world model updates.
+    Unique identifier for this context manager instance, used to track active world
+    model updates.
     """
 
     def __enter__(self):
@@ -334,24 +335,30 @@ class WorldModelManager:
 
     version: int = 0
     """
-    The version of the model. This increases whenever a change to the kinematic model is made. Mostly triggered
-    by adding/removing bodies and connections.
+    The version of the model.
+
+    This increases whenever a change to the kinematic model is made. Mostly triggered by
+    adding/removing bodies and connections.
     """
 
     model_modification_blocks: List[WorldModelModificationBlock] = field(
         default_factory=list, repr=False, kw_only=True
     )
     """
-    All atomic modifications applied to the world. Tracked by @atomic_world_modification.
-    The field itself is a list of lists. The outer lists indicates when to trigger the model/state change callbacks.
-    The inner list is a block of modifications where change callbacks must not be called in between.
+    All atomic modifications applied to the world.
+
+    Tracked by @atomic_world_modification. The field itself is a list of lists. The
+    outer lists indicates when to trigger the model/state change callbacks. The inner
+    list is a block of modifications where change callbacks must not be called in
+    between.
     """
 
     current_model_modification_block: WorldModelModificationBlock = field(
         default_factory=WorldModelModificationBlock, repr=False, init=False
     )
     """
-    The current modification block called within one context of @atomic_world_modification.
+    The current modification block called within one context of
+    @atomic_world_modification.
     """
 
     model_change_callbacks: List[ModelChangeCallback] = field(
@@ -365,30 +372,34 @@ class WorldModelManager:
         init=False, default_factory=list, repr=False
     )
     """
-    List of active world model managers currently modifying this world
+    List of active world model managers currently modifying this world.
     """
 
     _current_modifications_will_be_published: Optional[bool] = field(
         init=False, default=None
     )
     """
-    Indicates if the current modifications will be published via a synchronizer. If None, then there are no active contexts.
+    Indicates if the current modifications will be published via a synchronizer.
+
+    If None, then there are no active contexts.
     """
 
     pending_publications: List[Callable[[], None]] = field(
         init=False, default_factory=list, repr=False
     )
     """
-    Network publications deferred while the world is being modified. They are flushed (executed)
-    only after ``_world_lock`` has been released, so that a synchronous publish waiting for
-    acknowledgments never blocks the receiving executor that must acquire the lock to apply/ack.
+    Network publications deferred while the world is being modified.
+
+    They are flushed (executed) only after ``_world_lock`` has been released, so that a
+    synchronous publish waiting for acknowledgments never blocks the receiving executor
+    that must acquire the lock to apply/ack.
     """
 
     def update_model_version_and_notify_callbacks(self, **kwargs) -> None:
         """
-        Notifies the system of a model change and updates necessary states, caches,
-        and forward kinematics expressions while also triggering registered callbacks
-        for model changes.
+        Notifies the system of a model change and updates necessary states, caches, and
+        forward kinematics expressions while also triggering registered callbacks for
+        model changes.
         """
         self.version += 1
         for callback in list(self.model_change_callbacks):
@@ -396,10 +407,12 @@ class WorldModelManager:
 
     def flush_pending_publications(self) -> None:
         """
-        Execute and clear all publications that were deferred during a world modification.
+        Execute and clear all publications that were deferred during a world
+        modification.
 
-        Must be called *after* ``_world_lock`` is released so that publishing (and, in synchronous
-        mode, waiting for acknowledgments) does not happen while holding the lock.
+        Must be called *after* ``_world_lock`` is released so that publishing (and, in
+        synchronous mode, waiting for acknowledgments) does not happen while holding the
+        lock.
         """
         pending = self.pending_publications
         self.pending_publications = []
@@ -414,8 +427,10 @@ _LRU_CACHE_SIZE: int = 2048
 class World(HasSimulatorProperties):
     """
     A class representing the world.
-    The world manages a set of kinematic structure entities and connections represented as a tree-like graph.
-    The nodes represent kinematic structure entities in the world, and the edges represent joins between them.
+
+    The world manages a set of kinematic structure entities and connections represented
+    as a tree-like graph. The nodes represent kinematic structure entities in the world,
+    and the edges represent joins between them.
     """
 
     kinematic_structure: rx.PyDAG[KinematicStructureEntity] = field(
@@ -423,8 +438,10 @@ class World(HasSimulatorProperties):
     )
     """
     The kinematic structure of the world.
-    The kinematic structure is a tree shaped directed graph where the nodes represent kinematic structure entities
-     in the world, and the edges represent connections between them.
+
+    The kinematic structure is a tree shaped directed graph where the nodes represent
+    kinematic structure entities  in the world, and the edges represent connections
+    between them.
     """
 
     semantic_annotations: List[SemanticAnnotation] = field(
@@ -456,7 +473,10 @@ class World(HasSimulatorProperties):
 
     name: Optional[str] = None
     """
-    Name of the world. May act as default namespace for all bodies and semantic annotations in the world which do not have a prefix.
+    Name of the world.
+
+    May act as default namespace for all bodies and semantic annotations in the world
+    which do not have a prefix.
     """
 
     collision_manager: CollisionManager = field(init=False)
@@ -469,8 +489,10 @@ class World(HasSimulatorProperties):
     )
     """
     Decomposer used by the Bullet collision detector to split non-convex meshes into
-    convex parts. Defaults to VHACD; pass ``None`` to skip decomposition (non-convex
-    meshes will then be treated as their convex hulls).
+    convex parts.
+
+    Defaults to VHACD; pass ``None`` to skip decomposition (non-convex meshes will then
+    be treated as their convex hulls).
     """
 
     _current_active_atomic_world_modification: Optional[Callable] = field(
@@ -478,8 +500,9 @@ class World(HasSimulatorProperties):
     )
     """
     The function that is currently atomically modifying the world and hence locking it.
-    This acts like a flag that indicates if an atomic world operation is currently being executed.
-    See `atomic_world_modification` for more information.
+
+    This acts like a flag that indicates if an atomic world operation is currently being
+    executed. See `atomic_world_modification` for more information.
     """
 
     _id: UUID = field(init=False, default_factory=uuid.uuid4)
@@ -503,7 +526,7 @@ class World(HasSimulatorProperties):
 
     _world_entity_hash_table: Dict = field(init=False, default_factory=dict)
     """
-    Lookup table to get a world entity by its hash
+    Lookup table to get a world entity by its hash.
     """
 
     _world_lock: threading.RLock = field(
@@ -581,7 +604,8 @@ class World(HasSimulatorProperties):
     @property
     def active_degrees_of_freedom(self) -> List[DegreeOfFreedom]:
         """
-        The deduplicated, order-preserving list of active degrees of freedom across all connections.
+        The deduplicated, order-preserving list of active degrees of freedom across all
+        connections.
         """
         return list(
             dict.fromkeys(
@@ -592,7 +616,8 @@ class World(HasSimulatorProperties):
     @property
     def passive_degrees_of_freedom(self) -> List[DegreeOfFreedom]:
         """
-        The deduplicated, order-preserving list of passive degrees of freedom across all connections.
+        The deduplicated, order-preserving list of passive degrees of freedom across all
+        connections.
         """
         return list(
             dict.fromkeys(
@@ -663,7 +688,8 @@ class World(HasSimulatorProperties):
         self,
     ) -> List[KinematicStructureEntity]:
         """
-        Return a list of all kinematic_structure_entities in the world, sorted topologically.
+        Return a list of all kinematic_structure_entities in the world, sorted
+        topologically.
         """
         indices = rx.topological_sort(self.kinematic_structure)
         return [self.kinematic_structure[index] for index in indices]
@@ -687,7 +713,8 @@ class World(HasSimulatorProperties):
     @property
     def semantic_annotations_topologically_sorted(self) -> List[SemanticAnnotation]:
         """
-        Return a list of all semantic annotations in the world, sorted topologically based on their dependencies.
+        Return a list of all semantic annotations in the world, sorted topologically
+        based on their dependencies.
         """
         return self._topologically_sort_semantic_annotations(self.semantic_annotations)
 
@@ -697,7 +724,8 @@ class World(HasSimulatorProperties):
     ) -> List[SemanticAnnotation]:
         """
         Sort semantic annotations in topological order based on their dependencies.
-        Annotations with no dependencies come first, followed by annotations that depend on them.
+        Annotations with no dependencies come first, followed by annotations that depend
+        on them.
 
         :param annotations: List of semantic annotations to sort.
         :return: Sorted list of semantic annotations in dependency order.
@@ -753,8 +781,8 @@ class World(HasSimulatorProperties):
         Adds a connection to the kinematic structure.
 
         The method updates the connection instance to associate it with the current
-        world instance and reflects the connection in the kinematic structure.
-        Do not call this function directly, use add_connection instead.
+        world instance and reflects the connection in the kinematic structure. Do not
+        call this function directly, use add_connection instead.
 
         :param connection: The connection to be added to the kinematic structure.
         """
@@ -794,6 +822,7 @@ class World(HasSimulatorProperties):
     ):
         """
         Add a kinematic_structure_entity to the world.
+
         Do not call this function directly, use add_kinematic_structure_entity instead.
 
         :param kinematic_structure_entity: The kinematic_structure_entity to add.
@@ -806,7 +835,9 @@ class World(HasSimulatorProperties):
     def add_degree_of_freedom(self, dof: DegreeOfFreedom) -> None:
         """
         Adds degree of freedom in the world.
-        This is used to register DoFs that are not created by the world, but are part of the world model.
+
+        This is used to register DoFs that are not created by the world, but are part of
+        the world model.
         :param dof: The degree of freedom to register.
         """
         self._raise_error_if_belongs_to_other_world(dof)
@@ -818,11 +849,10 @@ class World(HasSimulatorProperties):
         """
         Adds a degree of freedom to the current system and initializes its state.
 
-        This method modifies the internal state of the system by adding a new
-        degree of freedom (DOF). It sets the initial position of the DOF based
-        on its configured lower and upper position limits, ensuring it respects
-        both constraints. The DOF is then added to the list of degrees of freedom
-        in the system.
+        This method modifies the internal state of the system by adding a new degree of
+        freedom (DOF). It sets the initial position of the DOF based on its configured
+        lower and upper position limits, ensuring it respects both constraints. The DOF
+        is then added to the list of degrees of freedom in the system.
 
         :param dof: The degree of freedom to be added to the system.
         :return: None
@@ -833,11 +863,11 @@ class World(HasSimulatorProperties):
 
     def add_semantic_annotation(self, semantic_annotation: SemanticAnnotation) -> None:
         """
-        Adds a semantic annotation to the current list of semantic annotations if it doesn't already exist
+        Adds a semantic annotation to the current list of semantic annotations if it
+        doesn't already exist.
 
-        :param semantic_annotation: The semantic annotation instance to be added. Its name must be unique within
-            the current context.
-
+        :param semantic_annotation: The semantic annotation instance to be added. Its
+            name must be unique within the current context.
         """
         self._raise_error_if_belongs_to_other_world(semantic_annotation)
         if self.is_semantic_annotation_in_world(semantic_annotation):
@@ -848,12 +878,13 @@ class World(HasSimulatorProperties):
         self, semantic_annotation: SemanticAnnotation
     ) -> None:
         """
-        Recursively adds a semantic annotation to the current list of semantic annotations if it doesn't already exist.
-        Recursively traverses the semantic annotation's fields and adds any nested semantic annotations as well.
-        Fields are added to the world first to ensure a valid modification history.
+        Recursively adds a semantic annotation to the current list of semantic
+        annotations if it doesn't already exist. Recursively traverses the semantic
+        annotation's fields and adds any nested semantic annotations as well. Fields are
+        added to the world first to ensure a valid modification history.
 
-        :param semantic_annotation: The semantic annotation instance to be added. Its name must be unique within
-            the current context.
+        :param semantic_annotation: The semantic annotation instance to be added. Its
+            name must be unique within the current context.
         """
         self._raise_error_if_belongs_to_other_world(semantic_annotation)
         if self.is_semantic_annotation_in_world(semantic_annotation):
@@ -877,9 +908,12 @@ class World(HasSimulatorProperties):
         semantic_annotations: List[SemanticAnnotation],
     ) -> None:
         """
-        Adds a list of semantic annotations to the current list of semantic annotations if they don't already exist.
+        Adds a list of semantic annotations to the current list of semantic annotations
+        if they don't already exist.
+
         :param semantic_annotations: The list of semantic annotations to be added.
-        :param skip_duplicates: Whether to raise an error or not when a semantic annotation already exists.
+        :param skip_duplicates: Whether to raise an error or not when a semantic
+            annotation already exists.
         """
         for semantic_annotation in semantic_annotations:
             self.add_semantic_annotation(
@@ -889,7 +923,8 @@ class World(HasSimulatorProperties):
     @atomic_world_modification(modification=AddSemanticAnnotationModification)
     def _add_semantic_annotation(self, semantic_annotation: SemanticAnnotation):
         """
-        The atomic method that adds a semantic annotation to the current list of semantic annotations.
+        The atomic method that adds a semantic annotation to the current list of
+        semantic annotations.
         """
         semantic_annotation.add_to_world(self)
         self.semantic_annotations.append(semantic_annotation)
@@ -898,7 +933,9 @@ class World(HasSimulatorProperties):
     def add_actuator(self, actuator: Actuator) -> None:
         """
         Adds an actuator in the world.
-        This is used to register Actuators that are not created by the world, but are part of the world model.
+
+        This is used to register Actuators that are not created by the world, but are
+        part of the world model.
 
         :param actuator: The actuator to register.
         """
@@ -915,9 +952,8 @@ class World(HasSimulatorProperties):
         """
         Adds an actuator to the current system.
 
-        This method modifies the internal state of the system by adding a new
-        actuator. The actuator is then added to the list of actuators
-        in the system.
+        This method modifies the internal state of the system by adding a new actuator.
+        The actuator is then added to the list of actuators in the system.
 
         :param actuator: The actuator to be added to the system.
         :return: None
@@ -927,7 +963,9 @@ class World(HasSimulatorProperties):
 
     def _raise_error_if_belongs_to_other_world(self, world_entity: WorldEntity):
         """
-        Raises an AlreadyBelongsToAWorldError if the world_entity already belongs to another world.
+        Raises an AlreadyBelongsToAWorldError if the world_entity already belongs to
+        another world.
+
         :param world_entity:
         """
         if world_entity._world is not None and world_entity._world is not self:
@@ -939,6 +977,7 @@ class World(HasSimulatorProperties):
     def remove_connection(self, connection: Connection) -> None:
         """
         Removes a connection.
+
         Might create disconnected entities, so make sure to add a new connection or delete the child kinematic_structure_entity.
 
         :param connection: The connection to be removed
@@ -983,7 +1022,8 @@ class World(HasSimulatorProperties):
         """
         Removes a kinematic_structure_entity from the world.
 
-        Do not call this function directly, use `remove_kinematic_structure_entity` instead.
+        Do not call this function directly, use `remove_kinematic_structure_entity`
+        instead.
 
         :param kinematic_structure_entity: The kinematic_structure_entity to remove.
         """
@@ -1005,7 +1045,8 @@ class World(HasSimulatorProperties):
         self, semantic_annotation: SemanticAnnotation
     ) -> None:
         """
-        Removes a semantic annotation from the current list of semantic annotations if it exists.
+        Removes a semantic annotation from the current list of semantic annotations if
+        it exists.
 
         :param semantic_annotation: The semantic annotation instance to be removed.
         """
@@ -1015,7 +1056,8 @@ class World(HasSimulatorProperties):
     @atomic_world_modification(modification=RemoveSemanticAnnotationModification)
     def _remove_semantic_annotation(self, semantic_annotation: SemanticAnnotation):
         """
-        The atomic method that removes a semantic annotation from the current list of semantic annotations.
+        The atomic method that removes a semantic annotation from the current list of
+        semantic annotations.
         """
         self.semantic_annotations.remove(semantic_annotation)
         semantic_annotation.remove_from_world()
@@ -1043,18 +1085,19 @@ class World(HasSimulatorProperties):
         self, dofs: Iterable[DegreeOfFreedom], value: bool
     ):
         """
-        Sets whether the specified degrees of freedom (DOFs) have a hardware interface or not.
+        Sets whether the specified degrees of freedom (DOFs) have a hardware interface
+        or not.
 
         This method allows controlling the presence of a hardware interface for multiple
         DOFs at once. The modification is atomic, ensuring that all DOFs are updated as
         a single operation and the state remains consistent. The method iterates through
-        the given DOFs and updates their `has_hardware_interface` attribute to the provided
-        value.
+        the given DOFs and updates their `has_hardware_interface` attribute to the
+        provided value.
 
         :param dofs: An iterable collection of DegreeOfFreedom instances whose
-                     `has_hardware_interface` attribute is to be updated.
+            `has_hardware_interface` attribute is to be updated.
         :param value: A boolean value indicating whether the DOFs should have a hardware
-                      interface (True) or not (False).
+            interface (True) or not (False).
         """
         for dof in dofs:
             dof.has_hardware_interface = value
@@ -1064,7 +1107,8 @@ class World(HasSimulatorProperties):
         self, parent: KinematicStructureEntity, child: KinematicStructureEntity
     ) -> Connection:
         """
-        Retrieves the connection between a parent and child kinematic_structure_entity in the kinematic structure.
+        Retrieves the connection between a parent and child kinematic_structure_entity
+        in the kinematic structure.
         """
         return self.kinematic_structure.get_edge_data(parent.index, child.index)
 
@@ -1089,7 +1133,8 @@ class World(HasSimulatorProperties):
         """
         Retrieves all semantic annotations of a specific type from the world.
 
-        :param semantic_annotation_type: The class (type) of the semantic annotations to search for.
+        :param semantic_annotation_type: The class (type) of the semantic annotations to
+            search for.
         :return: A list of `SemanticAnnotation` objects that match the given type.
         """
         return self._get_world_entity_by_type_from_iterable(
@@ -1103,7 +1148,8 @@ class World(HasSimulatorProperties):
         """
         Retrieves all kinematic structure entities of a specific type from the world.
 
-        :param entity_type: The class (type) of the kinematic structure entities to search for.
+        :param entity_type: The class (type) of the kinematic structure entities to
+            search for.
         :return: A list of `KinematicStructureEntity` objects that match the given type.
         """
         return self._get_world_entity_by_type_from_iterable(
@@ -1115,9 +1161,12 @@ class World(HasSimulatorProperties):
         world_entity_type: Type[GenericWorldEntity], iterable: Iterable[WorldEntity]
     ) -> List[GenericWorldEntity]:
         """
-        Helper function to retrieve all world entities of a specific type from an iterable.
+        Helper function to retrieve all world entities of a specific type from an
+        iterable.
+
         :param world_entity_type: The type of the world entity.
-        :param iterable: The iterable to search for the world entity, for example self.connections or self.kinematic_structure_entities.
+        :param iterable: The iterable to search for the world entity, for example
+            self.connections or self.kinematic_structure_entities.
         :return: A list of `WorldEntity` objects that match the given type.
         """
         return [entity for entity in iterable if isinstance(entity, world_entity_type)]
@@ -1195,14 +1244,16 @@ class World(HasSimulatorProperties):
         world_entity_iterable: list[GenericWorldEntity],
     ) -> GenericWorldEntity:
         """
-        If more than one world entity matches the specified name, or if no world entity is found,
-        an exception is raised.
-        :param name: The name of the entity to retrieve. Can be a string or
-            a `PrefixedName` instance.
+        If more than one world entity matches the specified name, or if no world entity
+        is found, an exception is raised.
+
+        :param name: The name of the entity to retrieve. Can be a string or a
+            `PrefixedName` instance.
         :param world_entity_iterable:
         :return: The `WorldEntity` object that matches the given name.
         :raises WorldEntityNotFoundError: If no world entity with the given name exists.
-        :raises DuplicateWorldEntityError: If multiple world entities with the given name exist.
+        :raises DuplicateWorldEntityError: If multiple world entities with the given
+            name exist.
         """
         matches = self._get_world_entities_by_name_from_iterable(
             name, world_entity_iterable
@@ -1295,17 +1346,18 @@ class World(HasSimulatorProperties):
     ) -> List[GenericWorldEntity]:
         """
         Retrieve a world entity by its name from an iterable of world entities.
-        This iterable would, for example, be self.connections or self.kinematic_structure_entities.
-        This method accepts either a string or a `PrefixedName` instance.
-        It searches through the provided iterable and returns the list of world entities
-        that matches the given name.
-        If only a string was provided, it matches against the name without prefix.
-        If a `PrefixedName` was provided, it matches against the full name including prefix.
+
+        This iterable would, for example, be self.connections or
+        self.kinematic_structure_entities. This method accepts either a string or a
+        `PrefixedName` instance. It searches through the provided iterable and returns
+        the list of world entities that matches the given name. If only a string was
+        provided, it matches against the name without prefix. If a `PrefixedName` was
+        provided, it matches against the full name including prefix.
         :param name: The name of the world entity to search for.
-        :param world_entity_iterable: The iterable to search for the world entity, for example self.connections or self.kinematic_structure_entities.
+        :param world_entity_iterable: The iterable to search for the world entity, for
+            example self.connections or self.kinematic_structure_entities.
         :return: The list of `WorldEntity` that match the given name.
         """
-
         match name:
             case PrefixedName():
                 return [
@@ -1394,7 +1446,9 @@ class World(HasSimulatorProperties):
         self, entity_hash: int
     ) -> bool:
         """
-        Check if a world entity with a given hash exists in the world based on a given iterable.
+        Check if a world entity with a given hash exists in the world based on a given
+        iterable.
+
         :param entity_hash: The hash of the entity to retrieve.
         :return: True if the entity exists, False otherwise.
         """
@@ -1405,10 +1459,12 @@ class World(HasSimulatorProperties):
         self, other: World, pose: HomogeneousTransformationMatrix
     ) -> None:
         """
-        Merge another world into the existing one, creates a 6DoF connection between the root of this world and the root
-        of the other world.
+        Merge another world into the existing one, creates a 6DoF connection between the
+        root of this world and the root of the other world.
+
         :param other: The world to be added.
-        :param pose: world_root_T_other_root, the pose of the other world's root with respect to the current world's root
+        :param pose: world_root_T_other_root, the pose of the other world's root with
+            respect to the current world's root
         """
         with self.modify_world():
             other_root_id = other.root.id
@@ -1427,11 +1483,12 @@ class World(HasSimulatorProperties):
         root_connection: Connection = None,
     ) -> None:
         """
-        Merge a world into the existing one by merging degrees of freedom, states, connections, and bodies.
-        This removes all bodies and connections from `other`.
+        Merge a world into the existing one by merging degrees of freedom, states,
+        connections, and bodies. This removes all bodies and connections from `other`.
 
         :param other: The world to be added.
-        :param root_connection: If provided, this connection will be used to connect the two worlds. Otherwise, a new Connection6DoF will be created
+        :param root_connection: If provided, this connection will be used to connect the
+            two worlds. Otherwise, a new Connection6DoF will be created
         :return: None
         """
         assert other is not self, "Cannot merge a world with itself."
@@ -1463,7 +1520,8 @@ class World(HasSimulatorProperties):
 
     def is_kinematic_structure_entity_in_world_by_name(self, name: str) -> bool:
         """
-        Checks if there is a kinematic structure entity with the given name in the world.
+        Checks if there is a kinematic structure entity with the given name in the
+        world.
 
         :param name: Name to be checked
         :return: True if the entity is in the world, False otherwise
@@ -1478,8 +1536,9 @@ class World(HasSimulatorProperties):
         new_parent: KinematicStructureEntity,
     ):
         """
-        Destroys the connection between branch_root and its parent, and moves it to a new parent using a new connection
-        of the same type. The pose of body with respect to root stays the same.
+        Destroys the connection between branch_root and its parent, and moves it to a
+        new parent using a new connection of the same type. The pose of body with
+        respect to root stays the same.
 
         ..warning::
 
@@ -1519,7 +1578,8 @@ class World(HasSimulatorProperties):
         Collect all bodies that are below root in the tree.
 
         :param root: The root body of the branch
-        :return: List of all bodies in the subtree rooted at the given body (including the root)
+        :return: List of all bodies in the subtree rooted at the given body (including
+            the root)
         """
         descendants_indices = rx.descendants(self.kinematic_structure, root.index)
         return [root] + [
@@ -1559,9 +1619,10 @@ class World(HasSimulatorProperties):
         enable_unsafe_inside_world_block: bool = False,
     ) -> None:
         """
-        Move ``branch_root`` under ``new_parent``, recreating its parent connection so the connection
-        type (and, for active joints, the degree of freedom) is preserved and the branch keeps its
-        world pose. No-op if ``branch_root`` is already a child of ``new_parent``.
+        Move ``branch_root`` under ``new_parent``, recreating its parent connection so
+        the connection type (and, for active joints, the degree of freedom) is preserved
+        and the branch keeps its world pose. No-op if ``branch_root`` is already a child
+        of ``new_parent``.
 
         A :class:`Connection6DoF` carries its pose in its degrees of freedom, so it is recreated with
         fresh DOFs whose origin is set to the world-preserving pose. Every other connection keeps its
@@ -1620,7 +1681,8 @@ class World(HasSimulatorProperties):
 
     def move_branch_to_new_world(self, new_root: KinematicStructureEntity) -> World:
         """
-        Copies the subgraph of the kinematic structure from the root body to a new world and removes it from the old world.
+        Copies the subgraph of the kinematic structure from the root body to a new world
+        and removes it from the old world.
 
         :param new_root: The root body of the subgraph to be copied.
         :return: A new `World` instance containing the copied subgraph.
@@ -1664,8 +1726,8 @@ class World(HasSimulatorProperties):
     # %% Change Notifications
     def notify_state_change(self, publish_changes: bool = True, **kwargs) -> None:
         """
-        If you have changed the state of the world, call this function to trigger necessary events and increase
-        the state version.
+        If you have changed the state of the world, call this function to trigger
+        necessary events and increase the state version.
         """
         if not self.is_empty():
             self._forward_kinematic_manager.recompute()
@@ -1703,8 +1765,11 @@ class World(HasSimulatorProperties):
         self, kinematic_structure_entity: KinematicStructureEntity
     ) -> List[KinematicStructureEntity]:
         """
-        Computes all child entities of a given KinematicStructureEntity in the world recursively.
-        :param kinematic_structure_entity: The KinematicStructureEntity for which to compute children.
+        Computes all child entities of a given KinematicStructureEntity in the world
+        recursively.
+
+        :param kinematic_structure_entity: The KinematicStructureEntity for which to
+            compute children.
         :return: A list of all child KinematicStructureEntities.
         """
         children = self.compute_child_kinematic_structure_entities(
@@ -1722,7 +1787,9 @@ class World(HasSimulatorProperties):
     ) -> List[KinematicStructureEntity]:
         """
         Computes the child entities of a given KinematicStructureEntity in the world.
-        :param kinematic_structure_entity: The KinematicStructureEntity for which to compute children.
+
+        :param kinematic_structure_entity: The KinematicStructureEntity for which to
+            compute children.
         :return: A list of child KinematicStructureEntities.
         """
         return list(
@@ -1734,7 +1801,9 @@ class World(HasSimulatorProperties):
     ) -> Optional[Connection]:
         """
         Computes the parent connection of a given KinematicStructureEntity in the world.
-        :param kinematic_structure_entity: The entityKinematicStructureEntity for which to compute the parent connection.
+
+        :param kinematic_structure_entity: The entityKinematicStructureEntity for which
+            to compute the parent connection.
         :return: The parent connection of the given KinematicStructureEntity.
         """
         parent = self.compute_parent_kinematic_structure_entity(
@@ -1752,10 +1821,14 @@ class World(HasSimulatorProperties):
         self, kinematic_structure_entity: KinematicStructureEntity
     ) -> Optional[KinematicStructureEntity]:
         """
-        Computes the parent KinematicStructureEntity of a given KinematicStructureEntity in the world.
-        :param kinematic_structure_entity: The KinematicStructureEntity for which to compute the parent KinematicStructureEntity.
-        :return: The parent KinematicStructureEntity of the given KinematicStructureEntity.
-         If the given KinematicStructureEntity is the root, None is returned.
+        Computes the parent KinematicStructureEntity of a given KinematicStructureEntity
+        in the world.
+
+        :param kinematic_structure_entity: The KinematicStructureEntity for which to
+            compute the parent KinematicStructureEntity.
+        :return: The parent KinematicStructureEntity of the given
+            KinematicStructureEntity. If the given KinematicStructureEntity is the root,
+            None is returned.
         """
         parent = self.kinematic_structure.predecessors(kinematic_structure_entity.index)
         return parent[0] if parent else None
@@ -1765,7 +1838,9 @@ class World(HasSimulatorProperties):
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> List[Connection]:
         """
-        Computes the chain of connections between root and tip. Can handle chains that start and end anywhere in the tree.
+        Computes the chain of connections between root and tip.
+
+        Can handle chains that start and end anywhere in the tree.
         """
         entity_chain = self.compute_chain_of_kinematic_structure_entities(root, tip)
         return [
@@ -1787,8 +1862,8 @@ class World(HasSimulatorProperties):
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> Tuple[KinematicStructureEntity, KinematicStructureEntity]:
         """
-        Removes root and tip links until they are both connected with a controlled connection.
-        Useful for implementing collision avoidance.
+        Removes root and tip links until they are both connected with a controlled
+        connection. Useful for implementing collision avoidance.
 
         1. Compute the kinematic chain of bodies between root and tip.
         2. Remove all entries from link_a downward until one is connected with a connection from this semantic annotation.
@@ -1828,8 +1903,9 @@ class World(HasSimulatorProperties):
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> Tuple[List[Connection], List[Connection]]:
         """
-        Computes split chains of connections between 'root' and 'tip' bodies. Returns tuple of two Connection lists:
-        (root->common ancestor, tip->common ancestor). Returns empty lists if root==tip.
+        Computes split chains of connections between 'root' and 'tip' bodies.
+
+        Returns tuple of two Connection lists: (root->common ancestor, tip->common ancestor). Returns empty lists if root==tip.
 
         :param root: The starting `KinematicStructureEntity` object for the chain of connections.
         :param tip: The ending `KinematicStructureEntity` object for the chain of connections.
@@ -1865,8 +1941,9 @@ class World(HasSimulatorProperties):
         List[KinematicStructureEntity],
     ]:
         """
-        Computes the chain between root and tip. Can handle chains that start and end anywhere in the tree.
-        :param root: The root KinematicStructureEntity to start the chain from
+        Computes the chain between root and tip.
+
+        Can handle chains that start and end anywhere in the tree. :param root: The root KinematicStructureEntity to start the chain from
         :param tip: The tip KinematicStructureEntity to end the chain at
         :return: tuple containing
                     1. chain from root to the common ancestor (excluding common ancestor)
@@ -1905,7 +1982,8 @@ class World(HasSimulatorProperties):
         self, root_path: List[int], tip_path: List[int]
     ) -> int:
         """
-        Find the index of the lowest common ancestor, which is the index where the two paths diverge, minus 1.
+        Find the index of the lowest common ancestor, which is the index where the two
+        paths diverge, minus 1.
 
         :param root_path: The path from the root to the first entity.
         :param tip_path: The path from the root to the second entity.
@@ -1926,7 +2004,9 @@ class World(HasSimulatorProperties):
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> List[KinematicStructureEntity]:
         """
-        Computes the chain between root and tip. Can handle chains that start and end anywhere in the tree.
+        Computes the chain between root and tip.
+
+        Can handle chains that start and end anywhere in the tree.
         """
         path_indeces = self._compute_chain_of_kinematic_structure_entities_indexes(
             root, tip
@@ -1938,7 +2018,9 @@ class World(HasSimulatorProperties):
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> List[int]:
         """
-        Computes the chain between root and tip. Can handle chains that start and end anywhere in the tree.
+        Computes the chain between root and tip.
+
+        Can handle chains that start and end anywhere in the tree.
         """
         if root == tip:
             return [root.index]
@@ -1958,15 +2040,19 @@ class World(HasSimulatorProperties):
         enable_unsafe_inside_world_block: bool = False,
     ) -> HomogeneousTransformationMatrix:
         """
-        Compute the forward kinematics from the root KinematicStructureEntity to the tip KinematicStructureEntity.
+        Compute the forward kinematics from the root KinematicStructureEntity to the tip
+        KinematicStructureEntity.
 
-        Calculate the transformation matrix representing the pose of the
-        tip KinematicStructureEntity relative to the root KinematicStructureEntity.
+        Calculate the transformation matrix representing the pose of the tip
+        KinematicStructureEntity relative to the root KinematicStructureEntity.
 
-        :param root: Root KinematicStructureEntity, for which the kinematics are computed.
+        :param root: Root KinematicStructureEntity, for which the kinematics are
+            computed.
         :param tip: Tip KinematicStructureEntity, to which the kinematics are computed.
-        :param enable_unsafe_inside_world_block: Whether to use the forward kinematic manager
-        :return: Transformation matrix representing the relative pose of the tip KinematicStructureEntity with respect to the root KinematicStructureEntity.
+        :param enable_unsafe_inside_world_block: Whether to use the forward kinematic
+            manager
+        :return: Transformation matrix representing the relative pose of the tip
+            KinematicStructureEntity with respect to the root KinematicStructureEntity.
         """
         if not enable_unsafe_inside_world_block:
             return self._forward_kinematic_manager.compute(root, tip)
@@ -1988,14 +2074,18 @@ class World(HasSimulatorProperties):
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> NpMatrix4x4:
         """
-        Compute the forward kinematics from the root KinematicStructureEntity to the tip KinematicStructureEntity, root_T_tip and return it as a 4x4 numpy ndarray.
+        Compute the forward kinematics from the root KinematicStructureEntity to the tip
+        KinematicStructureEntity, root_T_tip and return it as a 4x4 numpy ndarray.
 
-        Calculate the transformation matrix representing the pose of the
-        tip KinematicStructureEntity relative to the root KinematicStructureEntity, expressed as a numpy ndarray.
+        Calculate the transformation matrix representing the pose of the tip
+        KinematicStructureEntity relative to the root KinematicStructureEntity,
+        expressed as a numpy ndarray.
 
-        :param root: Root KinematicStructureEntity, for which the kinematics are computed.
+        :param root: Root KinematicStructureEntity, for which the kinematics are
+            computed.
         :param tip: Tip KinematicStructureEntity, to which the kinematics are computed.
-        :return: Transformation matrix representing the relative pose of the tip KinematicStructureEntity with respect to the root KinematicStructureEntity.
+        :return: Transformation matrix representing the relative pose of the tip
+            KinematicStructureEntity with respect to the root KinematicStructureEntity.
         """
         return self._forward_kinematic_manager.compute_np(root, tip).copy()
 
@@ -2018,10 +2108,13 @@ class World(HasSimulatorProperties):
         entity_b: KinematicStructureEntity,
     ) -> HomogeneousTransformationMatrix:
         """
-        Computes the transform entity_a_T_entity_b without using the forward kinematics manager.
+        Computes the transform entity_a_T_entity_b without using the forward kinematics
+        manager.
 
-        :param entity_a: The entity which is going to be the reference frame of the transform
-        :param entity_b: The entity which is going to be the child frame of the transform
+        :param entity_a: The entity which is going to be the reference frame of the
+            transform
+        :param entity_b: The entity which is going to be the child frame of the
+            transform
         """
         root_T_reference = (
             HomogeneousTransformationMatrix()
@@ -2041,13 +2134,14 @@ class World(HasSimulatorProperties):
         self, entity: KinematicStructureEntity
     ) -> HomogeneousTransformationMatrix:
         """
-        Computes world_root_T_self without using the world's forward kinematics manager. This is done to avoid having to
-        recompile and compute the forwardkinematics in this case.
-        This can be used in cases were you need to calculate global poses for Kinematic Structure Entities which have
-        been added to the world in the currently active World.modify_world() block.
+        Computes world_root_T_self without using the world's forward kinematics manager.
+
+        This is done to avoid having to recompile and compute the forwardkinematics in
+        this case. This can be used in cases were you need to calculate global poses for
+        Kinematic Structure Entities which have been added to the world in the currently
+        active World.modify_world() block.
 
         :param entity: The entity to compute the root_T_entity for.
-
         :return: The root_T_entity of the entity.
         """
         world = entity._world
@@ -2112,6 +2206,7 @@ class World(HasSimulatorProperties):
     def _clear_world_entities(self):
         """
         Clears all world entities from the world.
+
         ..warning::
             Super destructive, world will be unusable after this call.
         """
@@ -2196,15 +2291,18 @@ class World(HasSimulatorProperties):
 
     def visualize_world_structure(self) -> Image:
         """
-        Visualizes the kinematic structure of the world using Graphviz in a topological way.
-        This is not meant to be a beautiful visualization, but a functional way at all to quickly inspect the structure.
+        Visualizes the kinematic structure of the world using Graphviz in a topological
+        way. This is not meant to be a beautiful visualization, but a functional way at
+        all to quickly inspect the structure.
 
-        Each node in the graph represents a KinematicStructureEntity, and each edge represents a Connection between entities.
-        The nodes are labeled with the names of the entities, and the edges are labeled with the types of connections.
+        Each node in the graph represents a KinematicStructureEntity, and each edge
+        represents a Connection between entities. The nodes are labeled with the names
+        of the entities, and the edges are labeled with the types of connections.
 
         Plot by calling `world.plot_world_structure().show()`.
 
-        :return: An Image object containing the visualization of the world's kinematic structure.
+        :return: An Image object containing the visualization of the world's kinematic
+            structure.
         """
         return graphviz_draw(
             self.kinematic_structure,
@@ -2237,6 +2335,7 @@ class World(HasSimulatorProperties):
     def ray_tracer(self) -> RayTracer:
         """
         A ray tracer for the world.
+
         :return: A ray tracer for the world.
         """
         return RayTracer(self)
@@ -2245,12 +2344,12 @@ class World(HasSimulatorProperties):
         self, commands: np.ndarray, dt: float, derivative: Derivatives
     ) -> None:
         """
-        Updates the state of a system by applying control commands at a specified derivative level,
-        followed by backward integration to update lower derivatives.
+        Updates the state of a system by applying control commands at a specified
+        derivative level, followed by backward integration to update lower derivatives.
 
         :param commands: Control commands to be applied at the specified derivative
-            level. The array length must match the number of free variables
-            in the system.
+            level. The array length must match the number of free variables in the
+            system.
         :param dt: Time step used for the integration of lower derivatives.
         :param derivative: The derivative level to which the control commands are
             applied.

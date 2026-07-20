@@ -8,6 +8,7 @@ logger.setLevel(logging.INFO)
 
 try:
     from PyQt6.QtWidgets import QApplication
+
     app = QApplication(sys.argv)
 except ImportError:
     app = None

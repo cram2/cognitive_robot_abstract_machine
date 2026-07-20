@@ -1,4 +1,5 @@
-"""Analysis engine for processing stored RGB-D data from files.
+"""
+Analysis engine for processing stored RGB-D data from files.
 
 This module provides an analysis engine that demonstrates how to read and process
 RGB-D data stored in the local filesystem. It implements a pipeline for reading
@@ -35,7 +36,8 @@ from robokudo.descriptors import CrDescriptorFactory
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for processing stored RGB-D data.
+    """
+    Analysis engine for processing stored RGB-D data.
 
     This class implements a pipeline that reads RGB-D data from files and
     performs object detection and segmentation. It is designed to work with
@@ -54,14 +56,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "filereader_from_tmp"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline for processing stored RGB-D data.
+        """
+        Create a pipeline for processing stored RGB-D data.
 
         This method constructs a processing pipeline that reads RGB-D data from
         files and performs object detection and segmentation. The pipeline is
@@ -79,7 +83,6 @@ class AnalysisEngine(AnalysisEngineInterface):
             Make sure the robokudo_test_data repository is cloned and available
             in your ROS workspace before running this pipeline.
         """
-
         cr_fr_config = CrDescriptorFactory.create_descriptor(
             "file_reader",
             loop=True,

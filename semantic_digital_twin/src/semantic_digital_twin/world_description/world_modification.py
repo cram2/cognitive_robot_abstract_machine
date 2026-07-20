@@ -51,7 +51,8 @@ from semantic_digital_twin.world_description.world_entity import (
 @dataclass
 class WorldModification(ABC):
     """
-    An abstract base class representing a modification to the world which may be synchronized.
+    An abstract base class representing a modification to the world which may be
+    synchronized.
     """
 
     @abstractmethod
@@ -78,16 +79,20 @@ class WorldModification(ABC):
 @dataclass
 class WorldModificationWithWorldEntityReference(WorldModification, ABC):
     """
-    An abstract base class representing a modification to the world which may be synchronized, and which contains a
-     reference to an entity in the world, as those cases may sometimes be treated differently (see World.__deepcopy__).
+    An abstract base class representing a modification to the world which may be
+    synchronized, and which contains a reference to an entity in the world, as those
+    cases may sometimes be treated differently (see World.__deepcopy__).
     """
 
     @abstractmethod
     def update_reference_for_world(self, world: World) -> Self:
         """
-        Update the reference to the entity in the world to point to the corresponding entity in the given world. This is used
-        when applying modifications to a copied world, to ensure that the references in the modifications point to the entities
-        in the copied world rather than the original world.
+        Update the reference to the entity in the world to point to the corresponding
+        entity in the given world.
+
+        This is used when applying modifications to a copied world, to ensure that the
+        references in the modifications point to the entities in the copied world rather
+        than the original world.
 
         :param world: The world to update the reference for.
         """
@@ -108,9 +113,11 @@ class AddKinematicStructureEntityModification(
 
     original_kinematic_structure_entity_id: Optional[UUID] = field(default=None)
     """
-    The ID of the body when this block was created. This is used to ensure the KinematicStructureEntity sent is the same
-    as the one that was originally added. This should always be the case, but if for some reason its not it will be 
-    annoying to debug, and this check should be cheap anyways.
+    The ID of the body when this block was created.
+
+    This is used to ensure the KinematicStructureEntity sent is the same as the one that
+    was originally added. This should always be the case, but if for some reason its not
+    it will be annoying to debug, and this check should be cheap anyways.
     """
 
     def __post_init__(self):
@@ -354,7 +361,8 @@ class RemoveActuatorModification(WorldModification):
 @dataclass
 class WorldModelModificationBlock:
     """
-    A sequence of WorldModelModifications that were applied to the world within one `with world.modify_world()` context.
+    A sequence of WorldModelModifications that were applied to the world within one
+    `with world.modify_world()` context.
     """
 
     modifications: List[WorldModification] = field(default_factory=list)
@@ -368,9 +376,11 @@ class WorldModelModificationBlock:
 
     def update_references_for_world_and_apply(self, world: World):
         """
-        Update the references in the modifications to point to the corresponding entities in the given world, and
-        then apply the modifications to the world. This is used when applying modifications to a copied world, to
-        ensure that the references in the modifications point to the entities in the copied world rather than the original world.
+        Update the references in the modifications to point to the corresponding
+        entities in the given world, and then apply the modifications to the world. This
+        is used when applying modifications to a copied world, to ensure that the
+        references in the modifications point to the entities in the copied world rather
+        than the original world.
 
         :param world: The world to update the references for.
         """
@@ -443,6 +453,7 @@ class SetDofHasHardwareInterface(WorldModification):
 class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
     """
     An update to one or more attributes of an entity in the world.
+
     This is used when decorating a method with  @synchronized_attribute_modification
     """
 

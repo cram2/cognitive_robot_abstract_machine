@@ -33,10 +33,10 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 
 class AggregationValueAssembler(Assembler[Query, QueryPlan]):
     """
-    Realise an aggregation value-subquery from its query plan — an aggregation used as a *value*
-    (*"the maximum amount"*, or *"the sum of amounts among BankTransactions whose …"*).  The
-    aggregate noun is composed with an optional *"among <plural source> [whose/such that]
-    [having]"* scope.
+    Realise an aggregation value-subquery from its query plan — an aggregation used as a
+    *value* (*"the maximum amount"*, or *"the sum of amounts among BankTransactions
+    whose …"*).  The aggregate noun is composed with an optional *"among <plural source>
+    [whose/such that] [having]"* scope.
 
     >>> verbalize_expression(an(entity(max(variable(BankTransaction, []).amount_details.amount))))
     'Find the maximum of the amount of the amount_details of a BankTransaction'
@@ -48,8 +48,8 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
 
     def realize(self, node: Query, plan: QueryPlan) -> VerbalizationFragment:
         """
-        The unconstrained aggregate value — *"the <aggregation> <leaf>"*; a constrained one adds an
-        *"among <population> …"* scope (see :meth:`_among_population`).
+        The unconstrained aggregate value — *"the <aggregation> <leaf>"*; a constrained
+        one adds an *"among <population> …"* scope (see :meth:`_among_population`).
 
         :param node: The aggregation value-subquery.
         :param plan: The query plan.

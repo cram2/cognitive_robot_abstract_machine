@@ -438,7 +438,9 @@ class JustinMobileBase(MobileBase, HasTorso[JustinTorso]):
 @dataclass(eq=False)
 class Justin(AbstractRobot, HasMobileBase[JustinMobileBase]):
     """
-    The Justin robot built by the DLR. https://www.dlr.de/en/rm/research/robotic-systems/humanoids/rollin-justin
+    The Justin robot built by the DLR.
+
+    https://www.dlr.de/en/rm/research/robotic-systems/humanoids/rollin-justin
     """
 
     def _setup_collision_rules(self):

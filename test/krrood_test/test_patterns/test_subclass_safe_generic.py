@@ -123,8 +123,7 @@ def assert_field_kwargs_are_preserved_when_resolving_generic_type(cls, kw_only=F
     evaluated_type = eval(field_.type, sys.modules[cls.__module__].__dict__)
     assert get_origin(evaluated_type) is list
     assert (
-            get_args(evaluated_type)[0]
-            is get_generic_type_parameters(cls, FirstGeneric)[0]
+        get_args(evaluated_type)[0] is get_generic_type_parameters(cls, FirstGeneric)[0]
     )
 
 
@@ -267,8 +266,8 @@ def test_subclass_safe_generic_type_resolution_failure_does_not_kill_class_defin
 
 def test_subclass_safe_generic_propagates_non_transient_resolution_errors():
     """
-    A failure that is not a transient import/resolution error is a genuine fault and must
-    surface, not be swallowed by ``__init_subclass__``.
+    A failure that is not a transient import/resolution error is a genuine fault and
+    must surface, not be swallowed by ``__init_subclass__``.
     """
     from unittest.mock import patch
 
@@ -292,8 +291,8 @@ def test_subclass_safe_generic_propagates_non_transient_resolution_errors():
 
 def test_subclass_safe_generic_flags_a_lost_concrete_binding():
     """
-    A substitution that maps a type variable to a concrete type is reported as a lost binding,
-    which is the case worth surfacing when resolution fails.
+    A substitution that maps a type variable to a concrete type is reported as a lost
+    binding, which is the case worth surfacing when resolution fails.
     """
     T_local = TypeVar("T_local")
 
@@ -304,7 +303,8 @@ def test_subclass_safe_generic_flags_a_lost_concrete_binding():
 
 def test_subclass_safe_generic_does_not_flag_a_typevar_only_rename():
     """
-    A substitution that only renames a type variable (or is empty) is a no-op, not a lost binding.
+    A substitution that only renames a type variable (or is empty) is a no-op, not a
+    lost binding.
     """
     T_local = TypeVar("T_local")
     Renamed = TypeVar("Renamed")
@@ -382,8 +382,9 @@ V = TypeVar("V")
 
 def test_multiple_generic_parameters_specialization():
     """
-    Test that when a base has multiple generic parameters and some are specialized
-    with concrete types while others stay generic, all are correctly handled.
+    Test that when a base has multiple generic parameters and some are specialized with
+    concrete types while others stay generic, all are correctly handled.
+
     The current implementation using u_roots[0] and zip(unique_bases, specialized_types)
     is expected to fail here because it only maps the first parameter of the first base.
     """
@@ -430,6 +431,7 @@ def test_deep_inheritance_substitution():
 def test_transitive_resolution_complex():
     """
     Test that transitive resolution works for complex types like List[T].
+
     If T -> U and U -> int, then List[T] should become List[int].
     """
 
@@ -454,7 +456,9 @@ W = TypeVar("W")
 
 def test_multiple_generic_bases_map_failure():
     """
-    Test that multiple generic bases are correctly reconstructed in the substitution map.
+    Test that multiple generic bases are correctly reconstructed in the substitution
+    map.
+
     The current zip-based implementation is expected to fail.
     """
     from krrood.utils import ensure_hashable
@@ -492,6 +496,7 @@ def test_multiple_generic_bases_map_failure():
 def test_transitive_map_failure():
     """
     Test that the substitution map itself is not transitively resolved.
+
     If T -> U and U -> int, resolving List[T] should give List[int].
     """
 
@@ -544,24 +549,21 @@ def test_complex_type_resolution(type_hint, expected_resolved):
 
 def test_circular_reference_resolution():
     """
-    Test that circular references in type substitutions are handled without infinite recursion.
+    Test that circular references in type substitutions are handled without infinite
+    recursion.
     """
     T_local = TypeVar("T_local")
     U_local = TypeVar("U_local")
 
     # Direct cycle: T -> U, U -> T
     substitutions = {T_local: U_local, U_local: T_local}
-    resolved = SubClassSafeGeneric._resolve_substitutions_transitively(
-        substitutions
-    )
+    resolved = SubClassSafeGeneric._resolve_substitutions_transitively(substitutions)
     assert resolved[T_local] in {T_local, U_local}
     assert resolved[U_local] in {T_local, U_local}
 
     # Indirect cycle: T -> List[U], U -> T
     substitutions = {T_local: List[U_local], U_local: T_local}
-    resolved = SubClassSafeGeneric._resolve_substitutions_transitively(
-        substitutions
-    )
+    resolved = SubClassSafeGeneric._resolve_substitutions_transitively(substitutions)
     assert resolved[T_local] is not None
     assert resolved[U_local] is not None
 

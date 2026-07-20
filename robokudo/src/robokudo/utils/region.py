@@ -122,6 +122,7 @@ def region_marker_array(
 ):
     """
     Optional helper for visualization markers.
+
     This can replace BaseSemanticMap.publish_visualization_markers.
     """
     # Outline only; implement in actual migration if needed.

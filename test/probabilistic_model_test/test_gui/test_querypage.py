@@ -31,7 +31,9 @@ class TestQueryGUI(unittest.TestCase):
         self.model.probability.return_value = 0.5
 
         mock_marginal_v1 = MagicMock()
-        mock_marginal_v1.support.simple_sets = [SimpleEvent.from_data({self.v1: closed(0, 1)})]
+        mock_marginal_v1.support.simple_sets = [
+            SimpleEvent.from_data({self.v1: closed(0, 1)})
+        ]
 
         mock_marginal_v2 = MagicMock()
         mock_marginal_v2.support.simple_sets = [
@@ -104,7 +106,9 @@ class TestQueryGUI(unittest.TestCase):
 
     def test_controller_calculate_probability(self):
         query = Event.from_simple_sets(SimpleEvent.from_data({self.v1: closed(0, 0.5)}))
-        evidence = Event.from_simple_sets(SimpleEvent.from_data({self.v2: Set.from_iterable(["a"])}))
+        evidence = Event.from_simple_sets(
+            SimpleEvent.from_data({self.v2: Set.from_iterable(["a"])})
+        )
 
         self.model.probability.return_value = 0.5
         # Mock intersection_with

@@ -1,8 +1,10 @@
 """
-The ``RULES`` registry auto-discovers every concrete grammar rule by walking the grammar package,
-rather than hand-maintaining a list of imports — so adding a construct's ``rules`` module needs no
-edit to the registry. ``concrete_subclasses`` is the single subclass-discovery primitive shared by
-the registry and the :class:`SpecificityRule` families.
+The ``RULES`` registry auto-discovers every concrete grammar rule by walking the grammar
+package, rather than hand-maintaining a list of imports — so adding a construct's
+``rules`` module needs no edit to the registry.
+
+``concrete_subclasses`` is the single subclass-discovery primitive shared by the
+registry and the :class:`SpecificityRule` families.
 """
 
 from __future__ import annotations
@@ -26,11 +28,13 @@ from krrood.patterns.specificity_ranking import (
 
 
 def _discovered_grammar_rule_types():
-    """Concrete ``PhraseRule`` subclasses defined within the grammar package's own rule modules.
+    """
+    Concrete ``PhraseRule`` subclasses defined within the grammar package's own rule
+    modules.
 
-    Excludes any subclass defined elsewhere (e.g. by unrelated tests exercising ``PhraseRule``'s
-    dispatch contract with throwaway subclasses) so completeness checks against ``RULES`` stay
-    independent of those subclasses' unrelated object lifetimes.
+    Excludes any subclass defined elsewhere (e.g. by unrelated tests exercising
+    ``PhraseRule``'s dispatch contract with throwaway subclasses) so completeness checks
+    against ``RULES`` stay independent of those subclasses' unrelated object lifetimes.
     """
     return {
         subclass
@@ -59,16 +63,19 @@ def test_concrete_subclasses_excludes_abstract_bases():
 
 
 def test_rules_registry_is_exactly_one_instance_per_concrete_rule():
-    """The registry holds exactly one instance of every concrete ``PhraseRule`` subclass — proving
-    auto-discovery is complete and free of duplicates."""
+    """
+    The registry holds exactly one instance of every concrete ``PhraseRule`` subclass —
+    proving auto-discovery is complete and free of duplicates.
+    """
     discovered = {type(rule) for rule in RULES}
     assert discovered == _discovered_grammar_rule_types()
     assert len(RULES) == len(discovered)  # no duplicate instances
 
 
 def test_registry_completeness_check_ignores_phrase_rule_subclasses_defined_outside_grammar():
-    """A ``PhraseRule`` subclass defined outside the grammar package must not affect the registry's
-    completeness check.
+    """
+    A ``PhraseRule`` subclass defined outside the grammar package must not affect the
+    registry's completeness check.
 
     Regression: ``concrete_subclasses(PhraseRule)`` reflects on every live subclass in the whole
     process via ``__subclasses__()``, including throwaway subclasses other tests define to exercise
@@ -89,22 +96,29 @@ def test_registry_completeness_check_ignores_phrase_rule_subclasses_defined_outs
 
 
 def test_maxima_returns_all_co_maximal_candidates():
-    """A single winner yields a one-element list; equal-key candidates all come back (a tie)."""
+    """
+    A single winner yields a one-element list; equal-key candidates all come back (a
+    tie).
+    """
     assert maxima(["a", "abc", "ab"], key=len) == ["abc"]
     assert maxima(["ab", "cd", "a"], key=len) == ["ab", "cd"]
     assert maxima([], key=len) == []
 
 
 def test_sole_maximum_raises_supplied_error_on_tie():
-    """A tie raises the injected collision error; a unique maximum is returned as-is."""
+    """
+    A tie raises the injected collision error; a unique maximum is returned as-is.
+    """
     assert sole_maximum(["a", "abc"], key=len, collision_error=AssertionError) == "abc"
     with pytest.raises(ValueError):
         sole_maximum(["ab", "cd"], key=len, collision_error=ValueError)
 
 
 def test_select_raises_on_equally_specific_rule_collision():
-    """Two unguarded rules on the same construct are equally specific — selecting between them is a
-    collision, raised rather than resolved silently by registration order."""
+    """
+    Two unguarded rules on the same construct are equally specific — selecting between
+    them is a collision, raised rather than resolved silently by registration order.
+    """
 
     class Node:
         pass
@@ -127,8 +141,10 @@ def test_select_raises_on_equally_specific_rule_collision():
 
 
 def test_every_construct_folder_contributes_rules():
-    """A representative rule from each construct package is auto-discovered (the walk reaches every
-    ``rules`` module, not a hand-listed subset)."""
+    """
+    A representative rule from each construct package is auto-discovered (the walk
+    reaches every ``rules`` module, not a hand-listed subset).
+    """
     modules = {type(rule).__module__.rsplit(".", 2)[-2] for rule in RULES}
     for construct_folder in (
         "terms",

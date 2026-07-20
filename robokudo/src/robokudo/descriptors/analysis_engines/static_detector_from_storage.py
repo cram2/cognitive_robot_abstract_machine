@@ -1,4 +1,5 @@
-"""Analysis engine for static object detection from stored data.
+"""
+Analysis engine for static object detection from stored data.
 
 This module provides an analysis engine that demonstrates static object detection
 using stored camera data. It implements a pipeline that uses predefined bounding
@@ -28,7 +29,8 @@ from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for static object detection from stored data.
+    """
+    Analysis engine for static object detection from stored data.
 
     This class implements a pipeline that performs object detection using a
     static bounding box approach. It processes stored camera data and detects
@@ -48,14 +50,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "static_detector_from_storage"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline for static object detection.
+        """
+        Create a pipeline for static object detection.
 
         This method constructs a processing pipeline that performs object
         detection using a static bounding box approach. The detector uses

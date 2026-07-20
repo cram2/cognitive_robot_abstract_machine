@@ -1,4 +1,5 @@
-"""Analysis engine demonstrating basic tabletop segmentation.
+"""
+Analysis engine demonstrating basic tabletop segmentation.
 
 This module provides a basic analysis engine that demonstrates tabletop
 segmentation using a Kinect camera. It implements a straightforward pipeline
@@ -28,7 +29,8 @@ from robokudo.descriptors import CrDescriptorFactory
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for basic tabletop segmentation.
+    """
+    Analysis engine for basic tabletop segmentation.
 
     This class implements a simple pipeline for tabletop segmentation using
     a Kinect camera. It processes point cloud data to identify and segment
@@ -48,14 +50,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "demo"
 
     def implementation(self) -> Pipeline:
-        """Create a basic pipeline for tabletop segmentation.
+        """
+        Create a basic pipeline for tabletop segmentation.
 
         This method constructs a processing pipeline that performs tabletop
         segmentation using point cloud data from a Kinect camera. The pipeline

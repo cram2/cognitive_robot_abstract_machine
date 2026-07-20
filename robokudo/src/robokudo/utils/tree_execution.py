@@ -1,4 +1,5 @@
-"""Tree execution utilities for RoboKudo.
+"""
+Tree execution utilities for RoboKudo.
 
 This module provides utilities for executing behavior trees in ROS environments.
 It supports:
@@ -39,7 +40,8 @@ def run_tree_once(
     max_iterations: int = 500,
     tick_rate: int = 5,
 ) -> Optional[Status]:
-    """Execute a behavior tree once with monitoring.
+    """
+    Execute a behavior tree once with monitoring.
 
     This function:
     * Grows the tree with optional GUI

@@ -164,13 +164,15 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
         self.toggle_button.clicked.connect(self.toggle)
-        self.toggle_button.setStyleSheet("""
+        self.toggle_button.setStyleSheet(
+            """
             QToolButton {
                 border: none;
                 font-weight: bold;
                 color: #FFA07A; /* Light orange */
             }
-        """)
+        """
+        )
         self.title_label = QLabel(title)
         self.title_label.setTextFormat(Qt.TextFormat.RichText)  # Enable HTML rendering
         self.title_label.setTextInteractionFlags(

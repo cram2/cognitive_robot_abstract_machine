@@ -17,10 +17,12 @@ class QPSolverPIQP(QPSolver[QPDataExplicit]):
     """
     The solver object of piqp.
     """
+
     big_ball_mode: bool = False
     """
-    If the QP is known to be feasible, ignore non-SOLVED solver statuses and return the (possibly
-    suboptimal) solution instead of raising.
+    If the QP is known to be feasible, ignore non-SOLVED solver statuses and return the
+    (possibly suboptimal) solution instead of raising.
+
     .. warning:: This is unsafe because it might lead to instability if the QP was actually infeasible. Only enable it
         when you are certain the problem is feasible.
     """

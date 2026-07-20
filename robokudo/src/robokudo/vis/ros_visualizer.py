@@ -1,4 +1,5 @@
-"""ROS-based visualization for RoboKudo pipelines.
+"""
+ROS-based visualization for RoboKudo pipelines.
 
 This module provides ROS-based visualization capabilities for RoboKudo pipelines.
 It handles:
@@ -23,10 +24,15 @@ from robokudo.vis.visualizer import Visualizer
 
 
 class SharedROSVisualizer(Visualizer, Visualizer.Observer, Node):
-    """A single-view ROS Image Publisher. It publishes the active annotator from the SharedState."""
+    """
+    A single-view ROS Image Publisher.
+
+    It publishes the active annotator from the SharedState.
+    """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Initialize the shared ROS visualizer.
+        """
+        Initialize the shared ROS visualizer.
 
         .. note::
             This Visualizer works with a shared state and needs notifications
@@ -39,13 +45,17 @@ class SharedROSVisualizer(Visualizer, Visualizer.Observer, Node):
         self.ros_image_publisher: Publisher = self.create_publisher(
             Image, f"{self.pipeline.name}/output_image", 10
         )
-        """Publisher for the image topic"""
-
+        """
+        Publisher for the image topic.
+        """
         self.ros_image_cv_bridge: CvBridge = CvBridge()
-        """Bridge for converting between ROS and OpenCV image formats"""
+        """
+        Bridge for converting between ROS and OpenCV image formats.
+        """
 
     def tick(self) -> None:
-        """Update the visualization display.
+        """
+        Update the visualization display.
 
         This method:
 
@@ -95,7 +105,8 @@ class SharedROSVisualizer(Visualizer, Visualizer.Observer, Node):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """Handle notification of state changes.
+        """
+        Handle notification of state changes.
 
         :param observable: The object that sent the notification
         """
@@ -103,7 +114,8 @@ class SharedROSVisualizer(Visualizer, Visualizer.Observer, Node):
 
 
 class AllAnnotatorROSVisualizer(Visualizer, Node):
-    """A ROS Image Publisher that publishes the output of all images in the given Pipeline.
+    """
+    A ROS Image Publisher that publishes the output of all images in the given Pipeline.
 
     This class provides visualization of all annotator outputs in a pipeline
     through separate ROS image topics. It supports:
@@ -118,18 +130,24 @@ class AllAnnotatorROSVisualizer(Visualizer, Node):
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Initialize the multi-view ROS visualizer."""
+        """
+        Initialize the multi-view ROS visualizer.
+        """
         Visualizer.__init__(self, *args, **kwargs)
         Node.__init__(self, "all_annotator_ros_visualizer")
 
         self.ros_image_publishers: Dict[str, Publisher] = {}
-        """Mapping of annotator names to ROS publishers"""
-
+        """
+        Mapping of annotator names to ROS publishers.
+        """
         self.ros_image_cv_bridge: CvBridge = CvBridge()
-        """Bridge for converting between ROS and OpenCV image formats"""
+        """
+        Bridge for converting between ROS and OpenCV image formats.
+        """
 
     def update_ros_image_publishers(self) -> None:
-        """Update ROS publishers for all annotators.
+        """
+        Update ROS publishers for all annotators.
 
         This method:
 
@@ -148,7 +166,8 @@ class AllAnnotatorROSVisualizer(Visualizer, Node):
                 )
 
     def tick(self) -> None:
-        """Update all visualization displays.
+        """
+        Update all visualization displays.
 
         This method:
 
@@ -178,7 +197,8 @@ class AllAnnotatorROSVisualizer(Visualizer, Node):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """Handle notification of state changes.
+        """
+        Handle notification of state changes.
 
         :param observable: The object that sent the notification
         """

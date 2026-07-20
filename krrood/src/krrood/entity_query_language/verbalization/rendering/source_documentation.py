@@ -83,8 +83,8 @@ def docstring_for_source_ref(source_reference: SourceReference) -> Optional[str]
     immediately below the field definition (a PEP 257 attribute docstring).
 
     :param source_reference: The source reference to document.
-    :return: The first docstring line for the class or field *source_reference* points at, or ``None``
-        when no documentation is found.
+    :return: The first docstring line for the class or field *source_reference* points
+        at, or ``None`` when no documentation is found.
     """
     if source_reference.attribute is None:
         return first_docstring_line(source_reference.owner_type)

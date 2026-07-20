@@ -100,8 +100,8 @@ def test_parse_pick_up(immutable_model_world):
 def test_parse_pick_up_merges_motions_around_model_change(immutable_model_world):
     """
     The motions on each side of the model change (the attach) must be merged into a
-    single giskard executable per side, so the model change splits the plan into
-    exactly [merged motions, model change, merged motions].
+    single giskard executable per side, so the model change splits the plan into exactly
+    [merged motions, model change, merged motions].
     """
     world, view, context = immutable_model_world
 

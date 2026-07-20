@@ -1016,7 +1016,7 @@ class WallPanel(HasRootBody):
 
 
 @dataclass(eq=False)
-class Potato(Produce): ...
+class Potato(Vegetable): ...
 
 
 @dataclass(eq=False)
@@ -1186,6 +1186,7 @@ class DoorWithType(Door):
     """
 
     type_description: Optional[str] = field(kw_only=True, default=None)
+
 
 @dataclass(eq=False)
 class Leg(HasRootBody):

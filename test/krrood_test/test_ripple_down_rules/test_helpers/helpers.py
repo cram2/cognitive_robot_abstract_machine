@@ -1,7 +1,10 @@
 import inspect
 import os
+import shutil
+import tempfile
+from contextlib import contextmanager
 
-from typing_extensions import List, Any, Tuple, Type, Callable, Optional
+from typing_extensions import Iterator, List, Any, Tuple, Type, Callable, Optional
 
 from ..datasets import (
     Species,
@@ -14,6 +17,28 @@ from krrood.ripple_down_rules.datastructures.enums import Category
 from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.rdr import MultiClassRDR, SingleClassRDR, GeneralRDR
 from krrood.ripple_down_rules.utils import make_set
+
+
+@contextmanager
+def isolated_expert_answers_path(source_path: str) -> Iterator[str]:
+    """
+    Copy a committed expert-answers fixture into a private temporary directory and yield
+    the isolated copy's path, so a test can load it (and ``Human`` can delete/rewrite
+    its copy as part of normal construction) without racing other parallel test workers
+    that read or rewrite the same committed file at the same time.
+
+    :param source_path: The path, without extension, to the committed expert-answers
+        fixture to isolate.
+    :return: The path, without extension, to the isolated copy inside a private
+        temporary directory that is removed once the context exits.
+    """
+    with tempfile.TemporaryDirectory(prefix="expert_answers_") as temp_dir:
+        isolated_path = os.path.join(temp_dir, os.path.basename(source_path))
+        for extension in (".py", ".json"):
+            source_file = source_path + extension
+            if os.path.exists(source_file):
+                shutil.copyfile(source_file, isolated_path + extension)
+        yield isolated_path
 
 
 def get_fit_scrdr(
@@ -33,33 +58,38 @@ def get_fit_scrdr(
     filename = os.path.join(
         os.path.dirname(__file__), "..", expert_answers_dir, expert_answers_file
     )
-    expert = Human(use_loaded_answers=load_answers, answers_save_path=filename)
-    if load_answers:
-        expert.load_answers(filename)
-
-    targets = [None for _ in cases] if targets is None or len(targets) == 0 else targets
-    scrdr = SingleClassRDR()
-    case_queries = [
-        CaseQuery(
-            case,
-            attribute_name,
-            (attribute_type,),
-            True,
-            _target=target,
-            case_factory=case_factory,
-            case_factory_idx=i,
-            scenario=scenario,
+    with isolated_expert_answers_path(filename) as isolated_filename:
+        expert = Human(
+            use_loaded_answers=load_answers, answers_save_path=isolated_filename
         )
-        for i, (case, target) in enumerate(zip(cases, targets))
-    ]
-    scrdr.fit(
-        case_queries,
-        expert=expert,
-        animate_tree=draw_tree,
-        update_existing_rules=update_existing_rules,
-    )
-    if save_answers:
-        expert.save_answers(filename)
+        if load_answers:
+            expert.load_answers(isolated_filename)
+
+        targets = (
+            [None for _ in cases] if targets is None or len(targets) == 0 else targets
+        )
+        scrdr = SingleClassRDR()
+        case_queries = [
+            CaseQuery(
+                case,
+                attribute_name,
+                (attribute_type,),
+                True,
+                _target=target,
+                case_factory=case_factory,
+                case_factory_idx=i,
+                scenario=scenario,
+            )
+            for i, (case, target) in enumerate(zip(cases, targets))
+        ]
+        scrdr.fit(
+            case_queries,
+            expert=expert,
+            animate_tree=draw_tree,
+            update_existing_rules=update_existing_rules,
+        )
+        if save_answers:
+            expert.save_answers(filename)
     for case_query in case_queries:
         cat = scrdr.classify(case_query.case)
         assert cat == case_query.target_value
@@ -84,32 +114,37 @@ def get_fit_mcrdr(
     filename = os.path.join(
         os.path.dirname(__file__), "..", expert_answers_dir, expert_answers_file
     )
-    expert = Human(use_loaded_answers=load_answers, answers_save_path=filename)
-    if load_answers:
-        expert.load_answers(filename)
-    targets = [None for _ in cases] if targets is None or len(targets) == 0 else targets
-    mcrdr = MultiClassRDR()
-    case_queries = [
-        CaseQuery(
-            case,
-            attribute_name,
-            (attribute_type,),
-            mutually_exclusive,
-            _target=target,
-            case_factory=case_factory,
-            case_factory_idx=i,
-            scenario=scenario,
+    with isolated_expert_answers_path(filename) as isolated_filename:
+        expert = Human(
+            use_loaded_answers=load_answers, answers_save_path=isolated_filename
         )
-        for i, (case, target) in enumerate(zip(cases, targets))
-    ]
-    mcrdr.fit(
-        case_queries,
-        expert=expert,
-        animate_tree=draw_tree,
-        update_existing_rules=update_existing_rules,
-    )
-    if save_answers:
-        expert.save_answers(filename)
+        if load_answers:
+            expert.load_answers(isolated_filename)
+        targets = (
+            [None for _ in cases] if targets is None or len(targets) == 0 else targets
+        )
+        mcrdr = MultiClassRDR()
+        case_queries = [
+            CaseQuery(
+                case,
+                attribute_name,
+                (attribute_type,),
+                mutually_exclusive,
+                _target=target,
+                case_factory=case_factory,
+                case_factory_idx=i,
+                scenario=scenario,
+            )
+            for i, (case, target) in enumerate(zip(cases, targets))
+        ]
+        mcrdr.fit(
+            case_queries,
+            expert=expert,
+            animate_tree=draw_tree,
+            update_existing_rules=update_existing_rules,
+        )
+        if save_answers:
+            expert.save_answers(filename)
     for case_query in case_queries:
         cat = mcrdr.classify(case_query.case)
         assert make_set(cat) == make_set(case_query.target_value)
@@ -133,45 +168,48 @@ def get_fit_grdr(
     filename = os.path.join(
         os.path.dirname(__file__), "..", expert_answers_dir, expert_answers_file
     )
-    expert = Human(
-        use_loaded_answers=load_answers, append=append, answers_save_path=filename
-    )
-    if load_answers:
-        expert.load_answers(filename)
-
-    fit_scrdr, _ = get_fit_scrdr(cases, targets, draw_tree=False)
-
-    grdr = GeneralRDR()
-    grdr.add_rdr(fit_scrdr)
-
-    n = 20
-    true_targets = [get_habitat(x, t) for x, t in zip(cases[:n], targets[:n])]
-    if no_targets:
-        all_targets = [{"habitats": None} for i in range(n)]
-    else:
-        all_targets = true_targets
-    case_queries = [
-        CaseQuery(
-            case,
-            name,
-            (Species,) if name == "species" else (Habitat,),
-            True if name == "species" else False,
-            _target=target,
-            case_factory=case_factory,
-            case_factory_idx=i,
-            scenario=scenario,
+    with isolated_expert_answers_path(filename) as isolated_filename:
+        expert = Human(
+            use_loaded_answers=load_answers,
+            append=append,
+            answers_save_path=isolated_filename,
         )
-        for i, (case, targets) in enumerate(zip(cases[:n], all_targets))
-        for name, target in targets.items()
-    ]
-    grdr.fit(
-        case_queries,
-        expert=expert,
-        animate_tree=draw_tree,
-        update_existing_rules=update_existing_rules,
-    )
-    if save_answers:
-        expert.save_answers(filename)
+        if load_answers:
+            expert.load_answers(isolated_filename)
+
+        fit_scrdr, _ = get_fit_scrdr(cases, targets, draw_tree=False)
+
+        grdr = GeneralRDR()
+        grdr.add_rdr(fit_scrdr)
+
+        n = 20
+        true_targets = [get_habitat(x, t) for x, t in zip(cases[:n], targets[:n])]
+        if no_targets:
+            all_targets = [{"habitats": None} for i in range(n)]
+        else:
+            all_targets = true_targets
+        case_queries = [
+            CaseQuery(
+                case,
+                name,
+                (Species,) if name == "species" else (Habitat,),
+                True if name == "species" else False,
+                _target=target,
+                case_factory=case_factory,
+                case_factory_idx=i,
+                scenario=scenario,
+            )
+            for i, (case, targets) in enumerate(zip(cases[:n], all_targets))
+            for name, target in targets.items()
+        ]
+        grdr.fit(
+            case_queries,
+            expert=expert,
+            animate_tree=draw_tree,
+            update_existing_rules=update_existing_rules,
+        )
+        if save_answers:
+            expert.save_answers(filename)
     for case, case_targets in zip(cases[:n], true_targets):
         cat = grdr.classify(case)
         for cat_name, cat_val in cat.items():

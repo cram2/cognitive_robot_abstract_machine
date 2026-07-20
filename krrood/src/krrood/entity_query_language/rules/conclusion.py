@@ -1,7 +1,8 @@
 """
 Conclusion rules for the Entity Query Language.
 
-This module defines side-effecting clauses that adjust outputs or bindings (for example, Add) during query evaluation.
+This module defines side-effecting clauses that adjust outputs or bindings (for example,
+Add) during query evaluation.
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ class Conclusion(BinaryExpression, ABC):
     """
     The variable being affected by the conclusion.
     """
+
     right: Any
     """
     The value added or set to the variable by the conclusion.
@@ -67,7 +69,9 @@ class Conclusion(BinaryExpression, ABC):
 
 @dataclass(eq=False)
 class Add(Conclusion):
-    """Add a new value to the domain of a variable."""
+    """
+    Add a new value to the domain of a variable.
+    """
 
     def _evaluate__(
         self,

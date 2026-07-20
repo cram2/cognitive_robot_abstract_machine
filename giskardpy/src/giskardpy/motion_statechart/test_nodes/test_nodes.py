@@ -102,7 +102,9 @@ class TestNestedGoal(Goal):
 class TestRunAfterStop(Goal):
     """
     Goal that tests if a child node runs after the parent node has stopped.
-    Uses a CancelMotion node to raise an exception if the child node runs after the parent has stopped.
+
+    Uses a CancelMotion node to raise an exception if the child node runs after the
+    parent has stopped.
     """
 
     ticking1: CountControlCycles = field(init=False)
@@ -136,10 +138,11 @@ class TestRunAfterStop(Goal):
 class TestEndBeforeStart(Goal):
     """
     Test if a child node can end before it was started.
-    node1 waits 1 tick, then starts node 3.
-    node2 fulfills the end condition of node 3 immediately.
-    node3 should start when node1 is True and transition to RUNNING with Observationstate UNKNOWN.
-    On the next tick, node3 should end because its end condition is already fulfilled by node2.
+
+    node1 waits 1 tick, then starts node 3. node2 fulfills the end condition of node 3
+    immediately. node3 should start when node1 is True and transition to RUNNING with
+    Observationstate UNKNOWN. On the next tick, node3 should end because its end
+    condition is already fulfilled by node2.
     """
 
     node1: CountControlCycles = field(init=False)
@@ -164,7 +167,9 @@ class TestEndBeforeStart(Goal):
 class TestRunAfterStopFromPause(Goal):
     """
     Test if child node can transition to RUNNING from PAUSED after parent node is DONE.
-    Uses a CancelMotion node to raise an exception if the child node runs after the parent has stopped.
+
+    Uses a CancelMotion node to raise an exception if the child node runs after the
+    parent has stopped.
     """
 
     ticking1: CountControlCycles = field(init=False)
@@ -201,7 +206,9 @@ class TestRunAfterStopFromPause(Goal):
 @dataclass(repr=False, eq=False)
 class TestUnpauseUnknownFromParentPause(Goal):
     """
-    Tests if a child node can transition from PAUSED back to RUNNING when child.pause_condition is UNKNOWN.
+    Tests if a child node can transition from PAUSED back to RUNNING when
+    child.pause_condition is UNKNOWN.
+
     Child was paused by parent node being paused and child.pause_condition is UNKNOWN.
     When parent unpauses, child should transition back to RUNNING.
     """

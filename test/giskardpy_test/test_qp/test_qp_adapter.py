@@ -40,7 +40,10 @@ from semantic_digital_twin.world import World
 
 
 def _world_state_matrix(world: World) -> np.ndarray:
-    """Public-API equivalent of the raw world-state buffer expected by ``factory.evaluate``."""
+    """
+    Public-API equivalent of the raw world-state buffer expected by
+    ``factory.evaluate``.
+    """
     state = world.state
     return np.vstack(
         [state.positions, state.velocities, state.accelerations, state.jerks]

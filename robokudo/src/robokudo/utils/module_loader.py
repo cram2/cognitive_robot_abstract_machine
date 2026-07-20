@@ -1,4 +1,5 @@
-"""Dynamic module loading utilities for Robokudo.
+"""
+Dynamic module loading utilities for Robokudo.
 
 This module provides functionality for dynamically loading Robokudo modules and components.
 It supports loading:
@@ -43,58 +44,81 @@ if TYPE_CHECKING:
 
 
 class RobokudoModuleType(enum.Enum):
-    """Enumeration of Robokudo module types.
+    """
+    Enumeration of Robokudo module types.
 
     Defines the standard module types and their paths within a ROS package.
     """
 
     Annotator = ["annotators"]
-    """Annotator modules"""
+    """
+    Annotator modules.
+    """
 
     AnalysisEngine = ["descriptors", "analysis_engines"]
-    """Analysis engine descriptors"""
+    """
+    Analysis engine descriptors.
+    """
 
     CameraConfig = ["descriptors", "camera_configs"]
-    """Camera configuration descriptors"""
+    """
+    Camera configuration descriptors.
+    """
 
     IO = ["io"]
-    """Input/output modules"""
+    """
+    Input/output modules.
+    """
 
     WorldDescriptor = ["descriptors", "worlds"]
-    """World descriptor modules"""
+    """
+    World descriptor modules.
+    """
 
     TreeComponents = ["tree_components"]
-    """Behavior tree components"""
+    """
+    Behavior tree components.
+    """
 
     Types = ["types"]
-    """Type modules"""
+    """
+    Type modules.
+    """
 
     Utils = ["utils"]
-    """Utility modules"""
+    """
+    Utility modules.
+    """
 
     Data = ["data"]  # If you have Python modules in `robokudo.data`
-    """Data modules"""
+    """
+    Data modules.
+    """
 
 
 class ModuleLoader:
-    """Dynamic module loader for Robokudo components.
+    """
+    Dynamic module loader for Robokudo components.
 
-    Handles loading of various Robokudo module types from ROS packages.
-    Provides path resolution and module importing functionality.
+    Handles loading of various Robokudo module types from ROS packages. Provides path
+    resolution and module importing functionality.
     """
 
     def __init__(self) -> None:
-        """Initialize module loader with logger."""
-
+        """
+        Initialize module loader with logger.
+        """
         self.logger = logging.getLogger(self.__class__.__name__)
-        """The logger for the module loader instance."""
+        """
+        The logger for the module loader instance.
+        """
 
     def _load_module(
         self, ros_pkg_name: str, module_type: RobokudoModuleType, module_name: str
     ) -> ModuleType:
         """
         Dynamically import a submodule of the 'robokudo' package (or another package).
-        E.g., 'robokudo.descriptors.analysis_engines.demo'
+        E.g., 'robokudo.descriptors.analysis_engines.demo'.
 
         :param ros_pkg_name: Name of ROS package
         :param module_type: Type of module to load
@@ -118,14 +142,16 @@ class ModuleLoader:
         return loaded_module
 
     def load_ae(self, ros_pkg_name: str, module_name: str) -> AnalysisEngineInterface:
-        """Load an Analysis Engine (AE). Expects a class `AnalysisEngine` in the loaded module.
+        """
+        Load an Analysis Engine (AE).
 
-        The ROS package must be in the same workspace with path structure:
-        ``$package_path/src/robokudo_example_package/descriptors/analysis_engines/``
+        Expects a class `AnalysisEngine` in the loaded module.
+                The ROS package must be in the same workspace with path structure:
+                ``$package_path/src/robokudo_example_package/descriptors/analysis_engines/``
 
-        :param ros_pkg_name: Name of ROS package containing AE
-        :param module_name: Name of analysis engine module
-        :return: Root of loaded analysis engine
+                :param ros_pkg_name: Name of ROS package containing AE
+                :param module_name: Name of analysis engine module
+                :return: Root of loaded analysis engine
         """
         module_type = RobokudoModuleType.AnalysisEngine
         loaded_module = self._load_module(ros_pkg_name, module_type, module_name)
@@ -135,11 +161,14 @@ class ModuleLoader:
         return loaded_ae
 
     def load_annotator(self, ros_pkg_name: str, module_name: str) -> ModuleType:
-        """Load an annotator module. You can adjust the returned object as needed.
+        """
+        Load an annotator module.
 
+        You can adjust the returned object as needed.
         :param ros_pkg_name: Name of ROS package containing annotator
         :param module_name: Name of annotator module
-        :return: The requested module. This is not pointing to an Annotator in this module. It's just the module.
+        :return: The requested module. This is not pointing to an Annotator in this
+            module. It's just the module.
         :rtype: module
         """
         module_type = RobokudoModuleType.Annotator
@@ -147,8 +176,10 @@ class ModuleLoader:
         return loaded_module
 
     def load_camera_config(self, ros_pkg_name: str, module_name: str) -> Any:
-        """Load a camera config module. Expects class `CameraConfig`.
+        """
+        Load a camera config module.
 
+        Expects class `CameraConfig`.
         :param ros_pkg_name: Name of ROS package containing config
         :param module_name: Name of camera config module
         :return: Loaded camera configuration
@@ -170,8 +201,10 @@ class ModuleLoader:
         # return loaded_module.CameraConfig()
 
     def load_io(self, ros_pkg_name: str, module_name: str) -> ModuleType:
-        """Load an I/O module. Customize this if there's a specific class to instantiate.
+        """
+        Load an I/O module.
 
+        Customize this if there's a specific class to instantiate.
         :param ros_pkg_name: Name of ROS package containing IO module
         :param module_name: Name of IO module
         :return: Loaded IO module
@@ -184,7 +217,8 @@ class ModuleLoader:
     def load_world_descriptor(
         self, ros_pkg_name: str, module_name: str
     ) -> BaseWorldDescriptor:
-        """Load a WorldDescriptor given the module name and the ros package name.
+        """
+        Load a WorldDescriptor given the module name and the ros package name.
 
         The path within the package is meant to be:
         $package_path/src/PACKAGE_NAME/descriptors/worlds/.
@@ -202,8 +236,10 @@ class ModuleLoader:
         return loaded_world_descriptor
 
     def load_tree_components(self, ros_pkg_name: str, module_name: str) -> ModuleType:
-        """Load tree components. If there's a main class, instantiate it here.
+        """
+        Load tree components.
 
+        If there's a main class, instantiate it here.
         :param ros_pkg_name: Name of ROS package containing components
         :param module_name: Name of tree components module
         :return: Loaded tree components module
@@ -213,7 +249,8 @@ class ModuleLoader:
         return loaded_module
 
     def load_types(self, ros_pkg_name: str, module_name: str) -> ModuleType:
-        """Load a 'types' module, or a class if needed.
+        """
+        Load a 'types' module, or a class if needed.
 
         :param ros_pkg_name: Name of ROS package containing types
         :param module_name: Name of types module
@@ -224,7 +261,8 @@ class ModuleLoader:
         return loaded_module
 
     def load_utils(self, ros_pkg_name: str, module_name: str) -> ModuleType:
-        """Load a 'utils' module, or a class if needed.
+        """
+        Load a 'utils' module, or a class if needed.
 
         :param ros_pkg_name: Name of ROS package containing utilities
         :param module_name: Name of utility module
@@ -241,7 +279,8 @@ class ModuleLoader:
         dir_name: str,
         file_extension: Optional[str] = None,
     ) -> List[str]:  # pragma: no cover
-        """Get paths to files in module directory.
+        """
+        Get paths to files in module directory.
 
         If you previously used this to read data files from the 'source' folder, you can
         either remove it or refactor to read from:

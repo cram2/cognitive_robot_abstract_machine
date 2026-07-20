@@ -634,8 +634,10 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         )
 
     def _verb(self, plan: QueryPlan) -> VerbalizationFragment:
-        """:return: the opening verb — *"Report"* when the query presents results (a report),
-        else *"Find"* (a search).
+        """:return: the opening verb — *"Report"* when the query is a report (its plan aggregates,
+        groups, or orders the results — the three :class:`ReportKind` variants, all of which present
+        a summary rather than search for individual matches), a backend-chosen *"Generate"* /
+        *"Find"* when a performative override is set, else *"Find"* (a search).
 
         It emits only the leading word of the shown output: this ordered query presents results, so
         it produces *"Report"* rather than *"Find"*:
@@ -646,6 +648,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         """
         if plan.report is not None:
             return self._sentence_initial(Keywords.REPORT.as_fragment())
+        override = self.context.services.performative_override
+        if override is not None:
+            return override.as_fragment()
         return Keywords.FIND.as_fragment()
 
     def _subject_number(self, plan: QueryPlan) -> GrammaticalNumber:
@@ -879,8 +884,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
 
     def inline_noun(self, entity: Query) -> VerbalizationFragment:
         """
-        The entity's WHERE condition is deferred to the binding scope so it can be emitted as a
-        *"such that …"* clause after all binding overrides are registered.
+        The entity's WHERE condition is deferred to the binding scope so it can be
+        emitted as a *"such that …"* clause after all binding overrides are registered.
 
         :param entity: The entity used as a chain root inside an instantiated variable.
         :return: The inline-noun form for *entity*.

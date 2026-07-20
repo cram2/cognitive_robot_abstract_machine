@@ -172,9 +172,7 @@ class TestBuildNxGraph:
     def test_attribute_filter_limits_displayed_params(self):
         graph = directed_graph_with_payloads([{"label": "a"}])
 
-        nx_graph = build_nx_graph(
-            graph, {0: {"speed": 3, "force": 7}}, ["speed"], None
-        )
+        nx_graph = build_nx_graph(graph, {0: {"speed": 3, "force": 7}}, ["speed"], None)
 
         assert "speed" in nx_graph.nodes[0]["param_text"]
         assert "force" not in nx_graph.nodes[0]["param_text"]

@@ -1,8 +1,8 @@
 """
 Evaluation context and observer system for the Entity Query Language.
 
-This module provides an aspect-oriented mechanism for hooking into the
-evaluation pipeline without polluting the core evaluation methods.
+This module provides an aspect-oriented mechanism for hooking into the evaluation
+pipeline without polluting the core evaluation methods.
 """
 
 from __future__ import annotations
@@ -52,14 +52,16 @@ def is_condition_participant(expr: OperationResult) -> bool:
 
 
 class EvaluationTracker(EvaluationObserver):
-    """Observer that tracks which expressions were evaluated and stamps the cumulative set on each OperationResult.
+    """
+    Observer that tracks which expressions were evaluated and stamps the cumulative set
+    on each OperationResult.
 
-    Maintains a cumulative set of expression IDs in the evaluation context, adding each expression's ID
-    on :meth:`on_evaluate_enter`. On :meth:`on_result_yielded`, snapshots the current set onto the result
-    as ``evaluated_expression_ids``.
+    Maintains a cumulative set of expression IDs in the evaluation context, adding each
+    expression's ID on :meth:`on_evaluate_enter`. On :meth:`on_result_yielded`,
+    snapshots the current set onto the result as ``evaluated_expression_ids``.
 
-    This tracking is the foundation for distinguishing evaluated-from-skipped logical operators (for example,
-    short-circuited OR/AND branches) in inference explanations.
+    This tracking is the foundation for distinguishing evaluated-from-skipped logical
+    operators (for example, short-circuited OR/AND branches) in inference explanations.
     """
 
     def on_evaluate_enter(self, expression, sources):
@@ -84,10 +86,13 @@ class EvaluationTracker(EvaluationObserver):
 
 
 class SatisfiedConditionTracker(EvaluationObserver):
-    """Observer that tracks which condition expressions were satisfied during a single evaluation pass.
+    """
+    Observer that tracks which condition expressions were satisfied during a single
+    evaluation pass.
 
     Records truth values on :meth:`on_result_yielded` and populates
-    ``result.satisfied_condition_ids`` at the conditions root after all conditions have been evaluated.
+    ``result.satisfied_condition_ids`` at the conditions root after all conditions have
+    been evaluated.
     """
 
     def on_evaluate_enter(self, expression, sources):
@@ -154,7 +159,8 @@ class SatisfiedConditionTracker(EvaluationObserver):
 
 
 class InferenceRecorder(EvaluationObserver):
-    """Observer that records inferred instances for later explanation.
+    """
+    Observer that records inferred instances for later explanation.
 
     Attaches an :class:`~krrood.entity_query_language.explanation.explanation.InferenceExplanation`
     to each newly inferred :class:`~krrood.symbol_graph.symbol_graph.Symbol` instance so that
@@ -189,12 +195,13 @@ def create_default_evaluation_context() -> EvaluationContext:
     """
     Create an :class:`EvaluationContext` populated with the standard set of observers.
 
-    This is the authoritative factory for evaluation contexts used during normal
-    query evaluation.  Callers that need custom observer configurations should
-    construct an :class:`EvaluationContext` directly rather than calling this function.
+    This is the authoritative factory for evaluation contexts used during normal query
+    evaluation.  Callers that need custom observer configurations should construct an
+    :class:`EvaluationContext` directly rather than calling this function.
 
     :return: A new :class:`EvaluationContext` with :class:`EvaluationTracker`,
-        :class:`SatisfiedConditionTracker`, and :class:`InferenceRecorder` observers attached.
+        :class:`SatisfiedConditionTracker`, and :class:`InferenceRecorder` observers
+        attached.
     """
     return EvaluationContext(
         observers=[

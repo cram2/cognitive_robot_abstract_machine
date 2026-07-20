@@ -13,22 +13,28 @@ from typing_extensions import List
 
 
 class ClipAnnotator(BaseAnnotator):
-    """A simple CLIP annotator that uses a given vocabulary to annotate all incoming object hypothesis."""
+    """
+    A simple CLIP annotator that uses a given vocabulary to annotate all incoming object
+    hypothesis.
+    """
 
     def __init__(self, name: str = "ClipAnnotator") -> None:
         super().__init__(name)
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        """Torch device to be used by the annotator."""
-
+        """
+        Torch device to be used by the annotator.
+        """
         clip_model, clip_preprocess = clip.load("ViT-B/32", device=self.device)
 
         self.clip_model = clip_model
-        """CLIP model used for feature extraction."""
-
+        """
+        CLIP model used for feature extraction.
+        """
         self.clip_preprocess = clip_preprocess
-        """CLIP preprocessor used for feature extraction."""
-
+        """
+        CLIP preprocessor used for feature extraction.
+        """
         self.vocabulary: List[str] = [
             "Milk Container",
             "Conflakes",
@@ -37,11 +43,13 @@ class ClipAnnotator(BaseAnnotator):
             "Crepe Pan",
             "Dish Soap",
         ]
-        """The vocabulary used for object classification"""
-
+        """
+        The vocabulary used for object classification.
+        """
         self.vocabulary_index: faiss.IndexFlatIP = faiss.IndexFlatIP(512)
-        """A faiss index for text features used in similarity search."""
-
+        """
+        A faiss index for text features used in similarity search.
+        """
         with torch.no_grad():
             tokenized_vocabulary = [
                 clip.tokenize([name]).to(self.device) for name in self.vocabulary

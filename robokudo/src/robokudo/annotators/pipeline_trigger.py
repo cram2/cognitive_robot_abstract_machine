@@ -1,4 +1,5 @@
-"""Pipeline execution control through triggers.
+"""
+Pipeline execution control through triggers.
 
 This module provides an annotator for:
 
@@ -17,7 +18,8 @@ from robokudo.annotators.core import BaseAnnotator
 
 
 class PipelineTrigger(BaseAnnotator):
-    """Pipeline execution controller using triggers.
+    """
+    Pipeline execution controller using triggers.
 
     This annotator basically gives you a way to wait for a 'trigger'
     before a pipeline should start.
@@ -28,14 +30,16 @@ class PipelineTrigger(BaseAnnotator):
     """
 
     def __init__(self, name: str = "PipelineTrigger") -> None:
-        """Initialize the pipeline trigger.
+        """
+        Initialize the pipeline trigger.
 
         :param name: Name of this annotator instance, defaults to "PipelineTrigger"
         """
         super().__init__(name)
 
     def update(self) -> Status:
-        """Check trigger state and control pipeline execution.
+        """
+        Check trigger state and control pipeline execution.
 
         The method:
 

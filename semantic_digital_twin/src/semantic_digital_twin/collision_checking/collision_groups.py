@@ -23,18 +23,23 @@ if TYPE_CHECKING:
 class CollisionGroup:
     """
     Bodies in this group are viewed as a single entity for collision checking purposes.
-    A group is a collection of bodies that are connected by fixed or passive connections.
+
+    A group is a collection of bodies that are connected by fixed or passive
+    connections.
     """
 
     root: Body
     """
-    The root kinematic structure entity of the group. 
-    It does not necessarily have to have collision shapes.
-    Can be viewed as the reference frame for this group.
+    The root kinematic structure entity of the group.
+
+    It does not necessarily have to have collision shapes. Can be viewed as the
+    reference frame for this group.
     """
+
     bodies: set[Body] = field(default_factory=set)
     """
     All bodies belonging to the group.
+
     .. note: `root` is only in bodies, if it is itself a body.
     """
 
@@ -63,6 +68,7 @@ class CollisionGroup:
     def get_max_avoided_bodies(self, collision_manager: CollisionManager) -> int:
         """
         Returns the maximum number of collisions `self` should avoid.
+
         It is the maximum of all bodies in the group.
         :param collision_manager: collision manager to ask for the max avoided bodies.
         :return: Maximum number of collisions that are allowed for this group.
@@ -81,8 +87,11 @@ class CollisionGroup:
 @dataclass
 class CollisionGroupConsumer(CollisionConsumer, ABC):
     """
-    A collision consumer that keeps track of collision groups instead of individual bodies.
-    All groups of bodies that are connected by fixed or passive connections are considered as a single collision group.
+    A collision consumer that keeps track of collision groups instead of individual
+    bodies.
+
+    All groups of bodies that are connected by fixed or passive connections are
+    considered as a single collision group.
     """
 
     collision_groups: list[CollisionGroup] = field(default_factory=list, init=False)
@@ -96,6 +105,7 @@ class CollisionGroupConsumer(CollisionConsumer, ABC):
     def update_collision_groups(self, world: World):
         """
         Updates the collision groups based on the kinematic structure of the world.
+
         :param world: Reference to the updated world.
         """
         body_to_robot = world.robot_body_to_robot_mapping
@@ -126,6 +136,7 @@ class CollisionGroupConsumer(CollisionConsumer, ABC):
     def get_collision_group(self, body: KinematicStructureEntity) -> CollisionGroup:
         """
         Ever body belongs to at most one collision group.
+
         :param body: the body for which to get the collision group.
         :return: the collision group for the given body.
         """

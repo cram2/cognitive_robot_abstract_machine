@@ -14,6 +14,7 @@ from copy import copy
 from dataclasses import dataclass, field
 from functools import cached_property
 from uuid import UUID
+from functools import cached_property, lru_cache
 
 from ordered_set import OrderedSet
 from typing_extensions import (
@@ -29,7 +30,8 @@ from typing_extensions import (
     Self,
     TYPE_CHECKING,
     Generic,
-    Type, TypeAlias,
+    Type,
+    TypeAlias,
 )
 
 from krrood.entity_query_language.evaluation_context import (
@@ -133,28 +135,38 @@ class SymbolicExpression(ABC):
         return self._expression_id_cache_[id_]
 
     def tolist(
-            self,
+        self,
+        backend=None,
     ) -> list[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]]:
         """
         Evaluate and return the results as a list.
-        """
-        return make_list(self.evaluate())
 
-    def first(self) -> TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]:
+        :param backend: Optional query backend; forwarded to :py:meth:`evaluate`.
+        """
+        return make_list(self.evaluate(backend=backend))
+
+    def first(
+        self, backend=None
+    ) -> TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]:
         """
         Evaluate and return the first result of the query object descriptor.
 
+        :param backend: Optional query backend; forwarded to :py:meth:`evaluate`.
         :return: The first result of the query object descriptor.
         :raises StopIteration: If no results are found.
         """
-        return next(self.evaluate())
+        return next(self.evaluate(backend=backend))
 
     def evaluate(
-            self,
+        self,
+        backend=None,
     ) -> Iterator[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]]:
         """
         Evaluate the query and map the results to the correct output data structure.
         This is the exposed evaluation method for users.
+
+        :param backend: Accepted for interface uniformity with ``Query``/``Match``; the base
+            symbolic-expression engine always evaluates natively and ignores this argument.
         """
         SymbolGraph().remove_dead_instances()
         results = (
@@ -163,7 +175,7 @@ class SymbolicExpression(ABC):
         yield from itertools.islice(results, self._limit_)
 
     def _replace_child_(
-            self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         """
         Replace a child expression with a new child expression.
@@ -182,7 +194,7 @@ class SymbolicExpression(ABC):
 
     @abstractmethod
     def _replace_child_field_(
-            self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         """
         Replace a child field with a new child expression.
@@ -209,7 +221,7 @@ class SymbolicExpression(ABC):
             self._parent__ = self._parents_[-1] if self._parents_ else None
 
     def _update_children_(
-            self, *children: SymbolicExpression
+        self, *children: SymbolicExpression
     ) -> Tuple[SymbolicExpression, ...]:
         """
         Update multiple children expressions of this symbolic expression.
@@ -225,20 +237,32 @@ class SymbolicExpression(ABC):
             v if isinstance(v, SymbolicExpression) else Literal(_value_=v)
             for v in children
         ]
-        for v in children:
-            v._parent_ = self
-        return tuple(v._expression_ for v in children)
+        embedded_children = tuple(v._as_embeddable_child_(self) for v in children)
+        for child in embedded_children:
+            child._parent_ = self
+        return embedded_children
+
+    def _as_embeddable_child_(self, parent: SymbolicExpression) -> SymbolicExpression:
+        """
+        :param parent: The expression about to take this expression as a child.
+        :return: The node that should be stored as ``parent``'s child, defaulting to this
+            expression's compiled form. Subclasses whose compiled form is mutable and shared (for
+            example :class:`~krrood.entity_query_language.query.query.Query`) override this to embed
+            an immutable snapshot instead.
+        """
+        return self._expression_
 
     def _ensure_children_ids_are_cached_(self, *children: SymbolicExpression) -> None:
         """
-        Ensure that the IDs of the provided children expressions are cached within the current expression.
+        Ensure that the IDs of the provided children expressions, and all of their own descendants,
+        are cached within the current expression.
 
         :param children: The children expressions to cache IDs for.
         """
         for child in children:
             if child._id_ not in self._expression_id_cache_:
                 self._expression_id_cache_[child._id_] = child
-                child._ensure_children_ids_are_cached_(*child._children_)
+                self._ensure_children_ids_are_cached_(*child._children_)
 
     def _process_result_(self, result: OperationResult) -> Any:
         """
@@ -259,8 +283,8 @@ class SymbolicExpression(ABC):
             )
 
     def _evaluate_(
-            self,
-            sources: Optional[OperationResult] = None,
+        self,
+        sources: Optional[OperationResult] = None,
     ):
         """
         Wrapper for ``SymbolicExpression._evaluate__`` that manages evaluation context lifecycle.
@@ -293,8 +317,8 @@ class SymbolicExpression(ABC):
                 yield result
             else:
                 for result in map(
-                        self._evaluate_conclusions_and_update_bindings_,
-                        self._evaluate__(sources),
+                    self._evaluate_conclusions_and_update_bindings_,
+                    self._evaluate__(sources),
                 ):
                     evaluation_context.on_result_yielded(expression=self, result=result)
                     yield result
@@ -304,7 +328,7 @@ class SymbolicExpression(ABC):
                 _evaluation_context_var.reset(context_token)
 
     def _evaluate_conclusions_and_update_bindings_(
-            self, current_result: OperationResult
+        self, current_result: OperationResult
     ) -> OperationResult:
         """
         Update the bindings of the results by evaluating the conclusions using the received bindings.
@@ -343,8 +367,8 @@ class SymbolicExpression(ABC):
 
     @abstractmethod
     def _evaluate__(
-            self,
-            sources: OperationResult,
+        self,
+        sources: OperationResult,
     ) -> Iterator[OperationResult]:
         """
         Evaluate the symbolic expression and set the operands bindings in the result according to the evaluation logic
@@ -423,13 +447,10 @@ class SymbolicExpression(ABC):
         """
         from krrood.entity_query_language.query.query import Query
 
-        root = self._root_
-        root_query = None
-        for descendant in root._descendants_:
-            if isinstance(descendant, Query):
-                root_query = descendant
-                break
-        return root_query
+        for expression in self._all_expressions_:
+            if isinstance(expression, Query):
+                return expression
+        return None
 
     @property
     @abstractmethod
@@ -451,6 +472,9 @@ class SymbolicExpression(ABC):
     def _descendants_(self) -> Iterator[SymbolicExpression]:
         """
         :return: All descendants of this symbolic expression in children first, then depth-first by subtree order.
+
+        Does not recurse into ``ResultQuantifier`` children so that inner query
+        subtrees remain isolated from outer query traversals.
         """
         yield from self._children_
         for child in self._children_:
@@ -540,7 +564,7 @@ class UnaryExpression(SymbolicExpression, ABC):
         self._child_ = self._update_children_(self._child_)[0]
 
     def _replace_child_field_(
-            self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         if self._child_ is old_child:
             self._child_ = new_child
@@ -567,13 +591,13 @@ class MultiArityExpression(SymbolicExpression, ABC):
         self.update_children(*self._operation_children_)
 
     def _replace_child_field_(
-            self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         old_child_index = self._operation_children_.index(old_child)
         self._operation_children_ = (
-                self._operation_children_[:old_child_index]
-                + (new_child,)
-                + self._operation_children_[old_child_index + 1:]
+            self._operation_children_[:old_child_index]
+            + (new_child,)
+            + self._operation_children_[old_child_index + 1 :]
         )
 
     def update_children(self, *children: SymbolicExpression) -> None:
@@ -604,7 +628,7 @@ class BinaryExpression(SymbolicExpression, ABC):
         self.left, self.right = self._update_children_(self.left, self.right)
 
     def _replace_child_field_(
-            self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         if self.left is old_child:
             self.left = new_child
@@ -620,7 +644,7 @@ class TruthValueOperator(SymbolicExpression, ABC):
     """
 
     def _evaluate_child_as_condition_(
-            self, child: SymbolicExpression, sources: Optional[OperationResult]
+        self, child: SymbolicExpression, sources: Optional[OperationResult]
     ) -> Iterator[OperationResult]:
         """
         Evaluate ``child`` and apply truth-value semantics to each result.
@@ -791,10 +815,10 @@ class OperationResult:
 
     def __eq__(self, other):
         return (
-                self.bindings == other.bindings
-                and self.is_true == other.is_true
-                and self.operand == other.operand
-                and self.previous_operation_result == other.previous_operation_result
+            self.bindings == other.bindings
+            and self.is_true == other.is_true
+            and self.operand == other.operand
+            and self.previous_operation_result == other.previous_operation_result
         )
 
 
@@ -819,7 +843,7 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
     A variable that is used if the child class to this class want to provide a variable to be tracked other than 
     itself, this is specially useful for child classes that holds a variable instead of being a variable and want
      to delegate the variable behaviour to the variable it has instead.
-    For example, this is the case for the ResultQuantifiers & QueryDescriptors that operate on a single selected
+    For example, this is the case for queries and derived references that operate on a single selected
     variable.
     """
 
@@ -834,9 +858,9 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
             self._type_ = self._type__
 
     def _build_operation_result_and_update_truth_value_(
-            self,
-            bindings: Bindings,
-            child_result: Optional[OperationResult] = None,
+        self,
+        bindings: Bindings,
+        child_result: Optional[OperationResult] = None,
     ) -> OperationResult:
         """
         Build an OperationResult instance for this binding.

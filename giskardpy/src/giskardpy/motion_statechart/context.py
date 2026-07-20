@@ -25,6 +25,7 @@ from semantic_digital_twin.world import World
 class ContextExtension:
     """
     Context extension for build context.
+
     Used together with require_extension to augment BuildContext with custom data.
     """
 
@@ -39,21 +40,38 @@ class MotionStatechartContext:
     """
 
     world: World
-    """There world in which to execute the Motion Statechart."""
+    """
+    There world in which to execute the Motion Statechart.
+    """
+
     control_cycle_variable: FloatVariable = field(init=False)
-    """Auxiliary variable used to count control cycles, can be used my Motion StatechartNodes to implement time-dependent actions."""
+    """
+    Auxiliary variable used to count control cycles, can be used my Motion
+    StatechartNodes to implement time-dependent actions.
+    """
+
     float_variable_data: FloatVariableData = field(default_factory=FloatVariableData)
-    """Data structure used to store auxiliary variables."""
+    """
+    Data structure used to store auxiliary variables.
+    """
+
     qp_controller_config: QPControllerConfig = field(
         default_factory=QPControllerConfig.create_with_simulation_defaults
     )
-    """Optional configuration for the QP Controller. Is only needed when constraints are present in the motion statechart."""
+    """
+    Optional configuration for the QP Controller.
+
+    Is only needed when constraints are present in the motion statechart.
+    """
+
     extensions: Dict[Type[ContextExtension], ContextExtension] = field(
         default_factory=dict, repr=False, init=False
     )
     """
     Dictionary of extensions used to augment the build context.
-    Ros2 extensions are automatically added to the build context when using the Ros2Executor.
+
+    Ros2 extensions are automatically added to the build context when using the
+    Ros2Executor.
     """
 
     @property
@@ -63,7 +81,8 @@ class MotionStatechartContext:
     @cached_property
     def self_collision_manager(self) -> SelfCollisionVariableManager:
         """
-        Lazy-initialized SelfCollisionVariableManager shared by all self collision avoidance nodes.
+        Lazy-initialized SelfCollisionVariableManager shared by all self collision
+        avoidance nodes.
         """
         manager = SelfCollisionVariableManager(self.float_variable_data)
         self.collision_manager.add_collision_consumer(manager)
@@ -72,7 +91,8 @@ class MotionStatechartContext:
     @cached_property
     def external_collision_manager(self) -> ExternalCollisionVariableManager:
         """
-        Lazy-initialized ExternalCollisionVariableManager shared by all external collision avoidance nodes.
+        Lazy-initialized ExternalCollisionVariableManager shared by all external
+        collision avoidance nodes.
         """
         manager = ExternalCollisionVariableManager(self.float_variable_data)
         self.collision_manager.add_collision_consumer(manager)

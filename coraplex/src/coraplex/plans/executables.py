@@ -60,19 +60,21 @@ class Executable:
 
     execution_list: List[Executable] = field(default_factory=list)
     """
-    List of executables that comprises this executable
+    List of executables that comprises this executable.
     """
 
     context: Context = field(kw_only=True)
     """
-    Coraplex context which should be used to execute this executable
+    Coraplex context which should be used to execute this executable.
     """
 
     synchronize_time_delta: timedelta = field(
         default=timedelta(seconds=1), kw_only=True
     )
     """
-    Time delta that is waited between executables when executing on the real robot. Is done to prevent synchronization issues
+    Time delta that is waited between executables when executing on the real robot.
+
+    Is done to prevent synchronization issues
     """
 
     def execute(self) -> None:
@@ -88,27 +90,30 @@ class Executable:
 @dataclass
 class GiskardExecutable(Executable):
     """
-    Executable for everything that can be added to a Motion state chart, this includes the motions, pre -and postconditions
-    and the pause and interrupt calls.
+    Executable for everything that can be added to a Motion state chart, this includes
+    the motions, pre -and postconditions and the pause and interrupt calls.
     """
 
     motion_mappings: Dict[MotionNode, Task] = field(kw_only=True)
     """
-    Mapping from the motion nodes of the plan to their giskard tasks, in execution order.
+    Mapping from the motion nodes of the plan to their giskard tasks, in execution
+    order.
     """
 
     pre_condition_node: Optional[ConditionNode] = field(default=None, kw_only=True)
     """
-    Optional pre-condition of the action this executable belongs to. If set, the
-    motion only starts once the condition is observed to hold and the motion is
-    aborted (with :class:`ConditionNotSatisfied`) if it does not.
+    Optional pre-condition of the action this executable belongs to.
+
+    If set, the motion only starts once the condition is observed to hold and the motion
+    is aborted (with :class:`ConditionNotSatisfied`) if it does not.
     """
 
     post_condition_node: Optional[ConditionNode] = field(default=None, kw_only=True)
     """
-    Optional post-condition of the action this executable belongs to. If set, it
-    is evaluated after the motion finished; the motion only ends successfully if
-    the condition is observed to hold, otherwise it is aborted.
+    Optional post-condition of the action this executable belongs to.
+
+    If set, it is evaluated after the motion finished; the motion only ends successfully
+    if the condition is observed to hold, otherwise it is aborted.
     """
 
     execution_type: ClassVar[Optional[ExecutionType]] = None
@@ -119,14 +124,14 @@ class GiskardExecutable(Executable):
 
     collision_avoidance: ClassVar[bool] = False
     """
-    Whether an :class:`~giskardpy.motion_statechart.goals.collision_avoidance.ExternalCollisionAvoidance`
-    is added to the motion state chart, managed by
+    Whether an :class:`~giskardpy.motion_statechart.goals.collision_avoidance.ExternalCo
+    llisionAvoidance` is added to the motion state chart, managed by
     :py:class:`pycram.motion_executor.ExecutionEnvironment`.
     """
 
     _current_motion_state_chart: MotionStatechart = field(init=False, default=None)
     """
-    Currently build motion state chart, internal only for managing the building the msc
+    Currently build motion state chart, internal only for managing the building the msc.
     """
 
     @property
@@ -179,8 +184,8 @@ class GiskardExecutable(Executable):
         self, first_task: Task, end_trigger: ObservationStateValues
     ):
         """
-        Adds the pre -and postcondition nodes to the Motion state chart and wires them to the first task and the end
-        trigger of the motion state chart.
+        Adds the pre -and postcondition nodes to the Motion state chart and wires them
+        to the first task and the end trigger of the motion state chart.
 
         :param end_trigger: The trigger which ends the motion state chart.
         """
@@ -223,8 +228,9 @@ class GiskardExecutable(Executable):
 
     def _add_pause_interrupt(self, tasks: List[Task]) -> List[ObservationStateValues]:
         """
-        Wire the tasks as an interruptible/pausable sequence. Each task carries
-        two monitors bound to its originating plan node:
+        Wire the tasks as an interruptible/pausable sequence.
+
+        Each task carries two monitors bound to its originating plan node:
 
         - a pause monitor feeding the task's pause_condition, so the *active*
           motion is held (and later resumed) when its plan node is paused;
@@ -293,7 +299,8 @@ class GiskardExecutable(Executable):
 
     def execute(self) -> None:
         """
-        Builds the motion state chart from the motions and executes it according to the execution type.
+        Builds the motion state chart from the motions and executes it according to the
+        execution type.
         """
         if len(self.motion_mappings) == 0:
             return
@@ -310,7 +317,8 @@ class GiskardExecutable(Executable):
 
     def _execute_simulation(self) -> None:
         """
-        Compiles the motion state chart and ticks it in the world of the context until it is done.
+        Compiles the motion state chart and ticks it in the world of the context until
+        it is done.
         """
         executor = Ros2Executor(
             context=MotionStatechartContext(
@@ -356,7 +364,8 @@ class GiskardExecutable(Executable):
 
     def _execute_real(self) -> None:
         """
-        Executes the motion state chart on the real robot via giskard while monitoring for interrupts.
+        Executes the motion state chart on the real robot via giskard while monitoring
+        for interrupts.
         """
         from giskardpy.middleware.ros2.python_interface import GiskardWrapper
 
@@ -392,8 +401,8 @@ class ConditionExecutable(Executable):
 @dataclass
 class ModelChangeExecutable(Executable):
     """
-    Executable that re-attaches a body to a new parent in the world model while
-    keeping its current global pose.
+    Executable that re-attaches a body to a new parent in the world model while keeping
+    its current global pose.
     """
 
     body: Body = field(kw_only=True)
