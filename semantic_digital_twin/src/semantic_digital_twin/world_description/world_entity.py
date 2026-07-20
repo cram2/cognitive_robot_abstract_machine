@@ -928,6 +928,21 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer, AB
         )
 
     @property
+    def reference_origin_expression(self) -> HomogeneousTransformationMatrix:
+        """
+        The parent-to-child transform at the reference configuration, excluding the
+        variable joint :attr:`_kinematics`.
+
+        .. note::
+            A simulator must place a body's static frame with this rather than
+            :attr:`origin_expression`: the latter depends on the current joint
+            state, which the simulator joint would then apply a second time.
+
+        :return: The constant parent-to-child transform with the joint at zero.
+        """
+        return self.parent_T_connection_expression @ self.connection_T_child_expression
+
+    @property
     def active_dofs(self) -> List[DegreeOfFreedom]:
         return []
 
@@ -989,6 +1004,16 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer, AB
 
     def origin_as_position_quaternion(self) -> Matrix:
         return self._as_position_quaternion(self.origin_expression)
+
+    def reference_origin_as_position_quaternion(self) -> Matrix:
+        """
+        The reference-configuration origin (see :attr:`reference_origin_expression`)
+        as a stacked position and quaternion, so a simulator can place a body's
+        static frame independently of the current joint state.
+
+        :return: A 1x7 matrix of ``[x, y, z, qx, qy, qz, qw]``.
+        """
+        return self._as_position_quaternion(self.reference_origin_expression)
 
     @property
     def dofs(self) -> list[DegreeOfFreedom]:
