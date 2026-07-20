@@ -593,7 +593,7 @@ class Elevator(HasRootBody):
                 door_slider = Slider.create_with_new_body_in_world(
                     name=PrefixedName(f"{name.name}_door{i}_drive", name.prefix),
                     world=world,
-                    active_axis=Vector3.Y(),
+                    active_axis=(Vector3.Y() * ((-1) ** (i + 1))),
                     connection_limits=DegreeOfFreedomLimits(lower=lower, upper=upper),
                 )
                 door.add(door_slider)
@@ -608,18 +608,34 @@ class Elevator(HasRootBody):
         return elevator
 
     def open(self):
+        """
+        Opens the elevator doors
+        """
         self.doors.door_0.mechanical_joint.root.parent_connection.position = (
             self.scale.y
-        )
-        self.doors.door_1.mechanical_joint.root.parent_connection.position = -(
+        ) / 2
+        self.doors.door_1.mechanical_joint.root.parent_connection.position = (
             self.scale.y
-        )
-        # self._world.notify_state_change()
+        ) / 2
 
     def close(self):
+        """
+        Closes the elevator doors
+        """
         self.doors.door_0.mechanical_joint.root.parent_connection.position = 0
         self.doors.door_1.mechanical_joint.root.parent_connection.position = 0
-        # self._world.notify_state_change()
+
+    def add_floor(self, floor_name: str, floor_position: float):
+        """
+        Adds a floor to the possible targets for the elevator
+        """
+        self.floor_positions[floor_name] = floor_position
+
+    def drive_to_floor(self, floor_name: str):
+        """
+        Drives the elevator to the floor given
+        """
+        self.drive.root.parent_connection.position = self.floor_positions[floor_name]
 
 
 ############################### subclasses to Furniture
