@@ -48,6 +48,7 @@ from semantic_digital_twin.world_description.geometry import (
     Shape,
     Color,
     Mesh,
+    Texture,
 )
 from semantic_digital_twin.world_description.inertial_properties import (
     Inertial,
@@ -251,6 +252,40 @@ class MJCFParser:
                 )
             )
 
+    def _resolve_primitive_texture(
+        self, mujoco_geom: mujoco.MjsGeom
+    ) -> Optional[Texture]:
+        """
+        Resolves the texture a primitive (box/sphere/cylinder/plane) geom's ``material``
+        references, if any. Mesh geoms resolve their texture separately, as part of their
+        own trimesh visual (see the ``mjGEOM_MESH`` case in :meth:`parse_geom`).
+
+        :param mujoco_geom: The Mujoco geometry whose material to resolve a texture from.
+        :return: The resolved texture, or ``None`` if the geom has no material, its material
+            has no texture, or the texture file cannot be found on disk.
+        """
+        if not mujoco_geom.material:
+            return None
+        mujoco_material: Optional[mujoco.MjsMaterial] = self.spec.material(
+            mujoco_geom.material
+        )
+        if mujoco_material is None or not mujoco_material.textures[1]:
+            return None
+        mujoco_texture: Optional[mujoco.MjsTexture] = self.spec.texture(
+            mujoco_material.textures[1]
+        )
+        if mujoco_texture is None:
+            return None
+        texturedir = os.path.join(os.path.dirname(self.file_path), self.spec.texturedir)
+        texture_file_path = os.path.join(texturedir, mujoco_texture.file)
+        if not os.path.isfile(texture_file_path):
+            return None
+        return Texture(
+            file_path=texture_file_path,
+            repeat=tuple(mujoco_material.texrepeat.tolist()),
+            uniform=bool(mujoco_material.texuniform),
+        )
+
     def parse_geom(self, mujoco_geom: mujoco.MjsGeom) -> Shape:
         """
         Parse a Mujoco geometry and convert it into a Shape object.
@@ -281,18 +316,21 @@ class MJCFParser:
                     origin=origin_transform,
                     scale=Scale(*size[:2], 0.0),
                     color=color,
+                    texture=self._resolve_primitive_texture(mujoco_geom),
                 )
             case mujoco.mjtGeom.mjGEOM_BOX:
                 return Box(
                     origin=origin_transform,
                     scale=Scale(*size),
                     color=color,
+                    texture=self._resolve_primitive_texture(mujoco_geom),
                 )
             case mujoco.mjtGeom.mjGEOM_SPHERE:
                 return Sphere(
                     origin=origin_transform,
                     radius=size[0] / 2,
                     color=color,
+                    texture=self._resolve_primitive_texture(mujoco_geom),
                 )
             case mujoco.mjtGeom.mjGEOM_CYLINDER:
                 return Cylinder(
@@ -300,6 +338,7 @@ class MJCFParser:
                     width=size[0],
                     height=size[1] / 2,
                     color=color,
+                    texture=self._resolve_primitive_texture(mujoco_geom),
                 )
             case mujoco.mjtGeom.mjGEOM_MESH:
                 mujoco_mesh: mujoco.MjsMesh = self.spec.mesh(mujoco_geom.meshname)

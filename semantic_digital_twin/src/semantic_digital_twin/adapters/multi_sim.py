@@ -459,6 +459,10 @@ class ShapeConverter(EntityConverter, ABC):
                 self.rgba_str: geom_color,
             }
         )
+        if entity.texture is not None:
+            geom_props["texture_file_path"] = entity.texture.file_path
+            geom_props["texture_repeat"] = entity.texture.repeat
+            geom_props["texture_uniform"] = entity.texture.uniform
         return geom_props
 
 
@@ -1767,13 +1771,22 @@ class MujocoBuilder(MultiSimBuilder):
             raise MujocoEntityNotFoundError(
                 entity_name=parent_body_name, entity_type=mujoco.mjtObj.mjOBJ_BODY
             )
-        if geom_props["type"] == mujoco.mjtGeom.mjGEOM_MESH and not self._parse_geom(
-            geom_props=geom_props
-        ):
-            logger.warning(
-                f"Mesh {shape.mesh} could not be parsed. Skipping geom {geom_props['name']}."
-            )
-            return
+        if geom_props["type"] == mujoco.mjtGeom.mjGEOM_MESH:
+            if not self._parse_geom(geom_props=geom_props):
+                logger.warning(
+                    f"Mesh {shape.mesh} could not be parsed. Skipping geom {geom_props['name']}."
+                )
+                return
+        else:
+            texture_file_path = geom_props.pop("texture_file_path", None)
+            texture_repeat = geom_props.pop("texture_repeat", (1.0, 1.0))
+            texture_uniform = geom_props.pop("texture_uniform", False)
+            if isinstance(texture_file_path, str):
+                geom_props["material"] = self._register_texture_material(
+                    texture_file_path=texture_file_path,
+                    texture_repeat=texture_repeat,
+                    texture_uniform=texture_uniform,
+                )
         for mujoco_geom in shape.simulator_additional_properties:
             if isinstance(mujoco_geom, MujocoGeom):
                 geom_props["solimp"] = mujoco_geom.solver_impedance
@@ -1845,35 +1858,57 @@ class MujocoBuilder(MultiSimBuilder):
         geom_props["meshname"] = mesh_name
         texture_file_path = geom_props.pop("texture_file_path", None)
         if isinstance(texture_file_path, str):
-            # RoboCasa's asset pipeline reuses generic texture basenames (e.g. "T_BC001.png")
-            # across many unrelated fixtures' own distinct texture files, so the basename alone
-            # is not a valid dedup/uniqueness key: two different fixtures' textures with the
-            # same basename would otherwise collide onto whichever one was registered first.
-            # Suffixing with a hash of the full path keeps the same file deduplicated (reused)
-            # while keeping different files (even same basename) distinct.
-            path_hash = hashlib.md5(
-                os.path.abspath(texture_file_path).encode()
-            ).hexdigest()[:8]
-            texture_name = f"{os.path.splitext(os.path.basename(texture_file_path))[0]}_{path_hash}"
-            material_name = texture_name
-            if material_name.startswith("T_"):
-                material_name = material_name[2:]
-            material_name = f"M_{material_name}"
-            # Assign the material name to this geom before any of the dedup checks below:
-            # a texture/material reused by a later geom (the common case - most textures in a
-            # scene are shared across many geoms) must still be referenced by that later geom,
-            # not just by the first geom that happened to register it.
-            geom_props["material"] = material_name
-            texture_already_registered = texture_name in [
-                self.spec.textures[i].name for i in range(len(self.spec.textures))
-            ]
-            material_already_registered = material_name in [
-                self.spec.materials[i].name for i in range(len(self.spec.materials))
-            ]
-            if texture_already_registered or material_already_registered:
-                return True
-            if not os.path.exists(texture_file_path):
-                return True
+            geom_props["material"] = self._register_texture_material(
+                texture_file_path=texture_file_path
+            )
+        return True
+
+    def _register_texture_material(
+        self,
+        texture_file_path: str,
+        texture_repeat: Tuple[float, float] = (1.0, 1.0),
+        texture_uniform: bool = False,
+    ) -> str:
+        """
+        Registers a texture and a material referencing it in the spec, unless a texture or
+        material of the same derived name is already registered.
+
+        RoboCasa's asset pipeline reuses generic texture basenames (e.g. "T_BC001.png")
+        across many unrelated fixtures' own distinct texture files, so the basename alone is
+        not a valid dedup/uniqueness key: two different fixtures' textures with the same
+        basename would otherwise collide onto whichever one was registered first. Suffixing
+        with a hash of the full path keeps the same file deduplicated (reused) while keeping
+        different files (even same basename) distinct.
+
+        :param texture_file_path: The texture image's file path.
+        :param texture_repeat: How many times the texture tiles across the surface.
+        :param texture_uniform: Whether the texture is scaled uniformly across the surface.
+        :return: The name of the material referencing the texture, to set on a geom's
+            "material" property. Returned even if the texture file does not exist on disk (the
+            geom is still given a material name, just one with no actual texture registered).
+        """
+        path_hash = hashlib.md5(
+            os.path.abspath(texture_file_path).encode()
+        ).hexdigest()[:8]
+        texture_name = (
+            f"{os.path.splitext(os.path.basename(texture_file_path))[0]}_{path_hash}"
+        )
+        material_name = texture_name
+        if material_name.startswith("T_"):
+            material_name = material_name[2:]
+        material_name = f"M_{material_name}"
+
+        texture_already_registered = texture_name in [
+            self.spec.textures[i].name for i in range(len(self.spec.textures))
+        ]
+        material_already_registered = material_name in [
+            self.spec.materials[i].name for i in range(len(self.spec.materials))
+        ]
+        if (
+            not texture_already_registered
+            and not material_already_registered
+            and os.path.exists(texture_file_path)
+        ):
             self.spec.add_texture(
                 name=texture_name,
                 type=mujoco.mjtTexture.mjTEXTURE_2D,
@@ -1881,7 +1916,9 @@ class MujocoBuilder(MultiSimBuilder):
             )
             material = self.spec.add_material(name=material_name)
             material.textures[0] = texture_name
-        return True
+            material.texrepeat = list(texture_repeat)
+            material.texuniform = texture_uniform
+        return material_name
 
     def _build_connection(self, connection: Connection):
         if isinstance(connection, self._ignore_connection_types):

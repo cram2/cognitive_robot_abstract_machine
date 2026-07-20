@@ -139,3 +139,48 @@ def test_light_is_parsed_and_attached_to_its_parent_body():
     assert light.specular == pytest.approx([0.3, 0.3, 0.3])
     assert light.directional is True
     assert light.cast_shadow is False
+
+
+TEXTURED_BOX_MJCF_TEMPLATE = """
+<mujoco>
+  <asset>
+    <texture name="marble_tex" type="2d" file="{texture_file_path}"/>
+    <material name="marble" texture="marble_tex" texrepeat="3 3" texuniform="true"/>
+  </asset>
+  <worldbody>
+    <body name="counter">
+      <geom type="box" size="0.5 0.5 0.05" material="marble"/>
+    </body>
+  </worldbody>
+</mujoco>
+"""
+
+
+def test_primitive_box_geom_resolves_its_material_texture(tmp_path):
+    """
+    Regression test: Box/Sphere/Cylinder shapes never carried any texture reference, only a
+    flat Color. RoboCasa's countertops and cabinet doors are actual MJCF box geoms whose
+    material references a marble/wood texture, so this reference was silently discarded on
+    every round-trip and they rendered flat-colored instead of textured.
+    """
+    from PIL import Image
+
+    texture_file_path = tmp_path / "marble.png"
+    Image.new("RGB", (4, 4), color=(200, 200, 200)).save(texture_file_path)
+    mjcf_file_path = tmp_path / "scene.xml"
+    mjcf_file_path.write_text(
+        TEXTURED_BOX_MJCF_TEMPLATE.format(texture_file_path=texture_file_path)
+    )
+
+    world = MJCFParser(str(mjcf_file_path)).parse()
+
+    [counter] = [
+        body
+        for body in world.kinematic_structure_entities
+        if body.name.name == "counter"
+    ]
+    [box_shape] = counter.visual.shapes
+    assert box_shape.texture is not None
+    assert box_shape.texture.file_path == str(texture_file_path)
+    assert box_shape.texture.repeat == pytest.approx([3.0, 3.0])
+    assert box_shape.texture.uniform is True

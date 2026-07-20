@@ -30,6 +30,7 @@ from semantic_digital_twin.world_description.geometry import (
     Color,
     Cylinder,
     Mesh,
+    Texture,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body, Region, Actuator
@@ -446,6 +447,63 @@ def test_builder_writes_a_light_attached_to_a_body(tmp_path):
     assert list(light.pos) == pytest.approx([2.0, -2.0, 2.0])
     assert list(light.ambient) == pytest.approx([0.3, 0.3, 0.3])
     assert list(light.diffuse) == pytest.approx([0.5, 0.5, 0.5])
+
+
+def test_builder_assigns_material_to_a_textured_primitive_shape(tmp_path):
+    """
+    Regression test: Box/Sphere/Cylinder shapes never carried any texture reference, only a
+    flat Color - RoboCasa's countertops and cabinet doors are actual MJCF box geoms with a
+    material referencing a marble/wood texture, so this whole texture reference was silently
+    discarded on every round-trip and they rendered flat-colored instead of textured.
+    """
+    from PIL import Image
+
+    texture_directory = tmp_path / "textures"
+    texture_directory.mkdir()
+    texture_file = texture_directory / "marble.png"
+    Image.new("RGB", (4, 4), color=(200, 200, 200)).save(texture_file)
+
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        box_shape = Box(
+            scale=Scale(1, 1, 1),
+            texture=Texture(
+                file_path=str(texture_file), repeat=(3.0, 3.0), uniform=True
+            ),
+        )
+        counter = Body(
+            name=PrefixedName("counter"),
+            visual=ShapeCollection([box_shape]),
+            collision=ShapeCollection([box_shape]),
+        )
+        world.add_kinematic_structure_entity(counter)
+        world.add_connection(FixedConnection(parent=root, child=counter))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [geom] = [
+        geom
+        for body in builder.spec.bodies
+        for geom in body.geoms
+        if body.name == "counter"
+    ]
+    assert geom.material != ""
+    [material] = [
+        material
+        for material in builder.spec.materials
+        if material.name == geom.material
+    ]
+    assert list(material.texrepeat) == pytest.approx([3.0, 3.0])
+    assert bool(material.texuniform) is True
+    texture_name = material.textures[0]
+    assert texture_name != ""
+    [texture] = [
+        texture for texture in builder.spec.textures if texture.name == texture_name
+    ]
+    assert texture.file == str(texture_file)
 
 
 def test_mujoco_with_tracy_dae_files():
