@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import inspect
+import hashlib
 import os
 from typing import Tuple
 
@@ -1691,7 +1692,16 @@ class MujocoBuilder(MultiSimBuilder):
         geom_props["meshname"] = mesh_name
         texture_file_path = geom_props.pop("texture_file_path", None)
         if isinstance(texture_file_path, str):
-            texture_name = os.path.splitext(os.path.basename(texture_file_path))[0]
+            # RoboCasa's asset pipeline reuses generic texture basenames (e.g. "T_BC001.png")
+            # across many unrelated fixtures' own distinct texture files, so the basename alone
+            # is not a valid dedup/uniqueness key: two different fixtures' textures with the
+            # same basename would otherwise collide onto whichever one was registered first.
+            # Suffixing with a hash of the full path keeps the same file deduplicated (reused)
+            # while keeping different files (even same basename) distinct.
+            path_hash = hashlib.md5(
+                os.path.abspath(texture_file_path).encode()
+            ).hexdigest()[:8]
+            texture_name = f"{os.path.splitext(os.path.basename(texture_file_path))[0]}_{path_hash}"
             material_name = texture_name
             if material_name.startswith("T_"):
                 material_name = material_name[2:]

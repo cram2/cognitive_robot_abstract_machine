@@ -311,21 +311,19 @@ def test_mesh_scale_and_equality(test_mjcf_2_world):
         stop_multisim_if_running(multi_sim)
 
 
-def test_builder_assigns_material_to_every_geom_sharing_a_texture(tmp_path):
+def _write_textured_tetrahedron(directory, texture_color) -> str:
     """
-    Regression test: MujocoBuilder._parse_geom used to return early - without ever setting
-    geom_props["material"] - whenever a geom's texture was already registered by an earlier
-    geom. Since most textures in a scene are shared across many geoms (a real RoboCasa
-    kitchen reuses a handful of textures across ~90 meshes), this meant only the first geom
-    to use a given texture ever got a material; every later reuse silently rendered with
-    MuJoCo's default (untextured, gray) material instead.
+    Writes a minimal textured OBJ+MTL+PNG mesh (a tetrahedron, so its convex hull is
+    non-degenerate) into ``directory``, textured with a solid ``texture_color``, and returns
+    the OBJ file's path. Always named "tetra.obj"/"tetra.mtl"/"wood.png", so callers writing
+    into different directories can reproduce a texture basename collision between them.
     """
     from PIL import Image
 
-    texture_file = tmp_path / "wood.png"
-    Image.new("RGB", (4, 4), color=(120, 60, 20)).save(texture_file)
-
-    mesh_file = tmp_path / "tetra.obj"
+    directory.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (4, 4), color=texture_color).save(directory / "wood.png")
+    (directory / "tetra.mtl").write_text("newmtl wood\nmap_Kd wood.png\n")
+    mesh_file = directory / "tetra.obj"
     mesh_file.write_text(
         "mtllib tetra.mtl\n"
         "o tetra\n"
@@ -343,16 +341,20 @@ def test_builder_assigns_material_to_every_geom_sharing_a_texture(tmp_path):
         "f 1/1 3/3 4/4\n"
         "f 2/2 3/3 4/4\n"
     )
-    (tmp_path / "tetra.mtl").write_text("newmtl wood\nmap_Kd wood.png\n")
+    return str(mesh_file)
 
+
+def _build_world_with_two_textured_bodies(
+    tmp_path, mesh_file_a: str, mesh_file_b: str
+) -> MujocoBuilder:
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName("root"))
         world.add_body(root)
-        for i in range(2):
-            mesh_shape = Mesh(filename=str(mesh_file), scale=Scale(1, 1, 1))
+        for name, mesh_file in [("quad_0", mesh_file_a), ("quad_1", mesh_file_b)]:
+            mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
             body = Body(
-                name=PrefixedName(f"quad_{i}"),
+                name=PrefixedName(name),
                 visual=ShapeCollection([mesh_shape]),
                 collision=ShapeCollection([mesh_shape]),
             )
@@ -361,11 +363,54 @@ def test_builder_assigns_material_to_every_geom_sharing_a_texture(tmp_path):
 
     builder = MujocoBuilder()
     builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+    return builder
+
+
+def test_builder_assigns_material_to_every_geom_sharing_a_texture(tmp_path):
+    """
+    Regression test: MujocoBuilder._parse_geom used to return early - without ever setting
+    geom_props["material"] - whenever a geom's texture was already registered by an earlier
+    geom. Since most textures in a scene are shared across many geoms (a real RoboCasa
+    kitchen reuses a handful of textures across ~90 meshes), this meant only the first geom
+    to use a given texture ever got a material; every later reuse silently rendered with
+    MuJoCo's default (untextured, gray) material instead.
+    """
+    mesh_file = _write_textured_tetrahedron(tmp_path, texture_color=(120, 60, 20))
+
+    builder = _build_world_with_two_textured_bodies(tmp_path, mesh_file, mesh_file)
 
     materials = {
         body.name: geom.material for body in builder.spec.bodies for geom in body.geoms
     }
-    assert materials == {"quad_0": "M_wood", "quad_1": "M_wood"}
+    assert materials["quad_0"] == materials["quad_1"]
+    assert materials["quad_0"] != ""
+
+
+def test_builder_does_not_confuse_different_textures_sharing_a_basename(tmp_path):
+    """
+    Regression test: RoboCasa's asset pipeline reuses generic texture basenames (e.g.
+    "T_BC001.png") across many unrelated fixtures' own distinct texture files - a real
+    kitchen had 14 different fixtures (sink, stove, fridge, dishwasher, ...) all using a
+    texture file named exactly "T_BC001.png" in their own directories. Deduplicating by
+    basename alone collapsed all of them onto whichever fixture's texture was registered
+    first, so most fixtures rendered with the wrong (borrowed) texture image instead of
+    their own.
+    """
+    mesh_file_a = _write_textured_tetrahedron(
+        tmp_path / "fixture_a", texture_color=(200, 0, 0)
+    )
+    mesh_file_b = _write_textured_tetrahedron(
+        tmp_path / "fixture_b", texture_color=(0, 200, 0)
+    )
+
+    builder = _build_world_with_two_textured_bodies(tmp_path, mesh_file_a, mesh_file_b)
+
+    materials = {
+        body.name: geom.material for body in builder.spec.bodies for geom in body.geoms
+    }
+    assert materials["quad_0"] != materials["quad_1"]
+    texture_files = {texture.name: texture.file for texture in builder.spec.textures}
+    assert len(texture_files) == 2
 
 
 def test_mujoco_with_tracy_dae_files():
