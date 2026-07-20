@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from robocasa.models.scenes.scene_registry import LayoutType, StyleType
 
 from semantic_digital_twin.adapters.mjcf import MJCFParser
+from semantic_digital_twin.adapters.multi_sim import GeomVisibilityAndCollisionType
 from semantic_digital_twin.adapters.robocasa_dataset.exceptions import (
     RoboCasaApplianceNotFoundError,
     RoboCasaObjectAssetsNotFoundError,
@@ -125,6 +126,32 @@ def _mjcf_document_from_element_copy(element: ET.Element) -> str:
     return ET.tostring(root, encoding="unicode")
 
 
+def _parse_robosuite_mjcf(parser: MJCFParser) -> World:
+    """
+    Relabels a robosuite/RoboCasa-composed MJCF parser's collision-only geoms, then parses it.
+
+    Robosuite's own convention (its ``robosuite.utils.mjcf_utils.sort_elements``) treats a geom
+    with an unset or ``0``-valued ``group`` as collision-only ("contact_geoms"), reserving
+    ``group 1`` for visual geoms ("visual_geoms") - the opposite of this project's own MJCF
+    convention, where :attr:`~GeomVisibilityAndCollisionType.VISIBLE_AND_COLLIDABLE_1` (group 0)
+    is visible. MuJoCo compiles an omitted ``group`` attribute to 0 either way, so the two
+    conventions are indistinguishable by group number alone once parsed: RoboCasa's own
+    collision-decomposition proxy geoms (arbitrary debug colors, never meant to be rendered)
+    must be relabelled to this project's :attr:`~GeomVisibilityAndCollisionType.ONLY_COLLIDABLE`
+    group before the shared, convention-agnostic :class:`MJCFParser` sees them, or they would be
+    parsed as visible and rendered on top of the real materials.
+
+    :param parser: The parser, already constructed from a robosuite/RoboCasa-composed MJCF
+        document, to relabel and parse.
+    :return: The parsed world.
+    """
+    for body in parser.spec.bodies:
+        for geom in body.geoms:
+            if geom.group == GeomVisibilityAndCollisionType.VISIBLE_AND_COLLIDABLE_1:
+                geom.group = GeomVisibilityAndCollisionType.ONLY_COLLIDABLE
+    return parser.parse()
+
+
 def _category_from_class_name(class_name: str) -> str:
     """
     Convert a RoboCasa ``Fixture`` subclass name (upper camel case, for example
@@ -181,7 +208,10 @@ class RoboCasaDatasetLoader:
     Resolver mapping RoboCasa object category names to SemanticAnnotation subclasses.
     """
 
-    self_contained_object_groups: ClassVar[Tuple[str, ...]] = ("objaverse", "lightwheel")
+    self_contained_object_groups: ClassVar[Tuple[str, ...]] = (
+        "objaverse",
+        "lightwheel",
+    )
     """
     RoboCasa object asset groups (subdirectories of ``objects``) whose ``model.xml`` files reference
     their textures and meshes by relative paths and can therefore be parsed on any machine. The
@@ -253,7 +283,7 @@ class RoboCasaDatasetLoader:
             mujoco_objects=list(kitchen_appliances.values()),
         )
 
-        world = MJCFParser.from_xml_string(task.get_xml()).parse()
+        world = _parse_robosuite_mjcf(MJCFParser.from_xml_string(task.get_xml()))
         self._apply_kitchen_appliance_semantics(world, kitchen_appliances)
         return world
 
@@ -301,7 +331,7 @@ class RoboCasaDatasetLoader:
             environment.sim.model.get_xml(), object_world_poses
         )
 
-        world = MJCFParser.from_xml_string(stripped_document).parse()
+        world = _parse_robosuite_mjcf(MJCFParser.from_xml_string(stripped_document))
         self._apply_kitchen_appliance_semantics(world, environment.fixtures)
         manipulated_objects = self._apply_task_object_semantics(
             world, environment.object_cfgs, environment.objects
@@ -375,9 +405,9 @@ class RoboCasaDatasetLoader:
         worldbody = root.find("worldbody")
         for body in list(worldbody.findall("body")):
             body_name = body.get("name") or ""
-            if body_name.startswith(
-                cls.robot_body_name_prefixes
-            ) or body_name.endswith("_eef_target"):
+            if body_name.startswith(cls.robot_body_name_prefixes) or body_name.endswith(
+                "_eef_target"
+            ):
                 worldbody.remove(body)
 
         for section_tag in cls.robot_referencing_mjcf_sections:
@@ -405,7 +435,10 @@ class RoboCasaDatasetLoader:
         return " ".join(f"{component:.10g}" for component in vector)
 
     def _apply_task_object_semantics(
-        self, world: World, object_configurations: List[Dict[str, Any]], objects: Dict[str, Any]
+        self,
+        world: World,
+        object_configurations: List[Dict[str, Any]],
+        objects: Dict[str, Any],
     ) -> List[Body]:
         """
         Attach a SemanticAnnotation to each manipulated object's body and collect those bodies.
@@ -458,7 +491,7 @@ class RoboCasaDatasetLoader:
         :raises RoboCasaApplianceNotFoundError: if no layout contains a fixture of ``category``.
         """
         appliance = self._find_configured_appliance(category, style_id)
-        world = MJCFParser.from_xml_string(appliance.get_xml()).parse()
+        world = _parse_robosuite_mjcf(MJCFParser.from_xml_string(appliance.get_xml()))
         self._apply_kitchen_appliance_semantics(world, {appliance.name: appliance})
         return world
 
@@ -478,10 +511,12 @@ class RoboCasaDatasetLoader:
         :return: The matching RoboCasa fixture instance.
         :raises RoboCasaApplianceNotFoundError: if no layout contains a matching fixture.
         """
-        target_annotation_class = self.kitchen_appliance_annotator.category_to_annotation_class[
-            category
-        ]
-        style = style_id if style_id is not None else next(iter(scene_registry.StyleType))
+        target_annotation_class = (
+            self.kitchen_appliance_annotator.category_to_annotation_class[category]
+        )
+        style = (
+            style_id if style_id is not None else next(iter(scene_registry.StyleType))
+        )
         with open(scene_registry.get_style_path(style)) as style_file:
             style_config = yaml.safe_load(style_file)
 
@@ -530,7 +565,9 @@ class RoboCasaDatasetLoader:
         model_files = sorted(
             model_file
             for group in self.self_contained_object_groups
-            for model_file in (objects_directory / group).glob(f"{category}/**/model.xml")
+            for model_file in (objects_directory / group).glob(
+                f"{category}/**/model.xml"
+            )
         )
         if not model_files:
             raise RoboCasaObjectAssetsNotFoundError(
@@ -545,7 +582,7 @@ class RoboCasaDatasetLoader:
                 objects_directory,
             )
 
-        world = MJCFParser(str(model_files[instance_index])).parse()
+        world = _parse_robosuite_mjcf(MJCFParser(str(model_files[instance_index])))
         self._apply_object_semantics(world, category)
         return world
 
@@ -584,7 +621,9 @@ class RoboCasaDatasetLoader:
             raise RoboCasaObjectHasNoCollisionError(category)
         self._attach_semantic_annotation(world, bodies_with_collision[0], category)
 
-    def _attach_semantic_annotation(self, world: World, body: Body, category: str) -> None:
+    def _attach_semantic_annotation(
+        self, world: World, body: Body, category: str
+    ) -> None:
         """
         Attach the SemanticAnnotation matching ``category`` to ``body``, falling back to
         NaturalLanguageWithTypeDescription if no matching SemanticAnnotation subclass is known, and
@@ -673,5 +712,7 @@ class RoboCasaDatasetLoader:
         except WorldEntityNotFoundError:
             pass
 
-        matching_bodies = [body for body in world.bodies if body.name.name.startswith(name)]
+        matching_bodies = [
+            body for body in world.bodies if body.name.name.startswith(name)
+        ]
         return matching_bodies[0] if matching_bodies else None

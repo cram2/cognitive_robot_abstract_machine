@@ -5,7 +5,6 @@ import pytest
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.world_description.connections import FixedConnection
 
-
 MJCF_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "..",

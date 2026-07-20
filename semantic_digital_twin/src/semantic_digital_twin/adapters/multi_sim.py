@@ -252,13 +252,15 @@ class EntityConverter(ABC):
         :param entity: The object to convert.
         :return: A dictionary of properties, by default containing the name.
         """
-        return {
-            self.name_str: (
-                entity.name.name
-                if hasattr(entity, "name") and isinstance(entity.name, PrefixedName)
-                else f"{type(entity).__name__.lower()}_{id(entity)}"
-            )
-        }
+        if hasattr(entity, "name") and isinstance(entity.name, PrefixedName):
+            resolved_name = entity.name.name
+        elif hasattr(entity, "name") and isinstance(entity.name, str) and entity.name:
+            # SimulatorAdditionalProperty entities (e.g. MultiSimCamera) carry a plain
+            # string name rather than a PrefixedName; honor it if one was given.
+            resolved_name = entity.name
+        else:
+            resolved_name = f"{type(entity).__name__.lower()}_{id(entity)}"
+        return {self.name_str: resolved_name}
 
     @abstractmethod
     def _post_convert(
@@ -1174,19 +1176,31 @@ class MujocoMeshConverter(MujocoGeomConverter, MeshConverter):
         if isinstance(entity.mesh.visual, TextureVisuals) and isinstance(
             entity.mesh.visual.material.name, str
         ):
-            texture_file_path = entity.mesh.visual.material.name
-            if not os.path.isfile(texture_file_path):
-                texture_file_path = entity.mesh.visual.material.image.filename
-            if not os.path.isfile(texture_file_path):
-                texture_file_path = entity.mesh.visual.material.image.info.get(
-                    "file_path", ""
-                )
-            if not os.path.isfile(texture_file_path):
-                raise FileNotFoundError(
-                    f"Texture file not found for mesh. Checked paths: '{entity.mesh.visual.material.name}', '{entity.mesh.visual.material.image.filename}', '{entity.mesh.visual.material.image.info.get('file_path', '')}'"
-                )
-            shape_props["texture_file_path"] = texture_file_path
+            texture_file_path = self._resolve_texture_file_path(
+                entity.mesh.visual.material
+            )
+            if texture_file_path is not None:
+                shape_props["texture_file_path"] = texture_file_path
         return shape_props
+
+    @staticmethod
+    def _resolve_texture_file_path(material: Any) -> Optional[str]:
+        """
+        Resolves the on-disk file backing a mesh's texture.
+
+        :param material: The trimesh material (``TextureVisuals.material``) to resolve.
+        :return: The texture's file path, or ``None`` if the texture is a programmatically
+            generated image (for example a flat "glass" material) with no backing file.
+        """
+        if os.path.isfile(material.name):
+            return material.name
+        image = material.image
+        if hasattr(image, "filename") and os.path.isfile(image.filename):
+            return image.filename
+        file_path = image.info.get("file_path", "")
+        if os.path.isfile(file_path):
+            return file_path
+        return None
 
 
 @dataclass
@@ -2491,6 +2505,14 @@ class MujocoSynchronizer(MultiSimSynchronizer):
     entity_converter: Type[EntityConverter] = field(default=MujocoConverter)
     entity_spawner: Type[EntitySpawner] = field(default=MujocoEntitySpawner)
 
+    UNTHROTTLED_SYNC_RATE_HZ: ClassVar[float] = float("inf")
+    """
+    Assign this to :attr:`sync_rate_hz` to sync on every single call, i.e. to not throttle the
+    *sim → world* direction at all: since ``1 / sync_rate_hz`` is then exactly ``0.0``, the
+    "less than 1 / sync_rate_hz seconds elapsed" skip condition in :meth:`_sim_to_world` can
+    never trigger. Distinct from ``sync_rate_hz <= 0``, which disables that direction entirely.
+    """
+
     sync_rate_hz: float = 30
     """
     Throttle (in wall-clock Hz) for the *sim → world* direction: how often
@@ -2504,7 +2526,8 @@ class MujocoSynchronizer(MultiSimSynchronizer):
     produced by the simulator (gravity, contacts, actuator dynamics, etc.).
     The opposite *world → sim* direction (driven by ``_on_state_change``) is
     independent of this setting and continues to push ``world.state`` changes
-    into MuJoCo regardless.
+    into MuJoCo regardless. Set to :attr:`UNTHROTTLED_SYNC_RATE_HZ` for the
+    opposite extreme: sync on every call, with no throttling at all.
     """
 
     _last_sync_time: float = field(init=False, default=0.0, repr=False)
