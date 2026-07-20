@@ -480,6 +480,80 @@ def test_spawn_body_with_connections():
         stop_multisim_if_running(multi_sim)
 
 
+def test_body_frame_excludes_joint_state_at_build_time():
+    """A body's static frame must be built at the reference (zero-joint) pose.
+
+    The joint is non-zero while the simulator is built and is evaluated at a
+    different angle, so a frame that baked in the build-time angle would have it
+    applied twice and drift away from the world forward kinematics.
+    """
+    world = World()
+    base_body = Body(name=PrefixedName("base"))
+    rotated_link = Body(name=PrefixedName("rotated_link"))
+    # A tip offset from the joint axis, so a rotation actually moves its position
+    # (the joint child sits on the axis and would not reveal the bug).
+    tip_link = Body(name=PrefixedName("tip"))
+    rotated_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=0.3,
+        pos_y=0.0,
+        pos_z=0.9,
+        quat_w=0.707,
+        quat_x=0.707,
+        quat_y=0.0,
+        quat_z=0.0,
+    )
+    tip_offset = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5, y=0.2, z=0.0)
+    rotated_joint_dof = DegreeOfFreedom(name=PrefixedName("rotated_joint"))
+    with world.modify_world():
+        world.add_body(base_body)
+        world.add_degree_of_freedom(rotated_joint_dof)
+        world.add_connection(
+            RevoluteConnection(
+                name=rotated_joint_dof.name,
+                parent=base_body,
+                child=rotated_link,
+                axis=Vector3.Z(reference_frame=rotated_link),
+                raw_dof=rotated_joint_dof,
+                parent_T_connection_expression=rotated_origin,
+            )
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=rotated_link,
+                child=tip_link,
+                parent_T_connection_expression=tip_offset,
+            )
+        )
+
+    build_time_angle = 0.7
+    with world.modify_world():
+        world.state[rotated_joint_dof.id].position = build_time_angle
+
+    multi_sim = MujocoSim(world=world, headless=headless, step_size=0.001)
+    try:
+        evaluation_angle = 0.3
+        with world.modify_world():
+            world.state[rotated_joint_dof.id].position = evaluation_angle
+
+        mujoco_model = multi_sim.simulator._mj_model
+        mujoco_data = multi_sim.simulator._mj_data
+        joint_id = mujoco.mj_name2id(
+            mujoco_model, mujoco.mjtObj.mjOBJ_JOINT, rotated_joint_dof.name.name
+        )
+        mujoco_data.qpos[mujoco_model.jnt_qposadr[joint_id]] = evaluation_angle
+        mujoco.mj_forward(mujoco_model, mujoco_data)
+
+        simulated_position = multi_sim.simulator.get_body_position(
+            tip_link.name.name
+        ).result[:3]
+        world_position = world.compute_forward_kinematics_np(world.root, tip_link)[
+            :3, 3
+        ]
+        numpy.testing.assert_allclose(simulated_position, world_position, atol=1e-4)
+    finally:
+        stop_multisim_if_running(multi_sim)
+
+
 def test_world_sim_state_sync():
     plane_half_thickness = 0.05
     box_half_size = 0.1
