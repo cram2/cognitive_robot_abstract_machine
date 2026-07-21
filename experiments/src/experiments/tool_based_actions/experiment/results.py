@@ -8,15 +8,31 @@ can resume from what is already on disk.
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import MISSING, asdict, dataclass, fields
 from pathlib import Path
 
-from typing_extensions import List, Optional, Set
+from typing_extensions import Any, Dict, List, Optional, Set
 
 from experiments.tool_based_actions.experiment.configuration import (
     ToolBasedTask,
     TrialSpecification,
 )
+
+
+class IncompatibleResultRecord(Exception):
+    """
+    Raised when a stored result line does not match the current
+    :class:`TargetResult` schema, typically because the results file was written
+    by an older version of the experiment.
+    """
+
+    def __init__(self, missing_fields: List[str], unexpected_fields: List[str]):
+        super().__init__(
+            f"Result record does not match the current TargetResult schema: "
+            f"missing fields {missing_fields}, unexpected fields "
+            f"{unexpected_fields}. Archive or delete the results file to start "
+            f"a fresh campaign."
+        )
 
 
 @dataclass(frozen=True)
@@ -70,6 +86,11 @@ class TargetResult:
     Rotation in radians of the target around the world Z axis.
     """
 
+    target_scale: float
+    """
+    Uniform scale factor the target was spawned with.
+    """
+
     surface_name: str
     """
     Name of the surface the target was spawned on.
@@ -105,8 +126,29 @@ class TargetResult:
         :return: The deserialized result.
         """
         record = json.loads(line)
+        cls._validate_record_matches_schema(record)
         record["task"] = ToolBasedTask(record["task"])
         return cls(**record)
+
+    @classmethod
+    def _validate_record_matches_schema(cls, record: Dict[str, Any]) -> None:
+        """
+        Check that a deserialized record carries exactly the fields of this class.
+
+        :param record: The deserialized JSON record.
+        :raises IncompatibleResultRecord: If required fields are missing or unknown
+            fields are present.
+        """
+        field_names = {field.name for field in fields(cls)}
+        required_field_names = {
+            field.name
+            for field in fields(cls)
+            if field.default is MISSING and field.default_factory is MISSING
+        }
+        missing_fields = sorted(required_field_names - record.keys())
+        unexpected_fields = sorted(record.keys() - field_names)
+        if missing_fields or unexpected_fields:
+            raise IncompatibleResultRecord(missing_fields, unexpected_fields)
 
 
 @dataclass

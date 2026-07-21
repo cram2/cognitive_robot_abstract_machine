@@ -1,0 +1,93 @@
+"""
+Visualization helpers for the tool-based action experiment.
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.geometry import Color, Shape
+from semantic_digital_twin.world_description.world_entity import Body
+from typing_extensions import List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
+try:
+    import rclpy
+    from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+        VizMarkerPublisher,
+    )
+except ImportError:
+    rclpy = None
+    VizMarkerPublisher = None
+    logger.info(
+        "Could not import VizMarkerPublisher. This is probably because you are not "
+        "running ROS."
+    )
+
+
+def start_visualization_with_collision_markers(world: World) -> None:
+    """
+    Publish the world, its tf tree, and closest-point collision results to RViz.
+
+    Does nothing if ROS is not available.
+    """
+    if VizMarkerPublisher is None:
+        return
+    rclpy.init()
+    node = rclpy.create_node("viz_marker")
+    VizMarkerPublisher(_world=world, node=node).with_tf_and_collision_visualization()
+
+
+@dataclass
+class TargetHighlight:
+    """
+    Dyes a target body in a highlight color while the robot approaches and acts on it,
+    and restores the original colors afterwards.
+
+    Use as a context manager around the action performance. The world's visualization
+    publishers pick the color change up through the model change notification, so the
+    highlighted target stands out in RViz.
+    """
+
+    world: World
+    """
+    The world the target lives in.
+    """
+
+    body: Optional[Body]
+    """
+    The body to highlight, or None for targets that are pure poses (e.g. wiping
+    patches), which are left untouched.
+    """
+
+    color: Color = field(default_factory=lambda: Color(R=0.1, G=0.4, B=1.0))
+    """
+    The color the target is dyed with while it is highlighted.
+    """
+
+    _original_colors: List[Tuple[Shape, Color]] = field(
+        init=False, default_factory=list
+    )
+    """
+    The shape colors to restore when the highlight ends.
+    """
+
+    def __enter__(self) -> TargetHighlight:
+        if self.body is None:
+            return self
+        with self.world.modify_world():
+            for shape in self.body.visual.shapes:
+                self._original_colors.append((shape, shape.color))
+                shape.color = self.color
+        return self
+
+    def __exit__(self, exception_type, exception_value, exception_traceback) -> None:
+        if self.body is None:
+            return
+        with self.world.modify_world():
+            for shape, original_color in self._original_colors:
+                shape.color = original_color
+        self._original_colors.clear()

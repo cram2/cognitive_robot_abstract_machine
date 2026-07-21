@@ -8,6 +8,7 @@ target. The trial runner stays task-agnostic.
 
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -25,8 +26,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import Dict, Optional
+from typing_extensions import Dict, Optional, Tuple
 
 from coraplex.datastructures.enums import Arms, CuttingTechnique
 from coraplex.robot_plans.actions.base import ActionDescription
@@ -39,7 +41,10 @@ from coraplex.robot_plans.actions.composite.tool_based import (
 from coraplex.testing import attach_tool
 
 from experiments.tool_based_actions.experiment.configuration import ToolBasedTask
-from experiments.tool_based_actions.experiment.scene import TargetPlacement
+from experiments.tool_based_actions.experiment.scene import (
+    ObjectFootprint,
+    TargetPlacement,
+)
 from experiments.tool_based_actions.simple_demo.demo_world import (
     BOWL_COLOR,
     BREAD_COLOR,
@@ -85,6 +90,11 @@ class ToolTaskDefinition(ABC):
     The arm the tool is mounted on.
     """
 
+    pointer_stride: int = 15
+    """
+    Keep every Nth sampled tool path waypoint for execution.
+    """
+
     @abstractmethod
     def attach_tool(self, world: World, robot: AbstractRobot) -> Tool:
         """
@@ -115,6 +125,44 @@ class ToolTaskDefinition(ABC):
         :return: The tool action acting on the target.
         """
 
+    @abstractmethod
+    def target_footprint(
+        self, scale_choices: Tuple[float, ...], safety_factor: float
+    ) -> ObjectFootprint:
+        """
+        :param scale_choices: Uniform scale factors targets may be spawned with.
+        :param safety_factor: Factor the footprint radius is inflated by.
+        :return: The footprint of this task's targets, for scene sampling.
+        """
+
+    def _mesh_footprint(
+        self,
+        mesh_file_name: str,
+        scale_choices: Tuple[float, ...],
+        safety_factor: float,
+    ) -> ObjectFootprint:
+        """
+        Measure a mesh's XY footprint in its own frame.
+
+        :param mesh_file_name: Mesh file in the demo resources.
+        :param scale_choices: Uniform scale factors targets may be spawned with.
+        :param safety_factor: Factor the footprint radius is inflated by.
+        :return: The measured footprint of the mesh.
+        """
+        object_world = parse_object(mesh_file_name)
+        bounding_box = object_world.root.collision.as_bounding_box_collection_in_frame(
+            object_world.root
+        ).bounding_box()
+        base_radius = 0.5 * math.hypot(
+            bounding_box.max_x - bounding_box.min_x,
+            bounding_box.max_y - bounding_box.min_y,
+        )
+        return ObjectFootprint(
+            base_radius=base_radius,
+            scale_choices=scale_choices,
+            safety_factor=safety_factor,
+        )
+
     def _spawn_mesh_body(
         self,
         world: World,
@@ -123,7 +171,8 @@ class ToolTaskDefinition(ABC):
         color,
     ) -> Body:
         """
-        Spawn a mesh object at the placement under the placement's unique name.
+        Spawn a mesh object at the placement, at the placement's scale, under the
+        placement's unique name.
 
         :param world: The world to spawn into.
         :param placement: The sampled placement of the object.
@@ -133,6 +182,11 @@ class ToolTaskDefinition(ABC):
         """
         object_world = parse_object(mesh_file_name, color=color)
         object_world.root.name = PrefixedName(placement.name)
+        uniform_scale = Scale(placement.scale, placement.scale, placement.scale)
+        for shape in object_world.root.visual.shapes:
+            shape.scale = uniform_scale
+        for shape in object_world.root.collision.shapes:
+            shape.scale = uniform_scale
         with world.modify_world():
             world.merge_world_at_pose(
                 object_world,
@@ -192,9 +246,15 @@ class CuttingTaskDefinition(ToolTaskDefinition):
             arm=self.arm,
             tool=tool,
             technique=CuttingTechnique.SLICE,
-            number_of_cuts_on_local_x_axis=3,
-            slice_thickness=0.03,
+            number_of_cuts_on_local_x_axis=5,
+            slice_thickness=0.07,
+            pointer_stride=self.pointer_stride,
         )
+
+    def target_footprint(
+        self, scale_choices: Tuple[float, ...], safety_factor: float
+    ) -> ObjectFootprint:
+        return self._mesh_footprint("bread.stl", scale_choices, safety_factor)
 
 
 @dataclass
@@ -223,7 +283,17 @@ class MixingTaskDefinition(ToolTaskDefinition):
         )
 
     def build_action(self, target: ExperimentTarget, tool: Tool) -> ActionDescription:
-        return MixingAction(container=target.body, arm=self.arm, tool=tool)
+        return MixingAction(
+            container=target.body,
+            arm=self.arm,
+            tool=tool,
+            pointer_stride=self.pointer_stride,
+        )
+
+    def target_footprint(
+        self, scale_choices: Tuple[float, ...], safety_factor: float
+    ) -> ObjectFootprint:
+        return self._mesh_footprint("bowl.stl", scale_choices, safety_factor)
 
 
 @dataclass
@@ -260,6 +330,11 @@ class PouringTaskDefinition(ToolTaskDefinition):
             target_container=target.body, source_container=tool, arm=self.arm
         )
 
+    def target_footprint(
+        self, scale_choices: Tuple[float, ...], safety_factor: float
+    ) -> ObjectFootprint:
+        return self._mesh_footprint("bowl.stl", scale_choices, safety_factor)
+
 
 @dataclass
 class WipingTaskDefinition(ToolTaskDefinition):
@@ -282,18 +357,31 @@ class WipingTaskDefinition(ToolTaskDefinition):
         )
 
     def build_action(self, target: ExperimentTarget, tool: Tool) -> ActionDescription:
-        return WipingAction(arm=self.arm, tool=tool, target_pose=target.pose)
+        return WipingAction(
+            arm=self.arm,
+            tool=tool,
+            target_pose=target.pose,
+            pointer_stride=self.pointer_stride,
+        )
+
+    def target_footprint(
+        self, scale_choices: Tuple[float, ...], safety_factor: float
+    ) -> ObjectFootprint:
+        return ObjectFootprint.point()
 
 
-def definition_for_task(task: ToolBasedTask) -> ToolTaskDefinition:
+def definition_for_task(
+    task: ToolBasedTask, pointer_stride: int = 10
+) -> ToolTaskDefinition:
     """
     :param task: The task to run.
+    :param pointer_stride: Keep every Nth sampled tool path waypoint for execution.
     :return: The definition constructing scenes and actions for the task.
     """
     definitions: Dict[ToolBasedTask, ToolTaskDefinition] = {
-        ToolBasedTask.CUTTING: CuttingTaskDefinition(),
-        ToolBasedTask.MIXING: MixingTaskDefinition(),
-        ToolBasedTask.POURING: PouringTaskDefinition(),
-        ToolBasedTask.WIPING: WipingTaskDefinition(),
+        ToolBasedTask.CUTTING: CuttingTaskDefinition(pointer_stride=pointer_stride),
+        ToolBasedTask.MIXING: MixingTaskDefinition(pointer_stride=pointer_stride),
+        ToolBasedTask.POURING: PouringTaskDefinition(pointer_stride=pointer_stride),
+        ToolBasedTask.WIPING: WipingTaskDefinition(pointer_stride=pointer_stride),
     }
     return definitions[task]

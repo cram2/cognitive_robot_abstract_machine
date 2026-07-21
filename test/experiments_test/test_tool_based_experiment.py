@@ -1,7 +1,11 @@
+import json
 import math
 
 import pytest
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    CuttingKnife,
+)
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -16,16 +20,26 @@ from experiments.tool_based_actions.experiment.configuration import (
     TrialSpecification,
 )
 from experiments.tool_based_actions.experiment.results import (
+    IncompatibleResultRecord,
     ResultRecorder,
     TargetResult,
 )
 from experiments.tool_based_actions.experiment.scene import (
     MissingSpawnSurfaces,
+    ObjectFootprint,
+    ObstacleBox,
     SceneSampler,
     SpawnRegionExhausted,
     SpawnSurface,
+    TargetPlacement,
+    discover_obstacles,
     discover_spawn_surfaces,
 )
+from experiments.tool_based_actions.experiment.task_definitions import (
+    CuttingTaskDefinition,
+    definition_for_task,
+)
+from experiments.tool_based_actions.experiment.visualization import TargetHighlight
 
 COUNTER = SpawnSurface(
     name="counter",
@@ -81,10 +95,155 @@ def test_scene_sampler_spreads_targets_over_multiple_surfaces():
     assert used_surfaces == {"counter", "table"}
 
 
-def test_scene_sampler_target_count_is_reproducible_and_bounded():
-    counts = {_sampler().sample_target_count(2, 3) for _ in range(5)}
-    assert len(counts) == 1
-    assert counts.pop() in (2, 3)
+def test_target_count_follows_surface_area_density():
+    sampler = _sampler()
+    total_area = 0.2 * 1.1 + 0.6 * 1.4
+
+    unclamped = sampler.target_count(
+        targets_per_square_meter=12.0, minimum=2, maximum=30
+    )
+    assert unclamped == round(total_area * 12.0)
+
+    assert sampler.target_count(targets_per_square_meter=12.0, minimum=2, maximum=3) == 3
+    assert sampler.target_count(targets_per_square_meter=0.1, minimum=2, maximum=30) == 2
+
+
+def test_object_footprint_scales_base_radius():
+    footprint = ObjectFootprint(
+        base_radius=0.1, scale_choices=(0.8, 1.6), safety_factor=1.08
+    )
+    assert footprint.radius_for_scale(1.6) == pytest.approx(0.1 * 1.6 * 1.08)
+    assert footprint.largest_radius() == pytest.approx(0.1 * 1.6 * 1.08)
+
+
+def test_scene_sampler_keeps_scaled_footprints_inside_surface_bounds():
+    footprint = ObjectFootprint(
+        base_radius=0.1, scale_choices=(1.0, 1.6), safety_factor=1.0
+    )
+    sampler = SceneSampler(
+        surfaces=[TABLE], clearance=0.0, seed=910001, footprint=footprint
+    )
+
+    placements = sampler.sample_placements(3, name_prefix="target")
+
+    for placement in placements:
+        assert placement.scale in (1.0, 1.6)
+        assert placement.footprint_radius == pytest.approx(0.1 * placement.scale)
+        assert TABLE.region.minimum_x + placement.footprint_radius <= placement.x
+        assert placement.x <= TABLE.region.maximum_x - placement.footprint_radius
+        assert TABLE.region.minimum_y + placement.footprint_radius <= placement.y
+        assert placement.y <= TABLE.region.maximum_y - placement.footprint_radius
+
+
+def test_scene_sampler_places_best_effort_down_to_the_minimum_count():
+    footprint = ObjectFootprint(
+        base_radius=0.25, scale_choices=(1.0,), safety_factor=1.0
+    )
+    sampler = SceneSampler(
+        surfaces=[TABLE], clearance=0.35, seed=910001, footprint=footprint
+    )
+
+    placements = sampler.sample_placements(10, name_prefix="target", minimum_count=2)
+    assert 2 <= len(placements) < 10
+
+    with pytest.raises(SpawnRegionExhausted):
+        sampler.sample_placements(10, name_prefix="target", minimum_count=10)
+
+
+def test_scene_sampler_keeps_footprint_clearance_between_large_targets():
+    footprint = ObjectFootprint(
+        base_radius=0.25, scale_choices=(1.0,), safety_factor=1.0
+    )
+    sampler = SceneSampler(
+        surfaces=[TABLE],
+        clearance=0.35,
+        seed=910001,
+        footprint=footprint,
+        footprint_clearance=0.05,
+    )
+
+    placements = sampler.sample_placements(2, name_prefix="target")
+
+    assert placements[0].distance_to(placements[1]) >= 0.25 + 0.25 + 0.05
+
+
+def _table_covering_obstacle(minimum_z: float, maximum_z: float) -> ObstacleBox:
+    return ObstacleBox(
+        name="blocking_box",
+        minimum_x=TABLE.region.minimum_x,
+        maximum_x=TABLE.region.maximum_x,
+        minimum_y=TABLE.region.minimum_y,
+        maximum_y=TABLE.region.maximum_y,
+        minimum_z=minimum_z,
+        maximum_z=maximum_z,
+    )
+
+
+def test_scene_sampler_rejects_placements_inside_obstacle_bands():
+    sampler = SceneSampler(
+        surfaces=[TABLE],
+        clearance=0.35,
+        seed=910001,
+        obstacles=[_table_covering_obstacle(minimum_z=0.5, maximum_z=1.2)],
+    )
+    with pytest.raises(SpawnRegionExhausted):
+        sampler.sample_placements(2, name_prefix="target")
+
+
+def test_scene_sampler_ignores_obstacles_below_the_spawn_height():
+    sampler = SceneSampler(
+        surfaces=[TABLE],
+        clearance=0.35,
+        seed=910001,
+        obstacles=[_table_covering_obstacle(minimum_z=0.2, maximum_z=0.7)],
+    )
+    assert len(sampler.sample_placements(2, name_prefix="target")) == 2
+
+
+def test_scene_sampler_avoids_partial_obstacles():
+    obstacle = ObstacleBox(
+        name="tray",
+        minimum_x=TABLE.region.minimum_x,
+        maximum_x=TABLE.region.maximum_x,
+        minimum_y=TABLE.region.minimum_y,
+        maximum_y=4.0,
+        minimum_z=0.5,
+        maximum_z=1.2,
+    )
+    sampler = SceneSampler(
+        surfaces=[TABLE], clearance=0.35, seed=910001, obstacles=[obstacle]
+    )
+
+    placements = sampler.sample_placements(2, name_prefix="target")
+
+    for placement in placements:
+        assert placement.y > 4.0
+
+
+HIGH_SHELF = SpawnSurface(
+    name="high_shelf",
+    region=SpawnRegion(
+        minimum_x=4.7, maximum_x=5.3, minimum_y=3.3, maximum_y=4.7, height=1.6
+    ),
+)
+
+
+def test_scene_sampler_excludes_surfaces_above_the_maximum_spawn_height():
+    sampler = SceneSampler(
+        surfaces=[TABLE, HIGH_SHELF],
+        clearance=0.35,
+        seed=910001,
+        maximum_spawn_height=1.35,
+    )
+
+    placements = sampler.sample_placements(3, name_prefix="target")
+    assert {placement.surface_name for placement in placements} == {"table"}
+
+    shelf_only_sampler = SceneSampler(
+        surfaces=[HIGH_SHELF], clearance=0.35, seed=910001, maximum_spawn_height=1.35
+    )
+    with pytest.raises(SpawnRegionExhausted):
+        shelf_only_sampler.sample_placements(1, name_prefix="target")
 
 
 def test_scene_sampler_fails_fast_when_surfaces_cannot_fit_targets():
@@ -148,6 +307,127 @@ def test_discover_spawn_surfaces_raises_without_any_match():
         )
 
 
+def test_discover_obstacles_measures_collision_bodies_and_skips_excluded_names():
+    world = _world_with_surface_box("side_table")
+
+    obstacles = discover_obstacles(world, excluded_body_names=set())
+
+    assert [obstacle.name for obstacle in obstacles] == ["side_table"]
+    obstacle = obstacles[0]
+    assert obstacle.minimum_x == pytest.approx(1.5)
+    assert obstacle.maximum_x == pytest.approx(2.5)
+    assert obstacle.minimum_y == pytest.approx(2.0)
+    assert obstacle.maximum_y == pytest.approx(4.0)
+    assert obstacle.minimum_z == pytest.approx(0.7)
+    assert obstacle.maximum_z == pytest.approx(0.8)
+
+    assert discover_obstacles(world, excluded_body_names={"side_table"}) == []
+
+
+def test_obstacle_box_blocks_only_within_its_vertical_band():
+    obstacle = ObstacleBox(
+        name="crate",
+        minimum_x=0.0,
+        maximum_x=1.0,
+        minimum_y=0.0,
+        maximum_y=1.0,
+        minimum_z=0.5,
+        maximum_z=1.0,
+    )
+
+    assert obstacle.blocks(x=0.5, y=0.5, z=0.75, radius=0.0)
+    assert obstacle.blocks(x=1.05, y=0.5, z=0.75, radius=0.1)
+    assert not obstacle.blocks(x=1.2, y=0.5, z=0.75, radius=0.1)
+    assert not obstacle.blocks(x=0.5, y=0.5, z=1.05, radius=0.0)
+    assert not obstacle.blocks(x=0.5, y=0.5, z=0.4, radius=0.0)
+
+
+def test_cutting_targets_have_a_mesh_footprint():
+    footprint = CuttingTaskDefinition().target_footprint(
+        scale_choices=(0.8, 1.0), safety_factor=1.08
+    )
+    assert footprint.base_radius > 0.02
+    assert footprint.scale_choices == (0.8, 1.0)
+    assert footprint.safety_factor == pytest.approx(1.08)
+
+
+def test_task_definitions_forward_the_pointer_stride():
+    for task in ToolBasedTask:
+        definition = definition_for_task(task, pointer_stride=7)
+        assert definition.pointer_stride == 7
+
+
+def test_cutting_actions_carry_the_definition_pointer_stride():
+    world = _world_with_surface_box("counter")
+    definition = CuttingTaskDefinition(pointer_stride=7)
+    placement = TargetPlacement(
+        name="bread_target",
+        surface_name="counter",
+        x=2.0,
+        y=3.0,
+        z=0.9,
+        yaw=0.0,
+        scale=1.0,
+        footprint_radius=0.1,
+    )
+    target = definition.spawn_target(world, placement)
+    tool = CuttingKnife(root=world.get_body_by_name("counter"))
+
+    action = definition.build_action(target, tool)
+
+    assert action.pointer_stride == 7
+
+
+def test_target_highlight_dyes_and_restores_the_target_colors():
+    world = _world_with_surface_box("counter")
+    body = world.get_body_by_name("counter")
+    original_colors = [shape.color for shape in body.visual.shapes]
+
+    highlight = TargetHighlight(world=world, body=body)
+    with highlight:
+        for shape in body.visual.shapes:
+            assert shape.color == highlight.color
+    assert [shape.color for shape in body.visual.shapes] == original_colors
+
+
+def test_target_highlight_restores_colors_when_the_action_fails():
+    world = _world_with_surface_box("counter")
+    body = world.get_body_by_name("counter")
+    original_colors = [shape.color for shape in body.visual.shapes]
+
+    with pytest.raises(RuntimeError):
+        with TargetHighlight(world=world, body=body):
+            raise RuntimeError("action failed")
+    assert [shape.color for shape in body.visual.shapes] == original_colors
+
+
+def test_target_highlight_ignores_pose_only_targets():
+    world = _world_with_surface_box("counter")
+    with TargetHighlight(world=world, body=None):
+        pass
+
+
+def test_spawned_targets_carry_the_placement_scale():
+    world = _world_with_surface_box("counter")
+    placement = TargetPlacement(
+        name="bread_target",
+        surface_name="counter",
+        x=2.0,
+        y=3.0,
+        z=0.9,
+        yaw=0.0,
+        scale=1.4,
+        footprint_radius=0.1,
+    )
+
+    target = CuttingTaskDefinition().spawn_target(world, placement)
+
+    for shape in target.body.collision.shapes:
+        assert shape.scale.x == pytest.approx(1.4)
+        assert shape.scale.y == pytest.approx(1.4)
+        assert shape.scale.z == pytest.approx(1.4)
+
+
 def test_trial_grid_is_the_task_seed_product():
     configuration = ExperimentConfiguration(
         tasks=(ToolBasedTask.CUTTING, ToolBasedTask.WIPING),
@@ -165,7 +445,13 @@ def test_trial_grid_is_the_task_seed_product():
 
 def test_configuration_json_roundtrip():
     configuration = ExperimentConfiguration(
-        tasks=(ToolBasedTask.MIXING,), seeds=(7,), surface_names=("island_countertop",)
+        tasks=(ToolBasedTask.MIXING,),
+        seeds=(7,),
+        surface_names=("island_countertop",),
+        scale_choices=(0.9, 1.1),
+        full_body_motion=False,
+        tool_path_pointer_stride=5,
+        collision_avoidance=False,
     )
     assert ExperimentConfiguration.from_json(configuration.to_json()) == configuration
 
@@ -181,6 +467,7 @@ def _result(trial_identifier: str, target_name: str, success: bool) -> TargetRes
         target_x=2.4,
         target_y=2.2,
         target_yaw=1.57,
+        target_scale=1.2,
         surface_name="island_countertop",
         success=success,
         duration=1.5,
@@ -197,6 +484,7 @@ def test_result_recorder_roundtrip_and_resume(tmp_path):
     assert len(results) == 2
     assert results[0].success is True
     assert results[0].surface_name == "island_countertop"
+    assert results[0].target_scale == pytest.approx(1.2)
     assert results[1].failure_reason.startswith("MotionDidNotFinish")
 
     completed_specification = TrialSpecification(
@@ -213,6 +501,30 @@ def test_result_recorder_roundtrip_and_resume(tmp_path):
     )
     assert recorder.is_completed(completed_specification)
     assert not recorder.is_completed(pending_specification)
+
+
+def test_result_recorder_rejects_records_from_an_older_schema(tmp_path):
+    legacy_record = {
+        "trial_identifier": "cutting:apartment:pr2:910001",
+        "task": "cutting",
+        "seed": 910001,
+        "robot_name": "pr2",
+        "environment_name": "apartment",
+        "target_name": "cutting_910001_0",
+        "target_x": 2.4,
+        "target_y": 2.1,
+        "success": True,
+        "duration": 9.7,
+        "failure_reason": None,
+    }
+    results_file = tmp_path / "results.jsonl"
+    results_file.write_text(json.dumps(legacy_record) + "\n", encoding="utf-8")
+    recorder = ResultRecorder(results_file=results_file)
+
+    with pytest.raises(IncompatibleResultRecord) as error_information:
+        recorder.load_results()
+    assert "target_yaw" in str(error_information.value)
+    assert "surface_name" in str(error_information.value)
 
 
 def test_result_recorder_is_empty_without_file(tmp_path):

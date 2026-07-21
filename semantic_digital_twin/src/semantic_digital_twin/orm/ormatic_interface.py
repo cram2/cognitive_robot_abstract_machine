@@ -902,27 +902,6 @@ class CollisionManagerDAO_max_avoided_bodies_rules_association(
     )
 
 
-class CollisionManagerDAO_collision_consumers_association(
-    Base, AssociationDataAccessObject
-):
-    __tablename__ = "_18517485872566537243889877764736548861898657133656657980408730"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-    source_collisionmanagerdao_id: Mapped[int] = mapped_column(
-        ForeignKey("CollisionManagerDAO.database_id")
-    )
-    target_collisionconsumerdao_id: Mapped[int] = mapped_column(
-        ForeignKey("CollisionConsumerDAO.database_id")
-    )
-
-    target: Mapped[CollisionConsumerDAO] = relationship(
-        "CollisionConsumerDAO",
-        foreign_keys=[target_collisionconsumerdao_id],
-        lazy="selectin",
-    )
-
-
 class WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
@@ -11606,15 +11585,6 @@ class CollisionManagerDAO(
         foreign_keys="[CollisionManagerDAO_max_avoided_bodies_rules_association.source_collisionmanagerdao_id]",
         lazy="selectin",
     )
-    collision_consumers: Mapped[
-        builtins.list[CollisionManagerDAO_collision_consumers_association]
-    ] = relationship(
-        "CollisionManagerDAO_collision_consumers_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[CollisionManagerDAO_collision_consumers_association.source_collisionmanagerdao_id]",
-        lazy="selectin",
-    )
 
     __mapper_args__ = {
         "polymorphic_identity": "CollisionManagerDAO",
@@ -19322,11 +19292,6 @@ class CabinetDAO(
         nullable=True,
         use_existing_column=True,
     )
-    handle_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("HandleDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
     supporting_surface_id: Mapped[int] = mapped_column(
         ForeignKey("RegionDAO.database_id", use_alter=True),
         nullable=True,
@@ -19352,9 +19317,6 @@ class CabinetDAO(
         cascade="all, delete-orphan",
         foreign_keys="[CabinetDAO_doors_association.source_cabinetdao_id]",
         lazy="selectin",
-    )
-    handle: Mapped[HandleDAO] = relationship(
-        "HandleDAO", uselist=False, foreign_keys=[handle_id], post_update=True
     )
     objects: Mapped[builtins.list[CabinetDAO_objects_association]] = relationship(
         "CabinetDAO_objects_association",

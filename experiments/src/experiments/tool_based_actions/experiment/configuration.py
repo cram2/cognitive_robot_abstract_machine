@@ -79,6 +79,33 @@ class SpawnRegion:
         rows = int((self.maximum_y - self.minimum_y) / clearance) + 1
         return columns * rows
 
+    def inset(self, margin: float) -> SpawnRegion:
+        """
+        :param margin: Distance in meters to shrink the region by on every side.
+        :return: The shrunken region at the same height.
+        """
+        return SpawnRegion(
+            minimum_x=self.minimum_x + margin,
+            maximum_x=self.maximum_x - margin,
+            minimum_y=self.minimum_y + margin,
+            maximum_y=self.maximum_y - margin,
+            height=self.height,
+        )
+
+    def is_empty(self) -> bool:
+        """
+        :return: True if the region contains no points.
+        """
+        return self.maximum_x <= self.minimum_x or self.maximum_y <= self.minimum_y
+
+    def area(self) -> float:
+        """
+        :return: The area of the region in square meters.
+        """
+        if self.is_empty():
+            return 0.0
+        return (self.maximum_x - self.minimum_x) * (self.maximum_y - self.minimum_y)
+
 
 @dataclass(frozen=True)
 class TrialSpecification:
@@ -147,14 +174,58 @@ class ExperimentConfiguration:
     Smallest number of targets a trial spawns.
     """
 
-    maximum_targets_per_trial: int = 3
+    maximum_targets_per_trial: int = 30
     """
     Largest number of targets a trial spawns.
     """
 
+    targets_per_square_meter: float = 12.0
+    """
+    Target density on the spawn surfaces, clamped to the per-trial minimum and maximum.
+    """
+
     target_clearance: float = 0.35
     """
-    Minimum distance in meters between two spawned targets.
+    Minimum center distance in meters between two spawned targets.
+    """
+
+    footprint_clearance: float = 0.03
+    """
+    Minimum free gap in meters between the footprints of two spawned targets.
+    """
+
+    scale_choices: Tuple[float, ...] = (0.8, 1.0, 1.2, 1.4, 1.6)
+    """
+    Uniform scale factors a spawned target is randomly sized with.
+    """
+
+    footprint_safety_factor: float = 1.08
+    """
+    Factor the measured target footprint radius is inflated by during placement.
+    """
+
+    maximum_spawn_height: float = 1.35
+    """
+    Highest surface top in meters, in the world frame, targets are spawned on.
+    """
+
+    full_body_motion: bool = True
+    """
+    Allow the robot base to drive along during tool motions instead of keeping it fixed
+    at the navigated pose.
+    """
+
+    tool_path_pointer_stride: int = 10
+    """
+    Keep every Nth sampled tool path waypoint for execution.
+    """
+
+    collision_avoidance: bool = True
+    """
+    Avoid collisions with the environment during motions.
+
+    The tool motions themselves exempt the acting arm's manipulator, including the
+    mounted tool, so the tool can touch its target.
     """
 
     surface_names: Tuple[str, ...] = (
@@ -185,9 +256,10 @@ class ExperimentConfiguration:
     File the trial results are appended to, one JSON object per line.
     """
 
-    trial_timeout: float = 600.0
+    trial_timeout: float = 3600.0
     """
-    Wall-clock limit in seconds for a single trial process.
+    Wall-clock limit in seconds for a single trial process, sized for the density-based
+    target counts.
     """
 
     def build_trial_specifications(self) -> List[TrialSpecification]:
@@ -225,5 +297,6 @@ class ExperimentConfiguration:
         record["tasks"] = tuple(ToolBasedTask(task) for task in record["tasks"])
         record["seeds"] = tuple(record["seeds"])
         record["surface_names"] = tuple(record["surface_names"])
+        record["scale_choices"] = tuple(record["scale_choices"])
         record["results_file"] = Path(record["results_file"])
         return cls(**record)

@@ -35,7 +35,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     SetGripperAction,
 )
-from coraplex.testing import setup_world, start_visualization
+from coraplex.testing import setup_world
 
 from experiments.tool_based_actions.experiment.configuration import (
     ExperimentConfiguration,
@@ -48,12 +48,17 @@ from experiments.tool_based_actions.experiment.results import (
 )
 from experiments.tool_based_actions.experiment.scene import (
     SceneSampler,
+    discover_obstacles,
     discover_spawn_surfaces,
 )
 from experiments.tool_based_actions.experiment.task_definitions import (
     ExperimentTarget,
     ToolTaskDefinition,
     definition_for_task,
+)
+from experiments.tool_based_actions.experiment.visualization import (
+    TargetHighlight,
+    start_visualization_with_collision_markers,
 )
 
 logger = logging.getLogger(__name__)
@@ -110,27 +115,54 @@ class TrialRunner:
         :return: One result per target, in execution order.
         """
         world = setup_world()
-        start_visualization(world)
+        start_visualization_with_collision_markers(world)
         robot = PR2.from_world(world)
-        print(world.root)
+        robot.mobile_base.full_body_controlled = self.configuration.full_body_motion
         context = Context(world=world, robot=robot, _debug=False, ros_node=None)
         context.evaluate_conditions = False
 
-        definition = definition_for_task(self.specification.task)
+        definition = definition_for_task(
+            self.specification.task, self.configuration.tool_path_pointer_stride
+        )
+        targets = self._spawn_targets(world, robot, definition)
         tool = definition.attach_tool(world, robot)
-        targets = self._spawn_targets(world, definition)
 
         results = []
-        with simulated_robot:
+        self._park_robot(context, definition)
+        with simulated_robot(
+            collision_avoidance=self.configuration.collision_avoidance
+        ):
             for target in targets:
                 results.append(self._act_on_target(context, definition, tool, target))
         return results
 
+    def _park_robot(self, context: Context, definition: ToolTaskDefinition) -> None:
+        """
+        Bring the robot into its parked posture without collision avoidance.
+
+        The robot may spawn with its outstretched arms in contact with the environment,
+        so this first posture change must be free to leave those contacts before
+        collision avoidance takes over.
+
+        :param context: The plan context of the trial.
+        :param definition: The task definition providing the acting arm.
+        """
+        with simulated_robot(collision_avoidance=False):
+            sequential(
+                [
+                    SetGripperAction(definition.arm, GripperState.CLOSE),
+                    ParkArmsAction(Arms.BOTH),
+                    MoveTorsoAction(TorsoState.HIGH),
+                ],
+                context=context,
+            ).plan.perform()
+
     def _spawn_targets(
-        self, world: World, definition: ToolTaskDefinition
+        self, world: World, robot: PR2, definition: ToolTaskDefinition
     ) -> List[ExperimentTarget]:
         """
         :param world: The world to spawn into.
+        :param robot: The robot whose bodies must not act as spawn obstacles.
         :param definition: The task definition spawning the targets.
         :return: The spawned targets of this trial's seeded scene.
         """
@@ -140,20 +172,37 @@ class TrialRunner:
             margin=self.configuration.surface_margin,
             height_offset=self.configuration.spawn_height_offset,
         )
+        obstacles = discover_obstacles(
+            world, excluded_body_names={body.name.name for body in robot.bodies}
+        )
         sampler = SceneSampler(
             surfaces=surfaces,
             clearance=self.configuration.target_clearance,
             seed=self.specification.seed,
+            footprint=definition.target_footprint(
+                self.configuration.scale_choices,
+                self.configuration.footprint_safety_factor,
+            ),
+            obstacles=obstacles,
+            footprint_clearance=self.configuration.footprint_clearance,
+            maximum_spawn_height=self.configuration.maximum_spawn_height,
         )
-        count = sampler.sample_target_count(
+        count = sampler.target_count(
+            self.configuration.targets_per_square_meter,
             self.configuration.minimum_targets_per_trial,
             self.configuration.maximum_targets_per_trial,
         )
         placements = sampler.sample_placements(
             count,
             name_prefix=f"{self.specification.task.value}_{self.specification.seed}",
+            minimum_count=self.configuration.minimum_targets_per_trial,
         )
-        logger.info("Trial %s spawns %d targets.", self.specification.identifier, count)
+        logger.info(
+            "Trial %s spawns %d of %d desired targets.",
+            self.specification.identifier,
+            len(placements),
+            count,
+        )
         return [definition.spawn_target(world, placement) for placement in placements]
 
     def _act_on_target(
@@ -183,9 +232,10 @@ class TrialRunner:
             context=context,
         ).plan
 
-        start = time.monotonic()
-        failure_reason = self._perform_and_capture_failure(plan)
-        duration = time.monotonic() - start
+        with TargetHighlight(world=context.world, body=target.body):
+            start = time.monotonic()
+            failure_reason = self._perform_and_capture_failure(plan)
+            duration = time.monotonic() - start
 
         placement = target.placement
         return TargetResult(
@@ -198,6 +248,7 @@ class TrialRunner:
             target_x=placement.x,
             target_y=placement.y,
             target_yaw=placement.yaw,
+            target_scale=placement.scale,
             surface_name=placement.surface_name,
             success=failure_reason is None,
             duration=duration,

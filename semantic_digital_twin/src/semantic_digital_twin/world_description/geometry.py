@@ -388,12 +388,19 @@ class Mesh(Shape):
     scale: Scale = field(default_factory=Scale)
     """
     Scale of the mesh.
+
+    Assigning a new scale invalidates the cached mesh geometry.
     """
 
     filename: str = ""
     """
     Filename of the mesh.
     """
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "scale":
+            self.__dict__.pop("mesh", None)
+        super().__setattr__(name, value)
 
     @property
     def local_frame_bounding_box(self) -> BoundingBox:
