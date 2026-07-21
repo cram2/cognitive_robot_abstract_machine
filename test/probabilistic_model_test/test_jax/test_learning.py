@@ -12,6 +12,13 @@ from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import 
 )
 from probabilistic_model.probabilistic_circuit.jax.inner_layer import SparseSumLayer
 
+from probabilistic_model.probabilistic_circuit.jax.learning import (
+    calculate_edge_flows,
+)
+from probabilistic_model.probabilistic_circuit.jax.learning import (
+    prune_and_grow,
+)
+
 
 def create_tiny_dummy_circuit():
     """
@@ -120,6 +127,14 @@ def test_jax_structural_learning():
 
     assert pruned_circuit is not None
 
+    original_edges = circuit.root.log_weights[0].nse
+
+    pruned_edges = pruned_circuit.root.log_weights[0].nse
+
+    assert pruned_edges < original_edges, "Pruning did not remove any edges."
+
+    assert jnp.all(jnp.isfinite(pruned_circuit.root.log_weights[0].data))
+
     # -------------------------
     # GROW EXPANSION
     # -------------------------
@@ -127,17 +142,104 @@ def test_jax_structural_learning():
     expanded_circuit = grow_circuit(
         pruned_circuit,
         key,
+        grow_fraction=0.5,
         noise_scale=1e-3,
     )
 
-    expected_rows = pruned_circuit.root.log_weights[0].shape[0] * 2
+    initial_rows = pruned_circuit.root.log_weights[0].shape[0]
 
-    assert (
-        expanded_circuit.root.log_weights[0].shape[0] == expected_rows
-    ), "GROW failed to double the parent node capacity."
+    expanded_rows = expanded_circuit.root.log_weights[0].shape[0]
+
+    assert expanded_rows > initial_rows, "GROW failed to increase the number of nodes."
 
     # Check columns are still valid
     assert (
         expanded_circuit.root.log_weights[0].shape[1]
         == pruned_circuit.root.log_weights[0].shape[1]
     ), "Child dimension changed unexpectedly."
+
+
+def test_calculate_edge_flows():
+
+    circuit = create_tiny_dummy_circuit()
+
+    data = jnp.array(
+        [
+            [1.0, 2.0],
+            [3.0, 4.0],
+        ]
+    )
+
+    flows = calculate_edge_flows(
+        circuit,
+        data,
+    )
+
+    assert len(flows) == 1
+
+    assert flows[0].shape[0] == 4
+
+    assert jnp.all(flows[0] >= 0)
+
+
+def test_pruning_removes_low_flow_edges():
+
+    circuit = create_tiny_dummy_circuit()
+
+    data = jnp.array(
+        [
+            [1.0, 2.0],
+            [3.0, 4.0],
+        ]
+    )
+
+    pruned = prune_circuit_eflow(
+        circuit,
+        data,
+        prune_fraction=0.5,
+    )
+
+    assert pruned.root.log_weights[0].nse < circuit.root.log_weights[0].nse
+
+
+def test_growing_increases_nodes():
+
+    circuit = create_tiny_dummy_circuit()
+
+    key = jax.random.PRNGKey(0)
+
+    grown = grow_circuit(
+        circuit,
+        key,
+        grow_fraction=0.5,
+    )
+
+    assert grown.root.log_weights[0].shape[0] > circuit.root.log_weights[0].shape[0]
+
+
+def test_prune_and_grow_pipeline():
+
+    circuit = create_tiny_dummy_circuit()
+
+    data = jnp.array(
+        [
+            [1.0, 2.0],
+            [3.0, 4.0],
+        ]
+    )
+
+    key = jax.random.PRNGKey(0)
+
+    result = prune_and_grow(
+        circuit,
+        data,
+        key,
+        prune_fraction=0.5,
+        grow_fraction=0.5,
+    )
+
+    assert result is not None
+    assert isinstance(
+        result,
+        ProbabilisticCircuit,
+    )
