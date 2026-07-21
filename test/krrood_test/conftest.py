@@ -1,6 +1,7 @@
 import logging
 import os
 import tempfile
+import traceback
 from dataclasses import is_dataclass
 
 import pytest
@@ -33,11 +34,8 @@ from .dataset.example_classes import (
     ConceptType,
     JSONSerializableClass,
 )
-from .dataset.role_and_ontology import (
-    university_ontology_like_classes_without_descriptors,
-    role_takers_in_another_module,
-    classes_for_testing_role_recursion_error,
-)
+from .dataset.role_and_ontology import university_ontology_like_classes_without_descriptors, \
+    role_takers_in_another_module, classes_for_testing_role_recursion_error
 from .dataset.semantic_world_like_classes import *
 from .test_eql.conf.world.doors_and_drawers import DoorsAndDrawersWorld
 from .test_eql.conf.world.handles_and_containers import (
@@ -50,10 +48,9 @@ def generate_sqlalchemy_interface():
     """
     Generate the SQLAlchemy interface file before tests run.
 
-    This ensures the file exists before any imports attempt to use it,
-    solving krrood_test isolation issues when running all tests.
+    This ensures the file exists before any imports attempt to use it, solving
+    krrood_test isolation issues when running all tests.
     """
-
     # build the symbol graph
     SymbolGraph.clear()
     symbol_graph = SymbolGraph(packages=["krrood", "test.krrood"])
@@ -67,9 +64,7 @@ def generate_sqlalchemy_interface():
     all_classes |= set(classes_of_module(krrood.symbol_graph.symbol_graph))
     all_classes |= set(classes_of_module(example_classes))
     all_classes |= set(classes_of_module(semantic_world_like_classes))
-    all_classes |= set(
-        classes_of_module(university_ontology_like_classes_without_descriptors)
-    )
+    all_classes |= set(classes_of_module(university_ontology_like_classes_without_descriptors))
     all_classes |= set(classes_of_module(role_takers_in_another_module))
     all_classes |= set(classes_of_module(classes_for_testing_role_recursion_error))
     all_classes |= set(classes_of_module(alternative_mappings_construction_order))
@@ -126,7 +121,6 @@ def pytest_configure(config):
     """
     Set log levels before krrood_test collection.
     """
-
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
     logging.getLogger("numpy").setLevel(logging.WARNING)
 

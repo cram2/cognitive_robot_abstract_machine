@@ -493,8 +493,7 @@ class TestRotationMatrix:
 
     def test_quaternion_consistency(self):
         """
-        Test consistency between quaternion and rotation matrix
-        representations.
+        Test consistency between quaternion and rotation matrix representations.
         """
         # Create rotation via different methods
         r_rpy = RotationMatrix.from_rpy(0.1, 0.2, 0.3)
@@ -1982,7 +1981,7 @@ class TestQuaternion:
 
 
 def test_underspecification_of_vector():
-    q = a(Vector3)(x=1, y=2, z=3).resolve()
+    q = a(Vector3)(x=1, y=2, z=3)
     q = q.where(q.variable.x > 0)
     v1 = q.construct_instance()
     assert v1.x == 1
@@ -1991,7 +1990,7 @@ def test_underspecification_of_vector():
 
 
 def test_underspecification_of_transformation():
-    q = a(HomogeneousTransformationMatrix.from_xyz_rpy)(x=1).resolve()
+    q = a(HomogeneousTransformationMatrix.from_xyz_rpy)(x=1)
     q = q.where(q.variable.x > 0)
     t1 = q.construct_instance()
     assert t1.x == 1

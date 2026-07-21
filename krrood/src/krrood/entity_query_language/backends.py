@@ -45,11 +45,11 @@ class QueryBackend(ABC):
 
     opening_directive: ClassVar[Optional[Directive]] = None
     """
-    The opening verb a verbalization uses when this backend evaluates the
-    expression (``None`` keeps the query-type default).
+    The opening verb a verbalization uses when this backend evaluates the expression
+    (``None`` keeps the query-type default).
 
-    A backend declares its own performative so the verbalization layer
-    never inspects concrete backend types.
+    A backend declares its own performative so the verbalization layer never inspects
+    concrete backend types.
     """
 
     @abstractmethod
@@ -110,8 +110,7 @@ class GenerativeBackend(QueryBackend, ABC):
 @dataclass
 class SQLAlchemyBackend(SelectiveBackend):
     """
-    A backend that selects elements from a database that is available via
-    SQLAlchemy.
+    A backend that selects elements from a database that is available via SQLAlchemy.
     """
 
     session_maker: sessionmaker
@@ -141,11 +140,10 @@ class EntityQueryLanguageBackend(SelectiveBackend):
 @dataclass
 class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
     """
-    A generative backend that constructs new instances deterministically: it
-    treats a match's unspecified leaves as variables, enumerates every
-    combination over their (discrete) domains, constructs an instance per
-    combination via the type's constructor, and keeps those that satisfy the
-    match's ``where`` conditions.
+    A generative backend that constructs new instances deterministically: it treats a
+    match's unspecified leaves as variables, enumerates every combination over their
+    (discrete) domains, constructs an instance per combination via the type's
+    constructor, and keeps those that satisfy the match's ``where`` conditions.
     """
 
     def _evaluate(self, expression: Match[T]) -> Iterable[T]:
@@ -172,8 +170,7 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
         attribute_match: AttributeMatch,
     ) -> None:
         """
-        Raise if an assignment in the match cannot be used to generate
-        solutions.
+        Raise if an assignment in the match cannot be used to generate solutions.
 
         :param attribute_match: The attribute match to check.
         :raises UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration: If a
@@ -192,12 +189,11 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
         attribute_match: AttributeMatch,
     ) -> Selectable:
         """
-        Convert an attribute match into a variable to enumerate, handling
-        ellipsis assignments for enum fields and concrete values.
+        Convert an attribute match into a variable to enumerate, handling ellipsis
+        assignments for enum fields and concrete values.
 
         :param attribute_match: The attribute match to convert.
-        :return: A variable (or symbolic expression) representing the
-            attribute match.
+        :return: A variable (or symbolic expression) representing the attribute match.
         """
         if isinstance(attribute_match.assigned_value, type(Ellipsis)) and issubclass(
             attribute_match.assigned_variable._type_, enum.Enum
@@ -219,12 +215,9 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
         """
         Construct instances from the given match and enumerable variables.
 
-        :param expression: The match expression to construct instances
-            from.
-        :param variables: The variables to enumerate, keyed by access-
-            path name.
-        :return: A generator yielding an instance per variable
-            combination.
+        :param expression: The match expression to construct instances from.
+        :param variables: The variables to enumerate, keyed by access- path name.
+        :return: A generator yielding an instance per variable combination.
         """
         all_combinations = set_of(*variables.values())
         for combination in all_combinations._evaluate_natively_():
@@ -238,14 +231,14 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
 @dataclass
 class ProbabilisticBackend(GenerativeBackend):
     """
-    A backend that generates elements from a tractable probabilistic model
-    using a model registry.
+    A backend that generates elements from a tractable probabilistic model using a model
+    registry.
     """
 
     model_registry: ModelRegistry = field(default_factory=FullyFactorizedRegistry)
     """
-    A model registry that can be used to resolve match statements to
-    probabilistic models.
+    A model registry that can be used to resolve match statements to probabilistic
+    models.
     """
 
     number_of_samples: int = field(kw_only=True, default=50)

@@ -24,21 +24,27 @@ class DebugExpressionPublisher:
     """
     Visualizes the debug expressions registered by motion statechart nodes.
 
-    Harvests the spatial debug expressions of every compiled node and keeps them
-    updated as the robot moves by delegating to a :class:`SpatialTypePublisher`.
+    Harvests the spatial debug expressions of every compiled node and keeps them updated
+    as the robot moves by delegating to a :class:`SpatialTypePublisher`.
     """
 
     world: World
     """The world whose state the debug expressions are evaluated against."""
 
     node: Node
-    """The ROS2 node used to create the marker publisher."""
+    """
+    The ROS2 node used to create the marker publisher.
+    """
 
     _publisher: SpatialTypePublisher | None = field(init=False, default=None)
-    """The underlying publisher that renders and republishes the debug expressions."""
+    """
+    The underlying publisher that renders and republishes the debug expressions.
+    """
 
     def attach(self, motion_statechart: MotionStatechart) -> None:
-        """Register the spatial debug expressions of every node for live visualization."""
+        """
+        Register the spatial debug expressions of every node for live visualization.
+        """
         requests = [
             self._to_request(debug_expression)
             for debug_expression in motion_statechart.collect_debug_expressions()
@@ -51,7 +57,10 @@ class DebugExpressionPublisher:
     def _to_request(
         self, debug_expression: DebugExpression
     ) -> SpatialTypeVisualization:
-        """Build a visualization request from a debug expression, anchoring vectors correctly."""
+        """
+        Build a visualization request from a debug expression, anchoring vectors
+        correctly.
+        """
         expression = self._anchored_expression(debug_expression.expression)
         return SpatialTypeVisualization(
             spatial_type=expression,
@@ -61,7 +70,10 @@ class DebugExpressionPublisher:
         )
 
     def _anchored_expression(self, expression: SpatialType) -> SpatialType:
-        """Express a vector in its visualisation frame so the rendered arrow points correctly."""
+        """
+        Express a vector in its visualisation frame so the rendered arrow points
+        correctly.
+        """
         if not isinstance(expression, Vector3):
             return expression
         visualisation_frame = expression.visualisation_frame
@@ -73,6 +85,8 @@ class DebugExpressionPublisher:
         return self.world.transform(expression, visualisation_frame)
 
     def stop(self) -> None:
-        """Stop publishing and deregister from the world's state callbacks."""
+        """
+        Stop publishing and deregister from the world's state callbacks.
+        """
         if self._publisher is not None:
             self._publisher.stop()

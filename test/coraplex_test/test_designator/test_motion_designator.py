@@ -26,7 +26,9 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 try:
     from coraplex.alternative_motion_mappings.hsrb_motion_mapping import *
-    from giskardpy.motion_statechart.ros2_nodes.ros_tasks import NavigateActionServerTask
+    from giskardpy.motion_statechart.ros2_nodes.ros_tasks import (
+        NavigateActionServerTask,
+    )
 
     skip_tests = False
 except (ImportError, ModuleNotFoundError, AttributeError):

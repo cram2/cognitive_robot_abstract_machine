@@ -48,8 +48,8 @@ class Item(Symbol):
 
 def test_explain_inference_basic():
     """
-    Test that explain_inference correctly records and retrieves the stack for a
-    simple inference.
+    Test that explain_inference correctly records and retrieves the stack for a simple
+    inference.
     """
     # 1. Define the query
     # The stack captured should point here
@@ -74,8 +74,8 @@ def test_explain_inference_basic():
 
 def test_explain_inference_nested():
     """
-    Test that explain_inference correctly records and retrieves the stack
-    through nested function calls.
+    Test that explain_inference correctly records and retrieves the stack through nested
+    function calls.
     """
 
     def create_person_query(name):
@@ -109,8 +109,8 @@ def test_explain_inference_nested():
 
 def test_explain_inference_multiple_instances():
     """
-    Test that different instances from the same inference variable have the
-    same stack in their explanation.
+    Test that different instances from the same inference variable have the same stack
+    in their explanation.
     """
     from krrood.entity_query_language.factories import variable_from
 
@@ -140,8 +140,8 @@ def test_explain_inference_multiple_instances():
 
 def test_explain_inference_deeply_nested():
     """
-    Test that explain_inference correctly records and retrieves the stack
-    through deeply nested function calls.
+    Test that explain_inference correctly records and retrieves the stack through deeply
+    nested function calls.
     """
 
     def level_4(name):
@@ -270,8 +270,7 @@ def _get_true_results(query: Query):
 
 def _get_satisfied_names(ids, condition_root):
     """
-    Get expression names from satisfied condition IDs by traversing the
-    condition tree.
+    Get expression names from satisfied condition IDs by traversing the condition tree.
     """
     all_cond = [condition_root] + list(condition_root._descendants_)
     return {e._name_ for e in all_cond if e._id_ in ids}
@@ -510,8 +509,7 @@ def test_condition_graph_pipeline_not():
 
 def test_condition_graph_pipeline_no_conditions():
     """
-    explain_inference → condition_graph() returns None when no conditions
-    exist.
+    explain_inference → condition_graph() returns None when no conditions exist.
     """
     val = variable_from([1, 2])
     query = entity(inference(Item)(value=val))
@@ -526,8 +524,7 @@ def test_condition_graph_pipeline_no_conditions():
 
 def test_condition_graph_pipeline_or_short_circuit():
     """
-    OR short-circuits: satisfied comparator recorded, short-circuited one is
-    not.
+    OR short-circuits: satisfied comparator recorded, short-circuited one is not.
     """
     val = variable_from([6])
     query = entity(inference(Item)(value=val)).where(or_(val > 5, val < 10))
@@ -631,8 +628,7 @@ def test_condition_graph_pipeline_non_symbol():
 
 def test_query_graph_satisfaction_colors():
     """
-    Unsatisfied nodes get red borders; satisfied nodes keep full color and no
-    border.
+    Unsatisfied nodes get red borders; satisfied nodes keep full color and no border.
     """
     from krrood.entity_query_language.query_graph import ColorLegend
 
@@ -805,13 +801,12 @@ def test_nested_rule_meta_queries(drawer_rule):
 
 def test_explanation_lifecycle_tied_to_instance():
     """
-    InferenceExplanation must not keep the inferred instance (or its World)
-    alive after all external references are released.
+    InferenceExplanation must not keep the inferred instance (or its World) alive after
+    all external references are released.
 
-    The world is created directly inside a helper closure so that no
-    pytest fixture machinery holds an external strong reference — pytest
-    keeps fixture return-values alive for the duration of the test
-    function even after an explicit ``del``.
+    The world is created directly inside a helper closure so that no pytest fixture
+    machinery holds an external strong reference — pytest keeps fixture return-values
+    alive for the duration of the test function even after an explicit ``del``.
     """
     import weakref
     from ..test_eql.conf.world.doors_and_drawers import DoorsAndDrawersWorld

@@ -18,7 +18,7 @@ from typing_extensions import Type, List
 class PerceptionQuery:
     semantic_annotation: Type[SemanticAnnotation]
     """
-    The semantic annotation for which to perceive
+    The semantic annotation for which to perceive.
     """
 
     region: BoundingBox
@@ -27,8 +27,8 @@ class PerceptionQuery:
     """
 
     robot: AbstractRobot
-    """'
-    Robot annotation of the robot that should perceive the object.
+    """
+    ' Robot annotation of the robot that should perceive the object.
     """
 
     world: World

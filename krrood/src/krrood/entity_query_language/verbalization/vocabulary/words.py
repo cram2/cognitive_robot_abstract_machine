@@ -26,7 +26,9 @@ class PlainWord:
     """
 
     text: str
-    """The raw English text (e.g. ``"of"``, ``"and"``, ``"the"``, ``"ascending"``)."""
+    """
+    The raw English text (e.g. ``"of"``, ``"and"``, ``"the"``, ``"ascending"``).
+    """
 
     def as_fragment(self) -> WordFragment:
         """:return: A neutral word fragment.
@@ -40,12 +42,14 @@ class PlainWord:
 @dataclass(frozen=True)
 class PunctuationWord(PlainWord):
     """
-    A punctuation token carrying an orthographic spacing feature, so the orthography pass drops
-    the space adjacent to it.
+    A punctuation token carrying an orthographic spacing feature, so the orthography
+    pass drops the space adjacent to it.
     """
 
     spacing: Spacing = Spacing.NONE
-    """Which side hugs its neighbour (``LEFT`` for *","* / *")"*; ``RIGHT`` for *"("*)."""
+    """
+    Which side hugs its neighbour (``LEFT`` for *","* / *")"*; ``RIGHT`` for *"("*).
+    """
 
     def as_fragment(self) -> WordFragment:
         """:return: A role-less word fragment carrying this token's spacing.
@@ -65,10 +69,14 @@ class RoleWord:
     """
 
     text: str
-    """The raw English text."""
+    """
+    The raw English text.
+    """
 
     _role_: ClassVar[SemanticRole]
-    """The semantic role for this word type (set by each subclass)."""
+    """
+    The semantic role for this word type (set by each subclass).
+    """
 
     def as_fragment(self) -> RoleFragment:
         """:return: A role-tagged fragment, carrying the ``_role_`` its subclass declares.
@@ -80,13 +88,17 @@ class RoleWord:
 
 
 class KeyWord(RoleWord):
-    """EQL structure keyword with the ``KEYWORD`` role."""
+    """
+    EQL structure keyword with the ``KEYWORD`` role.
+    """
 
     _role_ = SemanticRole.KEYWORD
 
 
 class LogicalWord(RoleWord):
-    """Logical connective with the ``LOGICAL`` role."""
+    """
+    Logical connective with the ``LOGICAL`` role.
+    """
 
     _role_ = SemanticRole.LOGICAL
 
@@ -99,19 +111,26 @@ class AggregationWord(RoleWord):
 
     _role_ = SemanticRole.AGGREGATION
     child_form: Optional[GrammaticalNumber] = GrammaticalNumber.PLURAL
-    """The grammatical number the child expression is rendered in (*"sum of amounts"* → plural,
-    *"maximum of the amount"* → singular), or ``None`` for a childless aggregate (*"count of all"*)."""
+    """
+    The grammatical number the child expression is rendered in (*"sum of amounts"* →
+    plural, *"maximum of the amount"* → singular), or ``None`` for a childless aggregate
+    (*"count of all"*).
+    """
 
 
 class OperatorWord(RoleWord):
-    """Comparison operator phrase with the ``OPERATOR`` role."""
+    """
+    Comparison operator phrase with the ``OPERATOR`` role.
+    """
 
     _role_ = SemanticRole.OPERATOR
 
 
 class PronounWord(RoleWord):
     """
-    A coreference pronoun (e.g. *"its"*) standing in for a previously introduced variable.
+    A coreference pronoun (e.g. *"its"*) standing in for a previously introduced
+    variable.
+
     Carries the ``VARIABLE`` role so it is coloured like the variable it refers to.
     """
 
@@ -123,33 +142,49 @@ class OperatorPhrase:
     """
     All eight text variants for one comparison operator, co-located.
 
-    The three boolean flags ``negated``, ``compact``, and ``temporal`` select among the eight
-    fields.
+    The three boolean flags ``negated``, ``compact``, and ``temporal`` select among the
+    eight fields.
     """
 
     standard: str
-    """Default form (e.g. ``"is greater than"``)."""
+    """
+    Default form (e.g. ``"is greater than"``).
+    """
 
     compact: str
-    """Copula-less form used in HAVING clauses (e.g. ``"greater than"``)."""
+    """
+    Copula-less form used in HAVING clauses (e.g. ``"greater than"``).
+    """
 
     negated: str
-    """Negated form (e.g. ``"is not greater than"``)."""
+    """
+    Negated form (e.g. ``"is not greater than"``).
+    """
 
     negated_compact: str
-    """Negated copula-less form (e.g. ``"not greater than"``)."""
+    """
+    Negated copula-less form (e.g. ``"not greater than"``).
+    """
 
     temporal: str = ""
-    """Temporal standard form (e.g. ``"is after"``)."""
+    """
+    Temporal standard form (e.g. ``"is after"``).
+    """
 
     temporal_compact: str = ""
-    """Temporal compact form (e.g. ``"after"``)."""
+    """
+    Temporal compact form (e.g. ``"after"``).
+    """
 
     temporal_negated: str = ""
-    """Temporal negated form (e.g. ``"is no later than"``)."""
+    """
+    Temporal negated form (e.g. ``"is no later than"``).
+    """
 
     temporal_negated_compact: str = ""
-    """Temporal negated compact form (e.g. ``"no later than"``)."""
+    """
+    Temporal negated compact form (e.g. ``"no later than"``).
+    """
 
     def select(
         self, *, negated: bool = False, compact: bool = False, temporal: bool = False
@@ -196,8 +231,8 @@ class VocabEnum(Enum):
     """
     Enum mixin for enums whose member values are word instances.
 
-    Delegates ``as_fragment()`` and ``text`` to the dataclass stored in ``.value`` so callers
-    never write ``.value`` explicitly.
+    Delegates ``as_fragment()`` and ``text`` to the dataclass stored in ``.value`` so
+    callers never write ``.value`` explicitly.
     """
 
     def as_fragment(self) -> VerbalizationFragment:

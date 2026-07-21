@@ -1,4 +1,5 @@
-"""Analysis engine demonstrating parallel processing capabilities.
+"""
+Analysis engine demonstrating parallel processing capabilities.
 
 This module provides an analysis engine that demonstrates how to implement
 parallel processing within a pipeline. It shows how to configure and execute
@@ -26,11 +27,14 @@ from robokudo.annotators.pipeline_trigger import PipelineTrigger
 from robokudo.annotators.testing import SlowAnnotator
 from robokudo.tree_components.better_parallel import Parallel, ParallelPolicy
 from robokudo.pipeline import Pipeline
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine demonstrating parallel processing capabilities.
+    """
+    Analysis engine demonstrating parallel processing capabilities.
 
     This class implements a pipeline that demonstrates parallel execution of
     annotators. It uses the BetterParallel component with a synchronized
@@ -50,14 +54,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "parallel"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline with parallel processing capabilities.
+        """
+        Create a pipeline with parallel processing capabilities.
 
         This method constructs a processing pipeline that demonstrates parallel
         execution of annotators. It configures two slow annotators to run in
@@ -75,7 +81,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with parallel processing
         """
-        kinect_config = CrDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
 
         seq = Pipeline("RWPipeline")
         # parallel = py_trees.composites.Parallel()

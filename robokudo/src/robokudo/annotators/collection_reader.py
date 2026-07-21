@@ -18,18 +18,21 @@ The module uses:
    This is typically the first annotator in a pipeline.
 """
 
+from __future__ import annotations
+
 from timeit import default_timer as timer
-from typing_extensions import Optional, List
 
 from py_trees.common import Status
 from py_trees.composites import Sequence
 from py_trees.display import unicode_tree
+from typing_extensions import TYPE_CHECKING, List, Optional
 
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.io.camera_interface import CameraInterface
-from robokudo.cas import CASViews
-from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
-import robokudo.world
+from robokudo.descriptors.camera_configs.components import TfComponent
+
+if TYPE_CHECKING:
+    from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
+    from robokudo.io.camera_interface import CameraInterface
 
 
 class CollectionReaderAnnotator(BaseAnnotator):
@@ -65,28 +68,28 @@ class CollectionReaderAnnotator(BaseAnnotator):
                 """Parameters for configuring collection reader."""
 
                 def __init__(self) -> None:
-                    self.camera_config = camera_config
+                    self.camera_config: BaseCameraConfig = camera_config
                     """Configuration for camera interface"""
 
-                    self.camera_interface = camera_interface
+                    self.camera_interface: CameraInterface = camera_interface
                     """Interface for reading camera data"""
 
             self.parameters = Parameters()
 
     def __init__(
         self,
-        descriptor: "CollectionReaderAnnotator.Descriptor",
+        descriptor: CollectionReaderAnnotator.Descriptor,
         name: str = "CollectionReader",
     ) -> None:
         """Initialize the collection reader.
 
         :param descriptor: Configuration descriptor
-        :param name: Name of this annotator instance, defaults to "CollectionReader"
+        :param name: Name of this annotator instance
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
-        self.collection_readers: List["CollectionReaderAnnotator.Descriptor"] = [
+        self.collection_readers: List[CollectionReaderAnnotator.Descriptor] = [
             descriptor
         ]
         self.start_timer: Optional[float] = None
@@ -111,7 +114,7 @@ class CollectionReaderAnnotator(BaseAnnotator):
             child.feedback_message = ""
 
     def add_collection_reader(
-        self, descriptor: "CollectionReaderAnnotator.Descriptor"
+        self, descriptor: CollectionReaderAnnotator.Descriptor
     ) -> None:
         """Add another collection reader descriptor.
 
@@ -157,12 +160,13 @@ class CollectionReaderAnnotator(BaseAnnotator):
             self.rk_logger.debug("Waited for %f seconds \n" % time_difference)
             self.start_timer = None
             pipeline = self.get_parent_pipeline()
+            if pipeline is None:
+                self.feedback_message = "Pipeline is not set!"
+                return Status.FAILURE
 
             # Special case: If there is already a query present in this CAS, we need to temporarily save it and set
             # it in the new CAS
-            query = None
-            if pipeline.cas.contains(CASViews.QUERY):
-                query = pipeline.cas.get(CASViews.QUERY)
+            query = pipeline.cas.query
 
             # Create a fresh CAS for the pipeline
             pipeline.create_new_cas()
@@ -170,12 +174,15 @@ class CollectionReaderAnnotator(BaseAnnotator):
                 f"{self.__class__.__name__}.update(): New CAS id={pipeline.cas.cas_id}"
             )
 
-            # Create a fresh world
-            robokudo.world.clear_world()
+            camera_config = self.descriptor.parameters.camera_config
+            if issubclass(type(camera_config), TfComponent):
+                cas = self.get_cas()
+                cas.world_frame = camera_config.tf_to
+                cas.camera_frame = camera_config.tf_from
 
             # Restore any existing queries
             if query:
-                pipeline.cas.set(robokudo.cas.CASViews.QUERY, query)
+                pipeline.cas.query = query
 
             for collection_reader in self.collection_readers:
                 collection_reader.parameters.camera_interface.set_data(self.get_cas())
@@ -217,7 +224,6 @@ class CollectionReaderAnnotator(BaseAnnotator):
         )
 
 
-"""ROS1 TO ROS2 
-The setup method in the ROS2 version has three parameters (timeout, node, visitor) 
-n the ROS2 version, STATUS are referenced as py_trees.common.Status.RUNNING and py_trees.common.Status.SUCCESS
-"""
+# ROS1 TO ROS2
+# The setup method in the ROS2 version has three parameters (timeout, node, visitor)
+# n the ROS2 version, STATUS are referenced as py_trees.common.Status.RUNNING and py_trees.common.Status.SUCCESS

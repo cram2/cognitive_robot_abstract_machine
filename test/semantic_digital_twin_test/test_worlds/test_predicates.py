@@ -547,7 +547,9 @@ def test_empty_gripper_is_not_holding_something():
 
     @dataclass(eq=False)
     class ReviewEndEffector(EndEffector):
-        """Minimal concrete EndEffector for predicate tests."""
+        """
+        Minimal concrete EndEffector for predicate tests.
+        """
 
         def setup_hardware_interfaces(self):
             pass
@@ -590,7 +592,9 @@ def test_empty_gripper_is_not_holding_something():
 
 @dataclass(eq=False)
 class ReviewCamera(Camera):
-    """Minimal concrete Camera for predicate tests."""
+    """
+    Minimal concrete Camera for predicate tests.
+    """
 
     def setup_hardware_interfaces(self):
         pass

@@ -28,22 +28,24 @@ class Redraw(BaseAnnotator):
     """
     Annotator for triggering visualization updates.
 
-    This annotator sets the redraw flag on the pipeline to make
-    visualizers show the latest visualization output.
+    This annotator sets the redraw flag on the pipeline to make visualizers show the
+    latest visualization output.
     """
 
     def __init__(self, name: str = "Redraw") -> None:
-        """Initialize the redraw annotator.
+        """
+        Initialize the redraw annotator.
 
-        :param name: Annotator name, defaults to "Redraw"
+        :param name: Annotator name
         """
         super().__init__(name=name)
 
     def update(self) -> Status:
-        """Set redraw flag to trigger visualization update.
+        """
+        Set redraw flag to trigger visualization update.
 
-        Gets the annotator output pipeline map and sets the redraw
-        flag for the current pipeline.
+        Gets the annotator output pipeline map and sets the redraw flag for the current
+        pipeline.
 
         :return: SUCCESS status
         """

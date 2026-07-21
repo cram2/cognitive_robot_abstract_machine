@@ -31,25 +31,45 @@ ROLE_COLORS: dict[SemanticRole, Optional[str]] = {
 
 
 class BulletStyle(StrEnum):
-    """Bullet character used for hierarchical list items."""
+    """
+    Bullet character used for hierarchical list items.
+    """
 
     DASH = "-"
-    """A hyphen bullet."""
+    """
+    A hyphen bullet.
+    """
+
     DOT = "•"
-    """A round bullet."""
+    """
+    A round bullet.
+    """
+
     ASTERISK = "*"
-    """An asterisk bullet."""
+    """
+    An asterisk bullet.
+    """
 
 
 class IndentSize(StrEnum):
-    """Indentation string used per nesting level in hierarchical rendering."""
+    """
+    Indentation string used per nesting level in hierarchical rendering.
+    """
 
     TWO_SPACES = "  "
-    """Two-space indent (the default)."""
+    """
+    Two-space indent (the default).
+    """
+
     FOUR_SPACES = "    "
-    """Four-space indent."""
+    """
+    Four-space indent.
+    """
+
     TAB = "\t"
-    """Hard tab character."""
+    """
+    Hard tab character.
+    """
 
 
 def detect_osc8_support() -> bool:
@@ -84,31 +104,38 @@ class Formatter(ABC):
 
         :param text: Plain display text to colourize.
         :param role: Semantic role determining the colour.
-        :return: Coloured string (or *text* unchanged when no colour is defined for *role*).
+        :return: Coloured string (or *text* unchanged when no colour is defined for
+            *role*).
         """
         ...
 
     @property
     @abstractmethod
     def space(self) -> str:
-        """Inline word separator character(s) (e.g. ``" "`` or ``"&nbsp;"``)."""
+        """
+        Inline word separator character(s) (e.g. ``" "`` or ``"&nbsp;"``).
+        """
         ...
 
     @property
     @abstractmethod
     def newline(self) -> str:
-        """Line break character(s) (e.g. ``"\\n"`` or ``"<br>"``)."""
+        """
+        Line break character(s) (e.g. ``"\\n"`` or ``"<br>"``).
+        """
         ...
 
     def wrap_link(self, text: str, url: str, tooltip: Optional[str] = None) -> str:
         """
         Wrap already-rendered *text* with a hyperlink to *url*.
 
-        The base implementation is a no-op (hyperlinks are not supported for this format).
+        The base implementation is a no-op (hyperlinks are not supported for this
+        format).
 
         :param text: Already-colourized display text.
         :param url: Destination URL.
-        :param tooltip: Optional single-line docstring summary shown on hover (HTML-escaped).
+        :param tooltip: Optional single-line docstring summary shown on hover (HTML-
+            escaped).
         :return: *text* unchanged (base); linked string (subclasses).
         """
         return text
@@ -121,7 +148,9 @@ class PlainFormatter(Formatter):
     """
 
     def colorize(self, text: str, role: SemanticRole) -> str:
-        """Return *text* unchanged (no colour markup in plain mode)."""
+        """
+        Return *text* unchanged (no colour markup in plain mode).
+        """
         return text
 
     @property
@@ -138,13 +167,13 @@ class ANSIFormatter(Formatter):
     """
     True-color ANSI escape sequences (24-bit, ``\\033[38;2;R;G;Bm``).
 
-    Compatible with VS Code terminal, GNOME Terminal, iTerm2, Windows Terminal,
-    and any terminal supporting the ISO-8613-3 direct-color extension.
+    Compatible with VS Code terminal, GNOME Terminal, iTerm2, Windows Terminal, and any
+    terminal supporting the ISO-8613-3 direct-color extension.
 
-    OSC 8 hyperlinks are enabled automatically when the terminal is detected as
-    capable (``VTE_VERSION``, ``TERM_PROGRAM`` in ``{vscode, WezTerm, iTerm.app}``,
-    or ``TERM=xterm-kitty``).  On unsupported terminals links fall back to plain
-    coloured text with no link markup.
+    OSC 8 hyperlinks are enabled automatically when the terminal is detected as capable
+    (``VTE_VERSION``, ``TERM_PROGRAM`` in ``{vscode, WezTerm, iTerm.app}``, or
+    ``TERM=xterm-kitty``).  On unsupported terminals links fall back to plain coloured
+    text with no link markup.
     """
 
     _RESET: ClassVar[str] = "\033[0m"
@@ -176,7 +205,10 @@ class ANSIFormatter(Formatter):
         return "\n"
 
     def _hex_to_rgb(self, color: str) -> tuple[int, int, int]:
-        """Convert a hex colour string (e.g. ``\"#ff7f0e\"``) or named colour to an ``(R, G, B)`` tuple."""
+        """
+        Convert a hex colour string (e.g. ``\"#ff7f0e\"``) or named colour to an ``(R,
+        G, B)`` tuple.
+        """
         if color.startswith("#"):
             h = color.lstrip("#")
             return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
@@ -186,11 +218,11 @@ class ANSIFormatter(Formatter):
 @dataclass
 class HTMLFormatter(Formatter):
     """
-    HTML output with ``<span style="color: …">`` colour tags, ``&nbsp;`` spaces,
-    and ``<br>`` newlines.
+    HTML output with ``<span style="color: …">`` colour tags, ``&nbsp;`` spaces, and
+    ``<br>`` newlines.
 
-    Suitable for Jupyter notebooks, GitLab Markdown, and any renderer that
-    passes through inline HTML.  Hyperlinks use standard ``<a href="…">`` anchors.
+    Suitable for Jupyter notebooks, GitLab Markdown, and any renderer that passes
+    through inline HTML.  Hyperlinks use standard ``<a href="…">`` anchors.
     """
 
     def colorize(self, text: str, role: SemanticRole) -> str:

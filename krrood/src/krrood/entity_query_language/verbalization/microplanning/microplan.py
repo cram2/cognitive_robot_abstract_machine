@@ -26,8 +26,11 @@ class Microplan:
     """
 
     _cache: Dict[Tuple[int, type], object] = field(default_factory=dict)
-    """Memoised plans keyed by ``(id(node), planner)`` — node *identity* (not equality, which EQL
-    overrides to build comparators) paired with the planner that produced the plan."""
+    """
+    Memoised plans keyed by ``(id(node), planner)`` — node *identity* (not equality,
+    which EQL overrides to build comparators) paired with the planner that produced the
+    plan.
+    """
 
     def plan_for(
         self,

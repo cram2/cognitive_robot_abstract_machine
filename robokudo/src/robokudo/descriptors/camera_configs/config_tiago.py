@@ -19,7 +19,8 @@ class TiagoCameraConfig(
     StableViewpointComponent,
     WorldDescriptorComponent,
 ):
-    """Configuration class for the TIAGo robot's Xtion camera.
+    """
+    Configuration class for the TIAGo robot's Xtion camera.
 
     This class defines the configuration parameters for the Xtion RGB-D camera
     mounted on the TIAGo robot. It includes settings for camera interface,
@@ -36,7 +37,7 @@ class TiagoCameraConfig(
 
     topic_depth: str = "/xtion/depth_registered/image_raw/compressedDepth"
 
-    topic_cam_info: str = "/xtion/rgb/camera_info"
+    topic_camera_info: str = "/xtion/rgb/camera_info"
 
     topic_color: str = "/xtion/rgb/image_raw/compressed"
 

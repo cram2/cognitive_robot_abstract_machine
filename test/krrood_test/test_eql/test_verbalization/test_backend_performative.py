@@ -1,10 +1,10 @@
 """
-The opening verb (performative) of a verbalized query depends on the *backend*
-it would be evaluated with, not only on the query type: a generative backend
-reads *"Generate"*, a selective backend reads *"Find"*.
+The opening verb (performative) of a verbalized query depends on the *backend* it would
+be evaluated with, not only on the query type: a generative backend reads *"Generate"*,
+a selective backend reads *"Find"*.
 
-With no backend the verb falls back to the query-type default (a match
-generates, a plain query finds), so all existing output is unchanged.
+With no backend the verb falls back to the query-type default (a match generates, a
+plain query finds), so all existing output is unchanged.
 """
 
 from __future__ import annotations
@@ -43,8 +43,8 @@ def test_match_without_backend_defaults_to_generate():
 
 def test_match_with_selective_backend_reads_find():
     """
-    A selective backend turns the match's verb into *"Find"* (it searches
-    existing data).
+    A selective backend turns the match's verb into *"Find"* (it searches existing
+    data).
     """
     text = verbalize_expression(a(Position)(x=1), backend=EntityQueryLanguageBackend())
     assert text.startswith("Find")

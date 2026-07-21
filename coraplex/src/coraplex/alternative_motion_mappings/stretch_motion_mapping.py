@@ -23,8 +23,9 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[Stretch]):
     """
-    Better motions for stretch to move the tool center point to the given goal, first rotates the base such that the
-    gripper is pointing at the goal pose and then uses full body control to move the TCP to the goal.
+    Better motions for stretch to move the tool center point to the given goal, first
+    rotates the base such that the gripper is pointing at the goal pose and then uses
+    full body control to move the TCP to the goal.
     """
 
     execution_type = ExecutionType.SIMULATED, ExecutionType.REAL
@@ -59,7 +60,8 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
 
 class StretchMoveSim(MoveMotion, AlternativeMotion[Stretch]):
     """
-    Different giskard goal for moving stretch to a goal pose, this uses a goal optimal for a diff drive
+    Different giskard goal for moving stretch to a goal pose, this uses a goal optimal
+    for a diff drive.
     """
 
     execution_type = ExecutionType.SIMULATED
@@ -76,7 +78,8 @@ class StretchMoveSim(MoveMotion, AlternativeMotion[Stretch]):
 
 class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
     """
-    Uses a Giskard differential drive goal to move the Stretch base during real execution.
+    Uses a Giskard differential drive goal to move the Stretch base during real
+    execution.
     """
 
     execution_type = ExecutionType.REAL
@@ -100,8 +103,10 @@ class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
 
 class StretchClose(ClosingMotion, AlternativeMotion[Stretch]):
     """
-    Optimized close motion for the stretch robot. This puts the stretch directly in front of the container while holding
-    the handle and then pushes it arm forward to close the container.
+    Optimized close motion for the stretch robot.
+
+    This puts the stretch directly in front of the container while holding the handle
+    and then pushes it arm forward to close the container.
     """
 
     execution_type = ExecutionType.SIMULATED

@@ -38,11 +38,13 @@ TRANSIENT_TYPE_RESOLUTION_ERRORS = (
     TypeError,
     CouldNotResolveType,
 )
-"""Exceptions raised while importing and resolving a field's type annotation when that type is
-not yet available (typically a circular import during module load). They are transient: the field
-is narrowed later, once a subclass binds the parameter to a concrete type. Any other exception is
-a genuine fault and is left to propagate."""
+"""
+Exceptions raised while importing and resolving a field's type annotation when that type
+is not yet available (typically a circular import during module load).
 
+They are transient: the field is narrowed later, once a subclass binds the parameter to
+a concrete type. Any other exception is a genuine fault and is left to propagate.
+"""
 
 ResolvableType: TypeAlias = (
     type
@@ -84,10 +86,9 @@ class SubClassSafeGeneric(ABC):
 
     def __init_subclass__(cls, **kwargs):
         """
-        Automatically updates the field types that use the generic type parameters with the new
-        specified types, before the class is initialized.
+        Automatically updates the field types that use the generic type parameters with
+        the new specified types, before the class is initialized.
         """
-
         substitutions = cls._get_generic_type_substitutions()
         if not substitutions:
             return
@@ -122,21 +123,21 @@ class SubClassSafeGeneric(ABC):
         """
         return get_generic_type_parameters(cls, SubClassSafeGeneric)
 
-
     @staticmethod
     def _substitutions_bind_a_concrete_type(
         substitutions: Dict[Any, ResolvableType],
     ) -> bool:
         """
-        Report whether the substitution map assigns at least one type parameter to a concrete type,
-        rather than only renaming type variables.
+        Report whether the substitution map assigns at least one type parameter to a
+        concrete type, rather than only renaming type variables.
 
-        When resolution fails, this distinguishes a genuine loss (a field would have been narrowed
-        to a concrete type — worth a warning) from a pure type-variable rename (a no-op).
+        When resolution fails, this distinguishes a genuine loss (a field would have
+        been narrowed to a concrete type — worth a warning) from a pure type-variable
+        rename (a no-op).
 
         :param substitutions: The substitution map that could not be applied.
-        :return: True if any substitution assigns a concrete type; False if every substitution only
-            renames a type variable, or the map is empty.
+        :return: True if any substitution assigns a concrete type; False if every
+            substitution only renames a type variable, or the map is empty.
         """
         return any(
             not isinstance(value, (TypeVar, TypeVarTuple))
@@ -189,12 +190,11 @@ class SubClassSafeGeneric(ABC):
         """
         Get the generic type substitutions for this class.
 
-        :return: A mapping from each old generic type (as declared on the parent class) to the
-            new generic type used by this class, for every position whose binding changed.
+        :return: A mapping from each old generic type (as declared on the parent class)
+            to the new generic type used by this class, for every position whose binding
+            changed.
         """
-        if cls is SubClassSafeGeneric or not issubclass(
-            cls, SubClassSafeGeneric
-        ):
+        if cls is SubClassSafeGeneric or not issubclass(cls, SubClassSafeGeneric):
             return {}
 
         # Use a class-level cache to avoid redundant recursive calculations
@@ -205,9 +205,7 @@ class SubClassSafeGeneric(ABC):
         substitutions = {}
         for base in getattr(cls, "__orig_bases__", []):
             base_origin, resolved_types = cls._resolve_base_origin_and_arguments(base)
-            if base_origin is None or not issubclass(
-                base_origin, SubClassSafeGeneric
-            ):
+            if base_origin is None or not issubclass(base_origin, SubClassSafeGeneric):
                 continue
 
             # Map the root TypeVars of the base to the concrete arguments provided here
@@ -234,10 +232,12 @@ class SubClassSafeGeneric(ABC):
         resolved_types: tuple[type, ...],
     ) -> dict[Any, ResolvableType]:
         """
-        Retrieves resolved type substitutions for a given base origin and resolved types.
+        Retrieves resolved type substitutions for a given base origin and resolved
+        types.
 
         :param base_origin: The base origin type for which substitutions are retrieved.
-        :param resolved_types: The resolved types to match against the base origin's generic parameters.
+        :param resolved_types: The resolved types to match against the base origin's
+            generic parameters.
         :return: A dictionary of resolved type substitutions.
         """
         root_parameters = get_generic_type_parameters(
@@ -281,7 +281,8 @@ class SubClassSafeGeneric(ABC):
         new_type: type | tuple[type, ...] | None,
     ) -> bool:
         """
-        Determines if a substitution condition is fulfilled based on the old and new types.
+        Determines if a substitution condition is fulfilled based on the old and new
+        types.
 
         :param old_type: The old type to compare against.
         :param new_type: The new type to compare with.
@@ -312,7 +313,8 @@ class SubClassSafeGeneric(ABC):
         base_origin: type,
     ) -> list[tuple[type, type]]:
         """
-        Matches type variables in a tuple with resolved types, considering prefix and suffix lengths.
+        Matches type variables in a tuple with resolved types, considering prefix and
+        suffix lengths.
 
         :param type_var_tuple_index: Index of the TypeVarTuple within root_parameters.
         :param root_parameters: List of root parameters to match against resolved types.

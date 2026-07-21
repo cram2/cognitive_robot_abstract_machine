@@ -9,3 +9,4 @@ pydot
 # rustworkx_utils requirements:
 matplotlib
 igraph
+pyyaml

@@ -8,7 +8,9 @@ def test_classes_of_package():
 
 
 def test_classes_of_package_with_plain_module():
-    """classes_of_package should handle a plain module (no __path__) gracefully."""
+    """
+    classes_of_package should handle a plain module (no __path__) gracefully.
+    """
     import krrood.exceptions
 
     assert not hasattr(krrood.exceptions, "__path__")

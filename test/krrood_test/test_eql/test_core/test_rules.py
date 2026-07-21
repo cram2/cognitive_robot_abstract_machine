@@ -12,6 +12,7 @@ from krrood.entity_query_language.factories import (
     deduced_variable,
     add,
 )
+from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.core.base_expressions import OperationResult
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.rules.conclusion import Add
@@ -513,14 +514,78 @@ def test_doc_example(rule_tree_doc_example_connections, alternative_code, result
     assert set(results) == result_set
 
 
-def test_rule_tree_anchors_when_where_condition_is_reused_in_a_sibling():
-    """A node used as the bare WHERE condition and reused inside a sibling branch must still anchor.
+def test_conclusions_of_type_returns_matching_conclusions(handles_and_containers_world):
+    """``conclusions_of_type`` returns the attached conclusions of the requested subtype."""
+    world = handles_and_containers_world
+    container = variable(Container, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+    prismatic_connection = variable(PrismaticConnection, domain=world.connections)
+    drawers = variable(Drawer, domain=[])
+    condition = and_(
+        container == fixed_connection.parent,
+        handle == fixed_connection.child,
+        container == prismatic_connection.child,
+    )
 
-    ``drawer.correct`` is a shared node: it is the WHERE condition and also appears in the
-    ``alternative`` condition ``drawer.correct == False``. Building that comparator adds it as an
-    extra parent of the shared node. Its primary ``_parent_`` must stay the structural (WHERE)
-    parent so rule-tree splicing still finds the anchor; when the reuse overwrote ``_parent_``
-    the splice navigated from the comparator instead and failed.
+    with condition:
+        added = Add(drawers, inference(Drawer)(handle=handle, container=container))
+
+    assert condition.conclusions_of_type(Add) == [added]
+
+
+def test_conclusions_of_type_is_empty_without_matching_conclusions(
+    handles_and_containers_world,
+):
+    """``conclusions_of_type`` returns an empty list on an expression with no such conclusions."""
+    world = handles_and_containers_world
+    fixed_connection = variable(FixedConnection, domain=world.connections)
+
+    assert fixed_connection.conclusions_of_type(Add) == []
+
+
+def test_unwrapped_value_strips_literal_wrapper(handles_and_containers_world):
+    """``unwrapped_value`` returns the raw value behind a :class:`Literal` right-hand side."""
+    world = handles_and_containers_world
+    container = variable(Container, domain=world.bodies)
+    drawers = variable(Drawer, domain=[])
+    literal = Literal(_value_="drawer-value")
+    condition = container == container
+
+    with condition:
+        added = Add(drawers, literal)
+
+    assert added.unwrapped_value == "drawer-value"
+
+
+def test_unwrapped_value_returns_non_literal_right_unchanged(
+    handles_and_containers_world,
+):
+    """``unwrapped_value`` returns the right-hand expression unchanged when it is not a literal."""
+    world = handles_and_containers_world
+    container = variable(Container, domain=world.bodies)
+    handle = variable(Handle, domain=world.bodies)
+    drawers = variable(Drawer, domain=[])
+    condition = container == container
+
+    with condition:
+        conclusion_value = inference(Drawer)(handle=handle, container=container)
+        added = Add(drawers, conclusion_value)
+
+    assert added.unwrapped_value is conclusion_value
+
+
+def test_rule_tree_anchors_when_where_condition_is_reused_in_a_sibling():
+    """
+    A node used as the bare WHERE condition and reused inside a sibling branch must
+    still anchor.
+
+    ``drawer.correct`` is a shared node: it is the WHERE condition and also appears in
+    the ``alternative`` condition ``drawer.correct == False``. Building that comparator
+    adds it as an extra parent of the shared node. Its primary ``_parent_`` must stay
+    the structural (WHERE) parent so rule-tree splicing still finds the anchor; when the
+    reuse overwrote ``_parent_`` the splice navigated from the comparator instead and
+    failed.
     """
     correct_drawer = Drawer(
         handle=Handle("Handle1"), container=Container("Container1"), correct=True
@@ -550,16 +615,18 @@ def test_rule_tree_anchors_when_where_condition_is_reused_in_a_sibling():
 def test_conclusions_fire_without_an_active_evaluation_context(
     handles_and_containers_world,
 ):
-    """A conclusion must still fire when no ``EvaluationContext`` is active.
+    """
+    A conclusion must still fire when no ``EvaluationContext`` is active.
 
     ``_evaluate_conclusions_and_update_bindings_`` is normally only reached from inside
-    ``_evaluate_``, which has already set one up. But real-world callers can drive evaluation
-    from a code path where no context was ever created for the current thread (for example,
-    resuming a query from a thread that does not share the caller's ``contextvars.Context`` --
-    Python's ``ContextVar`` values do not propagate into a plain ``threading.Thread`` by
-    default). This calls the raw, double-underscore ``_evaluate__`` directly (bypassing
-    ``_evaluate_``'s context setup entirely) to prove the conclusion-firing check falls back to
-    a purely structural one instead of assuming a context always exists.
+    ``_evaluate_``, which has already set one up. But real-world callers can drive
+    evaluation from a code path where no context was ever created for the current thread
+    (for example, resuming a query from a thread that does not share the caller's
+    ``contextvars.Context`` -- Python's ``ContextVar`` values do not propagate into a
+    plain ``threading.Thread`` by default). This calls the raw, double-underscore
+    ``_evaluate__`` directly (bypassing ``_evaluate_``'s context setup entirely) to
+    prove the conclusion-firing check falls back to a purely structural one instead of
+    assuming a context always exists.
     """
     world = handles_and_containers_world
     container = variable(Container, domain=world.bodies)

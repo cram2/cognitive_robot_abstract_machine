@@ -13,7 +13,8 @@ from semantic_digital_twin.spatial_types import Vector3
 @dataclass(eq=False, repr=False)
 class ForceTorqueNode(TopicSubscriberNode[WrenchStamped]):
     """
-    Superclass for all nodes that subscribe to a ROS topic that contains force and torque data.
+    Superclass for all nodes that subscribe to a ROS topic that contains force and
+    torque data.
     """
 
     msg_type: WrenchStamped = field(init=False, default=WrenchStamped)

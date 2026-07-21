@@ -66,13 +66,13 @@ class TestSemanticAnnotation(SemanticAnnotation):
 def test_aggregate_bodies(kitchen_world):
     """
     Tests that SemanticAnnotation.kinematic_structure_entities aggregates:
+
     -  public direct kinematic structure entity fields
     - public list fields containing kinematic structure entities
     - public nested semantic annotations' kinematic structure entities
     but nothing from private fields
     The exact order is not specified by the contract, so we check set membership.
     """
-
     # Arrange: pick some existing bodies from the world fixture
     b0, b1, b2, b3 = kitchen_world.bodies[:4]
 
@@ -205,23 +205,17 @@ def test_handle_semantic_annotation_eql(apartment_world_copy):
 
 
 @pytest.mark.parametrize(
-    "semantic_annotation_type, update_existing_semantic_annotations, scenario, expected_number",
+    "semantic_annotation_type, update_existing_semantic_annotations, expected_number",
     [
-        (Handle, False, None, 29),
-        (Drawer, False, None, 19),
-        (Wardrobe, False, None, 8),
-        (
-            Door,
-            False,
-            None,
-            8,
-        ),  # Should be 11 as there are prismatically connected doors.
+        (Handle, False, 29),
+        (Drawer, False, 19),
+        (Wardrobe, False, 8),
+        (Door, False, 8),  # Should be 11 as there are prismatically connected doors.
     ],
 )
 def test_infer_apartment_semantic_annotation(
     semantic_annotation_type,
     update_existing_semantic_annotations,
-    scenario,
     expected_number,
     apartment_world_copy,
 ):
@@ -229,7 +223,6 @@ def test_infer_apartment_semantic_annotation(
         apartment_world_copy,
         semantic_annotation_type,
         update_existing_semantic_annotations,
-        scenario,
         expected_number,
     )
 
@@ -252,8 +245,6 @@ def test_apartment_semantic_annotations(apartment_world_copy):
     world_reasoner = WorldReasoner(apartment_world_copy)
     world_reasoner.fit_semantic_annotations(
         [Handle, Drawer, Wardrobe],
-        world_factory=lambda: apartment_world_copy,
-        scenario=None,
     )
 
     found_semantic_annotations = world_reasoner.infer_semantic_annotations()
@@ -315,15 +306,12 @@ def fit_rules_and_assert_semantic_annotations(
     world,
     semantic_annotation_type,
     update_existing_semantic_annotations,
-    scenario,
     expected_number: int,
 ):
     world_reasoner = WorldReasoner(world)
     world_reasoner.fit_semantic_annotations(
         [semantic_annotation_type],
         update_existing_semantic_annotations=update_existing_semantic_annotations,
-        world_factory=lambda: world,
-        scenario=scenario,
     )
 
     found_semantic_annotations = world_reasoner.infer_semantic_annotations()
@@ -386,7 +374,9 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
 
     @dataclass(eq=False)
     class ReviewKinematicChain(KinematicChain):
-        """Minimal concrete KinematicChain for chain tests."""
+        """
+        Minimal concrete KinematicChain for chain tests.
+        """
 
         def setup_hardware_interfaces(self):
             pass

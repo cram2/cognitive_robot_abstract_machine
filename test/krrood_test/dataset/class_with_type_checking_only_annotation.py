@@ -11,10 +11,11 @@ if TYPE_CHECKING:
 
 @dataclass
 class ClassWithTypeCheckingOnlyAnnotation:
-    """A dataclass whose field type is available only under ``TYPE_CHECKING``.
+    """
+    A dataclass whose field type is available only under ``TYPE_CHECKING``.
 
-    Reproduces the resolution scenario that previously raised ``CouldNotResolveType`` while building
-    the class diagram for ``set_of`` translations.
+    Reproduces the resolution scenario that previously raised ``CouldNotResolveType``
+    while building the class diagram for ``set_of`` translations.
     """
 
     annotation_only_field: TypeReferencedOnlyInAnnotations

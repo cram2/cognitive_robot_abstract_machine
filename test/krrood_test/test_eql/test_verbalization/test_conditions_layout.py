@@ -1,8 +1,10 @@
 """
-The condition grammar reads as cohesive, clearly-named concern units (Phase 4): the predicate
-realization (``predication``), the subject slot placement (``placement``), and the WHERE-subject
-resolution (``subject``). This test pins the public surface of that layout so the names do not drift
-back to the old scattered ``transforms`` / ``operator_phrase`` / ``forms`` / ``restriction`` files.
+The condition grammar reads as cohesive, clearly-named concern units (Phase 4): the
+predicate realization (``predication``), the subject slot placement (``placement``), and
+the WHERE-subject resolution (``subject``).
+
+This test pins the public surface of that layout so the names do not drift back to the
+old scattered ``transforms`` / ``operator_phrase`` / ``forms`` / ``restriction`` files.
 """
 
 from __future__ import annotations

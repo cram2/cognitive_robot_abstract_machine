@@ -19,7 +19,9 @@ from semantic_digital_twin.world import World
 
 
 def _build_executor(cylinder_bot_world: World) -> Executor:
-    """Build an executor that moves the bot to a Cartesian point while recording."""
+    """
+    Build an executor that moves the bot to a Cartesian point while recording.
+    """
     root = cylinder_bot_world.root
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     motion_statechart = MotionStatechart()

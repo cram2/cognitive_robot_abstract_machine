@@ -46,7 +46,6 @@ def generate_orm():
     """
     Generate the ORM classes for the coraplex package.
     """
-
     logging.basicConfig(level=logging.INFO)  # Or your preferred config
     logging.getLogger("krrood").setLevel(logging.DEBUG)
 

@@ -20,19 +20,27 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, Joi
 class Open(Goal):
     """
     Open a container in an environment.
-    Only works with the environment was added as urdf.
-    Assumes that a handle has already been grasped.
-    Can only handle containers with 1 dof, e.g. drawers or doors.
+
+    Only works with the environment was added as urdf. Assumes that a handle has already
+    been grasped. Can only handle containers with 1 dof, e.g. drawers or doors.
     """
 
     tip_link: KinematicStructureEntity = field(kw_only=True)
-    """end effector that is grasping the handle"""
+    """
+    End effector that is grasping the handle.
+    """
 
     environment_link: KinematicStructureEntity = field(kw_only=True)
-    """name of the handle that was grasped"""
+    """
+    Name of the handle that was grasped.
+    """
 
     goal_joint_state: Optional[float] = field(default=None, kw_only=True)
-    """goal state for the container. default is maximum joint state."""
+    """
+    Goal state for the container.
+
+    default is maximum joint state.
+    """
 
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
 
@@ -78,19 +86,27 @@ class Open(Goal):
 class Close(Open):
     """
     Open a container in an environment.
-    Only works with the environment was added as urdf.
-    Assumes that a handle has already been grasped.
-    Can only handle containers with 1 dof, e.g. drawers or doors.
+
+    Only works with the environment was added as urdf. Assumes that a handle has already
+    been grasped. Can only handle containers with 1 dof, e.g. drawers or doors.
     """
 
     tip_link: KinematicStructureEntity = field(kw_only=True)
-    """end effector that is grasping the handle"""
+    """
+    End effector that is grasping the handle.
+    """
 
     environment_link: KinematicStructureEntity = field(kw_only=True)
-    """name of the handle that was grasped"""
+    """
+    Name of the handle that was grasped.
+    """
 
     goal_joint_state: Optional[float] = field(default=None, kw_only=True)
-    """goal state for the container. default is maximum joint state."""
+    """
+    Goal state for the container.
+
+    default is maximum joint state.
+    """
 
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
 

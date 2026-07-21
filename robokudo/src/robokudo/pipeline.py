@@ -1,4 +1,5 @@
-"""Pipeline implementation for RoboKudo.
+"""
+Pipeline implementation for RoboKudo.
 
 This module provides the Pipeline class, which is a specialized version of py_trees'
 Sequence behavior. A Pipeline manages its own Common Analysis Structure (CAS) and
@@ -20,7 +21,7 @@ import timeit
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.composites import Sequence
-from typing_extensions import TYPE_CHECKING, Optional, List, Any
+from typing_extensions import TYPE_CHECKING, Any, List, Optional
 
 import robokudo.annotators.core
 import robokudo.annotators.outputs
@@ -33,11 +34,12 @@ if TYPE_CHECKING:
 
 
 class Pipeline(Sequence):
-    """A RoboKudo pipeline composed of annotators with its own CAS.
+    """
+    A RoboKudo pipeline composed of annotators with its own CAS.
 
     A Pipeline is a specialized sequence behavior that manages a Common Analysis
-    Structure (CAS) for its annotators. It provides visualization capabilities
-    and helper methods for accessing annotators and CAS data.
+    Structure (CAS) for its annotators. It provides visualization capabilities and
+    helper methods for accessing annotators and CAS data.
     """
 
     def __init__(
@@ -48,40 +50,49 @@ class Pipeline(Sequence):
         **kwargs: Any,
     ) -> None:
         super().__init__(name, memory=True, children=children)
-        """Initialize the pipeline.
+        """
+        Initialize the pipeline.
 
         :param name: Name of the pipeline, defaults to "Sequence"
         :param children: List of child behaviors, defaults to None
         """
-
         self.cas: cas.CAS = None
-        """The Common Analysis Structure for this pipeline."""
-
+        """
+        The Common Analysis Structure for this pipeline.
+        """
         self._cas_counter: int = 0
-        """Monotonic CAS counter that is local to this pipeline instance."""
-
+        """
+        Monotonic CAS counter that is local to this pipeline instance.
+        """
         self.cas_start_timer: timeit.default_timer = None
-        """Timer for measuring pipeline execution time."""
-
+        """
+        Timer for measuring pipeline execution time.
+        """
         self.rk_logger = logging.getLogger(defs.PACKAGE_NAME)
-        """Logger instance for this pipeline"""
-
+        """
+        Logger instance for this pipeline.
+        """
         self.create_new_cas()
         # self.update_gui_for_this_pipeline = False
         # self.annotator_outputs = AnnotatorOutputs()
 
     def create_new_cas(self) -> None:
-        """Create a new Common Analysis Structure (CAS) for this pipeline. Also resets the execution timer."""
+        """
+        Create a new Common Analysis Structure (CAS) for this pipeline.
+
+        Also resets the execution timer.
+        """
         self._cas_counter += 1
         self.cas = cas.CAS()
         self.cas.cas_id = self._cas_counter
         self.cas_start_timer = timeit.default_timer()
 
     def setup(self, **kwargs: Any) -> bool:
-        """Set up the pipeline and its annotator outputs.
+        """
+        Set up the pipeline and its annotator outputs.
 
-        Creates output structures for all annotators in the pipeline and
-        marks them for initial rendering.
+        Creates output structures for all annotators in the pipeline and marks them for
+        initial rendering.
         """
         blackboard = Blackboard()
         annotator_output_pipeline_map_buffer = blackboard.get(
@@ -103,17 +114,19 @@ class Pipeline(Sequence):
         return True
 
     def get_cas(self) -> cas.CAS:
-        """Get the pipeline's Common Analysis Structure.
+        """
+        Get the pipeline's Common Analysis Structure.
 
         :return: The pipeline's CAS
         """
         return self.cas
 
-    def get_annotators(self) -> List["robokudo.annotators.core.BaseAnnotator"]:
-        """Get all annotators in this pipeline.
+    def get_annotators(self) -> List[robokudo.annotators.core.BaseAnnotator]:
+        """
+        Get all annotators in this pipeline.
 
-        Returns a list of all annotators in this pipeline, including those
-        nested in other behaviors (except other pipelines).
+        Returns a list of all annotators in this pipeline, including those nested in
+        other behaviors (except other pipelines).
 
         :return: List of annotators
         """
@@ -124,10 +137,11 @@ class Pipeline(Sequence):
         ]
 
     def pipeline_children(self) -> List[Behaviour]:
-        """Get all children of this pipeline.
+        """
+        Get all children of this pipeline.
 
-        Returns a list of all children in this pipeline, stopping at nested
-        Pipeline objects. The order is given by utils.tree.behavior_iterate_except_type.
+        Returns a list of all children in this pipeline, stopping at nested Pipeline
+        objects. The order is given by utils.tree.behavior_iterate_except_type.
 
         :return: List of child behaviors
         """
@@ -139,7 +153,8 @@ class Pipeline(Sequence):
         ]
 
     def update(self) -> None:
-        """Update the pipeline's state.
+        """
+        Update the pipeline's state.
 
         Handles pipeline execution status and triggers GUI updates on failure.
         """
@@ -156,10 +171,11 @@ class Pipeline(Sequence):
             annotator_output_pipeline_map_buffer.map[self.name].redraw = True
 
     def terminate(self, new_status: Status) -> None:
-        """Handle pipeline termination.
+        """
+        Handle pipeline termination.
 
-        Called when the pipeline switches to a non-RUNNING state. Updates GUI
-        on success and logs execution time statistics.
+        Called when the pipeline switches to a non-RUNNING state. Updates GUI on success
+        and logs execution time statistics.
 
         :param new_status: New execution status
         """

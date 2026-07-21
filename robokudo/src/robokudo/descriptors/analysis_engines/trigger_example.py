@@ -1,4 +1,5 @@
-"""Analysis engine demonstrating pipeline trigger functionality.
+"""
+Analysis engine demonstrating pipeline trigger functionality.
 
 This module provides an analysis engine that demonstrates how to use pipeline
 triggers to control the execution flow. It implements a pipeline that waits for
@@ -20,13 +21,16 @@ from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.pipeline_trigger import PipelineTrigger
 from robokudo.annotators.testing import SlowAnnotator
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine with pipeline trigger functionality.
+    """
+    Analysis engine with pipeline trigger functionality.
 
     This class implements a pipeline that demonstrates the use of pipeline
     triggers for controlled execution. The pipeline waits for user input
@@ -46,14 +50,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "trigger_example"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline with trigger-controlled execution.
+        """
+        Create a pipeline with trigger-controlled execution.
 
         This method constructs a processing pipeline that includes a trigger
         mechanism. The pipeline will pause and wait for user input (keypress)
@@ -69,7 +75,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with trigger mechanism
         """
-        kinect_config = CrDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
 
         seq = Pipeline("RWPipeline")
 

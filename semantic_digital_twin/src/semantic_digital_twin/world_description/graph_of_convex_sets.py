@@ -57,13 +57,15 @@ class GraphOfConvexSets:
     """
     A graph that represents the connectivity between convex sets.
 
-    Every node in the graph is a convex set, represented by a bounding box.
-    Every edge in the graph represents the connectivity between two convex sets.
+    Every node in the graph is a convex set, represented by a bounding box. Every edge
+    in the graph represents the connectivity between two convex sets.
     """
 
     search_space: BoundingBoxCollection
     """
-    The bounding box of the search space. Defaults to the entire three dimensional space.
+    The bounding box of the search space.
+
+    Defaults to the entire three dimensional space.
     """
 
     graph: rx.PyGraph[BoundingBox]
@@ -108,10 +110,12 @@ class GraphOfConvexSets:
 
     def calculate_connectivity(self, tolerance=0.001):
         """
-        Calculate the connectivity of the graph by checking for intersections between the bounding boxes of the nodes.
-        This uses an R-tree for efficient spatial indexing and intersection queries.
+        Calculate the connectivity of the graph by checking for intersections between
+        the bounding boxes of the nodes. This uses an R-tree for efficient spatial
+        indexing and intersection queries.
 
-        :param tolerance: The tolerance for the intersection when calculating the connectivity.
+        :param tolerance: The tolerance for the intersection when calculating the
+            connectivity.
         """
 
         def _overlap(a_min, a_max, b_min, b_max) -> bool:
@@ -186,9 +190,9 @@ class GraphOfConvexSets:
     def plot_free_space(self) -> List[go.Mesh3d]:
         """
         Plot the free space of the environment in blue.
+
         :return: A list of traces that can be put into a plotly figure.
         """
-
         return self.free_space_event.plot(color="blue")
 
     def plot_and_show_free_space(self) -> None:
@@ -199,6 +203,7 @@ class GraphOfConvexSets:
     def plot_occupied_space(self) -> List[go.Mesh3d]:
         """
         Plot the occupied space of the environment in red.
+
         :return: A list of traces that can be put into a plotly figure.
         """
         free_space = Event.from_simple_sets(
@@ -229,9 +234,9 @@ class GraphOfConvexSets:
 
         :param start: The start pose.
         :param goal: The goal pose.
-        :return: The path as a sequence of points to navigate to or None if no path exists.
+        :return: The path as a sequence of points to navigate to or None if no path
+            exists.
         """
-
         # get poses from params
         start_node = self.node_of_point(start)
         goal_node = self.node_of_point(goal)
@@ -312,12 +317,14 @@ class GraphOfConvexSets:
         Create a connectivity graph from a list of semantic annotations.
 
         :param search_space: The search space for the connectivity graph.
-        :param semantic_obstacle_annotation: The semantic annotation to create the connectivity graph from.
-        :param semantic_wall_annotation: An optional semantic annotation containing walls to be considered as obstacles.
+        :param semantic_obstacle_annotation: The semantic annotation to create the
+            connectivity graph from.
+        :param semantic_wall_annotation: An optional semantic annotation containing
+            walls to be considered as obstacles.
         :param bloat_obstacles: The amount to bloat the obstacles.
         :param bloat_walls: The amount to bloat the walls.
-        :param keep_z: If True, the z-axis is kept in the resulting event. Default is True.
-
+        :param keep_z: If True, the z-axis is kept in the resulting event. Default is
+            True.
         :return: An event representing the obstacles in the search space.
         """
         bloated_obstacles = cls._build_bloated_obstacle_collection(
@@ -346,12 +353,18 @@ class GraphOfConvexSets:
         Filters out agent entities so the robot does not treat itself as an obstacle.
         Applies independent bloat amounts to obstacles and walls.
 
-        :param search_space: The search space; its reference frame is used as the origin.
-        :param semantic_obstacle_annotation: The annotation containing obstacle entities.
-        :param semantic_wall_annotation: An optional annotation containing wall entities.
-        :param bloat_obstacles: Amount to expand each obstacle bounding box symmetrically in x and y.
-        :param bloat_walls: Amount to expand wall bounding boxes in their thinner dimension.
-        :return: A BoundingBoxCollection of the bloated obstacle and wall bounding boxes.
+        :param search_space: The search space; its reference frame is used as the
+            origin.
+        :param semantic_obstacle_annotation: The annotation containing obstacle
+            entities.
+        :param semantic_wall_annotation: An optional annotation containing wall
+            entities.
+        :param bloat_obstacles: Amount to expand each obstacle bounding box
+            symmetrically in x and y.
+        :param bloat_walls: Amount to expand wall bounding boxes in their thinner
+            dimension.
+        :return: A BoundingBoxCollection of the bloated obstacle and wall bounding
+            boxes.
         """
         world_root = search_space.reference_frame
         world = world_root._world
@@ -378,19 +391,26 @@ class GraphOfConvexSets:
 
         obstacle_bounding_boxes = BoundingBoxCollection([], world_root)
         for bounding_box_collection in collections:
-            obstacle_bounding_boxes = obstacle_bounding_boxes.merge(bounding_box_collection)
+            obstacle_bounding_boxes = obstacle_bounding_boxes.merge(
+                bounding_box_collection
+            )
 
         bloated_obstacles = BoundingBoxCollection(
-            [bounding_box.bloat(bloat_obstacles, bloat_obstacles, 0.01) for bounding_box in obstacle_bounding_boxes],
+            [
+                bounding_box.bloat(bloat_obstacles, bloat_obstacles, 0.01)
+                for bounding_box in obstacle_bounding_boxes
+            ],
             world_root,
         )
 
         if semantic_wall_annotation is not None:
             bloated_walls: BoundingBoxCollection = BoundingBoxCollection(
                 [
-                    bounding_box.bloat(bloat_walls, 0, 0.01)
-                    if bounding_box.width > bounding_box.depth
-                    else bounding_box.bloat(0, bloat_walls, 0.01)
+                    (
+                        bounding_box.bloat(bloat_walls, 0, 0.01)
+                        if bounding_box.width > bounding_box.depth
+                        else bounding_box.bloat(0, bloat_walls, 0.01)
+                    )
                     for bounding_box in semantic_wall_annotation.as_bounding_box_collection_at_origin(
                         HomogeneousTransformationMatrix(reference_frame=world_root)
                     )
@@ -411,13 +431,15 @@ class GraphOfConvexSets:
         """
         Create a connectivity graph from a list of bounding boxes.
 
-        :param bounding_boxes: The list of bounding boxes to create the connectivity graph from.
-        :param search_space_event: The search space event to limit the connectivity graph to.
-        :param keep_z: If True, the z-axis is kept in the resulting event. Default is True.
-
-        :return: An event representing the obstacles in the search space, or None if no obstacles are found.
+        :param bounding_boxes: The list of bounding boxes to create the connectivity
+            graph from.
+        :param search_space_event: The search space event to limit the connectivity
+            graph to.
+        :param keep_z: If True, the z-axis is kept in the resulting event. Default is
+            True.
+        :return: An event representing the obstacles in the search space, or None if no
+            obstacles are found.
         """
-
         if not keep_z:
             search_space_event = search_space_event.marginal(SpatialVariables.xy)
 
@@ -490,16 +512,20 @@ class GraphOfConvexSets:
         bloat_walls: float = 0.0,
     ) -> Self:
         """
-        Create a connectivity graph from the free space in the belief state of the robot.
+        Create a connectivity graph from the free space in the belief state of the
+        robot.
 
         :param search_space: The search space for the connectivity graph.
-        :param semantic_obstacle_annotation: The semantic annotation containing the obstacles.
-        :param semantic_wall_annotation: An optional semantic annotation containing walls to be considered as obstacles.
-        :param tolerance: The tolerance for the intersection when calculating the connectivity.
+        :param semantic_obstacle_annotation: The semantic annotation containing the
+            obstacles.
+        :param semantic_wall_annotation: An optional semantic annotation containing
+            walls to be considered as obstacles.
+        :param tolerance: The tolerance for the intersection when calculating the
+            connectivity.
         :param bloat_obstacles: The amount to bloat the obstacles.
         :param bloat_walls: The amount to bloat the walls.
-
-        :return: The connectivity graph. If no obstacles are found, an empty graph is returned.
+        :return: The connectivity graph. If no obstacles are found, an empty graph is
+            returned.
         """
         bloated_obstacles = cls._build_bloated_obstacle_collection(
             search_space,
@@ -547,16 +573,16 @@ class GraphOfConvexSets:
         bloat_obstacles: float = 0.0,
     ) -> Self:
         """
-        Create a connectivity graph from the free space in the belief state of the robot.
+        Create a connectivity graph from the free space in the belief state of the
+        robot.
 
         :param world: The belief state.
         :param search_space: The search space for the connectivity graph.
-        :param tolerance: The tolerance for the intersection when calculating the connectivity.
+        :param tolerance: The tolerance for the intersection when calculating the
+            connectivity.
         :param bloat_obstacles: The amount to bloat the obstacles.
-
         :return: The connectivity graph.
         """
-
         semantic_annotation = SemanticEnvironmentAnnotation(
             root=world.root, _world=world
         )
@@ -581,10 +607,8 @@ class GraphOfConvexSets:
         :param world: The belief state.
         :param search_space: The search space for the connectivity graph.
         :param bloat_obstacles: The amount to bloat the obstacles.
-
         :return: An event representing the obstacles in the search space.
         """
-
         view = SemanticEnvironmentAnnotation(root=world.root, _world=world)
 
         return cls.obstacles_from_semantic_annotations(
@@ -604,20 +628,23 @@ class GraphOfConvexSets:
         bloat_walls: float = 0.0,
     ) -> Self:
         """
-        Create a GCS from the free space in the belief state of the robot for navigation.
-        The resulting GCS describes the paths for navigation, meaning that changing the z-axis position is not
-        possible.
-        Furthermore, it is taken into account that the robot has to fit through the entire space and not just
-        through the floor level obstacles.
+        Create a GCS from the free space in the belief state of the robot for
+        navigation. The resulting GCS describes the paths for navigation, meaning that
+        changing the z-axis position is not possible. Furthermore, it is taken into
+        account that the robot has to fit through the entire space and not just through
+        the floor level obstacles.
 
         :param search_space: The search space for the connectivity graph.
-        :param semantic_obstacle_annotation: The semantic annotation containing the obstacles.
-        :param semantic_wall_annotation: An optional semantic annotation containing walls to be considered as obstacles.
-        :param tolerance: The tolerance for the intersection when calculating the connectivity.
+        :param semantic_obstacle_annotation: The semantic annotation containing the
+            obstacles.
+        :param semantic_wall_annotation: An optional semantic annotation containing
+            walls to be considered as obstacles.
+        :param tolerance: The tolerance for the intersection when calculating the
+            connectivity.
         :param bloat_obstacles: The amount to bloat the obstacles.
         :param bloat_walls: The amount to bloat the walls.
-
-        :return: The connectivity graph. If no obstacles are found, an empty graph is returned.
+        :return: The connectivity graph. If no obstacles are found, an empty graph is
+            returned.
         """
         nav_obstacles = cls._build_bloated_obstacle_collection(
             search_space,
@@ -636,7 +663,9 @@ class GraphOfConvexSets:
         full_search_event = search_space.event
         search_event = full_search_event.marginal(SpatialVariables.xy)
 
-        free_space = cls.free_space_from_bounding_boxes(nav_obstacles, full_search_event, keep_z=False)
+        free_space = cls.free_space_from_bounding_boxes(
+            nav_obstacles, full_search_event, keep_z=False
+        )
 
         SimpleEvent.from_data({SpatialVariables.z.value: reals()})
         # create floor level
@@ -670,20 +699,19 @@ class GraphOfConvexSets:
         bloat_obstacles: float = 0.0,
     ) -> Self:
         """
-        Create a GCS from the free space in the belief state of the robot for navigation.
-        The resulting GCS describes the paths for navigation, meaning that changing the z-axis position is not
-        possible.
-        Furthermore, it is taken into account that the robot has to fit through the entire space and not just
-        through the floor level obstacles.
+        Create a GCS from the free space in the belief state of the robot for
+        navigation. The resulting GCS describes the paths for navigation, meaning that
+        changing the z-axis position is not possible. Furthermore, it is taken into
+        account that the robot has to fit through the entire space and not just through
+        the floor level obstacles.
 
         :param world: The belief state.
         :param search_space: The search space for the connectivity graph.
-        :param tolerance: The tolerance for the intersection when calculating the connectivity.
+        :param tolerance: The tolerance for the intersection when calculating the
+            connectivity.
         :param bloat_obstacles: The amount to bloat the obstacles.
-
         :return: The connectivity graph.
         """
-
         semantic_annotation = SemanticEnvironmentAnnotation(
             root=world.root, _world=world
         )
@@ -707,8 +735,9 @@ class GraphOfConvexSets:
         color: Color = Color(0.5, 1.0, 0.5, 0.5),
     ) -> Region:
         """
-        Spawn the GCS as a region (world_entity) connected with a fixed connection with the root of the GCS search space.
-        The geometry should be all boxes extracted from its free space.
+        Spawn the GCS as a region (world_entity) connected with a fixed connection with
+        the root of the GCS search space. The geometry should be all boxes extracted
+        from its free space.
 
         :param name: The name of the region.
         :param color: The color of the region.
@@ -744,7 +773,9 @@ def translate_event_to(
 ) -> Event:
     """
     Translates an event by a given position.
-    A translation is a change in the position of an entity in space without altering its shape or orientation.
+
+    A translation is a change in the position of an entity in space without altering its
+    shape or orientation.
 
     :param event: The event to translate.
     :param position: The position to translate the event by.
@@ -783,8 +814,10 @@ def navigation_map_at_target(
 ) -> GraphOfConvexSets:
     """
     Create a navigation map around the target.
-    The navigation map is a Graph of Convex Sets that represents the navigable space around the target.
-    The search space is constructed as a box around the target with the specified search ranges in the x and y directions.
+
+    The navigation map is a Graph of Convex Sets that represents the navigable space
+    around the target. The search space is constructed as a box around the target with
+    the specified search ranges in the x and y directions.
 
     :param target: The target around which the navigation map is created.
     :param search_range_x: The search range in the x-direction.
@@ -823,10 +856,10 @@ def translate_free_space_to_where_condition(
     y_variable_name: str = "y",
 ) -> OR:
     """
-    Translate the free space event generated by a GCS to a where condition describing the constraints of X and Y
-    variables.
-    This results in an OR statement containing a union over all simple events in the free space.
-    The components of the OR statement are conjunctions of constraints on the X and Y variables extracted from the simple
+    Translate the free space event generated by a GCS to a where condition describing
+    the constraints of X and Y variables. This results in an OR statement containing a
+    union over all simple events in the free space. The components of the OR statement
+    are conjunctions of constraints on the X and Y variables extracted from the simple
     events.
 
     :param free_space: The free space to parse
@@ -890,12 +923,13 @@ def translate_free_space_to_where_condition(
 def create_reference_frame_with_only_yaw_from_body(body: Body) -> Body:
     """
     Create a reference frame (new body without visual and collision) in the world.
-    This reference frame is a body that ignores the roll and pitch but keeps the yaw and position.
+
+    This reference frame is a body that ignores the roll and pitch but keeps the yaw and
+    position.
 
     :param body: The body to create the reference frame from.
     :return: The newly created reference frame.
     """
-
     world = body._world
     reference_frame = Body(
         name=PrefixedName(prefix=str(body.name), name="base_with_yaw")

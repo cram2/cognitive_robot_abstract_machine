@@ -1,4 +1,5 @@
-"""Analysis engine for handling query-based processing.
+"""
+Analysis engine for handling query-based processing.
 
 This module provides an analysis engine that demonstrates how to implement
 query-based processing in a pipeline. It shows how to set up a pipeline that
@@ -25,12 +26,15 @@ from robokudo.pipeline import Pipeline
 
 from robokudo.idioms import pipeline_init
 from robokudo.behaviours.action_server_checks import ActionServerCheck
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.utils.tree import add_children_to_parent
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for query-based processing.
+    """
+    Analysis engine for query-based processing.
 
     This class implements a pipeline that handles incoming queries by processing
     them with camera data and generating appropriate responses. It uses an
@@ -49,14 +53,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "query"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline for query-based processing.
+        """
+        Create a pipeline for query-based processing.
 
         This method constructs a processing pipeline that can handle incoming
         queries. The pipeline receives queries through a QueryAnnotator,
@@ -73,7 +79,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for query processing
         """
-        kinect_config = CrDescriptorFactory.create_descriptor("kinect_wo_tf")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            "kinect_wo_tf"
+        )
 
         seq = Pipeline("RWPipeline")
 

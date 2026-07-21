@@ -32,9 +32,12 @@ from random_events.variable import (
 @dataclass
 class UnderspecifiedParameters:
     """
-    A class that extracts all necessary information from a {py:class}`~krrood.entity_query_language.query.match.Match`
-    and binds it together. Instances of this can be used to parameterize objects with underspecified variables using
-    generative models. This generally serves as glue between `ProbabilisticModel` and `Match`.
+    A class that extracts all necessary information from a
+    {py:class}`~krrood.entity_query_language.query.match.Match` and binds it together.
+
+    Instances of this can be used to parameterize objects with underspecified variables
+    using generative models. This generally serves as glue between `ProbabilisticModel`
+    and `Match`.
     """
 
     statement: Match
@@ -47,6 +50,7 @@ class UnderspecifiedParameters:
     )
     """
     The translator that extracts a random event from the where conditions.
+
     Only exists if the statement has a where condition.
     """
 
@@ -55,6 +59,7 @@ class UnderspecifiedParameters:
     )
     """
     The where condition as random event.
+
     Only exists if the statement has a where condition.
     """
 
@@ -62,14 +67,23 @@ class UnderspecifiedParameters:
         random_events.variable.Variable, Any
     ] = field(init=False, default_factory=dict)
     """
-    Dictionary of events that are created from literal values, e.g. actual values. These are the assignments, that the probabilistic model is *conditioned* on.
+    Dictionary of events that are created from literal values, e.g. actual values.
+
+    These are the assignments, that the probabilistic model is *conditioned* on.
     """
 
     truncation_assignments_from_krrood_variables: list[Event] = field(
         init=False, default_factory=list
     )
     """
-    List of events that are created from symbolic expressions, e.g. variable assignments. These are the assignments, that the probabilistic model is *truncated* on. They may contain literals in their domains, however, the difference to `_events_from_literal_values` is, that these events are not directly used for conditioning, but rather for truncation. This means, that the events of this list do not change the weights of sum nodes in probabilistic circuits.
+    List of events that are created from symbolic expressions, e.g. variable
+    assignments.
+
+    These are the assignments, that the probabilistic model is *truncated* on. They may
+    contain literals in their domains, however, the difference to
+    `_events_from_literal_values` is, that these events are not directly used for
+    conditioning, but rather for truncation. This means, that the events of this list do
+    not change the weights of sum nodes in probabilistic circuits.
     """
 
     _symbolic_expression_event_cache: dict[
@@ -227,10 +241,14 @@ class UnderspecifiedParameters:
 
             indexed_name = f"{name}[{index}]"
             if isinstance(element, compatible_types):
-                result.update(self._handle_compatible_type_literal(indexed_name, element, type_))
+                result.update(
+                    self._handle_compatible_type_literal(indexed_name, element, type_)
+                )
             else:
                 result.update(
-                    self._extract_variables_from_non_primitive_literal(element, indexed_name)
+                    self._extract_variables_from_non_primitive_literal(
+                        element, indexed_name
+                    )
                 )
         return result
 
@@ -252,7 +270,9 @@ class UnderspecifiedParameters:
         dao_state = ToDataAccessObjectState()
         extractor = FeatureExtractor.from_instances([to_dao(value, dao_state)])
         for feature in extractor.features:
-            feature_name = f"{name_prefix}.{feature.get_clean_name_from_mapped_variable()}"
+            feature_name = (
+                f"{name_prefix}.{feature.get_clean_name_from_mapped_variable()}"
+            )
             random_events_variable = variable_from_name_and_type(
                 name=feature_name, type_=feature._type_
             )
@@ -260,7 +280,9 @@ class UnderspecifiedParameters:
             mapping = feature.apply_mapping_on_external_root(value)
             if not isinstance(mapping, feature._type_):
                 mapping = feature._type_(mapping)
-            self.conditioning_assignments_from_literal_values[random_events_variable] = mapping
+            self.conditioning_assignments_from_literal_values[
+                random_events_variable
+            ] = mapping
         return result
 
     def _handle_variable_attribute_match(
@@ -269,7 +291,8 @@ class UnderspecifiedParameters:
         """
         Handle attribute matches where the assigned value is a KRROOD variable.
 
-        :param attribute_match: The attribute match with a KRROOD variable assigned value.
+        :param attribute_match: The attribute match with a KRROOD variable assigned
+            value.
         :return: A dictionary of extracted variables.
         """
         type_ = self._process_attribute_match_type(
@@ -438,7 +461,9 @@ class UnderspecifiedParameters:
     @staticmethod
     def _process_attribute_match_type(type_):
         """
-        Process the type of an attribute matches assigned variable such that there are no unions.
+        Process the type of an attribute matches assigned variable such that there are
+        no unions.
+
         :param type_: The type to process
         :return: The processed type.
         """

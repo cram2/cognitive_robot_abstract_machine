@@ -44,6 +44,7 @@ class AggregationStatus(Enum):
     No grouping context in this query.
     """
 
+
 @dataclass
 class AntecedentInformation:
     """
@@ -78,6 +79,7 @@ class AntecedentInformation:
     form/slot is the condition-form registry's concern at render time, not the
     plan's.
     """
+
 
 @dataclass
 class ConsequentBinding:

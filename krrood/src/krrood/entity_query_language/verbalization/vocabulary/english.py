@@ -4,8 +4,17 @@ import operator
 import uuid
 from dataclasses import dataclass
 from enum import Enum
+from functools import lru_cache
 
-from typing_extensions import Callable, ClassVar, Dict, List, Optional, Type
+from typing_extensions import (
+    Callable,
+    ClassVar,
+    Dict,
+    FrozenSet,
+    List,
+    Optional,
+    Type,
+)
 
 from krrood.entity_query_language.core.base_expressions import Selectable
 from krrood.entity_query_language.operators.aggregators import (
@@ -448,6 +457,13 @@ class Prepositions(VocabEnum):
     WITHIN = PlainWord("within")
     WITHOUT = PlainWord("without")
     WORTH = PlainWord("worth")
+
+    @classmethod
+    @lru_cache(maxsize=None)
+    def texts(cls) -> FrozenSet[str]:
+        """:return: the surface word of every preposition, for testing whether a token already reads
+        as a preposition."""
+        return frozenset(preposition.text for preposition in cls)
 
 
 class Conjunctions(VocabEnum):

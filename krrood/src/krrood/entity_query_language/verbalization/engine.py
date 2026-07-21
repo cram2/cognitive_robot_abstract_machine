@@ -63,8 +63,8 @@ def fold(
     options: Optional[RenderOptions] = None,
 ) -> VerbalizationFragment:
     """
-    Verbalize *node* by dispatching it to its matching grammar rule and recursing — the single
-    catamorphism (fold) over the EQL expression tree.
+    Verbalize *node* by dispatching it to its matching grammar rule and recursing — the
+    single catamorphism (fold) over the EQL expression tree.
 
     A node carrying a pre-built binding override is returned directly, before any dispatch.
     When no rule covers the node, an ``UnverbalizableExpressionError`` is raised rather than

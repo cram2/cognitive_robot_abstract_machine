@@ -11,21 +11,27 @@ from semantic_digital_twin.world_description.world_entity import Body
 @dataclass
 class MaxManipulability(Task):
     """
-    This goal maximizes the manipulability of the kinematic chain between root_link and tip_link.
-    This chain should only include rotational joint and no linear joints i.e. torso lift joints or odometry joints.
+    This goal maximizes the manipulability of the kinematic chain between root_link and
+    tip_link.
+
+    This chain should only include rotational joint and no linear joints i.e. torso lift
+    joints or odometry joints.
     """
 
     root_link: Body = field(kw_only=True)
     """
     The root of the kinematic chain whose manipulability is maximized.
     """
+
     tip_link: Body = field(kw_only=True)
     """
     The tip of the kinematic chain whose manipulability is maximized.
     """
+
     manipulability_threshold: float = field(default=0.5, kw_only=True)
     """
-    Manipulability value the goal drives the measure towards; also defines the observation threshold.
+    Manipulability value the goal drives the measure towards; also defines the
+    observation threshold.
     """
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:

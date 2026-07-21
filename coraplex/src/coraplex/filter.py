@@ -5,7 +5,8 @@ from scipy.signal import butter, lfilter
 
 class Filter:
     """
-    Abstract class to ensure that every supported filter needs to implement the filter method.
+    Abstract class to ensure that every supported filter needs to implement the filter
+    method.
 
     :method filter: Abstract method to filter the given data.
     """
@@ -36,7 +37,6 @@ class Butterworth(Filter):
         Filters the given data using a Butterworth filter.
 
         :param data: The data to be filtered.
-
         :return: The filtered data.
         """
         return lfilter(self.b, self.a, data)

@@ -29,7 +29,8 @@ from krrood.class_diagrams.factory_method_registry import FactoryMethodRegistry
 @dataclass
 class FactoryMethodMarker:
     """
-    Descriptor that marks the classmethod it wraps as a factory and registers it eagerly.
+    Descriptor that marks the classmethod it wraps as a factory and registers it
+    eagerly.
 
     Python calls :meth:`__set_name__` once, when the owning class body finishes executing, and
     hands over both the owner class and the attribute name. The descriptor uses that single event
@@ -48,22 +49,29 @@ class FactoryMethodMarker:
     """The ``classmethod`` being marked as a factory."""
 
     def __set_name__(self, owner: Type, name: str) -> None:
-        """Register the factory with :class:`FactoryMethodRegistry` once the owner is known."""
+        """
+        Register the factory with :class:`FactoryMethodRegistry` once the owner is
+        known.
+        """
         FactoryMethodRegistry().register(owner, name)
 
     def __get__(self, instance: Any, owner: Type = None) -> Any:
-        """Bind the wrapped classmethod so the factory stays callable on the class and instances."""
+        """
+        Bind the wrapped classmethod so the factory stays callable on the class and
+        instances.
+        """
         return self.wrapped.__get__(instance, owner)
 
 
 def factory_method(method: classmethod) -> FactoryMethodMarker:
     """
-    Mark a classmethod as a factory method explicitly, regardless of its return annotation.
+    Mark a classmethod as a factory method explicitly, regardless of its return
+    annotation.
 
     :param method: The ``classmethod`` to mark.
     :return: A descriptor that registers the factory at class-definition time.
-    :raises FactoryMethodDecoratorError: If ``method`` is not a ``classmethod`` (for example when
-        the marker is applied below ``@classmethod`` instead of above it).
+    :raises FactoryMethodDecoratorError: If ``method`` is not a ``classmethod`` (for
+        example when the marker is applied below ``@classmethod`` instead of above it).
     """
     if not isinstance(method, classmethod):
         raise FactoryMethodDecoratorError(decorated_name=_decorated_name(method))
@@ -122,8 +130,8 @@ def factory_method_names(cls: Type) -> Tuple[str, ...]:
             if name in seen:
                 continue
             seen.add(name)
-            if isinstance(member, (classmethod, FactoryMethodMarker)) and is_factory_method(
-                cls, name
-            ):
+            if isinstance(
+                member, (classmethod, FactoryMethodMarker)
+            ) and is_factory_method(cls, name):
                 names.append(name)
     return tuple(names)

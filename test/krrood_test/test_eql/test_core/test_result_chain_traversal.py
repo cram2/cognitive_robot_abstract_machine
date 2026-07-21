@@ -1,22 +1,19 @@
 """
-Tests that verify full chain traversal from a final nested-query result back through
-all intermediate sub-query results, including results produced inside sub-query evaluation.
+Tests that verify full chain traversal from a final nested-query result back through all
+intermediate sub-query results, including results produced inside sub-query evaluation.
 
-After removing source_operation_result, all navigation is via previous_operation_result only.
+After removing source_operation_result, all navigation is via previous_operation_result
+only.
 
 Chain structure for a two-stage pipeline built with entity(a).where(a > 1):
 
-  r2  (stage-2 Variable result)
-    .previous_operation_result
-  → r1  (stage-1 Query result, slim bindings {a._id_: a_val})
-      .previous_operation_result
-    → product_result  (short-circuit Variable result carrying full bindings)
-        .previous_operation_result
-      → comparator_result  (= where_result, Where yields child results directly)
-          .previous_operation_result
-        → literal_result  (Literal(1) in cartesian product inside Comparator)
-            .previous_operation_result
-          → a_result  (Variable a evaluated inside Comparator)
+r2  (stage-2 Variable result)   .previous_operation_result → r1  (stage-1 Query result,
+slim bindings {a._id_: a_val})     .previous_operation_result   → product_result (short-
+circuit Variable result carrying full bindings)       .previous_operation_result →
+comparator_result  (= where_result, Where yields child results directly)
+.previous_operation_result       → literal_result  (Literal(1) in cartesian product
+inside Comparator)           .previous_operation_result         → a_result  (Variable a
+evaluated inside Comparator)
 """
 
 from dataclasses import dataclass
@@ -51,7 +48,9 @@ def _all(expr, sources=None):
 
 
 def _chain(result):
-    """Walk the previous_operation_result chain and return all nodes."""
+    """
+    Walk the previous_operation_result chain and return all nodes.
+    """
     nodes = []
     node = result
     while node is not None:
@@ -61,7 +60,9 @@ def _chain(result):
 
 
 def _any_binding(result, key):
-    """Return True if key appears in any node of the previous chain."""
+    """
+    Return True if key appears in any node of the previous chain.
+    """
     return any(key in node.bindings for node in _chain(result))
 
 
@@ -71,7 +72,10 @@ def _any_binding(result, key):
 
 
 def test_pipeline_previous_links_stage_results():
-    """previous_operation_result on stage-2 Variable result points exactly at the stage-1 result."""
+    """
+    previous_operation_result on stage-2 Variable result points exactly at the stage-1
+    result.
+    """
     a = variable_from([2, 3])
     q1 = entity(a).where(a > 1)
     q1.build()
@@ -84,7 +88,8 @@ def test_pipeline_previous_links_stage_results():
 
 
 def test_pipeline_stage1_values_accessible_from_stage2():
-    """Stage-1 variable binding is readable from the stage-2 result via all_bindings.
+    """
+    Stage-1 variable binding is readable from the stage-2 result via all_bindings.
 
     Note: Query slim bindings store only the query's own _id_, not the original variable's
     _id_.  Use all_bindings to reach values from the internal evaluation chain.
@@ -113,7 +118,9 @@ def test_pipeline_stage1_values_accessible_from_stage2():
 
 
 def test_stage1_product_result_reachable_from_stage2():
-    """The product result inside stage-1 (which carries full bindings) is reachable."""
+    """
+    The product result inside stage-1 (which carries full bindings) is reachable.
+    """
     a = variable_from([2])
     q1 = entity(a).where(a > 1)
     q1.build()
@@ -131,8 +138,8 @@ def test_stage1_product_result_reachable_from_stage2():
 
 def test_stage1_comparator_result_reachable_from_stage2():
     """
-    The comparator/Where result from stage-1's internal evaluation is reachable
-    via the previous chain from the stage-2 result.
+    The comparator/Where result from stage-1's internal evaluation is reachable via the
+    previous chain from the stage-2 result.
     """
     a = variable_from([2])
     q1 = entity(a).where(a > 1)
@@ -174,8 +181,8 @@ def test_stage1_literal_result_reachable_from_stage2():
 
 def test_stage1_variable_result_reachable_via_previous_on_literal():
     """
-    The innermost Variable-a result (produced inside the Comparator's sub-cartesian-product)
-    is reachable via previous_operation_result on the literal result.
+    The innermost Variable-a result (produced inside the Comparator's sub-cartesian-
+    product) is reachable via previous_operation_result on the literal result.
     """
     a = variable_from([2])
     q1 = entity(a).where(a > 1)
@@ -202,7 +209,9 @@ def test_stage1_variable_result_reachable_via_previous_on_literal():
 
 
 def test_three_stage_pipeline_previous_chain():
-    """Three-stage pipeline: previous chain includes r2 directly, r1 via internal b_result."""
+    """
+    Three-stage pipeline: previous chain includes r2 directly, r1 via internal b_result.
+    """
     a = variable_from([5])
     q1 = entity(a).where(a > 1)
     q1.build()
@@ -230,7 +239,10 @@ def test_three_stage_pipeline_previous_chain():
 
 
 def test_three_stage_pipeline_intermediate_reachable():
-    """From stage-3, stage-1's internal (comparator) result is reachable via the linear chain."""
+    """
+    From stage-3, stage-1's internal (comparator) result is reachable via the linear
+    chain.
+    """
     a = variable_from([5])
     q1 = entity(a).where(a > 1)
     q1.build()
@@ -259,7 +271,9 @@ def test_three_stage_pipeline_intermediate_reachable():
 
 
 def test_and_condition_chain_reachable():
-    """With an AND condition, the AND result is present in the chain."""
+    """
+    With an AND condition, the AND result is present in the chain.
+    """
     a = variable_from([6])
     q1 = entity(a).where(and_(a > 5, a < 10))
     q1.build()
@@ -280,7 +294,9 @@ def test_and_condition_chain_reachable():
 
 
 def test_inference_chain_reachable_from_pipeline():
-    """InstantiatedVariable results carry previous chain across a pipeline."""
+    """
+    InstantiatedVariable results carry previous chain across a pipeline.
+    """
     val = variable_from([3, 7])
     item_inf = inference(Item)
     q1 = entity(item_inf(value=val))
@@ -301,7 +317,8 @@ def test_inference_chain_reachable_from_pipeline():
 
 
 def test_all_bindings_contains_all_stage_variable_values():
-    """All variable values set in every stage are accessible via all_bindings.
+    """
+    All variable values set in every stage are accessible via all_bindings.
 
     Query slim bindings only store the query's own _id_, so a._id_ lives in the
     previous_operation_result chain.  all_bindings exposes it.
@@ -324,8 +341,11 @@ def test_all_bindings_contains_all_stage_variable_values():
 
 
 def test_query_slim_bindings_vs_all_bindings():
-    """Documents the slim-bindings characteristic: Query.bindings stores the query's own _id_,
-    not the original variable's _id_.  all_bindings includes both via the previous chain.
+    """
+    Documents the slim-bindings characteristic: Query.bindings stores the query's own
+    _id_, not the original variable's _id_.
+
+    all_bindings includes both via the previous chain.
     """
     a = variable_from([7])
     q1 = entity(a)

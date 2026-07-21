@@ -177,10 +177,14 @@ class DuplicateContextExtensionError(MotionStatechartError):
 
 @dataclass
 class PlotterNotConfiguredError(MotionStatechartError):
-    """Raised when a plot is requested but the corresponding plotter was never configured."""
+    """
+    Raised when a plot is requested but the corresponding plotter was never configured.
+    """
 
     plotter_name: str
-    """The human-readable name of the plotter that is missing."""
+    """
+    The human-readable name of the plotter that is missing.
+    """
 
     def error_message(self) -> str:
         return (

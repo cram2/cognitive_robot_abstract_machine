@@ -1,15 +1,16 @@
-"""Query-based task scheduling for behavior trees.
+"""
+Query-based task scheduling for behavior trees.
 
-This module provides a task scheduler that uses queries in the CAS (Common Analysis Structure)
-to determine which perception subtree to execute. It allows dynamic selection of perception
-pipelines based on the current query state.
+This module provides a task scheduler that uses queries in the CAS (Common Analysis
+Structure) to determine which perception subtree to execute. It allows dynamic selection
+of perception pipelines based on the current query state.
 
 Original implementation by Malte Huerkamp.
 """
 
 from py_trees.composites import Composite, Sequence
 from robokudo_msgs.action import Query
-from typing_extensions import Dict, Any, Optional, Callable
+from typing_extensions import Any, Callable, Dict, Optional
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
@@ -21,8 +22,10 @@ class QueryBasedScheduler(
     TaskSchedulerBase,
     BaseAnnotator,
 ):
-    """A Task Scheduler that checks the active Query in the CAS to infer which perception subtree to execute.
-    You can apply a function to infer per use-case which perception tree you want to incorporate.
+    """
+    A Task Scheduler that checks the active Query in the CAS to infer which perception
+    subtree to execute. You can apply a function to infer per use-case which perception
+    tree you want to incorporate.
 
     Original implementation by Malte Huerkamp
 
@@ -38,14 +41,17 @@ class QueryBasedScheduler(
         tasks: Optional[Dict[str, Composite]] = None,
         filter_fn: Optional[Callable[[Query.Goal], str]] = None,
     ) -> None:
-        """Initialize the query-based scheduler.
+        """
+        Initialize the query-based scheduler.
 
-        Tasks should be a dict with key='task-identifier' and value a py_trees.Behaviour)
+        Tasks should be a dict with key='task-identifier' and value a
+        py_trees.Behaviour)
 
         :param name: Name of the scheduler node
         :param tasks: Dictionary mapping task IDs to behavior trees
-        :param: filter_fn a callable/function which returns a string with the identifier of the subtree to include.
-        This function will receive the CASViews.QUERY and can then decide which subtree identifier is the desired one.
+        :param: filter_fn a callable/function which returns a string with the identifier
+            of the subtree to include. This function will receive the CASViews.QUERY and
+            can then decide which subtree identifier is the desired one.
         """
         super().__init__(name)
         if tasks is None:
@@ -54,13 +60,16 @@ class QueryBasedScheduler(
         self.filter_fn: Optional[Callable[[Query.Goal], str]] = filter_fn
 
     def setup(self, **kwargs: Any) -> bool:
-        """Set up all task trees."""
+        """
+        Set up all task trees.
+        """
         for task in self.tasks:
             setup_with_descendants_on_behavior(self.tasks[task])
         return True
 
     def plan_new_job(self) -> Optional[Sequence]:
-        """Plan the next job based on the current query.
+        """
+        Plan the next job based on the current query.
 
         This method:
         * Gets the current query from CAS
@@ -77,14 +86,12 @@ class QueryBasedScheduler(
         query = self.get_cas().get(CASViews.QUERY)
 
         task_key = self.filter_fn(query)
-        self.logger.info(f"Running perception task: {task_key}")
+        self.rk_logger.info(f"Running perception task: {task_key}")
 
-        if task_key in self.tasks.keys():
-            job_elements = self.tasks[task_key]
-            # p = job_elements.parent
-            add_child_to_parent(new_job, job_elements)
-        else:
-            self.logger.debug(f"Can't find task pipeline for '{task_key}'")
+        if task_key not in self.tasks.keys():
+            self.rk_logger.debug(f"Can't find task pipeline for '{task_key}'")
             return None
 
+        job_elements = self.tasks[task_key]
+        add_child_to_parent(new_job, job_elements)
         return new_job

@@ -166,7 +166,9 @@ class MultinomialInferenceTestCase(unittest.TestCase):
 
         mode_by_hand = (
             SimpleEvent.from_data({self.x: XEnum.A, self.y: YEnum.B}).as_composite_set()
-            | SimpleEvent.from_data({self.x: XEnum.B, self.y: YEnum.A}).as_composite_set()
+            | SimpleEvent.from_data(
+                {self.x: XEnum.B, self.y: YEnum.A}
+            ).as_composite_set()
         )
 
         self.assertEqual(likelihood, 0.7)
@@ -232,7 +234,9 @@ class MultinomialInferenceTestCase(unittest.TestCase):
             self.y.domain.simple_sets,
             self.z.domain.simple_sets,
         ):
-            event = SimpleEvent.from_data(zip([self.x, self.y, self.z], event)).as_composite_set()
+            event = SimpleEvent.from_data(
+                zip([self.x, self.y, self.z], event)
+            ).as_composite_set()
             self.assertAlmostEqual(
                 self.random_distribution.probability(event),
                 circuit.probabilistic_circuit.probability(event),

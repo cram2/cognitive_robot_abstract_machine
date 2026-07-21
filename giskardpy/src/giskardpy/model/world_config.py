@@ -34,7 +34,9 @@ class WorldConfig(ABC):
     @abc.abstractmethod
     def setup_world(self, *args, **kwargs):
         """
-        Implement this method to configure the initial world using it's self. methods.
+        Implement this method to configure the initial world using it's self.
+
+        methods.
         """
 
 
@@ -138,11 +140,14 @@ class WorldWithDiffDriveRobot(WorldConfig):
 @dataclass
 class WorldFromDatabaseConfig(WorldConfig):
     """
-    This world config loads a world from the semantic digital twin database at the given primary key.
+    This world config loads a world from the semantic digital twin database at the given
+    primary key.
     """
 
     primary_key: int = 1
-    """Primary key of the world in the semantic digital twin database."""
+    """
+    Primary key of the world in the semantic digital twin database.
+    """
 
     def setup_collision_config(self):
         pass

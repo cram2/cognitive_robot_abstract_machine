@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import Iterable, Protocol, Union, runtime_checkable
+from typing_extensions import ClassVar, Iterable, Protocol, Union, runtime_checkable
 
 from krrood.entity_query_language.predicate import VerbalizationField
 from krrood.entity_query_language.utils import camel_case_to_words
@@ -42,11 +42,10 @@ class ClauseElement(ABC):
     """
     One typed part-of-speech constituent of a predicate clause.
 
-    A predicate's ``_verbalization_fragment_`` builds its clause from
-    these elements rather than raw fragments, so the author writes the
-    affirmative, present-tense form once and the realisation passes
-    inflect it (verb agreement, copula suppletion) and negate it (do-
-    support). The element only declares *what part of speech* a word is;
+    A predicate's ``_verbalization_fragment_`` builds its clause from these elements
+    rather than raw fragments, so the author writes the affirmative, present-tense form
+    once and the realisation passes inflect it (verb agreement, copula suppletion) and
+    negate it (do- support). The element only declares *what part of speech* a word is;
     how it is realised is the morphology pass's job.
     """
 
@@ -59,21 +58,21 @@ class ClauseElement(ABC):
 class Noun(ClauseElement):
     """
     A noun constituent — a predicate
-    :class:`~krrood.entity_query_language.predicate.VerbalizationField`, an
-    already-rendered fragment, or a literal noun given by its *head word only*.
+    :class:`~krrood.entity_query_language.predicate.VerbalizationField`, an already-
+    rendered fragment, or a literal noun given by its *head word only*.
     """
 
     content: Union[str, "ClauseConstituent"]
     """
-    A literal noun *head* (the article is a feature, not part of the text —
-    write ``"instance"``, not ``"an instance"``), or any constituent (a field,
-    a rendered fragment) rendered as-is.
+    A literal noun *head* (the article is a feature, not part of the text — write
+    ``"instance"``, not ``"an instance"``), or any constituent (a field, a rendered
+    fragment) rendered as-is.
     """
 
     definiteness: Definiteness = Definiteness.INDEFINITE
     """
-    For a literal-head noun, the article to realise — *"an instance"*
-    (indefinite, the default) vs *"the instance"*.
+    For a literal-head noun, the article to realise — *"an instance"* (indefinite, the
+    default) vs *"the instance"*.
 
     Ignored when *content* is already a rendered constituent.
     """
@@ -116,8 +115,8 @@ class Verb(ClauseElement):
     """
     A lexical verb given as its lemma.
 
-    The morphology pass realises it present-tense (*"work"* → *"works"*)
-    and negates it with do-support (*"does not work"*).
+    The morphology pass realises it present-tense (*"work"* → *"works"*) and negates it
+    with do-support (*"does not work"*).
     """
 
     lemma: str
@@ -127,8 +126,8 @@ class Verb(ClauseElement):
 
     number: GrammaticalNumber = GrammaticalNumber.SINGULAR
     """
-    The subject number the verb agrees with — ``PLURAL`` reads the bare
-    *"work"* / *"have"* for a coordinated or plural subject.
+    The subject number the verb agrees with — ``PLURAL`` reads the bare *"work"* /
+    *"have"* for a coordinated or plural subject.
     """
 
     def as_fragment(self) -> RoleFragment:
@@ -163,8 +162,14 @@ class Adjective(ClauseElement):
 @dataclass(frozen=True)
 class Copula(ClauseElement):
     """
-    The copula *"is"* of a predicative clause — realised for number (*"is"* /
-    *"are"*) and negation (*"is not"*) by the morphology pass.
+    The copula *"is"* of a predicative clause — realised for number (*"is"* / *"are"*)
+    and negation (*"is not"*) by the morphology pass.
+    """
+
+    lemma: ClassVar[str] = "be"
+    """
+    The lemma a copular predicate name's leading word reduces to (``is`` / ``are`` ->
+    ``be``).
     """
 
     def as_fragment(self) -> RoleFragment:
@@ -179,8 +184,8 @@ class Copula(ClauseElement):
 @dataclass(frozen=True)
 class OneOf(ClauseElement):
     """
-    A bounded membership set — *"one of A, B, or C"* — over a collection of
-    admissible values.
+    A bounded membership set — *"one of A, B, or C"* — over a collection of admissible
+    values.
 
     This is the high-level element for a "the subject is one of these"
     clause (a tuple of admissible types, a small value domain), so an
@@ -194,8 +199,8 @@ class OneOf(ClauseElement):
     members: Union[Iterable, VerbalizationField]
     """
     The admissible values — a predicate
-    :class:`~krrood.entity_query_language.predicate.VerbalizationField` bound
-    to a collection, or a collection directly.
+    :class:`~krrood.entity_query_language.predicate.VerbalizationField` bound to a
+    collection, or a collection directly.
 
     Classes render as linked type references, other values as literals.
     """
@@ -216,7 +221,7 @@ class OneOf(ClauseElement):
         )
         listed = one_of(
             [
-                RoleFragment.for_member(member)
+                RoleFragment.for_value(member)
                 for member in members[: MAX_SET_MEMBERS + 1]
             ]
         )
@@ -237,26 +242,24 @@ class OneOf(ClauseElement):
 
 
 @dataclass(frozen=True)
-class Or(ClauseElement):
+class DisjunctivePhrase(ClauseElement):
     """
-    A disjunctive listing of admissible values — *"A, B, or C"* — over a
+    A disjunctive coordination of admissible values — *"A, B, or C"* — over a
     collection.
 
-    The vocabulary-level oxford-comma disjunction over any iterable of
-    members, each rendered by
-    :meth:`~…fragments.base.RoleFragment.for_member` (a class as a
-    linked type reference, any other value as a literal) and joined with
-    *"or"*. An author writes ``Or(field)`` rather than reaching for the
-    low-level :func:`~…fragments.base.oxford_comma` /
-    :class:`Conjunctions` builders. A field bound to a single (non-
-    iterable) value keeps that value's own rendered fragment.
+    The vocabulary-level oxford-comma disjunction over any iterable of members, each
+    rendered by :meth:`~…fragments.base.RoleFragment.for_value` (a class as a linked
+    type reference, any other value as a literal) and joined with *"or"*. An author
+    writes ``DisjunctivePhrase(field)`` rather than reaching for the low-level
+    :func:`~…fragments.base.oxford_comma` / :class:`Conjunctions` builders. A field
+    bound to a single (non- iterable) value keeps that value's own rendered fragment.
     """
 
     members: Union[Iterable, VerbalizationField]
     """
     The admissible values — a predicate
-    :class:`~krrood.entity_query_language.predicate.VerbalizationField` bound
-    to an iterable (or a single value), or an iterable directly.
+    :class:`~krrood.entity_query_language.predicate.VerbalizationField` bound to an
+    iterable (or a single value), or an iterable directly.
     """
 
     def as_fragment(self) -> VerbalizationFragment:
@@ -265,7 +268,7 @@ class Or(ClauseElement):
         >>> from krrood.entity_query_language.verbalization.fragments.base import (
         ...     flatten_fragment_to_plain_text,
         ... )
-        >>> flatten_fragment_to_plain_text(Or((int, str)).as_fragment())
+        >>> flatten_fragment_to_plain_text(DisjunctivePhrase((int, str)).as_fragment())
         'Integer or Text'
         """
         value = (
@@ -276,8 +279,47 @@ class Or(ClauseElement):
         if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
             return Noun(self.members).as_fragment()
         return oxford_comma(
-            [RoleFragment.for_member(member) for member in value],
+            [RoleFragment.for_value(member) for member in value],
             Conjunctions.OR.as_fragment(),
+        )
+
+
+@dataclass(frozen=True)
+class ConjunctivePhrase(ClauseElement):
+    """
+    A conjunctive coordination of clause constituents — *"A, B, and C"* — the
+    counterpart of :class:`DisjunctivePhrase` for constituents that already know how to
+    render themselves.
+
+    Each item is rendered through its ``as_fragment`` and the parts are joined with
+    *"and"* (an oxford comma before the final conjunct). An author writes
+    ``ConjunctivePhrase(operands)`` rather than reaching for the low- level
+    :func:`~…fragments.base.oxford_comma` / :class:`Conjunctions` builders, so the
+    conjunction pattern lives in one place.
+    """
+
+    items: Iterable[ClauseConstituent]
+    """
+    The constituents to conjoin, in order; each must provide ``as_fragment``.
+    """
+
+    def as_fragment(self) -> VerbalizationFragment:
+        """:return: the conjunction phrase *"A, B, and C"*.
+
+        >>> from krrood.entity_query_language.verbalization.fragments.base import (
+        ...     flatten_fragment_to_plain_text,
+        ...     WordFragment,
+        ... )
+        >>> flatten_fragment_to_plain_text(
+        ...     ConjunctivePhrase(
+        ...         [WordFragment(text="a"), WordFragment(text="b")]
+        ...     ).as_fragment()
+        ... )
+        'a and b'
+        """
+        return oxford_comma(
+            [item.as_fragment() for item in self.items],
+            Conjunctions.AND.as_fragment(),
         )
 
 
@@ -348,37 +390,171 @@ def function_as_noun(name: str, getter_prefix: str = "get") -> str:
     return " ".join(words)
 
 
-def function_as_phrase(
-    name: str, *operands: ClauseConstituent
-) -> VerbalizationFragment:
+class FunctionVerbalizationTemplates:
     """
-    Build *"the <noun> of <operands>"* for a value function — the value
-    counterpart of a predicate clause, for an operation that computes a value
-    rather than a truth.
+    The name-based surface templates a value
+    :class:`~krrood.entity_query_language.predicate.SymbolicFunction` reuses to
+    verbalize itself: call the template that matches how the value relates to
+    its operands. Each reading lives here in one place rather than being
+    duplicated per class, so a value function only has to pick a template.
 
-    The *name* is read as the value's noun (a leading ``get`` dropped) and the operands are read out
-    as a genitive over it. A nullary function is just the noun. This is the default, name-based surface
-    a value :class:`~krrood.entity_query_language.predicate.SymbolicFunction` reuses, so the reading
-    lives in one place rather than being duplicated per class.
+    The templates are stateless static methods; each takes the value function's *class* (its name read
+    as the value's noun, a leading ``get`` dropped) followed by its already-rendered operands, in the
+    order they are spoken.
 
-    :param name: The function's identifier (or class name).
-    :param operands: The function's already-rendered arguments.
-    :return: The value noun phrase.
+    ..note:: These build *noun phrases* — a value is a referring expression. The boolean counterpart for
+        a predicate is :func:`predicate_clause`, which builds a subject-led :class:`Clause`.
+    """
+
+    @staticmethod
+    def possessive(
+        function_class: type, *operands: ClauseConstituent
+    ) -> VerbalizationFragment:
+        """
+        Build *"the <noun> of <operands>"* — the operands read as a possessive genitive
+        over the value's noun. A nullary function is just the noun.
+
+        Reach for this when the value relates to its operands by the possessive *"of"* (``Length`` →
+        *"the length **of** …"*); use :meth:`custom_relation` for any other relating word.
+
+        :param function_class: The value function's class; its name is read as the value's noun.
+        :param operands: The function's already-rendered arguments, in spoken order.
+        :return: The value noun phrase.
+
+        >>> from krrood.entity_query_language.verbalization.fragments.base import (
+        ...     flatten_fragment_to_plain_text,
+        ... )
+        >>> from krrood.entity_query_language.verbalization.rendering.realization import (
+        ...     realize_tree,
+        ... )
+        >>> flatten_fragment_to_plain_text(realize_tree(
+        ...     FunctionVerbalizationTemplates.possessive(type("GetQuarter", (), {}))
+        ... ))
+        'quarter'
+        >>> flatten_fragment_to_plain_text(realize_tree(
+        ...     FunctionVerbalizationTemplates.possessive(
+        ...         type("RemainingLoad", (), {}), Noun.the("capacity")
+        ...     )
+        ... ))
+        'the remaining load of the capacity'
+        """
+        noun = function_as_noun(function_class.__name__)
+        if not operands:
+            return Noun.bare(noun).as_fragment()
+        return possessive_path(
+            [PathStep(noun)], ConjunctivePhrase(operands).as_fragment()
+        )
+
+    @staticmethod
+    def custom_relation(
+        function_class: type, relation: ClauseConstituent, *operands: ClauseConstituent
+    ) -> VerbalizationFragment:
+        """
+        Build *"the <noun> <relation> <operands...>"* — the general value noun
+        phrase for a value whose relation to its operands is not the possessive
+        *"of"* that :meth:`possessive` hardcodes (e.g. a length BETWEEN two
+        things).
+
+        The operands are joined with *"and"*; the relation is any constituent, typically a
+        :class:`~krrood.entity_query_language.verbalization.vocabulary.english.Prepositions` member.
+
+        :param function_class: The value function's class; its name is read as the value's noun.
+        :param relation: The word relating the value to its operands.
+        :param operands: The function's already-rendered arguments, in spoken order.
+        :return: The value noun phrase.
+
+        >>> from krrood.entity_query_language.verbalization.fragments.base import (
+        ...     flatten_fragment_to_plain_text,
+        ... )
+        >>> from krrood.entity_query_language.verbalization.rendering.realization import (
+        ...     realize_tree,
+        ... )
+        >>> flatten_fragment_to_plain_text(realize_tree(
+        ...     FunctionVerbalizationTemplates.custom_relation(
+        ...         type("InheritancePathLength", (), {}),
+        ...         Prepositions.BETWEEN,
+        ...         Noun.the("begin"),
+        ...         Noun.the("end"),
+        ...     )
+        ... ))
+        'the inheritance path length between the begin and the end'
+        """
+        return PhraseFragment(
+            parts=[
+                Noun.the(function_as_noun(function_class.__name__)).as_fragment(),
+                relation.as_fragment(),
+                ConjunctivePhrase(operands).as_fragment(),
+            ]
+        )
+
+
+def predicate_clause(
+    predicate_class: type, subject: ClauseConstituent, *objects: ClauseConstituent
+) -> Clause:
+    """
+    Build a predicate clause from a predicate's *class* and its operands — the boolean
+    counterpart of :meth:`FunctionVerbalizationTemplates.possessive`.
+
+    The class name (CamelCase or snake_case) is read as the predicate. A copular name — its leading
+    word a form of *"be"* (``IsReachable``) — uses the copula with the remaining words as the
+    complement (*"<subject> is reachable"*). Any other name reads verb-first, so a wrapping ``Not``
+    negates it with do-support (``ConnectsTo`` → *"<subject> connects to <object>"*). The first
+    operand is the subject; any further operands are trailing objects.
+
+    A copular complement attaches trailing operands only through a final preposition
+    (``is_supported_by`` → *"… is supported by <object>"*). With none, an adjective/noun complement
+    cannot take them as objects and naming any single operand the subject would be a false claim, so
+    the condition is stated to *hold given* all operands: *"one month holds given the begin and the end"*.
+
+    ..note:: The class name is only read as an English predicate when it happens to be a grammatical
+        verb phrase (``IsReachable``, ``ConnectsTo``). This surface is opt-in — a predicate uses it by
+        building its :meth:`~…predicate.Verbalizable._verbalization_fragment_` from this function; one
+        whose name does not read that way builds a custom clause from the :func:`clause` vocabulary
+        instead.
+
+    :param predicate_class: The predicate's class; its name is read as the predicate.
+    :param subject: The first operand, rendered as the clause's subject.
+    :param objects: Any further operands, rendered as trailing objects.
+    :return: The predicate clause.
+
+    A bare literal :class:`Noun` (e.g. ``Noun("Robot")``) still needs the lowering passes
+    (:func:`~…rendering.realization.realize_tree`) to choose its article before it can be flattened
+    to text — the examples below realize the clause first, the same as a full query render does.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import (
-    ...     flatten_fragment_to_plain_text, WordFragment,
+    ...     flatten_fragment_to_plain_text,
     ... )
-    >>> flatten_fragment_to_plain_text(function_as_phrase("GetQuarter"))
-    'quarter'
-    >>> flatten_fragment_to_plain_text(
-    ...     function_as_phrase("RemainingLoad", Noun(WordFragment(text="the capacity")))
+    >>> from krrood.entity_query_language.verbalization.rendering.realization import (
+    ...     realize_tree,
     ... )
-    'the remaining load of the capacity'
+    >>> def render(fragment):
+    ...     return flatten_fragment_to_plain_text(realize_tree(fragment))
+    >>> class IsReachable: pass
+    >>> render(predicate_clause(IsReachable, Noun("Robot")))
+    'a Robot is reachable'
+    >>> class ConnectsTo: pass
+    >>> render(predicate_clause(ConnectsTo, Noun("body"), Noun("gripper")))
+    'a body connects to a gripper'
+    >>> class IsOneMonth: pass
+    >>> render(predicate_clause(IsOneMonth, Noun.the("begin"), Noun.the("end")))
+    'one month holds given the begin and the end'
     """
-    noun = function_as_noun(name)
-    if not operands:
-        return Noun(WordFragment(text=noun)).as_fragment()
-    owner = oxford_comma(
-        [operand.as_fragment() for operand in operands], Conjunctions.AND.as_fragment()
+    head, *rest = camel_case_to_words(predicate_class.__name__).split()
+    complement = [WordFragment(text=word) for word in rest]
+    is_copular = morphology.verb_lemma(head) == Copula.lemma
+    if is_copular and objects and (not rest or rest[-1] not in Prepositions.texts()):
+        operands = ConjunctivePhrase(
+            [Noun(subject), *(Noun(obj) for obj in objects)]
+        ).as_fragment()
+        return clause(
+            Noun(PhraseFragment(parts=complement)),
+            Verb("hold"),
+            WordFragment(text="given"),
+            operands,
+        )
+    predicate = (
+        [Copula(), *complement]
+        if is_copular
+        else [Verb(morphology.verb_lemma(head)), *complement]
     )
-    return possessive_path([PathStep(noun)], owner)
+    return clause(Noun(subject), *predicate, *(Noun(obj) for obj in objects))

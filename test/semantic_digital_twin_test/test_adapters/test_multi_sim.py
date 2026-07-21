@@ -5,6 +5,7 @@ import time
 import mujoco
 import pytest
 import numpy
+from PIL import Image
 
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -24,14 +25,26 @@ from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
-from semantic_digital_twin.world_description.geometry import Box, Scale, Color, Cylinder
+from semantic_digital_twin.world_description.geometry import (
+    Box,
+    Scale,
+    Color,
+    Cylinder,
+    Mesh,
+    Texture,
+)
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body, Region, Actuator
 
 from physics_simulators.mujoco_simulator import MujocoSimulator
 from physics_simulators.base_simulator import SimulatorState
 from semantic_digital_twin.adapters.mjcf import MJCFParser
-from semantic_digital_twin.adapters.multi_sim import MujocoSim, MujocoActuator
+from semantic_digital_twin.adapters.multi_sim import (
+    MujocoSim,
+    MujocoActuator,
+    MujocoBuilder,
+    MujocoLight,
+)
 
 urdf_dir = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -301,6 +314,195 @@ def test_mesh_scale_and_equality(test_mjcf_2_world):
         stop_multisim_if_running(multi_sim)
 
 
+def _write_textured_tetrahedron(directory, texture_color) -> str:
+    """
+    Writes a minimal textured OBJ+MTL+PNG mesh (a tetrahedron, so its convex hull is
+    non-degenerate) into ``directory``, textured with a solid ``texture_color``, and returns
+    the OBJ file's path. Always named "tetra.obj"/"tetra.mtl"/"wood.png", so callers writing
+    into different directories can reproduce a texture basename collision between them.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (4, 4), color=texture_color).save(directory / "wood.png")
+    (directory / "tetra.mtl").write_text("newmtl wood\nmap_Kd wood.png\n")
+    mesh_file = directory / "tetra.obj"
+    mesh_file.write_text(
+        "mtllib tetra.mtl\n"
+        "o tetra\n"
+        "v 0.0 0.0 0.0\n"
+        "v 1.0 0.0 0.0\n"
+        "v 0.0 1.0 0.0\n"
+        "v 0.0 0.0 1.0\n"
+        "vt 0.0 0.0\n"
+        "vt 1.0 0.0\n"
+        "vt 0.0 1.0\n"
+        "vt 0.5 0.5\n"
+        "usemtl wood\n"
+        "f 1/1 2/2 3/3\n"
+        "f 1/1 2/2 4/4\n"
+        "f 1/1 3/3 4/4\n"
+        "f 2/2 3/3 4/4\n"
+    )
+    return str(mesh_file)
+
+
+def _build_world_with_two_textured_bodies(
+    tmp_path, mesh_file_a: str, mesh_file_b: str
+) -> MujocoBuilder:
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        for name, mesh_file in [("quad_0", mesh_file_a), ("quad_1", mesh_file_b)]:
+            mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
+            body = Body(
+                name=PrefixedName(name),
+                visual=ShapeCollection([mesh_shape]),
+                collision=ShapeCollection([mesh_shape]),
+            )
+            world.add_kinematic_structure_entity(body)
+            world.add_connection(FixedConnection(parent=root, child=body))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+    return builder
+
+
+def test_builder_assigns_material_to_every_geom_sharing_a_texture(tmp_path):
+    """
+    Regression test: MujocoBuilder._parse_geom used to return early - without ever setting
+    geom_props["material"] - whenever a geom's texture was already registered by an earlier
+    geom. Since most textures in a scene are shared across many geoms (a real RoboCasa
+    kitchen reuses a handful of textures across ~90 meshes), this meant only the first geom
+    to use a given texture ever got a material; every later reuse silently rendered with
+    MuJoCo's default (untextured, gray) material instead.
+    """
+    mesh_file = _write_textured_tetrahedron(tmp_path, texture_color=(120, 60, 20))
+
+    builder = _build_world_with_two_textured_bodies(tmp_path, mesh_file, mesh_file)
+
+    materials = {
+        body.name: geom.material for body in builder.spec.bodies for geom in body.geoms
+    }
+    assert materials["quad_0"] == materials["quad_1"]
+    assert materials["quad_0"] != ""
+
+
+def test_builder_does_not_confuse_different_textures_sharing_a_basename(tmp_path):
+    """
+    Regression test: RoboCasa's asset pipeline reuses generic texture basenames (e.g.
+    "T_BC001.png") across many unrelated fixtures' own distinct texture files - a real
+    kitchen had 14 different fixtures (sink, stove, fridge, dishwasher, ...) all using a
+    texture file named exactly "T_BC001.png" in their own directories. Deduplicating by
+    basename alone collapsed all of them onto whichever fixture's texture was registered
+    first, so most fixtures rendered with the wrong (borrowed) texture image instead of
+    their own.
+    """
+    mesh_file_a = _write_textured_tetrahedron(
+        tmp_path / "fixture_a", texture_color=(200, 0, 0)
+    )
+    mesh_file_b = _write_textured_tetrahedron(
+        tmp_path / "fixture_b", texture_color=(0, 200, 0)
+    )
+
+    builder = _build_world_with_two_textured_bodies(tmp_path, mesh_file_a, mesh_file_b)
+
+    materials = {
+        body.name: geom.material for body in builder.spec.bodies for geom in body.geoms
+    }
+    assert materials["quad_0"] != materials["quad_1"]
+    texture_files = {texture.name: texture.file for texture in builder.spec.textures}
+    assert len(texture_files) == 2
+
+
+def test_builder_writes_a_light_attached_to_a_body(tmp_path):
+    """
+    Regression test: MujocoBuilder had no handling for MujocoLight additional properties at
+    all, so a world's lights were silently dropped when built into a MuJoCo scene - every
+    recorded/simulated world fell back to MuJoCo's minimal default camera headlight instead
+    of the scene's own intended lighting.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        root.simulator_additional_properties.append(
+            MujocoLight(
+                name="overview_light",
+                body=root,
+                directional=True,
+                position=[2.0, -2.0, 2.0],
+                direction=[0.0, 0.0, -1.0],
+                ambient=[0.3, 0.3, 0.3],
+                diffuse=[0.5, 0.5, 0.5],
+                specular=[0.3, 0.3, 0.3],
+            )
+        )
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [light] = [light for body in builder.spec.bodies for light in body.lights]
+    assert light.name == "overview_light"
+    assert list(light.pos) == pytest.approx([2.0, -2.0, 2.0])
+    assert list(light.ambient) == pytest.approx([0.3, 0.3, 0.3])
+    assert list(light.diffuse) == pytest.approx([0.5, 0.5, 0.5])
+
+
+def test_builder_assigns_material_to_a_textured_primitive_shape(tmp_path):
+    """
+    Regression test: Box/Sphere/Cylinder shapes never carried any texture reference, only a
+    flat Color - RoboCasa's countertops and cabinet doors are actual MJCF box geoms with a
+    material referencing a marble/wood texture, so this whole texture reference was silently
+    discarded on every round-trip and they rendered flat-colored instead of textured.
+    """
+    texture_directory = tmp_path / "textures"
+    texture_directory.mkdir()
+    texture_file = texture_directory / "marble.png"
+    Image.new("RGB", (4, 4), color=(200, 200, 200)).save(texture_file)
+
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        box_shape = Box(
+            scale=Scale(1, 1, 1),
+            texture=Texture(
+                file_path=str(texture_file), repeat=(3.0, 3.0), uniform=True
+            ),
+        )
+        counter = Body(
+            name=PrefixedName("counter"),
+            visual=ShapeCollection([box_shape]),
+            collision=ShapeCollection([box_shape]),
+        )
+        world.add_kinematic_structure_entity(counter)
+        world.add_connection(FixedConnection(parent=root, child=counter))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [geom] = [
+        geom
+        for body in builder.spec.bodies
+        for geom in body.geoms
+        if body.name == "counter"
+    ]
+    assert geom.material != ""
+    [material] = [
+        material
+        for material in builder.spec.materials
+        if material.name == geom.material
+    ]
+    assert list(material.texrepeat) == pytest.approx([3.0, 3.0])
+    assert bool(material.texuniform) is True
+    texture_name = material.textures[0]
+    assert texture_name != ""
+    [texture] = [
+        texture for texture in builder.spec.textures if texture.name == texture_name
+    ]
+    assert texture.file == str(texture_file)
+
+
 def test_mujoco_with_tracy_dae_files():
     try:
         dae_world = URDFParser.from_file(file_path=TEST_URDF_TRACY).parse()
@@ -476,6 +678,80 @@ def test_spawn_body_with_connections():
         }
 
         multi_sim.stop_simulation()
+    finally:
+        stop_multisim_if_running(multi_sim)
+
+
+def test_body_frame_excludes_joint_state_at_build_time():
+    """A body's static frame must be built at the reference (zero-joint) pose.
+
+    The joint is non-zero while the simulator is built and is evaluated at a
+    different angle, so a frame that baked in the build-time angle would have it
+    applied twice and drift away from the world forward kinematics.
+    """
+    world = World()
+    base_body = Body(name=PrefixedName("base"))
+    rotated_link = Body(name=PrefixedName("rotated_link"))
+    # A tip offset from the joint axis, so a rotation actually moves its position
+    # (the joint child sits on the axis and would not reveal the bug).
+    tip_link = Body(name=PrefixedName("tip"))
+    rotated_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=0.3,
+        pos_y=0.0,
+        pos_z=0.9,
+        quat_w=0.707,
+        quat_x=0.707,
+        quat_y=0.0,
+        quat_z=0.0,
+    )
+    tip_offset = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5, y=0.2, z=0.0)
+    rotated_joint_dof = DegreeOfFreedom(name=PrefixedName("rotated_joint"))
+    with world.modify_world():
+        world.add_body(base_body)
+        world.add_degree_of_freedom(rotated_joint_dof)
+        world.add_connection(
+            RevoluteConnection(
+                name=rotated_joint_dof.name,
+                parent=base_body,
+                child=rotated_link,
+                axis=Vector3.Z(reference_frame=rotated_link),
+                raw_dof=rotated_joint_dof,
+                parent_T_connection_expression=rotated_origin,
+            )
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=rotated_link,
+                child=tip_link,
+                parent_T_connection_expression=tip_offset,
+            )
+        )
+
+    build_time_angle = 0.7
+    with world.modify_world():
+        world.state[rotated_joint_dof.id].position = build_time_angle
+
+    multi_sim = MujocoSim(world=world, headless=headless, step_size=0.001)
+    try:
+        evaluation_angle = 0.3
+        with world.modify_world():
+            world.state[rotated_joint_dof.id].position = evaluation_angle
+
+        mujoco_model = multi_sim.simulator._mj_model
+        mujoco_data = multi_sim.simulator._mj_data
+        joint_id = mujoco.mj_name2id(
+            mujoco_model, mujoco.mjtObj.mjOBJ_JOINT, rotated_joint_dof.name.name
+        )
+        mujoco_data.qpos[mujoco_model.jnt_qposadr[joint_id]] = evaluation_angle
+        mujoco.mj_forward(mujoco_model, mujoco_data)
+
+        simulated_position = multi_sim.simulator.get_body_position(
+            tip_link.name.name
+        ).result[:3]
+        world_position = world.compute_forward_kinematics_np(world.root, tip_link)[
+            :3, 3
+        ]
+        numpy.testing.assert_allclose(simulated_position, world_position, atol=1e-4)
     finally:
         stop_multisim_if_running(multi_sim)
 

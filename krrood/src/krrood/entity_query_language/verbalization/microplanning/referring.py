@@ -70,26 +70,37 @@ def referring_noun_with_restrictions(
 
 @dataclass
 class _CanonicalReferentGrouping:
-    """Numberable referent ids grouped under their canonical entity (``==``-unified referents
-    collapse to one), recording each type's canonicals in encounter order so they can be numbered.
+    """
+    Numberable referent ids grouped under their canonical entity (``==``-unified
+    referents collapse to one), recording each type's canonicals in encounter order so
+    they can be numbered.
     """
 
     canonicals_by_type: Dict[str, List[uuid.UUID]] = field(
         default_factory=lambda: defaultdict(list)
     )
-    """Each type's canonical entities, in first-encounter order — a type with two or more is numbered."""
+    """
+    Each type's canonical entities, in first-encounter order — a type with two or more
+    is numbered.
+    """
 
     members_by_canonical: Dict[uuid.UUID, List[uuid.UUID]] = field(
         default_factory=lambda: defaultdict(list)
     )
-    """Every original referent id that maps to a given canonical entity."""
+    """
+    Every original referent id that maps to a given canonical entity.
+    """
 
     _type_of_canonical: Dict[uuid.UUID, str] = field(default_factory=dict)
-    """The type a canonical was first registered under (guards against re-listing it)."""
+    """
+    The type a canonical was first registered under (guards against re-listing it).
+    """
 
     def add(self, referent_id: uuid.UUID, canonical: uuid.UUID, type_name: str) -> None:
-        """Record *referent_id* as a member of *canonical*, registering *canonical* under *type_name*
-        on first sight."""
+        """
+        Record *referent_id* as a member of *canonical*, registering *canonical* under
+        *type_name* on first sight.
+        """
         if canonical not in self._type_of_canonical:
             self._type_of_canonical[canonical] = type_name
             self.canonicals_by_type[type_name].append(canonical)
@@ -113,31 +124,45 @@ class _CanonicalReferentGrouping:
 
 @dataclass(frozen=True)
 class NumberedLabel:
-    """A variable's disambiguation label and whether it was numbered (*"Robot"* vs *"Robot 2"*)."""
+    """
+    A variable's disambiguation label and whether it was numbered (*"Robot"* vs *"Robot
+    2"*).
+    """
 
     text: str
-    """The display label — the plain type name, or a numbered *"TypeName N"* on a collision."""
+    """
+    The display label — the plain type name, or a numbered *"TypeName N"* on a
+    collision.
+    """
 
     is_numbered: bool
-    """``True`` when the label was disambiguated with a number (so it renders ``BARE``)."""
+    """
+    ``True`` when the label was disambiguated with a number (so it renders ``BARE``).
+    """
 
 
 @dataclass(frozen=True)
 class NounForm:
-    """The first-mention determiner form for a variable noun: its definiteness and label."""
+    """
+    The first-mention determiner form for a variable noun: its definiteness and label.
+    """
 
     definiteness: Definiteness
-    """``BARE`` for a numbered label, else ``INDEFINITE`` (*"a Robot"*)."""
+    """
+    ``BARE`` for a numbered label, else ``INDEFINITE`` (*"a Robot"*).
+    """
 
     label: str
-    """The display label for the noun head."""
+    """
+    The display label for the noun head.
+    """
 
 
 @dataclass
 class ReferringExpressions:
     """
-    Pre-computed referring-expression state for a verbalization pass: the disambiguation labels
-    (numbering colliding types) and the set of referents already introduced.
+    Pre-computed referring-expression state for a verbalization pass: the disambiguation
+    labels (numbering colliding types) and the set of referents already introduced.
 
     This is the referring-expression generation subtask of microplanning: deciding between an
     indefinite first mention (*"a Robot"*), a definite subsequent mention (*"the Robot"*), a
@@ -151,18 +176,29 @@ class ReferringExpressions:
     """
 
     seen: Set[uuid.UUID] = field(default_factory=set)
-    """Referent ``_id_`` s introduced so far, used to seed coreference across builds sharing this
-    context, so verbalizing the same expression twice reads *"a Robot"* then *"the Robot"*."""
+    """
+    Referent ``_id_`` s introduced so far, used to seed coreference across builds
+    sharing this context, so verbalizing the same expression twice reads *"a Robot"*
+    then *"the Robot"*.
+    """
 
     disambiguation_map: Dict[uuid.UUID, str] = field(default_factory=dict)
-    """Maps variable ``_id_`` → display label, pre-computed before verbalization
-    begins.  Single-type variables keep the plain type name; colliding types get
-    ``"TypeName 1"``, ``"TypeName 2"`` labels."""
+    """
+    Maps variable ``_id_`` → display label, pre-computed before verbalization begins.
+
+    Single-type variables keep the plain type name; colliding types get ``"TypeName
+    1"``, ``"TypeName 2"`` labels.
+    """
 
     numbered_labels: Dict[uuid.UUID, str] = field(default_factory=dict)
-    """The subset of :attr:`disambiguation_map` whose label was actually numbered (the collisions).
-    Relational referents carry no rule-resolved label — their relative-clause noun phrase is built
-    deep in the microplanner — so the coreference pass applies these to number them *"Robot 1"*."""
+    """
+    The subset of :attr:`disambiguation_map` whose label was actually numbered (the
+    collisions).
+
+    Relational referents carry no rule-resolved label — their relative-clause noun
+    phrase is built deep in the microplanner — so the coreference pass applies these to
+    number them *"Robot 1"*.
+    """
 
     @classmethod
     def from_expression(cls, expression: SymbolicExpression) -> ReferringExpressions:

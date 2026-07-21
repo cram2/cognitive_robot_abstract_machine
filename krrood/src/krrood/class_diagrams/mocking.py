@@ -13,7 +13,9 @@ class MockedModule:
 @dataclass
 class MockedClass:
     """
-    Base class for mocking classes. Cannot be instantiated (will raise an error).
+    Base class for mocking classes.
+
+    Cannot be instantiated (will raise an error).
     """
 
     def __new__(cls, *args, **kwargs):

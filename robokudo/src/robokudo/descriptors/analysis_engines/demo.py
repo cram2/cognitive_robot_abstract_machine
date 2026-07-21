@@ -1,4 +1,5 @@
-"""Analysis engine demonstrating basic tabletop segmentation.
+"""
+Analysis engine demonstrating basic tabletop segmentation.
 
 This module provides a basic analysis engine that demonstrates tabletop
 segmentation using a Kinect camera. It implements a straightforward pipeline
@@ -24,11 +25,14 @@ from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for basic tabletop segmentation.
+    """
+    Analysis engine for basic tabletop segmentation.
 
     This class implements a simple pipeline for tabletop segmentation using
     a Kinect camera. It processes point cloud data to identify and segment
@@ -48,14 +52,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "demo"
 
     def implementation(self) -> Pipeline:
-        """Create a basic pipeline for tabletop segmentation.
+        """
+        Create a basic pipeline for tabletop segmentation.
 
         This method constructs a processing pipeline that performs tabletop
         segmentation using point cloud data from a Kinect camera. The pipeline
@@ -76,7 +82,9 @@ class AnalysisEngine(AnalysisEngineInterface):
             The pipeline includes commented-out options for adding triggers
             and slow processing simulation, which can be useful for debugging.
         """
-        kinect_config = CrDescriptorFactory.create_descriptor("kinect_wo_tf")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            "kinect_wo_tf"
+        )
 
         seq = Pipeline("RWPipeline")
         seq.add_children(

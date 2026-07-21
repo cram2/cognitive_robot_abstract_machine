@@ -1,6 +1,6 @@
 """
-The realisation-pass framework — one shared contract for the ordered lowering passes that
-:func:`~…rendering.realization.realize_tree` runs over the fragment tree.
+The realisation-pass framework — one shared contract for the ordered lowering passes
+that :func:`~…rendering.realization.realize_tree` runs over the fragment tree.
 
 A :class:`RealizationPass` is *fragment in, fragment out*; the pipeline runs a list of them in
 order. A :class:`RewritePass` captures the common case — a stateless pass that is fully described by
@@ -21,7 +21,9 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 
 
 class RealizationPass(ABC):
-    """One ordered lowering pass over the realised fragment tree."""
+    """
+    One ordered lowering pass over the realised fragment tree.
+    """
 
     @abstractmethod
     def process(self, fragment: VerbalizationFragment) -> VerbalizationFragment:
@@ -33,10 +35,12 @@ class RealizationPass(ABC):
 
 class RewritePass(RealizationPass, ABC):
     """
-    A stateless pass expressed as a single *leaf* rewrite: :func:`~…fragments.base.map_fragment`
-    rebuilds the tree bottom-up, replacing each leaf with :meth:`rewrite` and reconstructing the
-    structural containers automatically — so a leaf-local pass (determiner lowering, morphology)
-    declares only what to do to a leaf, never how to traverse.
+    A stateless pass expressed as a single *leaf* rewrite:
+
+    :func:`~…fragments.base.map_fragment` rebuilds the tree bottom-up, replacing each
+    leaf with :meth:`rewrite` and reconstructing the structural containers automatically
+    — so a leaf-local pass (determiner lowering, morphology) declares only what to do to
+    a leaf, never how to traverse.
     """
 
     @abstractmethod

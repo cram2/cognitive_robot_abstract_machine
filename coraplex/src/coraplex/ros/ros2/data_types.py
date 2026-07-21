@@ -5,7 +5,8 @@ import builtin_interfaces
 
 class Time(builtin_interfaces.msg.Time):
     """
-    Class to abstract the ROS2 Time, to make it more consistent with the ROS1 Time class.
+    Class to abstract the ROS2 Time, to make it more consistent with the ROS1 Time
+    class.
     """
 
     def __init__(self, time=0, nsecs=0):

@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from typing_extensions import Tuple
 
 
@@ -21,7 +22,7 @@ class DepthComponent:
 class ColorComponent:
     """Camera component with configuration for color input data."""
 
-    topic_cam_info: str
+    topic_camera_info: str
     """ROS camera info topic name. Must be set by camera configs using this component."""
 
     topic_color: str
@@ -46,6 +47,25 @@ class TfComponent:
 
     lookup_viewpoint: bool = True
     """Whether to lookup the viewpoint between the camera and the world."""
+
+
+@dataclass(kw_only=True)
+class StaticCameraTransformComponent:
+    """Camera component with configuration for a fixed camera transform."""
+
+    static_camera_transform_enabled: bool = False
+    """Whether to write a configured static camera transform into each CAS."""
+
+    static_world_frame: str = "map"
+    """World frame ID for the configured static camera transform."""
+
+    static_camera_frame: str = "camera"
+    """Camera frame ID for the configured static camera transform."""
+
+    static_world_T_camera: HomogeneousTransformationMatrix = field(
+        default_factory=HomogeneousTransformationMatrix
+    )
+    """Camera pose relative to the configured world frame."""
 
 
 @dataclass(kw_only=True)

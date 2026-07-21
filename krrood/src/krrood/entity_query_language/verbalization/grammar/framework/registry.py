@@ -14,9 +14,11 @@ from krrood.patterns.specificity_ranking import concrete_subclasses
 
 def _load_rule_modules() -> None:
     """
-    Import every construct's ``rules`` module so its :class:`PhraseRule` subclasses are loaded (and
-    therefore discoverable) before ``RULES`` is built. Discovered by walking the ``grammar`` package
-    rather than a hand-maintained import list, so a new construct is registered simply by adding its
+    Import every construct's ``rules`` module so its :class:`PhraseRule` subclasses are
+    loaded (and therefore discoverable) before ``RULES`` is built.
+
+    Discovered by walking the ``grammar`` package rather than a hand-maintained import
+    list, so a new construct is registered simply by adding its
     ``grammar/<construct>/rules.py`` — no edit here.
     """
     for module_info in pkgutil.walk_packages(

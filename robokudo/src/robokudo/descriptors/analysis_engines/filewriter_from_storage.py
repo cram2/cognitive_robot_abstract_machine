@@ -1,4 +1,5 @@
-"""Analysis engine for writing stored data to filesystem.
+"""
+Analysis engine for writing stored data to filesystem.
 
 This module provides an analysis engine that demonstrates how to read data from
 MongoDB storage and write it to the local filesystem. It implements a simple
@@ -22,11 +23,14 @@ from robokudo.annotators.file_writer import FileWriter
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for transferring data from MongoDB to filesystem.
+    """
+    Analysis engine for transferring data from MongoDB to filesystem.
 
     This class implements a pipeline that reads data from MongoDB storage and
     writes it to the local filesystem. It is designed to facilitate data
@@ -44,22 +48,26 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "filewriter_from_storage"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline for writing MongoDB data to filesystem.
+        """
+        Create a pipeline for writing MongoDB data to filesystem.
 
-        This method constructs a processing pipeline that reads data from MongoDB
-        and writes it to the local filesystem. The pipeline is configured to
-        perform a single pass over the stored data.
+        This method constructs a processing pipeline that reads data from MongoDB and
+        writes it to the local filesystem. The pipeline is configured to perform a
+        single pass over the stored data.
 
         :return: The configured pipeline for data transfer
         """
-        cr_storage_config = CrDescriptorFactory.create_descriptor("mongo", loop=False)
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            "mongo", loop=False
+        )
 
         seq = Pipeline("StoragePipeline")
         seq.add_children(

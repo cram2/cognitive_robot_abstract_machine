@@ -4,17 +4,23 @@ from rclpy.node import Node
 from typing_extensions import Any
 
 _rk_node: Node = None
-"""Central RoboKudo ROS node."""
+"""
+Central RoboKudo ROS node.
+"""
 
 _rk_node_lock = Lock()
-"""Lock for safe creation of the central ROS node."""
+"""
+Lock for safe creation of the central ROS node.
+"""
 
 
 def init_node(node_name: str, *args: Any, **kwargs: Any) -> Node:
-    """Initialize the central RoboKudo ROS node. Args and kwargs are passed directly to rclpy.create_node().
+    """
+    Initialize the central RoboKudo ROS node.
 
-    Initializes the global rk_node variable if not already initialized. The node can simply be accessed through
-    robokudo.io.ros.rk_node at any time.
+    Args and kwargs are passed directly to rclpy.create_node().     Initializes the
+    global rk_node variable if not already initialized. The node can simply be accessed
+    through     robokudo.io.ros.rk_node at any time.
 
     :param node_name: Name of the ROS node
     :return: The newly created ROS node
@@ -27,7 +33,8 @@ def init_node(node_name: str, *args: Any, **kwargs: Any) -> Node:
 
 
 def get_node() -> Node:
-    """Get the central RoboKudo ROS node instance.
+    """
+    Get the central RoboKudo ROS node instance.
 
     :return: The central ROS node instance
     :raises RuntimeError: If the node has not been initialized yet

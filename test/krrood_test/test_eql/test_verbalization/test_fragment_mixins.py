@@ -1,12 +1,12 @@
 """
-Unit tests for the :class:`HasText` / :class:`HasNumber` fragment mixins — the single definition
-of the ``text`` and ``number`` fields, shared by the leaf/phrase fragments instead of being
-redeclared on each.
+Unit tests for the :class:`HasText` / :class:`HasNumber` fragment mixins — the single
+definition of the ``text`` and ``number`` fields, shared by the leaf/phrase fragments
+instead of being redeclared on each.
 
-These pin the two properties that justify the mixins: (1) the ``text`` / ``number`` fields are
-contributed by the mixins (one definition, reused), and (2) the migration preserves the existing
-construction contract — ``text`` stays positional, ``number`` is keyword-only — so no call site
-changes.
+These pin the two properties that justify the mixins: (1) the ``text`` / ``number``
+fields are contributed by the mixins (one definition, reused), and (2) the migration
+preserves the existing construction contract — ``text`` stays positional, ``number`` is
+keyword-only — so no call site changes.
 """
 
 from __future__ import annotations
@@ -31,8 +31,10 @@ def _field(cls, name) -> dc.Field:
 
 
 def test_text_field_is_defined_once_on_hastext():
-    """``text`` is contributed by :class:`HasText` — both text-bearing fragments inherit it,
-    none redeclares it."""
+    """
+    ``text`` is contributed by :class:`HasText` — both text-bearing fragments inherit
+    it, none redeclares it.
+    """
     assert HasText in WordFragment.__mro__
     assert HasText in RoleFragment.__mro__
     # The field exists on the concrete classes but is owned by the mixin, not redefined locally.
@@ -43,16 +45,20 @@ def test_text_field_is_defined_once_on_hastext():
 
 
 def test_number_field_is_defined_once_on_hasnumber():
-    """``number`` is contributed by :class:`HasNumber` — every fragment whose own text the
-    morphology pass pluralises inherits it, none redeclares it."""
+    """
+    ``number`` is contributed by :class:`HasNumber` — every fragment whose own text the
+    morphology pass pluralises inherits it, none redeclares it.
+    """
     for cls in (WordFragment, RoleFragment, NounPhrase):
         assert HasNumber in cls.__mro__
         assert "number" not in cls.__dict__.get("__annotations__", {})
 
 
 def test_number_is_keyword_only_and_text_is_positional():
-    """The migration keeps the construction contract: ``text`` positional (so ``WordFragment("x")``
-    keeps working), ``number`` keyword-only (so it never disturbs required-field ordering).
+    """
+    The migration keeps the construction contract: ``text`` positional (so
+    ``WordFragment("x")`` keeps working), ``number`` keyword-only (so it never disturbs
+    required-field ordering).
     """
     assert _field(WordFragment, "text").kw_only is False
     assert _field(RoleFragment, "text").kw_only is False
@@ -62,8 +68,10 @@ def test_number_is_keyword_only_and_text_is_positional():
 
 
 def test_positional_construction_preserved():
-    """The existing positional constructions still build (``text`` first), with the inherited
-    ``number`` defaulting to SINGULAR."""
+    """
+    The existing positional constructions still build (``text`` first), with the
+    inherited ``number`` defaulting to SINGULAR.
+    """
     assert WordFragment("the").text == "the"
     assert WordFragment("the").number is GrammaticalNumber.SINGULAR
     role = RoleFragment("Robot", SemanticRole.VARIABLE)
@@ -75,7 +83,9 @@ def test_positional_construction_preserved():
 
 
 def test_number_passed_by_keyword():
-    """``number=`` keyword construction reaches the inherited field on every fragment."""
+    """
+    ``number=`` keyword construction reaches the inherited field on every fragment.
+    """
     assert (
         WordFragment(text="x", number=GrammaticalNumber.PLURAL).number
         is GrammaticalNumber.PLURAL

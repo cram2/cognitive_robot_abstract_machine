@@ -109,7 +109,8 @@ class Layer(eqx.Module, SubclassJSONSerializer, ABC):
         """
         Create a deep copy of the layer.
 
-        :param memo: A dictionary that is used to keep track of objects that have already been copied.
+        :param memo: A dictionary that is used to keep track of objects that have
+            already been copied.
         """
         raise NotImplementedError
 
@@ -128,14 +129,13 @@ class Layer(eqx.Module, SubclassJSONSerializer, ABC):
     ) -> List[Unit]:
         """
         Convert the layer to a networkx circuit.
-        For every node in this circuit, a corresponding node in the networkx circuit
-        is created.
-        The nodes all belong to the same circuit.
+
+        For every node in this circuit, a corresponding node in the networkx circuit is
+        created. The nodes all belong to the same circuit.
 
         :param variables: The variables of the circuit.
         :param result: The resulting circuit to write into
         :param progress_bar: A progress bar to show the progress.
-
         :return: The nodes of the networkx circuit.
         """
         raise NotImplementedError
@@ -228,7 +228,7 @@ class Layer(eqx.Module, SubclassJSONSerializer, ABC):
 
 class InnerLayer(Layer, ABC):
     """
-    Abstract Base Class for inner layers
+    Abstract Base Class for inner layers.
     """
 
     child_layers: List[Layer]
@@ -277,8 +277,9 @@ class InputLayer(Layer, ABC):
     """
     Abstract base class for univariate input units.
 
-    Input layers contain only one type of distribution such that the vectorization of the log likelihood
-    calculation works without bottleneck statements like if/else or loops.
+    Input layers contain only one type of distribution such that the vectorization of
+    the log likelihood calculation works without bottleneck statements like if/else or
+    loops.
     """
 
     def __init__(self, variable: int):
@@ -662,16 +663,17 @@ class ProductLayer(InnerLayer):
 
     child_layers: List[Union[SparseSumLayer, InputLayer]]
     """
-    The child of a product layer is a list that contains groups sum units with the same scope or groups of input
-    units with the same scope.
+    The child of a product layer is a list that contains groups sum units with the same
+    scope or groups of input units with the same scope.
     """
 
     edges: Int[BCOO, "len(child_layers), number_of_nodes"] = eqx.field(static=True)
     """
     The edges consist of a sparse matrix containing integers.
-    The first dimension describes the edges for each child layer.
-    The second dimension describes the edges for each node in the child layer.
-    The integers are interpreted in such a way that n-th value represents a edge (n, edges[n]).
+
+    The first dimension describes the edges for each child layer. The second dimension
+    describes the edges for each node in the child layer. The integers are interpreted
+    in such a way that n-th value represents a edge (n, edges[n]).
 
     Nodes in the child layer can be mapped to by multiple nodes in this layer.
 
@@ -859,7 +861,8 @@ class ProductLayer(InnerLayer):
 @dataclass
 class RustworkxLayerConverter:
     """
-    Class used for conversion from a probabilistic circuit in rustworkx to a layered circuit in jax.
+    Class used for conversion from a probabilistic circuit in rustworkx to a layered
+    circuit in jax.
     """
 
     layer: Layer

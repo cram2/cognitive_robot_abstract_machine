@@ -872,8 +872,8 @@ def test_path_custom_type(session, database):
 def test_selectin_loading_preloads_relationships(session, database):
     """
     Relationship attributes are loaded eagerly (the generated relationships use
-    lazy='selectin') and remain accessible after the instance is detached from
-    the session, with or without the selectin_loading() context manager.
+    lazy='selectin') and remain accessible after the instance is detached from the
+    session, with or without the selectin_loading() context manager.
     """
     p1 = KRROODPosition(1, 2, 3)
     p2 = KRROODPosition(2, 3, 4)
@@ -899,9 +899,9 @@ def test_selectin_loading_preloads_relationships(session, database):
 
 def test_selectin_loading_reduces_queries_during_from_dao(session, database):
     """
-    All relationships are bulk-fetched in O(1) queries during the initial read
-    (mapper-level lazy='selectin'), so from_dao() makes zero additional DB
-    round-trips, with or without the selectin_loading() context manager.
+    All relationships are bulk-fetched in O(1) queries during the initial read (mapper-
+    level lazy='selectin'), so from_dao() makes zero additional DB round-trips, with or
+    without the selectin_loading() context manager.
     """
     N = 30
     positions = KRROODPositions(

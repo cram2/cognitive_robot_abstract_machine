@@ -47,8 +47,8 @@ logger = logging.getLogger(__name__)
 class Color:
     """
     Dataclass for storing rgba_color as an RGBA value.
-    The values are stored as floats between 0 and 1.
-    The default rgba_color is white.
+
+    The values are stored as floats between 0 and 1. The default rgba_color is white.
     """
 
     R: float = 1.0
@@ -204,6 +204,34 @@ class Color:
 
 
 @dataclass
+class Texture:
+    """
+    A 2D image texture applied to a geometric primitive's surface (for example a MuJoCo
+    box/cylinder/sphere geom's ``material``). Mesh shapes carry their own texture as part of
+    their own trimesh visual instead, and do not use this.
+    """
+
+    file_path: str
+    """The texture image's file path."""
+
+    repeat: Tuple[float, float] = (1.0, 1.0)
+    """How many times the texture tiles across the surface, along each of its two axes."""
+
+    uniform: bool = False
+    """
+    Whether the texture is scaled uniformly across the surface, independent of the surface's
+    own size, rather than scaled to fit it.
+    """
+
+    def __post_init__(self):
+        """
+        Normalize :attr:`repeat` to a tuple of floats so a texture stays equal to itself
+        across a serialization round-trip, which restores the pair as a list.
+        """
+        self.repeat = tuple(float(value) for value in self.repeat)
+
+
+@dataclass
 class Scale:
     """
     Dataclass for storing the scale of geometric objects.
@@ -259,8 +287,8 @@ class Scale:
         self, simple_event: SimpleEvent, direction: Vector3, amount: float
     ) -> SimpleEvent:
         """
-        Extend the inner event in the specified direction to create the container opening in that direction.
-
+        Extend the inner event in the specified direction to create the container
+        opening in that direction.
 
         :return: The modified inner event with the specified direction extended.
         """
@@ -313,11 +341,18 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
 
     color: Color = field(default_factory=Color)
 
+    texture: Optional[Texture] = None
+    """
+    A texture applied to this shape's surface, or ``None`` for a flat ``color``. Only
+    meaningful for primitive shapes (:class:`Box`, :class:`Cylinder`, :class:`Sphere`);
+    :class:`Mesh` shapes carry their own texture as part of their trimesh visual instead.
+    """
+
     @property
     @abstractmethod
     def local_frame_bounding_box(self) -> BoundingBox:
         """
-        Returns the bounding box of the shape
+        Returns the bounding box of the shape.
         """
 
     @property
@@ -325,6 +360,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
     def mesh(self) -> trimesh.Trimesh:
         """
         The mesh object of the shape.
+
         This should be implemented by subclasses.
         """
 
@@ -333,10 +369,13 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
             **super().to_json(),
             "origin": to_json(self.origin),
             "color": to_json(self.color),
+            "texture": to_json(self.texture) if self.texture is not None else None,
         }
 
     def __eq__(self, other: Shape) -> bool:
-        """Custom equality comparison that handles TransformationMatrix equivalence"""
+        """
+        Custom equality comparison that handles TransformationMatrix equivalence.
+        """
         if not isinstance(other, self.__class__):
             return False
 
@@ -358,6 +397,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
     def copy_for_world(self, world: World) -> Self:
         """
         Copies this shape with references to the given world.
+
         :param world: The world to copy to.
         :return: A copy of this shape with references to the given world.
         """
@@ -377,6 +417,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
 class Mesh(Shape):
     """
     Abstract mesh class.
+
     Subclasses must provide a `mesh` property returning a trimesh.Trimesh.
     """
 
@@ -394,6 +435,7 @@ class Mesh(Shape):
     def local_frame_bounding_box(self) -> BoundingBox:
         """
         Returns the local bounding box of the mesh.
+
         The bounding box is axis-aligned and centered at the origin.
         """
         return BoundingBox.from_mesh(self.mesh, self.origin)
@@ -519,7 +561,9 @@ class Mesh(Shape):
     ) -> Mesh:
         """
         Create a Mesh from a PLY file path and an optional texture file path.
-        Ply files are not supported by RViz2, so we need to convert them to OBJ files with the textures intact.
+
+        Ply files are not supported by RViz2, so we need to convert them to OBJ files
+        with the textures intact.
         """
         texture_image = Image.open(texture_file_path)
         ply_file = PlyData.read(ply_file_path)
@@ -672,16 +716,17 @@ class Mesh(Shape):
         sv_ratio_tol: float = 1e-7,
     ) -> Self:
         """
-        Constructs a Region from a list of 3D points by creating a convex hull around them.
-        The points are analyzed to determine if they are approximately planar. If they are,
-        a minimum thickness is added to ensure the region has a non-zero volume.
+        Constructs a Region from a list of 3D points by creating a convex hull around
+        them. The points are analyzed to determine if they are approximately planar. If
+        they are, a minimum thickness is added to ensure the region has a non-zero
+        volume.
 
         :param name: Prefixed name for the region.
         :param points_3d: List of 3D points.
         :param reference_frame: Optional reference frame.
         :param minimum_thickness: Minimum thickness to add if points are near-planar.
-        :param sv_ratio_tol: Tolerance for determining planarity based on singular value ratio.
-
+        :param sv_ratio_tol: Tolerance for determining planarity based on singular value
+            ratio.
         :return: Region object.
         """
         points = np.asarray([point.to_np()[:3] for point in points_3d], dtype=float)
@@ -813,10 +858,12 @@ class Sphere(Shape):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        texture = data.get("texture")
         return cls(
             radius=data["radius"],
             origin=from_json(data["origin"], **kwargs),
             color=from_json(data["color"], **kwargs),
+            texture=from_json(texture, **kwargs) if texture is not None else None,
         )
 
 
@@ -844,6 +891,7 @@ class Cylinder(Shape):
     def local_frame_bounding_box(self) -> BoundingBox:
         """
         Returns the bounding box of the cylinder.
+
         The bounding box is axis-aligned and centered at the origin.
         """
         half_width = self.width / 2
@@ -863,18 +911,22 @@ class Cylinder(Shape):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        texture = data.get("texture")
         return cls(
             width=data["width"],
             height=data["height"],
             origin=from_json(data["origin"], **kwargs),
             color=from_json(data["color"], **kwargs),
+            texture=from_json(texture, **kwargs) if texture is not None else None,
         )
 
 
 @dataclass(eq=False)
 class Box(Shape):
     """
-    A box shape. Pivot point is at the center of the box.
+    A box shape.
+
+    Pivot point is at the center of the box.
     """
 
     scale: Scale = field(default_factory=Scale)
@@ -883,6 +935,7 @@ class Box(Shape):
     def mesh(self) -> trimesh.Trimesh:
         """
         Returns a trimesh object representing the box.
+
         The box is centered at the origin and has the specified scale.
         """
         mesh = trimesh.creation.box(extents=(self.scale.x, self.scale.y, self.scale.z))
@@ -893,6 +946,7 @@ class Box(Shape):
     def local_frame_bounding_box(self) -> BoundingBox:
         """
         Returns the local bounding box of the box.
+
         The bounding box is axis-aligned and centered at the origin.
         """
         half_x = self.scale.x / 2
@@ -913,10 +967,12 @@ class Box(Shape):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        texture = data.get("texture")
         return cls(
             scale=from_json(data["scale"], **kwargs),
             origin=from_json(data["origin"], **kwargs),
             color=from_json(data["color"], **kwargs),
+            texture=from_json(texture, **kwargs) if texture is not None else None,
         )
 
 
@@ -1096,7 +1152,8 @@ class BoundingBox:
         Compute the intersection of two bounding boxes.
 
         :param other: The other bounding box.
-        :return: The intersection of the two bounding boxes or None if they do not intersect.
+        :return: The intersection of the two bounding boxes or None if they do not
+            intersect.
         """
         other_in_same_frame = other.transform_to_origin(self.origin)
         result = self.simple_event.intersection_with(other_in_same_frame.simple_event)
@@ -1115,6 +1172,7 @@ class BoundingBox:
     ):
         """
         Enlarge the axis-aligned bounding box by a given amount in-place.
+
         :param min_x: The amount to enlarge the minimum x-coordinate
         :param min_y: The amount to enlarge the minimum y-coordinate
         :param min_z: The amount to enlarge the minimum z-coordinate
@@ -1131,7 +1189,8 @@ class BoundingBox:
 
     def enlarge_all(self, amount: float):
         """
-        Enlarge the axis-aligned bounding box in all dimensions by a given amount in-place.
+        Enlarge the axis-aligned bounding box in all dimensions by a given amount in-
+        place.
 
         :param amount: The amount to enlarge the bounding box
         """
@@ -1145,11 +1204,11 @@ class BoundingBox:
     ) -> Self:
         """
         Create a bounding box from a trimesh object.
+
         :param mesh: The trimesh object.
         :param origin: The origin of the bounding box.
         :return: The bounding box.
         """
-
         bounds = mesh.bounds
         return cls(
             bounds[0][0],

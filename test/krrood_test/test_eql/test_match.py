@@ -183,12 +183,46 @@ def test_from_restricts_the_search():
     assert {robot.name for robot in selected} == {"R2D2", "C3PO"}
 
 
+def test_from_after_where_still_restricts_the_search():
+    """
+    ``from_`` must still scope the search to its domain even when ``where`` (which
+    triggers resolution) is called first: the expression built while resolving ``where``
+    must not stay permanently cached against the domain-less subject ``__call__``
+    eagerly created.
+    """
+
+    @dataclass(unsafe_hash=True)
+    class Robot:
+        name: str
+        battery: int
+
+    subset = [Robot("R2D2", 100), Robot("C3PO", 0)]
+    query = a(Robot)()
+    query.where(query.variable.battery >= 0)
+    query.from_(subset)
+    selected = query.tolist()
+    assert {robot.name for robot in selected} == {"R2D2", "C3PO"}
+
+
 def test_from_without_kwargs_selects_all(handles_and_containers_world):
     world = handles_and_containers_world
     # an(Type)().from_(X) with no kwargs is a valid "any Type in X" select.
     selected = a(FixedConnection)().from_(world.connections).tolist()
     assert selected
     assert all(isinstance(connection, FixedConnection) for connection in selected)
+
+
+def test_match_without_domain_selects_from_symbol_graph():
+    """
+    A domain-less match evaluated standalone (default selective backend) *selects* from the
+    SymbolGraph for ``Symbol`` types: it returns the existing registered instance rather than
+    constructing a new one. Generation requires an explicit generative backend.
+    """
+    existing = KRROODPosition(1.0, 2.0, 3.0)
+    result = an(KRROODPosition)(x=1.0, y=2.0, z=3.0).tolist()
+    # the existing object itself is returned (selection), not a freshly-built equal one
+    assert any(r is existing for r in result)
+    assert all(isinstance(r, KRROODPosition) and r == existing for r in result)
 
 
 def test_match_with_list():
@@ -286,9 +320,9 @@ def test_has_ellipsis_attributes_true_for_nested_ellipsis():
 
 def test_has_ellipsis_attributes_true_for_ellipsis_element_in_plain_list():
     """
-    An ``...`` element sitting inside an otherwise-concrete list (no nested
-    ``Match`` elements) is still resolved as one literal-valued attribute
-    match, but is just as underspecified as a direct ``x=...`` assignment.
+    An ``...`` element sitting inside an otherwise-concrete list (no nested ``Match``
+    elements) is still resolved as one literal-valued attribute match, but is just as
+    underspecified as a direct ``x=...`` assignment.
     """
     match = a(KRROODPositions)(
         positions=[KRROODPosition(1, 2, 3)],

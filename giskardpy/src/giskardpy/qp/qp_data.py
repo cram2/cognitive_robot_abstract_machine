@@ -14,6 +14,7 @@ from typing_extensions import Self
 class QPData(ABC):
     """
     Parent class for a container of input for a QP solver.
+
     Subclasses implement specific formats for the QP problem.
     """
 
@@ -30,7 +31,8 @@ class QPData(ABC):
     @abstractmethod
     def apply_filters(self) -> Self:
         """
-        Applies filters to the QP data to remove constraints that have slack-variables with 0 weight.
+        Applies filters to the QP data to remove constraints that have slack-variables
+        with 0 weight.
         """
 
 
@@ -80,6 +82,7 @@ class QPDataExplicit(QPData):
     """
     Lower bounds for the inequality matrix multiplied with x.
     """
+
     inequality_upper_bounds: np.ndarray
     """
     Upper bounds for the inequality matrix multiplied with x.
@@ -179,7 +182,8 @@ class QPDataExplicit(QPData):
         zero_quadratic_weight_filter: np.ndarray,
     ) -> sp.csc_matrix:
         """
-        Filters the equality matrix by removing specified rows and columns associated with inactive motion statechart nodes.
+        Filters the equality matrix by removing specified rows and columns associated
+        with inactive motion statechart nodes.
         """
         if len(eq_matrix.shape) > 1 and eq_matrix.shape[0] * eq_matrix.shape[1] > 0:
             return eq_matrix[bE_filter, :][:, zero_quadratic_weight_filter]
@@ -192,7 +196,8 @@ class QPDataExplicit(QPData):
         zero_quadratic_weight_filter: np.ndarray,
     ) -> sp.csc_matrix:
         """
-        Filters the inequality matrix by removing specified rows and columns associated with inactive motion statechart nodes.
+        Filters the inequality matrix by removing specified rows and columns associated
+        with inactive motion statechart nodes.
         """
         if len(neq_matrix.shape) > 1 and neq_matrix.shape[0] * neq_matrix.shape[1] > 0:
             return neq_matrix[:, zero_quadratic_weight_filter][bA_filter, :]
@@ -201,6 +206,7 @@ class QPDataExplicit(QPData):
     def pretty_print_problem(self):
         """
         Returns a human-readable string representation of the QP problem.
+
         Use this to create test cases for QPs that cannot be solved.
         """
         return (
@@ -243,6 +249,7 @@ class QPDataExplicit(QPData):
     def analyze_well_posedness(self):
         """
         Analyzes the QP problem data for numerical issues and poor posing.
+
         Prints statistics and warnings for potentially ill-posed problems.
         """
         print("--- QP Well-Posedness Analysis ---")
@@ -440,7 +447,9 @@ class QPDataTwoSidedInequality(QPData):
         Ai_inf_filter: np.ndarray | None = None,
     ) -> sp.csc_matrix:
         """
-        These models are often identical, yet the computation is expensive. Caching to the rescue
+        These models are often identical, yet the computation is expensive.
+
+        Caching to the rescue
         """
         nI_I = self._cached_eyes(dimensions_after_zero_filter)
         if Ai_inf_filter is None:
