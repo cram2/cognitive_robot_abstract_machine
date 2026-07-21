@@ -14,7 +14,7 @@ from sqlalchemy.orm import (
     MappedColumn,
 )
 from typing_extensions import Tuple, List, Set, Optional, Self, ClassVar
-from ucimlrepo import fetch_ucirepo
+from ucimlrepo import DatasetNotFoundError, fetch_ucirepo
 
 from krrood.ripple_down_rules.datastructures.case import (
     Case,
@@ -60,31 +60,38 @@ def save_dataset_to_cache(dataset, cache_file):
 def get_dataset(dataset_id, cache_file: Optional[str] = None):
     """
     Fetches dataset from cache or downloads it if not available.
+
+    Returns ``None`` if the dataset cannot be downloaded because the UCI ML repository
+    server is unreachable or does not have the dataset available, instead of raising, so
+    callers can skip gracefully.
     """
     if cache_file is not None:
         if not cache_file.endswith(".pkl"):
             cache_file += ".pkl"
     dataset = load_cached_dataset(cache_file) if cache_file else None
-    if dataset is None:
-        print("Downloading dataset...")
+    if dataset is not None:
+        return dataset
 
+    print("Downloading dataset...")
+    try:
         dataset = fetch_ucirepo(id=dataset_id)
+    except (ConnectionError, DatasetNotFoundError) as error:
+        print(f"Error: Failed to fetch dataset ({error}).")
+        return None
 
-        # Check if dataset is valid before caching
-        if dataset is None or not hasattr(dataset, "data"):
-            print("Error: Failed to fetch dataset.")
-            return None
+    # Check if dataset is valid before caching
+    if dataset is None or not hasattr(dataset, "data"):
+        print("Error: Failed to fetch dataset.")
+        return None
 
-        if cache_file:
-            save_dataset_to_cache(dataset, cache_file)
+    if cache_file:
+        save_dataset_to_cache(dataset, cache_file)
 
-        dataset = {
-            "features": dataset.data.features,
-            "targets": dataset.data.targets,
-            "ids": dataset.data.ids,
-        }
-
-    return dataset
+    return {
+        "features": dataset.data.features,
+        "targets": dataset.data.targets,
+        "ids": dataset.data.ids,
+    }
 
 
 def load_zoo_dataset(
@@ -97,10 +104,12 @@ def load_zoo_dataset(
     :return: all cases and targets.
     """
     # fetch dataset
-    try:
-        zoo = get_dataset(111, cache_file)
-    except ConnectionError:
-        print("Error: Failed to fetch dataset. Please check your internet connection.")
+    zoo = get_dataset(111, cache_file)
+    if zoo is None:
+        print(
+            "Error: Failed to fetch dataset. Please check your internet "
+            "connection or the dataset server availability."
+        )
         return [], []
 
     # data (as pandas dataframes)
