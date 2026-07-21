@@ -61,8 +61,6 @@ class TopicSubscriberNode(TopicNode[MsgType]):
     Internal ROS subscription object.
     """
 
-    _subscriber: Subscription = field(init=False, default=None)
-    """Internal ROS subscription object."""
     __last_msg: MsgType | None = field(init=False, default=None)
     """
     The callback updates this variable.
