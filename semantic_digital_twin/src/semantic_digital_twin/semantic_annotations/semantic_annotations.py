@@ -9,6 +9,7 @@ import numpy as np
 from typing_extensions import List, Type, Dict
 
 from krrood.ormatic.utils import classproperty
+from probabilistic_model.bayesian_network.bayesian_network import Node
 from semantic_digital_twin.datastructures.alignment import AlignmentPair
 from krrood.symbolic_math import symbolic_math
 from random_events.interval import closed
@@ -266,6 +267,14 @@ class MechanicalJoint(HasRootBody):
         main_has_root_body_annotation._world.move_branch(
             main_has_root_body_annotation.root, self.root
         )
+
+    @property
+    def position(self):
+        return self.root.parent_connection.position
+
+    @position.setter
+    def position(self, value):
+        self.root.parent_connection.position = value
 
 
 @dataclass(eq=False)
@@ -605,19 +614,16 @@ class Elevator(HasRootBody):
         """
         Opens the elevator doors
         """
-        self.doors.door_0.mechanical_joint.root.parent_connection.position = (
-            self.doors.door_0.scale.y
-        )
-        self.doors.door_1.mechanical_joint.root.parent_connection.position = (
-            self.doors.door_1.scale.y
-        )
+        self.doors.door_0.mechanical_joint.position = self.doors.door_0.scale.y
+
+        self.doors.door_1.mechanical_joint.position = self.doors.door_1.scale.y
 
     def close(self):
         """
         Closes the elevator doors
         """
-        self.doors.door_0.mechanical_joint.root.parent_connection.position = 0
-        self.doors.door_1.mechanical_joint.root.parent_connection.position = 0
+        self.doors.door_0.mechanical_joint.position = 0
+        self.doors.door_1.mechanical_joint.position = 0
 
     def add_floor(self, floor_name: str, floor_position: float):
         """

@@ -302,6 +302,11 @@ class Scale:
 
     @property
     def xy(self):
+        """
+        Returns the scale in the xy-plane with a zero for z
+
+        :return: The scale in the xy-plane
+        """
         return Scale(self.x, self.y, 0)
 
 
