@@ -24,7 +24,6 @@ def create_tiny_dummy_circuit():
     """
     Generates a minimal probabilistic circuit for testing structural learning.
     """
-
     indices = jnp.array(
         [
             [0, 0],
@@ -93,9 +92,8 @@ def create_tiny_dummy_circuit():
 
 def test_jax_structural_learning():
     """
-    Tests EFLOW pruning and GROW structural expansion.
+    Test pruning followed by growth modifies the circuit structure.
     """
-
     key = jax.random.PRNGKey(42)
 
     dummy_data = jnp.array(
@@ -107,17 +105,12 @@ def test_jax_structural_learning():
 
     circuit = create_tiny_dummy_circuit()
 
-    # Initial structure
     assert circuit.root.log_weights[0].shape == (
         2,
         2,
     )
 
     assert circuit.root.log_weights[0].data.shape[0] == 4
-
-    # -------------------------
-    # EFLOW PRUNING
-    # -------------------------
 
     pruned_circuit = prune_circuit_eflow(
         circuit,
@@ -135,10 +128,6 @@ def test_jax_structural_learning():
 
     assert jnp.all(jnp.isfinite(pruned_circuit.root.log_weights[0].data))
 
-    # -------------------------
-    # GROW EXPANSION
-    # -------------------------
-
     expanded_circuit = grow_circuit(
         pruned_circuit,
         key,
@@ -152,7 +141,6 @@ def test_jax_structural_learning():
 
     assert expanded_rows > initial_rows, "GROW failed to increase the number of nodes."
 
-    # Check columns are still valid
     assert (
         expanded_circuit.root.log_weights[0].shape[1]
         == pruned_circuit.root.log_weights[0].shape[1]
@@ -160,7 +148,9 @@ def test_jax_structural_learning():
 
 
 def test_calculate_edge_flows():
-
+    """
+    Test that edge flows are computed for sparse sum layers.
+    """
     circuit = create_tiny_dummy_circuit()
 
     data = jnp.array(
@@ -183,7 +173,9 @@ def test_calculate_edge_flows():
 
 
 def test_pruning_removes_low_flow_edges():
-
+    """
+    Test that pruning removes edges with low estimated flow.
+    """
     circuit = create_tiny_dummy_circuit()
 
     data = jnp.array(
@@ -203,7 +195,9 @@ def test_pruning_removes_low_flow_edges():
 
 
 def test_growing_increases_nodes():
-
+    """
+    Test that growth increases the number of parent nodes.
+    """
     circuit = create_tiny_dummy_circuit()
 
     key = jax.random.PRNGKey(0)
@@ -218,7 +212,9 @@ def test_growing_increases_nodes():
 
 
 def test_prune_and_grow_pipeline():
-
+    """
+    Test the complete structural learning pipeline.
+    """
     circuit = create_tiny_dummy_circuit()
 
     data = jnp.array(

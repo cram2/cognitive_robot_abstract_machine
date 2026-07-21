@@ -19,8 +19,14 @@ def _compute_node_log_likelihoods(
     circuit: ProbabilisticCircuit,
     data: jax.Array,
 ) -> dict[int, jax.Array]:
-    """Compute the log-likelihoods for every layer in the circuit."""
+    """
+    Compute node log-likelihoods for every layer in a circuit.
 
+    :param circuit: Probabilistic circuit to evaluate.
+    :param data: Samples used for likelihood computation.
+    :return: Mapping between layers and their node log-likelihood
+        values.
+    """
     node_log_likelihoods: dict[int, jax.Array] = {}
 
     for layer in reversed(circuit.root.all_layers()):
@@ -33,16 +39,12 @@ def calculate_edge_flows(
     circuit: ProbabilisticCircuit, data: jax.Array
 ) -> list[jax.Array]:
     """
-    Calculate the mean probability flow for every edge in each sparse sum layer.
+    Calculate average probability flow through circuit edges.
 
-    :param circuit:
-        Probabilistic circuit to analyse.
-    :param data:
-        Batch of samples used to estimate the edge flows.
-    :returns:
-        Mean flow for every edge of every sparse sum layer.
+    :param circuit: Probabilistic circuit to analyse.
+    :param data: Samples used to estimate edge flows.
+    :return: Mean flow values for edges in sparse sum layers.
     """
-
     node_log_likelihoods = _compute_node_log_likelihoods(
         circuit,
         data,
@@ -98,9 +100,14 @@ def _duplicate_parent_rows(
     noise_scale: float,
 ) -> BCOO:
     """
-    Duplicate selected parent nodes in a sparse weight matrix.
-    """
+    Duplicate selected parent nodes in sparse layer weights.
 
+    :param log_weights: Sparse weight matrix.
+    :param rows_to_duplicate: Parent nodes to duplicate.
+    :param key: Random key used to generate perturbations.
+    :param noise_scale: Scale of the noise added to duplicated weights.
+    :return: Expanded sparse weight matrix.
+    """
     number_of_parent_nodes = log_weights.shape[0]
 
     duplicated_indices = log_weights.indices[
@@ -162,93 +169,90 @@ def _duplicate_parent_rows(
 
 
 def prune_circuit_eflow(
-    circuit: ProbabilisticCircuit, data: jax.Array, prune_fraction: float
+    circuit: ProbabilisticCircuit,
+    data: jax.Array,
+    prune_fraction: float,
 ) -> ProbabilisticCircuit:
     """
-    EFLOW Pruning Algorithm: Evaluates edge flows, identifies redundant edges
-    with a mean flow below tau, and reconstructs the circuit structure.
+    Remove edges with the lowest probability flow.
 
-    :param circuit: The original ProbabilisticCircuit instance.
-    :param data: Input data array used to calculate current edge flows.
-    :param tau: Threshold tolerance for edge flow (edges with flow < tau are pruned).
-    :return: A new structurally modified ProbabilisticCircuit instance.
+    :param circuit: Probabilistic circuit to prune.
+    :param data: Samples used to estimate edge flows.
+    :param prune_fraction: Fraction of edges removed from each sparse
+        sum layer.
+    :return: Structurally pruned probabilistic circuit.
     """
-    # 1. Compute the mean flow passing through every active edge
-    mean_flows_list = calculate_edge_flows(circuit, data)
+    mean_flows = calculate_edge_flows(
+        circuit,
+        data,
+    )
 
-    log_weight_matrix_index = 0
+    flow_index = 0
 
-    # 2. Inner function to recursively traverse and prune the Pytree layers bottom-up
     def prune_layer(layer):
+        nonlocal flow_index
+
         if isinstance(layer, InnerLayer):
-            new_child_layers = [prune_layer(cl) for cl in layer.child_layers]
-            # Handle immutable update using Equinox tree tools
-            layer = eqx.tree_at(lambda l: l.child_layers, layer, new_child_layers)
+            child_layers = [
+                prune_layer(child_layer) for child_layer in layer.child_layers
+            ]
+
+            layer = eqx.tree_at(
+                lambda current_layer: current_layer.child_layers,
+                layer,
+                child_layers,
+            )
 
         if isinstance(layer, SparseSumLayer):
-            nonlocal log_weight_matrix_index
-
-            new_log_weights_list = []
+            new_log_weights = []
 
             for log_weights in layer.log_weights:
-                mean_edge_flows = mean_flows_list[log_weight_matrix_index]
-                log_weight_matrix_index += 1
-                # Boolean mask: True to keep the edge, False to prune it
-                number_of_edges = mean_edge_flows.shape[0]
+                edge_flows = mean_flows[flow_index]
+                flow_index += 1
 
-                number_to_prune = int(prune_fraction * number_of_edges)
+                number_to_remove = int(prune_fraction * edge_flows.shape[0])
 
-                if number_to_prune > 0:
-                    sorted_indices = jnp.argsort(mean_edge_flows)
-
-                    edges_to_keep = sorted_indices[number_to_prune:]
+                if number_to_remove > 0:
+                    kept_edges = jnp.argsort(edge_flows)[number_to_remove:]
 
                     keep_mask = jnp.zeros_like(
-                        mean_edge_flows,
+                        edge_flows,
                         dtype=bool,
                     )
 
-                    keep_mask = keep_mask.at[edges_to_keep].set(True)
+                    keep_mask = keep_mask.at[kept_edges].set(True)
                 else:
                     keep_mask = jnp.ones_like(
-                        mean_edge_flows,
+                        edge_flows,
                         dtype=bool,
                     )
 
-                cloned_weights = copy_bcoo(log_weights)
+                copied_weights = copy_bcoo(log_weights)
 
-                # Keep only edges with sufficient flow
-                new_indices = cloned_weights.indices[keep_mask]
-                new_data = cloned_weights.data[keep_mask]
-
-                updated_bcoo = BCOO(
-                    (
-                        new_data,
-                        new_indices,
-                    ),
-                    shape=cloned_weights.shape,
-                    indices_sorted=False,
-                    unique_indices=True,
+                new_log_weights.append(
+                    BCOO(
+                        (
+                            copied_weights.data[keep_mask],
+                            copied_weights.indices[keep_mask],
+                        ),
+                        shape=copied_weights.shape,
+                        indices_sorted=False,
+                        unique_indices=True,
+                    ).sort_indices()
                 )
 
-                updated_bcoo = updated_bcoo.sort_indices()
-
-                new_log_weights_list.append(updated_bcoo)
-
-            # Safely replace the log weights list in the current Equinox module layer
             layer = eqx.tree_at(
-                lambda l: l.log_weights,
+                lambda current_layer: current_layer.log_weights,
                 layer,
-                new_log_weights_list,
+                new_log_weights,
             )
 
         return layer
 
-    # 3. Process the complete architecture starting from the root
-    new_root = prune_layer(circuit.root)
-
-    # 4. Return the newly built pruned circuit wrapper
-    return ProbabilisticCircuit(circuit.variables, new_root)
+    return ProbabilisticCircuit(
+        circuit.variables,
+        prune_layer(circuit.root),
+    )
 
 
 def grow_circuit(
@@ -258,18 +262,16 @@ def grow_circuit(
     noise_scale: float = 1e-3,
 ) -> ProbabilisticCircuit:
     """
-    GROW Algorithm: Identifies candidate nodes to split, duplicates their parameters
-    to increase structural capacity, and injects a small amount of random noise
-    to break gradient symmetry during subsequent training.
+    Increase circuit capacity by duplicating selected nodes.
 
-    :param circuit: The current ProbabilisticCircuit instance.
-    :param key: JAX random key for noise generation.
-    :param noise_scale: Standard deviation of the Gaussian noise applied to new weights.
-    :return: A new structurally expanded ProbabilisticCircuit instance.
+    :param circuit: Probabilistic circuit to expand.
+    :param key: Random key used during node duplication.
+    :param grow_fraction: Fraction of nodes duplicated.
+    :param noise_scale: Noise applied to duplicated parameters.
+    :return: Expanded probabilistic circuit.
     """
 
     def grow_layer(layer, current_key):
-        # 1. Recurse through child layers first
         if isinstance(layer, InnerLayer):
             keys = jax.random.split(
                 current_key,
@@ -292,7 +294,6 @@ def grow_circuit(
 
             current_key = keys[-1]
 
-        # 2. Expand SparseSumLayer nodes
         if isinstance(layer, SparseSumLayer):
             new_log_weights_list = []
 
@@ -330,7 +331,6 @@ def grow_circuit(
 
         return layer
 
-    # 3. Process the complete architecture starting from the root node
     init_key, process_key = jax.random.split(key)
     new_root = grow_layer(circuit.root, process_key)
 
@@ -346,25 +346,16 @@ def prune_and_grow(
     noise_scale: float = 1e-3,
 ) -> ProbabilisticCircuit:
     """
-    Apply the complete structural learning procedure:
-    EFLOW pruning followed by GROW expansion.
+    Apply pruning and growth structural learning.
 
-    :param circuit:
-        Probabilistic circuit to modify.
-    :param data:
-        Training data used to estimate edge flows.
-    :param key:
-        JAX random key used during growth.
-    :param prune_fraction:
-        Fraction of low-flow edges to remove.
-    :param grow_fraction:
-        Fraction of nodes to duplicate.
-    :param noise_scale:
-        Noise added to duplicated parameters.
-    :return:
-        New structurally modified probabilistic circuit.
+    :param circuit: Probabilistic circuit to modify.
+    :param data: Training samples used for pruning.
+    :param key: Random key used during growth.
+    :param prune_fraction: Fraction of edges removed.
+    :param grow_fraction: Fraction of nodes duplicated.
+    :param noise_scale: Noise applied during growth.
+    :return: Structurally modified probabilistic circuit.
     """
-
     circuit = prune_circuit_eflow(
         circuit,
         data,
