@@ -1,3 +1,5 @@
+import math
+
 import pytest
 from numpy.testing import assert_allclose
 
@@ -37,6 +39,53 @@ def test_create_with_dofs_threads_parent_T_connection_expression(world_with_two_
         )
         world.add_connection(connection)
     assert_allclose(connection.origin.to_np(), parent_T_connection.to_np(), atol=1e-9)
+
+
+def test_reference_origin_excludes_joint_state(world_with_two_bodies):
+    """The reference origin stays at the zero configuration, the origin follows the joint.
+
+    A simulator places a body's static frame once, at build time. Using the
+    joint-carrying origin there bakes the current joint state in, and the
+    simulator joint then applies it a second time.
+    """
+    world, parent, child = world_with_two_bodies
+    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3, y=0.4)
+    with world.modify_world():
+        connection = RevoluteConnection.create_with_dofs(
+            world,
+            parent,
+            child,
+            axis=Vector3.Z(),
+            parent_T_connection_expression=parent_T_connection,
+        )
+        world.add_connection(connection)
+
+    origin_at_zero = connection.origin_as_position_quaternion().evaluate()[0]
+    reference_at_zero = connection.reference_origin_as_position_quaternion().evaluate()[0]
+    assert_allclose(origin_at_zero, reference_at_zero, atol=1e-9)
+
+    joint_position = 0.7
+    with world.modify_world():
+        world.state[connection.active_dofs[0].id].position = joint_position
+
+    origin_when_rotated = connection.origin_as_position_quaternion().evaluate()[0]
+    reference_when_rotated = connection.reference_origin_as_position_quaternion().evaluate()[
+        0
+    ]
+
+    # The reference is unaffected by the joint, so it is safe as a static frame.
+    assert_allclose(reference_when_rotated, reference_at_zero, atol=1e-9)
+    # The origin carries the joint's half-angle quaternion about the z axis.
+    expected_origin = [
+        0.3,
+        0.4,
+        0.0,
+        0.0,
+        0.0,
+        math.sin(joint_position / 2.0),
+        math.cos(joint_position / 2.0),
+    ]
+    assert_allclose(origin_when_rotated, expected_origin, atol=1e-9)
 
 
 @pytest.mark.parametrize("drive_type", [OmniDrive, DifferentialDrive])

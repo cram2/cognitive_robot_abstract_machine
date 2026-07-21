@@ -204,6 +204,34 @@ class Color:
 
 
 @dataclass
+class Texture:
+    """
+    A 2D image texture applied to a geometric primitive's surface (for example a MuJoCo
+    box/cylinder/sphere geom's ``material``). Mesh shapes carry their own texture as part of
+    their own trimesh visual instead, and do not use this.
+    """
+
+    file_path: str
+    """The texture image's file path."""
+
+    repeat: Tuple[float, float] = (1.0, 1.0)
+    """How many times the texture tiles across the surface, along each of its two axes."""
+
+    uniform: bool = False
+    """
+    Whether the texture is scaled uniformly across the surface, independent of the surface's
+    own size, rather than scaled to fit it.
+    """
+
+    def __post_init__(self):
+        """
+        Normalize :attr:`repeat` to a tuple of floats so a texture stays equal to itself
+        across a serialization round-trip, which restores the pair as a list.
+        """
+        self.repeat = tuple(float(value) for value in self.repeat)
+
+
+@dataclass
 class Scale:
     """
     Dataclass for storing the scale of geometric objects.
@@ -313,6 +341,13 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
 
     color: Color = field(default_factory=Color)
 
+    texture: Optional[Texture] = None
+    """
+    A texture applied to this shape's surface, or ``None`` for a flat ``color``. Only
+    meaningful for primitive shapes (:class:`Box`, :class:`Cylinder`, :class:`Sphere`);
+    :class:`Mesh` shapes carry their own texture as part of their trimesh visual instead.
+    """
+
     @property
     @abstractmethod
     def local_frame_bounding_box(self) -> BoundingBox:
@@ -334,6 +369,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
             **super().to_json(),
             "origin": to_json(self.origin),
             "color": to_json(self.color),
+            "texture": to_json(self.texture) if self.texture is not None else None,
         }
 
     def __eq__(self, other: Shape) -> bool:
@@ -822,10 +858,12 @@ class Sphere(Shape):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        texture = data.get("texture")
         return cls(
             radius=data["radius"],
             origin=from_json(data["origin"], **kwargs),
             color=from_json(data["color"], **kwargs),
+            texture=from_json(texture, **kwargs) if texture is not None else None,
         )
 
 
@@ -873,11 +911,13 @@ class Cylinder(Shape):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        texture = data.get("texture")
         return cls(
             width=data["width"],
             height=data["height"],
             origin=from_json(data["origin"], **kwargs),
             color=from_json(data["color"], **kwargs),
+            texture=from_json(texture, **kwargs) if texture is not None else None,
         )
 
 
@@ -927,10 +967,12 @@ class Box(Shape):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        texture = data.get("texture")
         return cls(
             scale=from_json(data["scale"], **kwargs),
             origin=from_json(data["origin"], **kwargs),
             color=from_json(data["color"], **kwargs),
+            texture=from_json(texture, **kwargs) if texture is not None else None,
         )
 
 

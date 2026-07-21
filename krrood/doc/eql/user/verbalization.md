@@ -257,7 +257,8 @@ surfaces as *"beginning"*).
 
 ```{code-cell} ipython3
 from dataclasses import dataclass, field
-from krrood.patterns.field_metadata import FieldMetadata, GrammarMetadata
+from krrood.entity_query_language.verbalization.grammar_metadata import GrammarMetadata
+from krrood.patterns.field_metadata import FieldMetadata
 
 @dataclass
 class Date:

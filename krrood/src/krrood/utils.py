@@ -39,14 +39,12 @@ from typing_extensions import (
 
 from krrood import logger
 from krrood.exceptions import (
-    NoSourceDataToParseImportsFrom,
     NoModuleSourceProvided,
     NoDefaultValueFound,
     PackageNameNotFoundError,
     PathMissingRequiredPartsError,
     SubprocessExecutionError,
     SourceDataNotProvided,
-    ModuleNotFoundForConvertingImportsToAbsolute,
 )
 
 T = TypeVar("T")
@@ -114,95 +112,6 @@ def get_default_values_for_dataclass(dataclass_type):
             defaults[f.name] = f.default_factory()
 
     return defaults
-
-
-def extract_imports_from(
-    module: Optional[types.ModuleType] = None,
-    file_path: Optional[str] = None,
-    source: Optional[str] = None,
-    ast_tree: Optional[ast.AST] = None,
-    exclude_libraries: Optional[List[str]] = None,
-    convert_relative_to_absolute: bool = False,
-) -> List[str]:
-    """
-    Extract imports from a module or source code or a file path or an ast and returns
-    them as a list of strings.
-
-    :param module: The module to extract imports from.
-    :param file_path: The file path to extract imports from.
-    :param source: The source code to extract imports from.
-    :param ast_tree: The ast tree to extract imports from.
-    :param exclude_libraries: A list of libraries to exclude from the imports.
-    :param convert_relative_to_absolute: Whether to convert relative imports to absolute
-        imports.
-    """
-    exclude_libraries = exclude_libraries or []
-    if module is None and source is None and file_path is None and ast_tree is None:
-        raise NoSourceDataToParseImportsFrom(
-            module=module, file_path=file_path, ast_tree=ast_tree
-        )
-    if module:
-        source = inspect.getsource(module)
-        current_module_name = module.__name__
-    elif file_path:
-        with open(file_path, "r") as f:
-            source = f.read()
-        current_module_name = os.path.splitext(os.path.basename(file_path))[0]
-    elif convert_relative_to_absolute:
-        raise ModuleNotFoundForConvertingImportsToAbsolute(
-            path=file_path, source_code=source
-        )
-
-    tree = ast_tree or ast.parse(source)
-
-    import_modules = set()
-    from_imports = defaultdict(set)
-
-    for node in ast.walk(tree):
-
-        # import x
-        if isinstance(node, ast.Import):
-
-            for alias in node.names:
-                name = alias.name
-
-                if name in exclude_libraries:
-                    continue
-
-                if alias.asname:
-                    import_modules.add(f"{name} as {alias.asname}")
-                else:
-                    import_modules.add(name)
-
-        # from x import y
-        elif isinstance(node, ast.ImportFrom):
-
-            prefix = "." * node.level
-            module_name = node.module or ""
-            full_module = f"{prefix}{module_name}"
-
-            if convert_relative_to_absolute and node.level > 0:
-                full_module = resolve_name(full_module, current_module_name)
-
-            if node.module and node.module in exclude_libraries:
-                continue
-
-            for alias in node.names:
-                if alias.asname:
-                    from_imports[full_module].add(f"{alias.name} as {alias.asname}")
-                else:
-                    from_imports[full_module].add(alias.name)
-
-    result = set()
-
-    for mod in import_modules:
-        result.add(f"import {mod}")
-
-    for mod, names in from_imports.items():
-        joined = ", ".join(sorted(names))
-        result.add(f"from {mod} import {joined}")
-
-    return sorted(result)
 
 
 def generate_relative_import(

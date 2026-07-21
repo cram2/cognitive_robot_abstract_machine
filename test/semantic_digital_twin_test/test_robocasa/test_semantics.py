@@ -6,6 +6,7 @@ from semantic_digital_twin.adapters.robocasa_dataset.loader import (
     RoboCasaDatasetLoader,
     _category_from_class_name,
     _mjcf_document_from_element_copy,
+    _parse_robosuite_mjcf,
 )
 from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
     RoboCasaKitchenApplianceCategory,
@@ -117,6 +118,50 @@ def test_mjcf_document_from_element_copy_is_parseable_by_mjcf_parser():
     ).parse()
 
     assert world.get_body_by_name("hinge_cabinet_main") is not None
+
+
+ROBOSUITE_STYLE_GEOM_GROUPS_MJCF = """
+<mujoco>
+  <worldbody>
+    <body name="base">
+      <geom type="box" size="0.1 0.1 0.1" rgba="1 0 0 1"/>
+      <geom type="box" size="0.1 0.1 0.1" group="1" rgba="0 1 0 1"/>
+    </body>
+  </worldbody>
+</mujoco>
+"""
+
+
+def test_parse_robosuite_mjcf_excludes_default_group_geoms_from_visuals():
+    """
+    Robosuite's own convention (confirmed against its own ``mjcf_utils.sort_elements``) treats
+    a geom with an unset ``group`` as collision-only, reserving group 1 for visual geoms - the
+    opposite of this project's own MJCF convention. ``_parse_robosuite_mjcf`` must relabel that
+    default-group geom before parsing, or it would be parsed as visible, as it would be by the
+    unmodified, convention-agnostic ``MJCFParser`` alone.
+    """
+    world = _parse_robosuite_mjcf(
+        MJCFParser.from_xml_string(ROBOSUITE_STYLE_GEOM_GROUPS_MJCF)
+    )
+    base = world.get_kinematic_structure_entity_by_name("base")
+
+    visual_colors = {tuple(shape.color.to_rgba()) for shape in base.visual.shapes}
+    assert (1.0, 0.0, 0.0, 1.0) not in visual_colors
+    assert (0.0, 1.0, 0.0, 1.0) in visual_colors
+
+
+def test_parse_robosuite_mjcf_keeps_default_group_geoms_collidable():
+    """
+    Relabelling a default-group geom to ONLY_COLLIDABLE must only affect its visibility, not
+    whether it still collides - the whole point of RoboCasa's collision-decomposition proxy
+    geoms is to still be collided with.
+    """
+    world = _parse_robosuite_mjcf(
+        MJCFParser.from_xml_string(ROBOSUITE_STYLE_GEOM_GROUPS_MJCF)
+    )
+    base = world.get_kinematic_structure_entity_by_name("base")
+
+    assert len(base.collision.shapes) == 2
 
 
 def test_attach_semantic_annotation_uses_kitchen_appliance_resolver():

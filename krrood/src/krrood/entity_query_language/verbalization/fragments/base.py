@@ -31,7 +31,7 @@ from krrood.entity_query_language.verbalization.value_lexicon import (
     type_noun,
     value_phrase,
 )
-from krrood.patterns.field_metadata import GrammarMetadata
+from krrood.entity_query_language.verbalization.grammar_metadata import GrammarMetadata
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.microplanning.coordination import (
