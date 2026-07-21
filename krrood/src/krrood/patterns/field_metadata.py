@@ -65,22 +65,3 @@ MetadataType = TypeVar("MetadataType", bound=FieldMetadata)
 """
 A type that is a subclass of :class:`FieldMetadata`.
 """
-
-
-@dataclass
-class GrammarMetadata(FieldMetadata):
-    """
-    Grammar / verbalization hints for a field.
-    """
-
-    is_identifying_field: bool = False
-    """
-    ``True`` when this field identifies its instance for verbalization (*"a specific
-    <Type> with <field> '<value>'"*).
-    """
-
-    display_name: Optional[str] = None
-    """
-    Surface word to use for this field when verbalized, in place of its attribute name
-    (*"beginning"* for a field named ``begin``); ``None`` keeps the attribute name.
-    """

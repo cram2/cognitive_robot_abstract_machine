@@ -8,8 +8,14 @@ exercised end-to-end through the verbalizer.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
+
+from krrood.entity_query_language.verbalization.boolean_predicate import (
+    AdjectivalPredicate,
+)
+from krrood.entity_query_language.verbalization.grammar_metadata import GrammarMetadata
+from krrood.patterns.field_metadata import FieldMetadata
 
 import krrood.entity_query_language.factories as eql
 from krrood.entity_query_language.factories import (
@@ -310,7 +316,12 @@ def test_two_value_domain_drops_the_serial_comma():
 
 @dataclass
 class _Coffee:
-    decaf: bool
+    # "decaf" is adjectival (the heuristic can't tell), so it declares its predicate form.
+    decaf: bool = field(
+        metadata=FieldMetadata(
+            other_metadata=[GrammarMetadata(boolean_predicate=AdjectivalPredicate())]
+        ).as_dict()
+    )
 
 
 def test_boolean_attribute_eq_true_is_predicative():

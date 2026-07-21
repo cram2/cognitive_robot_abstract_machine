@@ -33,3 +33,5 @@ plyfile
 huggingface-hub
 vhacdx
 rerun-sdk[datafusion]
+imageio
+imageio-ffmpeg

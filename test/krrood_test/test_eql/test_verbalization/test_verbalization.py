@@ -16,7 +16,13 @@ Coverage:
 from __future__ import annotations
 
 import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from krrood.entity_query_language.verbalization.boolean_predicate import (
+    AdjectivalPredicate,
+)
+from krrood.entity_query_language.verbalization.grammar_metadata import GrammarMetadata
+from krrood.patterns.field_metadata import FieldMetadata
 from typing import Any
 from typing_extensions import List
 
@@ -435,7 +441,12 @@ class _NavParcel:
 
 @dataclass
 class _NavPanel:
-    lit: bool
+    # "lit" is an irregular participle the shape heuristic misses, so it declares its form.
+    lit: bool = field(
+        metadata=FieldMetadata(
+            other_metadata=[GrammarMetadata(boolean_predicate=AdjectivalPredicate())]
+        ).as_dict()
+    )
 
 
 @dataclass
