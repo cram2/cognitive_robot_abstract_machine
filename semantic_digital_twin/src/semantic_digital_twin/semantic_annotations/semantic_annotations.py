@@ -23,6 +23,7 @@ from semantic_digital_twin.exceptions import (
     MechanicalJointAlreadyMounted,
 )
 from semantic_digital_twin.reasoning.predicates import InsideOf
+from semantic_digital_twin.regions.regions import Level
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasSupportingSurface,
     HasRootRegion,
@@ -480,7 +481,7 @@ class Elevator(HasRootBody):
     root point below the elevator from which the elevator is driving up
     """
 
-    floor_positions: Dict[str, float] = field(
+    floor_positions: Dict[Level, float] = field(
         kw_only=True, default_factory=dict, init=False
     )
     """
@@ -634,13 +635,13 @@ class Elevator(HasRootBody):
         self.doors.door_0.mechanical_joint.position = 0
         self.doors.door_1.mechanical_joint.position = 0
 
-    def add_floor(self, floor: str, floor_position: float):
+    def add_floor(self, floor: Level, floor_position: float):
         """
         Adds a floor to the possible targets for the elevator
         """
         self.floor_positions[floor] = floor_position
 
-    def drive_to_floor(self, floor: str):
+    def drive_to_floor(self, floor: Level):
         """
         Drives the elevator to the floor given
         """
