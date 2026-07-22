@@ -1,20 +1,13 @@
 import copy
 import numpy as np
 
-from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Tuple
 
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     SumUnit,
     Unit,
 )
-
-
-@dataclass(frozen=True)
-class Edge:
-    parent: Unit
-    child: Unit
 
 
 def average_log_likelihood(
@@ -25,11 +18,8 @@ def average_log_likelihood(
     Evaluate the average log likelihood of a probabilistic circuit.
 
     :param circuit: Probabilistic circuit to evaluate.
-    :type circuit: ProbabilisticCircuit
     :param data: Dataset used for evaluation.
-    :type data: np.ndarray
     :return: Average log likelihood over the provided samples.
-    :rtype: float
     """
 
     log_likelihood = circuit.log_likelihood(data)
@@ -40,7 +30,7 @@ def average_log_likelihood(
 def calculate_edge_flows(
     circuit: ProbabilisticCircuit,
     data: np.ndarray,
-) -> Dict[Edge, float]:
+) -> Dict[Tuple[Unit, Unit], float]:
     """
     Calculate the average probability flow through every weighted edge.
 
@@ -48,16 +38,13 @@ def calculate_edge_flows(
     according to the current dataset.
 
     :param circuit: Probabilistic circuit where flows are computed.
-    :type circuit: ProbabilisticCircuit
     :param data: Dataset used for estimating flows.
-    :type data: np.ndarray
     :return: Mapping from edges to their average probability flow.
-    :rtype: Dict[Edge, float]
     """
 
     circuit.log_likelihood(data)
 
-    flows: Dict[Edge, float] = {}
+    flows: Dict[Tuple[Unit, Unit], float] = {}
 
     for parent, child, log_weight in circuit.edges():
 
@@ -69,7 +56,7 @@ def calculate_edge_flows(
 
         flow = np.exp(child_likelihood + log_weight - parent_likelihood)
 
-        flows[Edge(parent, child)] = float(np.mean(flow))
+        flows[(parent, child)] = float(np.mean(flow))
 
     return flows
 
@@ -83,13 +70,9 @@ def prune_edges(
     Remove low-contribution edges from SumUnits.
 
     :param circuit: Circuit to prune.
-    :type circuit: ProbabilisticCircuit
     :param data: Dataset used to compute edge importance.
-    :type data: np.ndarray
     :param prune_fraction: Fraction of removable edges removed.
-    :type prune_fraction: float
     :return: Pruned circuit.
-    :rtype: ProbabilisticCircuit
     """
 
     flows = calculate_edge_flows(
@@ -117,7 +100,7 @@ def prune_edges(
                 (
                     child,
                     flows.get(
-                        Edge(node, child),
+                        (node, child),
                         0.0,
                     ),
                 )
@@ -155,13 +138,9 @@ def select_sum_units_to_grow(
     Select SumUnits that should be duplicated during growing.
 
     :param circuit: Circuit containing candidate SumUnits.
-    :type circuit: ProbabilisticCircuit
     :param data: Dataset used for importance estimation.
-    :type data: np.ndarray | None
     :param fraction: Fraction of nodes selected.
-    :type fraction: float
     :return: Selected SumUnits.
-    :rtype: list[SumUnit]
     """
 
     sum_nodes = [node for node in circuit.graph.nodes() if isinstance(node, SumUnit)]
@@ -198,7 +177,7 @@ def select_sum_units_to_grow(
         for child in node.subcircuits:
 
             score += flows.get(
-                Edge(node, child),
+                (node, child),
                 0.0,
             )
 
@@ -220,11 +199,8 @@ def duplicate_sum_unit(
     Duplicate a SumUnit and attach it to the circuit.
 
     :param circuit: Circuit where the duplicated node is added.
-    :type circuit: ProbabilisticCircuit
     :param node: SumUnit to duplicate.
-    :type node: SumUnit
     :param noise_scale: Standard deviation of weight perturbation.
-    :type noise_scale: float
     """
 
     parent_indices = list(circuit.graph.predecessors(node.index))
@@ -294,15 +270,10 @@ def grow_nodes(
     Increase circuit structure by duplicating SumUnits.
 
     :param circuit: Circuit to expand.
-    :type circuit: ProbabilisticCircuit
     :param data: Dataset used to estimate node importance.
-    :type data: np.ndarray | None
     :param fraction: Fraction of SumUnits to duplicate.
-    :type fraction: float
     :param noise_scale: Standard deviation of weight perturbation.
-    :type noise_scale: float
     :return: Expanded probabilistic circuit.
-    :rtype: ProbabilisticCircuit
     """
 
     selected_nodes = select_sum_units_to_grow(
@@ -336,19 +307,12 @@ def sparse_probabilistic_circuit_learning(
     Perform prune-and-grow structural learning.
 
     :param circuit: Initial probabilistic circuit.
-    :type circuit: ProbabilisticCircuit
     :param data: Dataset used for optimization.
-    :type data: np.ndarray
     :param prune_fraction: Fraction of edges removed.
-    :type prune_fraction: float
     :param grow_fraction: Fraction of SumUnits duplicated.
-    :type grow_fraction: float
     :param noise_scale: Weight perturbation magnitude.
-    :type noise_scale: float
     :param iterations: Number of structural learning iterations.
-    :type iterations: int
     :return: Best probabilistic circuit found.
-    :rtype: ProbabilisticCircuit
     """
 
     best_circuit = copy.deepcopy(circuit)
