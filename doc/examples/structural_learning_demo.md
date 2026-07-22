@@ -13,22 +13,27 @@ kernelspec:
 
 # Probabilistic Circuit Structural Learning Demo
 
-This notebook demonstrates the structural learning functionality
-implemented for RX probabilistic circuits.
+This demo presents the structural learning functionality implemented for
+RX probabilistic circuits.
 
-The demo follows the pruning and growing strategy described in:
+The implementation follows the pruning and growing strategy described in:
 
-Dang, M., Liu, A., and Van den Broeck, G.
-"Sparse Probabilistic Circuits via Pruning and Growing."
+Dang, M., Liu, A., and Van den Broeck, G.  
+"Sparse Probabilistic Circuits via Pruning and Growing."  
 NeurIPS 2022.
 
-The process consists of:
+Structural learning adapts the structure of a probabilistic circuit based
+on observed data.
 
-1. Creating an initial probabilistic circuit.
-2. Computing edge flows.
-3. Removing low-contribution connections.
-4. Growing the circuit by duplicating SumUnits.
-5. Applying the complete structural adaptation process.
+The implemented process consists of:
+
+1. Computing edge flows.
+2. Removing low-contribution edges (pruning).
+3. Increasing capacity by duplicating SumUnits (growing).
+4. Alternating pruning and growing operations.
+
+
+## Imports
 
 ```{code-cell} python
 import sys
@@ -40,16 +45,6 @@ sys.path.append(
     str(ROOT / "probabilistic_model" / "src")
 )
 
-sys.path.append(
-    str(ROOT / "krrood" / "src")
-)
-
-sys.path.append(
-    str(ROOT / "semantic_digital_twin" / "src")
-)
-```
-
-```{code-cell} python
 import numpy as np
 
 from probabilistic_model.probabilistic_circuit.rx.learning import (
@@ -70,66 +65,70 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 ```
 
-## Creating a small probabilistic circuit
+
+# Creating a small probabilistic circuit
 
 We create a simple Gaussian mixture model represented as a
 probabilistic circuit.
 
-The initial circuit contains two Gaussian components combined
-by a SumUnit.
+The circuit contains two Gaussian components combined by a SumUnit.
 
 ```{code-cell} python
 def create_demo_circuit():
 
-    x = Continuous("x")
+    variable = Continuous("x")
 
-    probabilistic_circuit = ProbabilisticCircuit()
+    circuit = ProbabilisticCircuit()
 
     root = SumUnit(
-        probabilistic_circuit=probabilistic_circuit
+        probabilistic_circuit=circuit
     )
 
-    product_unit_1 = ProductUnit(
-        probabilistic_circuit=probabilistic_circuit
+    product_1 = ProductUnit(
+        probabilistic_circuit=circuit
     )
 
-    product_unit_2 = ProductUnit(
-        probabilistic_circuit=probabilistic_circuit
+    product_2 = ProductUnit(
+        probabilistic_circuit=circuit
     )
 
-    leaf_unit_1 = leaf(
+    gaussian_1 = leaf(
         GaussianDistribution(
-            variable=x,
+            variable=variable,
             location=0,
             scale=1,
         ),
-        probabilistic_circuit,
+        circuit,
     )
 
-    leaf_unit_2 = leaf(
+    gaussian_2 = leaf(
         GaussianDistribution(
-            variable=x,
+            variable=variable,
             location=5,
             scale=1,
         ),
-        probabilistic_circuit,
+        circuit,
     )
 
-    product_unit_1.add_subcircuit(leaf_unit_1)
+    product_1.add_subcircuit(
+        gaussian_1
+    )
 
-    product_unit_2.add_subcircuit(leaf_unit_2)
+    product_2.add_subcircuit(
+        gaussian_2
+    )
 
     root.add_subcircuit(
-        product_unit_1,
-        np.log(0.5)
+        product_1,
+        np.log(0.5),
     )
 
     root.add_subcircuit(
-        product_unit_2,
-        np.log(0.5)
+        product_2,
+        np.log(0.5),
     )
 
-    return probabilistic_circuit
+    return circuit
 
 
 circuit = create_demo_circuit()
@@ -137,12 +136,11 @@ circuit = create_demo_circuit()
 circuit
 ```
 
-## 1. Computing Edge Flows
 
-Edge flows estimate how much every weighted connection contributes
-to the probability distribution.
+# Dataset
 
-Connections with low contribution are candidates for pruning.
+The dataset contains observations generated from the two Gaussian
+components.
 
 ```{code-cell} python
 data = np.array(
@@ -151,29 +149,54 @@ data = np.array(
         [5.0],
     ]
 )
+```
 
 
+# Edge Flow Calculation
+
+The edge flow calculation measures the contribution of each weighted
+connection in a SumUnit.
+
+Edges with low contribution are candidates for pruning.
+
+The implementation is available in:
+
+```{eval-rst}
+.. autofunction:: probabilistic_model.probabilistic_circuit.rx.learning.calculate_edge_flows
+```
+
+```{code-cell} python
 flows = calculate_edge_flows(
     circuit,
     data,
 )
 
-
 flows
 ```
 
-## 2. Pruning Low-Contribution Edges
 
-Pruning removes unnecessary connections while keeping the most
-important probability paths.
+# Pruning Edges
 
-The remaining SumUnit weights are normalized afterwards.
+Pruning removes edges with low probability contribution while keeping
+the most relevant paths in the circuit.
+
+The pruning procedure:
+
+1. Computes edge flows.
+2. Ranks edges according to their contribution.
+3. Removes the least relevant edges.
+4. Normalizes the remaining SumUnit weights.
+
+The implementation is available in:
+
+```{eval-rst}
+.. autofunction:: probabilistic_model.probabilistic_circuit.rx.learning.prune_edges
+```
 
 ```{code-cell} python
-before_edges = len(
+edges_before = len(
     list(circuit.edges())
 )
-
 
 prune_edges(
     circuit,
@@ -181,28 +204,40 @@ prune_edges(
     prune_fraction=0.2,
 )
 
-
-after_edges = len(
+edges_after = len(
     list(circuit.edges())
 )
 
+print(
+    "Edges before pruning:",
+    edges_before,
+)
 
-print("Edges before pruning:", before_edges)
-print("Edges after pruning:", after_edges)
+print(
+    "Edges after pruning:",
+    edges_after,
+)
 ```
 
-## 3. Growing the Circuit
 
-Growing increases the capacity of the probabilistic circuit.
+# Growing the Circuit
+
+Growing increases the representational capacity of the probabilistic
+circuit.
 
 Selected SumUnits are duplicated and their weights are slightly
 perturbed to create new structural alternatives.
 
+The implementation is available in:
+
+```{eval-rst}
+.. autofunction:: probabilistic_model.probabilistic_circuit.rx.learning.grow_nodes
+```
+
 ```{code-cell} python
-before_nodes = len(
+nodes_before = len(
     list(circuit.graph.nodes())
 )
-
 
 grow_nodes(
     circuit,
@@ -210,48 +245,62 @@ grow_nodes(
     noise_scale=1e-3,
 )
 
-
-after_nodes = len(
+nodes_after = len(
     list(circuit.graph.nodes())
 )
 
+print(
+    "Nodes before growing:",
+    nodes_before,
+)
 
-print("Nodes before growing:", before_nodes)
-print("Nodes after growing:", after_nodes)
+print(
+    "Nodes after growing:",
+    nodes_after,
+)
 ```
 
-## 4. Complete Structural Learning Pipeline
 
-The complete algorithm alternates pruning and growing operations.
+# Complete Structural Learning Pipeline
 
-It automatically reduces unnecessary structure and increases
-capacity where required by the data.
+The complete structural learning algorithm alternates pruning and growing
+operations.
+
+The implementation is available in:
+
+```{eval-rst}
+.. autofunction:: probabilistic_model.probabilistic_circuit.rx.learning.sparse_probabilistic_circuit_learning
+```
 
 ```{code-cell} python
 circuit = create_demo_circuit()
-
 
 result = sparse_probabilistic_circuit_learning(
     circuit,
     data,
     prune_fraction=0.2,
     grow_fraction=0.5,
+    noise_scale=1e-3,
     iterations=2,
 )
-
 
 result
 ```
 
-## When should structural learning be used?
+
+# When to Use Structural Learning
 
 Structural learning is useful when:
 
-- the initial probabilistic circuit contains redundant structure,
-- manually designing the architecture is difficult,
-- the model needs to adapt its complexity to the data,
-- a compact but expressive probabilistic circuit is desired.
+- The initial probabilistic circuit contains redundant structure.
+- The architecture is difficult to design manually.
+- The model needs to adapt its complexity according to data.
+- A compact but expressive probabilistic circuit is required.
 
-Pruning improves efficiency by removing unnecessary connections,
-while growing increases modelling capacity by introducing new
-structural components.
+Pruning improves efficiency by removing unnecessary connections.
+
+Growing increases modelling capacity by introducing additional structural
+components.
+
+Together, both operations allow the probabilistic circuit to automatically
+adapt its structure.
