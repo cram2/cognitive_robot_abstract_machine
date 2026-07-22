@@ -1,29 +1,35 @@
+import copy
 import numpy as np
 
-from typing import Dict, Tuple
+from dataclasses import dataclass
+from typing import Dict
 
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     SumUnit,
+    Unit,
 )
 
 
-def evaluate_likelihood(
+@dataclass(frozen=True)
+class Edge:
+    parent: Unit
+    child: Unit
+
+
+def average_log_likelihood(
     circuit: ProbabilisticCircuit,
     data: np.ndarray,
 ) -> float:
     """
     Evaluate the average log likelihood of a probabilistic circuit.
 
-    Args:
-        circuit:
-            Probabilistic circuit to evaluate.
-
-        data:
-            Dataset used for evaluation.
-
-    Returns:
-        Average log likelihood over the provided samples.
+    :param circuit: Probabilistic circuit to evaluate.
+    :type circuit: ProbabilisticCircuit
+    :param data: Dataset used for evaluation.
+    :type data: np.ndarray
+    :return: Average log likelihood over the provided samples.
+    :rtype: float
     """
 
     log_likelihood = circuit.log_likelihood(data)
@@ -34,27 +40,24 @@ def evaluate_likelihood(
 def calculate_edge_flows(
     circuit: ProbabilisticCircuit,
     data: np.ndarray,
-) -> Dict[Tuple[object, object], float]:
+) -> Dict[Edge, float]:
     """
     Calculate the average probability flow through every weighted edge.
 
     Edge flows measure the contribution of every SumUnit connection
     according to the current dataset.
 
-    Args:
-        circuit:
-            Probabilistic circuit where flows are computed.
-
-        data:
-            Dataset used for estimating flows.
-
-    Returns:
-        Mapping from edges to their average probability flow.
+    :param circuit: Probabilistic circuit where flows are computed.
+    :type circuit: ProbabilisticCircuit
+    :param data: Dataset used for estimating flows.
+    :type data: np.ndarray
+    :return: Mapping from edges to their average probability flow.
+    :rtype: Dict[Edge, float]
     """
 
     circuit.log_likelihood(data)
 
-    flows: Dict[Tuple[object, object], float] = {}
+    flows: Dict[Edge, float] = {}
 
     for parent, child, log_weight in circuit.edges():
 
@@ -66,7 +69,7 @@ def calculate_edge_flows(
 
         flow = np.exp(child_likelihood + log_weight - parent_likelihood)
 
-        flows[(parent, child)] = float(np.mean(flow))
+        flows[Edge(parent, child)] = float(np.mean(flow))
 
     return flows
 
@@ -79,18 +82,14 @@ def prune_edges(
     """
     Remove low-contribution edges from SumUnits.
 
-    Args:
-        circuit:
-            Circuit to prune.
-
-        data:
-            Dataset used to compute edge importance.
-
-        prune_fraction:
-            Fraction of removable edges removed.
-
-    Returns:
-        Pruned circuit.
+    :param circuit: Circuit to prune.
+    :type circuit: ProbabilisticCircuit
+    :param data: Dataset used to compute edge importance.
+    :type data: np.ndarray
+    :param prune_fraction: Fraction of removable edges removed.
+    :type prune_fraction: float
+    :return: Pruned circuit.
+    :rtype: ProbabilisticCircuit
     """
 
     flows = calculate_edge_flows(
@@ -118,7 +117,7 @@ def prune_edges(
                 (
                     child,
                     flows.get(
-                        (node, child),
+                        Edge(node, child),
                         0.0,
                     ),
                 )
@@ -147,6 +146,144 @@ def prune_edges(
     return circuit
 
 
+def select_sum_units_to_grow(
+    circuit: ProbabilisticCircuit,
+    data: np.ndarray | None,
+    fraction: float,
+) -> list[SumUnit]:
+    """
+    Select SumUnits that should be duplicated during growing.
+
+    :param circuit: Circuit containing candidate SumUnits.
+    :type circuit: ProbabilisticCircuit
+    :param data: Dataset used for importance estimation.
+    :type data: np.ndarray | None
+    :param fraction: Fraction of nodes selected.
+    :type fraction: float
+    :return: Selected SumUnits.
+    :rtype: list[SumUnit]
+    """
+
+    sum_nodes = [node for node in circuit.graph.nodes() if isinstance(node, SumUnit)]
+
+    if not sum_nodes:
+        return []
+
+    number_to_duplicate = max(
+        1,
+        int(len(sum_nodes) * fraction),
+    )
+
+    if data is None:
+
+        return list(
+            np.random.choice(
+                sum_nodes,
+                size=number_to_duplicate,
+                replace=False,
+            )
+        )
+
+    flows = calculate_edge_flows(
+        circuit,
+        data,
+    )
+
+    node_scores = {}
+
+    for node in sum_nodes:
+
+        score = 0.0
+
+        for child in node.subcircuits:
+
+            score += flows.get(
+                Edge(node, child),
+                0.0,
+            )
+
+        node_scores[node] = score
+
+    return sorted(
+        sum_nodes,
+        key=lambda node: node_scores[node],
+        reverse=True,
+    )[:number_to_duplicate]
+
+
+def duplicate_sum_unit(
+    circuit: ProbabilisticCircuit,
+    node: SumUnit,
+    noise_scale: float,
+) -> None:
+    """
+    Duplicate a SumUnit and attach it to the circuit.
+
+    :param circuit: Circuit where the duplicated node is added.
+    :type circuit: ProbabilisticCircuit
+    :param node: SumUnit to duplicate.
+    :type node: SumUnit
+    :param noise_scale: Standard deviation of weight perturbation.
+    :type noise_scale: float
+    """
+
+    parent_indices = list(circuit.graph.predecessors(node.index))
+
+    duplicate = node.copy_without_graph()
+
+    circuit.add_node(duplicate)
+
+    for weight, child in node.log_weighted_subcircuits:
+
+        duplicate.add_subcircuit(
+            child,
+            weight
+            + np.random.normal(
+                0,
+                noise_scale,
+            ),
+        )
+
+    if len(parent_indices) == 0:
+
+        new_root = SumUnit(probabilistic_circuit=circuit)
+
+        circuit.add_node(new_root)
+
+        new_root.add_subcircuit(
+            node,
+            np.log(0.5),
+        )
+
+        new_root.add_subcircuit(
+            duplicate,
+            np.log(0.5),
+        )
+
+        return
+
+    for parent in parent_indices:
+
+        edge_weight = circuit.graph.get_edge_data(
+            parent.index,
+            node.index,
+        )
+
+        if edge_weight is None:
+            continue
+
+        parent.add_subcircuit(
+            duplicate,
+            edge_weight
+            + np.random.normal(
+                0,
+                noise_scale,
+            ),
+        )
+
+    duplicate.normalize()
+
+
 def grow_nodes(
     circuit: ProbabilisticCircuit,
     data: np.ndarray | None = None,
@@ -156,152 +293,38 @@ def grow_nodes(
     """
     Increase circuit structure by duplicating SumUnits.
 
-    Selected SumUnits are copied and their outgoing weights are slightly
-    perturbed. If a dataset is provided, nodes can be selected according
-    to their estimated probability flow. Otherwise, SumUnits are selected
-    uniformly.
-
-    Args:
-        circuit:
-            Circuit to expand.
-
-        data:
-            Dataset used to estimate node importance. Optional.
-
-        fraction:
-            Fraction of SumUnits to duplicate.
-
-        noise_scale:
-            Standard deviation of the weight perturbation.
-
-    Returns:
-        Expanded probabilistic circuit.
+    :param circuit: Circuit to expand.
+    :type circuit: ProbabilisticCircuit
+    :param data: Dataset used to estimate node importance.
+    :type data: np.ndarray | None
+    :param fraction: Fraction of SumUnits to duplicate.
+    :type fraction: float
+    :param noise_scale: Standard deviation of weight perturbation.
+    :type noise_scale: float
+    :return: Expanded probabilistic circuit.
+    :rtype: ProbabilisticCircuit
     """
 
-    sum_nodes = [node for node in circuit.graph.nodes() if isinstance(node, SumUnit)]
-
-    if not sum_nodes:
-        return circuit
-
-    # ------------------------------------------------------------
-    # Node selection
-    # ------------------------------------------------------------
-    # If data is available, use edge flows as importance measure.
-    # Otherwise keep the previous uniform random selection.
-    # ------------------------------------------------------------
-
-    if data is not None:
-
-        flows = calculate_edge_flows(
-            circuit,
-            data,
-        )
-
-        node_scores = {}
-
-        for node in sum_nodes:
-
-            score = 0.0
-
-            for child in node.subcircuits:
-
-                score += flows.get(
-                    (node, child),
-                    0.0,
-                )
-
-            node_scores[node] = score
-
-        sorted_nodes = sorted(
-            sum_nodes,
-            key=lambda n: node_scores[n],
-            reverse=True,
-        )
-
-        number_to_duplicate = max(
-            1,
-            int(len(sum_nodes) * fraction),
-        )
-
-        selected_nodes = sorted_nodes[:number_to_duplicate]
-
-    else:
-
-        number_to_duplicate = max(
-            1,
-            int(len(sum_nodes) * fraction),
-        )
-
-        selected_nodes = np.random.choice(
-            sum_nodes,
-            size=number_to_duplicate,
-            replace=False,
-        )
+    selected_nodes = select_sum_units_to_grow(
+        circuit,
+        data,
+        fraction,
+    )
 
     for node in selected_nodes:
 
-        parent_indices = list(circuit.graph.predecessors(node.index))
-
-        duplicate = node.copy_without_graph()
-
-        circuit.add_node(duplicate)
-
-        for weight, child in node.log_weighted_subcircuits:
-
-            duplicate.add_subcircuit(
-                child,
-                weight
-                + np.random.normal(
-                    0,
-                    noise_scale,
-                ),
-            )
-
-        if len(parent_indices) == 0:
-
-            new_root = SumUnit(probabilistic_circuit=circuit)
-
-            circuit.add_node(new_root)
-
-            new_root.add_subcircuit(
-                node,
-                np.log(0.5),
-            )
-
-            new_root.add_subcircuit(
-                duplicate,
-                np.log(0.5),
-            )
-
-            continue
-
-        for parent in parent_indices:
-
-            edge_weight = circuit.graph.get_edge_data(
-                parent.index,
-                node.index,
-            )
-
-            if edge_weight is None:
-                continue
-
-            parent.add_subcircuit(
-                duplicate,
-                edge_weight
-                + np.random.normal(
-                    0,
-                    noise_scale,
-                ),
-            )
-
-        duplicate.normalize()
+        duplicate_sum_unit(
+            circuit,
+            node,
+            noise_scale,
+        )
 
     circuit._invalidate_topology_cache()
 
     return circuit
 
 
-def sparse_pc_learning(
+def sparse_probabilistic_circuit_learning(
     circuit: ProbabilisticCircuit,
     data: np.ndarray,
     prune_fraction: float = 0.1,
@@ -310,35 +333,27 @@ def sparse_pc_learning(
     iterations: int = 1,
 ) -> ProbabilisticCircuit:
     """
-    Perform iterative structural optimization.
+    Perform prune-and-grow structural learning.
 
-    Each iteration removes unnecessary connections and increases
-    capacity by duplicating relevant components.
-
-    Args:
-        circuit:
-            Initial probabilistic circuit.
-
-        data:
-            Dataset used for optimization.
-
-        prune_fraction:
-            Fraction of edges removed.
-
-        grow_fraction:
-            Fraction of SumUnits duplicated.
-
-        noise_scale:
-            Weight perturbation magnitude.
-
-        iterations:
-            Number of optimization iterations.
-
-    Returns:
-        Optimized probabilistic circuit.
+    :param circuit: Initial probabilistic circuit.
+    :type circuit: ProbabilisticCircuit
+    :param data: Dataset used for optimization.
+    :type data: np.ndarray
+    :param prune_fraction: Fraction of edges removed.
+    :type prune_fraction: float
+    :param grow_fraction: Fraction of SumUnits duplicated.
+    :type grow_fraction: float
+    :param noise_scale: Weight perturbation magnitude.
+    :type noise_scale: float
+    :param iterations: Number of structural learning iterations.
+    :type iterations: int
+    :return: Best probabilistic circuit found.
+    :rtype: ProbabilisticCircuit
     """
 
-    best_score = evaluate_likelihood(
+    best_circuit = copy.deepcopy(circuit)
+
+    best_score = average_log_likelihood(
         circuit,
         data,
     )
@@ -358,15 +373,15 @@ def sparse_pc_learning(
             noise_scale,
         )
 
-        new_score = evaluate_likelihood(
+        current_score = average_log_likelihood(
             circuit,
             data,
         )
 
-        # Keep track of the current best structure.
-        best_score = max(
-            best_score,
-            new_score,
-        )
+        if current_score > best_score:
 
-    return circuit
+            best_score = current_score
+
+            best_circuit = copy.deepcopy(circuit)
+
+    return best_circuit

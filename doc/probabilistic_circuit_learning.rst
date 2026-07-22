@@ -16,7 +16,7 @@ NeurIPS 2022.
 
 
 Structural learning automatically modifies the structure of a
-probabilistic circuit based on the observed data.
+probabilistic circuit based on observed data.
 
 The implemented operations are:
 
@@ -30,17 +30,10 @@ The implemented operations are:
 Edge Flow Calculation
 ---------------------
 
-The function:
+The edge flow calculation is implemented by:
 
-.. code-block:: python
+.. autofunction:: probabilistic_model.probabilistic_circuit.rx.learning.calculate_edge_flows
 
-    calculate_edge_flows(
-        circuit,
-        data
-    )
-
-computes the probability flow through the weighted edges of a
-probabilistic circuit.
 
 The edge flow represents the contribution of each connection to the
 overall probability distribution.
@@ -56,13 +49,7 @@ Edge Pruning
 
 The pruning operation is implemented by:
 
-.. code-block:: python
-
-    prune_edges(
-        circuit,
-        data,
-        prune_fraction
-    )
+.. autofunction:: probabilistic_model.probabilistic_circuit.rx.learning.prune_edges
 
 
 The procedure is:
@@ -83,13 +70,7 @@ Node Growing
 
 The growing operation is implemented by:
 
-.. code-block:: python
-
-    grow_nodes(
-        circuit,
-        fraction,
-        noise_scale
-    )
+.. autofunction:: probabilistic_model.probabilistic_circuit.rx.learning.grow_nodes
 
 
 Growing increases the representational capacity of the probabilistic
@@ -110,16 +91,7 @@ Complete Learning Pipeline
 
 The complete structural learning procedure is implemented by:
 
-.. code-block:: python
-
-    sparse_pc_learning(
-        circuit,
-        data,
-        prune_fraction,
-        grow_fraction,
-        noise_scale,
-        iterations
-    )
+.. autofunction:: probabilistic_model.probabilistic_circuit.rx.learning.sparse_probabilistic_circuit_learning
 
 
 The algorithm alternates between pruning and growing steps:
@@ -146,8 +118,9 @@ Structural learning is useful when:
   desired.
 
 
+
 Interactive Demo
 ----------------
 
 A Jupyter notebook demonstrating the complete structural learning
-process is included in the documentation.
+process is included as part of this documentation.

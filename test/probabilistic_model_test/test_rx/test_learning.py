@@ -4,7 +4,7 @@ from probabilistic_model.probabilistic_circuit.rx.learning import (
     calculate_edge_flows,
     prune_edges,
     grow_nodes,
-    sparse_pc_learning,
+    sparse_probabilistic_circuit_learning,
 )
 
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
@@ -24,42 +24,42 @@ def create_tiny_dummy_circuit() -> ProbabilisticCircuit:
 
     Structure:
 
-              Sum
-             /   \
-          Prod   Prod
-           |      |
-         Leaf    Leaf
+                SumUnit
+                /        \
+          ProductUnit   ProductUnit
+               |            |
+             Leaf          Leaf
 
     Returns:
         A small Gaussian mixture probabilistic circuit.
     """
 
-    x = Continuous("x")
+    variable = Continuous("x")
 
-    pc = ProbabilisticCircuit()
+    probabilistic_circuit = ProbabilisticCircuit()
 
-    root = SumUnit(probabilistic_circuit=pc)
+    root = SumUnit(probabilistic_circuit=probabilistic_circuit)
 
-    product1 = ProductUnit(probabilistic_circuit=pc)
+    product1 = ProductUnit(probabilistic_circuit=probabilistic_circuit)
 
-    product2 = ProductUnit(probabilistic_circuit=pc)
+    product2 = ProductUnit(probabilistic_circuit=probabilistic_circuit)
 
     leaf1 = leaf(
         GaussianDistribution(
-            variable=x,
+            variable=variable,
             location=0.0,
             scale=1.0,
         ),
-        pc,
+        probabilistic_circuit,
     )
 
     leaf2 = leaf(
         GaussianDistribution(
-            variable=x,
+            variable=variable,
             location=5.0,
             scale=1.0,
         ),
-        pc,
+        probabilistic_circuit,
     )
 
     product1.add_subcircuit(leaf1)
@@ -75,7 +75,7 @@ def create_tiny_dummy_circuit() -> ProbabilisticCircuit:
         np.log(0.5),
     )
 
-    return pc
+    return probabilistic_circuit
 
 
 def test_calculate_edge_flows():
@@ -151,7 +151,7 @@ def test_growing_increases_structure():
     assert after > before
 
 
-def test_sparse_pc_learning():
+def test_sparse_probabilistic_circuit_learning():
     """
     Verify that the complete learning pipeline returns
     a valid probabilistic circuit.
@@ -166,7 +166,7 @@ def test_sparse_pc_learning():
         ]
     )
 
-    result = sparse_pc_learning(
+    result = sparse_probabilistic_circuit_learning(
         circuit,
         data,
         prune_fraction=0.2,

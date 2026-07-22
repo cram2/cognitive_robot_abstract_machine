@@ -6,6 +6,7 @@ chapters:
   - file: probabilistic_circuit_learning
     sections:
           - file: examples/structural_learning_demo
+          
   - file: contributing
     options:
       hidden: true
