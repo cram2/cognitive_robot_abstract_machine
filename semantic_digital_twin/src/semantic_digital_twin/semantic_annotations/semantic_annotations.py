@@ -453,16 +453,6 @@ class Elevator(HasRootBody):
     """
     An elevator in the world, consists of three walls a floor, double doors for entering and a prismatic drive that moves
     the elevator to other floors.
-
-    ``scale`` (passed to :meth:`create_with_new_bodies_in_world`) defines the cabin as follows:
-    ``scale.x`` is the cabin depth, along the axis the double doors face and open (the back wall
-    sits opposite the doors); ``scale.y`` is the cabin width (the two side walls); ``scale.z`` is
-    the cabin height, from floor level up to the ceiling.
-    """
-
-    WALL_THICKNESS: ClassVar[float] = 0.05
-    """
-    Thickness used for the three cabin walls and the two door leaves.
     """
 
     doors: DoubleDoor = field(kw_only=True, default=None)
@@ -499,8 +489,24 @@ class Elevator(HasRootBody):
 
     @classmethod
     def create_with_new_bodies_in_world(
-        cls, name: PrefixedName, world: World, scale: Scale
+        cls,
+        name: PrefixedName,
+        world: World,
+        scale: Scale,
+        wall_thickness: float = 0.05,
     ) -> Self:
+        """
+        Creates an elevator in the world by creating new bodies.
+         ``scale.x`` is the cabin depth, along the axis the double doors face and open (the back wall
+        sits opposite the doors); ``scale.y`` is the cabin width (the two side walls); ``scale.z`` is
+        the cabin height, from floor level up to the ceiling.
+
+        :param name: The name of the elevator
+        :param world: The world in which to create the elevator
+        :param scale: The scale of the elevator
+        :param wall_thickness: The wall thickness of elevator walls
+        :return: The elevator semantic annotation
+        """
         with world.modify_world():
             anker = Body(name=PrefixedName(f"{name.name}_anker", name.prefix))
             elevator = cls._create_with_connection_in_world(name, world, anker)
@@ -520,18 +526,21 @@ class Elevator(HasRootBody):
             world.move_branch(slider.root, anker)
             world.move_branch(floor.root, slider.root)
 
-            thickness = cls.WALL_THICKNESS
             wall_configs = (
-                (0.0, Point3(-scale.x / 2, 0, 0), Scale(thickness, scale.y, scale.z)),
+                (
+                    0.0,
+                    Point3(-scale.x / 2, 0, 0),
+                    Scale(wall_thickness, scale.y, scale.z),
+                ),
                 (
                     math.pi / 2,
                     Point3(0, -scale.y / 2, 0),
-                    Scale(thickness, scale.x, scale.z),
+                    Scale(wall_thickness, scale.x, scale.z),
                 ),
                 (
                     math.pi / 2,
                     Point3(0, scale.y / 2, 0),
-                    Scale(thickness, scale.x, scale.z),
+                    Scale(wall_thickness, scale.x, scale.z),
                 ),
             )
             walls = []
@@ -549,7 +558,7 @@ class Elevator(HasRootBody):
                     )
                 )
 
-            door_scale = Scale(thickness, scale.y / 2, scale.z)
+            door_scale = Scale(wall_thickness, scale.y / 2, scale.z)
             door1 = Door.create_with_new_body_in_world(
                 name=PrefixedName(f"{name.name}_door0", name.prefix),
                 world=world,
@@ -625,17 +634,17 @@ class Elevator(HasRootBody):
         self.doors.door_0.mechanical_joint.position = 0
         self.doors.door_1.mechanical_joint.position = 0
 
-    def add_floor(self, floor_name: str, floor_position: float):
+    def add_floor(self, floor: str, floor_position: float):
         """
         Adds a floor to the possible targets for the elevator
         """
-        self.floor_positions[floor_name] = floor_position
+        self.floor_positions[floor] = floor_position
 
-    def drive_to_floor(self, floor_name: str):
+    def drive_to_floor(self, floor: str):
         """
         Drives the elevator to the floor given
         """
-        self.drive.root.parent_connection.position = self.floor_positions[floor_name]
+        self.drive.root.parent_connection.position = self.floor_positions[floor]
 
 
 ############################### subclasses to Furniture
