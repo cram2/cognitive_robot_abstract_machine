@@ -1,6 +1,9 @@
+import json
+
 import numpy as np
 import pytest
 
+from krrood.adapters.json_serializer import from_json, to_json
 from krrood.entity_query_language.factories import a, an
 from krrood.ormatic.data_access_objects.helper import to_dao
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
@@ -167,6 +170,66 @@ def test_monte_carlo_sample_count_controls_mixture_size(rpc, room_query_4):
     rpc.monte_carlo_sample_count = 50
     many = sum(1 for n in rpc.ground(room_query_4).nodes() if isinstance(n, SumUnit))
     assert many > single
+
+
+@pytest.fixture
+def deserialized_rpc(rpc):
+    """
+    The circuit after a round-trip through actual JSON text.
+
+    Going through :func:`json.dumps` and :func:`json.loads` rather than only through the
+    intermediate dict is what exposes encoding losses such as integer node keys becoming
+    strings.
+    """
+    return from_json(json.loads(json.dumps(to_json(rpc))))
+
+
+def test_deserialization_restores_class(deserialized_rpc):
+    assert isinstance(deserialized_rpc, RelationalProbabilisticCircuit)
+    assert deserialized_rpc.class_ is SceneRoom
+
+
+def test_deserialization_restores_class_circuit_variables(rpc, deserialized_rpc):
+    original_names = {v.name for v in rpc.class_probabilistic_circuit.variables}
+    restored_names = {
+        v.name for v in deserialized_rpc.class_probabilistic_circuit.variables
+    }
+    assert restored_names == original_names
+
+
+def test_deserialization_restores_exchangeable_templates(rpc, deserialized_rpc):
+    assert (
+        deserialized_rpc.exchangeable_distribution_templates.keys()
+        == rpc.exchangeable_distribution_templates.keys()
+    )
+    template = deserialized_rpc.exchangeable_distribution_templates["objects"]
+    latent_names = {v.name for v in template.latent_variables}
+    assert latent_names == {
+        v.name
+        for v in rpc.exchangeable_distribution_templates["objects"].latent_variables
+    }
+
+
+def test_deserialized_circuit_grounds_to_the_same_variables(
+    rpc, deserialized_rpc, room_query_4
+):
+    np.random.seed(0)
+    original = rpc.ground(room_query_4)
+    np.random.seed(0)
+    restored = deserialized_rpc.ground(room_query_4)
+    assert restored.is_valid()
+    assert {v.name for v in restored.variables} == {v.name for v in original.variables}
+
+
+def test_deserialized_circuit_preserves_likelihoods(rpc, deserialized_rpc):
+    """
+    The class distribution itself must be preserved numerically, not only structurally.
+    """
+    samples = rpc.class_probabilistic_circuit.sample(10)
+    assert np.allclose(
+        rpc.class_probabilistic_circuit.log_likelihood(samples),
+        deserialized_rpc.class_probabilistic_circuit.log_likelihood(samples),
+    )
 
 
 def test_ground_variable_count_scales_with_query_size(rpc):

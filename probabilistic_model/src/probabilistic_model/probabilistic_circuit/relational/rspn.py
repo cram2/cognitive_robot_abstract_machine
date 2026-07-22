@@ -219,6 +219,10 @@ class RelationalProbabilisticCircuit:
     feature_extractor: Optional[FeatureExtractor] = field(init=False, default=None)
     """
     Feature extractor built from the training instances.
+
+    ..note::
+        Only needed while fitting; grounding derives its aggregation statistics from the
+        queried domain object instead, so this stays ``None`` on a deserialized circuit.
     """
 
     @staticmethod
@@ -467,9 +471,7 @@ class RelationalProbabilisticCircuit:
         :return: The class circuit extended with the grounded exchangeable part.
         """
         aggregation_statistics = compute_aggregation_statistics(
-            instance,
-            self.feature_extractor.exchangeable_features[exchangeable_part_name],
-            template.latent_variables,
+            instance, exchangeable_part_name, template.latent_variables
         )
         determined_statistics = {
             variable: value
