@@ -3,87 +3,127 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import numpy as np
-from sklearn.mixture import GaussianMixture
-from typing_extensions import List
-
-from random_events.variable import Continuous
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
-    SumUnit,
     ProductUnit,
+    SumUnit,
     leaf,
 )
+from random_events.variable import Variable
+from sklearn.mixture import GaussianMixture
+from random_events.variable import Variable
+from typing_extensions import List
 
 
 @dataclass
 class GaussianMixtureCircuit:
-    """A tractable probabilistic circuit compiled from a Gaussian mixture.
+    """
+    A tractable probabilistic circuit compiled from a Gaussian mixture.
 
-    A real :class:`sklearn.mixture.GaussianMixture` is fitted from data and then
-    compiled into a sum-product circuit of Gaussian leaves. The circuit supports
-    exact and efficient log-likelihood and marginal queries, which is what the
-    confidence check relies on.
+    A :class:`sklearn.mixture.GaussianMixture` is fitted from data and then compiled
+    into a sum-product circuit of Gaussian leaves, which supports exact log-likelihood,
+    marginal and conditional queries.
 
-    .. note::
-        The circuit orders its variables alphabetically, so queries permute
-        incoming rows from domain order into circuit order before evaluation.
+    .. warning::
+        The mixture is fitted with a diagonal covariance, and only the diagonal is read
+        when the circuit is compiled. Correlations between variables inside a component
+        are therefore not represented: within one component the variables are treated as
+        independent, and dependencies are only captured through the mixture weights of
+        the components. A full covariance would need leaves over several variables, or a
+        model such as a joint probability tree.
     """
 
     gaussian_mixture: GaussianMixture
-    """The fitted mixture that defines the component means, variances, and weights."""
+    """
+    The fitted mixture that defines the component means, variances and weights.
+    """
 
-    feature_names: List[str]
-    """Feature names in domain order, matching the columns of the training data."""
+    variables: List[Variable]
+    """
+    The variables of the model, in the order of the columns of the training data.
+    """
 
     circuit: ProbabilisticCircuit = field(init=False)
-    """The compiled sum-product circuit used for likelihood queries."""
+    """
+    The compiled sum-product circuit used for the queries.
+    """
 
-    _domain_to_circuit_permutation: List[int] = field(init=False)
-    """Column permutation mapping domain order to circuit variable order."""
+    _training_to_circuit_permutation: List[int] = field(init=False)
+    """
+    Column permutation from the training order to the variable order of the circuit.
+    """
 
     def __post_init__(self) -> None:
         self.circuit = self._compile_circuit()
-        circuit_order = [variable.name for variable in self.circuit.variables]
-        self._domain_to_circuit_permutation = [
-            self.feature_names.index(name) for name in circuit_order
+        training_order = [variable.name for variable in self.variables]
+        self._training_to_circuit_permutation = [
+            training_order.index(variable.name) for variable in self.circuit.variables
         ]
 
     @property
+    def variable_names(self) -> List[str]:
+        """
+        The variable names in training-column order.
+        """
+        return [variable.name for variable in self.variables]
+
+    @property
     def number_of_components(self) -> int:
-        """The number of mixture components in the underlying Gaussian mixture."""
+        """
+        :return: The number of components of the underlying Gaussian mixture.
+        """
         return self.gaussian_mixture.n_components
 
     def log_likelihood(self, rows: np.ndarray) -> np.ndarray:
-        """Return the log-likelihood of each row under the circuit.
+        """
+        Compute the log-likelihood of complete instances.
 
-        :param rows: A matrix of instances in domain feature order.
+        :param rows: A matrix of instances whose columns follow :attr:`variables`.
+        :return: The log-likelihood of every row.
         """
         rows = np.asarray(rows, dtype=float)
         if rows.ndim == 1:
             rows = rows[np.newaxis, :]
-        return self.circuit.log_likelihood(rows[:, self._domain_to_circuit_permutation])
+        return self.circuit.log_likelihood(
+            rows[:, self._training_to_circuit_permutation]
+        )
 
-    def marginal(self, feature_names: List[str]) -> ProbabilisticCircuit:
-        """Return the circuit marginalised onto the given features."""
-        variables = [
+    def marginal(self, variables: List[Variable]) -> ProbabilisticCircuit:
+        """
+        Marginalise the circuit onto a subset of its variables.
+
+        :param variables: The variables to keep.
+        :return: The circuit over the given variables only.
+        """
+        kept_names = {variable.name for variable in variables}
+        kept = [
             variable
             for variable in self.circuit.variables
-            if variable.name in feature_names
+            if variable.name in kept_names
         ]
-        return self.circuit.marginal(variables)
+        return self.circuit.marginal(kept)
 
     def _compile_circuit(self) -> ProbabilisticCircuit:
-        """Build the sum-product circuit from the fitted mixture parameters."""
-        variables = [Continuous(name) for name in self.feature_names]
+        """
+        Build the sum-product circuit from the parameters of the fitted mixture.
+
+        :return: A circuit whose root is a sum over one product per mixture component.
+        """
         circuit = ProbabilisticCircuit()
         mixture_node = SumUnit(probabilistic_circuit=circuit)
         for component_index in range(self.number_of_components):
             product_node = ProductUnit(probabilistic_circuit=circuit)
-            for feature_index, variable in enumerate(variables):
-                mean = float(self.gaussian_mixture.means_[component_index, feature_index])
+            for variable_index, variable in enumerate(self.variables):
+                mean = float(
+                    self.gaussian_mixture.means_[component_index, variable_index]
+                )
                 standard_deviation = float(
-                    np.sqrt(self.gaussian_mixture.covariances_[component_index, feature_index])
+                    np.sqrt(
+                        self.gaussian_mixture.covariances_[
+                            component_index, variable_index
+                        ]
+                    )
                 )
                 gaussian = GaussianDistribution(
                     location=mean, scale=standard_deviation, variable=variable
@@ -96,22 +136,25 @@ class GaussianMixtureCircuit:
 
 def fit_gaussian_mixture_circuit(
     data: np.ndarray,
-    feature_names: List[str],
+    variables: List[Variable],
     number_of_components: int = 0,
     maximum_components: int = 8,
     random_seed: int = 0,
     covariance_regularisation: float = 1e-4,
 ) -> GaussianMixtureCircuit:
-    """Fit a Gaussian mixture to data and compile it into a tractable circuit.
+    """
+    Fit a Gaussian mixture to data and compile it into a tractable circuit.
 
-    :param data: Training matrix in domain feature order.
-    :param feature_names: Feature names in domain order.
-    :param number_of_components: Number of mixture components, or ``0`` to select
-        the count automatically by the Bayesian information criterion.
-    :param maximum_components: Upper bound tried during automatic selection.
-    :param random_seed: Seed for reproducible mixture fitting.
-    :param covariance_regularisation: Value added to the diagonal of each
-        covariance to keep near-constant features well conditioned.
+    :param data: The training matrix whose columns follow ``variables``.
+    :param variables: The variables of the model, in the order of the columns.
+    :param number_of_components: The number of mixture components, or ``0`` to select
+        the number automatically by the Bayesian information criterion.
+    :param maximum_components: The largest number of components tried during automatic
+        selection.
+    :param random_seed: The seed used for the mixture fitting.
+    :param covariance_regularisation: The value added to the diagonal of every
+        covariance to keep nearly constant variables well conditioned.
+    :return: The compiled circuit together with the mixture it was compiled from.
     """
     data = np.asarray(data, dtype=float)
     if number_of_components == 0:
@@ -124,7 +167,7 @@ def fit_gaussian_mixture_circuit(
         random_state=random_seed,
         reg_covar=covariance_regularisation,
     ).fit(data)
-    return GaussianMixtureCircuit(gaussian_mixture, list(feature_names))
+    return GaussianMixtureCircuit(gaussian_mixture, list(variables))
 
 
 def _select_component_count(
@@ -133,7 +176,16 @@ def _select_component_count(
     random_seed: int,
     covariance_regularisation: float,
 ) -> int:
-    """Choose the component count minimising the Bayesian information criterion."""
+    """
+    Choose the number of components that minimises the Bayesian information criterion.
+
+    :param data: The training matrix the mixtures are fitted to.
+    :param maximum_components: The largest number of components tried.
+    :param random_seed: The seed used for every fit.
+    :param covariance_regularisation: The value added to the diagonal of every
+        covariance.
+    :return: The number of components with the lowest criterion value.
+    """
     best_component_count = 1
     best_criterion = np.inf
     for candidate in range(1, min(maximum_components, len(data)) + 1):

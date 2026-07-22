@@ -1,57 +1,51 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, fields
 from enum import Enum
 
 import numpy as np
-from random_events.variable import Continuous
-from typing_extensions import List, Optional, Type
-
-
-@dataclass
-class EncodedInstance:
-    """The numeric encoding of one instance against a feature schema."""
-
-    row: Optional[np.ndarray]
-    """Feature values in schema order, or ``None`` when the instance is incomplete."""
-
-    missing_features: List[str] = field(default_factory=list)
-    """Names of features that were absent on the instance."""
-
-    @property
-    def is_complete(self) -> bool:
-        """Whether every feature was present and encodable."""
-        return not self.missing_features
+from random_events.variable import Continuous, Variable
+from typing_extensions import Any, List, Type
 
 
 @dataclass
 class FeatureSchema:
-    """The ordered random variables that describe one kind of instance.
+    """
+    The ordered random variables that describe one kind of instance.
 
-    A schema is derived from a dataclass whose public fields are the features.
-    Each field becomes a :class:`random_events.variable.Continuous` variable, so
-    the variables used for encoding are exactly the ones the probabilistic
-    circuit is built over. Enumeration fields are encoded by the numeric value of
-    their member, which keeps the whole feature vector continuous and therefore
-    representable by the Gaussian mixture.
+    The schema is derived from a dataclass whose public fields are the features,
+    and it turns an instance of that class into the numeric row that a
+    probabilistic model scores.
+
+    .. note::
+        Every field becomes a :class:`random_events.variable.Continuous`
+        variable. Enumeration fields are represented by the numeric value of
+        their member, because the Gaussian mixture used here can only place
+        continuous distributions on its leaves. A model with symbolic leaves,
+        such as a joint probability tree, would allow
+        :class:`random_events.variable.Symbolic` variables instead.
     """
 
-    variables: List[Continuous]
+    variables: List[Variable]
     """The random variables of the schema, in the order used for encoding."""
 
     @property
-    def feature_names(self) -> List[str]:
-        """The variable names in schema order."""
+    def variable_names(self) -> List[str]:
+        """
+        The variable names in schema order.
+        """
         return [variable.name for variable in self.variables]
 
     @classmethod
     def from_dataclass(cls, instance_class: Type) -> FeatureSchema:
-        """Derive a schema from the public fields of a dataclass.
+        """
+        Derive a schema from the public fields of a dataclass.
 
         Fields whose names begin with an underscore are treated as internal and
         excluded, so framework-injected attributes never become features.
 
         :param instance_class: The dataclass whose fields describe the features.
+        :return: The schema over the public fields of the class.
         """
         variables = [
             Continuous(field_definition.name)
@@ -60,29 +54,47 @@ class FeatureSchema:
         ]
         return cls(variables)
 
-    def encode(self, instance: object) -> EncodedInstance:
-        """Encode an instance into a numeric row in schema order.
+    def encode(self, instance: Any) -> np.ndarray:
+        """
+        Encode an instance into a numeric row in schema order.
 
-        A feature is recorded as missing when its attribute is ``None``, so an
-        incomplete instance is reported rather than silently mis-encoded.
+        Features whose attribute is ``None`` are encoded as ``numpy.nan``, which marks
+        them as unobserved so the caller can marginalise them out.
 
         :param instance: The instance whose attributes are read by name.
+        :return: One row of feature values in schema order.
         """
-        missing_features: List[str] = []
-        values: List[float] = []
-        for variable in self.variables:
-            value = getattr(instance, variable.name)
-            if value is None:
-                missing_features.append(variable.name)
-                continue
-            values.append(self._encode_value(value))
-        if missing_features:
-            return EncodedInstance(row=None, missing_features=missing_features)
-        return EncodedInstance(row=np.array(values, dtype=float))
+        return np.array(
+            [
+                self._encode_value(getattr(instance, variable.name))
+                for variable in self.variables
+            ],
+            dtype=float,
+        )
+
+    def observed_variables(self, row: np.ndarray) -> List[Variable]:
+        """
+        Return the variables that were actually observed in a row.
+
+        :param row: An encoded row, where unobserved features are ``numpy.nan``.
+        :return: The variables whose value is present.
+        """
+        return [
+            variable
+            for variable, value in zip(self.variables, row)
+            if not np.isnan(value)
+        ]
 
     @staticmethod
-    def _encode_value(value: object) -> float:
-        """Encode a single attribute value to its numeric representation."""
+    def _encode_value(value: Any) -> float:
+        """
+        Encode a single attribute value to its numeric representation.
+
+        :param value: The attribute value, possibly ``None`` or an enumeration member.
+        :return: The numeric encoding, or ``numpy.nan`` when the value is absent.
+        """
+        if value is None:
+            return np.nan
         if isinstance(value, Enum):
             return float(value.value)
         return float(value)
