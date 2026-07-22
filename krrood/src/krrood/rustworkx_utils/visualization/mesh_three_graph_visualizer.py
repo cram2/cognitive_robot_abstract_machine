@@ -21,36 +21,6 @@ from krrood.rustworkx_utils.visualization.three_graph_visualizer import (
 if TYPE_CHECKING:
     from flask import Flask
 
-_THREE_VERSION = "0.147.0"
-"""The three.js release used for the separately loaded ``GLTFLoader``.
-
-Pinned to the newest release that still ships the classic, non-module
-``examples/js/loaders/GLTFLoader.js`` (three.js moved to ES-modules-only examples at 0.148.0, and
-dropped the classic ``build/three.min.js`` UMD bundle entirely at 0.161.0); the page template loads
-scripts as plain ``<script>`` tags with no bundler or import map. Needs to be recent enough for
-Object3D compatibility with whatever three.js 3d-force-graph bundles internally — 0.128.0 (pre
-r133) caused ``TypeError: e.removeFromParent is not a function`` when 3d-force-graph tried to add a
-loaded mesh to the scene, since it bundles a newer three.js than that. Kept separate from the base
-class rather than shared: the base class's node labels are plain DOM overlays now (no separate
-three.js needed there at all) after ``three-spritetext``'s Sprite-based approach ran into a similar
-but *unfixable* version mismatch — 3d-force-graph's internal three.js bundle is newer than any
-release that still ships a classic (non-module) build, and Sprite materials are compiled against
-shader chunks that must match exactly, unlike plain meshes/geometries loaded through GLTFLoader,
-which tolerate the version gap fine.
-"""
-
-MESH_ROTATION_RADIANS_PER_SECOND = 0.6
-"""How fast mesh nodes spin around their vertical axis."""
-
-MESH_TARGET_SIZE_UNITS = 25.0
-"""The on-screen size every loaded mesh is normalized to, regardless of its real-world dimensions.
-
-A body's visual mesh is scaled in meters (a screw and a wardrobe differ by orders of magnitude),
-while 3d-force-graph's layout space uses much larger arbitrary units unrelated to any real-world
-scale (its default node sphere has a radius on the order of a few units) — without normalizing,
-most real-world meshes would render far too small to see next to the graph's node spacing.
-"""
-
 
 @dataclass
 class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
@@ -89,6 +59,33 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
     mesh_getter: Callable[[Any], Optional[trimesh.Trimesh]] = field(kw_only=True)
     """
     Method to extract the mesh from a node
+    """
+
+    three_version: str = "0.147.0"
+    """The three.js release used for the separately loaded ``GLTFLoader``.
+
+    Pinned to the newest release that still ships the classic, non-module
+    ``examples/js/loaders/GLTFLoader.js`` (three.js moved to ES-modules-only examples at 0.148.0,
+    and dropped the classic ``build/three.min.js`` UMD bundle entirely at 0.161.0); the page
+    template loads scripts as plain ``<script>`` tags with no bundler or import map. Needs to be
+    recent enough for Object3D compatibility with whatever three.js 3d-force-graph bundles
+    internally — 0.128.0 (pre r133) caused ``TypeError: e.removeFromParent is not a function`` when
+    3d-force-graph tried to add a loaded mesh to the scene, since it bundles a newer three.js than
+    that.
+    """
+
+    mesh_rotation_radians_per_second: float = 0.6
+    """How fast mesh nodes spin around their vertical axis."""
+
+    mesh_target_size_units: float = 25.0
+    """The on-screen size every loaded mesh is normalized to, regardless of its real-world
+    dimensions.
+
+    A body's visual mesh is scaled in meters (a screw and a wardrobe differ by orders of
+    magnitude), while 3d-force-graph's layout space uses much larger arbitrary units unrelated to
+    any real-world scale (its default node sphere has a radius on the order of a few units) —
+    without normalizing, most real-world meshes would render far too small to see next to the
+    graph's node spacing.
     """
 
     def node_extra_data(self, node_index: int) -> Dict[str, Any]:
@@ -130,8 +127,8 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
         callback runs, not merely "eventually" after an async load).
         """
         return f"""
-<script src="https://unpkg.com/three@{_THREE_VERSION}/build/three.min.js"></script>
-<script src="https://unpkg.com/three@{_THREE_VERSION}/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://unpkg.com/three@{self.three_version}/build/three.min.js"></script>
+<script src="https://unpkg.com/three@{self.three_version}/examples/js/loaders/GLTFLoader.js"></script>
 """
 
     def extra_script(self) -> str:
@@ -149,8 +146,8 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
         return f"""
 (function() {{
   const loader = new THREE.GLTFLoader();
-  const radiansPerSecond = {MESH_ROTATION_RADIANS_PER_SECOND};
-  const targetSize = {MESH_TARGET_SIZE_UNITS};
+  const radiansPerSecond = {self.mesh_rotation_radians_per_second};
+  const targetSize = {self.mesh_target_size_units};
   let lastFrameTime = performance.now();
 
   // Keyed by node id rather than cached on the node object itself: each poll's refresh() parses a

@@ -23,10 +23,6 @@ VisEdge = Dict[str, Any]
 """A single vis-network edge."""
 
 
-DEFAULT_BORDER_COLOR = "#888888"
-"""The border color used for nodes and edges when no border color is given."""
-
-
 @dataclass
 class VisNetworkGraphVisualizer(GraphVisualizerBase):
     """Render a live rustworkx graph as an interactive Flask application backed by vis-network.
@@ -81,7 +77,7 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
                 "label": self.node_label(index),
                 "color": {
                     "background": self.node_color(index),
-                    "border": self.node_border_color(index) or DEFAULT_BORDER_COLOR,
+                    "border": self.node_border_color(index) or self.default_border_color,
                 },
             }
             for index in self.graph.node_indices()

@@ -17,9 +17,6 @@ from typing_extensions import (
     Dict,
 )
 
-DEFAULT_NODE_COLOR = "#79a6d2"
-"""The marker color used when no ``color_getter`` is provided."""
-
 NodePosition = Union[Tuple[float, float], Tuple[float, float, float]]
 """An explicit 2D or 3D node position, in whatever coordinate space the caller intends (for
 example a world frame, so nodes end up placed at bodies' real spatial positions)."""
@@ -111,8 +108,14 @@ class GraphVisualizerBase(ABC):
     color_getter: Optional[Callable[[Any], str]] = None
     """Maps a node payload to its color; a constant color is used when not provided."""
 
+    default_node_color: str = "#79a6d2"
+    """The marker color used when no ``color_getter`` is provided."""
+
     border_color_getter: Optional[Callable[[Any], str]] = None
     """Maps a node payload to its border color; derived automatically from its fill color when not provided."""
+
+    default_border_color: str = "#888888"
+    """The border color used for nodes and edges when no border color is given."""
 
     position_getter: Optional[Callable[[Any], NodePosition]] = None
     """Maps a node payload to an explicit position; used when :attr:`layout` is
@@ -146,7 +149,7 @@ class GraphVisualizerBase(ABC):
         :return: The color of the node.
         """
         if self.color_getter is None:
-            return DEFAULT_NODE_COLOR
+            return self.default_node_color
         return self.color_getter(self.graph[node_index])
 
     def node_border_color(self, node_index: int) -> Optional[str]:
