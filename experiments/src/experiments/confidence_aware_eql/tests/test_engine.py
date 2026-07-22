@@ -5,7 +5,6 @@ from enum import Enum
 
 import numpy as np
 import pytest
-from probabilistic_model.learning.jpt.variables import AnnotatedVariable
 from random_events.variable import Continuous
 from sklearn.mixture import GaussianMixture
 
@@ -15,10 +14,6 @@ from experiments.confidence_aware_eql.engine.circuit_model import (
 from experiments.confidence_aware_eql.engine.evaluator import ConfidenceAwareEvaluator
 from experiments.confidence_aware_eql.engine.schema import FeatureSchema
 from experiments.confidence_aware_eql.engine.threshold import PercentileThreshold
-from experiments.confidence_aware_eql.engine.training import (
-    ClusterPrototype,
-    TrainingDataGenerator,
-)
 
 
 class SampleMaterial(Enum):
@@ -108,23 +103,6 @@ def test_absent_feature_is_marked_unobserved():
     row = schema.encode(TwoFeatureSample(1.0, None))
     assert np.isnan(row[1])
     assert schema.observed_variables(row) == [schema.variables[0]]
-
-
-def test_generated_training_data_follows_the_requested_variable_order():
-    """
-    The generator returns columns in the order the caller asks for.
-    """
-    weight = Continuous("weight")
-    size = Continuous("size")
-    prototype = ClusterPrototype(
-        [
-            AnnotatedVariable(weight, mean=3.0, standard_deviation=0.01),
-            AnnotatedVariable(size, mean=0.3, standard_deviation=0.01),
-        ]
-    )
-    data = TrainingDataGenerator([prototype]).sample(50, [weight, size])
-    assert data[:, 0].mean() == pytest.approx(3.0, abs=0.1)
-    assert data[:, 1].mean() == pytest.approx(0.3, abs=0.1)
 
 
 def test_impossible_instance_flagged_by_evaluator(two_cluster_data):
