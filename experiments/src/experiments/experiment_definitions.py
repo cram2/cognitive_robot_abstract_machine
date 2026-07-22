@@ -167,3 +167,15 @@ class TypstRenderer:
             f")"
         )
         return typst_markup
+
+    def render_figure(self, caption: str) -> str:
+        """
+        Renders the table wrapped in a Typst #figure with a caption.
+
+        Use this instead of :meth:`render_table` whenever the table is presented to a
+        reader, so every table in a document explains what it shows.
+
+        :param caption: Caption text describing what the table shows.
+        :return: Typst markup for a captioned figure.
+        """
+        return f"#figure(\n{self.render_table()},\n  caption: [{caption}]\n)"
