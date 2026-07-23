@@ -2,12 +2,16 @@ import json
 import logging
 import threading
 import time
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 
 import numpy as np
 import pytest
+
+import giskardpy.motion_statechart.graph_node as graph_node_module
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.data_types.exceptions import DuplicateNameException
 from giskardpy.executor import Executor
+from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
@@ -46,12 +50,6 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
 )
-from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
-from giskardpy.motion_statechart.tasks.cartesian_tasks import (
-    CartesianPose,
-)
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
-from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability
 from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ChangeStateOnEvents,
     ConstTrueNode,
@@ -63,11 +61,15 @@ from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     TestEndBeforeStart,
     TestUnpauseUnknownFromParentPause,
 )
-from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
+from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPose,
+)
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability
 from giskardpy.qp.constraint import GiskardEqualityConstraint
-from giskardpy.qp.enforcement_strategy import IntegralStrategy
 from giskardpy.qp.constraint_collection import ConstraintCollection
-import krrood.symbolic_math.symbolic_math as sm
+from giskardpy.qp.enforcement_strategy import IntegralStrategy
 from krrood.symbolic_math.symbolic_math import (
     trinary_logic_and,
     trinary_logic_not,
@@ -542,8 +544,6 @@ def test_thread_payload_monitor_cleanup_stops_worker():
 
 
 def test_thread_payload_monitor_surfaces_compute_exception():
-    import giskardpy.motion_statechart.graph_node as graph_node_module
-
     records: list[logging.LogRecord] = []
 
     class _CapturingHandler(logging.Handler):
