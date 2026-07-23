@@ -5,7 +5,7 @@ from dataclasses import field, dataclass
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.exceptions import NodeInitializationError
+from giskardpy.motion_statechart.exceptions import EmptyGoalStateError
 from giskardpy.motion_statechart.graph_node import NodeArtifacts
 from giskardpy.motion_statechart.graph_node import Task
 from semantic_digital_twin.datastructures.joint_state import JointState
@@ -36,7 +36,9 @@ class JointPositionList(Task):
     state is true.
     """
 
-    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE, kw_only=True
+    )
     """
     The weight of this task.
     """
@@ -48,7 +50,7 @@ class JointPositionList(Task):
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         if len(self.goal_state) == 0:
-            raise NodeInitializationError(node=self, reason="empty goal_state")
+            raise EmptyGoalStateError(node=self)
 
         artifacts = NodeArtifacts()
 

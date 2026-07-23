@@ -1,3 +1,7 @@
+import builtins
+import importlib
+import sys
+
 import krrood.symbolic_math.symbolic_math as sm
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -43,6 +47,31 @@ def build_align_planes_task(world: World) -> AlignPlanes:
     return task
 
 
+def test_ros_executor_importable_without_rclpy(monkeypatch):
+    """giskardpy.ros_executor must stay importable when rclpy is not installed."""
+    modules_to_evict = [
+        name
+        for name in sys.modules
+        if name == "rclpy"
+        or name.startswith("rclpy.")
+        or name == "giskardpy.ros_executor"
+        or name == "giskardpy.motion_statechart.debug_expression_publisher"
+    ]
+    for name in modules_to_evict:
+        monkeypatch.delitem(sys.modules, name, raising=False)
+
+    real_import = builtins.__import__
+
+    def blocking_import(name, *args, **kwargs):
+        if name == "rclpy" or name.startswith("rclpy."):
+            raise ImportError(f"No module named '{name}'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", blocking_import)
+
+    importlib.import_module("giskardpy.ros_executor")
+
+
 def test_align_planes_sets_visualisation_frame(cylinder_bot_world):
     task = build_align_planes_task(cylinder_bot_world)
 
@@ -85,6 +114,20 @@ def test_vector_with_reference_frame_is_transformed_to_visualisation_frame(
     request = publisher._to_request(DebugExpression(name="vector", expression=vector))
 
     assert request.spatial_type.reference_frame is bot
+
+
+def test_stop_clears_previously_published_markers(rclpy_node, cylinder_bot_world):
+    task = build_align_planes_task(cylinder_bot_world)
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(task)
+
+    publisher = DebugExpressionPublisher(world=cylinder_bot_world, node=rclpy_node)
+    publisher.attach(motion_statechart)
+    assert publisher._publisher._published_marker_identities
+
+    publisher.stop()
+
+    assert publisher._publisher._published_marker_identities == set()
 
 
 def test_attach_publisher_tracks_state_changes(rclpy_node, cylinder_bot_world):

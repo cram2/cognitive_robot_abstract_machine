@@ -1,4 +1,5 @@
 import json
+from dataclasses import fields
 
 import numpy as np
 import pytest
@@ -26,7 +27,7 @@ from giskardpy.motion_statechart.motion_statechart import (
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from giskardpy.motion_statechart.test_nodes.test_nodes import (
+from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstTrueNode,
     TestNestedGoal,
 )
@@ -346,6 +347,35 @@ def test_cancel_motion():
 
     with pytest.raises(Exception):
         kin_sim.tick_until_end()
+
+
+def test_cancel_motion_to_json_does_not_mutate_dataclass_field():
+    exception_field = next(f for f in fields(CancelMotion) if f.name == "exception")
+    assert exception_field.init is True
+
+    cancel = CancelMotion(exception=Exception("boom"))
+    cancel.to_json()
+
+    assert exception_field.init is True
+    # The class must still be constructible with the exception keyword.
+    CancelMotion(exception=Exception("again"))
+
+
+def test_to_json_does_not_accumulate_edges():
+    msc = MotionStatechart()
+    node1 = ConstTrueNode()
+    node2 = ConstTrueNode()
+    msc.add_node(node1)
+    msc.add_node(node2)
+    node2.start_condition = node1.observation_variable
+
+    first = msc.to_json()
+    edges_after_first = len(msc.edges)
+    second = msc.to_json()
+    edges_after_second = len(msc.edges)
+
+    assert edges_after_first == edges_after_second
+    assert first["unique_edges"] == second["unique_edges"]
 
 
 def test_unreachable_cart_goal(pr2_world_state_reset):

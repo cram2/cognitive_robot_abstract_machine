@@ -5,6 +5,7 @@ import scipy.sparse as sp
 from giskardpy.qp.qp_data import (
     QPData,
     QPDataExplicit,
+    QPDataTwoSidedInequality,
 )
 from giskardpy.qp.solvers.qp_solver_piqp import QPSolverPIQP
 
@@ -339,3 +340,69 @@ def test_sadness_qp17(sadness_qp17):
 def test_sadness_qp21(sadness_qp21):
     qp_data = sadness_qp21
     QPSolverPIQP().solver_call(qp_data)
+
+
+def test_apply_filters_keeps_dof_columns_without_slack():
+    """
+    Without slack variables, apply_filters must not drop degree-of-freedom columns whose
+    quadratic weight happens to be zero.
+    """
+    qp_data = QPDataExplicit(
+        quadratic_weights=np.array([1.0, 0.0]),
+        linear_weights=np.array([0.0, 0.0]),
+        box_lower_constraints=np.array([-1.0, -1.0]),
+        box_upper_constraints=np.array([1.0, 1.0]),
+        equality_matrix=sp.csc_matrix(np.zeros((0, 2))),
+        equality_bounds=np.array([]),
+        inequality_matrix=sp.csc_matrix(np.zeros((0, 2))),
+        inequality_lower_bounds=np.array([]),
+        inequality_upper_bounds=np.array([]),
+        num_equality_slack_variables=0,
+        num_inequality_slack_variables=0,
+    )
+
+    filtered = qp_data.apply_filters()
+
+    assert filtered.quadratic_weights.shape[0] == 2
+
+
+def test_apply_filters_two_sided_inequality_with_box_and_inequality_rows():
+    """
+    QPDataTwoSidedInequality.apply_filters must correctly filter a combined box +
+    inequality matrix (box rows must not be mistaken for the eq/ineq rows when slicing
+    self.inequality_matrix with the constraint filter).
+    """
+    qp_data = QPDataTwoSidedInequality(
+        quadratic_weights=np.array([1.0, 1.0]),
+        linear_weights=np.array([0.0, 0.0]),
+        inequality_matrix=sp.csc_matrix(np.vstack([np.eye(2), np.array([[1.0, 1.0]])])),
+        inequality_lower_bounds=np.array([-1.0, -1.0, -np.inf]),
+        inequality_upper_bounds=np.array([1.0, 1.0, 1.0]),
+        num_equality_slack_variables=0,
+        num_inequality_slack_variables=0,
+    )
+
+    filtered = qp_data.apply_filters()
+
+    assert filtered.quadratic_weights.shape[0] == 2
+    assert filtered.inequality_matrix.shape == (3, 2)
+
+
+def test_apply_filters_keeps_dof_columns_without_slack_two_sided_inequality():
+    """
+    Without slack variables, QPDataTwoSidedInequality.apply_filters must not drop
+    degree-of-freedom columns whose quadratic weight happens to be zero.
+    """
+    qp_data = QPDataTwoSidedInequality(
+        quadratic_weights=np.array([1.0, 0.0]),
+        linear_weights=np.array([0.0, 0.0]),
+        inequality_matrix=sp.csc_matrix(np.eye(2)),
+        inequality_lower_bounds=np.array([-1.0, -1.0]),
+        inequality_upper_bounds=np.array([1.0, 1.0]),
+        num_equality_slack_variables=0,
+        num_inequality_slack_variables=0,
+    )
+
+    filtered = qp_data.apply_filters()
+
+    assert filtered.quadratic_weights.shape[0] == 2

@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Optional
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -49,7 +50,7 @@ class ConstFalseNode(MotionStatechartNode):
 
 @dataclass(repr=False, eq=False)
 class ChangeStateOnEvents(MotionStatechartNode):
-    state: Optional[str] = None
+    state: str | None = None
 
     def on_start(self, context: MotionStatechartContext):
         self.state = "on_start"

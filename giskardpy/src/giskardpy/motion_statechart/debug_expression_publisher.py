@@ -86,7 +86,9 @@ class DebugExpressionPublisher:
 
     def stop(self) -> None:
         """
-        Stop publishing and deregister from the world's state callbacks.
+        Delete published markers, stop publishing, and deregister from the world's state
+        callbacks.
         """
         if self._publisher is not None:
+            self._publisher.clear()
             self._publisher.stop()

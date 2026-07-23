@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 
@@ -28,6 +28,10 @@ class Pointing(CartesianTask):
     """
 
     max_velocity: float = field(default=0.3, kw_only=True)
+    """
+    Reference angular velocity for normalization in rad/s.
+    """
+
     threshold: float = field(default=0.01, kw_only=True)
     """
     Observation is true if the pointing angle is below this threshold.
@@ -100,6 +104,10 @@ class PointingCone(CartesianTask):
     """
 
     max_velocity: float = field(default=0.3, kw_only=True)
+    """
+    Reference angular velocity for normalization in rad/s.
+    """
+
     threshold: float = field(default=0.01, kw_only=True)
     """
     Observation is true if the pointing angle is below this threshold.

@@ -67,7 +67,7 @@ class GeometricConstraintBuilder:
         expression_current: sm.SymbolicScalar,
         expression_goal: sm.ScalarData,
         reference_velocity: sm.ScalarData,
-        quadratic_weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         name: Optional[str] = None,
     ) -> None:
         """
@@ -94,7 +94,7 @@ class GeometricConstraintBuilder:
         frame_V_current: Vector3,
         frame_V_goal: Vector3,
         reference_velocity: sm.ScalarData,
-        quadratic_weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         name: Optional[str] = None,
     ) -> None:
         """

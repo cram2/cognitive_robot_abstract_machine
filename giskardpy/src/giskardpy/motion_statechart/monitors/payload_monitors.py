@@ -1,6 +1,7 @@
 import logging
 import threading
 import time
+from abc import ABC, abstractmethod
 from dataclasses import field, dataclass
 from typing import Optional, Callable
 
@@ -67,17 +68,62 @@ class CountSeconds(MotionStatechartNode):
         self._start_time = self._now()
 
 
-@dataclass(repr=False, eq=False)
-class CountControlCycles(MotionStatechartNode):
+@dataclass(eq=False, repr=False)
+class TickCounter(MotionStatechartNode, ABC):
     """
-    This node counts 'threshold'-many control cycles and then turns True.
+    Base for nodes that count control ticks while RUNNING and turn True once a target is
+    reached.
 
     Only counts while in state RUNNING.
     """
 
-    _counter: int = field(init=False)
+    _counter: int = field(init=False, default=0)
     """
-    Keeps track of how many ticks have passed since first True.
+    Number of ticks counted since the last start/reset.
+    """
+
+    def on_start(self, context: MotionStatechartContext):
+        self._counter = 0
+
+    def on_tick(
+        self, context: MotionStatechartContext
+    ) -> Optional[ObservationStateValues]:
+        self._counter += 1
+        if self._reached_target(context):
+            return ObservationStateValues.TRUE
+        return ObservationStateValues.FALSE
+
+    @abstractmethod
+    def _reached_target(self, context: MotionStatechartContext) -> bool:
+        """
+        Whether the counted target has been reached on the current tick.
+        """
+
+
+@dataclass(eq=False, repr=False)
+class CountSimulationTimeSeconds(TickCounter):
+    """
+    This node counts X seconds of simulation time (control cycles * simulation time
+    step) and then turns True.
+
+    Only counts while in state RUNNING.
+    """
+
+    seconds: float = field(kw_only=True)
+    """
+    How many seconds of simulation time to count.
+    """
+
+    def _reached_target(self, context: MotionStatechartContext) -> bool:
+        return context.qp_controller_config.control_dt * self._counter >= self.seconds
+
+
+@dataclass(eq=False, repr=False)
+class CountControlCycles(TickCounter):
+    """
+    This node counts 'control_cycles'-many control cycles and then turns True.
+
+    Only counts while in state RUNNING.
     """
 
     control_cycles: int = field(kw_only=True)
@@ -85,16 +131,8 @@ class CountControlCycles(MotionStatechartNode):
     Turns True after this many control cycles.
     """
 
-    def on_tick(
-        self, context: MotionStatechartContext
-    ) -> Optional[ObservationStateValues]:
-        self._counter += 1
-        if self._counter >= self.control_cycles:
-            return ObservationStateValues.TRUE
-        return ObservationStateValues.FALSE
-
-    def on_start(self, context: MotionStatechartContext):
-        self._counter = 0
+    def _reached_target(self, context: MotionStatechartContext) -> bool:
+        return self._counter >= self.control_cycles
 
 
 @dataclass(eq=False, repr=False)

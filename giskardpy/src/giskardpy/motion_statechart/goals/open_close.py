@@ -42,7 +42,9 @@ class Open(Goal):
     default is maximum joint state.
     """
 
-    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
+    )
 
     def expand(self, context: MotionStatechartContext) -> None:
         self.connection = self.environment_link.get_first_parent_connection_of_type(
@@ -108,7 +110,9 @@ class Close(Open):
     default is maximum joint state.
     """
 
-    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
+    )
 
     def expand(self, context: MotionStatechartContext) -> None:
         self.connection = self.environment_link.get_first_parent_connection_of_type(

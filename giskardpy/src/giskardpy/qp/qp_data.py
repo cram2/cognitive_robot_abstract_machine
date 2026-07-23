@@ -135,11 +135,12 @@ class QPDataExplicit(QPData):
 
     def apply_filters(self) -> Self:
         zero_quadratic_weight_filter: np.ndarray = self.quadratic_weights != 0
+        number_non_slack_variables = (
+            zero_quadratic_weight_filter.shape[0] - self.num_slack_variables
+        )
         # don't filter dofs with 0 weight
-        zero_quadratic_weight_filter[: -self.num_slack_variables] = True
-        slack_part = zero_quadratic_weight_filter[
-            -(self.num_equality_slack_variables + self.num_inequality_slack_variables) :
-        ]
+        zero_quadratic_weight_filter[:number_non_slack_variables] = True
+        slack_part = zero_quadratic_weight_filter[number_non_slack_variables:]
         bE_part = slack_part[: self.num_equality_slack_variables]
         bA_part = slack_part[self.num_equality_slack_variables :]
 
@@ -399,9 +400,12 @@ class QPDataTwoSidedInequality(QPData):
         ]
 
         zero_quadratic_weight_filter = self.quadratic_weights != 0
-        zero_quadratic_weight_filter[: -self.num_slack_variables] = True
+        number_non_slack_variables = (
+            zero_quadratic_weight_filter.shape[0] - self.num_slack_variables
+        )
+        zero_quadratic_weight_filter[:number_non_slack_variables] = True
 
-        slack_part = zero_quadratic_weight_filter[-self.num_slack_variables :]
+        slack_part = zero_quadratic_weight_filter[number_non_slack_variables:]
         equality_part = slack_part[: self.num_equality_slack_variables]
         if len(equality_part) > 0:
             equality_filter_view[-len(equality_part) :] = equality_part
@@ -418,9 +422,9 @@ class QPDataTwoSidedInequality(QPData):
             box_finite_filter  # [zero_quadratic_weight_filter]
         )
 
-        inequality_matrix = self.inequality_matrix[:, zero_quadratic_weight_filter][
-            constraint_filter, :
-        ]
+        inequality_matrix = self.inequality_matrix[
+            self.num_box_constraints :, zero_quadratic_weight_filter
+        ][constraint_filter, :]
 
         box_matrix = self._direct_limit_model(
             self.quadratic_weights.shape[0],

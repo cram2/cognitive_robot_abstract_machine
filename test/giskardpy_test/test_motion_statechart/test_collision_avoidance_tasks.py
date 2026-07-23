@@ -260,7 +260,7 @@ def test_external_collision_avoidance_battle():
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=1, reference_frame=weak
                 ),
-                weight=DefaultWeights.WEIGHT_BELOW_CA,
+                weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
             ),
             ExternalCollisionAvoidance(robot=weak_robot_sa),
             ExternalCollisionAvoidance(robot=strong_robot_sa),
@@ -607,7 +607,7 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
                                 angle=np.pi / 2.0,
                                 reference_frame=pr2_with_box.root,
                             ),
-                            weight=DefaultWeights.WEIGHT_BELOW_CA,
+                            weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
                         ),
                         ExternalCollisionAvoidance(robot=robot),
                     ]
@@ -679,7 +679,7 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box):
                             goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                                 0.2, reference_frame=r_tip
                             ),
-                            weight=DefaultWeights.WEIGHT_ABOVE_CA,
+                            weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
                         ),
                         SelfCollisionAvoidance(robot=robot),
                     ],

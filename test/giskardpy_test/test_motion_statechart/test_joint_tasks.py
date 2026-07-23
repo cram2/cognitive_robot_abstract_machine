@@ -18,7 +18,7 @@ from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
-from giskardpy.motion_statechart.test_nodes.test_nodes import (
+from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstTrueNode,
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig

@@ -162,7 +162,6 @@ class PR2Tester(GiskardTester):
             ),
             qp_controller_config=QPControllerConfig(
                 target_frequency=20,
-                retries_with_relaxed_constraints=15,
             ),
         )
 

@@ -380,15 +380,17 @@ class TestCartesianTasks:
         expected = pr2_world_state_reset.transform(tip_goal, root)
 
         motion_statechart = MotionStatechart()
-        cart_goal = CartesianPose(
-            root_link=root,
-            tip_link=tip,
-            goal_pose=tip_goal,
+
+        motion_statechart.add_nodes(
+            [
+                cart_goal := CartesianPose(
+                    root_link=root,
+                    tip_link=tip,
+                    goal_pose=tip_goal,
+                ),
+                EndMotion.when_true(cart_goal),
+            ]
         )
-        motion_statechart.add_node(cart_goal)
-        end = EndMotion()
-        motion_statechart.add_node(end)
-        end.start_condition = cart_goal.observation_variable
 
         executor = Executor(
             MotionStatechartContext(
@@ -1042,7 +1044,7 @@ class TestVelocityTasks:
                 root_link=root,
                 tip_link=tip,
                 goal_point=Point3(1, 0, 0, reference_frame=tip),
-                weight=DefaultWeights.WEIGHT_ABOVE_CA,
+                weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
             )
         else:
             goal = CartesianOrientation(
@@ -1051,11 +1053,13 @@ class TestVelocityTasks:
                 goal_orientation=RotationMatrix.from_rpy(
                     yaw=np.pi / 2, reference_frame=tip
                 ),
-                weight=DefaultWeights.WEIGHT_ABOVE_CA,
+                weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
             )
 
         low_weight_limit = limit_cls(
-            root_link=root, tip_link=tip, weight=DefaultWeights.WEIGHT_BELOW_CA
+            root_link=root,
+            tip_link=tip,
+            weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         )
         motion_statechart = self._build_msc(goal_node=goal, limit_node=low_weight_limit)
         cancel_motion = CancelMotion(exception=Exception("test"))
