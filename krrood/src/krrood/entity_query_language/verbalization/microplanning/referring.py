@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import operator
 import uuid
+from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
+from enum import Enum
+
 from typing_extensions import Dict, List, Optional, Set, TYPE_CHECKING
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
@@ -204,19 +207,29 @@ def operand_head_noun(node: Variable, edges: List[ParentEdge]) -> str:
 # %% Same-noun disambiguation
 
 
-@dataclass(frozen=True)
-class Distinguisher:
+@dataclass
+class Distinguisher(ABC):
     """
     The determiner-level feature distinguishing one member of a same-noun group of ≥ 2 distinct
     referents from the others — mirrors :attr:`~…fragments.base.NounPhrase.alternative` /
     :attr:`~…fragments.base.NounPhrase.ordinal`.
     """
 
-    alternative: bool = False
-    """``True`` for the second member of a same-noun *pair* — realised as *"another"* / *"the
-    other"*."""
 
-    ordinal: Optional[int] = None
+@dataclass
+class AlternativeDistinguisher(Distinguisher):
+    """
+    Distinguish using `another`/`the other`. Used for two distinguish identical nouns.
+    """
+
+
+@dataclass
+class OrdinalDistinguisher(Distinguisher):
+    """
+    Distinguish using ordinals.
+    """
+
+    ordinal: int
     """A member's position within a same-noun group of three or more, counting the first member as
     position 1 — so a value of 2 realises as an ordinal word (*"a second …"*), 3 as *"a third
     …"*, and so on."""
@@ -282,8 +295,8 @@ class DistinguisherIndex:
         if position == 0:
             return None
         if self.group_size[noun] == 2:
-            return Distinguisher(alternative=True)
-        return Distinguisher(ordinal=position + 1)
+            return AlternativeDistinguisher()
+        return OrdinalDistinguisher(position + 1)
 
 
 @dataclass
