@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import inflection
 
 # %%
 # Naming utilities
@@ -14,16 +15,16 @@ def to_snake_case(name: str) -> str:
     :param name: The string to convert.
     :return: The snake_case string.
     """
-    converted = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
-    converted = re.sub("([a-z0-9])([A-Z])", r"\1_\2", converted).lower()
-    converted = re.sub(r"_{2,}", "_", converted)
-    converted = re.sub(r"^_|_$", "", converted)
-    return converted
+    if len(name) == 0:
+        return name
+    return inflection.underscore(name)
 
 
 def to_camel_case(name: str) -> str:
     """Convert snake_case to CamelCase. E.g. ``'my_func'`` → ``'MyFunc'``."""
-    return "".join(part.capitalize() for part in name.split("_"))
+    if len(name) == 0:
+        return name
+    return inflection.camelize(name, True)
 
 
 def camel_case_to_lower_camel_case(name: str) -> str:
@@ -31,4 +32,6 @@ def camel_case_to_lower_camel_case(name: str) -> str:
 
     E.g. ``"Distance"`` → ``"distance"``, ``"MyDistance"`` → ``"myDistance"``.
     """
-    return name[0].lower() + name[1:] if name else name
+    if len(name) == 0:
+        return name
+    return inflection.camelize(name, False)
