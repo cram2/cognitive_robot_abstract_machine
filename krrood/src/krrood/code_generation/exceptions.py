@@ -1,4 +1,6 @@
-"""Exceptions raised by the code-generation package."""
+"""
+Exceptions raised by the code-generation package.
+"""
 
 from __future__ import annotations
 
@@ -13,14 +15,18 @@ from krrood.exceptions import DataclassException
 
 @dataclass
 class FunctionMissingAnnotationsError(DataclassException):
-    """Raised when a callable lacks a type annotation required for generation."""
+    """
+    Raised when a callable lacks a type annotation required for generation.
+    """
 
     function_qualified_name: str
     """The qualified name of the callable that is missing an annotation."""
 
     missing_parameter_name: Optional[str] = None
-    """The parameter whose annotation is missing, or ``None`` when the return
-    annotation is the one missing."""
+    """
+    The parameter whose annotation is missing, or ``None`` when the return annotation is
+    the one missing.
+    """
 
     def error_message(self) -> str:
         if self.missing_parameter_name is None:
