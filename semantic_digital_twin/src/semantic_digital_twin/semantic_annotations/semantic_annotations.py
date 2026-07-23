@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Iterable, Optional, Self, Tuple, TYPE_CHECKING, Union
+from typing import ClassVar, Iterable, Optional, Self, Tuple, TYPE_CHECKING, Union
 
 import numpy as np
-from typing_extensions import List, Type
+from typing_extensions import List, Type, Dict
 
 from krrood.ormatic.utils import classproperty
+from probabilistic_model.bayesian_network.bayesian_network import Node
 from semantic_digital_twin.datastructures.alignment import AlignmentPair
 from krrood.symbolic_math import symbolic_math
 from random_events.interval import closed
@@ -21,6 +23,7 @@ from semantic_digital_twin.exceptions import (
     MechanicalJointAlreadyMounted,
 )
 from semantic_digital_twin.reasoning.predicates import InsideOf
+from semantic_digital_twin.regions.regions import Level
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasSupportingSurface,
     HasRootRegion,
@@ -40,7 +43,9 @@ from semantic_digital_twin.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
     Vector3,
+    RotationMatrix,
 )
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -264,6 +269,14 @@ class MechanicalJoint(HasRootBody):
             main_has_root_body_annotation.root, self.root
         )
 
+    @property
+    def position(self):
+        return self.root.parent_connection.position
+
+    @position.setter
+    def position(self, value):
+        self.root.parent_connection.position = value
+
 
 @dataclass(eq=False)
 class Hinge(MechanicalJoint):
@@ -434,6 +447,205 @@ class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMechanicalJoint):
     @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.Z()
+
+
+@dataclass(eq=False)
+class Elevator(HasRootBody):
+    """
+    An elevator in the world, consists of three walls a floor, double doors for entering and a prismatic drive that moves
+    the elevator to other floors.
+    """
+
+    doors: DoubleDoor = field(kw_only=True, default=None)
+    """
+    Double doors through which one can access the elevator
+    """
+
+    drive: Slider = field(kw_only=True, default=None)
+    """
+    Prismatic drive that moves the elevator to other floors.
+    """
+
+    walls: List[Wall] = field(kw_only=True, default=None)
+    """
+    Other 3 walls of the elevator cabin, besides the double doors.
+    """
+
+    floor: Floor = field(kw_only=True, default=None)
+    """
+    Floor of the elevator cabin
+    """
+
+    anker_point: Body = field(kw_only=True, default=None)
+    """
+    root point below the elevator from which the elevator is driving up
+    """
+
+    floor_positions: Dict[Level, float] = field(
+        kw_only=True, default_factory=dict, init=False
+    )
+    """
+    Positions of the drive which corresponds to the floor the elevator can reach.
+    """
+
+    @classmethod
+    def create_with_new_bodies_in_world(
+        cls,
+        name: PrefixedName,
+        world: World,
+        scale: Scale,
+        wall_thickness: float = 0.05,
+    ) -> Self:
+        """
+        Creates an elevator in the world by creating new bodies.
+         ``scale.x`` is the cabin depth, along the axis the double doors face and open (the back wall
+        sits opposite the doors); ``scale.y`` is the cabin width (the two side walls); ``scale.z`` is
+        the cabin height, from floor level up to the ceiling.
+
+        :param name: The name of the elevator
+        :param world: The world in which to create the elevator
+        :param scale: The scale of the elevator
+        :param wall_thickness: The wall thickness of elevator walls
+        :return: The elevator semantic annotation
+        """
+        with world.modify_world():
+            anker = Body(name=PrefixedName(f"{name.name}_anker", name.prefix))
+            elevator = cls._create_with_connection_in_world(name, world, anker)
+
+            floor = Floor.create_with_new_body_in_world(
+                name=PrefixedName(f"{name.name}_floor", name.prefix),
+                world=world,
+                scale=scale.xy,
+            )
+
+            slider = Slider.create_with_new_body_in_world(
+                name=PrefixedName(f"{name.name}_drive", name.prefix),
+                world=world,
+                active_axis=Vector3.Z(),
+            )
+
+            world.move_branch(slider.root, anker)
+            world.move_branch(floor.root, slider.root)
+
+            wall_configs = (
+                (
+                    0.0,
+                    Point3(-scale.x / 2, 0, 0),
+                    Scale(wall_thickness, scale.y, scale.z),
+                ),
+                (
+                    math.pi / 2,
+                    Point3(0, -scale.y / 2, 0),
+                    Scale(wall_thickness, scale.x, scale.z),
+                ),
+                (
+                    math.pi / 2,
+                    Point3(0, scale.y / 2, 0),
+                    Scale(wall_thickness, scale.x, scale.z),
+                ),
+            )
+            walls = []
+            for i, (yaw, translation, wall_scale) in enumerate(wall_configs):
+                rotation = RotationMatrix.from_rpy(yaw=yaw)
+                transform = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                    translation, rotation, reference_frame=world.root
+                )
+                walls.append(
+                    Wall.create_with_new_body_in_world(
+                        name=PrefixedName(f"{name.name}_wall{i}", name.prefix),
+                        world=world,
+                        world_root_T_self=transform,
+                        scale=wall_scale,
+                    )
+                )
+
+            door_scale = Scale(wall_thickness, scale.y / 2, scale.z)
+            door1 = Door.create_with_new_body_in_world(
+                name=PrefixedName(f"{name.name}_door0", name.prefix),
+                world=world,
+                world_root_T_self=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                    Point3(scale.x / 2, -scale.y / 4, scale.z / 2),
+                    reference_frame=world.root,
+                ),
+                scale=door_scale,
+            )
+            door2 = Door.create_with_new_body_in_world(
+                name=PrefixedName(f"{name.name}_door1", name.prefix),
+                world=world,
+                world_root_T_self=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                    Point3(scale.x / 2, scale.y / 4, scale.z / 2),
+                    reference_frame=world.root,
+                ),
+                scale=door_scale,
+            )
+            double_door = DoubleDoor(
+                name=PrefixedName(f"{name.name}_double_door", name.prefix),
+                door_0=door1,
+                door_1=door2,
+            )
+            world.add_semantic_annotation(double_door)
+
+            for wall in walls:
+                world.move_branch(wall.root, floor.root)
+            for door in (door1, door2):
+                world.move_branch(door.root, floor.root)
+
+            door_travel = door_scale.y
+            door_slider_configs = (
+                (
+                    door1,
+                    DerivativeMap(position=-door_travel),
+                    DerivativeMap(position=0.0),
+                ),
+                (
+                    door2,
+                    DerivativeMap(position=0.0),
+                    DerivativeMap(position=door_travel),
+                ),
+            )
+            for i, (door, lower, upper) in enumerate(door_slider_configs):
+                door_slider = Slider.create_with_new_body_in_world(
+                    name=PrefixedName(f"{name.name}_door{i}_drive", name.prefix),
+                    world=world,
+                    active_axis=(Vector3.Y() * ((-1) ** (i + 1))),
+                    connection_limits=DegreeOfFreedomLimits(lower=lower, upper=upper),
+                )
+                door.add(door_slider)
+
+            elevator.doors = double_door
+            elevator.drive = slider
+            elevator.walls = walls
+            elevator.floor = floor
+            elevator.anker_point = anker
+
+        return elevator
+
+    def open(self):
+        """
+        Opens the elevator doors
+        """
+        self.doors.door_0.mechanical_joint.position = self.doors.door_0.scale.y
+
+        self.doors.door_1.mechanical_joint.position = self.doors.door_1.scale.y
+
+    def close(self):
+        """
+        Closes the elevator doors
+        """
+        self.doors.door_0.mechanical_joint.position = 0
+        self.doors.door_1.mechanical_joint.position = 0
+
+    def add_floor(self, floor: Level, floor_position: float):
+        """
+        Adds a floor to the possible targets for the elevator
+        """
+        self.floor_positions[floor] = floor_position
+
+    def drive_to_floor(self, floor: Level):
+        """
+        Drives the elevator to the floor given
+        """
+        self.drive.root.parent_connection.position = self.floor_positions[floor]
 
 
 ############################### subclasses to Furniture
