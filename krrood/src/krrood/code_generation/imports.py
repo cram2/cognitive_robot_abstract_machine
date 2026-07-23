@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from importlib.util import resolve_name
 from typing import Callable, Dict, Iterable, List, Optional, Set, Type
 
+from krrood.code_generation.enums import PythonBuiltinParameterNames
 from krrood.code_generation.exceptions import FunctionMissingAnnotationsError
 from krrood.utils import (
     get_function_import_data,
@@ -77,7 +78,7 @@ def validate_annotations(function: Callable) -> None:
     """
     signature = inspect.signature(function)
     for parameter_name, parameter in signature.parameters.items():
-        if parameter_name in ("self", "cls"):
+        if parameter_name in PythonBuiltinParameterNames:
             continue
         if parameter.annotation is inspect.Parameter.empty:
             raise FunctionMissingAnnotationsError(
@@ -93,42 +94,6 @@ def validate_annotations(function: Callable) -> None:
 
 # %%
 # Import extraction / generation
-
-
-def generate_relative_import(
-    from_module: str, target_module: str, symbol: Optional[str] = None
-) -> str:
-    """Generate a relative import statement using Python's own resolver.
-
-    :param from_module: The module where the import is being made.
-    :param target_module: The module to import.
-    :param symbol: The symbol (e.g., a class, a method, etc.) to import (optional).
-    :returns: A relative import statement string.
-    """
-    absolute = resolve_name(target_module, from_module)
-
-    from_package = from_module.rsplit(".", 1)[0]
-    from_parts = from_package.split(".")
-    target_parts = absolute.split(".")
-
-    common_prefix_length = 0
-    while (
-        common_prefix_length < min(len(from_parts), len(target_parts))
-        and from_parts[common_prefix_length] == target_parts[common_prefix_length]
-    ):
-        common_prefix_length += 1
-
-    levels_up = len(from_parts) - common_prefix_length
-    prefix = "." * (levels_up + 1)
-
-    remainder = ".".join(target_parts[common_prefix_length:])
-
-    if symbol:
-        if remainder:
-            return f"from {prefix}{remainder} import {symbol}"
-        return f"from {prefix} import {symbol}"
-    else:
-        return f"from {prefix} import {remainder}"
 
 
 def get_type_names_per_module_from_types(
