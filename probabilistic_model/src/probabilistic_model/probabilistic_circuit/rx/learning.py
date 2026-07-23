@@ -295,6 +295,52 @@ def grow_nodes(
     return circuit
 
 
+def update_sum_weights(
+    circuit: ProbabilisticCircuit,
+    data: np.ndarray,
+) -> None:
+    """
+    Update the weights of SumUnits based on the estimated probability flows.
+
+    The function re-estimates the outgoing weights of every SumUnit using
+    the average probability flow through each edge. The new weights are
+    normalized so that they form a valid probability distribution.
+
+    :param circuit: Probabilistic circuit whose SumUnit weights are updated.
+    :param data: Dataset used to estimate edge probability flows.
+    """
+
+    flows = calculate_edge_flows(circuit, data)
+
+    for node in circuit.graph.nodes():
+
+        if not isinstance(node, SumUnit):
+            continue
+
+        children = list(node.subcircuits)
+
+        if len(children) == 0:
+            continue
+
+        values = np.array(
+            [flows.get((node, child), 0.0) for child in children],
+            dtype=float,
+        )
+
+        if values.sum() == 0:
+            continue
+
+        values /= values.sum()
+
+        for child in children:
+            circuit.graph.remove_edge(node.index, child.index)
+
+        for child, weight in zip(children, values):
+            node.add_subcircuit(child, np.log(weight))
+
+    circuit._invalidate_topology_cache()
+
+
 def sparse_probabilistic_circuit_learning(
     circuit: ProbabilisticCircuit,
     data: np.ndarray,
@@ -335,6 +381,11 @@ def sparse_probabilistic_circuit_learning(
             data,
             grow_fraction,
             noise_scale,
+        )
+
+        update_sum_weights(
+            circuit,
+            data,
         )
 
         current_score = average_log_likelihood(
