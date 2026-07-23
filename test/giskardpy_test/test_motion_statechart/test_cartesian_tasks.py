@@ -938,6 +938,48 @@ class TestCartesianTasks:
             cart_straight.goal_pose.to_np(), goal_pose.to_np(), atol=0.015
         )
 
+    def test_soft_trunk_cartesian_position(self):
+        """
+        Verifies that Giskardpy can solve and execute a CartesianPosition task
+        for the procedurally built Piecewise Constant Curvature SoftTrunk robot.
+        """
+        from semantic_digital_twin.datastructures.soft_trunk import (
+            SoftTrunk,
+            SoftTrunkSection,
+        )
+
+        world = World()
+        # Define 3 identical sections of 0.3m, 0.02m radius, and 10 resolution
+        sections = [SoftTrunkSection(length=0.3, radius=0.02, resolution=10)] * 3
+        trunk = SoftTrunk.build_piecewise_constant_curvature(world, sections)
+
+        # Define a reachable Cartesian target point relative to the base root
+        goal_point = Point3(0.3, 0.0, 0.6, reference_frame=world.root)
+
+        msc = MotionStatechart()
+        goal = CartesianPosition(
+            root_link=world.root,
+            tip_link=trunk.arms[0].tip,
+            goal_point=goal_point,
+        )
+        msc.add_node(goal)
+        msc.add_node(EndMotion.when_true(goal))
+
+        kin_sim = Executor(MotionStatechartContext(world=world))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        # Retrieve the final tip pose
+        tip_body = trunk.arms[0].tip
+        fk = world.compute_forward_kinematics_np(world.root, tip_body)
+
+        # Verify that the tip reached the target point within the goal threshold
+        actual_position = fk[:3, 3]
+        target_position = goal_point.to_np()[:3]
+        distance_error = np.linalg.norm(actual_position - target_position)
+
+        assert distance_error <= goal.threshold
+
 
 class TestDiffDriveBaseGoal:
     @pytest.mark.parametrize(
