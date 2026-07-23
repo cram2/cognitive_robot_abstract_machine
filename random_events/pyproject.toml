@@ -8,7 +8,7 @@ dynamic=["version", "dependencies"]
 description = "Random random events for probabilistic reasoning"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT License"}
+license = "LGPL-3.0-only"
 authors = [
     {name = "Tom Schierenbeck", email = "tom_sch@uni-bremen.de"}
 ]
@@ -21,7 +21,6 @@ keywords = [
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 
@@ -37,5 +36,5 @@ include = ["random_events*"]
 include-dirs = ["src/random_events_lib/random_events_lib/include"]
 
 [tool.setuptools.dynamic]
-version = {attr = "random_events.__version__"}
+version = {attr = "random_events._version.__version__"}
 dependencies = {file = "requirements.txt"}

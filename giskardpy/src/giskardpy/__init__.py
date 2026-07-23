@@ -1,6 +1,7 @@
-__version__ = "1.0.0"
 import os
 import threading
+
+from ._version import __version__
 
 
 def preload_matplotlib():

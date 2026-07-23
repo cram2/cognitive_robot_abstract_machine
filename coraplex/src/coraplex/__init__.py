@@ -1,7 +1,7 @@
-__version__ = "2.0.0"
-
-
+import sys
 import logging
+
+from ._version import __version__
 
 format = "%(levelname)s:%(filename)s::%(lineno)s %(funcName)s %(message)s"
 logging.basicConfig(format=format)
