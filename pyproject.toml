@@ -37,10 +37,6 @@ dev = [
     "mypy>=1.8",
 ]
 
-# Requirements for building the documentation of all sub-packages.
-# Collected from the doc/requirements.txt files of the workspace members
-# (coraplex, krrood, probabilistic_model, random_events, semantic_digital_twin).
-# Workspace packages (e.g. random-events) are omitted since they are core dependencies.
 doc = [
     "jupyter-book<2.0.0",
     "jupyter",

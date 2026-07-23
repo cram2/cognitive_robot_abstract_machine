@@ -39,6 +39,11 @@ dev = [
     "pytest>=7.0.0,<8.0.0",
     "mypy>=1.8",
 ]
+visualization = [
+    "dash",
+    "plotly",
+    "flask",
+]
 
 [project.urls]
 Homepage = "https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html"
@@ -58,6 +63,7 @@ exclude = ["test*"]
 krrood = [
   "ormatic/templates/*.j2",
   "ormatic/templates/*.jinja",
+  "rustworkx_utils/visualization/templates/*.jinja",
   "code_generation/templates/*.jinja",
 ]
 

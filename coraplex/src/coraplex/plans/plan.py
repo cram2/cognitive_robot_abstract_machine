@@ -23,7 +23,17 @@ from coraplex.plans.plan_node import (
     ActionNode,
     DesignatorNode,
 )
-from coraplex.visualization import plot_rustworkx_interactive, create_ordered_graph
+from krrood.rustworkx_utils.graph_visualizer_base import (
+    GraphLayout,
+    GraphVisualizerBackend,
+    GraphVisualizerBase,
+)
+from krrood.rustworkx_utils.visualization.cytoscape_graph_visualizer import (
+    CytoscapeGraphVisualizer,
+)
+from krrood.rustworkx_utils.visualization.interactive_graph_visualizer import (
+    InteractiveGraphVisualizer,
+)
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 
@@ -309,19 +319,51 @@ class Plan:
 
         self.root.simplify()
 
-    def plot(self, layout: str = "bfs"):
-        """
-        Plots the plan in an interactive browser window.
+    _visualizer_classes = {
+        GraphVisualizerBackend.PLOTLY: InteractiveGraphVisualizer,
+        GraphVisualizerBackend.CYTOSCAPE: CytoscapeGraphVisualizer,
+    }
+    """The visualizer to use for each rendering backend."""
 
-        :param layout: The layout of the plot
+    def visualize(
+        self,
+        backend: GraphVisualizerBackend = GraphVisualizerBackend.CYTOSCAPE,
+        layout: GraphLayout = GraphLayout.PHYSICS,
+    ) -> GraphVisualizerBase:
         """
-        graph, mapping = create_ordered_graph(self)
-        plot_rustworkx_interactive(
-            graph,
-            graph_source=lambda: create_ordered_graph(self)[0],
+        Open an interactive, real-time visualization of the plan graph.
+
+        Nodes appear as the plan is built, are labelled by their type, coloured by execution
+        status and reveal their status and timing when clicked. With the default physics layout
+        the nodes self-organize and bounce as the plan grows.
+
+        :param backend: The rendering technology to use.
+        :param layout: The algorithm used to place the nodes.
+        :return: The running visualizer.
+        """
+        visualizer = self._visualizer_classes[backend](
+            graph=self.plan_graph,
+            label_getter=lambda node: node.__class__.__name__,
+            information_getter=self._node_details,
+            color_getter=lambda node: node.status.color.replace("-", ""),
             layout=layout,
-            start=mapping[self.root.index],
+            title=repr(self),
         )
+        visualizer.run()
+        return visualizer
+
+    def _node_details(self, node: PlanNode) -> List[str]:
+        """
+        :param node: The node to describe.
+        :return: The status, timing and outcome of the node as detail lines.
+        """
+        return [
+            f"status: {node.status.name}",
+            f"start: {node.start_time}",
+            f"end: {node.end_time}",
+            f"result: {node.result}",
+            f"reason: {node.reason}",
+        ]
 
     def __repr__(self):
         return f"Plan with {len(self.all_nodes)} nodes"

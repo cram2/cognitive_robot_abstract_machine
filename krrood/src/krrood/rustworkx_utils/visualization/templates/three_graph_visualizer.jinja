@@ -1,0 +1,187 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{{ title }}</title>
+<script src="https://unpkg.com/3d-force-graph"></script>
+{{ extra_head | safe }}
+<style>
+  html, body { margin: 0; height: 100%; font-family: "Segoe UI", sans-serif; background: #0b0b0f; }
+  #container { display: flex; height: 100vh; }
+  #graph { flex: 3; background: #000000; }
+  #details { flex: 1; padding: 1.25rem; overflow: auto; background: #121218;
+    color: #d6d6e0; border-left: 1px solid #2a2a35; }
+  #details h3 { margin-top: 0; color: #ffffff; border-bottom: 1px solid #2a2a35; padding-bottom: 0.5rem; }
+  #details p { color: #b5b5c4; line-height: 1.5; }
+  #details i { color: #7a7a8c; }
+  #popup { position: fixed; display: none; max-width: 280px; background: #121218;
+    color: #d6d6e0; border: 1px solid #2a2a35; border-radius: 6px; padding: 0.75rem 1rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); z-index: 10; }
+  #popup h3 { margin: 0 0 0.5rem 0; color: #ffffff; font-size: 14px; padding-right: 1.25rem; }
+  #popup p { margin: 0.25rem 0; color: #b5b5c4; font-size: 12px; line-height: 1.4; }
+  #popup .close-popup { position: absolute; top: 4px; right: 8px; cursor: pointer;
+    color: #7a7a8c; background: none; border: none; font-size: 14px; line-height: 1; }
+  .node-label { position: fixed; display: none; pointer-events: none; color: #ffffff;
+    font-size: 12px; white-space: nowrap; transform: translate(-50%, -100%);
+    text-shadow: 0 0 4px #000000, 0 0 4px #000000, 0 0 4px #000000; }
+</style>
+</head>
+<body>
+<div id="container">
+  <div id="graph"></div>
+  <div id="details"><i>Click a node to see its details</i></div>
+</div>
+<div id="popup"></div>
+<script>
+const layoutOptions = {{ layout_options_json | safe }};
+
+function escapeHtml(text) {
+  const holder = document.createElement("div");
+  holder.textContent = text;
+  return holder.innerHTML;
+}
+
+function hidePopup() {
+  document.getElementById("popup").style.display = "none";
+}
+
+function showPopup(label, lines, clientX, clientY) {
+  const popup = document.getElementById("popup");
+  popup.innerHTML =
+    '<button class="close-popup" onclick="hidePopup()">×</button>' +
+    "<h3>" + escapeHtml(label) + "</h3>" +
+    lines.map((line) => "<p>" + escapeHtml(line) + "</p>").join("");
+  popup.style.display = "block";
+  const maxLeft = window.innerWidth - popup.offsetWidth - 12;
+  const maxTop = window.innerHeight - popup.offsetHeight - 12;
+  popup.style.left = Math.max(12, Math.min(clientX + 12, maxLeft)) + "px";
+  popup.style.top = Math.max(12, Math.min(clientY + 12, maxTop)) + "px";
+}
+
+let lastMouseX = 0;
+let lastMouseY = 0;
+document.getElementById("graph").addEventListener("mousemove", (event) => {
+  lastMouseX = event.clientX;
+  lastMouseY = event.clientY;
+});
+
+let hoveredNodeId = null;
+
+const graph = ForceGraph3D()(document.getElementById("graph"))
+  .backgroundColor("#000000")
+  .nodeLabel(null)
+  .nodeColor((node) => node.color)
+  .linkColor(() => "#ffffff")
+  .linkWidth(2)
+  .onNodeClick(async (node) => {
+    const response = await fetch("node/" + node.id);
+    const payload = await response.json();
+    const lines = payload.details.map((line) => "<p>" + escapeHtml(line) + "</p>").join("");
+    document.getElementById("details").innerHTML =
+      "<h3>" + escapeHtml(node.label) + "</h3>" + lines;
+  })
+  .onNodeHover(async (node) => {
+    hoveredNodeId = node ? node.id : null;
+    if (!node) { hidePopup(); return; }
+    const response = await fetch("node/" + node.id);
+    const payload = await response.json();
+    if (hoveredNodeId !== node.id) { return; } // hover moved on before this resolved
+    showPopup(node.label, payload.details, lastMouseX, lastMouseY);
+  })
+  .onBackgroundClick(hidePopup);
+
+Object.keys(layoutOptions).forEach((key) => { graph[key](layoutOptions[key]); });
+
+const ProjectionVector3 = graph.scene().position.constructor;
+const labelElements = new Map();
+
+function updateLabels() {
+  const graphElement = document.getElementById("graph");
+  const rect = graphElement.getBoundingClientRect();
+  const camera = graph.camera();
+  const currentIds = new Set();
+
+  graph.graphData().nodes.forEach((node) => {
+    if (node.x === undefined) { return; }
+    currentIds.add(node.id);
+    let element = labelElements.get(node.id);
+    if (!element) {
+      element = document.createElement("div");
+      element.className = "node-label";
+      document.body.appendChild(element);
+      labelElements.set(node.id, element);
+    }
+    element.textContent = node.label;
+
+    const projected = new ProjectionVector3(node.x, node.y, node.z).project(camera);
+    if (projected.z > 1) {
+      element.style.display = "none";
+      return;
+    }
+    element.style.display = "block";
+    element.style.left = (rect.left + (projected.x * 0.5 + 0.5) * rect.width) + "px";
+    element.style.top = (rect.top + (-projected.y * 0.5 + 0.5) * rect.height - 10) + "px";
+  });
+
+  labelElements.forEach((element, id) => {
+    if (!currentIds.has(id)) { element.remove(); labelElements.delete(id); }
+  });
+
+  requestAnimationFrame(updateLabels);
+}
+requestAnimationFrame(updateLabels);
+
+const knownNodeIds = new Set();
+const knownLinkIds = new Set();
+
+function linkId(link) { return link.source + "->" + link.target; }
+
+async function refresh() {
+  let response;
+  try {
+    response = await fetch("graph");
+  } catch (error) {
+    console.error("Failed to reach the graph endpoint:", error);
+    return;
+  }
+  if (!response.ok) {
+    console.error("Graph endpoint returned status", response.status);
+    if (knownNodeIds.size === 0) {
+      document.getElementById("details").innerHTML =
+        "<i>Failed to load the graph (server returned " + response.status + "). Retrying...</i>";
+    }
+    return;
+  }
+  const payload = await response.json();
+  const currentNodeIds = new Set(payload.nodes.map((node) => node.id));
+  const currentLinkIds = new Set(payload.links.map(linkId));
+  const structureChanged =
+    currentNodeIds.size !== knownNodeIds.size ||
+    currentLinkIds.size !== knownLinkIds.size ||
+    [...currentNodeIds].some((id) => !knownNodeIds.has(id)) ||
+    [...currentLinkIds].some((id) => !knownLinkIds.has(id));
+
+  if (structureChanged) {
+    // Only rebuild the graph (which restarts the force simulation) when nodes or links were
+    // actually added or removed;
+    graph.graphData(payload);
+    knownNodeIds.clear();
+    currentNodeIds.forEach((id) => knownNodeIds.add(id));
+    knownLinkIds.clear();
+    currentLinkIds.forEach((id) => knownLinkIds.add(id));
+  } else {
+    // Update fields (color, label, ...) on the existing, already-simulated node objects in place
+    const nodesById = new Map(graph.graphData().nodes.map((node) => [node.id, node]));
+    payload.nodes.forEach((updatedNode) => {
+      const existingNode = nodesById.get(updatedNode.id);
+      if (existingNode) { Object.assign(existingNode, updatedNode); }
+    });
+  }
+}
+
+refresh();
+setInterval(refresh, {{ interval_ms }});
+{{ extra_script | safe }}
+</script>
+</body>
+</html>
