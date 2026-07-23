@@ -28,7 +28,7 @@ from krrood.entity_query_language.factories import (
     variable,
 )
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
-from krrood.entity_query_language.verbalization.example_domain import (
+from krrood.entity_query_language.verbalization._example_domain import (
     BankTransaction,
     Employee,
     Robot,

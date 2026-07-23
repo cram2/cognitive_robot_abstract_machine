@@ -4,6 +4,7 @@ from dataclasses import replace
 
 from typing_extensions import Optional
 
+from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.fragments.base import (
     flatten_fragment_to_plain_text,
     NounPhrase,
@@ -54,7 +55,8 @@ class DeterminerProcessor(RewritePass):
 
     def _lower_noun_phrase(self, noun_phrase: NounPhrase) -> VerbalizationFragment:
         """:return: *noun_phrase* lowered to a determiner-bearing phrase — the chosen determiner,
-        an optional pre-head qualifier, the number-tagged head, and the recursed modifiers.
+        an optional ordinal-distinguisher and pre-head qualifier, the number-tagged head, and the
+        recursed modifiers.
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
         >>> phrase = NounPhrase(head=RoleFragment.for_type(Robot), definiteness=Definiteness.INDEFINITE)
@@ -62,20 +64,34 @@ class DeterminerProcessor(RewritePass):
         'a Robot'
         """
         head = self._tag_number(self.process(noun_phrase.head), noun_phrase.number)
-        # A pre-head qualifier sits between the determiner and the head: "the [first two] Robots" /
-        # "a [specific] Body". The indefinite article agrees with the first surface word, so it is
-        # chosen from the pre-head when there is one, else the head ("a specific Body", not "an …").
+        # An ordinal distinguisher ("a [second] Robot") sits ahead of any pre-head qualifier ("the
+        # [first two] Robots" / "a [specific] Body"), both between the determiner and the head. The
+        # indefinite article agrees with the first surface word, so the anchor is the ordinal when
+        # present, else the pre-head, else the head ("a specific Body", not "an …").
+        ordinal_fragment = (
+            WordFragment(text=morphology.ordinal(noun_phrase.ordinal - 1))
+            if noun_phrase.ordinal is not None
+            else None
+        )
         pre_head_fragment = (
             self.process(noun_phrase.pre_head)
             if noun_phrase.pre_head is not None
             else None
         )
+        leading_fragment = (
+            ordinal_fragment if ordinal_fragment is not None else pre_head_fragment
+        )
         determiner = self._determiner(
             noun_phrase.definiteness,
             noun_phrase.number,
-            pre_head_fragment if pre_head_fragment is not None else head,
+            leading_fragment if leading_fragment is not None else head,
+            alternative=noun_phrase.alternative,
         )
-        pre_head = [pre_head_fragment] if pre_head_fragment is not None else []
+        pre_head = [
+            fragment
+            for fragment in (ordinal_fragment, pre_head_fragment)
+            if fragment is not None
+        ]
         head_group_parts = [
             *([determiner] if determiner is not None else []),
             *pre_head,
@@ -112,10 +128,16 @@ class DeterminerProcessor(RewritePass):
         definiteness: Definiteness,
         number: GrammaticalNumber,
         article_anchor: VerbalizationFragment,
+        *,
+        alternative: bool = False,
     ) -> Optional[VerbalizationFragment]:
         """:return: The determiner fragment for *(definiteness, number)*, or ``None`` (bare). The
-        indefinite *a/an* agrees phonologically with *article_anchor* (the first surface word —
-        the pre-head when present, else the head).
+        indefinite *a/an* agrees phonologically with *article_anchor* (the first surface word — the
+        ordinal distinguisher or pre-head when present, else the head).
+
+        *alternative* selects the fused indefinite/definite pair-distinguisher determiner in place
+        of the ordinary article — *"another"* (indefinite singular) / *"the other"* (definite) —
+        for the second of a same-noun pair of distinct referents (:attr:`NounPhrase.alternative`).
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
         >>> flatten_fragment_to_plain_text(
@@ -126,14 +148,28 @@ class DeterminerProcessor(RewritePass):
         'the'
         >>> DeterminerProcessor._determiner(Definiteness.INDEFINITE, GrammaticalNumber.PLURAL, WordFragment(text="Robot")) is None
         True
+        >>> flatten_fragment_to_plain_text(
+        ...     DeterminerProcessor._determiner(Definiteness.INDEFINITE, GrammaticalNumber.SINGULAR,
+        ...                                      WordFragment(text="Robot"), alternative=True))
+        'another'
+        >>> flatten_fragment_to_plain_text(
+        ...     DeterminerProcessor._determiner(Definiteness.DEFINITE, GrammaticalNumber.SINGULAR,
+        ...                                      WordFragment(text="Robot"), alternative=True))
+        'the other'
         """
         if definiteness is Definiteness.UNIQUE:
             return Articles.THE_UNIQUE.as_fragment()
         if definiteness is Definiteness.DEFINITE:
-            return Articles.THE.as_fragment()
+            return (
+                Articles.THE_OTHER.as_fragment()
+                if alternative
+                else Articles.THE.as_fragment()
+            )
         if (
             definiteness is Definiteness.INDEFINITE
             and number is GrammaticalNumber.SINGULAR
         ):
+            if alternative:
+                return Articles.ANOTHER.as_fragment()
             return Articles.indefinite(flatten_fragment_to_plain_text(article_anchor))
         return None  # BARE, or INDEFINITE + PLURAL → the determiner-drop

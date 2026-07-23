@@ -31,7 +31,7 @@ import krrood.entity_query_language.factories as eql
 import krrood.entity_query_language.verbalization as verbalization_package
 from krrood.entity_query_language.operators.core_logical_operators import Not
 from krrood.entity_query_language.operators.logical_quantifiers import Exists, ForAll
-from krrood.entity_query_language.verbalization import example_domain
+from krrood.entity_query_language.verbalization import _example_domain as example_domain
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 # A shared namespace for all examples. It includes the EQL factories, so an example can write

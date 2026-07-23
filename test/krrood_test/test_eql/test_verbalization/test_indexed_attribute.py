@@ -7,7 +7,7 @@ first of the tasks of a Worker"*.
 from __future__ import annotations
 
 from krrood.entity_query_language.factories import variable
-from krrood.entity_query_language.verbalization.example_domain import Worker
+from krrood.entity_query_language.verbalization._example_domain import Worker
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 

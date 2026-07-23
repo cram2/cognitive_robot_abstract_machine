@@ -84,7 +84,7 @@ class EQLVerbalizer:
             fragment,
             previously_introduced_referents=previously_introduced_referents,
             discourse=discourse,
-            numbered_labels=services.referring.numbered_labels,
+            distinguisher_index=services.referring.distinguishers,
         )
 
     @staticmethod

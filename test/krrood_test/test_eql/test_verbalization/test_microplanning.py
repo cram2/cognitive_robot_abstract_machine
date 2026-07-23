@@ -68,12 +68,20 @@ def test_noun_for_parts_returns_first_mention_form_and_records():
     )
 
 
-def test_noun_for_parts_numbered_variable_takes_no_article():
+def test_noun_for_parts_uses_the_precomputed_head_noun():
+    """
+    ``noun_for_parts`` reads the pre-computed head noun when available -- always
+    ``INDEFINITE``; the disambiguating determiner (if this noun turns out to be shared
+    with another referent) is decided later, by the coreference pass, not here.
+    """
     var = variable(Robot, domain=[])
-    refer = ReferringExpressions(disambiguation_map={var._id_: "Robot 2"})
+    refer = ReferringExpressions(head_nouns={var._id_: "gripper"})
 
     noun_form = refer.noun_for_parts(var)
-    assert (noun_form.definiteness, noun_form.label) == (Definiteness.BARE, "Robot 2")
+    assert (noun_form.definiteness, noun_form.label) == (
+        Definiteness.INDEFINITE,
+        "gripper",
+    )
 
 
 def test_noun_for_parts_records_the_mention():

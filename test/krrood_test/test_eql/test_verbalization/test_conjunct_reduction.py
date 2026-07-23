@@ -21,7 +21,7 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
     RangeFold,
     reduce_conjuncts,
 )
-from krrood.entity_query_language.verbalization.example_domain import (
+from krrood.entity_query_language.verbalization._example_domain import (
     BankTransaction,
     LoveBirds,
 )

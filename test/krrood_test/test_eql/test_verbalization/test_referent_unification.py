@@ -4,13 +4,13 @@ Tests for equality-induced referent unification and relational-identity collapse
 An ``==`` constraint that identifies a variable with a relational hop (``m.assigned_to
 == r``) is said as the active relational predicate (*"it is assigned to a Mission"*),
 and the two referents are counted as one entity so the subject reads *"a Robot"* rather
-than *"Robot 1"* / *"Robot 2"*.
+than *"a Robot"* / *"another Robot"*.
 """
 
 from __future__ import annotations
 
 from krrood.entity_query_language.factories import an, entity, variable
-from krrood.entity_query_language.verbalization.example_domain import Mission, Robot
+from krrood.entity_query_language.verbalization._example_domain import Mission, Robot
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 
@@ -35,9 +35,9 @@ def test_relational_identity_holds_either_operand_order():
     )
 
 
-def test_distinct_same_type_referents_are_still_numbered_without_an_identity():
+def test_distinct_same_type_referents_are_still_distinguished_without_an_identity():
     first, second = variable(Robot, []), variable(Robot, [])
     assert (
         verbalize_expression(an(entity(first).where(first.battery > second.battery)))
-        == "Find Robot 1 whose battery is greater than the battery of Robot 2"
+        == "Find a Robot whose battery is greater than the battery of another Robot"
     )

@@ -25,7 +25,7 @@ import pytest
 
 import krrood.entity_query_language.factories as eql
 from krrood.entity_query_language.factories import an, entity, variable
-from krrood.entity_query_language.verbalization.example_domain import Robot
+from krrood.entity_query_language.verbalization._example_domain import Robot
 from krrood.entity_query_language.verbalization.fragments.base import (
     BlockFragment,
     PhraseFragment,
@@ -218,10 +218,10 @@ def test_autoapi_resolver_no_warning_when_page_exists(tmp_path):
 @pytest.fixture(scope="session")
 def built_example_domain_autoapi(tmp_path_factory) -> Path:
     """
-    Build the Sphinx AutoAPI HTML for ``example_domain`` into a tmp dir and return the
+    Build the Sphinx AutoAPI HTML for ``_example_domain`` into a tmp dir and return the
     HTML root.
 
-    Only ``example_domain`` is mirrored (into its real
+    Only ``_example_domain`` is mirrored (into its real
     ``krrood/entity_query_language/verbalization`` package path) so the build is fast
     yet faithful: the generated page path and anchor ids are exactly those of a full
     docs build, which is what the resolver's URLs must point at.
@@ -229,7 +229,7 @@ def built_example_domain_autoapi(tmp_path_factory) -> Path:
     pytest.importorskip("sphinx.application")
     pytest.importorskip("autoapi")
     from sphinx.application import Sphinx
-    import krrood.entity_query_language.verbalization.example_domain as example_domain
+    import krrood.entity_query_language.verbalization._example_domain as example_domain
 
     root = tmp_path_factory.mktemp("autoapi_build")
     package_src = root / "package_src"
@@ -241,7 +241,7 @@ def built_example_domain_autoapi(tmp_path_factory) -> Path:
         module_dir,
     ):
         (package / "__init__.py").write_text("")
-    (module_dir / "example_domain.py").write_text(
+    (module_dir / "_example_domain.py").write_text(
         Path(example_domain.__file__).read_text(encoding="utf-8"), encoding="utf-8"
     )
 

@@ -311,8 +311,13 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         assembler only knows it has a list of conditions to say, and hands them over; folding a
         bound pair into a *between* is the verbalizer's concern, not this one's.
 
-        >>> verbalize_expression(a(Robot)(name="R2").where(variable(Robot, []).battery > 50))
-        "Generate Robot 1 given that the name of Robot 1 is 'R2', where the battery of Robot 2 is greater than 50"
+        >>> from krrood.entity_query_language.backends import EntityQueryLanguageBackend
+        >>> robot_match = a(Robot)(name="R2")
+        >>> verbalize_expression(
+        ...     robot_match.where(robot_match.variable.battery > 50),
+        ...     backend=EntityQueryLanguageBackend(),
+        ... )
+        "Find a Robot given that its name is 'R2', where its battery is greater than 50"
         """
         if not plan.where_conditions:
             return None
