@@ -142,3 +142,32 @@ def test_contains(pr2_apartment_state_reset):
     point = Point3(0, 0, 0, reference_frame=pr2_apartment_state_reset.root)
 
     assert bb.contains(point)
+
+
+def test_shrink_moves_the_bounds_inward():
+    bounding_box = BoundingBox(
+        0.0, 0.0, 0.0, 1.0, 2.0, 1.0, HomogeneousTransformationMatrix()
+    )
+
+    shrunk = bounding_box.shrink(x_amount=0.1, y_amount=0.2)
+
+    assert shrunk.min_x == pytest.approx(0.1)
+    assert shrunk.max_x == pytest.approx(0.9)
+    assert shrunk.min_y == pytest.approx(0.2)
+    assert shrunk.max_y == pytest.approx(1.8)
+    assert shrunk.min_z == pytest.approx(0.0)
+    assert shrunk.max_z == pytest.approx(1.0)
+
+
+def test_shrink_clamps_amounts_so_the_box_never_inverts():
+    bounding_box = BoundingBox(
+        0.0, 0.0, 0.0, 1.0, 2.0, 1.0, HomogeneousTransformationMatrix()
+    )
+
+    shrunk = bounding_box.shrink(x_amount=5.0, y_amount=5.0, z_amount=5.0)
+
+    assert shrunk.min_x < shrunk.max_x
+    assert shrunk.min_y < shrunk.max_y
+    assert shrunk.min_z < shrunk.max_z
+    assert shrunk.min_x == pytest.approx(0.5)
+    assert shrunk.max_x == pytest.approx(0.5)

@@ -207,20 +207,26 @@ class Color:
 class Texture:
     """
     A 2D image texture applied to a geometric primitive's surface (for example a MuJoCo
-    box/cylinder/sphere geom's ``material``). Mesh shapes carry their own texture as part of
-    their own trimesh visual instead, and do not use this.
+    box/cylinder/sphere geom's ``material``).
+
+    Mesh shapes carry their own texture as part of their own trimesh visual instead, and
+    do not use this.
     """
 
     file_path: str
-    """The texture image's file path."""
+    """
+    The texture image's file path.
+    """
 
     repeat: Tuple[float, float] = (1.0, 1.0)
-    """How many times the texture tiles across the surface, along each of its two axes."""
+    """
+    How many times the texture tiles across the surface, along each of its two axes.
+    """
 
     uniform: bool = False
     """
-    Whether the texture is scaled uniformly across the surface, independent of the surface's
-    own size, rather than scaled to fit it.
+    Whether the texture is scaled uniformly across the surface, independent of the
+    surface's own size, rather than scaled to fit it.
     """
 
     def __post_init__(self):
@@ -343,9 +349,11 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
 
     texture: Optional[Texture] = None
     """
-    A texture applied to this shape's surface, or ``None`` for a flat ``color``. Only
-    meaningful for primitive shapes (:class:`Box`, :class:`Cylinder`, :class:`Sphere`);
-    :class:`Mesh` shapes carry their own texture as part of their trimesh visual instead.
+    A texture applied to this shape's surface, or ``None`` for a flat ``color``.
+
+    Only meaningful for primitive shapes (:class:`Box`, :class:`Cylinder`,
+    :class:`Sphere`); :class:`Mesh` shapes carry their own texture as part of their
+    trimesh visual instead.
     """
 
     @property
@@ -424,12 +432,23 @@ class Mesh(Shape):
     scale: Scale = field(default_factory=Scale)
     """
     Scale of the mesh.
+
+    Assigning a new scale invalidates the cached mesh geometry.
     """
 
     filename: str = ""
     """
     Filename of the mesh.
     """
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """
+        Set an attribute, evicting the cached :attr:`mesh` when :attr:`scale` is
+        assigned so the geometry is reloaded at the new scale.
+        """
+        if name == "scale":
+            self.__dict__.pop("mesh", None)
+        super().__setattr__(name, value)
 
     @property
     def local_frame_bounding_box(self) -> BoundingBox:
@@ -1114,6 +1133,35 @@ class BoundingBox:
             self.max_z + z_amount,
             self.origin,
         )
+
+    def shrink(
+        self, x_amount: float = 0.0, y_amount: float = 0.0, z_amount: float = 0.0
+    ) -> BoundingBox:
+        """
+        Shrinks the bounding box by a given amount per axis.
+
+        Every amount is clamped just below half of its axis extent, so the shrunken box
+        never inverts.
+
+        :param x_amount: The amount to move minimum and maximum x-coordinates inward.
+        :param y_amount: The amount to move minimum and maximum y-coordinates inward.
+        :param z_amount: The amount to move minimum and maximum z-coordinates inward.
+        :return: New shrunken bounding box
+        """
+        return self.bloat(
+            x_amount=-self._clamped_shrink_amount(x_amount, self.max_x - self.min_x),
+            y_amount=-self._clamped_shrink_amount(y_amount, self.max_y - self.min_y),
+            z_amount=-self._clamped_shrink_amount(z_amount, self.max_z - self.min_z),
+        )
+
+    @staticmethod
+    def _clamped_shrink_amount(amount: float, extent: float) -> float:
+        """
+        :param amount: The requested shrink amount along one axis.
+        :param extent: The extent of the bounding box along that axis.
+        :return: The amount clamped just below half the extent.
+        """
+        return min(amount, np.nextafter(extent / 2, 0.0))
 
     def contains(self, point: Point3) -> bool:
         """

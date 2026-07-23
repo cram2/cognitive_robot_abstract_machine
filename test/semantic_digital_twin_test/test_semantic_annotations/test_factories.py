@@ -72,7 +72,7 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.world_description.geometry import BoundingBox, Scale
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
 )
@@ -585,6 +585,59 @@ class TestFactories(unittest.TestCase):
         self.assertIsNotNone(surface)
         self.assertEqual(surface, table.supporting_surface)
         self.assertEqual(expected_z, surface.global_transform.z)
+
+    def _table_with_collision_box(
+        self, world_z: float, collision_box_bounds: tuple
+    ) -> tuple:
+        """
+        Create a world with one table whose collision is a box with the given bounds in
+        the table's own frame.
+        """
+        world = World()
+        root = Body(name=PrefixedName("root"))
+        with world.modify_world():
+            world.add_body(root)
+        with world.modify_world():
+            table = Table.create_with_new_body_in_world(
+                name=PrefixedName("table"),
+                world=world,
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    z=world_z
+                ),
+            )
+        collision_box = BoundingBox(
+            *collision_box_bounds,
+            HomogeneousTransformationMatrix(reference_frame=table.root),
+        )
+        table.root.collision = BoundingBoxCollection.from_event(
+            table.root, collision_box.simple_event.as_composite_set()
+        ).as_shapes()
+        table.root.visual = table.root.collision
+        return world, table
+
+    def test_supporting_surface_position_with_body_frame_on_the_ground(self):
+        world, table = self._table_with_collision_box(
+            world_z=1.0, collision_box_bounds=(-0.5, -0.5, 0.0, 0.5, 0.5, 0.5)
+        )
+
+        with world.modify_world():
+            surface = table.calculate_supporting_surface()
+
+        self.assertIsNotNone(surface)
+        self.assertAlmostEqual(1.5, float(surface.global_transform.z))
+
+    def test_supporting_surface_position_follows_an_off_center_surface(self):
+        world, table = self._table_with_collision_box(
+            world_z=1.0, collision_box_bounds=(0.2, -0.5, -0.25, 1.2, 0.5, 0.25)
+        )
+
+        with world.modify_world():
+            surface = table.calculate_supporting_surface()
+
+        self.assertIsNotNone(surface)
+        self.assertAlmostEqual(0.7, float(surface.global_transform.x))
+        self.assertAlmostEqual(0.0, float(surface.global_transform.y))
+        self.assertAlmostEqual(1.25, float(surface.global_transform.z))
 
     def test_sample_points_from_surface(self):
         world = World()

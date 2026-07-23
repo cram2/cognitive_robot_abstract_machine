@@ -48,6 +48,20 @@ def test_mesh_color_survives_serialization(tmp_path):
     assert (restored.mesh.visual.vertex_colors[:, :3] == [200, 50, 50]).all()
 
 
+def test_mesh_scale_change_after_load_is_reflected_by_the_geometry(tmp_path):
+    """
+    Assigning a new scale after the mesh geometry was already loaded must be reflected
+    by the geometry, not silently ignored by the cache.
+    """
+    source = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
+    mesh = Mesh.from_trimesh(mesh=source, dirname=str(tmp_path), file_type="stl")
+    assert np.allclose(mesh.mesh.extents, [1.0, 1.0, 1.0])
+
+    mesh.scale = Scale(1.6, 1.6, 1.6)
+
+    assert np.allclose(mesh.mesh.extents, [1.6, 1.6, 1.6])
+
+
 def test_mesh_color_is_lost_without_color_preserving_format(tmp_path):
     """
     A format that cannot store per-vertex color (STL) drops it on export.
