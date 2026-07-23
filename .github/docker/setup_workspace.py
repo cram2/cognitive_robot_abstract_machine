@@ -175,6 +175,8 @@ def main():
         "ros-jazzy-ament-cmake-ros",
         "ros-jazzy-launch-testing-ament-cmake",
         "ros-jazzy-rviz2",
+        "ros-jazzy-ur-robot-driver",
+        "ros-jazzy-ur-client-library",
     ]
     manager.dep_manager.install_packages(packages)
 

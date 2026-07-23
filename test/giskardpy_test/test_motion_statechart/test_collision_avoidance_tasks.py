@@ -4,6 +4,7 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
+
 from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
@@ -60,6 +61,7 @@ from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.tracy import Tracy
+from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
@@ -820,11 +822,20 @@ def test_hard_constraints_violated(cylinder_bot_world: World):
     assert len(exc_info.value.violated_collisions) == 2
 
 
-def test_collision_for_robot_with_static_base(tracy_world):
-    world = deepcopy(tracy_world)
-    robot = world.get_semantic_annotations_by_type(Tracy)[0]
+@pytest.mark.parametrize(
+    "fix_name, tool_frame_id, robot_type",
+    [
+        ("tracy_world", "r_gripper_tool_frame", Tracy),
+        ("daisy_world", "right_gripper_tool_frame", DAiSy),
+    ],
+)
+def test_collision_for_robot_with_static_base(
+    fix_name, tool_frame_id, robot_type, request, rclpy_node
+):
+    world = request.getfixturevalue(fix_name)
+    robot = world.get_semantic_annotations_by_type(robot_type)[0]
 
-    tool_frame = world.get_body_by_name("r_gripper_tool_frame")
+    tool_frame = world.get_body_by_name(tool_frame_id)
     with world.modify_world():
         obstacle = Body(
             name=PrefixedName("obstacle"),
