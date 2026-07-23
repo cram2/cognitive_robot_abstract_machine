@@ -4,4 +4,5 @@ execute:
   execute_notebooks: off
 sphinx:
   extra_extensions:
+    - sphinx.ext.autodoc
     - sphinxcontrib.mermaid
