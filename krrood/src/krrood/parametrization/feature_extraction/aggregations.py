@@ -158,6 +158,41 @@ class AggregationStatistic(Generic[T], SubClassSafeGeneric):
                 names.add(func.__name__)
         return names
 
+    @classmethod
+    def aggregation_features_of_field(cls, field_name: str) -> list[Callable]:
+        """
+        All methods on this class marked with :func:`aggregation_statistic` for
+        ``field_name``.
+
+        :param field_name: The exchangeable-part field to look up.
+        :return: The marked callable methods for the given field, sorted alphabetically
+            by name.
+        """
+        registered = cls._registered_names_for_field(field_name)
+        return [
+            func
+            for _, func in inspect.getmembers(cls, predicate=inspect.isfunction)
+            if func.__name__ in registered
+        ]
+
+    @classmethod
+    def symbolic_features_of_field(cls, field_name: str) -> list[MappedVariable]:
+        """
+        Symbolic variables for the statistic methods that aggregate ``field_name``.
+
+        Requires no domain object, so the features of an already fitted model can be
+        recreated from the class alone.
+
+        :param field_name: The exchangeable-part field to look up.
+        :return: One :class:`~krrood.entity_query_language.core.mapped_variable.MappedVariable`
+            per matching statistic method, in alphabetical order.
+        """
+        aggregation_variable = variable(cls, [])
+        return [
+            getattr(aggregation_variable, func.__name__)()
+            for func in cls.aggregation_features_of_field(field_name)
+        ]
+
     @property
     def aggregation_features(self) -> list[Callable]:
         """
@@ -170,14 +205,7 @@ class AggregationStatistic(Generic[T], SubClassSafeGeneric):
         """
         if self.field_name is None:
             raise MissingFieldNameError()
-        registered = type(self)._registered_names_for_field(self.field_name)
-        return [
-            func
-            for _, func in inspect.getmembers(
-                self.__class__, predicate=inspect.isfunction
-            )
-            if func.__name__ in registered
-        ]
+        return type(self).aggregation_features_of_field(self.field_name)
 
     def symbolic_aggregation_features(self) -> list[MappedVariable]:
         """
@@ -186,12 +214,11 @@ class AggregationStatistic(Generic[T], SubClassSafeGeneric):
 
         :return: One :class:`~krrood.entity_query_language.core.mapped_variable.MappedVariable`
             per matching statistic method, in alphabetical order.
+        :raises MissingFieldNameError: If :attr:`field_name` was not provided.
         """
-        aggregation_variable = variable(type(self), [])
-        return [
-            getattr(aggregation_variable, func.__name__)()
-            for func in self.aggregation_features
-        ]
+        if self.field_name is None:
+            raise MissingFieldNameError()
+        return type(self).symbolic_features_of_field(self.field_name)
 
     def apply_mapping(self) -> dict[str, Any]:
         """
@@ -209,18 +236,17 @@ class AggregationStatistic(Generic[T], SubClassSafeGeneric):
 
 def compute_aggregation_statistics(
     domain_object,
-    feature_functions: list[MappedVariable],
+    field_name: str,
     latent_variables: list[Variable],
 ) -> dict[Variable, Any]:
     """
-    Evaluate aggregation feature functions against a domain object and map results to
-    latent variables.
+    Evaluate the aggregation statistics of one exchangeable-part field against a domain
+    object and map the results to latent variables.
 
-    Each feature function is evaluated only if its name matches a latent variable.
+    Each statistic is evaluated only if its name matches a latent variable.
 
     :param domain_object: The domain object whose aggregation statistics are computed.
-    :param feature_functions: Symbolic feature functions for one exchangeable-part
-        field.
+    :param field_name: The exchangeable-part field whose statistics are evaluated.
     :param latent_variables: Latent variables that define which statistics are relevant.
     :return: A mapping from matched latent variables to their observed values.
     """
@@ -232,7 +258,7 @@ def compute_aggregation_statistics(
         return {}
     aggregation_instance = aggregation_class(instance=domain_object)
     statistics = {}
-    for feature_function in feature_functions:
+    for feature_function in aggregation_class.symbolic_features_of_field(field_name):
         feature_name = feature_function._name_
         if feature_name not in latent_variable_by_name:
             continue
