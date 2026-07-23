@@ -15,10 +15,12 @@ from semantic_digital_twin.exceptions import (
 )
 from semantic_digital_twin.physics.equations.pouring_equations import (
     ArticulatedPouringEquation,
+    DEFAULT_DISCHARGE_COEFFICIENT,
     DEFAULT_POUR_EXIT_SPEED,
     GatedArticulatedPouringEquation,
     GatedInflowEquation,
     InflowEquation,
+    MINIMUM_POUR_HEAD,
     STANDARD_GRAVITY,
     SymbolicFillContext,
 )
@@ -321,26 +323,38 @@ class TestTransferGate:
 
 
 class TestCurrentOutflowVelocity:
-    """Validates the Torricelli exit speed derived from the live pour head."""
+    """Validates the discharge-scaled Torricelli exit speed derived from the live pour head."""
 
-    def _tilted_source(self, tilt: float) -> tuple[World, HasFillLevel]:
+    def _tilted_source(
+        self, tilt: float, discharge_coefficient: float = DEFAULT_DISCHARGE_COEFFICIENT
+    ) -> tuple[World, HasFillLevel]:
         gate_world = TestTransferGate()
         world, source, _ = gate_world._build_world(
             source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
         )
+        source.fill_equation.discharge_coefficient = discharge_coefficient
         gate_world._set_source_offset(world, source, tilt)
         return world, source
 
-    def test_matches_torricelli_of_pour_head(self):
-        """The exit speed is ``sqrt(2 g h_head)`` for the current head above the pouring lip."""
-        world, source = self._tilted_source(1.2)
+    def test_matches_discharge_scaled_torricelli(self):
+        """The exit speed is ``C_d * sqrt(2 g h_head)`` for the current head above the lip."""
+        world, source = self._tilted_source(1.2, discharge_coefficient=0.4)
         head = source.fill_equation.head_above_lip(source.fill_connection).evaluate()[0]
         velocity = source.current_outflow_velocity(world)
         assert velocity is not None
         assert velocity.evaluate()[0] == pytest.approx(
-            math.sqrt(2 * STANDARD_GRAVITY * head)
+            0.4 * math.sqrt(2 * STANDARD_GRAVITY * head)
         )
-        assert velocity.evaluate()[0] > 0
+
+    def test_discharge_coefficient_scales_speed_linearly(self):
+        """The discharge coefficient scales the exit speed proportionally."""
+        low_world, low = self._tilted_source(1.2, discharge_coefficient=0.2)
+        high_world, high = self._tilted_source(1.2, discharge_coefficient=0.6)
+        ratio = (
+            high.current_outflow_velocity(high_world).evaluate()[0]
+            / low.current_outflow_velocity(low_world).evaluate()[0]
+        )
+        assert ratio == pytest.approx(3.0)
 
     def test_more_tilt_pours_faster(self):
         """A steeper tilt lifts more liquid above the lip, so the exit speed grows."""
@@ -351,17 +365,38 @@ class TestCurrentOutflowVelocity:
             > gentle.current_outflow_velocity(gentle_world).evaluate()[0]
         )
 
-    def test_floors_at_nominal_speed_when_barely_pouring(self):
-        """With no head above the lip the speed floors at the nominal default, not zero."""
-        world, source = self._tilted_source(0.0)
+    def test_head_is_floored_when_barely_pouring(self):
+        """With no head above the lip the head is floored so the exit-speed gradient stays finite."""
+        world, source = self._tilted_source(0.0, discharge_coefficient=0.4)
         assert source.current_outflow_velocity(world).evaluate()[0] == pytest.approx(
-            DEFAULT_POUR_EXIT_SPEED
+            0.4 * math.sqrt(2 * STANDARD_GRAVITY * MINIMUM_POUR_HEAD)
         )
 
     def test_source_without_pour_head_has_no_velocity(self):
         """A source whose dynamics expose no head reports no exit speed."""
         source = _StaticLiquidSource(exit_point=Point3(), volume_rate=0.01)
         assert source.current_outflow_velocity(world=None) is None
+
+    def test_initialize_fill_level_threads_discharge_coefficient(self):
+        """The discharge coefficient passed to ``initialize_fill_level`` reaches the pour model."""
+        world = World()
+        with world.modify_world():
+            world.add_body(Body(name=PrefixedName("map")))
+        with world.modify_world():
+            cup = _TiltingContainer.create_with_new_body_in_world(
+                name=PrefixedName("cup"),
+                world=world,
+                active_axis=Vector3(0, 1, 0),
+                connection_limits=DegreeOfFreedomLimits(
+                    lower=DerivativeMap(position=-2.0, velocity=-1.0),
+                    upper=DerivativeMap(position=2.0, velocity=1.0),
+                ),
+                scale=Scale(0.1, 0.1, 0.2),
+            )
+        cup.initialize_fill_level(
+            world=world, initial_fill=1.0, discharge_coefficient=0.5
+        )
+        assert cup.fill_equation.discharge_coefficient == 0.5
 
 
 class TestLiquidExitPoint:

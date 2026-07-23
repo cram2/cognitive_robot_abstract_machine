@@ -11,12 +11,11 @@ from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.templates import Parallel
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
-from giskardpy.motion_statechart.tasks.feature_functions import HeightGoal
 from giskardpy.motion_statechart.tasks.pouring import (
     FillByTransferTask,
     KeepProjectileInReceiver,
+    KeepSourceRimAboveReceiverRim,
 )
-from giskardpy.qp.constraint import LargeNumber
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.joint_state import JointState
 from giskardpy.motion_statechart.graph_node import EndMotion
@@ -29,7 +28,6 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
-    Point3,
     Vector3,
 )
 from giskardpy.middleware.ros2.python_interface import GiskardWrapper
@@ -125,11 +123,11 @@ park_state = JointState.from_mapping(
         )
     }
 )
-msc_park = MotionStatechart()
-park_task = JointPositionList(goal_state=park_state)
-msc_park.add_node(park_task)
-msc_park.add_node(EndMotion.when_true(park_task))
-giskard.execute(msc_park)
+# msc_park = MotionStatechart()
+# park_task = JointPositionList(goal_state=park_state)
+# msc_park.add_node(park_task)
+# msc_park.add_node(EndMotion.when_true(park_task))
+# giskard.execute(msc_park)
 
 # ------ Move the left gripper to the upright carry pose ----
 left_tool_frame = world.get_body_by_name("l_gripper_tool_frame")
@@ -206,7 +204,9 @@ else:
     with world.modify_world():
         world.add_semantic_annotation(source_cup)
     source_cup.initialize_fill_level(
-        world=world, initial_fill=START_FILL, outflow_rate_constant=0.8
+        world=world,
+        initial_fill=START_FILL,
+        outflow_rate_constant=0.8,
     )
 
     # ----- Place the receiving cup on the table -----
@@ -236,7 +236,7 @@ else:
     # ----- Couple the receiver's inflow to the source's gated outflow -----
     receiving_cup.receive_outflow_from(source=source_cup, world=world)
 
-time.sleep(0.2)
+# time.sleep(0.2)
 
 assert source_cup.fill_level == START_FILL
 assert receiving_cup.fill_level == 0.0
@@ -254,15 +254,14 @@ transfer_task = FillByTransferTask(
 # Keep the liquid's projectile landing in the receiver so the optimizer repositions the gripper
 # upstream as the source tilts and the arc reaches forward.
 no_spill = KeepProjectileInReceiver(receiver=receiving_cup, source=source_cup)
-# Keep the source cup above the receiver so the optimizer never lowers it into the receiver.
-minimum_clearance = 0.2
-keep_above = HeightGoal(
-    root_link=world.root,
-    tip_link=source_cup.root,
-    tip_point=Point3(reference_frame=source_cup.root),
-    reference_point=Point3(reference_frame=receiving_cup.root),
-    lower_limit=minimum_clearance,
-    upper_limit=minimum_clearance + 0.02,
+# Keep the pouring cup's rim (its lowest lip while tilting) above the receiving cup's rim, so the
+# rims never collide no matter how far the source tilts. ``minimum_clearance`` is a true rim-to-rim
+# gap: the task derives the lip from the live kinematics on Giskard's side, so it descends with the
+# tilt instead of relying on a hand-picked offset on the cup origins.
+keep_above = KeepSourceRimAboveReceiverRim(
+    receiver=receiving_cup,
+    source=source_cup,
+    minimum_clearance=0.05,
     weight=DefaultWeights.WEIGHT_ABOVE_CA,
 )
 keep_plane = AlignPlanes(

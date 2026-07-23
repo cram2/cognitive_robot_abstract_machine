@@ -17,8 +17,24 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix,
 DEFAULT_POUR_EXIT_SPEED: float = 0.2
 """Default horizontal speed of liquid leaving a fully tilted cup, in metres per second."""
 
+DEFAULT_DISCHARGE_COEFFICIENT: float = 0.3
+"""Default discharge coefficient scaling the Torricelli exit speed of a rim pour.
+
+Lumps the losses that make a rim pour slower than ideal orifice efflux (only a thin film crosses
+the lip, plus contraction and viscosity), so it is well below an orifice's ``0.6``-``1.0``. Tune it
+per cup and liquid to match the observed pour range.
+"""
+
 STANDARD_GRAVITY: float = 9.81
 """Gravitational acceleration used for the pouring projectile, in metres per second squared."""
+
+MINIMUM_POUR_HEAD: float = 0.01
+"""Lower bound on the pour head used in the Torricelli exit speed, in metres.
+
+Keeps the square-root's gradient bounded as the head above the lip approaches zero, mirroring
+:data:`MINIMUM_DROP_HEIGHT` for the projectile flight time.
+"""
+
 
 MINIMUM_DROP_HEIGHT: float = 0.01
 """Lower bound on the source-to-receiver drop used in the projectile flight time, in metres.
@@ -134,11 +150,17 @@ class ArticulatedPouringEquation(PouringEquation):
     container_width: float
     """Inner width of the rectangular container (twice the half-width ``r``), in metres."""
 
+    discharge_coefficient: float = field(
+        default=DEFAULT_DISCHARGE_COEFFICIENT, kw_only=True
+    )
+    """Dimensionless coefficient scaling the Torricelli exit speed to a realistic rim pour."""
+
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
         result["container_height"] = self.container_height
         result["container_width"] = self.container_width
         result["outflow_rate_constant"] = self.outflow_rate_constant
+        result["discharge_coefficient"] = self.discharge_coefficient
         return result
 
     @classmethod
@@ -147,6 +169,9 @@ class ArticulatedPouringEquation(PouringEquation):
             container_height=data["container_height"],
             container_width=data["container_width"],
             outflow_rate_constant=data["outflow_rate_constant"],
+            discharge_coefficient=data.get(
+                "discharge_coefficient", DEFAULT_DISCHARGE_COEFFICIENT
+            ),
         )
 
     def head_above_lip(self, context: FillContext) -> Scalar:
@@ -168,6 +193,20 @@ class ArticulatedPouringEquation(PouringEquation):
             sm.Scalar(0.0),
             L_sym * sm.sin(context.tilt_expression - phi_sym),
         )
+
+    def exit_velocity(self, context: FillContext) -> Scalar:
+        """
+        Horizontal exit speed of the pour stream, in metres per second.
+
+        Applies Torricelli's law to the head above the lip and scales it by the discharge
+        coefficient: ``C_d * sqrt(2 g h_head)``.  The head is floored at :data:`MINIMUM_POUR_HEAD`
+        so the speed stays finite and its gradient bounded as the head approaches zero.
+
+        :param context: Kinematic context providing the tilt and fill symbols.
+        :return: Symbolic exit speed.
+        """
+        head = sm.max(sm.Scalar(MINIMUM_POUR_HEAD), self.head_above_lip(context))
+        return self.discharge_coefficient * sm.sqrt(2 * STANDARD_GRAVITY * head)
 
     def symbolic_velocity(self, context: FillContext) -> Scalar:
         """

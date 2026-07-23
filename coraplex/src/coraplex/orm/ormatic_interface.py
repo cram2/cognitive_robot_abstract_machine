@@ -11529,6 +11529,39 @@ class KeepProjectileInReceiverDAO(
     }
 
 
+class KeepSourceRimAboveReceiverRimDAO(
+    TaskDAO,
+    DataAccessObject[
+        giskardpy.motion_statechart.tasks.pouring.KeepSourceRimAboveReceiverRim
+    ],
+):
+    __tablename__ = "KeepSourceRimAboveReceiverRimDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(TaskDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    minimum_clearance: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    clearance_band: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    maximum_velocity: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    receiver_id: Mapped[int] = mapped_column(
+        ForeignKey("HasFillLevelDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    receiver: Mapped[HasFillLevelDAO] = relationship(
+        "HasFillLevelDAO", uselist=False, foreign_keys=[receiver_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "KeepSourceRimAboveReceiverRimDAO",
+        "inherit_condition": database_id == TaskDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class TerminalFillConstraintTaskDAO(
     TaskDAO,
     DataAccessObject[
@@ -19188,6 +19221,9 @@ class ArticulatedPouringEquationDAO(
 
     container_height: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     container_width: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    discharge_coefficient: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
 
     __mapper_args__ = {
         "polymorphic_identity": "ArticulatedPouringEquationDAO",

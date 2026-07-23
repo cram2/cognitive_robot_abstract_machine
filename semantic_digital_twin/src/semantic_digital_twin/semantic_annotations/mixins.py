@@ -81,6 +81,7 @@ from semantic_digital_twin.world_description.world_modification import (
 )
 from semantic_digital_twin.physics.equations.pouring_equations import (
     ArticulatedPouringEquation,
+    DEFAULT_DISCHARGE_COEFFICIENT,
     DEFAULT_POUR_EXIT_SPEED,
     GatedArticulatedPouringEquation,
     GatedInflowEquation,
@@ -1166,6 +1167,7 @@ class HasFillLevel(HasRootBody, LiquidSource):
         world,
         initial_fill: float = 1.0,
         outflow_rate_constant: float = 1.0,
+        discharge_coefficient: float = DEFAULT_DISCHARGE_COEFFICIENT,
     ) -> None:
         """
         Create the virtual fill-level DOF, attach it to the world, and wire up the pouring equation.
@@ -1175,11 +1177,13 @@ class HasFillLevel(HasRootBody, LiquidSource):
         :param world: The world to add the fill-level DOF to.
         :param initial_fill: Starting fill level in [0, 1].
         :param outflow_rate_constant: Outflow rate constant for the articulated pouring equation.
+        :param discharge_coefficient: Scales the Torricelli exit speed to a realistic pour range.
         """
         fill_equation = ArticulatedPouringEquation(
             container_width=self.root.collision.width,
             container_height=self.root.collision.height,
             outflow_rate_constant=outflow_rate_constant,
+            discharge_coefficient=discharge_coefficient,
         )
         phantom = Body(name=PrefixedName(f"{self.root.name.name}_fill_level_phantom"))
         with world.modify_world():
@@ -1341,25 +1345,17 @@ class HasFillLevel(HasRootBody, LiquidSource):
 
     def current_outflow_velocity(self, world: World) -> Optional[sm.Scalar]:
         """
-        Torricelli exit speed from the current pour head, or ``None`` without a head model.
+        Discharge-scaled Torricelli exit speed from the current pour, or ``None`` without a model.
 
-        The liquid leaves the lip at ``sqrt(2 g h_head)``, where ``h_head`` is the height of the
-        liquid surface above the pouring lip, so a fuller or more tilted cup pours faster.  The
-        speed is floored at the nominal :data:`DEFAULT_POUR_EXIT_SPEED`, both to give a sensible
-        value while barely pouring and to bound the square-root gradient at zero head.
+        Delegates to the pour equation, which leaves the lip at ``C_d * sqrt(2 g h_head)``: a
+        fuller or more tilted cup pours faster, and the discharge coefficient tunes the pour range.
 
         :param world: The world providing the forward kinematics.
         :return: Symbolic exit speed, or ``None`` if the fill equation exposes no pour head.
         """
         if not isinstance(self.fill_equation, ArticulatedPouringEquation):
             return None
-        head = self.fill_equation.head_above_lip(self.fill_connection)
-        return sm.sqrt(
-            sm.max(
-                sm.Scalar(DEFAULT_POUR_EXIT_SPEED**2),
-                2 * STANDARD_GRAVITY * head,
-            )
-        )
+        return self.fill_equation.exit_velocity(self.fill_connection)
 
     def liquid_exit_point(self, world: World) -> Point3:
         """
@@ -1371,9 +1367,11 @@ class HasFillLevel(HasRootBody, LiquidSource):
         :param world: The world providing the forward kinematics.
         :return: Symbolic exit point in the world frame.
         """
-        return world.compose_forward_kinematics_expression(
+        exit_point = world.compose_forward_kinematics_expression(
             world.root, self.root
         ) @ self._rim_exit_point(world)
+        exit_point.reference_frame = world.root
+        return exit_point
 
     def _rim_exit_point(self, world: World) -> Point3:
         """
@@ -1438,6 +1436,7 @@ class HasFillLevel(HasRootBody, LiquidSource):
                 container_height=self.fill_equation.container_height,
                 container_width=self.fill_equation.container_width,
                 outflow_rate_constant=self.fill_equation.outflow_rate_constant,
+                discharge_coefficient=self.fill_equation.discharge_coefficient,
                 gate=gate,
             )
         )

@@ -8230,6 +8230,9 @@ class ArticulatedPouringEquationDAO(
 
     container_height: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     container_width: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    discharge_coefficient: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
 
     __mapper_args__ = {
         "polymorphic_identity": "ArticulatedPouringEquationDAO",

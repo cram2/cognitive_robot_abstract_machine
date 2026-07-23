@@ -764,6 +764,93 @@ class TestTracyLiquidTransfer:
         )
 
 
+class TestRimClearanceDuringTransfer:
+    """
+    :class:`~giskardpy.motion_statechart.tasks.pouring.KeepSourceRimAboveReceiverRim` keeps the
+    pouring cup's lip above the receiving cup's rim throughout the transfer, so the rims never
+    collide however far the source tilts, and the motion statechart stays serializable.
+    """
+
+    def _build_transfer(self, tracy_transfer_world):
+        from giskardpy.motion_statechart.tasks.pouring import (
+            FillByTransferTask,
+            KeepProjectileInReceiver,
+            KeepSourceRimAboveReceiverRim,
+        )
+
+        world, source_cup, receiving_cup, left_tool_frame = tracy_transfer_world
+
+        transfer_task = FillByTransferTask(
+            receiver=receiving_cup,
+            goal_value=0.7,
+            fill_level_tolerance=0.05,
+            reference_velocity=0.03,
+        )
+        no_spill = KeepProjectileInReceiver(receiver=receiving_cup, source=source_cup)
+        keep_above = KeepSourceRimAboveReceiverRim(
+            receiver=receiving_cup, source=source_cup, minimum_clearance=0.05
+        )
+        keep_plane = AlignPlanes(
+            root_link=world.root,
+            tip_link=left_tool_frame,
+            goal_normal=Vector3.X(reference_frame=world.root),
+            tip_normal=Vector3.Z(reference_frame=left_tool_frame),
+        )
+        motion = Parallel([transfer_task, no_spill, keep_above, keep_plane])
+        msc_transfer = MotionStatechart()
+        msc_transfer.add_node(motion)
+        msc_transfer.add_node(EndMotion.when_true(motion))
+        return world, source_cup, receiving_cup, transfer_task, msc_transfer
+
+    def test_transfer_motion_is_json_serializable(self, tracy_transfer_world):
+        """
+        The transfer motion statechart serializes to JSON, as the standalone demo requires when
+        it ships the goal to Giskard; a task carrying a live symbolic point would break this.
+        """
+        import json
+
+        _, _, _, _, msc_transfer = self._build_transfer(tracy_transfer_world)
+
+        json.dumps(msc_transfer.to_json())
+
+    def test_pouring_lip_stays_above_receiver_rim(self, tracy_transfer_world):
+        """
+        The rim clearance stays positive for the whole pour, without a hand-tuned origin offset.
+        """
+        world, source_cup, receiving_cup, transfer_task, msc_transfer = (
+            self._build_transfer(tracy_transfer_world)
+        )
+
+        source_lip = source_cup.liquid_exit_point(world)
+        receiver_rim = (
+            world.compose_forward_kinematics_expression(world.root, receiving_cup.root)
+            @ receiving_cup.rim_point()
+        )
+        clearance_history: list[float] = []
+        original_on_tick = transfer_task.on_tick
+
+        def recording_on_tick(context):
+            clearance_history.append(
+                float(source_lip.z.evaluate()[0] - receiver_rim.z.evaluate()[0])
+            )
+            return original_on_tick(context)
+
+        transfer_task.on_tick = recording_on_tick
+
+        transfer_executor = Executor(
+            _pouring_context(world), pacer=SimulationPacer(real_time_factor=1)
+        )
+        transfer_executor.compile(motion_statechart=msc_transfer)
+        transfer_executor.tick_until_end(timeout=4000)
+
+        assert transfer_task.observation_state == ObservationStateValues.TRUE
+        assert clearance_history, "transfer never ticked"
+        assert min(clearance_history) > 0.0, (
+            "the pouring lip dropped to or below the receiver rim: "
+            f"minimum clearance was {min(clearance_history):.3f} m"
+        )
+
+
 class TestKeepProjectileInReceiverDebugExpressions:
     """
     :class:`~giskardpy.motion_statechart.tasks.pouring.KeepProjectileInReceiver` registers the

@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import ClassVar, Optional
 
+import krrood.symbolic_math.symbolic_math as sm
 from krrood.symbolic_math.symbolic_math import Scalar
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -23,7 +24,7 @@ from semantic_digital_twin.physics.equations.pouring_equations import (
     tilt_expression_from_fk,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel, LiquidSource
-from semantic_digital_twin.spatial_types.spatial_types import Point3
+from semantic_digital_twin.spatial_types.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.connections import LiquidConnection
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import Body
@@ -306,3 +307,71 @@ class KeepProjectileInReceiver(Task):
                 name="landing", expression=landing_point, color=self.LANDING_POINT_COLOR
             ),
         ]
+
+
+@dataclass(eq=False, repr=False)
+class KeepSourceRimAboveReceiverRim(Task):
+    """
+    Keeps the pouring source's rim above the receiver's rim so the rims never collide.
+
+    Constrains the height of the source's pouring lip (its lowest rim point while tilting) above
+    the receiver's rim to stay within a clearance band.  Because the lip is derived from the live
+    forward kinematics, the constraint accounts for the lip descending as the source tilts, so the
+    clearance is a true rim-to-rim gap rather than a hand-tuned offset on the cup origins.
+
+    The task stores only the source and receiver, building the symbolic lip and rim on the target
+    world, so it survives serialization to a standalone Giskard process (unlike a task that would
+    carry a pre-built symbolic point).
+    """
+
+    receiver: HasFillLevel
+    """The container whose rim the source's rim must stay above."""
+
+    source: LiquidSource
+    """The pouring source whose rim must stay above the receiver's rim."""
+
+    minimum_clearance: float = field(default=0.05, kw_only=True)
+    """Lower bound on the source-lip-above-receiver-rim clearance, in metres."""
+
+    clearance_band: float = field(default=0.05, kw_only=True)
+    """Width of the clearance band above :attr:`minimum_clearance`, in metres.
+
+    A band, rather than a one-sided lower bound, keeps the optimization well-conditioned.
+    """
+
+    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
+    """QP constraint weight for the clearance."""
+
+    maximum_velocity: float = field(default=0.2, kw_only=True)
+    """Maximum allowed vertical speed for the clearance motion, in metres per second."""
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        """
+        Creates the constraint keeping the source's pouring lip above the receiver's rim.
+
+        :param context: The build context.
+        :return: The generated task artifacts.
+        """
+        artifacts = NodeArtifacts()
+        source_lip = self.source.liquid_exit_point(context.world)
+        receiver_rim = (
+            context.world.compose_forward_kinematics_expression(
+                context.world.root, self.receiver.root
+            )
+            @ self.receiver.rim_point()
+        )
+        clearance = (source_lip - receiver_rim) @ Vector3.Z()
+        upper_limit = self.minimum_clearance + self.clearance_band
+        artifacts.constraints.add_inequality_constraint(
+            reference_velocity=self.maximum_velocity,
+            upper_error=upper_limit - clearance,
+            lower_error=self.minimum_clearance - clearance,
+            quadratic_weight=self.weight,
+            task_expression=clearance,
+            name=f"{self.name}_clearance",
+        )
+        artifacts.observation = sm.logic_and(
+            sm.if_less_eq(clearance, upper_limit, 1, 0),
+            sm.if_greater_eq(clearance, self.minimum_clearance, 1, 0),
+        )
+        return artifacts
