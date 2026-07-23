@@ -69,31 +69,32 @@ class PiecewiseConstantCurvatureConnection(Connection):
         it_is_straight = sm.abs(kappa) < 1e-8
 
         # Position formulas (px, py, pz)
-        px = sm.if_else(
+        position_x = sm.if_else(
             it_is_straight, 0, (sm.cos(phi) * (1 - sm.cos(theta))) / (kappa + 1e-12)
         )
-        py = sm.if_else(
+        position_y = sm.if_else(
             it_is_straight, 0, (sm.sin(phi) * (1 - sm.cos(theta))) / (kappa + 1e-12)
         )
-        pz = sm.if_else(it_is_straight, length, sm.sin(theta) / (kappa + 1e-12))
+        position_z = sm.if_else(it_is_straight, length, sm.sin(theta) / (kappa + 1e-12))
 
         # Rotation matrix components
-        c_p = sm.cos(phi)
-        s_p = sm.sin(phi)
-        c_t = sm.cos(theta)
-        s_t = sm.sin(theta)
+        cos_phi = sm.cos(phi)
+        sin_phi = sm.sin(phi)
+        cos_theta = sm.cos(theta)
+        sin_theta = sm.sin(theta)
+
         # fmt: off
-        r11 = c_p**2 * (c_t - 1) + 1;  r12 = s_p * c_p * (c_t - 1);     r13 = c_p * s_t
-        r21 = s_p * c_p * (c_t - 1);   r22 = c_p**2 * (1 - c_t) + c_t;  r23 = s_p * s_t
-        r31 = -c_p * s_t;              r32 = -s_p * s_t;                r33 = c_t
+        rotation_11 = cos_phi**2 * (cos_theta - 1) + 1;     rotation_12 = sin_phi * cos_phi * (cos_theta - 1);       rotation_13 = cos_phi * sin_theta
+        rotation_21 = sin_phi * cos_phi * (cos_theta - 1);  rotation_22 = cos_phi**2 * (1 - cos_theta) + cos_theta;  rotation_23 = sin_phi * sin_theta
+        rotation_31 = -cos_phi * sin_theta;                 rotation_32 = -sin_phi * sin_theta;                      rotation_33 = cos_theta
         # fmt: on
 
         # Build 4x4 matrix
         matrix = sm.vstack(
             [
-                sm.hstack([r11, r12, r13, px]),
-                sm.hstack([r21, r22, r23, py]),
-                sm.hstack([r31, r32, r33, pz]),
+                sm.hstack([rotation_11, rotation_12, rotation_13, position_x]),
+                sm.hstack([rotation_21, rotation_22, rotation_23, position_y]),
+                sm.hstack([rotation_31, rotation_32, rotation_33, position_z]),
                 sm.hstack([0, 0, 0, 1]),
             ]
         )
@@ -157,18 +158,18 @@ class CosseratRodConnection(Connection):
         """
         super().add_to_world(world)
 
-        bx = world.get_degree_of_freedom_by_id(self.bending_x_dof_id)
-        by = world.get_degree_of_freedom_by_id(self.bending_y_dof_id)
-        tor = world.get_degree_of_freedom_by_id(self.torsion_dof_id)
-        ext = world.get_degree_of_freedom_by_id(self.extension_dof_id)
+        bending_x_dof = world.get_degree_of_freedom_by_id(self.bending_x_dof_id)
+        bending_y_dof = world.get_degree_of_freedom_by_id(self.bending_y_dof_id)
+        torsion_dof = world.get_degree_of_freedom_by_id(self.torsion_dof_id)
+        extension_dof = world.get_degree_of_freedom_by_id(self.extension_dof_id)
 
-        ux = bx.variables.position
-        uy = by.variables.position
-        uz = tor.variables.position
-        vz = ext.variables.position
+        bending_x = bending_x_dof.variables.position
+        bending_y = bending_y_dof.variables.position
+        torsion = torsion_dof.variables.position
+        extension = extension_dof.variables.position
 
         # xi vector: [bending_x, bending_y, torsion, shear_x, shear_y, extension]
-        xi = sm.Vector([ux, uy, uz, 0, 0, vz])
+        xi = sm.Vector([bending_x, bending_y, torsion, 0, 0, extension])
 
         def hat_operator(strain_vector: sm.Vector) -> sm.Matrix:
             """
@@ -176,13 +177,19 @@ class CosseratRodConnection(Connection):
             This matrix represents the local derivative of the transformation
             along the rod's length.
             """
-            u = strain_vector[:3]
-            v = strain_vector[3:]
+            angular_strain = strain_vector[:3]
+            linear_strain = strain_vector[3:]
             return sm.vstack(
                 [
-                    sm.hstack([0, -u[2], u[1], v[0]]),
-                    sm.hstack([u[2], 0, -u[0], v[1]]),
-                    sm.hstack([-u[1], u[0], 0, v[2]]),
+                    sm.hstack(
+                        [0, -angular_strain[2], angular_strain[1], linear_strain[0]]
+                    ),
+                    sm.hstack(
+                        [angular_strain[2], 0, -angular_strain[0], linear_strain[1]]
+                    ),
+                    sm.hstack(
+                        [-angular_strain[1], angular_strain[0], 0, linear_strain[2]]
+                    ),
                     sm.hstack([0, 0, 0, 0]),
                 ]
             )
@@ -190,14 +197,14 @@ class CosseratRodConnection(Connection):
         # RK4 Integration along the length
         accumulated_transform = sm.Matrix.eye(4)
         num_steps = 10
-        ds = self.segment_length / num_steps
+        step_length = self.segment_length / num_steps
 
         for _ in range(num_steps):
             k1 = accumulated_transform @ hat_operator(xi)
-            k2 = (accumulated_transform + (ds / 2) * k1) @ hat_operator(xi)
-            k3 = (accumulated_transform + (ds / 2) * k2) @ hat_operator(xi)
-            k4 = (accumulated_transform + ds * k3) @ hat_operator(xi)
-            accumulated_transform = accumulated_transform + (ds / 6) * (
+            k2 = (accumulated_transform + (step_length / 2) * k1) @ hat_operator(xi)
+            k3 = (accumulated_transform + (step_length / 2) * k2) @ hat_operator(xi)
+            k4 = (accumulated_transform + step_length * k3) @ hat_operator(xi)
+            accumulated_transform = accumulated_transform + (step_length / 6) * (
                 k1 + 2 * k2 + 2 * k3 + k4
             )
 

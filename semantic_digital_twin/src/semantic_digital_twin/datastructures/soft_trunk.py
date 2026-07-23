@@ -187,12 +187,12 @@ class SoftTrunk(SemanticAnnotation):
                 upper=DerivativeMap(position=10.0, velocity=10.0),
             )
 
-            for s, section in enumerate(sections):
+            for section_index, section in enumerate(sections):
                 kappa = DegreeOfFreedom(
-                    name=PrefixedName(f"kappa_{s}", prefix), limits=limits
+                    name=PrefixedName(f"kappa_{section_index}", prefix), limits=limits
                 )
                 phi = DegreeOfFreedom(
-                    name=PrefixedName(f"phi_{s}", prefix), limits=limits
+                    name=PrefixedName(f"phi_{section_index}", prefix), limits=limits
                 )
                 world.add_degree_of_freedom(kappa)
                 world.add_degree_of_freedom(phi)
@@ -202,8 +202,8 @@ class SoftTrunk(SemanticAnnotation):
                 trunk.phi_dofs.append(phi)
 
                 segment_length = section.length / section.resolution
-                for i in range(section.resolution):
-                    color_val = (s + 1) / len(sections)
+                for segment_index in range(section.resolution):
+                    color_val = (section_index + 1) / len(sections)
                     visual_shape = Cylinder(
                         origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                             z=-segment_length / 2
@@ -214,7 +214,9 @@ class SoftTrunk(SemanticAnnotation):
                     )
 
                     curr_body = Body(
-                        name=PrefixedName(f"sec{s}_seg{i}", prefix),
+                        name=PrefixedName(
+                            f"sec{section_index}_seg{segment_index}", prefix
+                        ),
                         visual=ShapeCollection([visual_shape]),
                         collision=ShapeCollection([visual_shape]),
                     )
@@ -296,18 +298,22 @@ class SoftTrunk(SemanticAnnotation):
                 upper=DerivativeMap(position=3.0, velocity=10.0),
             )
 
-            for s, section in enumerate(sections):
+            for section_index, section in enumerate(sections):
                 bending_x = DegreeOfFreedom(
-                    name=PrefixedName(f"bending_x_{s}", prefix), limits=strain_limits
+                    name=PrefixedName(f"bending_x_{section_index}", prefix),
+                    limits=strain_limits,
                 )
                 bending_y = DegreeOfFreedom(
-                    name=PrefixedName(f"bending_y_{s}", prefix), limits=strain_limits
+                    name=PrefixedName(f"bending_y_{section_index}", prefix),
+                    limits=strain_limits,
                 )
                 torsion = DegreeOfFreedom(
-                    name=PrefixedName(f"torsion_{s}", prefix), limits=strain_limits
+                    name=PrefixedName(f"torsion_{section_index}", prefix),
+                    limits=strain_limits,
                 )
                 extension = DegreeOfFreedom(
-                    name=PrefixedName(f"extension_{s}", prefix), limits=extension_limits
+                    name=PrefixedName(f"extension_{section_index}", prefix),
+                    limits=extension_limits,
                 )
 
                 for dof in [bending_x, bending_y, torsion, extension]:
@@ -322,8 +328,8 @@ class SoftTrunk(SemanticAnnotation):
                 trunk.extension_dofs.append(extension)
 
                 segment_length = section.length / section.resolution
-                for i in range(section.resolution):
-                    color_val = (s + 1) / len(sections)
+                for segment_index in range(section.resolution):
+                    color_val = (section_index + 1) / len(sections)
                     visual_shape = Cylinder(
                         origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                             z=-segment_length / 2
@@ -334,7 +340,9 @@ class SoftTrunk(SemanticAnnotation):
                     )
 
                     curr_body = Body(
-                        name=PrefixedName(f"sec{s}_seg{i}", prefix),
+                        name=PrefixedName(
+                            f"sec{section_index}_seg{segment_index}", prefix
+                        ),
                         visual=ShapeCollection([visual_shape]),
                         collision=ShapeCollection([visual_shape]),
                     )
