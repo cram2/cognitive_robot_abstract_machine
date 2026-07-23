@@ -1,20 +1,25 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing_extensions import ClassVar, Callable
-from {{ base_module }} import {{ base_class_name }}
-{{ type_imports }}try:
-    {{ import_line }}
-except ImportError:
-    pass
+from typing_extensions import ClassVar, Callable, TYPE_CHECKING
+
+from {{ base_class_module }} import {{ base_class_name }}
+{{ import_line }}
+
+if TYPE_CHECKING:
+    {% for line in type_imports %}
+    {{ line }}
+    {% endfor %}
 
 
 @dataclass
 class {{ class_name }}({{ base_class_name }}):
-    """FunctionCase for the `{{ function_name }}` function."""
-{% for field in fields %}
-    {{ field.name }}: {{ field.type_string }}
+    """
+    FunctionCase for the `{{ function_name }}` function.
+    """
+{% for parameter in function_meta_data.parameter_data %}
+    {{ parameter.name }}: {{ parameter.type_hint }}
 {% endfor %}
-    _output: {{ return_type }}
+    _output: {{ function_meta_data.return_type_hint }}
 
 
 try:

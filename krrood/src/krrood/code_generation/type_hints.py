@@ -93,10 +93,6 @@ def stringify_type_hint(type_hint: Any) -> str:
     return str(type_hint)
 
 
-stringify_hint = stringify_type_hint
-"""Backward-compatible alias for :func:`stringify_type_hint`."""
-
-
 def value_to_source(value: object) -> str:
     """Convert a Python value to its source-code representation.
 
@@ -115,7 +111,7 @@ def value_to_source(value: object) -> str:
     return repr(value)
 
 
-def get_types_to_import_from_type_hints(hints: List[Type]) -> Set[Type]:
+def get_types_to_import_from_type_hints(hints: List[Type]) -> List[Type]:
     """Extract importable types from a list of type hints.
 
     :param hints: A list of type hints to extract types from.
@@ -125,21 +121,21 @@ def get_types_to_import_from_type_hints(hints: List[Type]) -> Set[Type]:
     for hint in hints:
         _extract_types(hint, seen_types)
 
-    to_import: Set[Type] = set()
-    for tp in seen_types:
-        if isinstance(tp, ForwardRef) or isinstance(tp, str):
+    to_import: List[Type] = []
+    for type_ in seen_types:
+        if isinstance(type_, ForwardRef) or isinstance(type_, str):
             continue
-        if not is_builtin_type(tp):
-            to_import.add(tp)
+        if not is_builtin_type(type_) and type_ not in to_import:
+            to_import.append(type_)
 
     return to_import
 
 
-def get_types_to_import_from_function_type_hints(function: Callable) -> Set[Type]:
+def get_types_to_import_from_function_type_hints(function: Callable) -> List[Type]:
     """Extract importable types from a function's annotations.
 
     :param function: The function to extract type hints from.
-    :returns: A set of types that need to be imported.
+    :returns: A list of types that need to be imported.
     """
     hints = get_type_hints_of_object(function)
 

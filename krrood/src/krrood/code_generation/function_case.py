@@ -1,13 +1,14 @@
-"""Generation of ``@dataclass`` ``FunctionCase`` subclasses for callables."""
-
 from __future__ import annotations
 
 import importlib.resources
 import inspect
 from dataclasses import dataclass, field
-from typing import Callable, Dict, Optional
+
+from typing_extensions import Callable, Dict, Optional, ClassVar, Type, Any, List, Self
 
 from krrood.class_diagrams.utils import get_type_hints_of_object
+from krrood.code_generation import templates
+from krrood.code_generation.enums import PythonBuiltinParameterNames
 from krrood.code_generation.generator import CodeGenerator
 from krrood.code_generation.imports import (
     generate_import_statement_for_callable,
@@ -15,36 +16,121 @@ from krrood.code_generation.imports import (
     validate_annotations,
 )
 from krrood.code_generation.naming import to_camel_case
-from krrood.code_generation.type_hints import stringify_type_hint
+from krrood.code_generation.type_hints import stringify_type_hint, get_types_to_import_from_function_type_hints
 
-# %%
-# FunctionCase dataclass generation
+
+@dataclass
+class FunctionCase:
+    """
+    Base class for function cases (dataclass representations of a function).
+    """
+
+    function: ClassVar[Callable]
+    """
+    The original (unwrapped) function object.
+    """
+
+    _output: Any = field(init=False)
+    """
+    The output of the function. The return type should be specified in the subclass.
+    """
+
+
+@dataclass
+class FunctionParameter:
+    """
+    A single parameter of a function.
+    """
+
+    name: str
+    """
+    The name of the parameter.
+    """
+    type_hint: Any
+    """
+    The type hint of the parameter.
+    """
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"name": self.name,
+                "type_hint": stringify_type_hint(self.type_hint)}
+
+
+@dataclass
+class FunctionMetaData:
+    """
+    Metadata about a function.
+    """
+
+    parameter_data: List[FunctionParameter] = field(default_factory=list)
+    """
+    The data of the parameters of the function.
+    """
+    return_type_hint: Any = None
+    """
+    The return type hint of the function.
+    """
+
+    @classmethod
+    def from_function(cls, function: Callable) -> Self:
+        """
+        :param function: The function to extract metadata from.
+        :return: A FunctionMetaData instance containing the given function's metadata.
+        """
+        try:
+            type_hints: Dict[str, object] = get_type_hints_of_object(function)
+        except NameError:
+            type_hints = {}
+
+        # Build field data for the Jinja2 template.
+        signature = inspect.signature(function)
+        fields = [
+            FunctionParameter(name=parameter_name, type_hint=type_hints.get(parameter_name, parameter.annotation))
+            for parameter_name, parameter in signature.parameters.items()
+            if parameter_name not in PythonBuiltinParameterNames
+        ]
+        return_annotation_string = type_hints.get("return", signature.return_annotation)
+        return cls(parameter_data=fields, return_type_hint=return_annotation_string)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"parameter_data": [parameter.to_dict() for parameter in self.parameter_data],
+                "return_type_hint": stringify_type_hint(self.return_type_hint)}
 
 
 @dataclass
 class FunctionCaseGenerator:
-    """Emits @dataclass FunctionCase subclass source for a callable."""
+    """
+    Generates a dataclass FunctionCase subclass source for a given function.
+    """
 
-    base_class_fully_qualified_name: str = (
-        "krrood.entity_query_language.rdr.function_case.FunctionCase"
-    )
-    """Fully-qualified name of the base class the emitted dataclass inherits from."""
+    base_class: Type[FunctionCase] = FunctionCase
+    """
+    The base class to inherit from.  Must be a subclass of ``FunctionCase``.
+    """
 
     code_generator: CodeGenerator = field(init=False)
-    """Renderer bound to this package's templates directory."""
+    """
+    Jinja code generator bound to this package's templates directory.
+    """
+
+    template_file_name: ClassVar[str] = "function_case.py.jinja"
+    """
+    The name of the template file to use for generating FunctionCase subclasses.
+    """
 
     def __post_init__(self):
-        templates = importlib.resources.files("krrood.code_generation") / "templates"
-        self.code_generator = CodeGenerator(template_directory=str(templates))
+        templates_path = importlib.resources.files(templates)
+        self.code_generator = CodeGenerator(template_directory=str(templates_path))
 
     def generate(self, function: Callable, class_name: Optional[str] = None) -> str:
-        """Emit Python source for a ``@dataclass`` subclass of ``FunctionCase``.
+        """
+        Generate Python source for a ``@dataclass`` subclass of ``FunctionCase``.
 
-        The emitted class has:
+        The generated class has:
 
         - ``function: ClassVar[Callable] = <access_expression>`` — bound to the
           decorated callable via a module-level import (wrapped in try/except so
-          the source can also be exec'd in isolated test namespaces).
+          the source can also be executed in isolated test namespaces).
         - One field per annotated parameter (``self`` / ``cls`` excluded).
         - ``_output: <return_annotation>`` — the attribute the RDR will predict.
 
@@ -60,65 +146,22 @@ class FunctionCaseGenerator:
             class_name = to_camel_case(function.__name__)
         callable_import = generate_import_statement_for_callable(function)
 
-        base_module, base_class_name = self.base_class_fully_qualified_name.rsplit(
-            ".", 1
-        )
-
-        # Resolve string annotations (produced by
-        # ``from __future__ import annotations`` in the caller's module) to
-        # actual type objects before formatting.
-        try:
-            type_hints: Dict[str, object] = get_type_hints_of_object(function)
-        except NameError:
-            type_hints = {}
-
         # Collect custom types referenced by annotations.
-        signature = inspect.signature(function)
-        referenced_types: Dict[str, type] = {}
-        for parameter_name, parameter in signature.parameters.items():
-            if parameter_name in ("self", "cls"):
-                continue
-            annotation_type = type_hints.get(parameter_name, parameter.annotation)
-            if isinstance(annotation_type, type) and annotation_type.__module__ not in (
-                "builtins",
-            ):
-                referenced_types[annotation_type.__name__] = annotation_type
-        return_type = type_hints.get("return", signature.return_annotation)
-        if isinstance(return_type, type) and return_type.__module__ not in (
-            "builtins",
-        ):
-            referenced_types[return_type.__name__] = return_type
+        types_to_import = get_types_to_import_from_function_type_hints(function)
 
         # Generate type-import lines using the centralized import generator.
-        type_import_lines = "\n".join(
-            get_imports_from_types(list(referenced_types.values()))
-        )
-        type_imports = type_import_lines + "\n" if type_import_lines else ""
+        type_import_lines = get_imports_from_types(list(types_to_import))
 
-        # Build field data for the Jinja2 template.
-        fields = [
-            {
-                "name": parameter_name,
-                "type_string": stringify_type_hint(
-                    type_hints.get(parameter_name, parameter.annotation)
-                ),
-            }
-            for parameter_name, parameter in signature.parameters.items()
-            if parameter_name not in ("self", "cls")
-        ]
-        return_annotation_string = stringify_type_hint(
-            type_hints.get("return", signature.return_annotation)
-        )
+        function_meta_data = FunctionMetaData.from_function(function)
 
         return self.code_generator.render(
-            "function_case.py.jinja",
-            base_module=base_module,
-            base_class_name=base_class_name,
+            self.template_file_name,
             class_name=class_name,
+            base_class_name=self.base_class.__name__,
+            base_class_module=self.base_class.__module__,
             function_name=function.__name__,
             import_line=callable_import.import_line,
             access_expression=callable_import.access_expression,
-            type_imports=type_imports,
-            fields=fields,
-            return_type=return_annotation_string,
+            type_imports=type_import_lines,
+            function_meta_data=function_meta_data.to_dict(),
         )
