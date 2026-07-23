@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 from typing_extensions import ClassVar, Dict, Optional, Type
 
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.mixins import HasRootBody, HasRootRegion
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Apple,
     Banana,
@@ -37,6 +37,37 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Tomato,
 )
 from semantic_digital_twin.utils import camel_case_split
+from semantic_digital_twin.world_description.world_entity import Body
+
+
+@dataclass(eq=False)
+class PlacementArea(HasRootRegion):
+    """
+    A region a specific object may be placed within or on, as resolved by a RoboCasa
+    placement sampler rather than reconstructed from a task's source.
+    """
+
+    placed_object: Body = field(kw_only=True)
+    """
+    The body this area was resolved for.
+    """
+
+
+@dataclass(eq=False)
+class GripperExclusionZone(HasRootRegion):
+    """
+    A region a RoboCasa task's success condition requires the gripper to stay outside
+    of.
+
+    The admissible region a task actually describes is this zone's complement, not the
+    zone itself: what a success condition states directly is the excluded volume, and
+    the space the gripper may occupy is everything else in the world.
+    """
+
+    excluded_object: Body = field(kw_only=True)
+    """
+    The body this exclusion zone keeps the gripper away from.
+    """
 
 
 class RoboCasaKitchenApplianceCategory(StrEnum):

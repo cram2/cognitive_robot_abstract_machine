@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 import mujoco
 import numpy
+import trimesh
 from scipy.spatial.transform import Rotation
 from typing_extensions import Optional, Dict
 from xml.etree import ElementTree as ET
@@ -257,12 +258,13 @@ class MJCFParser:
     ) -> Optional[Texture]:
         """
         Resolves the texture a primitive (box/sphere/cylinder/plane) geom's ``material``
-        references, if any. Mesh geoms resolve their texture separately, as part of their
-        own trimesh visual (see the ``mjGEOM_MESH`` case in :meth:`parse_geom`).
+        references, if any. Mesh geoms resolve their texture separately, as part of
+        their own trimesh visual (see the ``mjGEOM_MESH`` case in :meth:`parse_geom`).
 
-        :param mujoco_geom: The Mujoco geometry whose material to resolve a texture from.
-        :return: The resolved texture, or ``None`` if the geom has no material, its material
-            has no texture, or the texture file cannot be found on disk.
+        :param mujoco_geom: The Mujoco geometry whose material to resolve a texture
+            from.
+        :return: The resolved texture, or ``None`` if the geom has no material, its
+            material has no texture, or the texture file cannot be found on disk.
         """
         if not mujoco_geom.material:
             return None
@@ -340,6 +342,15 @@ class MJCFParser:
                     color=color,
                     texture=self._resolve_primitive_texture(mujoco_geom),
                 )
+            case mujoco.mjtGeom.mjGEOM_ELLIPSOID:
+                # No dedicated Shape exists for an ellipsoid (unlike a sphere, its
+                # three semi-axes need not be equal), so it is approximated by a unit
+                # sphere mesh stretched to the geom's three diameters instead.
+                unit_sphere = trimesh.creation.icosphere(subdivisions=3, radius=0.5)
+                unit_sphere.apply_scale(size)
+                ellipsoid = Mesh.from_trimesh(mesh=unit_sphere, origin=origin_transform)
+                ellipsoid.color = color
+                return ellipsoid
             case mujoco.mjtGeom.mjGEOM_MESH:
                 mujoco_mesh: mujoco.MjsMesh = self.spec.mesh(mujoco_geom.meshname)
                 meshdir = os.path.join(
@@ -659,7 +670,7 @@ class MJCFParser:
                 body=body,
                 name=mujoco_light.name,
                 mode=mujoco_light.mode,
-                directional=mujoco_light.type == mujoco.mjtLightType.mjLIGHT_DIRECTIONAL,
+                directional=bool(mujoco_light.directional),
                 active=bool(mujoco_light.active),
                 cast_shadow=bool(mujoco_light.castshadow),
                 position=mujoco_light.pos.tolist(),
