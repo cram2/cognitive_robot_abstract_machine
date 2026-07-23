@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from typing_extensions import TextIO, TYPE_CHECKING
 
-from krrood.code_generation.formatting import run_ruff_on_file
+from krrood.code_generation.formatting import run_ruff_format_on_file
 from krrood.code_generation.generator import CodeGenerator
 
 if TYPE_CHECKING:
@@ -54,4 +54,4 @@ class SQLAlchemyGenerator:
         file.write(output)
 
         # format the output with ruff
-        run_ruff_on_file(str(file.name))
+        run_ruff_format_on_file(str(file.name))

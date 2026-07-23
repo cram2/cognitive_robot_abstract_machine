@@ -33,10 +33,20 @@ def run_black_on_file(filename: str) -> None:
     run_subprocess_on_file(command)
 
 
-def run_ruff_on_file(filename: str) -> None:
+def run_ruff_check_on_file(filename: str) -> None:
     """Lint and fix *filename* with Ruff.
 
     :param filename: The name of the file to format.
     """
     command = ["ruff", "check", "--fix", filename]
+    run_subprocess_on_file(command)
+
+
+def run_ruff_format_on_file(filename: str) -> None:
+    """
+    Format *filename* with Ruff.
+
+    :param filename: The name of the file to format.
+    """
+    command = ["ruff", "format", filename]
     run_subprocess_on_file(command)
