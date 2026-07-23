@@ -27,7 +27,7 @@ from krrood.entity_query_language.verbalization.microplanning.possessive import 
     pronominal_path,
 )
 from krrood.entity_query_language.verbalization.microplanning.referring import (
-    DistinguisherIndex,
+    DistinguisherIndex, AlternativeDistinguisher, OrdinalDistinguisher,
 )
 from krrood.entity_query_language.verbalization.rendering.discourse import (
     DiscourseView,
@@ -572,8 +572,8 @@ class CoreferenceProcessor(RealizationPass):
         )
         return replace(
             noun_phrase,
-            alternative=distinguisher.alternative,
-            ordinal=distinguisher.ordinal,
+            alternative=isinstance(distinguisher, AlternativeDistinguisher),
+            ordinal=distinguisher.ordinal if isinstance(distinguisher, OrdinalDistinguisher) else None,
             modifiers=modifiers,
         )
 
