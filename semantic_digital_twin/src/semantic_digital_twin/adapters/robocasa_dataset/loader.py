@@ -130,7 +130,8 @@ def _mjcf_document_from_element_copy(element: ET.Element) -> str:
 
 def _parse_robosuite_mjcf(parser: MJCFParser) -> World:
     """
-    Relabels a robosuite/RoboCasa-composed MJCF parser's collision-only geoms, then parses it.
+    Relabels a robosuite/RoboCasa-composed MJCF parser's collision-only geoms, then
+    parses it.
 
     Robosuite's own convention (its ``robosuite.utils.mjcf_utils.sort_elements``) treats a geom
     with an unset or ``0``-valued ``group`` as collision-only ("contact_geoms"), reserving
@@ -317,6 +318,34 @@ class RoboCasaDatasetLoader:
         :raises RoboCasaTaskNotFoundError: if ``task_name`` is not a registered RoboCasa kitchen
             task.
         """
+        environment = self.build_task_environment(task_name, layout_id, style_id)
+        return self.load_task_from_environment(environment)
+
+    def build_task_environment(
+        self,
+        task_name: str,
+        layout_id: LayoutType,
+        style_id: StyleType,
+    ) -> Any:
+        """
+        Build and reset the RoboCasa/robosuite environment a task's scene is composed
+        in, without parsing it into a World yet.
+
+        Exposed on its own, rather than folded into :meth:`load_task`, so a caller that
+        needs ground truth :meth:`load_task` does not read (for example a placement
+        sampler's resolved region, or a success condition's resolved threshold) can read
+        it from the exact same reset environment :meth:`load_task_from_environment`
+        would otherwise have discarded, instead of building a second, independently
+        sampled one.
+
+        :param task_name: The name of a registered RoboCasa kitchen task environment
+            (for example ``"TurnOnMicrowave"``).
+        :param layout_id: A member of ``robocasa.models.scenes.scene_registry.LayoutType``.
+        :param style_id: A member of ``robocasa.models.scenes.scene_registry.StyleType``.
+        :return: The reset environment.
+        :raises RoboCasaTaskNotFoundError: if ``task_name`` is not a registered RoboCasa kitchen
+            task.
+        """
         if task_name not in self._available_task_names():
             raise RoboCasaTaskNotFoundError(task_name, self._available_task_names())
 
@@ -332,7 +361,17 @@ class RoboCasaDatasetLoader:
             ignore_done=True,
         )
         environment.reset()
+        return environment
 
+    def load_task_from_environment(self, environment: Any) -> RoboCasaTask:
+        """
+        Parse an already built and reset task environment into a
+        :class:`RoboCasaTask`.
+
+        :param environment: A reset RoboCasa/robosuite task environment, typically
+            obtained from :meth:`build_task_environment`.
+        :return: The task bound to the world it is defined over.
+        """
         episode_metadata = environment.get_ep_meta()
         object_world_poses = self._object_world_poses(environment)
         stripped_document = self._strip_robot_and_bake_object_poses(
