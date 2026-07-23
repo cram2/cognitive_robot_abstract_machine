@@ -599,8 +599,11 @@ class CartesianPose(CartesianTask):
     )
     """Unit: rad/s. This is used for normalization, for real limits use CartesianVelocityLimit."""
 
-    threshold: float = field(default=0.01, kw_only=True)
-    """If the error falls below this threshold, the goal is achieved. This is used for both position and orientation. Units are m and rad."""
+    angular_threshold: float = field(default=0.025, kw_only=True)
+    """If the error falls below this threshold, the goal is achieved. Unit is rad."""
+
+    linear_threshold: float = field(default=0.01, kw_only=True)
+    """If the error falls below this threshold, the goal is achieved. Unit is m."""
 
     @property
     def goal_reference_frame(self) -> KinematicStructureEntity:
@@ -657,8 +660,8 @@ class CartesianPose(CartesianTask):
 
         rotation_error = root_R_current.rotational_error(root_R_goal)
         artifacts.observation = sm.logic_and(
-            sm.abs(rotation_error) < self.threshold,
-            distance_to_goal < self.threshold,
+            sm.abs(rotation_error) < self.angular_threshold,
+            distance_to_goal < self.linear_threshold,
         )
         self.add_goal_and_current_debug_expressions(
             artifacts,

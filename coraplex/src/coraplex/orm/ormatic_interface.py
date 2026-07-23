@@ -17,6 +17,7 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 
 import builtins
 import coraplex.alternative_motion_mapping
+import coraplex.alternative_motion_mappings.hsrb_motion_mapping
 import coraplex.alternative_motion_mappings.stretch_motion_mapping
 import coraplex.alternative_motion_mappings.tiago_motion_mapping
 import coraplex.datastructures.dataclasses
@@ -65,7 +66,16 @@ import datetime
 import enum
 import giskardpy.data_types.exceptions
 import giskardpy.executor
+import giskardpy.middleware.ros2.behavior_tree_config
 import giskardpy.middleware.ros2.exceptions
+import giskardpy.middleware.ros2.giskard
+import giskardpy.middleware.ros2.python_interface
+import giskardpy.middleware.ros2.scripts.iai_robots.hsr.configs
+import giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs
+import giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs
+import giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs
+import giskardpy.middleware.ros2.scripts.tools.interactive_marker
+import giskardpy.middleware.ros2.utils.utils_for_tests
 import giskardpy.model.world_config
 import giskardpy.motion_statechart.binding_policy
 import giskardpy.motion_statechart.constraint_builders
@@ -94,6 +104,7 @@ import giskardpy.motion_statechart.plotters.graphviz
 import giskardpy.motion_statechart.plotters.plot_specs
 import giskardpy.motion_statechart.plotters.styles
 import giskardpy.motion_statechart.ros2_nodes.force_torque_monitor
+import giskardpy.motion_statechart.ros2_nodes.ros_tasks
 import giskardpy.motion_statechart.ros2_nodes.topic_monitor
 import giskardpy.motion_statechart.ros_context
 import giskardpy.motion_statechart.tasks.align_planes
@@ -116,6 +127,7 @@ import giskardpy.qp.qp_data_symbolic
 import giskardpy.qp.qp_debugger
 import giskardpy.ros2_tools.force_torque_filter_node
 import giskardpy.ros_executor
+import giskardpy.tree.behaviors.publish_debug_expressions
 import krrood.adapters.json_serializer
 import krrood.ormatic.custom_types
 import krrood.ormatic.data_access_objects.alternative_mappings
@@ -125,6 +137,7 @@ import pathlib
 import semantic_digital_twin.adapters.fbx
 import semantic_digital_twin.adapters.mesh
 import semantic_digital_twin.adapters.mjcf
+import semantic_digital_twin.adapters.mujoco_video_recording
 import semantic_digital_twin.adapters.multi_sim
 import semantic_digital_twin.adapters.package_resolver
 import semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations
@@ -478,6 +491,23 @@ class TrainingEnvironmentDAO_executed_plans_association(
 
     target: Mapped[PlanMappingDAO] = relationship(
         "PlanMappingDAO", foreign_keys=[target_planmappingdao_id], lazy="selectin"
+    )
+
+
+class GiskardTesterDAO_robot_names_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_18552742813313585395849894661168412239528432174761485585780336"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_giskardtesterdao_id: Mapped[int] = mapped_column(
+        ForeignKey("GiskardTesterDAO.database_id")
+    )
+    target_prefixednamedao_id: Mapped[int] = mapped_column(
+        ForeignKey("PrefixedNameDAO.database_id")
+    )
+
+    target: Mapped[PrefixedNameDAO] = relationship(
+        "PrefixedNameDAO", foreign_keys=[target_prefixednamedao_id], lazy="selectin"
     )
 
 
@@ -6201,6 +6231,27 @@ class MoveMotionDAO(
     }
 
 
+class HSRBMoveMotionDAO(
+    MoveMotionDAO,
+    DataAccessObject[
+        coraplex.alternative_motion_mappings.hsrb_motion_mapping.HSRBMoveMotion
+    ],
+):
+    __tablename__ = "HSRBMoveMotionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MoveMotionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "HSRBMoveMotionDAO",
+        "inherit_condition": database_id == MoveMotionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class StretchMoveRealDAO(
     MoveMotionDAO,
     DataAccessObject[
@@ -6738,6 +6789,122 @@ class SimulationPacerDAO(
     }
 
 
+class BehaviorTreeConfigDAO(
+    Base,
+    DataAccessObject[giskardpy.middleware.ros2.behavior_tree_config.BehaviorTreeConfig],
+):
+    __tablename__ = "BehaviorTreeConfigDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    tree_tick_rate: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    debug_mode: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    add_gantt_chart_plotter: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
+    add_goal_graph_plotter: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
+    add_trajectory_plotter: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
+    add_debug_trajectory_plotter: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
+    add_debug_marker_publisher: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
+    add_trajectory_visualizer: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
+    add_debug_trajectory_visualizer: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    add_qp_data_publisher_id: Mapped[int] = mapped_column(
+        ForeignKey("QPDataPublisherConfigDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    add_qp_data_publisher: Mapped[QPDataPublisherConfigDAO] = relationship(
+        "QPDataPublisherConfigDAO",
+        uselist=False,
+        foreign_keys=[add_qp_data_publisher_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "BehaviorTreeConfigDAO",
+    }
+
+
+class ClosedLoopBTConfigDAO(
+    BehaviorTreeConfigDAO,
+    DataAccessObject[giskardpy.middleware.ros2.behavior_tree_config.ClosedLoopBTConfig],
+):
+    __tablename__ = "ClosedLoopBTConfigDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(BehaviorTreeConfigDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ClosedLoopBTConfigDAO",
+        "inherit_condition": database_id == BehaviorTreeConfigDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class OpenLoopBTConfigDAO(
+    BehaviorTreeConfigDAO,
+    DataAccessObject[giskardpy.middleware.ros2.behavior_tree_config.OpenLoopBTConfig],
+):
+    __tablename__ = "OpenLoopBTConfigDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(BehaviorTreeConfigDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "OpenLoopBTConfigDAO",
+        "inherit_condition": database_id == BehaviorTreeConfigDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class StandAloneBTConfigDAO(
+    BehaviorTreeConfigDAO,
+    DataAccessObject[giskardpy.middleware.ros2.behavior_tree_config.StandAloneBTConfig],
+):
+    __tablename__ = "StandAloneBTConfigDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(BehaviorTreeConfigDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    publish_world_state: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "StandAloneBTConfigDAO",
+        "inherit_condition": database_id == BehaviorTreeConfigDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class ExecutionExceptionDAO(
     GiskardExceptionDAO,
     DataAccessObject[giskardpy.middleware.ros2.exceptions.ExecutionException],
@@ -7045,6 +7212,232 @@ class NoActiveGoalToCancelErrorDAO(
     }
 
 
+class GiskardDAO(Base, DataAccessObject[giskardpy.middleware.ros2.giskard.Giskard]):
+    __tablename__ = "GiskardDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    world_config_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldConfigDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    behavior_tree_config_id: Mapped[int] = mapped_column(
+        ForeignKey("BehaviorTreeConfigDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    qp_controller_config_id: Mapped[int] = mapped_column(
+        ForeignKey("QPControllerConfigDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world_config: Mapped[WorldConfigDAO] = relationship(
+        "WorldConfigDAO",
+        uselist=False,
+        foreign_keys=[world_config_id],
+        post_update=True,
+    )
+    behavior_tree_config: Mapped[BehaviorTreeConfigDAO] = relationship(
+        "BehaviorTreeConfigDAO",
+        uselist=False,
+        foreign_keys=[behavior_tree_config_id],
+        post_update=True,
+    )
+    qp_controller_config: Mapped[QPControllerConfigDAO] = relationship(
+        "QPControllerConfigDAO",
+        uselist=False,
+        foreign_keys=[qp_controller_config_id],
+        post_update=True,
+    )
+
+
+class GiskardWrapperDAO(
+    Base, DataAccessObject[giskardpy.middleware.ros2.python_interface.GiskardWrapper]
+):
+    __tablename__ = "GiskardWrapperDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    giskard_node_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "GiskardWrapperDAO",
+    }
+
+
+class GiskardWrapperNodeDAO(
+    GiskardWrapperDAO,
+    DataAccessObject[giskardpy.middleware.ros2.python_interface.GiskardWrapperNode],
+):
+    __tablename__ = "GiskardWrapperNodeDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GiskardWrapperDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    is_spinning: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    node_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    avoid_name_conflict: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    namespace: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    use_global_arguments: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
+    enable_rosout: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    start_parameter_services: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
+    allow_undeclared_parameters: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
+    automatically_declare_parameters_from_overrides: Mapped[builtins.bool] = (
+        mapped_column(use_existing_column=True)
+    )
+    enable_logger_service: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
+
+    context_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("ContextDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    context: Mapped[ContextDAO] = relationship(
+        "ContextDAO", uselist=False, foreign_keys=[context_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GiskardWrapperNodeDAO",
+        "inherit_condition": database_id == GiskardWrapperDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class InteractiveMarkerNodeDAO(
+    Base,
+    DataAccessObject[
+        giskardpy.middleware.ros2.scripts.tools.interactive_marker.InteractiveMarkerNode
+    ],
+):
+    __tablename__ = "InteractiveMarkerNodeDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    motion_timeout_seconds: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+
+
+class KinematicChainMarkerDAO(
+    Base,
+    DataAccessObject[
+        giskardpy.middleware.ros2.scripts.tools.interactive_marker.KinematicChainMarker
+    ],
+):
+    __tablename__ = "KinematicChainMarkerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    root_link: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    tip_link: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    marker_scale: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    marker_box_size: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    marker_color_value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    marker_color_alpha: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    root_body_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    tip_body_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    root_body: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[root_body_id],
+        post_update=True,
+    )
+    tip_body: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[tip_body_id],
+        post_update=True,
+    )
+
+
+class GiskardTesterDAO(
+    Base,
+    DataAccessObject[giskardpy.middleware.ros2.utils.utils_for_tests.GiskardTester],
+):
+    __tablename__ = "GiskardTesterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    total_time_spend_giskarding: Mapped[builtins.int] = mapped_column(
+        use_existing_column=True
+    )
+    total_time_spend_moving: Mapped[builtins.int] = mapped_column(
+        use_existing_column=True
+    )
+    default_env_name: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    robot_names: Mapped[builtins.list[GiskardTesterDAO_robot_names_association]] = (
+        relationship(
+            "GiskardTesterDAO_robot_names_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[GiskardTesterDAO_robot_names_association.source_giskardtesterdao_id]",
+            lazy="selectin",
+        )
+    )
+
+
 class WorldConfigDAO(Base, DataAccessObject[giskardpy.model.world_config.WorldConfig]):
     __tablename__ = "WorldConfigDAO"
 
@@ -7171,6 +7564,27 @@ class WorldWithDiffDriveRobotDAO(
     }
 
 
+class WorldWithStretchConfigDiffDriveDAO(
+    WorldWithDiffDriveRobotDAO,
+    DataAccessObject[
+        giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs.WorldWithStretchConfigDiffDrive
+    ],
+):
+    __tablename__ = "WorldWithStretchConfigDiffDriveDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldWithDiffDriveRobotDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "WorldWithStretchConfigDiffDriveDAO",
+        "inherit_condition": database_id == WorldWithDiffDriveRobotDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class WorldWithFixedRobotDAO(
     WorldConfigDAO, DataAccessObject[giskardpy.model.world_config.WorldWithFixedRobot]
 ):
@@ -7215,6 +7629,27 @@ class WorldWithFixedRobotDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WorldWithFixedRobotDAO",
         "inherit_condition": database_id == WorldConfigDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class WorldWithTracyConfigDAO(
+    WorldWithFixedRobotDAO,
+    DataAccessObject[
+        giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs.WorldWithTracyConfig
+    ],
+):
+    __tablename__ = "WorldWithTracyConfigDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldWithFixedRobotDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "WorldWithTracyConfigDAO",
+        "inherit_condition": database_id == WorldWithFixedRobotDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -7275,6 +7710,69 @@ class WorldWithOmniDriveRobotDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WorldWithOmniDriveRobotDAO",
         "inherit_condition": database_id == WorldConfigDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class WorldWithHSRConfigDAO(
+    WorldWithOmniDriveRobotDAO,
+    DataAccessObject[
+        giskardpy.middleware.ros2.scripts.iai_robots.hsr.configs.WorldWithHSRConfig
+    ],
+):
+    __tablename__ = "WorldWithHSRConfigDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldWithOmniDriveRobotDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "WorldWithHSRConfigDAO",
+        "inherit_condition": database_id == WorldWithOmniDriveRobotDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class WorldWithPR2ConfigDAO(
+    WorldWithOmniDriveRobotDAO,
+    DataAccessObject[
+        giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs.WorldWithPR2Config
+    ],
+):
+    __tablename__ = "WorldWithPR2ConfigDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldWithOmniDriveRobotDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "WorldWithPR2ConfigDAO",
+        "inherit_condition": database_id == WorldWithOmniDriveRobotDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class WorldWithStretchConfigDAO(
+    WorldWithOmniDriveRobotDAO,
+    DataAccessObject[
+        giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs.WorldWithStretchConfig
+    ],
+):
+    __tablename__ = "WorldWithStretchConfigDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldWithOmniDriveRobotDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "WorldWithStretchConfigDAO",
+        "inherit_condition": database_id == WorldWithOmniDriveRobotDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -8672,15 +9170,17 @@ class InsertCylinderDAO(
         ForeignKey(GoalDAO.database_id), primary_key=True, use_existing_column=True
     )
 
-    cylinder_height: Mapped[typing.Optional[builtins.float]] = mapped_column(
-        use_existing_column=True
-    )
     pre_grasp_height: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     tilt: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    get_straight_after: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    weight: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
-    cylinder_name_id: Mapped[int] = mapped_column(
-        ForeignKey("BodyDAO.database_id", use_alter=True),
+    tip_link_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    tip_P_tool_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
@@ -8689,14 +9189,28 @@ class InsertCylinderDAO(
         nullable=True,
         use_existing_column=True,
     )
-    up_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+    tip_V_axis_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    up_axis_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
         ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    cylinder_name: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[cylinder_name_id], post_update=True
+    tip_link: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+    )
+    tip_P_tool: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[tip_P_tool_id],
+        post_update=True,
     )
     hole_point: Mapped[Point3MappingDAO] = relationship(
         "Point3MappingDAO",
@@ -8704,8 +9218,14 @@ class InsertCylinderDAO(
         foreign_keys=[hole_point_id],
         post_update=True,
     )
-    up: Mapped[Vector3MappingDAO] = relationship(
-        "Vector3MappingDAO", uselist=False, foreign_keys=[up_id], post_update=True
+    tip_V_axis: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO",
+        uselist=False,
+        foreign_keys=[tip_V_axis_id],
+        post_update=True,
+    )
+    up_axis: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO", uselist=False, foreign_keys=[up_axis_id], post_update=True
     )
 
     __mapper_args__ = {
@@ -9030,6 +9550,271 @@ class _SelfCollisionHasDataDAO(
     __mapper_args__ = {
         "polymorphic_identity": "_SelfCollisionHasDataDAO",
         "inherit_condition": database_id == _SelfCollisionAvoidanceNodeDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class ReachPointTaskDAO(
+    TaskDAO, DataAccessObject[giskardpy.motion_statechart.goals.tracebot.ReachPointTask]
+):
+    __tablename__ = "ReachPointTaskDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(TaskDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    reference_velocity: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    tip_P_tool_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    root_link_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    tip_link_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    root_P_goal_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    tip_P_tool: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[tip_P_tool_id],
+        post_update=True,
+    )
+    root_link: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+    )
+    tip_link: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+    )
+    root_P_goal: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[root_P_goal_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ReachPointTaskDAO",
+        "inherit_condition": database_id == TaskDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class SlightlyTiltedTaskDAO(
+    TaskDAO,
+    DataAccessObject[giskardpy.motion_statechart.goals.tracebot.SlightlyTiltedTask],
+):
+    __tablename__ = "SlightlyTiltedTaskDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(TaskDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    tilt: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    tip_V_axis_id: Mapped[int] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    root_link_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    tip_link_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    root_V_reference_id: Mapped[int] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    tip_V_axis: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO",
+        uselist=False,
+        foreign_keys=[tip_V_axis_id],
+        post_update=True,
+    )
+    root_link: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+    )
+    tip_link: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+    )
+    root_V_reference: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO",
+        uselist=False,
+        foreign_keys=[root_V_reference_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SlightlyTiltedTaskDAO",
+        "inherit_condition": database_id == TaskDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class StayOnLineTaskDAO(
+    TaskDAO, DataAccessObject[giskardpy.motion_statechart.goals.tracebot.StayOnLineTask]
+):
+    __tablename__ = "StayOnLineTaskDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(TaskDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    tip_P_tool_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    root_link_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    tip_link_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    root_P_start_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    root_P_end_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    tip_P_tool: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[tip_P_tool_id],
+        post_update=True,
+    )
+    root_link: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+    )
+    tip_link: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+    )
+    root_P_start: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[root_P_start_id],
+        post_update=True,
+    )
+    root_P_end: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[root_P_end_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "StayOnLineTaskDAO",
+        "inherit_condition": database_id == TaskDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class TiltStraightTaskDAO(
+    TaskDAO,
+    DataAccessObject[giskardpy.motion_statechart.goals.tracebot.TiltStraightTask],
+):
+    __tablename__ = "TiltStraightTaskDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(TaskDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    tip_V_axis_id: Mapped[int] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    root_link_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    tip_link_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    root_V_reference_id: Mapped[int] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    tip_V_axis: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO",
+        uselist=False,
+        foreign_keys=[tip_V_axis_id],
+        post_update=True,
+    )
+    root_link: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+    )
+    tip_link: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+    )
+    root_V_reference: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO",
+        uselist=False,
+        foreign_keys=[root_V_reference_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "TiltStraightTaskDAO",
+        "inherit_condition": database_id == TaskDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -10218,6 +11003,72 @@ class ConditionColorsDAO(
     )
 
 
+class ActionServerTaskDAO(
+    MotionStatechartNodeDAO,
+    DataAccessObject[giskardpy.motion_statechart.ros2_nodes.ros_tasks.ActionServerTask],
+):
+    __tablename__ = "ActionServerTaskDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MotionStatechartNodeDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    action_topic: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    message_type: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ActionServerTaskDAO",
+        "inherit_condition": database_id == MotionStatechartNodeDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class NavigateActionServerTaskDAO(
+    ActionServerTaskDAO,
+    DataAccessObject[
+        giskardpy.motion_statechart.ros2_nodes.ros_tasks.NavigateActionServerTask
+    ],
+):
+    __tablename__ = "NavigateActionServerTaskDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ActionServerTaskDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    target_pose_id: Mapped[int] = mapped_column(
+        ForeignKey("PoseMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    base_link_id: Mapped[int] = mapped_column(
+        ForeignKey("BodyDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    target_pose: Mapped[PoseMappingDAO] = relationship(
+        "PoseMappingDAO", uselist=False, foreign_keys=[target_pose_id], post_update=True
+    )
+    base_link: Mapped[BodyDAO] = relationship(
+        "BodyDAO", uselist=False, foreign_keys=[base_link_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NavigateActionServerTaskDAO",
+        "inherit_condition": database_id == ActionServerTaskDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class TopicNodeDAO(
     MotionStatechartNodeDAO,
     DataAccessObject[giskardpy.motion_statechart.ros2_nodes.topic_monitor.TopicNode],
@@ -10321,6 +11172,42 @@ class ForceTorqueNodeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ForceTorqueNodeDAO",
         "inherit_condition": database_id == TopicSubscriberNodeDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class ForceDirectionMonitorDAO(
+    ForceTorqueNodeDAO,
+    DataAccessObject[
+        giskardpy.motion_statechart.ros2_nodes.force_torque_monitor.ForceDirectionMonitor
+    ],
+):
+    __tablename__ = "ForceDirectionMonitorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ForceTorqueNodeDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    threshold: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    direction_id: Mapped[int] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    direction: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO",
+        uselist=False,
+        foreign_keys=[direction_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ForceDirectionMonitorDAO",
+        "inherit_condition": database_id == ForceTorqueNodeDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -10652,7 +11539,8 @@ class CartesianPoseDAO(
     reference_angular_velocity: Mapped[builtins.float] = mapped_column(
         use_existing_column=True
     )
-    threshold: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    angular_threshold: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    linear_threshold: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
     goal_pose_id: Mapped[int] = mapped_column(
         ForeignKey("PoseMappingDAO.database_id", use_alter=True),
@@ -12340,6 +13228,31 @@ class Ros2ExecutorDAO(
     }
 
 
+class QPDataPublisherConfigDAO(
+    Base,
+    DataAccessObject[
+        giskardpy.tree.behaviors.publish_debug_expressions.QPDataPublisherConfig
+    ],
+):
+    __tablename__ = "QPDataPublisherConfigDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    publish_lb: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    publish_ub: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    publish_lbA: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    publish_ubA: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    publish_bE: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    publish_Ax: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    publish_Ex: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    publish_xdot: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    publish_weights: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    publish_g: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    publish_debug: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+
+
 class FBXGlobalSettingsDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.fbx.FBXGlobalSettings]
 ):
@@ -12532,6 +13445,88 @@ class MJCFParserDAO(
     prefix: Mapped[typing.Optional[builtins.str]] = mapped_column(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
+
+
+class MujocoVideoRecorderDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder
+    ],
+):
+    __tablename__ = "MujocoVideoRecorderDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    frames_per_second: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    capture_every_n_state_changes: Mapped[builtins.int] = mapped_column(
+        use_existing_column=True
+    )
+
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    resolution_id: Mapped[int] = mapped_column(
+        ForeignKey("VideoResolutionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    camera_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("MujocoCameraDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+    resolution: Mapped[VideoResolutionDAO] = relationship(
+        "VideoResolutionDAO",
+        uselist=False,
+        foreign_keys=[resolution_id],
+        post_update=True,
+    )
+    camera: Mapped[MujocoCameraDAO] = relationship(
+        "MujocoCameraDAO", uselist=False, foreign_keys=[camera_id], post_update=True
+    )
+
+
+class RecordedVideoDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.mujoco_video_recording.RecordedVideo
+    ],
+):
+    __tablename__ = "RecordedVideoDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    frames_per_second: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+    frames: Mapped[typing.List[numpy.ndarray]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+
+class VideoResolutionDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.mujoco_video_recording.VideoResolution
+    ],
+):
+    __tablename__ = "VideoResolutionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    width: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    height: Mapped[builtins.int] = mapped_column(use_existing_column=True)
 
 
 class EntityConverterDAO(
@@ -13014,6 +14009,25 @@ class BodySpawnerDAO(
     }
 
 
+class LightConverterDAO(
+    EntityConverterDAO,
+    DataAccessObject[semantic_digital_twin.adapters.multi_sim.LightConverter],
+):
+    __tablename__ = "LightConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(EntityConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "LightConverterDAO",
+        "inherit_condition": database_id == EntityConverterDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class MujocoActuatorConverterDAO(
     ActuatorConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoActuatorConverter],
@@ -13367,6 +14381,25 @@ class MujocoBodySpawnerDAO(
         "polymorphic_identity": "MujocoBodySpawnerDAO",
         "inherit_condition": database_id
         == MujocoKinematicStructureEntitySpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MujocoLightConverterDAO(
+    LightConverterDAO,
+    DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoLightConverter],
+):
+    __tablename__ = "MujocoLightConverterDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(LightConverterDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MujocoLightConverterDAO",
+        "inherit_condition": database_id == LightConverterDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -18257,6 +19290,161 @@ class UselessConceptErrorDAO(
     }
 
 
+class VideoRecordingErrorDAO(
+    MultiSimErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.VideoRecordingError],
+):
+    __tablename__ = "VideoRecordingErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MultiSimErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "VideoRecordingErrorDAO",
+        "inherit_condition": database_id == MultiSimErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class EmptyVideoRecordingErrorDAO(
+    VideoRecordingErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.EmptyVideoRecordingError],
+):
+    __tablename__ = "EmptyVideoRecordingErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(VideoRecordingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    output_path: Mapped[pathlib.Path] = mapped_column(
+        krrood.ormatic.custom_types.PathType, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "EmptyVideoRecordingErrorDAO",
+        "inherit_condition": database_id == VideoRecordingErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class EmptyWorldVideoRecordingErrorDAO(
+    VideoRecordingErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.EmptyWorldVideoRecordingError],
+):
+    __tablename__ = "EmptyWorldVideoRecordingErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(VideoRecordingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "EmptyWorldVideoRecordingErrorDAO",
+        "inherit_condition": database_id == VideoRecordingErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class InvalidVideoRecordingRateErrorDAO(
+    VideoRecordingErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.InvalidVideoRecordingRateError],
+):
+    __tablename__ = "InvalidVideoRecordingRateErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(VideoRecordingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    field_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    value: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "InvalidVideoRecordingRateErrorDAO",
+        "inherit_condition": database_id == VideoRecordingErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class VideoRecordingAlreadyStartedErrorDAO(
+    VideoRecordingErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.exceptions.VideoRecordingAlreadyStartedError
+    ],
+):
+    __tablename__ = "VideoRecordingAlreadyStartedErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(VideoRecordingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "VideoRecordingAlreadyStartedErrorDAO",
+        "inherit_condition": database_id == VideoRecordingErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class VideoRecordingNotStartedErrorDAO(
+    VideoRecordingErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.VideoRecordingNotStartedError],
+):
+    __tablename__ = "VideoRecordingNotStartedErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(VideoRecordingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "VideoRecordingNotStartedErrorDAO",
+        "inherit_condition": database_id == VideoRecordingErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class WorldEntityNotFoundErrorDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.WorldEntityNotFoundError],
@@ -18771,6 +19959,84 @@ class MujocoCameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoCameraDAO",
         "inherit_condition": database_id == MultiSimCameraDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MultiSimLightDAO(
+    SimulatorAdditionalPropertyDAO,
+    DataAccessObject[semantic_digital_twin.adapters.multi_sim.MultiSimLight],
+):
+    __tablename__ = "MultiSimLightDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SimulatorAdditionalPropertyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    body_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("BodyDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    body: Mapped[BodyDAO] = relationship(
+        "BodyDAO", uselist=False, foreign_keys=[body_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MultiSimLightDAO",
+        "inherit_condition": database_id == SimulatorAdditionalPropertyDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MujocoLightDAO(
+    MultiSimLightDAO,
+    DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoLight],
+):
+    __tablename__ = "MujocoLightDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MultiSimLightDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    directional: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    active: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    cast_shadow: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    cutoff: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    exponent: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    bulb_radius: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    position: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+    direction: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+    ambient: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+    diffuse: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+    specular: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+    attenuation: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MujocoLightDAO",
+        "inherit_condition": database_id == MultiSimLightDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -20592,6 +21858,11 @@ class ShapeDAO(
         nullable=True,
         use_existing_column=True,
     )
+    texture_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("TextureDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
 
     origin: Mapped[HomogeneousTransformationMatrixMappingDAO] = relationship(
         "HomogeneousTransformationMatrixMappingDAO",
@@ -20601,6 +21872,9 @@ class ShapeDAO(
     )
     color: Mapped[ColorDAO] = relationship(
         "ColorDAO", uselist=False, foreign_keys=[color_id], post_update=True
+    )
+    texture: Mapped[TextureDAO] = relationship(
+        "TextureDAO", uselist=False, foreign_keys=[texture_id], post_update=True
     )
 
     __mapper_args__ = {
@@ -20702,6 +21976,25 @@ class SphereDAO(
         "inherit_condition": database_id == ShapeDAO.database_id,
         "polymorphic_load": "selectin",
     }
+
+
+class TextureDAO(
+    Base, DataAccessObject[semantic_digital_twin.world_description.geometry.Texture]
+):
+    __tablename__ = "TextureDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    file_path: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    uniform: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+
+    repeat: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
 
 
 class InertialDAO(
@@ -21732,6 +23025,40 @@ class StateChangeCallbackDAO(
     __mapper_args__ = {
         "polymorphic_identity": "StateChangeCallbackDAO",
         "inherit_condition": database_id == CallbackDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class _FrameCaptureCallbackDAO(
+    StateChangeCallbackDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.mujoco_video_recording._FrameCaptureCallback
+    ],
+):
+    __tablename__ = "_FrameCaptureCallbackDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(StateChangeCallbackDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    recorder_id: Mapped[int] = mapped_column(
+        ForeignKey("MujocoVideoRecorderDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    recorder: Mapped[MujocoVideoRecorderDAO] = relationship(
+        "MujocoVideoRecorderDAO",
+        uselist=False,
+        foreign_keys=[recorder_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "_FrameCaptureCallbackDAO",
+        "inherit_condition": database_id == StateChangeCallbackDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -29762,11 +31089,6 @@ class CabinetDAO(
         nullable=True,
         use_existing_column=True,
     )
-    handle_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("HandleDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
     supporting_surface_id: Mapped[int] = mapped_column(
         ForeignKey("RegionDAO.database_id", use_alter=True),
         nullable=True,
@@ -29792,9 +31114,6 @@ class CabinetDAO(
         cascade="all, delete-orphan",
         foreign_keys="[CabinetDAO_doors_association.source_cabinetdao_id]",
         lazy="selectin",
-    )
-    handle: Mapped[HandleDAO] = relationship(
-        "HandleDAO", uselist=False, foreign_keys=[handle_id], post_update=True
     )
     objects: Mapped[builtins.list[CabinetDAO_objects_association]] = relationship(
         "CabinetDAO_objects_association",
@@ -30747,25 +32066,6 @@ class OrangeDAO(
     }
 
 
-class PotatoDAO(
-    ProduceDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Potato
-    ],
-):
-    __tablename__ = "PotatoDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(ProduceDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "PotatoDAO",
-        "inherit_condition": database_id == ProduceDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
 class RoomDAO(
     SemanticAnnotationDAO,
     DataAccessObject[
@@ -31640,6 +32940,25 @@ class LettuceDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "LettuceDAO",
+        "inherit_condition": database_id == VegetableDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PotatoDAO(
+    VegetableDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Potato
+    ],
+):
+    __tablename__ = "PotatoDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(VegetableDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PotatoDAO",
         "inherit_condition": database_id == VegetableDAO.database_id,
         "polymorphic_load": "selectin",
     }

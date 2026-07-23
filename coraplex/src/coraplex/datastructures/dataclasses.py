@@ -89,6 +89,15 @@ class Context(PlanEntity):
     Should debug information be printed or visualized.
     """
 
+    _giskard_wrapper: Any = field(default=None, init=False, repr=False)
+    """
+    Cached giskard instance so that it isnt reinitialized each action
+    """
+    _giskard_wrapper_world: Any = field(default=None, init=False, repr=False)
+    """
+    World the cached wrapper was built against. Used to detect world swaps
+    """
+
     @property
     def debug(self):
         return self._debug
@@ -101,6 +110,18 @@ class Context(PlanEntity):
         logging.getLogger("coraplex").setLevel(
             logging.DEBUG if self.debug else logging.INFO
         )
+
+    @property
+    def giskard_wrapper(self):
+        if (
+            self._giskard_wrapper is None
+            or self._giskard_wrapper_world is not self.world
+        ):
+            from giskardpy.middleware.ros2.python_interface import GiskardWrapper
+
+            self._giskard_wrapper = GiskardWrapper(self.ros_node, world=self.world)
+            self._giskard_wrapper_world = self.world
+        return self._giskard_wrapper
 
     @classmethod
     def from_world(

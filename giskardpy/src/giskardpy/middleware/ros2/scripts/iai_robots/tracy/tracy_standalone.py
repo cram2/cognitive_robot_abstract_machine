@@ -8,15 +8,20 @@ from rclpy import Parameter
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.middleware.ros2.behavior_tree_config import StandAloneBTConfig
 from giskardpy.middleware.ros2.giskard import Giskard
+from giskardpy.middleware.ros2.utils.utils import load_xacro
 
 
 def main():
     rospy.init_node("giskard")
+    default_robot_description = load_xacro(
+        "package://iai_tracy_description/urdf/tracy.urdf.xacro"
+    )
     rospy.node.declare_parameters(
         namespace="", parameters=[("robot_description", Parameter.Type.STRING)]
     )
     robot_description = rospy.node.get_parameter_or("robot_description").value
-    # robot_description = load_xacro("package://iai_tracy_description/urdf/tracy.urdf.xacro")
+    if robot_description is None:
+        robot_description = default_robot_description
 
     giskard = Giskard(
         world_config=WorldWithTracyConfig(urdf=robot_description),

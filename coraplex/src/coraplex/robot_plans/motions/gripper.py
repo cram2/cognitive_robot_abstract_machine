@@ -90,7 +90,7 @@ class ReachMotion(BaseMotion):
                 root_link=self.robot_view.root,
                 tip_link=tip,
                 goal_pose=pose,
-                threshold=0.005,
+                linear_threshold=0.005,
                 name="Reach",
             )
             for pose in self._calculate_pose_sequence()
@@ -372,7 +372,7 @@ class MoveManipulatorMotion(BaseMotion):
             root_link=root,
             tip_link=self.end_effector.tool_frame,
             goal_pose=self.target,
-            threshold=0.005,
+            linear_threshold=0.005,
             binding_policy=GoalBindingPolicy.Bind_on_start,
             name=self.__class__.__name__,
         )

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from abc import ABC
-from collections import defaultdict
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
@@ -264,7 +263,7 @@ class TracyRightArm(Arm[TracyRightGripper]):
         connections = self.active_connections
         arm_park = JointState.from_mapping(
             name=PrefixedName("right_arm_park", prefix=self.name.name),
-            mapping=dict(zip(connections, [3.72, -2.07, -1.17, 4.0, 0.82, 0.75])),
+            mapping=dict(zip(connections, [3.77, -2.05, -0.9, 3.8, 0.76, -2.28])),
             state_type=StaticJointState.PARK,
         )
         return [arm_park]
@@ -349,7 +348,7 @@ class Tracy(
         )
 
     def _setup_velocity_limits(self):
-        self.tighten_dof_velocity_limits_proportionally(maximum_velocity=0.2)
+        self.tighten_dof_velocity_limits_proportionally(maximum_velocity=1.0)
 
     def get_end_effectors(self) -> list[EndEffector]:
         return [self.left_arm.end_effector, self.right_arm.end_effector]
