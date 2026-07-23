@@ -24,15 +24,6 @@ from krrood.utils import is_builtin_type, is_typing_type
 # %%
 # Type-hint serialisation
 
-_ORIGIN_TYPE_TO_HINT: Dict[type, type] = {
-    list: List,
-    set: Set,
-    dict: Dict,
-    tuple: Tuple,
-}
-"""Mapping from origin types to their typing hint equivalents."""
-
-
 def _extract_types(type_hint: Any, seen: Optional[Set[type]] = None) -> Set[type]:
     """Recursively extract all base types from a type hint."""
     if seen is None:
@@ -48,10 +39,7 @@ def _extract_types(type_hint: Any, seen: Optional[Set[type]] = None) -> Set[type
     args = get_args(type_hint)
 
     if origin:
-        if origin in _ORIGIN_TYPE_TO_HINT:
-            seen.add(_ORIGIN_TYPE_TO_HINT[origin])
-        else:
-            seen.add(origin)
+        seen.add(origin)
         for arg in args:
             _extract_types(arg, seen)
     elif isinstance(type_hint, type):
