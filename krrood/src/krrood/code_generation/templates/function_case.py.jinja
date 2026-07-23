@@ -17,9 +17,9 @@ class {{ class_name }}({{ base_class_name }}):
     FunctionCase for the `{{ function_name }}` function.
     """
 {% for parameter in function_meta_data.parameter_data %}
-    {{ parameter.name }}: {{ parameter.type_hint }}
+    {{ parameter.name }}: {{ parameter.string_type_hint }}
 {% endfor %}
-    _output: {{ function_meta_data.return_type_hint }}
+    _output: {{ function_meta_data.string_return_type_hint }}
 
 
 try:

@@ -54,8 +54,12 @@ class FunctionParameter:
     The type hint of the parameter.
     """
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {"name": self.name, "type_hint": stringify_type_hint(self.type_hint)}
+    @property
+    def string_type_hint(self) -> str:
+        """
+        :return: The string representation of the type hint.
+        """
+        return stringify_type_hint(self.type_hint)
 
 
 @dataclass
@@ -97,13 +101,12 @@ class FunctionMetaData:
         return_annotation_string = type_hints.get("return", signature.return_annotation)
         return cls(parameter_data=fields, return_type_hint=return_annotation_string)
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "parameter_data": [
-                parameter.to_dict() for parameter in self.parameter_data
-            ],
-            "return_type_hint": stringify_type_hint(self.return_type_hint),
-        }
+    @property
+    def string_return_type_hint(self) -> str:
+        """
+        :return: The string representation of the return type hint.
+        """
+        return stringify_type_hint(self.return_type_hint)
 
 
 @dataclass
@@ -172,5 +175,5 @@ class FunctionCaseGenerator:
             import_line=callable_import.import_line,
             access_expression=callable_import.access_expression,
             type_imports=type_import_lines,
-            function_meta_data=function_meta_data.to_dict(),
+            function_meta_data=function_meta_data,
         )
