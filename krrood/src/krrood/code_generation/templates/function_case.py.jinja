@@ -1,0 +1,28 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from typing_extensions import ClassVar, Callable, TYPE_CHECKING
+
+from {{ base_class_module }} import {{ base_class_name }}
+{{ import_line }}
+
+if TYPE_CHECKING:
+    {% for line in type_imports %}
+    {{ line }}
+    {% endfor %}
+
+
+@dataclass
+class {{ class_name }}({{ base_class_name }}):
+    """
+    FunctionCase for the `{{ function_name }}` function.
+    """
+{% for parameter in function_meta_data.parameter_data %}
+    {{ parameter.name }}: {{ parameter.string_type_hint }}
+{% endfor %}
+    _output: {{ function_meta_data.string_return_type_hint }}
+
+
+try:
+    {{ class_name }}.function = {{ access_expression }}
+except NameError:
+    pass

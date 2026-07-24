@@ -30,13 +30,13 @@ import six
 from graphviz import Source
 from sqlalchemy.exc import NoInspectionAvailable
 from krrood.ripple_down_rules import logger
+from krrood.code_generation.imports import get_imports_from_types
 from krrood.utils import (
     is_builtin_type,
     get_import_path_from_path,
     get_method_name,
     get_method_class_name_if_exists,
     get_method_file_name,
-    get_imports_from_types,
 )
 
 try:

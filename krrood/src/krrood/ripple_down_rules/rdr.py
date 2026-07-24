@@ -91,9 +91,9 @@ from krrood.ripple_down_rules.utils import (
     update_case_in_case_query,
     copy_case,
 )
+from krrood.code_generation.imports import get_imports_from_types
 from krrood.utils import (
     get_import_path_from_path,
-    get_imports_from_types,
     get_scope_from_imports,
 )
 

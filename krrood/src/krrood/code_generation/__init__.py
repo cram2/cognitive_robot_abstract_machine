@@ -1,9 +1,11 @@
 """Code generation utilities for the CRAM krrood package.
 
-This package currently provides source-extraction infrastructure: reading
-function/class definitions and import statements out of modules, files, or
-source strings (see :mod:`krrood.code_generation.source_extraction_utils`).
+This package provides general infrastructure for generating Python source code:
+naming conventions, import extraction, type-hint serialisation, source-code
+formatting, and a :class:`~krrood.code_generation.generator.CodeGenerator` base
+class for Jinja2-based generation.
 
-Import from the specific submodule; the package root deliberately exposes no
-symbols.
+Import from the specific submodule (for example
+:mod:`krrood.code_generation.naming` or :mod:`krrood.code_generation.imports`);
+the package root deliberately exposes no symbols.
 """
