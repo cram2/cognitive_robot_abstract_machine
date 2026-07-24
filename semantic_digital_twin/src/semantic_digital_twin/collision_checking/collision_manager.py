@@ -147,9 +147,14 @@ class CollisionManager(ModelChangeCallback):
     between two bodies.
     """
 
-    collision_consumers: list[CollisionConsumer] = field(default_factory=list)
+    collision_consumers: list[CollisionConsumer] = field(
+        default_factory=list, init=False
+    )
     """
     Objects that are notified about changes in the collision matrix.
+
+    Consumers are runtime observers (e.g. visualization publishers holding ROS nodes)
+    and are excluded from serialization.
     """
 
     def __post_init__(self):

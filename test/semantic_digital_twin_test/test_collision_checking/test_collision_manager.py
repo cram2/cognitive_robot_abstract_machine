@@ -1,7 +1,12 @@
+from dataclasses import dataclass, field
+
 import numpy as np
 
 from krrood.symbolic_math.float_variable_data import (
     FloatVariableData,
+)
+from semantic_digital_twin.collision_checking.collision_manager import (
+    CollisionConsumer,
 )
 from krrood.symbolic_math.symbolic_math import Vector, VariableParameters, FloatVariable
 from semantic_digital_twin.collision_checking.collision_matrix import (
@@ -275,3 +280,34 @@ def test_collision_rules_survive_merge(pr2_world_copy):
     with world.modify_world():
         world.merge_world(pr2_world_copy)
     assert len(world.collision_manager.rules) == expected
+
+
+@dataclass(eq=False)
+class RuntimeResourceHoldingConsumer(CollisionConsumer):
+    """
+    A collision consumer holding a runtime-only resource that cannot be serialized, like
+    a visualization publisher holding a ROS node.
+    """
+
+    resource: object = field(default_factory=object)
+    """
+    A resource without a registered JSON serializer.
+    """
+
+    def on_compute_collisions(self, collision_results):
+        pass
+
+    def on_world_model_update(self, world):
+        pass
+
+    def on_collision_matrix_update(self):
+        pass
+
+
+def test_to_json_skips_runtime_collision_consumers(cylinder_bot_world):
+    collision_manager = cylinder_bot_world.collision_manager
+    collision_manager.add_collision_consumer(RuntimeResourceHoldingConsumer())
+
+    result = collision_manager.to_json()
+
+    assert "collision_consumers" not in result

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import datetime
 import enum
 import importlib
 import inspect
+import pathlib
 import uuid
 from abc import ABC
 from dataclasses import dataclass, fields, is_dataclass
@@ -406,6 +408,46 @@ class UUIDJSONSerializer(ExternalClassJSONSerializer[uuid.UUID]):
         cls, data: Dict[str, Any], clazz: Type[uuid.UUID], **kwargs
     ) -> uuid.UUID:
         return clazz(data["value"])
+
+
+@dataclass
+class PathJSONSerializer(ExternalClassJSONSerializer[pathlib.PurePath]):
+    """
+    External JSON serializer for :mod:`pathlib` paths.
+    """
+
+    @classmethod
+    def to_json(cls, obj: pathlib.PurePath) -> Dict[str, Any]:
+        return {
+            JSON_TYPE_NAME: get_full_class_name(type(obj)),
+            "value": str(obj),
+        }
+
+    @classmethod
+    def from_json(
+        cls, data: Dict[str, Any], clazz: Type[pathlib.PurePath], **kwargs
+    ) -> pathlib.PurePath:
+        return clazz(data["value"])
+
+
+@dataclass
+class TimedeltaJSONSerializer(ExternalClassJSONSerializer[datetime.timedelta]):
+    """
+    External JSON serializer for :class:`datetime.timedelta`.
+    """
+
+    @classmethod
+    def to_json(cls, obj: datetime.timedelta) -> Dict[str, Any]:
+        return {
+            JSON_TYPE_NAME: get_full_class_name(type(obj)),
+            "total_seconds": obj.total_seconds(),
+        }
+
+    @classmethod
+    def from_json(
+        cls, data: Dict[str, Any], clazz: Type[datetime.timedelta], **kwargs
+    ) -> datetime.timedelta:
+        return clazz(seconds=data["total_seconds"])
 
 
 @dataclass

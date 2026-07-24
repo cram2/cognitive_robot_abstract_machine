@@ -1,3 +1,5 @@
+import datetime
+import pathlib
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
@@ -383,3 +385,19 @@ def test_dataclass_dict():
     data = to_json(cls)
     result = from_json(data)
     assert result == cls
+
+
+def test_path_roundtrip():
+    path = pathlib.Path("/tmp/results/records.jsonl")
+    data = to_json(path)
+    result = from_json(data)
+    assert result == path
+    assert isinstance(result, pathlib.Path)
+
+
+def test_timedelta_roundtrip():
+    duration = datetime.timedelta(hours=1, seconds=30.5)
+    data = to_json(duration)
+    result = from_json(data)
+    assert result == duration
+    assert isinstance(result, datetime.timedelta)

@@ -97,7 +97,6 @@ class IsPerceivable:
     The exact class label of the perceived object.
     """
 
-
 TKinematicStructureEntity = TypeVar(
     "TKinematicStructureEntity", bound=KinematicStructureEntity
 )
@@ -134,7 +133,9 @@ class HasRootKinematicStructureEntity(
     @classproperty
     def _parent_connection_type(self) -> Type[Connection]:
         """
-        The type of connection used to connect the root kinematic structure entity to the world.
+        The type of connection used to connect the root kinematic structure entity to
+        the world.
+
         .. note:: Currently its always, except with sliders and hinges, but in the future this may change. So override if needed.
         """
         return FixedConnection
@@ -157,14 +158,14 @@ class HasRootKinematicStructureEntity(
         :param name: The name of the semantic annotation.
         :param world: The world to add the annotation and entity to.
         :param kinematic_structure_entity: The root entity of the semantic annotation.
-        :param world_root_T_self: The initial pose of the entity in the world root frame.
+        :param world_root_T_self: The initial pose of the entity in the world root
+            frame.
         :param connection_limits: The limits for the connection's degrees of freedom.
         :param active_axis: The active axis for the connection.
         :param connection_multiplier: The multiplier for the connection.
         :param connection_offset: The offset for the connection.
         :return: The created semantic annotation instance.
         """
-
         self_instance = cls(name=name, root=kinematic_structure_entity)
         world_root_T_self = world_root_T_self or HomogeneousTransformationMatrix()
 
@@ -198,12 +199,13 @@ class HasRootKinematicStructureEntity(
     def _mount_strategy(self, main_has_root_body_annotation: HasRootBody) -> None:
         """
         Realize the relationship between this annotation (as a part) and the
-        ``main_has_root_body_annotation`` (the whole) in the kinematic structure. The default is to
-        become a kinematic child of the whole; parts with a different strategy (e.g. mechanical
-        joints that re-parent the whole, apertures that cut it) override this.
+        ``main_has_root_body_annotation`` (the whole) in the kinematic structure. The
+        default is to become a kinematic child of the whole; parts with a different
+        strategy (e.g. mechanical joints that re-parent the whole, apertures that cut
+        it) override this.
 
-        :param main_has_root_body_annotation: The annotation (the whole) this one is being added to
-            as a part.
+        :param main_has_root_body_annotation: The annotation (the whole) this one is
+            being added to as a part.
         """
         main_has_root_body_annotation._world.move_branch(
             self.root, main_has_root_body_annotation.root, True
@@ -232,10 +234,12 @@ TBody = TypeVar("TBody", bound=Body)
 @dataclass(eq=False)
 class HasRootBody(HasRootKinematicStructureEntity[TBody], ABC):
     """
-    Abstract base class for all household objects. Each semantic annotation refers to a single Body.
-    Each subclass automatically derives a MatchRule from its own class name and
-    the names of its HouseholdObject ancestors. This makes specialized subclasses
-    naturally more specific than their bases.
+    Abstract base class for all household objects.
+
+    Each semantic annotation refers to a single Body. Each subclass automatically
+    derives a MatchRule from its own class name and the names of its HouseholdObject
+    ancestors. This makes specialized subclasses naturally more specific than their
+    bases.
     """
 
     @classmethod
@@ -311,7 +315,8 @@ class HasRootRegion(HasRootKinematicStructureEntity[TRegion], ABC):
 
         :param name: The name of the semantic annotation.
         :param world: The world to add the annotation and region to.
-        :param world_root_T_self: The initial pose of the region in the world root frame.
+        :param world_root_T_self: The initial pose of the region in the world root
+            frame.
         :param connection_limits: The limits for the connection's degrees of freedom.
         :param active_axis: The active axis for the connection.
         :param connection_multiplier: The multiplier for the connection.
@@ -337,8 +342,9 @@ def _wrapped_part_whole_relationship_fields(
     cls: Type[PartWholeRelationship],
 ) -> list[WrappedField]:
     """
-    Filters the fields of cls for all fields marked as a part-whole relationship (by carrying an
-    :class:`IsPartWholeRelationship` in their metadata), and returns them as a Wrapped Class.
+    Filters the fields of cls for all fields marked as a part-whole relationship (by
+    carrying an :class:`IsPartWholeRelationship` in their metadata), and returns them as
+    a Wrapped Class.
     """
     return [
         wrapped_part_whole_relationship_field
@@ -353,10 +359,11 @@ def _wrapped_part_whole_relationship_fields(
 
 @dataclass
 class IsPartWholeRelationship(FieldMetadata):
-    """Marks a field as holding a structural *part* of its owner (the part-whole relation).
+    """
+    Marks a field as holding a structural *part* of its owner (the part-whole relation).
 
-    The relation is signalled by the mere presence of an instance of this class in a field's
-    :attr:`~FieldMetadata.other_metadata`; it carries no further data.
+    The relation is signalled by the mere presence of an instance of this class in a
+    field's :attr:`~FieldMetadata.other_metadata`; it carries no further data.
     """
 
 
@@ -375,19 +382,20 @@ class PartWholeRelationship(HasRootKinematicStructureEntity, ABC):
         self, part: HasRootKinematicStructureEntity, *, field_name: str = ""
     ) -> None:
         """
-        Add ``part`` as a structural part, routing it to the matching part-whole relationship field
-        by type.
+        Add ``part`` as a structural part, routing it to the matching part-whole
+        relationship field by type.
 
         :param part: The part to add.
-        :param field_name: Optional name of the target part-whole relationship field. When given,
-            only that field is considered (and ``part`` must still match its element type), which
-            resolves the ambiguity when ``type(part)`` matches several fields. When empty (default),
-            the field is resolved by type alone.
-        :raises UnknownPartWholeRelationshipField: If ``field_name`` is given but is not a
-            part-whole relationship field of this annotation.
-        :raises CannotBeAPartOf: If no part-whole relationship field of this annotation accepts
-            ``type(part)``.
-        :raises AmbiguousPart: If ``type(part)`` matches more than one part-whole relationship field.
+        :param field_name: Optional name of the target part-whole relationship field.
+            When given, only that field is considered (and ``part`` must still match its
+            element type), which resolves the ambiguity when ``type(part)`` matches
+            several fields. When empty (default), the field is resolved by type alone.
+        :raises UnknownPartWholeRelationshipField: If ``field_name`` is given but is not
+            a part-whole relationship field of this annotation.
+        :raises CannotBeAPartOf: If no part-whole relationship field of this annotation
+            accepts ``type(part)``.
+        :raises AmbiguousPart: If ``type(part)`` matches more than one part-whole
+            relationship field.
         """
         candidate_fields = _wrapped_part_whole_relationship_fields(type(self))
         if field_name:
@@ -440,7 +448,6 @@ class HasApertures(HasRootBody, PartWholeRelationship, ABC):
     The apertures of the semantic annotation.
     """
 
-
 @dataclass(eq=False)
 class HasMechanicalJoint(HasRootBody, PartWholeRelationship, ABC):
     """
@@ -485,7 +492,6 @@ class HasDrawers(PartWholeRelationship, ABC):
     The drawers of the semantic annotation.
     """
 
-
 @dataclass(eq=False)
 class HasDoors(PartWholeRelationship, ABC):
     """
@@ -502,7 +508,6 @@ class HasDoors(PartWholeRelationship, ABC):
     The doors of the semantic annotation.
     """
 
-
 @dataclass(eq=False)
 class HasHandle(HasRootBody, PartWholeRelationship, ABC):
     """
@@ -517,12 +522,10 @@ class HasHandle(HasRootBody, PartWholeRelationship, ABC):
     The handle of the semantic annotation.
     """
 
-
 THasRootBody = TypeVar("THasRootBody", bound=HasRootBody)
 """
 A type variable for HasRootBody.
 """
-
 
 @dataclass(eq=False)
 class HasLegs(PartWholeRelationship, ABC):
@@ -540,7 +543,6 @@ class HasLegs(PartWholeRelationship, ABC):
     The legs of the semantic annotation.
     """
 
-
 @dataclass(eq=False)
 class HasSink(PartWholeRelationship, ABC):
     """
@@ -555,12 +557,13 @@ class HasSink(PartWholeRelationship, ABC):
     The sink of the semantic annotation.
     """
 
-
 @dataclass(eq=False)
 class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric, ABC):
     """
-    A mixin class for semantic annotations that represent storage spaces. Used to afterthefact add object for example
-    to a table, and have those objects move with the table when it is moved.
+    A mixin class for semantic annotations that represent storage spaces.
+
+    Used to afterthefact add object for example to a table, and have those objects move
+    with the table when it is moved.
     """
 
     objects: List[THasRootBody] = field(default_factory=list, hash=False, kw_only=True)
@@ -597,7 +600,6 @@ class HasSupportingSurface(IsStorageSpace, ABC):
     """
     A semantic annotation that represents a supporting surface.
     """
-
     supporting_surface: Region = field(default=None)
     """
     The supporting surface region of the semantic annotation.
@@ -610,14 +612,17 @@ class HasSupportingSurface(IsStorageSpace, ABC):
         min_surface_area: float = 0.0225,  # 15cm x 15cm
     ) -> Optional[Region]:
         """
-        Calculate the supporting surface region for the semantic annotation, add it to the world, and set
-        it as the supporting surface of self
+        Calculate the supporting surface region for the semantic annotation, add it to
+        the world, and set it as the supporting surface of self.
 
-        :param upward_threshold: The threshold for the face normal to be considered upward-facing.
-        :param clearance_threshold: The threshold for the vertical clearance above the surface.
-        :param min_surface_area: The minimum area for a surface to be considered a supporting surface.
-
-        :return: The supporting surface region, or None if no suitable region could be found.
+        :param upward_threshold: The threshold for the face normal to be considered
+            upward-facing.
+        :param clearance_threshold: The threshold for the vertical clearance above the
+            surface.
+        :param min_surface_area: The minimum area for a surface to be considered a
+            supporting surface.
+        :return: The supporting surface region, or None if no suitable region could be
+            found.
         """
         mesh = self.root.combined_mesh
         if mesh is None:
@@ -667,14 +672,19 @@ class HasSupportingSurface(IsStorageSpace, ABC):
         candidates_filtered = candidates.submesh([clear_mask], append=True)
 
         # --- Build the region ---
+        average_z = np.mean(candidates_filtered.vertices[:, 2])
+        surface_points = np.unique(
+            np.column_stack(
+                (
+                    candidates_filtered.vertices[:, 0],
+                    candidates_filtered.vertices[:, 1],
+                    np.full(len(candidates_filtered.vertices), average_z),
+                )
+            ),
+            axis=0,
+        )
         points_3d = [
-            Point3(
-                x,
-                y,
-                z,
-                reference_frame=self.root,
-            )
-            for x, y, z in candidates_filtered.vertices
+            Point3(x, y, z, reference_frame=self.root) for x, y, z in surface_points
         ]
         supporting_surface = Region.from_3d_points(
             name=PrefixedName(
@@ -684,12 +694,19 @@ class HasSupportingSurface(IsStorageSpace, ABC):
             points_3d=points_3d,
         )
 
-        supporting_surface_z_position = self.root.collision.scale.z / 2
+        # The region's hull is centered on the centroid of the surface points, so the
+        # region frame must sit at that centroid. This derives the placement purely
+        # from the detected geometry, independent of where the body frame lies (URDFs
+        # place it at the geometric center or on the ground, depending on the model).
+        surface_centroid = surface_points.mean(axis=0)
         self_C_supporting_surface = FixedConnection(
             parent=self.root,
             child=supporting_surface,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                z=supporting_surface_z_position, reference_frame=self.root
+                x=float(surface_centroid[0]),
+                y=float(surface_centroid[1]),
+                z=float(surface_centroid[2]),
+                reference_frame=self.root,
             ),
         )
         self._world.add_region(supporting_surface)
@@ -701,9 +718,9 @@ class HasSupportingSurface(IsStorageSpace, ABC):
         """
         Infer and add objects that are supported by this surface to the storage space.
 
-        This method queries the world for bodies that are supported by this annotation's root body,
-        finds their corresponding semantic annotations, and adds them to the objects list if they
-        are not already present.
+        This method queries the world for bodies that are supported by this annotation's
+        root body, finds their corresponding semantic annotations, and adds them to the
+        objects list if they are not already present.
         """
         bodies = variable_from(self._world.bodies_with_collision)
         body = entity(bodies).where(
@@ -736,10 +753,12 @@ class HasSupportingSurface(IsStorageSpace, ABC):
         body_to_sample_for: Optional[HasRootBody] = None,
         category_of_interest: Optional[Type[SemanticAnnotation]] = None,
         amount: int = 100,
+        edge_clearance: Optional[float] = None,
     ) -> List[Point3]:
         """
-        Samples points from a surface around the semantic annotation. The surface is determined by the supporting
-        surface of the semantic annotation and is truncated by the objects on the surface. The points are sampled
+        Samples points from a surface around the semantic annotation.
+
+        The surface is determined by the supporting surface of the semantic annotation and is truncated by the objects on the surface. The points are sampled
         using a Gaussian mixture model.
 
         ..warning:: Calling this method when the self.supporting_surface is None will cause the method to calculate the
@@ -748,6 +767,8 @@ class HasSupportingSurface(IsStorageSpace, ABC):
         :param body_to_sample_for: The physical object to sample points for.
         :param category_of_interest: The type of object sample points around.
         :param amount: The number of points to sample.
+        :param edge_clearance: Minimum distance to keep from the supporting surface edge in x/y. If not provided,
+            half of the sampled object's largest x/y extent is used.
 
         :return: A list of sampled points, sorted by distance to the around_object.
         """
@@ -765,6 +786,9 @@ class HasSupportingSurface(IsStorageSpace, ABC):
             ].max()
             z_object_dimension = body_to_sample_for.root.combined_mesh.extents[2]
 
+        if edge_clearance is None:
+            edge_clearance = largest_xy_object_dimension / 2
+
         self_max_z = self.supporting_surface.area.max_point.z
         z_coordinate = np.full(
             (amount, 1),
@@ -774,6 +798,7 @@ class HasSupportingSurface(IsStorageSpace, ABC):
         surface_circuit = self._build_surface_sampler(
             category_of_interest=category_of_interest,
             object_bloat=largest_xy_object_dimension,
+            edge_clearance=edge_clearance,
         )
 
         if surface_circuit is None:
@@ -793,16 +818,21 @@ class HasSupportingSurface(IsStorageSpace, ABC):
         self,
         category_of_interest: Optional[Type[SemanticAnnotation]] = None,
         object_bloat: float = 0.1,
+        edge_clearance: float = 0.0,
     ):
         """
-        Build a probabilistic circuit representing the supporting surface, truncated by the objects on the surface,
-        and with Gaussian mixtures around the objects of interest.
+        Build a probabilistic circuit representing the supporting surface, truncated by
+        the objects on the surface, and with Gaussian mixtures around the objects of
+        interest.
 
         :param category_of_interest: The type of object sample points around.
         :param object_bloat: The amount of bloat to apply to the object event.
+        :param edge_clearance: Minimum distance to keep from the supporting surface edge
+            in x/y.
         """
         truncated_event_2d = self._2d_surface_sample_space_excluding_objects(
-            object_bloat
+            object_bloat,
+            edge_clearance=edge_clearance,
         )
 
         objects_of_interest = (
@@ -820,15 +850,27 @@ class HasSupportingSurface(IsStorageSpace, ABC):
         else:
             return uniform_measure_of_event(truncated_event_2d)
 
-    def _2d_surface_sample_space_excluding_objects(self, object_bloat: float) -> Event:
+    def _2d_surface_sample_space_excluding_objects(
+        self, object_bloat: float, edge_clearance: float = 0.0
+    ) -> Event:
         """
-        Compute a 2D event representing the supporting surface, truncated by the objects on the surface.
+        Compute a 2D event representing the supporting surface, truncated by the objects
+        on the surface.
 
         :param object_bloat: The amount of bloat to apply to the object events.
+        :param edge_clearance: Minimum distance to keep from the supporting surface edge
+            in x/y.
         """
         area_of_self = BoundingBoxCollection.from_shapes(self.supporting_surface.area)
         area_of_self.transform_all_shapes_to_own_frame()
         event = area_of_self.event
+
+        if edge_clearance > 0:
+            # Shrink only in x/y so sampled points stay away from the surface edges.
+            shrunk_surface = area_of_self.bounding_box().shrink(
+                x_amount=edge_clearance, y_amount=edge_clearance
+            )
+            event = shrunk_surface.simple_event.as_composite_set()
 
         event_2d = event.marginal(SpatialVariables.xy)
         for obj in self.objects:
@@ -850,14 +892,14 @@ class HasSupportingSurface(IsStorageSpace, ABC):
         """
         Create a Gaussian mixture model from a list of points, truncated by an event.
 
-        :param objects_of_interest: Objects of interest to sample around. The Gaussian mixtures will be centered around
-           the positions of these objects on the surface.
+        :param objects_of_interest: Objects of interest to sample around. The Gaussian
+            mixtures will be centered around the positions of these objects on the
+            surface.
         :param variance: The standard deviation to use for the Gaussian mixtures.
         :param sample_space: The event to truncate the Gaussian mixture model with.
-
-        :return: A probabilistic circuit representing the Gaussian mixture model truncated by the event, or None if the event has zero measure.
+        :return: A probabilistic circuit representing the Gaussian mixture model
+            truncated by the event, or None if the event has zero measure.
         """
-
         surface_circuit = self._untruncated_2d_gaussian_sampler(
             objects_of_interest=objects_of_interest,
             variance=variance,
@@ -874,8 +916,10 @@ class HasSupportingSurface(IsStorageSpace, ABC):
     ) -> ProbabilisticCircuit:
         """
         Create a Gaussian mixture model from a list of points, without truncation.
-        This method is extracted from the `_2d_gaussian_sampler_from_2d_sample_space` method so that the generated
-        distribution can be tested properly, which cannot be done after truncation.
+
+        This method is extracted from the `_2d_gaussian_sampler_from_2d_sample_space`
+        method so that the generated distribution can be tested properly, which cannot
+        be done after truncation.
         """
         surface_circuit = ProbabilisticCircuit()
         surface_circuit_root = SumUnit(probabilistic_circuit=surface_circuit)
@@ -920,15 +964,15 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
     """
     A mixin class for semantic annotations that have a case as root body.
     """
-
     @classproperty
     @abstractmethod
     def hole_direction(self) -> Vector3:
         """
-        The direction of the physical hole of the geometry. For a drawer for example, this would always be Z.
+        The direction of the physical hole of the geometry.
 
-        ..warning:: This does not describe the axis along, for example, a drawer opens. Its the physical opening where
-        you can put something into the drawer.
+        For a drawer for example, this would always be Z.
+                ..warning:: This does not describe the axis along, for example, a drawer opens. Its the physical opening where
+                you can put something into the drawer.
         """
         ...
 
