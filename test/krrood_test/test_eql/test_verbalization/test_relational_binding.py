@@ -20,7 +20,7 @@ from krrood.entity_query_language.verbalization.grammar.conditions.scoping impor
     RelationalBindingFold,
     bind_relational_entities,
 )
-from krrood.entity_query_language.verbalization.example_domain import (
+from krrood.entity_query_language.verbalization._example_domain import (
     Mission as DomainMission,
     Robot as DomainRobot,
 )

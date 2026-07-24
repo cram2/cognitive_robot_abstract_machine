@@ -3,7 +3,7 @@ Tests for the verbalization documentation's example domain.
 
 The verbalization user guide queries over a small example domain (``Robot``, ``Mission``,
 ``BankTransaction``, …).  Those classes live in
-:mod:`krrood.entity_query_language.verbalization.example_domain` — a *real* module under
+:mod:`krrood.entity_query_language.verbalization._example_domain` — a *real* module under
 ``src`` — precisely so Sphinx AutoAPI documents them like any other module and the
 :class:`~krrood.entity_query_language.verbalization.rendering.source_link_resolver.AutoAPIResolver`
 resolves the rendered hyperlinks to the generated AutoAPI pages (on GitHub Pages and in a
@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from krrood.entity_query_language.verbalization import example_domain
+from krrood.entity_query_language.verbalization import _example_domain as example_domain
 from krrood.entity_query_language.verbalization.fragments.base import (
     VerbalizationFragment,
     WordFragment,
@@ -41,7 +41,7 @@ _DOC_EQL_USER = _PROJECT_ROOT / "krrood" / "doc" / "eql" / "user"
 _CONFIG_YML = _PROJECT_ROOT / "krrood" / "doc" / "_config.yml"
 
 _GITHUB_PAGES_BASE = "https://cram2.github.io/cognitive_robot_abstract_machine/krrood"
-_MODULE = "krrood.entity_query_language.verbalization.example_domain"
+_MODULE = "krrood.entity_query_language.verbalization._example_domain"
 _MODULE_PATH = _MODULE.replace(".", "/")
 
 # Every example class the user guide uses, so a rename/removal trips this test. Mirrors the

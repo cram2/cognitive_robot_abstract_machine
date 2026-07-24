@@ -14,7 +14,7 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
     group_by_owner,
     group_consecutive_by_owner,
 )
-from krrood.entity_query_language.verbalization.example_domain import (
+from krrood.entity_query_language.verbalization._example_domain import (
     Department,
     Employee,
 )

@@ -9,6 +9,7 @@ from krrood.entity_query_language.predicate import VerbalizationField
 from krrood.entity_query_language.utils import camel_case_to_words
 from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.fragments.base import (
+    apply_subject_verb_agreement,
     Clause,
     VerbalizationFragment,
     NounPhrase,
@@ -356,6 +357,12 @@ def clause(*constituents: ClauseConstituent) -> Clause:
     field fragment can be dropped in directly. The result is a :class:`Clause`, so coreference
     treats the first constituent as the clause's subject (pronominalisation, verb agreement).
 
+    A subject built from :class:`ConjunctivePhrase` (*"A, B, and C"*) is a coordination of ≥ 2
+    distinct entities, so the following predicate word (:class:`Copula` / :class:`Verb`) is tagged
+    plural here, at build time — coordination is static knowledge, unlike a quantified
+    population's plurality, which the coreference pass decides once it knows the subject is in
+    scope.
+
     :param constituents: The clause's elements in surface order.
     :return: The clause fragment.
 
@@ -368,7 +375,15 @@ def clause(*constituents: ClauseConstituent) -> Clause:
     ... )
     'an Employee work in a Department'
     """
-    return Clause(parts=[constituent.as_fragment() for constituent in constituents])
+    leading = constituents[0] if constituents else None
+    coordinated = isinstance(leading, ConjunctivePhrase)
+    if coordinated:
+        items = list(leading.items)
+        constituents = (ConjunctivePhrase(items), *constituents[1:])
+    parts = [constituent.as_fragment() for constituent in constituents]
+    if coordinated and len(items) >= 2 and len(parts) > 1:
+        parts[1] = apply_subject_verb_agreement(parts[1], GrammaticalNumber.PLURAL)
+    return Clause(parts=parts)
 
 
 def function_as_noun(name: str, getter_prefix: str = "get") -> str:

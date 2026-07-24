@@ -15,6 +15,7 @@
 - Name test classes (and the mimic classes used by tests) after the pattern or behaviour they exercise, not after the concrete external class they happen to stand in for
 
 ## Code Style
+- Divide a file into logical sections with `# %% <short description>` comment headers (e.g. `# %% same-noun disambiguation`), not decorative box-drawing dividers. Applies to source files as well as test files
 - Do not use abbreviations in variable names, methods, classes, or any other identifiers
 - Method and class names should be concise and descriptive: they should tell *what* they do, not *how* they do it
 - Create classes instead of using too many primitives. If a return type is always repeated, consider whether a dedicated class or type alias would convey more meaningful information

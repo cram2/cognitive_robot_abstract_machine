@@ -23,8 +23,14 @@ from krrood.entity_query_language.factories import (
     NodeType,
     RuntimeType,
 )
-from krrood.entity_query_language.predicate import HasType, HasTypes, Is, Length
-from krrood.entity_query_language.verbalization.example_domain import (
+from krrood.entity_query_language.predicate import (
+    HasType,
+    HasTypes,
+    Is,
+    Length,
+    SymbolicCallable,
+)
+from krrood.entity_query_language.verbalization._example_domain import (
     IsReachable,
     WorksIn,
 )
@@ -39,7 +45,7 @@ SURFACES: Tuple[VerbalizationSurface, ...] = (
         AttributeOwnerClass, "the attribute owner class of an Attribute"
     ),
     VerbalizationSurface(IsClass, "an object is a class"),
-    VerbalizationSurface(IsSubclass, "object 1 is a subclass of object 2"),
+    VerbalizationSurface(IsSubclass, "a subclass is a subclass of a parent or parents"),
     VerbalizationSurface(NodeChildren, "the node children of a CanBehaveLikeAVariable"),
     VerbalizationSurface(
         NodeDescendants, "the node descendants of a SymbolicExpression"
@@ -48,17 +54,17 @@ SURFACES: Tuple[VerbalizationSurface, ...] = (
     VerbalizationSurface(NodeParents, "the node parents of a SymbolicExpression"),
     VerbalizationSurface(NodeType, "the node type of a Selectable"),
     VerbalizationSurface(RuntimeType, "the runtime type of an object"),
-    VerbalizationSurface(HasType, "an object is of type Integer"),
-    VerbalizationSurface(HasTypes, "an object is of type Integer or Text"),
-    VerbalizationSurface(Is, "object 1 is the same object as object 2"),
-    VerbalizationSurface(Length, "the length of an object"),
-    VerbalizationSurface(IsReachable, "an object is reachable"),
-    VerbalizationSurface(WorksIn, "object 1 works in object 2"),
+    VerbalizationSurface(HasType, "a variable is of type Integer"),
+    VerbalizationSurface(HasTypes, "a variable is of type Integer or Text"),
+    VerbalizationSurface(Is, "a first entity is the same object as a second entity"),
+    VerbalizationSurface(Length, "the length of an iterable"),
+    VerbalizationSurface(IsReachable, "a location is reachable for a body"),
+    VerbalizationSurface(WorksIn, "an employee works in a department"),
     VerbalizationSurface(
         InheritancePathLength,
-        "the inheritance path length between object 1 and object 2",
+        "the inheritance path length between a child class and a parent class",
     ),
     VerbalizationSurface(
-        IsSameSemanticEntity, "object 1 is the same entity as object 2"
+        IsSameSemanticEntity, "an entity 1 is the same entity as an entity 2"
     ),
 )

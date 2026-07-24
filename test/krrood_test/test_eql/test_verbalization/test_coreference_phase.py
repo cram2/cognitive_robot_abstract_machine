@@ -128,20 +128,38 @@ def test_first_mention_modifiers_dropped_on_repeat():
     assert _realise(tree) == "a Robot of Cabinet and the Robot"
 
 
-def test_numbered_referent_never_downgrades():
+def test_alternative_distinguisher_survives_repeat_mention():
+    """
+    A referent stamped with the pair-distinguishing feature
+    (:attr:`NounPhrase.alternative`) keeps it across a repeat mention -- *"another
+    Robot"* (first) becomes *"the other Robot"* (repeat), not a plain *"the Robot"* that
+    would re-collide with the referent it was distinguished from.
+    """
     rid = uuid.uuid4()
     tree = PhraseFragment(
         parts=[
-            NounPhrase(
-                head=_noun("Robot 2"), definiteness=Definiteness.BARE, referent_id=rid
-            ),
+            NounPhrase(head=_noun("Robot"), referent_id=rid, alternative=True),
             WordFragment(text="and"),
-            NounPhrase(
-                head=_noun("Robot 2"), definiteness=Definiteness.BARE, referent_id=rid
-            ),
+            NounPhrase(head=_noun("Robot"), referent_id=rid, alternative=True),
         ]
     )
-    assert _realise(tree) == "Robot 2 and Robot 2"
+    assert _realise(tree) == "another Robot and the other Robot"
+
+
+def test_ordinal_distinguisher_survives_repeat_mention():
+    """
+    The ordinal counterpart of the above: *"a second Robot"* (first) becomes *"the
+    second Robot"* (repeat).
+    """
+    rid = uuid.uuid4()
+    tree = PhraseFragment(
+        parts=[
+            NounPhrase(head=_noun("Robot"), referent_id=rid, ordinal=2),
+            WordFragment(text="and"),
+            NounPhrase(head=_noun("Robot"), referent_id=rid, ordinal=2),
+        ]
+    )
+    assert _realise(tree) == "a second Robot and the second Robot"
 
 
 def test_distinct_referents_do_not_interfere():

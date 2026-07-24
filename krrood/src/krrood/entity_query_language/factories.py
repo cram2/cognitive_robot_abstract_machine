@@ -948,10 +948,6 @@ class NodeChildren(SymbolicFunction):
 node_children = symbolic_callable_to_function(NodeChildren)
 
 
-
-
-
-
 @dataclass(eq=False)
 class AttributeOwnerClass(SymbolicFunction):
     """
@@ -1056,17 +1052,17 @@ class IsClass(Predicate):
     Whether an object is a class.
     """
 
-    obj: Any
+    object: Any
     """
     The object checked.
     """
 
     def __call__(self) -> bool:
-        return isclass(self.obj)
+        return isclass(self.object)
 
     @classmethod
     def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
-        """:return: the clause *"<obj> is a class"* — a custom fragment because the name-based
+        """:return: the clause *"<object> is a class"* — a custom fragment because the name-based
         reading drops the complement's article (*"… is class"*)."""
         # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
@@ -1075,7 +1071,7 @@ class IsClass(Predicate):
             Noun,
         )
 
-        return clause(Noun(fields["obj"]), Copula(), Noun("class"))
+        return clause(Noun(fields["object"]), Copula(), Noun("class"))
 
 
 is_class = symbolic_callable_to_function(IsClass)
@@ -1087,13 +1083,13 @@ class RuntimeType(SymbolicFunction):
     The runtime class of an object, as a value operation.
     """
 
-    obj: Any
+    object: Any
     """
     The object whose runtime class is read.
     """
 
     def __call__(self) -> Type:
-        return self.obj.__class__
+        return self.object.__class__
 
     @classmethod
     def _verbalization_fragment_(cls, fields):
@@ -1105,6 +1101,8 @@ class RuntimeType(SymbolicFunction):
 
 
 type_ = symbolic_callable_to_function(RuntimeType)
+
+
 @symbolic_function
 def type_(obj: Any):
     """

@@ -469,8 +469,8 @@ class NotVerbalizablePredicateRule(PhraseRule):
     clause in *"not (...)"*. A clause with no verb or copula head has nothing to negate, so it falls
     back to the wrapped form.
 
-    >>> verbalize_expression(Not(IsReachable(variable(Location, []))))
-    'a Location is not reachable'
+    >>> verbalize_expression(Not(IsReachable(variable(Location, []), variable(Robot, []))))
+    'a Location is not reachable for a Robot'
     >>> employee, department = variable(StaffMember, []), variable(Department, [])
     >>> verbalize_expression(Not(WorksIn(employee, department)))
     'a StaffMember does not work in a Department'

@@ -180,7 +180,7 @@ class Employee:
 @dataclass(eq=False)
 class Location:
     """
-    A named place, used as the body of the :class:`IsReachable` predicate.
+    A named place, used as the location of the :class:`IsReachable` predicate.
     """
 
     name: str
@@ -192,12 +192,17 @@ class Location:
 @dataclass(eq=False)
 class IsReachable(Predicate):
     """
-    Single-field custom predicate: *"<body> is reachable"*.
+    Two-field custom predicate: *"<location> is reachable for <body>"*.
+    """
+
+    location: object
+    """
+    The place whose reachability is asserted.
     """
 
     body: object
     """
-    The thing whose reachability is asserted.
+    The entity the location must be reachable for.
     """
 
     def __call__(self):
@@ -207,7 +212,13 @@ class IsReachable(Predicate):
     def _verbalization_fragment_(
         cls, fields: Mapping[str, VerbalizationFragment]
     ) -> VerbalizationFragment:
-        return clause(Noun(fields["body"]), Copula(), Adjective("reachable"))
+        return clause(
+            Noun(fields["location"]),
+            Copula(),
+            Adjective("reachable"),
+            Prepositions.FOR,
+            Noun(fields["body"]),
+        )
 
 
 @dataclass(eq=False)

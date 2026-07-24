@@ -11,7 +11,7 @@ Scoped to a bare variable; an attribute-chain conjunction keeps its per-clause s
 from __future__ import annotations
 
 from krrood.entity_query_language.factories import and_, variable
-from krrood.entity_query_language.verbalization.example_domain import Robot
+from krrood.entity_query_language.verbalization._example_domain import Robot
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 
