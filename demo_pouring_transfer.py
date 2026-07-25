@@ -253,7 +253,12 @@ transfer_task = FillByTransferTask(
 )
 # Keep the liquid's projectile landing in the receiver so the optimizer repositions the gripper
 # upstream as the source tilts and the arc reaches forward.
-no_spill = KeepProjectileInReceiver(receiver=receiving_cup, source=source_cup)
+no_spill = KeepProjectileInReceiver(
+    receiver=receiving_cup,
+    source=source_cup,
+    weight=DefaultWeights.WEIGHT_MAX,
+    reference_velocity=0.1,
+)
 # Keep the pouring cup's rim (its lowest lip while tilting) above the receiving cup's rim, so the
 # rims never collide no matter how far the source tilts. ``minimum_clearance`` is a true rim-to-rim
 # gap: the task derives the lip from the live kinematics on Giskard's side, so it descends with the
