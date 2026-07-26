@@ -123,11 +123,11 @@ park_state = JointState.from_mapping(
         )
     }
 )
-# msc_park = MotionStatechart()
-# park_task = JointPositionList(goal_state=park_state)
-# msc_park.add_node(park_task)
-# msc_park.add_node(EndMotion.when_true(park_task))
-# giskard.execute(msc_park)
+msc_park = MotionStatechart()
+park_task = JointPositionList(goal_state=park_state)
+msc_park.add_node(park_task)
+msc_park.add_node(EndMotion.when_true(park_task))
+giskard.execute(msc_park)
 
 # ------ Move the left gripper to the upright carry pose ----
 left_tool_frame = world.get_body_by_name("l_gripper_tool_frame")
@@ -238,13 +238,24 @@ else:
 
 # time.sleep(0.2)
 
+# Declare the receiver's fill level as externally updatable, so perception can drive the belief
+# during the transfer: the Giskard server applies these updates mid-motion (see
+# WorldSynchronizer.apply_external_state_updates / the ApplyExternalStateUpdates control-loop
+# behavior). The flag travels with the object model to the server; the object does not exist at
+# server setup, so the client that adds it declares this.
+with world.modify_world():
+    receiver_fill_dof = world.get_degree_of_freedom_by_id(
+        receiving_cup.fill_connection.dof.id
+    )
+    world.set_dofs_allow_external_state_update([receiver_fill_dof], True)
+
 assert source_cup.fill_level == START_FILL
 assert receiving_cup.fill_level == 0.0
 
 # ----- Transfer -----
 goal_fill = GOAL_FILL_CONST
 tolerance = 0.05
-
+input("Press Enter to continue...")
 transfer_task = FillByTransferTask(
     receiver=receiving_cup,
     goal_value=goal_fill,
