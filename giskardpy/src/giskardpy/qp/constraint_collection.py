@@ -25,6 +25,8 @@ from giskardpy.qp.enforcement_strategy import (
     VelocityStrategy,
 )
 from giskardpy.qp.terminal_state_prediction_strategy import (
+    TerminalSpillPredictionConstraint,
+    TerminalSpillPredictionStrategy,
     TerminalStatePredictionStrategy,
     TerminalStatePredictionConstraint,
 )
@@ -348,5 +350,42 @@ class ConstraintCollection:
             linear_weight=0,
             state_variable=state_variable,
             goal_value=goal_value,
+        )
+        self.add_constraint(constraint)
+
+    def add_terminal_spill_prediction_constraint(
+        self,
+        spill_rate: sm.SymbolicScalar,
+        spill_tolerance: float,
+        quadratic_weight: sm.ScalarData,
+        reference_velocity: sm.ScalarData,
+        name: Optional[str] = None,
+    ) -> None:
+        """
+        Add a horizon-predictive upper bound on an accumulating non-negative rate.
+
+        At each QP solve the constraint predicts how much ``spill_rate`` will accumulate over the
+        control horizon — by linearizing it at the current operating point and unrolling the
+        discrete recursion — and keeps that prediction at or below ``spill_tolerance``.  Because the
+        rate's symbolic dependence on the joint variables couples earlier velocity decisions to a
+        larger share of the predicted accumulation, the optimizer eases off the motion that drives
+        the rate up (e.g. the cup tilt) before the accumulation is spent, rather than reacting once
+        it has already occurred.
+
+        :param spill_rate: Symbolic instantaneous rate f(q₀) at the current operating point; its
+            jacobian w.r.t. the joint variables drives the prediction.
+        :param spill_tolerance: Upper bound on the accumulation predicted over the control horizon.
+        :param quadratic_weight: Cost weight for violating the bound.
+        :param reference_velocity: Expected rate scale; used for normalization and bound capping.
+        :param name: Optional constraint name for debugging.
+        """
+        constraint = TerminalSpillPredictionConstraint(
+            name=name,
+            expression=spill_rate,
+            normalization_factor=reference_velocity,
+            quadratic_weight=quadratic_weight,
+            enforcement_strategy=TerminalSpillPredictionStrategy,
+            linear_weight=0,
+            spill_tolerance=spill_tolerance,
         )
         self.add_constraint(constraint)

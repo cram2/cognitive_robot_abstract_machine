@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import ClassVar, Optional
 
 import krrood.symbolic_math.symbolic_math as sm
-from krrood.symbolic_math.symbolic_math import Scalar
+from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
@@ -375,3 +375,91 @@ class KeepSourceRimAboveReceiverRim(Task):
             sm.if_greater_eq(clearance, self.minimum_clearance, 1, 0),
         )
         return artifacts
+
+
+@dataclass(eq=False, repr=False)
+class PredictedSpillConstraint(Task):
+    """
+    Keeps the pour spill-aware by capping the spill the MPC predicts over the control horizon.
+
+    The spill rate is the source's ungated outflow that misses the receiver, ``ungated_outflow ·
+    (1 − gate)``: liquid the tilted cup physically pours while the transfer gate is closed.  The
+    constraint predicts how much of it accumulates over the horizon and bounds it, so when the aim
+    cannot keep the gate open the optimizer eases off the tilt (reducing the pour head) instead of
+    pouring liquid that will miss.
+
+    **Why the gate is detached from the gradient**
+
+    The missed fraction ``1 − gate`` enters the constraint as a per-tick constant (a
+    :class:`float_variable` refreshed in :meth:`on_tick`), not as a differentiable function of the
+    joints.  Aiming is already owned by :class:`KeepProjectileInReceiver`; if the gate were left
+    differentiable here the optimizer would cut the predicted spill the cheapest way — by swinging the
+    sharp landing gate, i.e. driving the source further over the receiver — which *worsens* the
+    rim collision.  Detaching the gate leaves reducing the pour head (hence the tilt) as the only way
+    to satisfy the cap, so the spill awareness routes to the tilt and never to a hover over the cup.
+    """
+
+    receiver: HasFillLevel
+    """The container the liquid must land in; must already be coupled via ``receive_outflow_from``."""
+
+    source: HasFillLevel
+    """The pouring source whose ungated outflow is measured against the gate."""
+
+    spill_tolerance: float = field(default=0.02, kw_only=True)
+    """Upper bound on the spilled fill fraction predicted to accumulate over the control horizon."""
+
+    reference_velocity: float = field(default=0.05, kw_only=True)
+    """Spill-rate scale (normalized fill per second) normalizing the cap and its per-solve correction."""
+
+    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
+    """QP constraint weight for the spill cap."""
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        """
+        Creates the horizon-predictive spill cap over the source's ungated-but-missed outflow.
+
+        :param context: The build context.
+        :return: The generated task artifacts.
+        """
+        artifacts = NodeArtifacts()
+        self.receiver.ensure_inflow_coupling(context.world)
+        inflow_equation = self.receiver.fill_connection.inflow_equation
+        if inflow_equation is None:
+            raise NodeInitializationError(
+                self, "receiver has no inflow equation; call receive_outflow_from first"
+            )
+        self._gate_expression = inflow_equation.gate
+        self._missed_fraction = FloatVariable(f"{self.name}_missed_fraction")
+        context.float_variable_data.register_expression(self._missed_fraction)
+        context.float_variable_data.set_value(
+            self._missed_fraction, self._current_missed_fraction()
+        )
+        ungated_outflow = self.source.ungated_outflow_rate(context.world)
+        spill_rate = ungated_outflow * self._missed_fraction
+        artifacts.constraints.add_terminal_spill_prediction_constraint(
+            spill_rate=spill_rate,
+            spill_tolerance=self.spill_tolerance,
+            quadratic_weight=self.weight,
+            reference_velocity=self.reference_velocity,
+            name=f"{self.name}_spill",
+        )
+        artifacts.observation = Scalar.const_true()
+        return artifacts
+
+    def on_tick(
+        self, context: MotionStatechartContext
+    ) -> Optional[ObservationStateValues]:
+        """
+        Refreshes the detached missed-aim fraction from the live gate.
+
+        :param context: The runtime context.
+        :return: ``None``; the cap is a guard and never reports success on its own.
+        """
+        context.float_variable_data.set_value(
+            self._missed_fraction, self._current_missed_fraction()
+        )
+        return None
+
+    def _current_missed_fraction(self) -> float:
+        """The fraction of the current pour that misses the receiver, ``1 − gate``."""
+        return 1.0 - float(self._gate_expression.evaluate()[0])
