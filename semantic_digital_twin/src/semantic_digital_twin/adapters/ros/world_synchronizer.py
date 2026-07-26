@@ -574,6 +574,73 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         for message in pending_messages:
             self.acknowledge_message(message)
 
+    def _externally_updatable_dof_ids(self) -> Set[UUID]:
+        """Ids of DOFs the world model flags as externally updatable.
+
+        The flag lives on the model (:attr:`DegreeOfFreedom.allows_external_state_update`) and is set
+        by whoever adds the object, so it syncs to this world automatically — no separate
+        registration step is needed.
+        """
+        return {
+            dof.id
+            for dof in self._world.degrees_of_freedom
+            if dof.allows_external_state_update
+        }
+
+    def apply_external_state_updates(self) -> None:
+        """Apply buffered state for externally-updatable DOFs only, deferring everything else.
+
+        For each buffered update, the state entries whose DOF is flagged
+        :attr:`DegreeOfFreedom.allows_external_state_update` are applied immediately; model
+        modifications and other state entries stay buffered for the next
+        :meth:`apply_missed_messages`. This is the live external-input path: safe to call every
+        control cycle during a motion, because it never applies a model change (which would
+        invalidate the compiled controller) and never overwrites a DOF the controller owns.
+        """
+        externally_updatable = self._externally_updatable_dof_ids()
+        if not externally_updatable:
+            return
+        registered_ids: List[UUID] = []
+        registered_states: List[float] = []
+        remaining_messages: List[WorldUpdate] = []
+        for message in self.missed_messages:
+            state_update = message.state_update
+            if state_update is None:
+                remaining_messages.append(message)
+                continue
+            deferred_ids: List[UUID] = []
+            deferred_states: List[float] = []
+            for identifier, value in zip(state_update.ids, state_update.states):
+                if identifier in externally_updatable:
+                    registered_ids.append(identifier)
+                    registered_states.append(value)
+                else:
+                    deferred_ids.append(identifier)
+                    deferred_states.append(value)
+            message.state_update = (
+                WorldStateUpdate(
+                    meta_data=state_update.meta_data,
+                    ids=deferred_ids,
+                    states=deferred_states,
+                )
+                if deferred_ids
+                else None
+            )
+            if (
+                message.modification_block is not None
+                or message.state_update is not None
+            ):
+                remaining_messages.append(message)
+        self.missed_messages = remaining_messages
+        if registered_ids:
+            self._apply_state(
+                WorldStateUpdate(
+                    meta_data=self.meta_data,
+                    ids=registered_ids,
+                    states=registered_states,
+                )
+            )
+
     def resume(self):
         """Resume publishing and subscribing. Missed messages are NOT applied automatically."""
         super().resume()

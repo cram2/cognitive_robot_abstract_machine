@@ -142,11 +142,21 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     """
     Whether this DOF is linked to a controller and can therefore respond to control commands.
 
-    E.g. the caster wheels of a PR2 have dofs, but they are not directly controlled. 
+    E.g. the caster wheels of a PR2 have dofs, but they are not directly controlled.
     Instead a the omni drive connection is directly controlled and a low level controller translates these commands
     to commands for the caster wheels.
 
     A door hinge also has a dof that cannot be controlled.
+    """
+
+    allows_external_state_update: bool = False
+    """
+    Whether this DOF's state may be overwritten from an external source (e.g. perception) while a
+    motion is running, rather than being owned by the controller.
+
+    Declared by whoever adds the object to the world (not known at server setup). The world
+    synchronizer applies buffered external updates only to DOFs with this flag set; see
+    :meth:`semantic_digital_twin.adapters.ros.world_synchronizer.WorldSynchronizer.apply_external_state_updates`.
     """
 
     def __post_init__(self):
@@ -189,6 +199,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
             "upper_limits": to_json(self.limits.upper),
             "name": to_json(self.name),
             "has_hardware_interface": self.has_hardware_interface,
+            "allows_external_state_update": self.allows_external_state_update,
         }
 
     @classmethod
@@ -202,6 +213,9 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
             limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
             id=uuid,
             has_hardware_interface=data["has_hardware_interface"],
+            allows_external_state_update=data.get(
+                "allows_external_state_update", False
+            ),
         )
         tracker.add_world_entity_with_id(self)
         return self
@@ -213,6 +227,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
             ),
             name=deepcopy(self.name),
             has_hardware_interface=self.has_hardware_interface,
+            allows_external_state_update=self.allows_external_state_update,
             id=self.id,
         )
         result._world = self._world

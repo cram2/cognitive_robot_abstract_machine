@@ -467,6 +467,84 @@ def test_callback_pausing(rclpy_node):
     assert len(w2.connections) == 1
 
 
+def test_registered_external_state_dof_applies_while_paused(rclpy_node):
+    """A DOF registered as externally driven is applied by ``apply_external_state_updates`` even
+    while the synchronizer is paused, while an unregistered DOF from the same update stays deferred.
+
+    This is the mechanism that lets perception (or any external sensor) write a passive DOF into the
+    server world *during* a running motion, without accepting stale overwrites of the DOFs the
+    controller owns. The deferred DOF must still be delivered by the normal between-goals drain.
+    """
+    producer_world = create_dummy_world()
+    server_world = create_dummy_world()
+
+    producer_synchronizer = WorldSynchronizer(node=rclpy_node, _world=producer_world)
+    server_synchronizer = WorldSynchronizer(node=rclpy_node, _world=server_world)
+    server_synchronizer.pause()
+
+    time.sleep(0.2)
+
+    externally_driven_dof = server_world.get_degree_of_freedom_by_name("x").id
+    unregistered_dof = server_world.get_degree_of_freedom_by_name("y").id
+    server_world.get_degree_of_freedom_by_name("x").allows_external_state_update = True
+
+    producer_world.state[externally_driven_dof].position = 0.7
+    producer_world.state[unregistered_dof].position = 0.4
+    producer_world.notify_state_change()
+
+    assert wait_for_condition(lambda: len(server_synchronizer.missed_messages) >= 1)
+
+    server_synchronizer.apply_external_state_updates()
+    assert server_world.state[externally_driven_dof].position == 0.7
+    assert server_world.state[unregistered_dof].position == 0.0
+
+    server_synchronizer.apply_missed_messages()
+    assert server_world.state[unregistered_dof].position == 0.4
+
+    producer_synchronizer.close()
+    server_synchronizer.close()
+
+
+def test_apply_external_state_updates_defers_model_changes(rclpy_node):
+    """``apply_external_state_updates`` never applies a buffered model change while paused.
+
+    Model updates recompile the world structure and would invalidate the compiled controller, so
+    they must stay deferred to the between-goals drain even when external state input is live.
+    """
+    producer_world = create_dummy_world()
+    server_world = create_dummy_world()
+
+    producer_synchronizer = WorldSynchronizer(node=rclpy_node, _world=producer_world)
+    server_synchronizer = WorldSynchronizer(node=rclpy_node, _world=server_world)
+    server_synchronizer.pause()
+
+    time.sleep(0.2)
+
+    # Flag a DOF so the live path actually runs its drain body rather than returning early.
+    server_world.get_degree_of_freedom_by_name("x").allows_external_state_update = True
+
+    with producer_world.modify_world():
+        new_body = Body(name=PrefixedName("b3"))
+        producer_world.add_body(new_body)
+        producer_world.add_connection(
+            FixedConnection(
+                parent=producer_world.get_kinematic_structure_entity_by_name("b2"),
+                child=new_body,
+            )
+        )
+
+    assert wait_for_condition(lambda: len(server_synchronizer.missed_messages) >= 1)
+
+    server_synchronizer.apply_external_state_updates()
+    assert len(server_world.kinematic_structure_entities) == 2
+
+    server_synchronizer.apply_missed_messages()
+    assert len(server_world.kinematic_structure_entities) == 3
+
+    producer_synchronizer.close()
+    server_synchronizer.close()
+
+
 def test_ChangeDifHasHardwareInterface(rclpy_node):
     w1 = World(name="w1")
     w2 = World(name="w2")
@@ -515,6 +593,47 @@ def test_ChangeDifHasHardwareInterface(rclpy_node):
         assert w1.connections[0].dof.has_hardware_interface
         assert w2.connections[0].dof.has_hardware_interface
 
+    finally:
+        synchronizer_1.close()
+        synchronizer_2.close()
+
+
+def test_allow_external_state_update_flag_syncs(rclpy_node):
+    """Setting ``allows_external_state_update`` in a modify_world block propagates to other worlds.
+
+    This is what lets the client (which adds the object) declare the flag and have the Giskard server
+    learn it; without a synchronized modification the flag stays local and the server never applies
+    external updates for that DOF.
+    """
+    w1 = World(name="w1")
+    w2 = World(name="w2")
+
+    synchronizer_1 = WorldSynchronizer(node=rclpy_node, _world=w1)
+    synchronizer_2 = WorldSynchronizer(node=rclpy_node, _world=w2)
+
+    try:
+        with w1.modify_world():
+            body1 = Body(name=PrefixedName("b1"))
+            body2 = Body(name=PrefixedName("b2"))
+            w1.add_kinematic_structure_entity(body1)
+            w1.add_kinematic_structure_entity(body2)
+            dof = DegreeOfFreedom(name=PrefixedName("dof"))
+            w1.add_degree_of_freedom(dof)
+            connection = PrismaticConnection(
+                raw_dof=dof, parent=body1, child=body2, axis=Vector3(1, 1, 1)
+            )
+            w1.add_connection(connection)
+
+        wait_for_sync_kse_and_return_ids(w1, w2)
+        time.sleep(0.2)
+        assert not w2.connections[0].dof.allows_external_state_update
+
+        with w1.modify_world():
+            w1.set_dofs_allow_external_state_update(w1.degrees_of_freedom, True)
+
+        time.sleep(0.2)
+        assert w1.connections[0].dof.allows_external_state_update
+        assert w2.connections[0].dof.allows_external_state_update
     finally:
         synchronizer_1.close()
         synchronizer_2.close()

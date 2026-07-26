@@ -11225,6 +11225,9 @@ class DegreeOfFreedomDAO(
     has_hardware_interface: Mapped[builtins.bool] = mapped_column(
         use_existing_column=True
     )
+    allows_external_state_update: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
 
     limits_id: Mapped[int] = mapped_column(
         ForeignKey("DegreeOfFreedomLimits_floatDAO.database_id", use_alter=True),
@@ -21626,6 +21629,33 @@ class RemoveSemanticAnnotationModificationDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "RemoveSemanticAnnotationModificationDAO",
+        "inherit_condition": database_id == WorldModificationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class SetDofAllowExternalStateUpdateDAO(
+    WorldModificationDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.world_modification.SetDofAllowExternalStateUpdate
+    ],
+):
+    __tablename__ = "SetDofAllowExternalStateUpdateDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldModificationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    value: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+
+    degree_of_freedom_ids: Mapped[typing.List[uuid.UUID]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SetDofAllowExternalStateUpdateDAO",
         "inherit_condition": database_id == WorldModificationDAO.database_id,
         "polymorphic_load": "selectin",
     }

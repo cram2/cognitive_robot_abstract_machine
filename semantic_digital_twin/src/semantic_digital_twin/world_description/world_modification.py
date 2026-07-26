@@ -440,6 +440,42 @@ class SetDofHasHardwareInterface(WorldModification):
 
 
 @dataclass
+class SetDofAllowExternalStateUpdate(WorldModification):
+    degree_of_freedom_ids: List[UUID]
+    value: bool
+
+    def apply(self, world: World):
+        for dof_id in self.degree_of_freedom_ids:
+            world.get_degree_of_freedom_by_id(dof_id).allows_external_state_update = (
+                self.value
+            )
+
+    @classmethod
+    def from_kwargs(cls, kwargs: Dict[str, Any]) -> Self:
+        dofs = kwargs["dofs"]
+        degree_of_freedom_ids = [dof.id for dof in dofs]
+        return cls(degree_of_freedom_ids=degree_of_freedom_ids, value=kwargs["value"])
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "degree_of_freedom_ids": [
+                to_json(dof_id) for dof_id in self.degree_of_freedom_ids
+            ],
+            "value": self.value,
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(
+            degree_of_freedom_ids=[
+                from_json(_id) for _id in data["degree_of_freedom_ids"]
+            ],
+            value=data["value"],
+        )
+
+
+@dataclass
 class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
     """
     An update to one or more attributes of an entity in the world.
