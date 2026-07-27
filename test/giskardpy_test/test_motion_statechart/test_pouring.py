@@ -273,6 +273,121 @@ def tracy_transfer_world(tracy_pouring_world):
     return world, source_cup, receiving_cup, left_tool_frame
 
 
+@dataclass
+class TransferMotion:
+    """
+    A built liquid-transfer motion together with the entities its tasks act on.
+
+    Bundles what a transfer test needs to run the motion and observe the cups, so the tests that
+    exercise different weightings of the same motion share one construction path.
+    """
+
+    world: World
+    """The world the motion is built against."""
+
+    source_cup: PourableContainer
+    """The cup being poured from."""
+
+    receiving_cup: PourableContainer
+    """The cup being poured into."""
+
+    transfer_task: PouringTask
+    """The fill-driving task, whose tick hook the clearance recorder wraps."""
+
+    motion_statechart: MotionStatechart
+    """The statechart executing the transfer."""
+
+    def record_rim_clearance(self) -> list[float]:
+        """
+        Start recording the source-lip-above-receiver-rim clearance on every transfer tick.
+
+        :return: The list the clearance samples are appended to as the motion runs.
+        """
+        source_lip = self.source_cup.liquid_exit_point(self.world)
+        receiver_rim = (
+            self.world.compose_forward_kinematics_expression(
+                self.world.root, self.receiving_cup.root
+            )
+            @ self.receiving_cup.rim_point()
+        )
+        clearance_history: list[float] = []
+        original_on_tick = self.transfer_task.on_tick
+
+        def recording_on_tick(context):
+            clearance_history.append(
+                float(source_lip.z.evaluate()[0] - receiver_rim.z.evaluate()[0])
+            )
+            return original_on_tick(context)
+
+        self.transfer_task.on_tick = recording_on_tick
+        return clearance_history
+
+    def execute(self) -> None:
+        """Run the transfer to completion in simulation."""
+        executor = Executor(
+            _pouring_context(self.world), pacer=SimulationPacer(real_time_factor=1)
+        )
+        executor.compile(motion_statechart=self.motion_statechart)
+        executor.tick_until_end(timeout=4000)
+
+
+def _build_transfer_motion(
+    tracy_transfer_world,
+    minimum_clearance: float = 0.05,
+    no_spill_weight: float = DefaultWeights.WEIGHT_ABOVE_CA,
+    no_spill_reference_velocity: float = 0.2,
+) -> TransferMotion:
+    """
+    Build the cup-to-cup transfer motion used by the rim-clearance tests.
+
+    :param tracy_transfer_world: The transfer world fixture value.
+    :param minimum_clearance: Rim-to-rim clearance floor handed to the clearance task.
+    :param no_spill_weight: Weight of the competing pour-aiming task.
+    :param no_spill_reference_velocity: Reference velocity of the competing pour-aiming task.
+    :return: The built motion.
+    """
+    from giskardpy.motion_statechart.tasks.pouring import (
+        FillByTransferTask,
+        KeepProjectileInReceiver,
+        KeepSourceRimAboveReceiverRim,
+    )
+
+    world, source_cup, receiving_cup, left_tool_frame = tracy_transfer_world
+
+    transfer_task = FillByTransferTask(
+        receiver=receiving_cup,
+        goal_value=0.7,
+        fill_level_tolerance=0.05,
+        reference_velocity=0.03,
+    )
+    no_spill = KeepProjectileInReceiver(
+        receiver=receiving_cup,
+        source=source_cup,
+        weight=no_spill_weight,
+        reference_velocity=no_spill_reference_velocity,
+    )
+    keep_above = KeepSourceRimAboveReceiverRim(
+        receiver=receiving_cup, source=source_cup, minimum_clearance=minimum_clearance
+    )
+    keep_plane = AlignPlanes(
+        root_link=world.root,
+        tip_link=left_tool_frame,
+        goal_normal=Vector3.X(reference_frame=world.root),
+        tip_normal=Vector3.Z(reference_frame=left_tool_frame),
+    )
+    motion = Parallel([transfer_task, no_spill, keep_above, keep_plane])
+    msc_transfer = MotionStatechart()
+    msc_transfer.add_node(motion)
+    msc_transfer.add_node(EndMotion.when_true(motion))
+    return TransferMotion(
+        world=world,
+        source_cup=source_cup,
+        receiving_cup=receiving_cup,
+        transfer_task=transfer_task,
+        motion_statechart=msc_transfer,
+    )
+
+
 def _tick_with_perception_correction(
     executor: Executor,
     world: "World",
@@ -771,37 +886,6 @@ class TestRimClearanceDuringTransfer:
     collide however far the source tilts, and the motion statechart stays serializable.
     """
 
-    def _build_transfer(self, tracy_transfer_world):
-        from giskardpy.motion_statechart.tasks.pouring import (
-            FillByTransferTask,
-            KeepProjectileInReceiver,
-            KeepSourceRimAboveReceiverRim,
-        )
-
-        world, source_cup, receiving_cup, left_tool_frame = tracy_transfer_world
-
-        transfer_task = FillByTransferTask(
-            receiver=receiving_cup,
-            goal_value=0.7,
-            fill_level_tolerance=0.05,
-            reference_velocity=0.03,
-        )
-        no_spill = KeepProjectileInReceiver(receiver=receiving_cup, source=source_cup)
-        keep_above = KeepSourceRimAboveReceiverRim(
-            receiver=receiving_cup, source=source_cup, minimum_clearance=0.05
-        )
-        keep_plane = AlignPlanes(
-            root_link=world.root,
-            tip_link=left_tool_frame,
-            goal_normal=Vector3.X(reference_frame=world.root),
-            tip_normal=Vector3.Z(reference_frame=left_tool_frame),
-        )
-        motion = Parallel([transfer_task, no_spill, keep_above, keep_plane])
-        msc_transfer = MotionStatechart()
-        msc_transfer.add_node(motion)
-        msc_transfer.add_node(EndMotion.when_true(motion))
-        return world, source_cup, receiving_cup, transfer_task, msc_transfer
-
     def test_transfer_motion_is_json_serializable(self, tracy_transfer_world):
         """
         The transfer motion statechart serializes to JSON, as the standalone demo requires when
@@ -809,45 +893,94 @@ class TestRimClearanceDuringTransfer:
         """
         import json
 
-        _, _, _, _, msc_transfer = self._build_transfer(tracy_transfer_world)
+        transfer = _build_transfer_motion(tracy_transfer_world)
 
-        json.dumps(msc_transfer.to_json())
+        json.dumps(transfer.motion_statechart.to_json())
 
     def test_pouring_lip_stays_above_receiver_rim(self, tracy_transfer_world):
         """
         The rim clearance stays positive for the whole pour, without a hand-tuned origin offset.
         """
-        world, source_cup, receiving_cup, transfer_task, msc_transfer = (
-            self._build_transfer(tracy_transfer_world)
-        )
+        transfer = _build_transfer_motion(tracy_transfer_world)
+        clearance_history = transfer.record_rim_clearance()
 
-        source_lip = source_cup.liquid_exit_point(world)
-        receiver_rim = (
-            world.compose_forward_kinematics_expression(world.root, receiving_cup.root)
-            @ receiving_cup.rim_point()
-        )
-        clearance_history: list[float] = []
-        original_on_tick = transfer_task.on_tick
+        transfer.execute()
 
-        def recording_on_tick(context):
-            clearance_history.append(
-                float(source_lip.z.evaluate()[0] - receiver_rim.z.evaluate()[0])
-            )
-            return original_on_tick(context)
-
-        transfer_task.on_tick = recording_on_tick
-
-        transfer_executor = Executor(
-            _pouring_context(world), pacer=SimulationPacer(real_time_factor=1)
-        )
-        transfer_executor.compile(motion_statechart=msc_transfer)
-        transfer_executor.tick_until_end(timeout=4000)
-
+        transfer_task = transfer.transfer_task
         assert transfer_task.observation_state == ObservationStateValues.TRUE
         assert clearance_history, "transfer never ticked"
         assert min(clearance_history) > 0.0, (
             "the pouring lip dropped to or below the receiver rim: "
             f"minimum clearance was {min(clearance_history):.3f} m"
+        )
+
+
+class TestClearanceBandStaysAboveTheRim:
+    """
+    The clearance band of
+    :class:`~giskardpy.motion_statechart.tasks.pouring.KeepSourceRimAboveReceiverRim` describes
+    where the pouring lip is held, and the optimizer tracks it only to within a slack tolerance.
+    A band reaching down to the rim therefore lets the lip settle below the rim, so the task
+    rejects one instead of accepting a physically impossible pour.
+    """
+
+    def test_band_reaching_down_to_the_rim_is_rejected(self, tracy_transfer_world):
+        """
+        A zero clearance floor asks for the rims to touch, which the soft bound turns into the rims
+        crossing, so building the task raises rather than accepting it.
+        """
+        from giskardpy.motion_statechart.tasks.pouring import (
+            KeepSourceRimAboveReceiverRim,
+        )
+
+        world, source_cup, receiving_cup, _left_tool_frame = tracy_transfer_world
+        keep_above = KeepSourceRimAboveReceiverRim(
+            receiver=receiving_cup, source=source_cup, minimum_clearance=0.0
+        )
+
+        with pytest.raises(NodeInitializationError):
+            keep_above.build(MotionStatechartContext(world=world))
+
+    def test_band_is_derived_from_the_configured_width(self, tracy_transfer_world):
+        """
+        The band's upper end follows :attr:`clearance_band` above the floor, so callers configure
+        one width instead of two absolute heights that could be ordered wrongly.
+        """
+        from giskardpy.motion_statechart.tasks.pouring import (
+            KeepSourceRimAboveReceiverRim,
+        )
+
+        _world, source_cup, receiving_cup, _left_tool_frame = tracy_transfer_world
+        keep_above = KeepSourceRimAboveReceiverRim(
+            receiver=receiving_cup,
+            source=source_cup,
+            minimum_clearance=0.1,
+            clearance_band=0.04,
+        )
+
+        assert keep_above.maximum_clearance == pytest.approx(0.14)
+
+    def test_rims_do_not_cross_when_aiming_outweighs_the_clearance(
+        self, tracy_transfer_world
+    ):
+        """
+        With the pour-aiming task at maximum weight, as the standalone demo configures it, the
+        pouring lip still never reaches the receiver rim.
+        """
+        transfer = _build_transfer_motion(
+            tracy_transfer_world,
+            minimum_clearance=0.05,
+            no_spill_weight=DefaultWeights.WEIGHT_MAX,
+            no_spill_reference_velocity=0.1,
+        )
+        clearance_history = transfer.record_rim_clearance()
+
+        transfer.execute()
+
+        assert clearance_history, "transfer never ticked"
+        assert min(clearance_history) > 0.0, (
+            "the pouring lip reached the receiver rim: minimum clearance was "
+            f"{min(clearance_history):.4f} m"
         )
 
 
@@ -1026,3 +1159,4 @@ class TestPerceptionCorrectedTransfer:
             f"receiver fill {receiving_cup.fill_level:.3f} too far below goal {goal_fill} "
             f"(sigma={sigma}, perception_hz={perception_hz} Hz)"
         )
+

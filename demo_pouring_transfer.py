@@ -7,7 +7,10 @@ import math
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 
+from collision_checking.collision_rules import AllowAllCollisions, AvoidCollisionBetweenGroups, AvoidSelfCollisions
 from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.goals.collision_avoidance import UpdateTemporaryCollisionRules, \
+    ExternalCollisionAvoidance, SelfCollisionAvoidance
 from giskardpy.motion_statechart.goals.templates import Parallel
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
@@ -16,6 +19,8 @@ from giskardpy.motion_statechart.tasks.pouring import (
     KeepProjectileInReceiver,
     KeepSourceRimAboveReceiverRim,
 )
+from robots.robot_parts import AbstractRobot
+from robots.tracy import Tracy
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.joint_state import JointState
 from giskardpy.motion_statechart.graph_node import EndMotion
@@ -48,7 +53,7 @@ _JEROEN_CUP_STL = str(
     / "jeroen_cup.stl"
 )
 _JEROEN_CUP_SCALE = Scale(1, 1, 1)
-_TABLE_SURFACE_Z = 0.9
+_TABLE_SURFACE_Z = 0.875 + 0.1
 IS_SIM = False
 
 # START_FILL = 0.8
@@ -89,7 +94,7 @@ thread.start()
 
 
 giskard = GiskardWrapper(rclpy_node)
-
+robot = giskard.robot
 world = giskard.world
 print(f"world root: {world.root.name.name}")
 
@@ -123,11 +128,11 @@ park_state = JointState.from_mapping(
         )
     }
 )
-msc_park = MotionStatechart()
-park_task = JointPositionList(goal_state=park_state)
-msc_park.add_node(park_task)
-msc_park.add_node(EndMotion.when_true(park_task))
-giskard.execute(msc_park)
+# msc_park = MotionStatechart()
+# park_task = JointPositionList(goal_state=park_state)
+# msc_park.add_node(park_task)
+# msc_park.add_node(EndMotion.when_true(park_task))
+# giskard.execute(msc_park)
 
 # ------ Move the left gripper to the upright carry pose ----
 left_tool_frame = world.get_body_by_name("l_gripper_tool_frame")
@@ -207,6 +212,7 @@ else:
         world=world,
         initial_fill=START_FILL,
         outflow_rate_constant=0.8,
+        discharge_coefficient=0.2
     )
 
     # ----- Place the receiving cup on the table -----
@@ -220,7 +226,7 @@ else:
                 receiving_cup_body,
                 name=PrefixedName("table_T_receiving_cup"),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    1.0, 0.1, _TABLE_SURFACE_Z
+                    1.0, 0.099, _TABLE_SURFACE_Z
                 ),
             )
         )
@@ -277,7 +283,8 @@ no_spill = KeepProjectileInReceiver(
 keep_above = KeepSourceRimAboveReceiverRim(
     receiver=receiving_cup,
     source=source_cup,
-    minimum_clearance=0.05,
+    minimum_clearance=0.08,
+    clearance_band=0.05,
     weight=DefaultWeights.WEIGHT_ABOVE_CA,
 )
 keep_plane = AlignPlanes(
@@ -286,14 +293,19 @@ keep_plane = AlignPlanes(
     goal_normal=Vector3.X(reference_frame=world.root),
     tip_normal=Vector3.Z(reference_frame=left_tool_frame),
 )
-motion = Parallel([transfer_task, no_spill, keep_above, keep_plane])
+motion = Parallel([no_spill, keep_above, keep_plane])
 msc_transfer = MotionStatechart()
 msc_transfer.add_node(motion)
 msc_transfer.add_node(EndMotion.when_true(motion))
-
-print("Start transfer.")
-
 giskard.execute(msc_transfer)
+
+extended_motion = Parallel([transfer_task, no_spill, keep_above, keep_plane])
+msc = MotionStatechart()
+msc.add_node(extended_motion)
+msc.add_node(EndMotion.when_true(extended_motion))
+print("Start transfer.")
+giskard.execute(msc)
+
 
 # ``giskard.execute`` returns on the action result, but the final fill levels are synchronized
 # back from the Giskard process asynchronously. Wait until the receiver's fill reflects the

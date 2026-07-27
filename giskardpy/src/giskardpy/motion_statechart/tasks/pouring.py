@@ -331,12 +331,20 @@ class KeepSourceRimAboveReceiverRim(Task):
     """The pouring source whose rim must stay above the receiver's rim."""
 
     minimum_clearance: float = field(default=0.05, kw_only=True)
-    """Lower bound on the source-lip-above-receiver-rim clearance, in metres."""
+    """Lower bound on the source-lip-above-receiver-rim clearance, in metres.
+
+    Must be positive: a band reaching down to zero would ask the optimizer to hold the rims in
+    contact, and since the bound is enforced softly the lip would settle below the receiver rim.
+    Choose it above the clearance the optimizer actually tracks, not at the collision limit.
+    """
 
     clearance_band: float = field(default=0.05, kw_only=True)
     """Width of the clearance band above :attr:`minimum_clearance`, in metres.
 
-    A band, rather than a one-sided lower bound, keeps the optimization well-conditioned.
+    A band, rather than a one-sided lower bound, keeps the optimization well-conditioned: it is the
+    only constraint pinning the source's vertical position, because the landing point that
+    :class:`KeepProjectileInReceiver` aims lies in the receiver's opening plane by construction and
+    so carries no vertical error.
     """
 
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
@@ -345,13 +353,26 @@ class KeepSourceRimAboveReceiverRim(Task):
     maximum_velocity: float = field(default=0.2, kw_only=True)
     """Maximum allowed vertical speed for the clearance motion, in metres per second."""
 
+    @property
+    def maximum_clearance(self) -> float:
+        """Upper end of the clearance band, in metres."""
+        return self.minimum_clearance + self.clearance_band
+
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
         Creates the constraint keeping the source's pouring lip above the receiver's rim.
 
         :param context: The build context.
         :return: The generated task artifacts.
+        :raises NodeInitializationError: if the clearance band is not entirely above the rim, which
+            would describe a physically impossible pour.
         """
+        if self.minimum_clearance <= 0.0:
+            raise NodeInitializationError(
+                self,
+                f"minimum_clearance must be positive to keep the rims apart, got "
+                f"{self.minimum_clearance}",
+            )
         artifacts = NodeArtifacts()
         source_lip = self.source.liquid_exit_point(context.world)
         receiver_rim = (
@@ -361,17 +382,16 @@ class KeepSourceRimAboveReceiverRim(Task):
             @ self.receiver.rim_point()
         )
         clearance = (source_lip - receiver_rim) @ Vector3.Z()
-        upper_limit = self.minimum_clearance + self.clearance_band
         artifacts.constraints.add_inequality_constraint(
             reference_velocity=self.maximum_velocity,
-            upper_error=upper_limit - clearance,
             lower_error=self.minimum_clearance - clearance,
+            upper_error=self.maximum_clearance - clearance,
             quadratic_weight=self.weight,
             task_expression=clearance,
             name=f"{self.name}_clearance",
         )
         artifacts.observation = sm.logic_and(
-            sm.if_less_eq(clearance, upper_limit, 1, 0),
+            sm.if_less_eq(clearance, self.maximum_clearance, 1, 0),
             sm.if_greater_eq(clearance, self.minimum_clearance, 1, 0),
         )
         return artifacts
