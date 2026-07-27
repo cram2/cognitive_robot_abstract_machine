@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Optional, Type
+from typing_extensions import List, Optional, Type
 
 from experiments.confidence_aware_eql.engine.circuit_model import (
     fit_gaussian_mixture_circuit,
@@ -13,35 +13,39 @@ from experiments.confidence_aware_eql.engine.threshold import (
     FamiliarityThreshold,
     PercentileThreshold,
 )
-from experiments.confidence_aware_eql.engine.training import TrainingDataGenerator
+from experiments.confidence_aware_eql.engine.training import (
+    FamiliarCluster,
+    TrainingDataGenerator,
+)
 
 
 @dataclass
 class ConfidenceModelBuilder:
     """
-    Assembles a confidence-aware evaluator from a set of cluster prototypes.
+    Assembles a confidence-aware evaluator from a set of familiar clusters.
 
     The builder derives the feature schema from the instance class, generates familiar
-    training instances from the prototypes, fits a mixture circuit on them, and
-    calibrates the familiarity threshold on the training log-likelihoods.
+    training instances from the clusters through the generative backend of the query
+    language, fits a mixture circuit on them, and calibrates the familiarity threshold
+    on the training log-likelihoods.
     """
 
     instance_class: Type
     """The dataclass whose instances the evaluator will score."""
 
-    generator: TrainingDataGenerator
+    clusters: List[FamiliarCluster]
     """
-    The source of familiar training instances.
+    The clusters of familiar instances the model is learned from.
     """
 
-    instances_per_prototype: int = 80
+    instances_per_cluster: int = 80
     """
-    How many instances to draw from each prototype.
+    How many instances to draw from each cluster.
     """
 
     random_seed: int = 0
     """
-    The seed used for generating the training set and fitting the mixture.
+    The seed used for fitting the mixture.
     """
 
     def build(
@@ -57,9 +61,8 @@ class ConfidenceModelBuilder:
         if threshold is None:
             threshold = PercentileThreshold(percentile=1.0)
         schema = FeatureSchema.from_dataclass(self.instance_class)
-        training_data = self.generator.sample(
-            self.instances_per_prototype, schema.variables, self.random_seed
-        )
+        generator = TrainingDataGenerator(schema, self.clusters)
+        training_data = generator.sample(self.instances_per_cluster)
         circuit = fit_gaussian_mixture_circuit(
             training_data, schema.variables, random_seed=self.random_seed
         )

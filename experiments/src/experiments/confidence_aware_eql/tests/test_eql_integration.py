@@ -10,8 +10,7 @@ from experiments.confidence_aware_eql.eql_integration import (
     ConfidenceAwareEvaluationObserver,
 )
 from experiments.confidence_aware_eql.engine.pipeline import ConfidenceModelBuilder
-from experiments.confidence_aware_eql.engine.training import TrainingDataGenerator
-from experiments.confidence_aware_eql.tests.test_kitchen import kitchen_prototypes
+from experiments.confidence_aware_eql.tests.test_kitchen import kitchen_clusters
 
 NORMAL_PITCHER = KitchenObject(2.50, 0.25, Material.GLASS)
 NORMAL_POT = KitchenObject(3.00, 0.30, Material.METAL)
@@ -21,10 +20,9 @@ IMPOSSIBLE_CUP = KitchenObject(50.0, 0.10, Material.GLASS)
 @pytest.fixture
 def evaluator():
     """
-    An evaluator trained on the familiar kitchen object prototypes.
+    An evaluator learned from the familiar kitchen clusters.
     """
-    generator = TrainingDataGenerator(kitchen_prototypes())
-    return ConfidenceModelBuilder(KitchenObject, generator).build()
+    return ConfidenceModelBuilder(KitchenObject, kitchen_clusters()).build()
 
 
 def evaluate_heavy_object_rule(world, observer):
