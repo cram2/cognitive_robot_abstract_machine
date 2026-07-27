@@ -9,8 +9,6 @@ from pathlib import Path
 
 from giskardpy.motion_statechart.goals.templates import Parallel
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
-from giskardpy.motion_statechart.tasks.feature_functions import HeightGoal
-from giskardpy.qp.constraint import LargeNumber
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
@@ -776,6 +774,7 @@ class TestTracyLiquidTransfer:
         from giskardpy.motion_statechart.tasks.pouring import (
             FillByTransferTask,
             KeepProjectileInReceiver,
+            KeepSourceRimAboveReceiverRim,
         )
 
         world, source_cup, receiving_cup, left_tool_frame = tracy_transfer_world
@@ -798,15 +797,16 @@ class TestTracyLiquidTransfer:
         # repositions the gripper upstream as the source tilts and the arc reaches forward.
         no_spill = KeepProjectileInReceiver(receiver=receiving_cup, source=source_cup)
         # Keep the source cup in a tight height band above the receiver so the optimizer aims the
-        # pour from a stable elevation instead of thrashing vertically while repositioning.
+        # pour from a stable elevation instead of thrashing vertically while repositioning.  The
+        # band is rim-to-rim, matching what the transfer gate measures: a band on the cup origins
+        # lets the lip sink towards the receiver's rim as the source tilts, closing the gate the
+        # fill task needs open.
         minimum_clearance = 0.2
-        keep_above = HeightGoal(
-            root_link=world.root,
-            tip_link=source_cup.root,
-            tip_point=Point3(reference_frame=source_cup.root),
-            reference_point=Point3(reference_frame=receiving_cup.root),
-            lower_limit=minimum_clearance,
-            upper_limit=minimum_clearance + 0.02,
+        keep_above = KeepSourceRimAboveReceiverRim(
+            receiver=receiving_cup,
+            source=source_cup,
+            minimum_clearance=minimum_clearance,
+            clearance_band=0.02,
             weight=DefaultWeights.WEIGHT_ABOVE_CA,
         )
         keep_plane = AlignPlanes(
@@ -984,6 +984,44 @@ class TestClearanceBandStaysAboveTheRim:
         )
 
 
+class TestProjectileAimingErrorIsHorizontal:
+    """
+    :class:`~giskardpy.motion_statechart.tasks.pouring.KeepProjectileInReceiver` measures only
+    where the arc lands within the receiver's opening.  Aiming at the receiver's origin, which sits
+    at the base of the container, would add a constant vertical error no arm motion can remove, so
+    the task could never report the pour as aimed.
+    """
+
+    def test_task_reports_aimed_once_the_landing_is_within_the_threshold(
+        self, tracy_transfer_world
+    ):
+        """
+        The task's aiming error equals the horizontal distance from the landing point to the
+        opening centre: a threshold above that distance is satisfied, one below it is not.
+        """
+        from giskardpy.motion_statechart.tasks.pouring import KeepProjectileInReceiver
+
+        world, source_cup, receiving_cup, _left_tool_frame = tracy_transfer_world
+        landing = receiving_cup.projectile_landing_point(
+            source_cup, world, source_cup.current_outflow_velocity(world)
+        )
+        opening = receiving_cup.opening_point(world)
+        horizontal_distance = math.hypot(
+            landing.x.evaluate()[0] - opening.x.evaluate()[0],
+            landing.y.evaluate()[0] - opening.y.evaluate()[0],
+        )
+
+        def is_aimed(threshold: float) -> bool:
+            task = KeepProjectileInReceiver(
+                receiver=receiving_cup, source=source_cup, threshold=threshold
+            )
+            artifacts = task.build(MotionStatechartContext(world=world))
+            return bool(artifacts.observation.evaluate()[0])
+
+        assert is_aimed(horizontal_distance * 1.5)
+        assert not is_aimed(horizontal_distance * 0.5)
+
+
 class TestKeepProjectileInReceiverDebugExpressions:
     """
     :class:`~giskardpy.motion_statechart.tasks.pouring.KeepProjectileInReceiver` registers the
@@ -1095,6 +1133,7 @@ class TestPerceptionCorrectedTransfer:
         from giskardpy.motion_statechart.tasks.pouring import (
             FillByTransferTask,
             KeepProjectileInReceiver,
+            KeepSourceRimAboveReceiverRim,
         )
 
         world, source_cup, receiving_cup, left_tool_frame = tracy_transfer_world
@@ -1110,13 +1149,13 @@ class TestPerceptionCorrectedTransfer:
             reference_velocity=0.03,
         )
         no_spill = KeepProjectileInReceiver(receiver=receiving_cup, source=source_cup)
-        keep_above = HeightGoal(
-            root_link=world.root,
-            tip_link=source_cup.root,
-            tip_point=Point3(reference_frame=source_cup.root),
-            reference_point=Point3(reference_frame=receiving_cup.root),
-            lower_limit=0.05,
-            upper_limit=LargeNumber,
+        # The clearance band bounds the source's height from both sides.  A one-sided limit leaves
+        # the vertical direction free, which the optimizer exploits to aim the pour: the drop height
+        # sets the projectile's flight time, so climbing lengthens the arc.
+        keep_above = KeepSourceRimAboveReceiverRim(
+            receiver=receiving_cup,
+            source=source_cup,
+            minimum_clearance=0.05,
             weight=DefaultWeights.WEIGHT_ABOVE_CA,
         )
         keep_plane = AlignPlanes(
@@ -1159,4 +1198,3 @@ class TestPerceptionCorrectedTransfer:
             f"receiver fill {receiving_cup.fill_level:.3f} too far below goal {goal_fill} "
             f"(sigma={sigma}, perception_hz={perception_hz} Hz)"
         )
-

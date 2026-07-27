@@ -270,9 +270,7 @@ class KeepProjectileInReceiver(Task):
         landing_point = self.receiver.projectile_landing_point(
             self.source, context.world, exit_speed
         )
-        receiver_opening = context.world.compose_forward_kinematics_expression(
-            context.world.root, self.receiver.root
-        ).to_position()
+        receiver_opening = self.receiver.opening_point(context.world)
         artifacts.geometry.add_point_goal_constraints(
             name=f"{self.receiver.root.name}_projectile",
             frame_P_goal=receiver_opening,

@@ -237,6 +237,7 @@ class TestTransferGate:
         source_class=_TranslatingContainer,
         source_axis=Vector3(1, 0, 0),
         source_height=0.3,
+        receiver_height=0.2,
     ) -> tuple[World, HasFillLevel, _TranslatingContainer]:
         """Builds a fixed receiver at the origin and a source held above it on a single DOF."""
         wide_limits = DegreeOfFreedomLimits(
@@ -253,7 +254,7 @@ class TestTransferGate:
                 world=world,
                 active_axis=Vector3(1, 0, 0),
                 connection_limits=wide_limits,
-                scale=Scale(0.1, 0.1, 0.2),
+                scale=Scale(0.1, 0.1, receiver_height),
             )
             source = source_class.create_with_new_body_in_world(
                 name=PrefixedName("source"),
@@ -320,6 +321,28 @@ class TestTransferGate:
         assert upright_gate > 0.9
         assert tilted_gate < upright_gate
         assert tilted_gate < 0.5
+
+    def test_gate_closes_when_the_source_lip_is_below_the_receiver_opening(self):
+        """
+        Liquid enters over the rim, so a receiver whose opening reaches above the source's lip
+        cannot be poured into -- even while the lip is still well above the receiver's base.
+        """
+        world, source, receiver = self._build_world(receiver_height=1.0)
+        self._set_source_offset(world, source, 0.0)
+        source_lip = source.liquid_exit_point(world).z.evaluate()[0]
+        receiver_base = (
+            world.compose_forward_kinematics_expression(world.root, receiver.root)
+            .to_position()
+            .z.evaluate()[0]
+        )
+        receiver_opening = receiver.opening_point(world).z.evaluate()[0]
+        assert (
+            receiver_base < source_lip < receiver_opening
+        ), "the setup must hold the lip above the receiver's base but below its opening"
+
+        gate = receiver.fill_connection.inflow_equation.gate
+
+        assert gate.evaluate()[0] < 0.1
 
 
 class TestCurrentOutflowVelocity:
@@ -518,6 +541,50 @@ class TestProjectileLandingPoint:
             high_source, high_world, exit_speed=0.2
         ).x.evaluate()[0]
         assert high_landing > low_landing
+
+    def test_arc_terminates_at_the_opening_not_the_base(self):
+        """
+        The arc ends where the liquid actually arrives -- the receiver's opening.  Terminating it at
+        the receiver's origin, which lies at the base of the container, over-states the fall by the
+        container's height and so over-states the throw distance.
+        """
+        gate_world = TestTransferGate()
+        world, source, receiver = gate_world._build_world()
+        gate_world._set_source_offset(world, source, 0.1)
+
+        landing = receiver.projectile_landing_point(source, world, exit_speed=0.2)
+
+        assert landing.z.evaluate()[0] == pytest.approx(
+            receiver.opening_point(world).z.evaluate()[0], abs=1e-9
+        )
+
+    def test_throw_distance_follows_the_fall_to_the_opening(self):
+        """
+        The horizontal throw is the exit velocity carried over the time the liquid takes to fall
+        from the source's lip to the receiver's opening.
+        """
+        exit_speed = 0.2
+        gate_world = TestTransferGate()
+        world, source, receiver = gate_world._build_world(
+            source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
+        )
+        gate_world._set_source_offset(world, source, 0.6)
+
+        landing = receiver.projectile_landing_point(
+            source, world, exit_speed=exit_speed
+        )
+
+        exit_point = source.liquid_exit_point(world)
+        exit_direction = source.liquid_exit_direction(world)
+        fall_height = (
+            exit_point.z.evaluate()[0] - receiver.opening_point(world).z.evaluate()[0]
+        )
+        flight_time = math.sqrt(2 * fall_height / STANDARD_GRAVITY)
+        expected_x = (
+            exit_point.x.evaluate()[0]
+            + exit_speed * exit_direction.x.evaluate()[0] * flight_time
+        )
+        assert landing.x.evaluate()[0] == pytest.approx(expected_x, abs=1e-9)
 
 
 class TestReceiveOutflowGuard:

@@ -1110,10 +1110,10 @@ class LiquidTransferCoupling(SubclassJSONSerializer):
     exit_speed: float = field(default=DEFAULT_POUR_EXIT_SPEED)
     """Horizontal speed of the liquid leaving the source, in metres per second."""
 
-    height_gate_sharpness: float = field(default=80.0)
+    height_gate_sharpness: float = field(default=20.0)
     """Logistic steepness of the source-above-receiver gate."""
 
-    overlap_gate_sharpness: float = field(default=80.0)
+    overlap_gate_sharpness: float = field(default=20.0)
     """Logistic steepness of the projectile-landing gate."""
 
     def to_json(self) -> Dict[str, Any]:

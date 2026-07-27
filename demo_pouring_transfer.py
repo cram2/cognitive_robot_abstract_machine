@@ -128,11 +128,11 @@ park_state = JointState.from_mapping(
         )
     }
 )
-# msc_park = MotionStatechart()
-# park_task = JointPositionList(goal_state=park_state)
-# msc_park.add_node(park_task)
-# msc_park.add_node(EndMotion.when_true(park_task))
-# giskard.execute(msc_park)
+msc_park = MotionStatechart()
+park_task = JointPositionList(goal_state=park_state)
+msc_park.add_node(park_task)
+msc_park.add_node(EndMotion.when_true(park_task))
+giskard.execute(msc_park)
 
 # ------ Move the left gripper to the upright carry pose ----
 left_tool_frame = world.get_body_by_name("l_gripper_tool_frame")

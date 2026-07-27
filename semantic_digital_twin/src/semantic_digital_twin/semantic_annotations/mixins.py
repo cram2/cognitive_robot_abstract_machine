@@ -1463,7 +1463,7 @@ class HasFillLevel(HasRootBody, LiquidSource):
 
         The liquid leaves the source's exit point horizontally in the source's exit direction and
         then follows projectile motion under gravity; the returned point is where that arc crosses
-        this container's opening plane, taken at the container's origin height.
+        this container's opening plane.
 
         :param source: The pouring liquid source.
         :param world: The world providing the forward kinematics.
@@ -1473,11 +1473,7 @@ class HasFillLevel(HasRootBody, LiquidSource):
         """
         exit_point = source.liquid_exit_point(world)
         exit_direction = source.liquid_exit_direction(world)
-        plane_height = (
-            world.compose_forward_kinematics_expression(world.root, self.root)
-            .to_position()
-            .z
-        )
+        plane_height = self.opening_point(world).z
         drop_height = exit_point.z - plane_height
         flight_time = sm.sqrt(
             2 * sm.max(sm.Scalar(MINIMUM_DROP_HEIGHT), drop_height) / gravity
@@ -1506,6 +1502,10 @@ class HasFillLevel(HasRootBody, LiquidSource):
         Because the landing point moves forward as the source tilts, the optimizer must position
         the source upstream and tilt it so the arc lands in this container.
 
+        Both terms are measured against the opening rather than the container's origin: liquid
+        enters over the rim, so a lip below the rim cannot fill the container however far above its
+        base it sits.
+
         :param source: The pouring liquid source.
         :param world: The world providing the forward kinematics.
         :param landing_point: The projectile landing point on this container's opening plane.
@@ -1514,23 +1514,43 @@ class HasFillLevel(HasRootBody, LiquidSource):
         :return: Symbolic gate factor in ``[0, 1]``.
         """
         source_exit = source.liquid_exit_point(world)
-        receiver_position = world.compose_forward_kinematics_expression(
-            world.root, self.root
-        ).to_position()
+        receiver_opening = self.opening_point(world)
 
         height_gate = self._logistic(
-            source_exit.z - receiver_position.z, height_gate_sharpness
+            source_exit.z - receiver_opening.z, height_gate_sharpness
         )
         landing_distance = sm.sqrt(
-            (landing_point.x - receiver_position.x) ** 2
-            + (landing_point.y - receiver_position.y) ** 2
+            (landing_point.x - receiver_opening.x) ** 2
+            + (landing_point.y - receiver_opening.y) ** 2
         )
-        receiver_radius = self.root.collision.width / 2
         overlap_gate = self._logistic(
-            (receiver_radius - landing_distance) / receiver_radius,
+            (self.opening_radius - landing_distance) / self.opening_radius,
             overlap_gate_sharpness,
         )
         return height_gate * overlap_gate
+
+    @property
+    def opening_radius(self) -> float:
+        """Radius of this container's opening, in metres."""
+        return self.root.collision.width / 2
+
+    def opening_point(self, world: World) -> Point3:
+        """
+        The centre of this container's opening, in the world frame.
+
+        The container's own origin sits at the base of its collision geometry, so the opening is a
+        container height above it; anything that reasons about where liquid enters or leaves must
+        use this rather than the origin.
+
+        :param world: The world providing the forward kinematics.
+        :return: Symbolic opening centre in the world frame.
+        """
+        opening_point = (
+            world.compose_forward_kinematics_expression(world.root, self.root)
+            @ self.rim_point()
+        )
+        opening_point.reference_frame = world.root
+        return opening_point
 
     def rim_point(self) -> Point3:
         """
