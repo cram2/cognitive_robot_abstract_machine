@@ -11,7 +11,7 @@ from experiments.confidence_aware_eql.eql_integration import (
 )
 from experiments.confidence_aware_eql.exceptions import UnfamiliarSampleException
 from experiments.confidence_aware_eql.engine.pipeline import ConfidenceModelBuilder
-from experiments.confidence_aware_eql.tests.test_kitchen import kitchen_clusters
+from test.experiments_test.confidence_aware_eql.test_kitchen import kitchen_clusters
 
 NORMAL_PITCHER = KitchenObject(2.50, 0.25, Material.GLASS)
 NORMAL_POT = KitchenObject(3.00, 0.30, Material.METAL)
