@@ -19,6 +19,7 @@ from typing_extensions import (
     TypeVar,
 )
 
+from krrood.adapters.json_serializer import to_json
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.factories import variable_from, entity, variable, an
@@ -1250,6 +1251,26 @@ class HasFillLevel(HasRootBody, LiquidSource):
             source, world, exit_speed, height_gate_sharpness, overlap_gate_sharpness
         )
 
+    def recouple_outflow_from(
+        self, source: HasFillLevel, world: World, fill_equation: PouringEquation
+    ) -> None:
+        """
+        Replace the source's drain with ``fill_equation`` and (re-)establish the coupling from it.
+
+        Unlike :meth:`receive_outflow_from`, this accepts a source that is already coupled: the
+        previous gated drain is discarded, so a client can switch the source's head model (for
+        example analytic to learned) against a live Giskard process. The equation swap is
+        published, which marks the coupling stale in every synchronized world, and
+        :meth:`ensure_inflow_coupling` rebuilds it there from the new equation.
+
+        :param source: The liquid source whose drain is replaced.
+        :param world: The world providing the forward kinematics for the geometric gate.
+        :param fill_equation: The new, ungated drain equation for the source.
+        """
+        with world.modify_world():
+            source.add_fill_equation(fill_equation)
+        self.receive_outflow_from(source=source, world=world)
+
     def _establish_inflow_coupling(
         self,
         source: LiquidSource,
@@ -1291,24 +1312,62 @@ class HasFillLevel(HasRootBody, LiquidSource):
         with world.modify_world(publish_changes=False):
             self.add_inflow_equation(inflow_equation)
             source.couple_drain_to_gate(gate, world)
+        self._record_coupling_provenance(source)
+
+    def _record_coupling_provenance(self, source: LiquidSource) -> None:
+        """
+        Remember which source drain the just-built symbolic coupling was derived from.
+
+        Recorded after the drain was gated, so an unchanged coupling compares equal to the
+        source's current fill equation and only a synchronized equation swap reads as stale.
+
+        :param source: The liquid source the coupling was built from.
+        """
+        if not isinstance(source, HasFillLevel):
+            return
+        self.fill_connection.coupled_source_equation_json = to_json(
+            source.fill_equation
+        )
+
+    def _inflow_coupling_is_stale(self, source: LiquidSource) -> bool:
+        """
+        Whether the local symbolic coupling was built from a different source drain than the
+        source currently carries, e.g. after a client switched head models and the swap was
+        synchronized into this world.
+
+        :param source: The coupling's liquid source, resolved in this world.
+        :return: ``True`` if the coupling must be rebuilt from the source's current equation.
+        """
+        if not isinstance(source, HasFillLevel):
+            return False
+        recorded = self.fill_connection.coupled_source_equation_json
+        if recorded is None:
+            return False
+        return recorded != to_json(source.fill_equation)
 
     def ensure_inflow_coupling(self, world: World) -> None:
         """
-        Rebuild the symbolic inflow coupling from the stored descriptor if it is missing.
+        Rebuild the symbolic inflow coupling from the stored descriptor if it is missing or stale.
 
         A world synchronized from another process carries the coupling descriptor but not the
         symbolic inflow equation, which cannot be serialized. This reconstructs the symbolic
         coupling against ``world`` so a transfer task can read it. It is a no-op when the symbolic
-        inflow equation is already present or no coupling descriptor was recorded.
+        inflow equation is already present and still derived from the source's current fill
+        equation, or when no coupling descriptor was recorded.
 
         :param world: The world the coupling must be rebuilt against.
         """
         coupling = self.inflow_coupling
-        if coupling is None or self.fill_connection.inflow_equation is not None:
+        if coupling is None:
             return
         source = world.get_semantic_annotation_by_id(coupling.source_id)
         self._reattach_fill_connection(world)
         source._reattach_fill_connection(world)
+        if (
+            self.fill_connection.inflow_equation is not None
+            and not self._inflow_coupling_is_stale(source)
+        ):
+            return
         self._establish_inflow_coupling(
             source,
             world,
@@ -1452,18 +1511,13 @@ class HasFillLevel(HasRootBody, LiquidSource):
         """
         Gate this cup's own outflow so it drains only while ``gate`` is open.
 
+        Delegates to the fill equation so its head model (analytic or learned) is preserved
+        when the coupling is rebuilt, for example after synchronization to another process.
+
         :param gate: The shared transfer gate in ``[0, 1]``.
         :param world: The world the cup lives in.
         """
-        self.add_fill_equation(
-            GatedArticulatedPouringEquation(
-                container_height=self.fill_equation.container_height,
-                container_width=self.fill_equation.container_width,
-                outflow_rate_constant=self.fill_equation.outflow_rate_constant,
-                discharge_coefficient=self.fill_equation.discharge_coefficient,
-                gate=gate,
-            )
-        )
+        self.add_fill_equation(self.fill_equation.with_gate(gate))
 
     def validate_can_pour(self) -> None:
         """

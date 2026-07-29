@@ -1167,6 +1167,14 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
     )
     """ODE governing how liquid enters this container from an external source."""
 
+    coupled_source_equation_json: Optional[Dict[str, Any]] = field(
+        default=None, kw_only=True, init=False, repr=False, compare=False
+    )
+    """JSON of the source drain equation :attr:`inflow_equation` was built from, recorded after
+    the drain was gated. Process-local and never serialized: when a synchronized world replaces
+    the source's fill equation (a client switching head models), the mismatch marks the local
+    symbolic coupling stale so it is rebuilt from the new equation."""
+
     @property
     def active_dofs(self) -> List[DegreeOfFreedom]:
         """

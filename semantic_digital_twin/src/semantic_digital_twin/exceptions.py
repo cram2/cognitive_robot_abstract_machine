@@ -1,6 +1,7 @@
 from __future__ import annotations, absolute_import
 
 from dataclasses import dataclass, field, Field
+from pathlib import Path
 from typing import Dict, Set, Any
 from uuid import UUID
 
@@ -817,6 +818,66 @@ class SourceAlreadyCoupledError(UsageError):
 
     def suggest_correction(self) -> str:
         return "couple each source to a single receiver, or re-initialize the source's fill level first."
+
+
+@dataclass
+class MissingLearnedModelCheckpointError(UsageError):
+    """
+    Raised when a learned model reference points to a checkpoint file that does not exist.
+    """
+
+    checkpoint_path: Path
+    """
+    The resolved checkpoint path that was not found.
+    """
+
+    def error_message(self) -> str:
+        return f"Learned model checkpoint not found: {self.checkpoint_path}."
+
+    def suggest_correction(self) -> str:
+        return (
+            "train the surrogate first (see learned_pouring/head_surrogate.py) or fix the "
+            "reference's checkpoint_path; relative paths resolve against the workspace root."
+        )
+
+
+@dataclass
+class LearnedModelGeometryMismatchError(UsageError):
+    """
+    Raised when a learned head model trained for one container geometry is paired with an
+    equation describing a different geometry.
+    """
+
+    trained_container_height: float
+    """
+    Container height the checkpoint was trained for, in metres.
+    """
+
+    trained_container_width: float
+    """
+    Container width the checkpoint was trained for, in metres.
+    """
+
+    equation_container_height: float
+    """
+    Container height of the equation the model was paired with, in metres.
+    """
+
+    equation_container_width: float
+    """
+    Container width of the equation the model was paired with, in metres.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Learned head model was trained for container geometry "
+            f"(height={self.trained_container_height}, width={self.trained_container_width}) "
+            f"but the equation describes "
+            f"(height={self.equation_container_height}, width={self.equation_container_width})."
+        )
+
+    def suggest_correction(self) -> str:
+        return "use a checkpoint trained for this cup, or retrain the surrogate for its geometry."
 
 
 @dataclass
