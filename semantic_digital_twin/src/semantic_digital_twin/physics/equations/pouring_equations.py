@@ -164,14 +164,48 @@ class ArticulatedPouringEquation(PouringEquation):
         return result
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(
-            container_height=data["container_height"],
-            container_width=data["container_width"],
-            outflow_rate_constant=data["outflow_rate_constant"],
-            discharge_coefficient=data.get(
+    def _constructor_arguments_from_json(
+        cls, data: Dict[str, Any], **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Extract this class's constructor arguments from a JSON dict.
+
+        Subclasses extend the returned dict with their own arguments so deserialization
+        composes along the inheritance chain.
+
+        :param data: The JSON dict.
+        :param kwargs: Additional deserialization context.
+        :return: Keyword arguments for the constructor.
+        """
+        return {
+            "container_height": data["container_height"],
+            "container_width": data["container_width"],
+            "outflow_rate_constant": data["outflow_rate_constant"],
+            "discharge_coefficient": data.get(
                 "discharge_coefficient", DEFAULT_DISCHARGE_COEFFICIENT
             ),
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(**cls._constructor_arguments_from_json(data, **kwargs))
+
+    def with_gate(self, gate: Scalar) -> GatedArticulatedPouringEquation:
+        """
+        The gated counterpart of this equation, draining only while ``gate`` is open.
+
+        Subclasses override this so coupling a source to a receiver preserves the head model
+        (analytic or learned) instead of always rebuilding an analytic drain.
+
+        :param gate: The shared transfer gate in ``[0, 1]``.
+        :return: A gated equation with this equation's parameters.
+        """
+        return GatedArticulatedPouringEquation(
+            container_height=self.container_height,
+            container_width=self.container_width,
+            outflow_rate_constant=self.outflow_rate_constant,
+            discharge_coefficient=self.discharge_coefficient,
+            gate=gate,
         )
 
     def head_above_lip(self, context: FillContext) -> Scalar:

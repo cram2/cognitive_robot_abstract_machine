@@ -67,6 +67,7 @@ import semantic_digital_twin.mixin
 import semantic_digital_twin.orm.exceptions
 import semantic_digital_twin.orm.model
 import semantic_digital_twin.physics.equations.differential_equation
+import semantic_digital_twin.physics.equations.learned_pouring_equations
 import semantic_digital_twin.physics.equations.pouring_equations
 import semantic_digital_twin.pipeline.gltf_loader
 import semantic_digital_twin.pipeline.mesh_decomposition.base
@@ -6997,6 +6998,40 @@ class InvalidPlaneDimensionsDAO(
     }
 
 
+class LearnedModelGeometryMismatchErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.exceptions.LearnedModelGeometryMismatchError
+    ],
+):
+    __tablename__ = "LearnedModelGeometryMismatchErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    trained_container_height: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    trained_container_width: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    equation_container_height: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    equation_container_width: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "LearnedModelGeometryMismatchErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class MechanicalJointAlreadyMountedDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.MechanicalJointAlreadyMounted],
@@ -7176,6 +7211,31 @@ class MissingFillEquationErrorDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "MissingFillEquationErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MissingLearnedModelCheckpointErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.exceptions.MissingLearnedModelCheckpointError
+    ],
+):
+    __tablename__ = "MissingLearnedModelCheckpointErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    checkpoint_path: Mapped[pathlib.Path] = mapped_column(
+        krrood.ormatic.custom_types.PathType, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MissingLearnedModelCheckpointErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
         "polymorphic_load": "selectin",
     }
@@ -8121,6 +8181,65 @@ class DifferentialEquationDAO(
     }
 
 
+class HasLearnedHeadDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.learned_pouring_equations.HasLearnedHead
+    ],
+):
+    __tablename__ = "HasLearnedHeadDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    model_reference_id: Mapped[int] = mapped_column(
+        ForeignKey("LearnedHeadModelReferenceDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    model_reference: Mapped[LearnedHeadModelReferenceDAO] = relationship(
+        "LearnedHeadModelReferenceDAO",
+        uselist=False,
+        foreign_keys=[model_reference_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "HasLearnedHeadDAO",
+    }
+
+
+class LearnedHeadModelReferenceDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.learned_pouring_equations.LearnedHeadModelReference
+    ],
+):
+    __tablename__ = "LearnedHeadModelReferenceDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    checkpoint_path: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    trained_container_height: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    trained_container_width: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    hidden_width: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+
 class FillEquationDAO(
     DifferentialEquationDAO,
     DataAccessObject[
@@ -8241,6 +8360,36 @@ class ArticulatedPouringEquationDAO(
     }
 
 
+class LearnedPouringEquationDAO(
+    HasLearnedHeadDAO,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.learned_pouring_equations.LearnedPouringEquation
+    ],
+):
+    __tablename__ = "LearnedPouringEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasLearnedHeadDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    outflow_rate_constant: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    container_height: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    container_width: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    discharge_coefficient: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "LearnedPouringEquationDAO",
+        "inherit_condition": database_id == HasLearnedHeadDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class GatedArticulatedPouringEquationDAO(
     ArticulatedPouringEquationDAO,
     DataAccessObject[
@@ -8258,6 +8407,36 @@ class GatedArticulatedPouringEquationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GatedArticulatedPouringEquationDAO",
         "inherit_condition": database_id == ArticulatedPouringEquationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class GatedLearnedPouringEquationDAO(
+    HasLearnedHeadDAO,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.learned_pouring_equations.GatedLearnedPouringEquation
+    ],
+):
+    __tablename__ = "GatedLearnedPouringEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasLearnedHeadDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    outflow_rate_constant: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    container_height: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    container_width: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    discharge_coefficient: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GatedLearnedPouringEquationDAO",
+        "inherit_condition": database_id == HasLearnedHeadDAO.database_id,
         "polymorphic_load": "selectin",
     }
 

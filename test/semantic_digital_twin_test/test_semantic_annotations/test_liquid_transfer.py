@@ -694,6 +694,98 @@ class TestCouplingReconstruction:
         assert receiver.fill_connection.inflow_equation is original_inflow
 
 
+class TestCouplingModelSwitch:
+    """
+    Validates that switching the source's drain model against a live coupling takes effect.
+
+    A client switches models by publishing a new (ungated) source fill equation; the symbolic
+    coupling another process built earlier is then stale and must be rebuilt from the new
+    equation instead of being kept because it merely exists.
+    """
+
+    def _coupled_world(self):
+        return TestTransferGate()._build_world(
+            source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
+        )
+
+    def _drain_swapped_like_a_synchronized_diff(
+        self, source: HasFillLevel
+    ) -> ArticulatedPouringEquation:
+        """Replace the source's fill equation the way a synchronized attribute diff does:
+        a plain attribute assignment of a fresh ungated equation, doubling the outflow rate so
+        the rebuilt coupling is distinguishable from the stale one."""
+        swapped = ArticulatedPouringEquation(
+            container_height=source.fill_equation.container_height,
+            container_width=source.fill_equation.container_width,
+            outflow_rate_constant=source.fill_equation.outflow_rate_constant * 2,
+        )
+        source.fill_equation = swapped
+        return swapped
+
+    def test_ensure_rebuilds_when_synchronized_source_equation_changed(self):
+        """A synchronized source-equation swap marks the coupling stale: the next ensure call
+        rebuilds the inflow and re-gates the drain from the new equation."""
+        world, source, receiver = self._coupled_world()
+        stale_inflow = receiver.fill_connection.inflow_equation
+        swapped = self._drain_swapped_like_a_synchronized_diff(source)
+
+        receiver.ensure_inflow_coupling(world)
+
+        assert receiver.fill_connection.inflow_equation is not stale_inflow
+        regated_drain = source.fill_equation
+        assert isinstance(regated_drain, GatedArticulatedPouringEquation)
+        assert regated_drain.outflow_rate_constant == swapped.outflow_rate_constant
+        assert source.fill_connection.outflow_equation is regated_drain
+
+    def test_rebuilt_inflow_reflects_the_new_drain(self):
+        """The rebuilt inflow is derived from the swapped drain: doubling the source's outflow
+        rate constant doubles the inflow volume rate at the same pose."""
+        world, source, receiver = self._coupled_world()
+        stale_inflow = receiver.fill_connection.inflow_equation
+        self._drain_swapped_like_a_synchronized_diff(source)
+
+        receiver.ensure_inflow_coupling(world)
+
+        world.set_positions_1DOF_connection({source.root.parent_connection: 1.0})
+        rebuilt_inflow = receiver.fill_connection.inflow_equation
+        assert rebuilt_inflow.inflow.evaluate()[0] == pytest.approx(
+            2 * stale_inflow.inflow.evaluate()[0]
+        )
+
+    def test_ensure_is_stable_after_a_rebuild(self):
+        """A rebuild settles: ensuring again without another synchronized swap is a no-op."""
+        world, source, receiver = self._coupled_world()
+        self._drain_swapped_like_a_synchronized_diff(source)
+        receiver.ensure_inflow_coupling(world)
+        rebuilt_inflow = receiver.fill_connection.inflow_equation
+
+        receiver.ensure_inflow_coupling(world)
+
+        assert receiver.fill_connection.inflow_equation is rebuilt_inflow
+
+    def test_recouple_replaces_drain_and_coupling_of_a_coupled_source(self):
+        """``recouple_outflow_from`` accepts an already-coupled source, replacing its gated drain
+        with the given equation and re-establishing the coupling from it — the client-side half
+        of a live model switch."""
+        world, source, receiver = self._coupled_world()
+        previous_inflow = receiver.fill_connection.inflow_equation
+        replacement = ArticulatedPouringEquation(
+            container_height=source.fill_equation.container_height,
+            container_width=source.fill_equation.container_width,
+            outflow_rate_constant=source.fill_equation.outflow_rate_constant * 2,
+        )
+
+        receiver.recouple_outflow_from(
+            source=source, world=world, fill_equation=replacement
+        )
+
+        regated_drain = source.fill_equation
+        assert isinstance(regated_drain, GatedArticulatedPouringEquation)
+        assert regated_drain.outflow_rate_constant == replacement.outflow_rate_constant
+        assert receiver.fill_connection.inflow_equation is not previous_inflow
+        assert receiver.inflow_coupling is not None
+
+
 class TestNonCupLiquidSource:
     """A receiver fills from a :class:`LiquidSource` that is not a :class:`HasFillLevel` cup."""
 

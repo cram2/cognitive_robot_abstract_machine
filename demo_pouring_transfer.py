@@ -30,6 +30,13 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPosition,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
+from semantic_digital_twin.physics.equations.learned_pouring_equations import (
+    LearnedHeadModelReference,
+    couple_source_with_learned_head,
+)
+from semantic_digital_twin.physics.equations.pouring_equations import (
+    ArticulatedPouringEquation,
+)
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -62,6 +69,38 @@ IS_SIM = False
 START_FILL = 1.0
 GOAL_FILL_CONST = 0.7
 START_YAW = 0.1
+
+USE_LEARNED_HEAD = False
+"""Drive the transfer with the learned head-above-lip surrogate instead of the analytic head.
+Only the model reference is sent to Giskard, which loads the checkpoint itself."""
+
+_LEARNED_HEAD_CHECKPOINT = "learned_pouring/head_surrogate.pt"
+"""Workspace-relative path of the trained head surrogate; resolves on whichever machine runs
+the Giskard process, since both sides run against the same workspace."""
+
+
+def _learned_head_reference(source_cup: HasFillLevel) -> LearnedHeadModelReference:
+    """Build the model reference for the source cup's geometry, failing early if untrained.
+
+    The Giskard process rematerializes the torch model from this descriptor, so the checkpoint
+    must exist in the workspace before the goal is sent.
+    """
+    equation = source_cup.fill_equation
+    reference = LearnedHeadModelReference(
+        checkpoint_path=_LEARNED_HEAD_CHECKPOINT,
+        trained_container_height=equation.container_height,
+        trained_container_width=equation.container_width,
+    )
+    if not reference.resolved_checkpoint_path().exists():
+        raise SystemExit(
+            f"learned head checkpoint missing: {reference.resolved_checkpoint_path()}\n"
+            "train it first:\n"
+            "python -m semantic_digital_twin.physics.equations.head_surrogate_training "
+            f"--container-height {equation.container_height} "
+            f"--container-width {equation.container_width} "
+            f"--checkpoint {reference.resolved_checkpoint_path()}"
+        )
+    return reference
 
 
 def _spawn_jeroen_cup_body(name: str) -> Body:
@@ -184,6 +223,27 @@ if cups_already_present:
         )
     # Give the reset fill state time to propagate to the Giskard process before the transfer goal.
     time.sleep(0.5)
+    # Tear down whatever coupling the previous run left (analytic or learned) and re-couple with
+    # the selected head model. The published equation swap marks Giskard's coupling stale, so it
+    # rebuilds gate, inflow, and gated drain from the new model without a restart.
+    if USE_LEARNED_HEAD:
+        print("Re-coupling the transfer with the learned head surrogate.")
+        couple_source_with_learned_head(
+            receiving_cup, source_cup, world, _learned_head_reference(source_cup)
+        )
+    else:
+        print("Re-coupling the transfer with the analytic head.")
+        equation = source_cup.fill_equation
+        receiving_cup.recouple_outflow_from(
+            source=source_cup,
+            world=world,
+            fill_equation=ArticulatedPouringEquation(
+                container_height=equation.container_height,
+                container_width=equation.container_width,
+                outflow_rate_constant=equation.outflow_rate_constant,
+                discharge_coefficient=equation.discharge_coefficient,
+            ),
+        )
 else:
     # ----- Attach the source cup to the gripper -----
     old_number_bodies = len(world.bodies)
@@ -240,7 +300,13 @@ else:
     )
 
     # ----- Couple the receiver's inflow to the source's gated outflow -----
-    receiving_cup.receive_outflow_from(source=source_cup, world=world)
+    if USE_LEARNED_HEAD:
+        print("Coupling the transfer with the learned head surrogate.")
+        couple_source_with_learned_head(
+            receiving_cup, source_cup, world, _learned_head_reference(source_cup)
+        )
+    else:
+        receiving_cup.receive_outflow_from(source=source_cup, world=world)
 
 # time.sleep(0.2)
 
