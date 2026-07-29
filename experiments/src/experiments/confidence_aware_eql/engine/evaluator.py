@@ -5,39 +5,26 @@ from dataclasses import dataclass
 import numpy as np
 from probabilistic_model.probabilistic_model import ProbabilisticModel
 from random_events.variable import Variable
-from typing_extensions import Any, List, Optional
+from typing_extensions import Any, List
 
 from experiments.confidence_aware_eql.engine.schema import FeatureSchema
 from experiments.confidence_aware_eql.engine.threshold import FamiliarityThreshold
-from experiments.confidence_aware_eql.exceptions import UnfamiliarSampleWarning
 
 
 @dataclass
 class FamiliarityResult:
-    """
-    The outcome of checking one instance against the learned distribution.
-    """
+    """The outcome of checking one instance against the learned distribution."""
 
     log_likelihood: float
     """Log-likelihood of the instance under the model."""
 
-    warning: Optional[UnfamiliarSampleWarning] = None
-    """
-    The warning raised for an unfamiliar instance, or ``None`` when familiar.
-    """
-
-    @property
-    def is_familiar(self) -> bool:
-        """
-        Whether the instance was accepted as familiar.
-        """
-        return self.warning is None
+    is_familiar: bool
+    """Whether the instance was accepted as familiar."""
 
 
 @dataclass
 class ConfidenceAwareEvaluator:
-    """
-    Scores instances and flags those unlikely under the learned distribution.
+    """Scores instances and reports whether they are familiar.
 
     Features that are not observed on an instance are marginalised out of the
     model, so an incomplete instance is still scored on the information it does
@@ -55,21 +42,18 @@ class ConfidenceAwareEvaluator:
     """The feature schema used to encode instances."""
 
     model: ProbabilisticModel
-    """
-    The probabilistic model scoring encoded instances.
-    """
+    """The probabilistic model scoring encoded instances."""
 
     threshold: FamiliarityThreshold
     """The fitted cutoff separating familiar from unfamiliar instances."""
 
     def check(self, instance: Any, node_name: str) -> FamiliarityResult:
-        """
-        Check one instance and report whether it is familiar.
+        """Check one instance and report whether it is familiar.
 
         :param instance: The instance whose features are read by the schema.
-        :param node_name: Name of the rule node performing the check, recorded on any
-            warning for traceability.
-        :return: The log-likelihood of the instance and a warning when it is unfamiliar.
+        :param node_name: Name of the rule node performing the check, kept for
+            callers that raise on an unfamiliar instance.
+        :return: The log-likelihood of the instance and whether it is familiar.
         """
         row = self.schema.encode(instance)
         observed_variables = self.schema.observed_variables(row)
@@ -77,18 +61,13 @@ class ConfidenceAwareEvaluator:
             log_likelihood = float(self.model.log_likelihood(row[np.newaxis, :])[0])
         else:
             log_likelihood = self._marginal_log_likelihood(row, observed_variables)
-        if self.threshold.is_familiar(log_likelihood):
-            return FamiliarityResult(log_likelihood, None)
-        return FamiliarityResult(
-            log_likelihood,
-            UnfamiliarSampleWarning(node_name, log_likelihood, self.threshold.value),
-        )
+        is_familiar = self.threshold.is_familiar(log_likelihood)
+        return FamiliarityResult(log_likelihood, is_familiar)
 
     def _marginal_log_likelihood(
         self, row: np.ndarray, observed_variables: List[Variable]
     ) -> float:
-        """
-        Score a partially observed instance by marginalising the missing features.
+        """Score a partially observed instance by marginalising the missing features.
 
         :param row: The encoded row, where unobserved features are ``numpy.nan``.
         :param observed_variables: The variables that were actually observed.

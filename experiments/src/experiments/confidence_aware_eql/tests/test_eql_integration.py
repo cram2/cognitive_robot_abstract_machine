@@ -9,6 +9,7 @@ from experiments.confidence_aware_eql.domains.kitchen import KitchenObject, Mate
 from experiments.confidence_aware_eql.eql_integration import (
     ConfidenceAwareEvaluationObserver,
 )
+from experiments.confidence_aware_eql.exceptions import UnfamiliarSampleException
 from experiments.confidence_aware_eql.engine.pipeline import ConfidenceModelBuilder
 from experiments.confidence_aware_eql.tests.test_kitchen import kitchen_clusters
 
@@ -38,42 +39,30 @@ def evaluate_heavy_object_rule(world, observer):
         set_evaluation_context(None)
 
 
-def test_deterministic_result_is_unchanged_by_the_observer(evaluator):
+def test_familiar_objects_are_evaluated_without_raising(evaluator):
     """
-    Observing the evaluation does not alter the solutions of the rule.
-    """
-    observer = ConfidenceAwareEvaluationObserver(evaluator, KitchenObject)
-    world = [NORMAL_PITCHER, NORMAL_POT, IMPOSSIBLE_CUP]
-    assert len(evaluate_heavy_object_rule(world, observer)) == len(world)
-
-
-def test_familiar_objects_raise_no_warning(evaluator):
-    """
-    Familiar objects pass every node without raising a warning.
+    Familiar objects pass the rule conclusion without raising.
     """
     observer = ConfidenceAwareEvaluationObserver(evaluator, KitchenObject)
-    evaluate_heavy_object_rule([NORMAL_PITCHER, NORMAL_POT], observer)
-    assert observer.warnings == []
+    results = evaluate_heavy_object_rule([NORMAL_PITCHER, NORMAL_POT], observer)
+    assert len(results) == 2
 
 
-def test_impossible_object_is_flagged_during_evaluation(evaluator):
+def test_impossible_object_raises_during_evaluation(evaluator):
     """
-    An impossible object is flagged while the rule tree is evaluated.
-    """
-    observer = ConfidenceAwareEvaluationObserver(evaluator, KitchenObject)
-    evaluate_heavy_object_rule([IMPOSSIBLE_CUP], observer)
-    assert observer.warnings
-    assert all(
-        warning.log_likelihood < warning.threshold for warning in observer.warnings
-    )
-
-
-def test_warning_names_the_node_that_flagged_the_instance(evaluator):
-    """
-    The variable node of the queried class is named as a rejecting node.
+    An impossible object raises an unfamiliar-sample exception when its rule fires.
     """
     observer = ConfidenceAwareEvaluationObserver(evaluator, KitchenObject)
-    evaluate_heavy_object_rule([IMPOSSIBLE_CUP], observer)
-    assert KitchenObject.__name__ in {
-        warning.node_name for warning in observer.warnings
-    }
+    with pytest.raises(UnfamiliarSampleException):
+        evaluate_heavy_object_rule([IMPOSSIBLE_CUP], observer)
+
+
+def test_raised_exception_names_the_node_that_flagged_the_instance(evaluator):
+    """
+    The raised exception names the rule node that rejected the instance.
+    """
+    observer = ConfidenceAwareEvaluationObserver(evaluator, KitchenObject)
+    with pytest.raises(UnfamiliarSampleException) as raised:
+        evaluate_heavy_object_rule([IMPOSSIBLE_CUP], observer)
+    assert raised.value.node_name
+    assert raised.value.log_likelihood < raised.value.threshold

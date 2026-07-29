@@ -66,8 +66,7 @@ def test_impossible_cup_is_flagged(evaluator):
         KitchenObject(50.0, 0.10, Material.GLASS), node_name="is_heavy"
     )
     assert not result.is_familiar
-    assert result.warning.node_name == "is_heavy"
-    assert result.warning.log_likelihood < result.warning.threshold
+    assert result.log_likelihood < evaluator.threshold.value
 
 
 def test_missing_material_is_marginalised_and_still_scored(evaluator):
@@ -76,7 +75,6 @@ def test_missing_material_is_marginalised_and_still_scored(evaluator):
     """
     result = evaluator.check(KitchenObject(0.25, 0.10, None), node_name="is_glass")
     assert result.is_familiar
-    assert result.warning is None
 
 
 def test_missing_material_with_impossible_weight_is_still_flagged(evaluator):
