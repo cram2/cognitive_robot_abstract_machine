@@ -11563,46 +11563,6 @@ class KeepSourceRimAboveReceiverRimDAO(
     }
 
 
-class PredictedSpillConstraintDAO(
-    TaskDAO,
-    DataAccessObject[
-        giskardpy.motion_statechart.tasks.pouring.PredictedSpillConstraint
-    ],
-):
-    __tablename__ = "PredictedSpillConstraintDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(TaskDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    spill_tolerance: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    reference_velocity: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-    receiver_id: Mapped[int] = mapped_column(
-        ForeignKey("HasFillLevelDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    source_id: Mapped[int] = mapped_column(
-        ForeignKey("HasFillLevelDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    receiver: Mapped[HasFillLevelDAO] = relationship(
-        "HasFillLevelDAO", uselist=False, foreign_keys=[receiver_id], post_update=True
-    )
-    source: Mapped[HasFillLevelDAO] = relationship(
-        "HasFillLevelDAO", uselist=False, foreign_keys=[source_id], post_update=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "PredictedSpillConstraintDAO",
-        "inherit_condition": database_id == TaskDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
 class TerminalFillConstraintTaskDAO(
     TaskDAO,
     DataAccessObject[
@@ -12746,50 +12706,6 @@ class LinearizedScalarStateModelDAO(
 
     time_step: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     control_horizon: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-
-
-class TerminalSpillPredictionConstraintDAO(
-    GiskardInequalityConstraintDAO,
-    DataAccessObject[
-        giskardpy.qp.terminal_state_prediction_strategy.TerminalSpillPredictionConstraint
-    ],
-):
-    __tablename__ = "TerminalSpillPredictionConstraintDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(GiskardInequalityConstraintDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    spill_tolerance: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-    __mapper_args__ = {
-        "polymorphic_identity": "TerminalSpillPredictionConstraintDAO",
-        "inherit_condition": database_id == GiskardInequalityConstraintDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class TerminalSpillPredictionStrategyDAO(
-    IntegralStrategyDAO,
-    DataAccessObject[
-        giskardpy.qp.terminal_state_prediction_strategy.TerminalSpillPredictionStrategy
-    ],
-):
-    __tablename__ = "TerminalSpillPredictionStrategyDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(IntegralStrategyDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "TerminalSpillPredictionStrategyDAO",
-        "inherit_condition": database_id == IntegralStrategyDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
 
 
 class TerminalStatePredictionConstraintDAO(

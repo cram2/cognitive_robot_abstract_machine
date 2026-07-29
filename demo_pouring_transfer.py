@@ -89,8 +89,11 @@ def _learned_head_reference(source_cup: HasFillLevel) -> LearnedHeadModelReferen
     if not reference.resolved_checkpoint_path().exists():
         raise SystemExit(
             f"learned head checkpoint missing: {reference.resolved_checkpoint_path()}\n"
-            "train it first, e.g. via pytest test/giskardpy_test/test_motion_statechart/"
-            "test_pouring_learned.py::test_learn_head_model"
+            "train it first:\n"
+            "python -m semantic_digital_twin.physics.equations.head_surrogate_training "
+            f"--container-height {equation.container_height} "
+            f"--container-width {equation.container_width} "
+            f"--checkpoint {reference.resolved_checkpoint_path()}"
         )
     return reference
 

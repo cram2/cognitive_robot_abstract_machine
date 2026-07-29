@@ -1402,30 +1402,6 @@ class HasFillLevel(HasRootBody, LiquidSource):
         normalised_drain = self.fill_equation.symbolic_velocity(self.fill_connection)
         return -normalised_drain * self.fill_equation.cross_section_volume
 
-    def ungated_outflow_rate(self, world: World) -> sm.Scalar:
-        """
-        Normalized fill-drain rate driven by tilt alone, before any transfer gate is applied.
-
-        Unlike the coupled outflow (which reflects the gated volume-conserving drain once the cup
-        pours into a receiver), this is the physical drain a tilted cup produces regardless of where
-        the stream lands, in the cup's own normalized fill units per second.  The gap between it and
-        the gated drain — ``ungated · (1 − gate)`` — is the spilled fraction rate.  It shares the
-        normalized fill scale of the pouring tasks, so a constraint built on it normalizes the same
-        way they do.
-
-        :param world: The world providing the forward kinematics.
-        :return: Symbolic ungated normalized drain rate, positive while tilted past the lip.
-        :raises MissingFillEquationError: if the cup has no articulated pour model exposing a head.
-        """
-        if not isinstance(self.fill_equation, ArticulatedPouringEquation):
-            raise MissingFillEquationError(source=self)
-        head = self.fill_equation.head_above_lip(self.fill_connection)
-        return (
-            self.fill_equation.outflow_rate_constant
-            * head
-            / self.fill_equation.container_height
-        )
-
     def current_outflow_velocity(self, world: World) -> Optional[sm.Scalar]:
         """
         Discharge-scaled Torricelli exit speed from the current pour, or ``None`` without a model.

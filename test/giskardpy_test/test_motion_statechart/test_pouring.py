@@ -60,7 +60,6 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
 from dataclasses import dataclass
-from typing_extensions import Callable, Optional
 from krrood.ormatic.utils import classproperty
 
 _JEROEN_CUP_STL = str(
@@ -74,7 +73,6 @@ _TABLE_SURFACE_Z = 0.9
 _POURING_TARGET_FREQUENCY = 80
 _POURING_PREDICTION_HORIZON = 120
 _DEFAULT_PERCEPTION_HZ: int = 10
-_LEARNED_DIR = Path(__file__).resolve().parents[3] / "learned_pouring"
 
 
 def _pouring_context(world: World) -> MotionStatechartContext:
@@ -197,8 +195,8 @@ def tracy_transfer_world(tracy_pouring_world):
 
     upright_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
         pos_x=1,
-        pos_y=0.3,
-        pos_z=_TABLE_SURFACE_Z + 0.15,
+        pos_y=0.2,
+        pos_z=_TABLE_SURFACE_Z + 0.3,
         quat_z=0.5,
         quat_x=0.5,
         quat_y=0.5,
@@ -283,56 +281,39 @@ def _tick_with_perception_correction(
     perception_hz: float,
     rng: np.random.Generator,
     timeout: int = 4000,
-    recorder: Optional[Callable[[int, float, float, Optional[float]], None]] = None,
 ) -> None:
     """
     Run the executor tick loop, injecting a noisy fill-level measurement at ``perception_hz``.
 
-    This is a **measurement model**: a monotonic physical (ground-truth) fill is maintained by
-    integrating the receiver inflow rate — which does not depend on the receiver's own fill — so it
-    is unaffected by the writes perception makes to the fill DOF.  When the current tick aligns with
-    the perception period the controller's fill belief (the DOF the QP linearizes at) is overwritten
-    by an *independent* measurement ``physical + Gaussian noise``.  Drawing each measurement around
-    the ground truth (rather than around the previous belief) keeps the belief scattered about the
-    true fill instead of drifting away from it.
+    After each tick the ODE has already advanced the fill level via
+    :meth:`~semantic_digital_twin.world.World.step_physics`.  When the current tick index
+    aligns with the perception period the ODE-integrated value is replaced by the true fill
+    plus additive Gaussian noise, making it the QP's linearization point on the next tick.
+    This models a perception pipeline that corrects the controller's fill-level belief at a
+    rate lower than the control frequency.
 
     Cleanup (zero velocities/accelerations/jerks, node and context teardown) mirrors
     :meth:`~giskardpy.executor.Executor.tick_until_end`.
 
     :param executor: The executor driving the motion statechart.
-    :param world: The world whose fill belief is corrected by perception.
-    :param fill_connection: The receiver's fill DOF (belief) perception overwrites; its inflow
-        equation drives the ground-truth accumulator.
+    :param world: The world whose fill state is corrected by perception.
+    :param fill_connection: The receiver's fill DOF to update on each perception tick.
     :param sigma: Standard deviation of additive Gaussian noise on the fill measurement.
     :param perception_hz: Frequency at which perception measurements arrive, in Hz.
     :param rng: Random number generator for reproducible noise sequences.
     :param timeout: Maximum number of control ticks before raising ``TimeoutError``.
-    :param recorder: Optional callback invoked every control tick with the tick index, the physical
-        (ground-truth) fill, the controller belief (the DOF), and the injected noisy measurement on
-        perception ticks (``None`` otherwise). Used to capture trajectories for performance plots.
     """
     control_hz = executor.context.qp_controller_config.target_frequency
     ticks_per_perception = max(1, round(control_hz / perception_hz))
-    time_step = 1.0 / control_hz
-    inflow_rate = fill_connection.inflow_equation.symbolic_velocity(fill_connection)
-    physical_fill = float(fill_connection.position)
     try:
         for tick_index in range(timeout):
             executor.tick()
-            physical_fill += float(inflow_rate.evaluate()[0]) * time_step
-            perceived_fill: Optional[float] = None
             if tick_index % ticks_per_perception == 0:
-                perceived_fill = float(
-                    np.clip(physical_fill + rng.normal(0.0, sigma), 0.0, 1.0)
+                true_fill = float(fill_connection.position)
+                noisy_fill = float(
+                    np.clip(true_fill + rng.normal(0.0, sigma), 0.0, 1.0)
                 )
-                world.set_positions_1DOF_connection({fill_connection: perceived_fill})
-            if recorder is not None:
-                recorder(
-                    tick_index,
-                    physical_fill,
-                    float(fill_connection.position),
-                    perceived_fill,
-                )
+                world.set_positions_1DOF_connection({fill_connection: noisy_fill})
             executor.pacer.sleep()
             if executor.motion_statechart.is_end_motion():
                 return
@@ -932,10 +913,9 @@ class TestPerceptionCorrectedTransfer:
 
     Models the real-world scenario in which a perception pipeline (e.g., RoboKudo) supplies
     fill-level estimates at ``perception_hz`` while the controller runs at
-    :data:`_POURING_TARGET_FREQUENCY`.  Each perception tick overwrites the controller's fill belief
-    with an independent measurement — the physical (ground-truth) fill plus additive Gaussian noise —
-    so the QP linearizes at the (possibly inaccurate) measured belief while the true fill keeps
-    accumulating monotonically underneath.
+    :data:`_POURING_TARGET_FREQUENCY`.  After each perception tick the receiver's ODE-integrated
+    fill level is replaced by the true value plus additive Gaussian noise, so the QP linearizes
+    at the (possibly inaccurate) corrected belief.
 
     Parametrized over noise standard deviation ``sigma`` and ``perception_hz`` so the stability
     boundary can be explored as both dimensions vary independently.
@@ -971,11 +951,10 @@ class TestPerceptionCorrectedTransfer:
         Verifies that the transfer task converges to the fill-level goal when the receiver's
         fill level is observed with Gaussian noise at a sub-control-rate frequency.
 
-        Perception updates arrive at ``perception_hz`` and overwrite the fill belief with an
-        independent measurement (physical fill + noise); between updates the ODE integrates freely
-        from the last measurement.  The task terminates only once the perceived fill level reaches
-        the goal within ``fill_level_tolerance``, so a noise-adjusted bound is used for the final
-        assertion.
+        Perception updates arrive at ``perception_hz`` and overwrite the ODE-integrated fill
+        belief; between updates the ODE integrates freely from the last corrected value.  The
+        task terminates only once the perceived fill level reaches the goal within
+        ``fill_level_tolerance``, so a noise-adjusted bound is used for the final assertion.
 
         :param sigma: Standard deviation of additive Gaussian noise on the fill measurement.
         :param perception_hz: Rate of perception updates in Hz.
@@ -1024,42 +1003,6 @@ class TestPerceptionCorrectedTransfer:
         )
         transfer_executor.compile(motion_statechart=msc_transfer)
 
-        source_head_expression = source_cup.fill_equation.head_above_lip(
-            source_cup.fill_connection
-        )
-        source_lip = source_cup.liquid_exit_point(world)
-        receiver_rim = (
-            world.compose_forward_kinematics_expression(world.root, receiving_cup.root)
-            @ receiving_cup.rim_point()
-        )
-        tick_history: list[int] = []
-        physical_fill_history: list[float] = []
-        belief_fill_history: list[float] = []
-        perceived_fill_history: list[float] = []
-        source_fill_history: list[float] = []
-        gate_history: list[float] = []
-        head_history: list[float] = []
-        clearance_history: list[float] = []
-
-        def record(
-            tick_index: int,
-            physical_fill: float,
-            belief_fill: float,
-            perceived_fill,
-        ) -> None:
-            tick_history.append(tick_index)
-            physical_fill_history.append(physical_fill)
-            belief_fill_history.append(belief_fill)
-            perceived_fill_history.append(
-                np.nan if perceived_fill is None else perceived_fill
-            )
-            source_fill_history.append(float(source_cup.fill_level))
-            gate_history.append(float(transfer_task.inflow_equation.gate.evaluate()[0]))
-            head_history.append(float(source_head_expression.evaluate()[0]))
-            clearance_history.append(
-                float(source_lip.z.evaluate()[0] - receiver_rim.z.evaluate()[0])
-            )
-
         _tick_with_perception_correction(
             executor=transfer_executor,
             world=world,
@@ -1067,26 +1010,6 @@ class TestPerceptionCorrectedTransfer:
             sigma=sigma,
             perception_hz=perception_hz,
             rng=np.random.default_rng(seed=42),
-            recorder=record,
-        )
-
-        np.savez(
-            str(
-                _LEARNED_DIR / f"perception_sigma{sigma:.2f}_hz{int(perception_hz)}.npz"
-            ),
-            tick=np.array(tick_history),
-            physical_fill=np.array(physical_fill_history),
-            belief_fill=np.array(belief_fill_history),
-            perceived_fill=np.array(perceived_fill_history),
-            source_fill=np.array(source_fill_history),
-            gate=np.array(gate_history),
-            head=np.array(head_history),
-            clearance=np.array(clearance_history),
-            sigma=sigma,
-            perception_hz=perception_hz,
-            goal_fill=goal_fill,
-            tolerance=tolerance,
-            converged=transfer_task.observation_state == ObservationStateValues.TRUE,
         )
 
         assert transfer_task.observation_state == ObservationStateValues.TRUE, (

@@ -836,8 +836,9 @@ class MissingLearnedModelCheckpointError(UsageError):
 
     def suggest_correction(self) -> str:
         return (
-            "train the surrogate first (see learned_pouring/head_surrogate.py) or fix the "
-            "reference's checkpoint_path; relative paths resolve against the workspace root."
+            "train the surrogate first (python -m semantic_digital_twin.physics.equations"
+            ".head_surrogate_training) or fix the reference's checkpoint_path; relative paths "
+            "resolve against the workspace root."
         )
 
 
