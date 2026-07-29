@@ -21,7 +21,7 @@ class FamiliarityResult:
     log_likelihood: float
     """Log-likelihood of the instance under the model."""
 
-    warning: Optional[UnfamiliarSampleWarning]
+    warning: Optional[UnfamiliarSampleWarning] = None
     """
     The warning raised for an unfamiliar instance, or ``None`` when familiar.
     """
