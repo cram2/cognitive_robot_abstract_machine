@@ -12,11 +12,7 @@ import runpy
 from pathlib import Path
 
 from krrood.ormatic.utils import create_engine, drop_database
-
-try:
-    from coraplex.datastructures.dataclasses import Context
-except ModuleNotFoundError:
-    pass
+from coraplex.datastructures.dataclasses import Context
 
 try:
     from coraplex.orm.ormatic_interface import Base

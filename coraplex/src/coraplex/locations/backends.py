@@ -87,8 +87,8 @@ class GiskardLocationBackend(PoseGeneratorBackend):
 
         occupancy_map = OccupancyCostmap(
             resolution=0.02,
-            height=200,
-            width=200,
+            height=300,
+            width=300,
             world=self.world,
             robot_view=self.robot,
             origin=ground_pose,
@@ -97,7 +97,7 @@ class GiskardLocationBackend(PoseGeneratorBackend):
         gaussian_map = GaussianCostmap(
             resolution=0.02,
             origin=ground_pose,
-            mean=200,
+            mean=300,
             sigma=15,
             world=self.world,
         )

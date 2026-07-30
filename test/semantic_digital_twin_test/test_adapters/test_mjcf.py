@@ -118,10 +118,10 @@ LIT_WORLD_MJCF = """
 
 def test_light_is_parsed_and_attached_to_its_parent_body():
     """
-    Regression test: MJCFParser used to have no handling for <light> elements at all, so every
-    world built through the parser -> World -> MujocoBuilder round-trip silently lost all
-    lighting information, falling back to MuJoCo's minimal default camera headlight instead of
-    the scene's own intended lights.
+    Regression test: MJCFParser used to have no handling for <light> elements at all, so
+    every world built through the parser -> World -> MujocoBuilder round-trip silently
+    lost all lighting information, falling back to MuJoCo's minimal default camera
+    headlight instead of the scene's own intended lights.
     """
     world = MJCFParser.from_xml_string(LIT_WORLD_MJCF).parse()
 
@@ -141,6 +141,39 @@ def test_light_is_parsed_and_attached_to_its_parent_body():
     assert light.cast_shadow is False
 
 
+VISUAL_ONLY_GEOM_MJCF = """
+<mujoco>
+  <worldbody>
+    <body name="shelf">
+      <geom type="box" size="0.1 0.1 0.1" contype="0" conaffinity="0"/>
+    </body>
+  </worldbody>
+</mujoco>
+"""
+
+
+def test_visual_only_geom_is_not_a_collision_shape_by_default():
+    world = MJCFParser.from_xml_string(VISUAL_ONLY_GEOM_MJCF).parse()
+
+    [shelf] = [
+        body for body in world.kinematic_structure_entities if body.name.name == "shelf"
+    ]
+    assert len(shelf.visual.shapes) == 1
+    assert len(shelf.collision.shapes) == 0
+
+
+def test_visual_only_geom_becomes_collision_shape_when_visuals_are_used_as_collision():
+    parser = MJCFParser.from_xml_string(VISUAL_ONLY_GEOM_MJCF)
+    parser.use_visual_as_collision = True
+
+    world = parser.parse()
+
+    [shelf] = [
+        body for body in world.kinematic_structure_entities if body.name.name == "shelf"
+    ]
+    assert len(shelf.collision.shapes) == 1
+
+
 TEXTURED_BOX_MJCF_TEMPLATE = """
 <mujoco>
   <asset>
@@ -158,10 +191,12 @@ TEXTURED_BOX_MJCF_TEMPLATE = """
 
 def test_primitive_box_geom_resolves_its_material_texture(tmp_path):
     """
-    Regression test: Box/Sphere/Cylinder shapes never carried any texture reference, only a
-    flat Color. RoboCasa's countertops and cabinet doors are actual MJCF box geoms whose
-    material references a marble/wood texture, so this reference was silently discarded on
-    every round-trip and they rendered flat-colored instead of textured.
+    Regression test: Box/Sphere/Cylinder shapes never carried any texture reference,
+    only a flat Color.
+
+    RoboCasa's countertops and cabinet doors are actual MJCF box geoms whose material
+    references a marble/wood texture, so this reference was silently discarded on every
+    round-trip and they rendered flat-colored instead of textured.
     """
     from PIL import Image
 

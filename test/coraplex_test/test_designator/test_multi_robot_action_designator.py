@@ -53,11 +53,7 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from typing_extensions import Tuple, Generator
-
-try:
-    from semantic_digital_twin.robots.garmi import Garmi
-except ImportError:
-    Garmi = None
+from semantic_digital_twin.robots.garmi import Garmi
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
@@ -70,6 +66,8 @@ from semantic_digital_twin.spatial_types import (
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
+
+from .robot_annotation_lookup import get_or_create_robot_annotation
 
 # The alternative motion mappings that should be available to the plans in this test module.
 # Resolution filters by robot type and execution type, so passing the full set is always safe.
@@ -85,20 +83,7 @@ ALTERNATIVE_MOTION_MAPPINGS = [
 
 @pytest.fixture(
     scope="session",
-    params=[
-        # TODO Garmi commented out until we get access to the robot description in CI
-        # pytest.param(
-        #     "garmi",
-        #     marks=pytest.mark.skipif(
-        #         Garmi is None,
-        #         reason="GARMI semantic annotation not installed",
-        #     ),
-        # ),
-        "hsrb",
-        "stretch",
-        "tiago",
-        "pr2",
-    ],
+    params=["hsrb", "stretch", "tiago", "pr2", "garmi"],
 )
 def setup_multi_robot_apartment(
     request,
@@ -106,6 +91,7 @@ def setup_multi_robot_apartment(
     _stretch_world_setup,
     _tiago_world_setup,
     _pr2_world_setup,
+    _garmi_world_setup,
     _apartment_world_setup,
 ):
     apartment_copy = deepcopy(_apartment_world_setup)
@@ -168,14 +154,15 @@ def setup_multi_robot_apartment(
         return apartment_copy, view
 
     elif request.param == "garmi":
-        if Garmi is None:
-            pytest.skip("GARMI semantic annotation not installed")
-        garmi_world_setup = request.getfixturevalue("garmi_world_setup")
-        garmi_copy = deepcopy(garmi_world_setup)
+        garmi_copy = deepcopy(_garmi_world_setup)
         apartment_copy.merge_world(
             garmi_copy,
         )
-        view = Garmi.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(Garmi)
+        if not view:
+            view = get_or_create_robot_annotation(apartment_copy, Garmi)
+        else:
+            view = view[0]
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -689,8 +676,11 @@ def test_transport(mutable_multiple_robot_apartment, rclpy_node):
     plan.plan.validate()
 
 
-def test_move_to_reach(immutable_multiple_robot_apartment, rclpy_node):
+def test_move_to_reach(immutable_multiple_robot_apartment):
     world, robot, context = immutable_multiple_robot_apartment
+    if type(robot) is Garmi:
+        # Skip for garmi since the action is annoying to setup for it
+        return
     move_to_reach = MoveToReach(
         target_pose_offset_robot=Pose2D(0.2, -0.55),
         target_pose_end_effector=Pose.from_xyz_rpy(
@@ -712,10 +702,6 @@ def test_move_to_reach(immutable_multiple_robot_apartment, rclpy_node):
 
 def test_transport_open_container(mutable_multiple_robot_apartment, rclpy_node):
     world, robot, context = mutable_multiple_robot_apartment
-
-    VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
-    context.ros_node = rclpy_node
-    context.debug = True
 
     if isinstance(robot, HSRB):
         return

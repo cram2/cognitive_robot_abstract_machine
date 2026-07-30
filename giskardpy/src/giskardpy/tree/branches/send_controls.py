@@ -1,7 +1,8 @@
-from typing import List
+from typing import List, Optional
 
 from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import (
     JointGroupVelController,
+    VelocityCommand,
 )
 from giskardpy.tree.behaviors.joint_vel_controller_publisher import JointVelController
 from giskardpy.tree.behaviors.send_cmd_vel import SendCmdVelTwist
@@ -24,12 +25,14 @@ class SendControls(RunningSelector):
         cmd_topic: str,
         connections: List[ActiveConnection1DOF],
         minimum_valid_velocity: float,
+        velocity_command: Optional[VelocityCommand] = None,
     ):
         self.add_child(
             JointGroupVelController(
                 cmd_topic=cmd_topic,
                 connections=connections,
                 minimum_valid_velocity=minimum_valid_velocity,
+                velocity_command=velocity_command,
             )
         )
 

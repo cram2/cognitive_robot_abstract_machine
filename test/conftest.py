@@ -13,16 +13,9 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 
-try:
-    from semantic_digital_twin.robots.garmi import Garmi
-except ImportError:
-    Garmi = None
+from semantic_digital_twin.robots.garmi import Garmi
+from coraplex.datastructures.dataclasses import Context
 
-try:
-    from coraplex.datastructures.dataclasses import Context
-except ModuleNotFoundError:
-    # ROS dependencies.
-    Context = None
 from semantic_digital_twin.adapters.package_resolver import PathResolver
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
@@ -38,7 +31,6 @@ from krrood.utils import recursive_subclasses
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
@@ -361,8 +353,8 @@ def supported_abstract_robots():
         ICub3,
         UnitreeG1,
         MMPDresden,
+        Garmi,
         DAiSy,
-        # Garmi, We dont have the ROS Package yet
     ]
 
 
@@ -473,13 +465,7 @@ def hsr_world_copy(_hsr_world_setup):
 
 @pytest.fixture(scope="session")
 def _garmi_world_setup():
-    if Garmi is None:
-        pytest.skip("GARMI semantic annotation not installed")
-    urdf_dir = "package://garmi_description/urdf/garmi.urdf"
-    try:
-        return world_with_urdf_factory(urdf_dir, Garmi, OmniDrive)
-    except ParsingError as error:
-        pytest.skip(f"GARMI URDF not available: {error}")
+    return world_with_urdf_factory(Garmi, OmniDrive)
 
 
 @pytest.fixture(scope="session")
@@ -874,6 +860,15 @@ def tiago_apartment_world(_tiago_world_setup, _apartment_world_setup):
     apartment_copy.merge_world(tiago_copy)
 
     return apartment_copy, Tiago.from_world(apartment_copy)
+
+
+@pytest.fixture(scope="session")
+def garmi_apartment_world(_garmi_world_setup, _apartment_world_setup):
+    apartment_copy = deepcopy(_apartment_world_setup)
+    garmi_copy = deepcopy(_garmi_world_setup)
+    apartment_copy.merge_world(garmi_copy)
+
+    return apartment_copy, Garmi.from_world(apartment_copy)
 
 
 ###############################

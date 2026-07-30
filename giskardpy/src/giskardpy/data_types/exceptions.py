@@ -26,6 +26,33 @@ class SetupException(GiskardException):
 
 
 @dataclass
+class IncompleteKinematicChainParametersError(SetupException):
+    """
+    Raised when only one of ``root_links`` and ``tip_links`` is provided.
+    """
+
+    root_links: list[str] | None
+    """The root link names that were provided, or ``None``."""
+
+    tip_links: list[str] | None
+    """
+    The tip link names that were provided, or ``None``.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "root_links and tip_links must be provided together; "
+            f"got root_links={self.root_links} and tip_links={self.tip_links}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Pass both link lists as constructor arguments, or omit both to read "
+            "them from the ROS 2 node parameters."
+        )
+
+
+@dataclass
 class PlanningException(GiskardException):
     """
     Base class for errors that occur while planning a motion.

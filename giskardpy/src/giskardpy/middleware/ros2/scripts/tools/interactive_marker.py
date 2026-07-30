@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from time import sleep
 from dataclasses import dataclass, field
+from threading import Thread
 from typing import Dict, List
 
 import rclpy
@@ -13,6 +14,7 @@ from semantic_digital_twin.world_description.world_entity import (
 from visualization_msgs.msg import InteractiveMarker, InteractiveMarkerControl, Marker
 from visualization_msgs.msg import InteractiveMarkerFeedback
 
+from giskardpy.data_types.exceptions import IncompleteKinematicChainParametersError
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.payload_monitors import CountSeconds
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
@@ -32,10 +34,9 @@ class InteractiveMarkerNode:
     users to manipulate them via RViz. When a marker is moved, it generates motion
     goals that are sent to Giskard for execution.
 
-    Node parameters for launching the node:
-
-    - root_links: List of root link names for kinematic chains
-    - tip_links: List of tip link names corresponding to root_links
+    ``root_links`` and ``tip_links`` may be supplied directly as constructor arguments.
+    When omitted, they are read from ROS 2 node parameters, which allows configuration
+    via a launch file.
 
     Example Node for .launch.py:
 
@@ -63,54 +64,93 @@ class InteractiveMarkerNode:
     """
     Timeout in seconds for motion execution.
     """
+
+    root_links: List[str] | None = None
+    """
+    List of root link names.
+
+    When ``None``, read from the ``root_links`` ROS 2 parameter.
+    """
+
+    tip_links: List[str] | None = None
+    """
+    List of tip link names corresponding to ``root_links``.
+
+    When ``None``, read from the ``tip_links`` ROS 2 parameter.
+    """
+
     giskard: GiskardWrapper = field(init=False)
     """
     Wrapper for Giskard motion planner.
     """
+
     markers: Dict[str, KinematicChainMarker] = field(init=False)
     """
     Dictionary mapping marker names to KinematicChainMarker instances.
     """
+
     server: InteractiveMarkerServer | None = field(init=False)
     """
     Interactive marker server for RViz.
     """
-    root_links: List[str] = field(init=False)
-    """
-    List of root link names from parameters.
-    """
-    tip_links: List[str] = field(init=False)
-    """
-    List of tip link names from parameters.
-    """
 
     def __post_init__(self) -> None:
         """
-        Sets up the Giskard wrapper, reads parameters, creates kinematic chain markers,
-        and initializes the interactive marker server. Retries up to world_entity_retry_attempts
-        times if world entities are not found initially.
+        Sets up the Giskard wrapper, resolves kinematic chain parameters, creates
+        markers, and initializes the interactive marker server.
 
-        :raises WorldEntityNotFoundError: If kinematic structure entities cannot be found
-            after all retry attempts.
+        When ``root_links`` or ``tip_links`` were not passed to the constructor, they
+        are read from the ``root_links`` and ``tip_links`` ROS 2 node parameters.
+
+        :raises IncompleteKinematicChainParametersError: If only one of ``root_links``
+            and ``tip_links`` is provided.
+        :raises WorldEntityNotFoundError: If kinematic structure entities cannot be
+            found.
         """
+        if (self.root_links is None) != (self.tip_links is None):
+            raise IncompleteKinematicChainParametersError(
+                root_links=self.root_links, tip_links=self.tip_links
+            )
+
         self.giskard = GiskardWrapper(
             node_handle=rospy.node, giskard_node_name="giskard"
         )
         self.markers = {}
         self.server = None
 
-        self.giskard.node_handle.declare_parameters(
-            namespace="",
-            parameters=[
-                ("root_links", Parameter.Type.STRING_ARRAY),
-                ("tip_links", Parameter.Type.STRING_ARRAY),
-            ],
-        )
-        self.root_links = self.giskard.node_handle.get_parameter("root_links").value
-        self.tip_links = self.giskard.node_handle.get_parameter("tip_links").value
+        if self.root_links is None or self.tip_links is None:
+            self.giskard.node_handle.declare_parameters(
+                namespace="",
+                parameters=[
+                    ("root_links", Parameter.Type.STRING_ARRAY),
+                    ("tip_links", Parameter.Type.STRING_ARRAY),
+                ],
+            )
+            self.root_links = self.giskard.node_handle.get_parameter("root_links").value
+            self.tip_links = self.giskard.node_handle.get_parameter("tip_links").value
 
         self._initialize_markers()
         self._setup_marker_server()
+
+    @classmethod
+    def start_in_background_thread(
+        cls, root_links: List[str], tip_links: List[str]
+    ) -> Thread:
+        """
+        Start an interactive marker node for the given kinematic chains in a daemon
+        thread.
+
+        :param root_links: Root link names of the kinematic chains.
+        :param tip_links: Tip link names corresponding to ``root_links``.
+        :return: The started daemon thread running the node.
+        """
+        thread = Thread(
+            target=lambda: cls(root_links=root_links, tip_links=tip_links),
+            daemon=True,
+            name="interactive_marker",
+        )
+        thread.start()
+        return thread
 
     def _initialize_markers(self) -> None:
         """
@@ -130,8 +170,8 @@ class InteractiveMarkerNode:
         """
         Set up the interactive marker server and register all markers.
 
-        Creates the server, configures each marker with controls,
-        and registers feedback callbacks.
+        Creates the server, configures each marker with controls, and registers feedback
+        callbacks.
         """
         self.server = InteractiveMarkerServer(rospy.node, "cartesian_goals")
 
@@ -147,10 +187,11 @@ class InteractiveMarkerNode:
         Process feedback from interactive markers when user interactions occur.
 
         When a marker is released (MOUSE_UP event), this method extracts the new pose,
-        creates a motion goal with a timeout, and sends it to Giskard for execution.
-        The marker is then reset to its default pose.
+        creates a motion goal with a timeout, and sends it to Giskard for execution. The
+        marker is then reset to its default pose.
 
-        :param feedback: The interactive marker feedback containing pose and event information.
+        :param feedback: The interactive marker feedback containing pose and event
+            information.
         """
         if feedback.event_type != InteractiveMarkerFeedback.MOUSE_UP:
             return
@@ -187,10 +228,8 @@ class InteractiveMarkerNode:
             EndMotion.when_any_true([goal_transformation, motion_timeout])
         )
         self.giskard.execute_async(motion_statechart)
-
         # Reset marker pose
         kinematic_chain_marker.reset_pose()
-
         # Update marker in server
         self.server.insert(kinematic_chain_marker.interactive_marker_message)
         self.server.applyChanges()
@@ -210,38 +249,47 @@ class KinematicChainMarker:
     """
     Name of the root link in the kinematic chain.
     """
+
     tip_link: str
     """
     Name of the tip/end-effector link in the kinematic chain.
     """
+
     root_body: KinematicStructureEntity
     """
     Kinematic structure entity representing the root body.
     """
+
     tip_body: KinematicStructureEntity
     """
     Kinematic structure entity representing the tip body.
     """
+
     marker_scale: float = 0.25
     """
     Scale of the interactive marker in meters.
     """
+
     marker_box_size: float = 0.175
     """
     Size of the marker box along each axis in meters.
     """
+
     marker_color_value: float = 0.5
     """
     RGB color value for the marker box (0.0 to 1.0).
     """
+
     marker_color_alpha: float = 0.5
     """
     Alpha transparency value for the marker box (0.0 to 1.0).
     """
+
     name: str = field(init=False)
     """
     Formatted name combining root and tip links.
     """
+
     interactive_marker_message: InteractiveMarker = field(init=False)
     """
     ROS InteractiveMarker message object.
@@ -258,8 +306,8 @@ class KinematicChainMarker:
         """
         Configure and create the interactive marker with all controls.
 
-        Sets up marker frame, appearance (cube visualization), and movement and
-        rotation controls for all axes.
+        Sets up marker frame, appearance (cube visualization), and movement and rotation
+        controls for all axes.
         """
         self._setup_marker_properties()
         self._add_box_control()
@@ -293,7 +341,6 @@ class KinematicChainMarker:
         box_control.always_visible = True
         box_control.markers.append(box_marker)
         box_control.interaction_mode = InteractiveMarkerControl.MOVE_PLANE
-
         self.interactive_marker_message.controls.append(box_control)
 
     def _add_movement_controls(self) -> None:
@@ -352,7 +399,8 @@ class KinematicChainMarker:
         Add a single interactive marker control for translation or rotation.
 
         :param name: Identifier for the control (e.g., "move_x", "rotate_z")
-        :param interaction_mode: InteractiveMarkerControl mode (MOVE_AXIS or ROTATE_AXIS)
+        :param interaction_mode: InteractiveMarkerControl mode (MOVE_AXIS or
+            ROTATE_AXIS)
         :param x: X component of the control orientation quaternion
         :param y: Y component of the control orientation quaternion
         :param z: Z component of the control orientation quaternion
@@ -386,8 +434,8 @@ def main(args: None = None) -> None:
     """
     Main entry point for the interactive marker ROS 2 node.
 
-    Initializes the ROS 2 node, creates the InteractiveMarkerNode instance,
-    logs a startup message, and keeps the node running until shutdown is requested.
+    Initializes the ROS 2 node, creates the InteractiveMarkerNode instance, logs a
+    startup message, and keeps the node running until shutdown is requested.
 
     :param args: Optional command-line arguments (currently unused)
     """

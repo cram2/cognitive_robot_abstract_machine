@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Dict, Set, Any
 from uuid import UUID
 
-import mujoco
 from typing_extensions import (
     Optional,
     List,
@@ -23,6 +22,7 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
+    import mujoco
     from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
     from semantic_digital_twin.robots.robot_parts import (
         AbstractRobot,
@@ -1273,7 +1273,8 @@ class MujocoEntityNotFoundError(MujocoError):
 @dataclass
 class VideoRecordingError(MultiSimError):
     """
-    Base class for all :class:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder`
+    Base class for all
+    :class:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder`
     exceptions.
     """
 
@@ -1281,8 +1282,9 @@ class VideoRecordingError(MultiSimError):
 @dataclass
 class VideoRecordingAlreadyStartedError(VideoRecordingError):
     """
-    Raised when :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder.start`
-    is called on a recorder that is already recording.
+    Raised when the
+    :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder.start`
+    method is called on a recorder that is already recording.
     """
 
     world: World
@@ -1300,8 +1302,9 @@ class VideoRecordingAlreadyStartedError(VideoRecordingError):
 @dataclass
 class VideoRecordingNotStartedError(VideoRecordingError):
     """
-    Raised when :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder.stop`
-    is called on a recorder that was never started.
+    Raised when the
+    :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder.stop`
+    method is called on a recorder that was never started.
     """
 
     world: World
@@ -1340,7 +1343,8 @@ class EmptyWorldVideoRecordingError(VideoRecordingError):
 @dataclass
 class EmptyVideoRecordingError(VideoRecordingError):
     """
-    Raised when :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.RecordedVideo.write`
+    Raised when
+    :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.RecordedVideo.write`
     is called on a recording that has no frames.
     """
 
@@ -1359,7 +1363,8 @@ class EmptyVideoRecordingError(VideoRecordingError):
 @dataclass
 class InvalidVideoRecordingRateError(VideoRecordingError):
     """
-    Raised when a :class:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder`
+    Raised when a
+    :class:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder`
     is configured with a non-positive rate.
     """
 
