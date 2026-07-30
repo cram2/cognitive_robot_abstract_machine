@@ -20,6 +20,7 @@ world synchronization while the symbolic coupling is rebuilt per world.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass, field
 from importlib.resources import files
@@ -37,6 +38,7 @@ from semantic_digital_twin.exceptions import (
     LearnedModelGeometryMismatchError,
     MissingFillEquationError,
     MissingLearnedModelCheckpointError,
+    NonArticulatedDrainError,
 )
 from semantic_digital_twin.physics.equations.pouring_equations import (
     ArticulatedPouringEquation,
@@ -53,9 +55,15 @@ SHIPPED_HEAD_SURROGATE_CHECKPOINT: str = (
 )
 """Workspace-relative path of the committed reference checkpoint.
 
-Trained for the Jeroen cup geometry (container height 0.16 m, width 0.07 m, derived from
-``resources/stl/jeroen_cup.stl``) with the default hidden width. Use it as a working default;
-train a dedicated checkpoint for any other cup geometry."""
+Trained for the Jeroen cup geometry (derived from ``resources/stl/jeroen_cup.stl``) with the
+default hidden width. Use it as a working default; train a dedicated checkpoint for any other
+cup geometry."""
+
+SHIPPED_HEAD_SURROGATE_CONTAINER_HEIGHT: float = 0.16
+"""Container height, in metres, the shipped reference checkpoint was trained for."""
+
+SHIPPED_HEAD_SURROGATE_CONTAINER_WIDTH: float = 0.07
+"""Container width, in metres, the shipped reference checkpoint was trained for."""
 
 
 @dataclass
@@ -103,6 +111,24 @@ class LearnedHeadModelReference(SubclassJSONSerializer):
             return path
         return self.workspace_root() / path
 
+    def checkpoint_digest(self) -> str:
+        """
+        Hex digest identifying the resolved checkpoint file and its exact contents.
+
+        Two references digest equally only if they resolve to the same file holding the same
+        bytes, so checkpoints that merely share a file name never alias each other.
+
+        :return: A 16-character hexadecimal digest.
+        :raises MissingLearnedModelCheckpointError: if the checkpoint file does not exist.
+        """
+        path = self.resolved_checkpoint_path()
+        if not path.exists():
+            raise MissingLearnedModelCheckpointError(checkpoint_path=path)
+        hasher = hashlib.sha256()
+        hasher.update(str(path).encode())
+        hasher.update(path.read_bytes())
+        return hasher.hexdigest()[:16]
+
     def load_torch_model(self) -> Any:
         """
         Rebuild the surrogate network and load the checkpoint weights.
@@ -142,6 +168,18 @@ class LearnedHeadModelReference(SubclassJSONSerializer):
         )
 
 
+def shipped_head_model_reference() -> LearnedHeadModelReference:
+    """
+    :return: A reference to the committed default checkpoint, declared with the container
+        geometry it was trained for.
+    """
+    return LearnedHeadModelReference(
+        checkpoint_path=SHIPPED_HEAD_SURROGATE_CHECKPOINT,
+        trained_container_height=SHIPPED_HEAD_SURROGATE_CONTAINER_HEIGHT,
+        trained_container_width=SHIPPED_HEAD_SURROGATE_CONTAINER_WIDTH,
+    )
+
+
 @dataclass
 class HasLearnedHead:
     """
@@ -150,6 +188,9 @@ class HasLearnedHead:
     Combine with :class:`ArticulatedPouringEquation` (or a subclass); the mixin overrides
     ``head_above_lip`` and extends the JSON round trip with the model reference. The l4casadi
     wrapper is a process-local cache, rebuilt lazily on first evaluation and never serialized.
+
+    ..note:: This mixin carries no persistence of its own; the equations inheriting it map its
+        fields within their own single-rooted DAO hierarchy.
     """
 
     GEOMETRY_ABSOLUTE_TOLERANCE: ClassVar[float] = 1e-6
@@ -194,20 +235,54 @@ class HasLearnedHead:
         :return: The callable l4casadi wrapper.
         :raises LearnedModelGeometryMismatchError: if the checkpoint was trained for a different
             container geometry than this equation describes.
+        :raises MissingLearnedModelCheckpointError: if the checkpoint file does not exist.
         """
-        import l4casadi
-
         self._validate_geometry_matches_reference()
         name = self._generated_function_name()
         cached = self._l4casadi_cache.get(name)
         if cached is not None:
             return cached
+
+        import l4casadi
+
         torch_model = self.model_reference.load_torch_model()
-        wrapper = l4casadi.L4CasADi(torch_model, name=name, batched=True)
+        wrapper = l4casadi.L4CasADi(
+            torch_model,
+            name=name,
+            batched=True,
+            build_dir=str(self._generated_code_directory(name)),
+        )
         self._l4casadi_cache[name] = wrapper
         return wrapper
 
+    @staticmethod
+    def _generated_code_directory(generated_function_name: str) -> Path:
+        """
+        Per-user cache directory the l4casadi C code and shared library are built in.
+
+        Keeps build artifacts out of the process's working directory and gives every generated
+        model its own directory, so builds of different checkpoints cannot race each other.
+
+        :param generated_function_name: The generated model's unique C identifier.
+        :return: The created build directory.
+        """
+        directory = (
+            Path.home()
+            / ".cache"
+            / "semantic_digital_twin"
+            / "l4casadi"
+            / generated_function_name
+        )
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
     def _validate_geometry_matches_reference(self) -> None:
+        """
+        Ensure this equation's container geometry equals the geometry the referenced
+        checkpoint was trained for, within :attr:`GEOMETRY_ABSOLUTE_TOLERANCE`.
+
+        :raises LearnedModelGeometryMismatchError: if the geometries deviate.
+        """
         reference = self.model_reference
         height_deviation = abs(
             reference.trained_container_height - self.container_height
@@ -228,19 +303,20 @@ class HasLearnedHead:
         """
         A deterministic C identifier for the l4casadi generated code.
 
-        Derived from the checkpoint and geometry (never from object identity), so equal
-        references map to the same generated code across instances and processes.
+        Derived from the checkpoint digest and the container geometry (never from object
+        identity), so equal references map to the same generated code across instances and
+        processes while distinct checkpoints — even under identical file names — never share
+        one generated model.
+
+        :raises MissingLearnedModelCheckpointError: if the checkpoint file does not exist.
         """
-        checkpoint_stem = re.sub(
-            r"\W", "_", self.model_reference.resolved_checkpoint_path().stem
-        )
         geometry_tag = re.sub(
             r"\W",
             "_",
             f"{self.model_reference.hidden_width}"
             f"_{self.container_height}_{self.container_width}",
         )
-        return f"learned_head_{checkpoint_stem}_{geometry_tag}"
+        return f"learned_head_{self.model_reference.checkpoint_digest()}_{geometry_tag}"
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
@@ -251,6 +327,13 @@ class HasLearnedHead:
     def _constructor_arguments_from_json(
         cls, data: Dict[str, Any], **kwargs
     ) -> Dict[str, Any]:
+        """
+        Extend the analytic constructor arguments with the deserialized model reference.
+
+        :param data: The JSON dict.
+        :param kwargs: Additional deserialization context.
+        :return: Keyword arguments for the constructor.
+        """
         arguments = super()._constructor_arguments_from_json(data, **kwargs)
         arguments["model_reference"] = LearnedHeadModelReference.from_json(
             data["model_reference"], **kwargs
@@ -316,7 +399,8 @@ def couple_source_with_learned_head(
     coupling, so the gate, the receiver inflow, and the projectile are all built from the learned
     head. The gated learned drain is installed by the coupling itself via
     :meth:`HasLearnedHead.with_gate`, keeping drain and inflow volume-consistent. The source may
-    already be coupled (analytically or learned); the previous coupling is replaced.
+    already be coupled (analytically or learned); the previous coupling is replaced, keeping the
+    receiver's tuned exit speed and gate sharpnesses.
 
     :param receiver: The container to be filled.
     :param source: The container to pour from; must already have a fill equation.
@@ -324,18 +408,22 @@ def couple_source_with_learned_head(
     :param model_reference: Reference to the trained head surrogate for the source's geometry.
 
     :raises MissingFillEquationError: if the source was never initialized with a fill level.
+    :raises NonArticulatedDrainError: if the source's drain carries no articulated cup geometry
+        to derive the learned drain from.
     """
-    equation = source.fill_equation
-    if equation is None:
+    drain = source.fill_equation
+    if drain is None:
         raise MissingFillEquationError(source=source)
+    if not isinstance(drain, ArticulatedPouringEquation):
+        raise NonArticulatedDrainError(source=source, drain=drain)
     receiver.recouple_outflow_from(
         source=source,
         world=world,
         fill_equation=LearnedPouringEquation(
-            container_height=equation.container_height,
-            container_width=equation.container_width,
-            outflow_rate_constant=equation.outflow_rate_constant,
-            discharge_coefficient=equation.discharge_coefficient,
+            container_height=drain.container_height,
+            container_width=drain.container_width,
+            outflow_rate_constant=drain.outflow_rate_constant,
+            discharge_coefficient=drain.discharge_coefficient,
             model_reference=model_reference,
         ),
     )

@@ -1,5 +1,6 @@
 import builtins
 import importlib
+import math
 import sys
 
 import krrood.symbolic_math.symbolic_math as sm
@@ -13,7 +14,7 @@ from giskardpy.motion_statechart.graph_node import DebugExpression
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.ros_executor import Ros2Executor
-from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types import Point3, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import RevoluteConnection
 
@@ -134,7 +135,9 @@ def test_stop_clears_previously_published_markers(rclpy_node, cylinder_bot_world
     assert publisher._publisher._published_marker_identities == set()
 
 
-def test_anchored_vector_tracks_moving_visualisation_frame(rclpy_node, mini_world):
+def test_anchored_vector_tracks_moving_visualisation_frame(
+    rclpy_node, mini_world: World
+) -> None:
     """
     A vector anchored to a moving visualisation frame stays correct as that frame moves.
 
@@ -155,9 +158,66 @@ def test_anchored_vector_tracks_moving_visualisation_frame(rclpy_node, mini_worl
     anchored = publisher._anchored_expression(tip_axis_in_world)
     mini_world.set_positions_1DOF_connection({joint: 1.0})
 
+    # The frame must actually have rotated: in the world the tip axis now points at the
+    # rotated direction, so the constant anchored value below is not a silent no-op.
+    np.testing.assert_allclose(
+        tip_axis_in_world.evaluate().flatten()[:3],
+        [math.cos(1.0), math.sin(1.0), 0.0],
+        atol=1e-6,
+    )
     np.testing.assert_allclose(
         anchored.evaluate().flatten()[:3], [1.0, 0.0, 0.0], atol=1e-6
     )
+
+
+def test_anchoring_leaves_non_vector_expressions_unchanged(
+    rclpy_node, mini_world: World
+) -> None:
+    """
+    Only vectors need re-expression; any other spatial type passes through untouched.
+    """
+    tip = mini_world.get_body_by_name("tip")
+    point = Point3(x=1, y=2, z=3, reference_frame=mini_world.root)
+    point.visualisation_frame = tip
+    publisher = DebugExpressionPublisher(world=mini_world, node=rclpy_node)
+
+    assert publisher._anchored_expression(point) is point
+
+
+def test_anchoring_leaves_vector_without_visualisation_frame_unchanged(
+    rclpy_node, mini_world: World
+) -> None:
+    """
+    A vector with no visualisation frame has nothing to anchor to.
+    """
+    vector = Vector3(x=1, y=0, z=0, reference_frame=mini_world.root)
+    publisher = DebugExpressionPublisher(world=mini_world, node=rclpy_node)
+
+    assert publisher._anchored_expression(vector) is vector
+
+
+def test_anchoring_leaves_vector_already_in_visualisation_frame_unchanged(
+    rclpy_node, mini_world: World
+) -> None:
+    """
+    A vector already expressed in its visualisation frame needs no re-expression.
+    """
+    tip = mini_world.get_body_by_name("tip")
+    vector = Vector3(x=1, y=0, z=0, reference_frame=tip, visualisation_frame=tip)
+    publisher = DebugExpressionPublisher(world=mini_world, node=rclpy_node)
+
+    assert publisher._anchored_expression(vector) is vector
+
+
+def test_stop_without_publisher_is_a_no_op(rclpy_node, mini_world: World) -> None:
+    """
+    Stopping a publisher that never attached must not raise.
+    """
+    publisher = DebugExpressionPublisher(world=mini_world, node=rclpy_node)
+
+    publisher.stop()
+
+    assert publisher._publisher is None
 
 
 def test_attach_publisher_tracks_state_changes(rclpy_node, cylinder_bot_world):

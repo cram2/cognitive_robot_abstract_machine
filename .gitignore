@@ -162,3 +162,6 @@ class_diagram.pdf
 # Personal, per-user Claude Code memory (populated by .claude/hooks/session-start.sh
 # from the claude/personal-notes branch). Never committed on any branch.
 CLAUDE.local.md
+
+# l4casadi code-generation artifacts (fallback default build directory)
+_l4c_generated/

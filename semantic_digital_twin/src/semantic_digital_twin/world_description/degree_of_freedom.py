@@ -165,9 +165,8 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     Whether this DOF's state may be overwritten from an external source (e.g.
     perception) while a motion is running, rather than being owned by the controller.
 
-    Declared by whoever adds the object to the world (not known at server setup). The world
-    synchronizer applies buffered external updates only to DOFs with this flag set; see
-    :meth:`semantic_digital_twin.adapters.ros.world_synchronizer.WorldSynchronizer.apply_external_state_updates`.
+    Declared by whoever adds the object to the world (not known at server setup).
+    Buffered external state updates are applied only to DOFs with this flag set.
     """
 
     def __post_init__(self):

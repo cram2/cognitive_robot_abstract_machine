@@ -3,7 +3,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Tuple
 
 import numpy as np
 import trimesh
@@ -15,6 +14,7 @@ from typing_extensions import (
     Optional,
     Self,
     Set,
+    Tuple,
     Type,
     TypeVar,
 )
@@ -40,23 +40,16 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from random_events.product_algebra import Event
 from random_events.set import Set as EventSet
 from random_events.variable import Symbolic
-from typing_extensions import (
-    TYPE_CHECKING,
-    Generic,
-    List,
-    Optional,
-    Self,
-    Set,
-    Type,
-    TypeVar,
-)
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
     AmbiguousPart,
     CannotBeAPartOf,
+    FillLevelAlreadyInitializedError,
     MissingFillEquationError,
+    ReceiverAlreadyCoupledError,
+    ReceiverNotInitializedError,
     SourceAlreadyCoupledError,
     UnknownPartWholeRelationshipField,
 )
@@ -115,7 +108,6 @@ if TYPE_CHECKING:
         Leg,
         Sink,
     )
-    from semantic_digital_twin.world import World
 
 
 @dataclass(eq=False)
@@ -1034,6 +1026,9 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
         return container_event
 
 
+# %% liquid source interface
+
+
 class LiquidSource(ABC):
     """
     A source of liquid that can pour into a container.
@@ -1098,6 +1093,9 @@ class LiquidSource(ABC):
     @abstractmethod
     def validate_can_pour(self) -> None:
         """Raise if the source cannot currently pour, e.g. uninitialized or already coupled."""
+
+
+# %% fill-level container
 
 
 @dataclass(eq=False)
@@ -1178,7 +1176,7 @@ class HasFillLevel(HasRootBody, LiquidSource):
 
     def initialize_fill_level(
         self,
-        world,
+        world: World,
         initial_fill: float = 1.0,
         outflow_rate_constant: float = 1.0,
         discharge_coefficient: float = DEFAULT_DISCHARGE_COEFFICIENT,
@@ -1192,7 +1190,10 @@ class HasFillLevel(HasRootBody, LiquidSource):
         :param initial_fill: Starting fill level in [0, 1].
         :param outflow_rate_constant: Outflow rate constant for the articulated pouring equation.
         :param discharge_coefficient: Scales the Torricelli exit speed to a realistic pour range.
+        :raises FillLevelAlreadyInitializedError: if this container's fill level is already initialized.
         """
+        if self.fill_connection is not None:
+            raise FillLevelAlreadyInitializedError(container=self)
         fill_equation = ArticulatedPouringEquation(
             container_width=self.root.collision.width,
             container_height=self.root.collision.height,
@@ -1250,11 +1251,20 @@ class HasFillLevel(HasRootBody, LiquidSource):
 
         ..warning:: This mutates the source via :meth:`LiquidSource.couple_drain_to_gate`.
 
-        :raises MissingFillEquationError: if this receiver was never initialized with a fill level.
+        :raises MissingFillEquationError: if the source was never initialized with a fill level.
+        :raises SourceAlreadyCoupledError: if the source's outflow is already gated onto a receiver.
+        :raises ReceiverNotInitializedError: if this receiver was never initialized with a fill level.
+        :raises ReceiverAlreadyCoupledError: if this receiver's inflow is already coupled to a source.
         """
         source.validate_can_pour()
         if self.fill_connection is None:
-            raise MissingFillEquationError(source=self)
+            raise ReceiverNotInitializedError(receiver=self)
+        if (
+            self.inflow_coupling is not None
+            or self.inflow_equation is not None
+            or self.fill_connection.inflow_equation is not None
+        ):
+            raise ReceiverAlreadyCoupledError(receiver=self)
         if isinstance(source, WorldEntityWithID):
             coupling = LiquidTransferCoupling(
                 source_id=source.id,
@@ -1274,19 +1284,42 @@ class HasFillLevel(HasRootBody, LiquidSource):
         """
         Replace the source's drain with ``fill_equation`` and (re-)establish the coupling from it.
 
-        Unlike :meth:`receive_outflow_from`, this accepts a source that is already coupled: the
-        previous gated drain is discarded, so a client can switch the source's head model (for
-        example analytic to learned) against a live Giskard process. The equation swap is
-        published, which marks the coupling stale in every synchronized world, and
-        :meth:`ensure_inflow_coupling` rebuilds it there from the new equation.
+        Unlike :meth:`receive_outflow_from`, this accepts a source and a receiver that are already
+        coupled: the previous gated drain and inflow are discarded while the coupling's exit speed
+        and gate sharpnesses are kept, so a client can switch the source's head model (for example
+        analytic to learned) against a live Giskard process. The equation swap is published, which
+        marks the coupling stale in every synchronized world, and :meth:`ensure_inflow_coupling`
+        rebuilds it there from the new equation.
 
         :param source: The liquid source whose drain is replaced.
         :param world: The world providing the forward kinematics for the geometric gate.
         :param fill_equation: The new, ungated drain equation for the source.
         """
+        previous_coupling = self.inflow_coupling
         with world.modify_world():
             source.add_fill_equation(fill_equation)
-        self.receive_outflow_from(source=source, world=world)
+        self._clear_inflow_coupling(world)
+        if previous_coupling is None:
+            self.receive_outflow_from(source=source, world=world)
+            return
+        self.receive_outflow_from(
+            source=source,
+            world=world,
+            exit_speed=previous_coupling.exit_speed,
+            height_gate_sharpness=previous_coupling.height_gate_sharpness,
+            overlap_gate_sharpness=previous_coupling.overlap_gate_sharpness,
+        )
+
+    def _clear_inflow_coupling(self, world: World) -> None:
+        """
+        Detach the coupling descriptor and the local symbolic inflow so this receiver can be
+        coupled anew.
+
+        :param world: The world the coupling was built against.
+        """
+        with world.modify_world(publish_changes=False):
+            self.add_inflow_equation(None)
+            self.set_inflow_coupling(None)
 
     def _establish_inflow_coupling(
         self,
@@ -1420,7 +1453,7 @@ class HasFillLevel(HasRootBody, LiquidSource):
         :return: Symbolic outflow volume rate, positive while pouring.
         """
         normalised_drain = self.fill_equation.symbolic_velocity(self.fill_connection)
-        return -normalised_drain * self.fill_equation.cross_section_volume
+        return -normalised_drain * self.fill_equation.half_cross_section_area
 
     def current_outflow_velocity(self, world: World) -> Optional[sm.Scalar]:
         """
@@ -1446,11 +1479,10 @@ class HasFillLevel(HasRootBody, LiquidSource):
         :param world: The world providing the forward kinematics.
         :return: Symbolic exit point in the world frame.
         """
-        exit_point = world.compose_forward_kinematics_expression(
-            world.root, self.root
-        ) @ self._rim_exit_point(world)
-        exit_point.reference_frame = world.root
-        return exit_point
+        world_T_cup = world.compose_forward_kinematics_expression(world.root, self.root)
+        world_P_rim_exit = world_T_cup @ self._rim_exit_point(world)
+        world_P_rim_exit.reference_frame = world.root
+        return world_P_rim_exit
 
     def _rim_exit_point(self, world: World) -> Point3:
         """
@@ -1466,25 +1498,21 @@ class HasFillLevel(HasRootBody, LiquidSource):
         collision = self.root.collision
         lower = collision.min_point
         upper = collision.max_point
-        cup_rotation_world = world.compose_forward_kinematics_expression(
+        cup_R_world = world.compose_forward_kinematics_expression(
             self.root, world.root
         ).to_rotation_matrix()
-        world_up_in_cup = cup_rotation_world @ Vector3.Z()
-        tilt_magnitude_squared = (
-            world_up_in_cup.x * world_up_in_cup.x
-            + world_up_in_cup.y * world_up_in_cup.y
-        )
+        cup_V_up = cup_R_world @ Vector3.Z()
+        tilt_magnitude_squared = cup_V_up.x * cup_V_up.x + cup_V_up.y * cup_V_up.y
         normalization = sm.sqrt(tilt_magnitude_squared + self.RIM_EXIT_TILT_EPSILON**2)
         half_extent_x = (upper.x - lower.x) / 2
         half_extent_y = (upper.y - lower.y) / 2
-        return Point3(
-            x=(lower.x + upper.x) / 2
-            - world_up_in_cup.x / normalization * half_extent_x,
-            y=(lower.y + upper.y) / 2
-            - world_up_in_cup.y / normalization * half_extent_y,
+        cup_P_rim_exit = Point3(
+            x=(lower.x + upper.x) / 2 - cup_V_up.x / normalization * half_extent_x,
+            y=(lower.y + upper.y) / 2 - cup_V_up.y / normalization * half_extent_y,
             z=upper.z,
             reference_frame=self.root,
         )
+        return cup_P_rim_exit
 
     def liquid_exit_direction(self, world: World) -> Vector3:
         """
@@ -1493,10 +1521,11 @@ class HasFillLevel(HasRootBody, LiquidSource):
         :param world: The world providing the forward kinematics.
         :return: Symbolic exit direction in the world frame.
         """
-        rotation = world.compose_forward_kinematics_expression(
+        world_R_cup = world.compose_forward_kinematics_expression(
             world.root, self.root
         ).to_rotation_matrix()
-        return rotation @ Vector3.Z()
+        world_V_pour = world_R_cup @ Vector3.Z()
+        return world_V_pour
 
     @property
     def pour_tilt_expression(self) -> sm.Scalar:
@@ -1619,12 +1648,11 @@ class HasFillLevel(HasRootBody, LiquidSource):
         :param world: The world providing the forward kinematics.
         :return: Symbolic opening centre in the world frame.
         """
-        opening_point = (
-            world.compose_forward_kinematics_expression(world.root, self.root)
-            @ self.rim_point()
-        )
-        opening_point.reference_frame = world.root
-        return opening_point
+        world_T_cup = world.compose_forward_kinematics_expression(world.root, self.root)
+        cup_P_rim = self.rim_point()
+        world_P_opening = world_T_cup @ cup_P_rim
+        world_P_opening.reference_frame = world.root
+        return world_P_opening
 
     def rim_point(self) -> Point3:
         """

@@ -15,6 +15,7 @@ from semantic_digital_twin.physics.equations.pouring_equations import (
     DEFAULT_POUR_EXIT_SPEED,
     tilt_expression_from_fk,
 )
+from semantic_digital_twin.exceptions import MissingFillLevelLimitsError
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -1201,25 +1202,15 @@ class LiquidTransferCoupling(SubclassJSONSerializer):
 
 
 @dataclass(eq=False)
-class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
+class LiquidConnection(PrismaticConnection, HasUpdateState):
     """
-    Translating DOF representing the fill level of a container.
+    Prismatic connection whose degree of freedom is the normalized fill level of a
+    container, integrated from :attr:`outflow_equation` and :attr:`inflow_equation` each
+    physics step (either may be ``None``; the net velocity is their sum).
 
-    Integrates :attr:`outflow_equation` and :attr:`inflow_equation` each tick.
-    Either may be ``None``; the net velocity is their sum.
-
-    **Why the fill DOF is passive (not QP-active)**
-
-    The fill level must be driven exclusively by physics: liquid flows out only when the container is
-    physically tilted beyond the spill threshold. If the fill DOF were listed in :meth:`active_dofs`,
-    the QP solver would include it as a free variable and could satisfy pouring constraints by directly
-    commanding fill velocity — bypassing the tilt mechanics entirely. In practice this caused the QP to
-    drain the container without the cup ever tilting, because using the fill DOF directly was a cheaper
-    path to minimising the constraint error than moving all the arm joints.
-
-    Declaring the DOF as passive (via :meth:`passive_dofs`) keeps it in the world state and forward-
-    kinematics parameter set — so the FK phantom-link transform and constraint expressions that read
-    ``fill_sym`` remain valid — while excluding it from the QP's optimisation variables.
+    The fill DOF is passive: it stays in the world state and forward-kinematics
+    parameter set so expressions reading :attr:`fill_position` remain valid, but it is
+    never a QP optimisation variable and can only be driven by the physics equations.
     """
 
     outflow_equation: Optional[PouringEquation] = field(
@@ -1249,7 +1240,7 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
     """
 
     @property
-    def active_dofs(self) -> List[DegreeOfFreedom]:
+    def active_dofs(self) -> list[DegreeOfFreedom]:
         """
         Returns an empty list so the QP solver cannot command fill velocity directly.
 
@@ -1258,7 +1249,7 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
         return []
 
     @property
-    def passive_dofs(self) -> List[DegreeOfFreedom]:
+    def passive_dofs(self) -> list[DegreeOfFreedom]:
         """
         Registers the fill DOF as passive so it remains in the world state and FK
         parameter set without being a QP optimisation variable.
@@ -1306,18 +1297,8 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
         copy.inflow_equation = self.inflow_equation
         return copy
 
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
-        translation_axis = self.axis * self.dof.variables.position
-        self._kinematics = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=translation_axis[0],
-            y=translation_axis[1],
-            z=translation_axis[2],
-            child_frame=self.child,
-        )
-
     @property
-    def tilt_expression(self) -> Optional[Scalar]:
+    def tilt_expression(self) -> Scalar:
         """
         Symbolic tilt angle used by :attr:`outflow_equation` during physics integration.
         """
@@ -1343,14 +1324,18 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
         equations guard against themselves.
 
         :param dt: Time elapsed since the previous step, in seconds.
+        :raises MissingFillLevelLimitsError: If the fill DOF has no position limits to
+            clamp to.
         """
+        limits = self.raw_dof.limits
+        if limits.lower.position is None or limits.upper.position is None:
+            raise MissingFillLevelLimitsError(connection_name=self.name)
         state = self._world.state
         velocity = sum(
             equation.symbolic_velocity(self).evaluate()[0]
             for equation in (self.outflow_equation, self.inflow_equation)
             if equation is not None
         )
-        limits = self.raw_dof.limits
         integrated_position = state[self.raw_dof.id].position + velocity * dt
         state[self.raw_dof.id].position = min(
             max(integrated_position, limits.lower.position), limits.upper.position

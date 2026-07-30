@@ -1,9 +1,6 @@
 from py_trees.decorators import FailureIsRunning, SuccessIsRunning
 
 from giskardpy.executor import SimulationPacer
-from giskardpy.tree.behaviors.apply_external_state_updates import (
-    ApplyExternalStateUpdates,
-)
 from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.behaviors.time import RosTime
@@ -42,12 +39,6 @@ class ControlLoop(AsyncBehavior):
         self.publish_state = PublishState("publish state 2")
         self.publish_state.add_publish_feedback()
         self.projection_synchronization = Synchronization()
-        # Apply externally-sensed DOF state (e.g. perception) before the controller reads the world.
-        # Present in both modes so it also runs in standalone (projection) runtime, not only closed
-        # loop against real hardware.
-        self.projection_synchronization.insert_child(
-            ApplyExternalStateUpdates(), index=0
-        )
         self.projection_synchronization_sir = SuccessIsRunning(
             f"sir {self.projection_synchronization.name}",
             self.projection_synchronization,
@@ -57,9 +48,6 @@ class ControlLoop(AsyncBehavior):
         self.ros_time = RosTime()
         self.send_controls = SendControls()
         self.closed_loop_synchronization = Synchronization()
-        self.closed_loop_synchronization.insert_child(
-            ApplyExternalStateUpdates(), index=0
-        )
         self.closed_loop_synchronization_sir = SuccessIsRunning(
             f"sir {self.closed_loop_synchronization.name}",
             self.closed_loop_synchronization,

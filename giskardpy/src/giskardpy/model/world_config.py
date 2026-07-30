@@ -8,6 +8,7 @@ import numpy as np
 from sqlalchemy import select
 
 from krrood.ormatic.data_access_objects.helper import get_dao_class
+from giskardpy.data_types.exceptions import WorldNotEmptyError
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
@@ -63,6 +64,15 @@ class WorldWithFixedRobot(WorldConfig):
     urdf_view: AbstractRobot = field(kw_only=True, default=MinimalRobot)
 
     def setup_world(self):
+        """
+        Parses the URDF into :attr:`world`, making the robot root the world root.
+
+        :raises WorldNotEmptyError: If :attr:`world` already contains kinematic
+            structure, since merging would then attach the robot below the existing root
+            instead of making it the root.
+        """
+        if not self.world.is_empty():
+            raise WorldNotEmptyError(config_name=type(self).__name__)
         urdf_parser = URDFParser(urdf=self.urdf, prefix="")
         world_with_robot = urdf_parser.parse()
         self.urdf_view.from_world(world_with_robot)

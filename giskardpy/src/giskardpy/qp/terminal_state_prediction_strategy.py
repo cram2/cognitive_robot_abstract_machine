@@ -26,6 +26,15 @@ from giskardpy.qp.dof_limits import DirectLimits
 from giskardpy.qp.enforcement_strategy import IntegralStrategy, normalize_slack_weight
 from giskardpy.qp.exceptions import MultipleTerminalStateConstraintsError
 
+WEIGHT_SUM_MAGNITUDE_EPSILON: float = 1e-9
+"""
+Smallest lookahead-weight sum magnitude that is still normalized.
+
+A stiff or oscillatory linearization can nearly cancel the raw weight sum; dividing by such
+a sum would inject enormous or non-finite coefficients into the QP matrix, so below this
+magnitude the raw weights are kept instead.
+"""
+
 
 def _geometric_series(base: Scalar, n: int) -> Scalar:
     """
@@ -79,10 +88,14 @@ def horizon_normalized_weights(
     for weight in weights:
         total = total + weight
     horizon = sm.Scalar(float(control_horizon))
-    # A stiff or oscillatory linearization can cancel the raw weight sum to exactly zero;
-    # normalizing would then inject inf/nan into the QP matrix, so fall back to the raw weights.
     return [
-        sm.if_eq_zero(total, weight, weight * horizon / total) for weight in weights
+        sm.if_less(
+            abs(total),
+            sm.Scalar(WEIGHT_SUM_MAGNITUDE_EPSILON),
+            weight,
+            weight * horizon / total,
+        )
+        for weight in weights
     ]
 
 
@@ -225,6 +238,12 @@ class TerminalStatePredictionStrategy(IntegralStrategy):
         """
         Builds the constraint row by scaling the state-rate jacobian per horizon block with the
         geometric velocity weights, padding the jerk columns with zeros.
+
+        Scaling contract: the jacobian carries a single ``time_step`` factor and the lookahead
+        weights are mean-normalized to unit average by :func:`horizon_normalized_weights`, so the
+        row lives at the same scale as the reactive :class:`~giskardpy.qp.enforcement_strategy.IntegralStrategy`
+        row.  The effective gain therefore depends on the prediction horizon and control frequency;
+        deployments are calibrated against this convention.
         """
         constraint = self._constraint
         time_step = self.qp_controller_config.model_predictive_control_time_step

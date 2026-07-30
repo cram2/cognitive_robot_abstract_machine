@@ -3,20 +3,23 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from semantic_digital_twin.world_description.effects import Effect
-from semantic_digital_twin.world_description.motion import MotionTrajectory
-from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.world import World
+from typing_extensions import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.world_description.effects import Effect
+    from semantic_digital_twin.world_description.motion import MotionTrajectory
+    from semantic_digital_twin.world_description.world_entity import Body
+    from semantic_digital_twin.world import World
 
 
 class PhysicsModel(ABC):
     """
     Abstract interface for simulating the causal effect of a motion.
 
-    Implementations define how a motion trajectory changes the world state
-    within a specific physical regime (e.g., rigid-body kinematics, fluid-flow
-    dynamics). Concrete subclasses live in the package that owns the simulation
-    machinery (e.g., giskardpy).
+    Implementations define how a motion trajectory changes the world state within a
+    specific physical regime (e.g., rigid-body kinematics, fluid-flow dynamics).
+    Concrete subclasses live in the package that owns the simulation machinery (e.g.,
+    giskardpy).
     """
 
     @abstractmethod
@@ -31,7 +34,7 @@ class PhysicsModel(ABC):
 
     def interaction_body(self) -> Optional[Body]:
         """
-        :return: The body the robot physically interacts with during this motion,
-                 or ``None`` to fall back to ``motion.actuator.child``.
+        :return: The body the robot physically interacts with during this motion, or
+            ``None`` if the model does not single one out.
         """
         return None

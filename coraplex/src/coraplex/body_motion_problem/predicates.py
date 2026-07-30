@@ -1,9 +1,10 @@
+# %% imports
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import ClassVar
 
 import numpy as np
+from typing_extensions import ClassVar
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -26,6 +27,7 @@ from krrood.utils import clear_memoization_cache
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionBetweenGroups,
     AvoidExternalCollisions,
+    CollisionRule,
 )
 from semantic_digital_twin.reasoning.bmp_predicates import CanPerform
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
@@ -41,34 +43,65 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
+from coraplex.exceptions import UntrackedMotionConnection
 from coraplex.locations.costmaps import (
+    Costmap,
     OccupancyCostmap,
     OrientationGenerator,
     RingCostmap,
 )
+
+# %% whole-body feasibility predicate
 
 
 @dataclass
 class MotionStatechartCanPerform(CanPerform):
     """
     Actual implementation of the abstract interface defined in CanPerform.
-    Whole-body feasibility check using QP-based motion planning with
-    costmap-driven base placement.
 
-    Samples candidate base poses around the start of the trajectory to avoid
-    local minima in the QP solver. For each candidate, tests whether the gripper
-    can follow the full trajectory of world-space poses. Robots without a mobile
-    base are tested from their current base placement instead.
+    Whole-body feasibility check using QP-based motion planning with costmap-driven base
+    placement.
+
+    Samples candidate base poses around the start of the trajectory to avoid local
+    minima in the QP solver. For each candidate, tests whether the gripper can follow
+    the full trajectory of world-space poses. Robots without a mobile base are tested
+    from their current base placement instead.
     """
 
-    _timeout: ClassVar[int] = 2000
+    _maximum_tick_count: ClassVar[int] = 2000
+    """
+    Tick budget for a single planning attempt; exhausting it marks the attempt
+    infeasible.
+    """
+
     _costmap_samples: ClassVar[int] = 10
+    """
+    Number of candidate base poses sampled from the costmap.
+    """
+
     _arm_reach_distance: ClassVar[float] = 0.7
+    """
+    Radius of the ring costmap around the trajectory start, in meters.
+    """
+
     _external_collision_buffer_distance: ClassVar[float] = 0.01
+    """
+    Buffer zone distance used for external collision avoidance during planning attempts,
+    in meters.
+    """
+
     _max_trajectory_waypoints: ClassVar[int] = 20
-    """Maximum number of trajectory waypoints passed to the CartesianPose sequence."""
+    """
+    Maximum number of trajectory waypoints passed to the CartesianPose sequence.
+    """
 
     def __call__(self) -> bool:
+        """
+        :return: Whether any of the robot's end effectors can follow the motion's
+                 body trajectory, relocating the base first for mobile robots.
+        :raises UntrackedMotionConnection: If the motion trajectory holds no
+            positions for the motion's connection.
+        """
         if (
             self.motion.motion_trajectory is None
             or self.motion.motion_trajectory.is_empty()
@@ -78,6 +111,8 @@ class MotionStatechartCanPerform(CanPerform):
         with world.reset_state_context():
             target = self._resolve_target()
             trajectory = self._compute_body_trajectory(target)
+        if not trajectory:
+            raise UntrackedMotionConnection(motion=self.motion)
         with world.reset_state_context():
             return self._execute_for_any_gripper(target, trajectory)
 
@@ -129,15 +164,17 @@ class MotionStatechartCanPerform(CanPerform):
                     root_link=root,
                     tip_link=gripper,
                     goal_pose=pose,
-                    name=f"step_{i}",
+                    name=f"step_{step_index}",
                 )
-                for i, pose in enumerate(trajectory)
+                for step_index, pose in enumerate(trajectory)
             ]
         )
         motion_statechart.add_node(sequence)
         return motion_statechart, sequence
 
-    def _build_collision_rules(self, gripper: EndEffector, target: Body) -> list:
+    def _build_collision_rules(
+        self, gripper: EndEffector, target: Body
+    ) -> list[CollisionRule]:
         """
         :return: Rules allowing gripper–target collision during trajectory following.
                  Covers the full kinematic chain from the target body up to the world root
@@ -145,19 +182,23 @@ class MotionStatechartCanPerform(CanPerform):
         """
         world = target._world
         chain = world.compute_chain_of_kinematic_structure_entities(world.root, target)
-        target_collision_bodies = [b for b in chain if b.has_collision()]
+        target_collision_bodies = [
+            entity
+            for entity in chain
+            if isinstance(entity, Body) and entity.has_collision()
+        ]
         if not target_collision_bodies:
             return []
         return [
             AllowCollisionBetweenGroups(
-                body_group_a=[b for b in gripper.bodies if b.has_collision()],
+                body_group_a=gripper.bodies_with_collision,
                 body_group_b=target_collision_bodies,
             )
         ]
 
     def _build_temporary_collision_rules(
         self, robot: AbstractRobot, gripper: EndEffector, target: Body
-    ) -> list:
+    ) -> list[CollisionRule]:
         """
         :return: Temporary collision rules combining a reduced-distance avoidance rule with
                  explicit allow-rules for the target's kinematic chain.
@@ -183,14 +224,25 @@ class MotionStatechartCanPerform(CanPerform):
         return [trajectory[index] for index in waypoint_indices]
 
     def _execute_for_any_gripper(self, target: Body, trajectory: list[Pose]) -> bool:
+        """
+        Test every end effector of the robot, sampling candidate base poses beforehand
+        for robots with a mobile base.
+
+        The collision manager's temporary rules, its collision matrix, and the robot's
+        base placement are saved and restored before returning; the collision matrix is
+        recomputed from the current rules up front, and the recomputed matrix is what
+        gets restored.
+
+        :return: Whether any gripper can follow the trajectory.
+        """
         trajectory = self._subsample_trajectory(trajectory)
         world = self.robot._world
+        collision_manager = world.collision_manager
         base_is_relocatable = isinstance(self.robot, HasMobileBase)
-        original_temporary_rules = list(world.collision_manager.temporary_rules)
-        original_collision_matrix = getattr(
-            world.collision_manager, "collision_matrix", None
-        )
-        original_origin = self.robot.root.parent_connection.origin
+        original_temporary_rules = list(collision_manager.temporary_rules)
+        collision_manager.update_collision_matrix()
+        original_collision_matrix = collision_manager.collision_matrix
+        original_world_T_base = self.robot.root.parent_connection.origin
 
         try:
             for gripper in self.robot.get_end_effectors():
@@ -199,19 +251,18 @@ class MotionStatechartCanPerform(CanPerform):
                         return True
                     continue
 
-                for base_candidate in self._setup_costmap(trajectory[0], world):
-                    base_candidate.z = original_origin.z
-                    self.robot.root.parent_connection.origin = base_candidate
+                for world_T_base_candidate in self._setup_costmap(trajectory[0], world):
+                    world_T_base_candidate.z = original_world_T_base.z
+                    self.robot.root.parent_connection.origin = world_T_base_candidate
                     if self._gripper_can_follow_trajectory(gripper, target, trajectory):
                         return True
         finally:
             if base_is_relocatable:
-                self.robot.root.parent_connection.origin = original_origin
-            world.collision_manager.clear_temporary_rules()
-            world.collision_manager.extend_temporary_rule(original_temporary_rules)
-            if original_collision_matrix is not None:
-                world.collision_manager.set_collision_matrix(original_collision_matrix)
-            clear_memoization_cache(world.collision_manager.collision_detector)
+                self.robot.root.parent_connection.origin = original_world_T_base
+            collision_manager.clear_temporary_rules()
+            collision_manager.extend_temporary_rule(original_temporary_rules)
+            collision_manager.set_collision_matrix(original_collision_matrix)
+            clear_memoization_cache(collision_manager.collision_detector)
             world.notify_state_change()
 
         return False
@@ -240,39 +291,50 @@ class MotionStatechartCanPerform(CanPerform):
         with world.reset_state_context():
             executor.compile(motion_statechart=motion_statechart)
             try:
-                executor.tick_until_end(timeout=self._timeout)
+                motion_is_feasible = executor.tick_until_end_or_timeout(
+                    timeout=self._maximum_tick_count
+                )
             except (
-                TimeoutError,
                 CollisionViolatedError,
                 LocalMinimumReachedError,
                 QPSolverException,
             ):
-                # Each of these means "this candidate placement cannot follow the
-                # trajectory", not a programming error: the motion ran out of ticks,
-                # violated a collision constraint, converged into a local minimum,
-                # or posed an infeasible/unsolvable QP.
-                pass
+                # A violated collision constraint, a local minimum, or an
+                # infeasible/unsolvable QP means this candidate placement
+                # cannot follow the trajectory, not a programming error.
+                motion_is_feasible = False
 
-        return motion_statechart.is_end_motion()
+        return motion_is_feasible
 
-    def _setup_costmap(self, target_pose: Pose, world: World):
+    def _scaled_number_of_samples(self, number_of_segments: int) -> int:
         """
-        :return: An occupancy + ring costmap centred on the ground projection of target_pose.
+        :return: The configured costmap sample count, raised to the number of
+                 costmap segments so that every segment receives at least one sample.
         """
-        position = target_pose.to_position().to_np()
-        ground_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=position[0], y=position[1], z=0.0
-        )
+        return max(self._costmap_samples, number_of_segments)
+
+    def _setup_costmap(self, world_T_target: Pose, world: World) -> Costmap:
+        """
+        :return: An occupancy + ring costmap centred on the ground projection of
+                 the target pose.
+        """
+        world_P_target = world_T_target.to_position().to_np()
+        world_T_ground = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=world_P_target[0], y=world_P_target[1], z=0.0
+        ).to_pose()
         base = self.robot.mobile_base
-        base_bb = base.bounding_box
+        base_bounding_box = base.bounding_box
         occupancy = OccupancyCostmap(
-            distance_to_obstacle=(base_bb.depth / 2 + base_bb.width / 2) / 2,
+            distance_to_obstacle=(
+                base_bounding_box.depth / 2 + base_bounding_box.width / 2
+            )
+            / 2,
             world=world,
             robot_view=self.robot,
             width=200,
             height=200,
             resolution=0.02,
-            origin=ground_pose,
+            origin=world_T_ground,
         )
         ring = RingCostmap(
             distance=self._arm_reach_distance,
@@ -281,14 +343,14 @@ class MotionStatechartCanPerform(CanPerform):
             resolution=0.02,
             width=200,
             height=200,
-            origin=ground_pose,
+            origin=world_T_ground,
         )
         costmap = occupancy + ring
-        costmap.number_of_samples = self._costmap_samples
+        costmap.number_of_samples = self._scaled_number_of_samples(
+            len(costmap.segment_map())
+        )
         costmap.orientation_generator = (
-            OrientationGenerator.orientation_generator_for_axis(
-                list(base.forward_axis.to_np())
-            )
+            OrientationGenerator.orientation_generator_for_axis(base.forward_axis)
         )
         return costmap
 

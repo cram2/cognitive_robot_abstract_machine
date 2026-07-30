@@ -1106,14 +1106,13 @@ class World(HasSimulatorProperties):
     @atomic_world_modification(modification=SetDofAllowExternalStateUpdate)
     def set_dofs_allow_external_state_update(
         self, dofs: Iterable[DegreeOfFreedom], value: bool
-    ):
+    ) -> None:
         """
         Sets whether the specified degrees of freedom may be updated from an external
         source.
 
         Call this inside a :meth:`modify_world` block so the change is tracked and
-        synchronized to other processes. Whoever adds the object declares this, since
-        the object (and its DOFs) does not exist at server setup.
+        synchronized to other processes.
 
         :param dofs: The degrees of freedom whose ``allows_external_state_update`` flag
             is set.
@@ -1440,8 +1439,8 @@ class World(HasSimulatorProperties):
         """
         :return: Whether this exact annotation instance is bound to this world.
 
-        Unlike :meth:`contains_semantic_annotation`, this requires the given instance itself
-        to be stored here, so it is the right check before removing an annotation.
+        Unlike :meth:`contains_semantic_annotation`, an equal but distinct instance does
+        not count; the given instance itself must be stored here.
         """
         return (
             semantic_annotation._world == self
@@ -1456,10 +1455,12 @@ class World(HasSimulatorProperties):
 
         Equality is defined by :meth:`SemanticAnnotation.__eq__` (annotation type and kinematic
         bodies), so a freshly built annotation matches an already-stored one describing the same
-        bodies even though it is a different instance. This is the check the add paths need to
-        deduplicate, independently of whether the given annotation has been bound to a world yet.
+        bodies even though it is a different instance, independently of whether the given
+        annotation has been bound to a world yet.
         """
-        return semantic_annotation in self.semantic_annotations
+        return self._is_world_entity_with_hash_in_world_from_iterable(
+            hash(semantic_annotation)
+        )
 
     def is_body_in_world(self, body: Body) -> bool:
         return self._is_world_entity_with_hash_in_world_from_iterable(hash(body))
@@ -2386,6 +2387,9 @@ class World(HasSimulatorProperties):
         """
         Updates the state of a system by applying control commands at a specified
         derivative level, followed by backward integration to update lower derivatives.
+
+        After the commands are integrated, all self-integrating connections are stepped
+        forward by ``dt`` via :meth:`step_physics`.
 
         :param commands: Control commands to be applied at the specified derivative
             level. The array length must match the number of free variables in the

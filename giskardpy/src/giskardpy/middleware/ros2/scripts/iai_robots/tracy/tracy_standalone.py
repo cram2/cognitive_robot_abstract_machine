@@ -12,9 +12,12 @@ from giskardpy.middleware.ros2.giskard import Giskard
 
 def main():
     rospy.init_node("giskard")
-    robot_description = load_xacro(
-        "package://iai_tracy_description/urdf/tracy.urdf.xacro"
-    )
+    rospy.node.declare_parameter("robot_description", "")
+    robot_description = rospy.node.get_parameter("robot_description").value
+    if not robot_description:
+        robot_description = load_xacro(
+            "package://iai_tracy_description/urdf/tracy.urdf.xacro"
+        )
 
     giskard = Giskard(
         world_config=WorldWithTracyConfig(urdf=robot_description),
@@ -23,7 +26,11 @@ def main():
             debug_mode=True, add_debug_marker_publisher=True
         ),
         qp_controller_config=QPControllerConfig(
-            target_frequency=80, prediction_horizon=120
+            target_frequency=80,
+            # Calibrated against the terminal-state prediction row's scaling convention
+            # (mean-normalized lookahead weights, single time-step factor); see
+            # TerminalStatePredictionStrategy.create_matrix.
+            prediction_horizon=120,
         ),
     )
     giskard.live()

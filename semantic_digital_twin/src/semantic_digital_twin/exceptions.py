@@ -24,6 +24,9 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+    from semantic_digital_twin.physics.equations.pouring_equations import (
+        PouringEquation,
+    )
     from semantic_digital_twin.world_description.motion import Motion
     from semantic_digital_twin.robots.robot_parts import (
         AbstractRobot,
@@ -344,6 +347,45 @@ class InvalidConnectionLimits(UsageError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class MismatchedTrajectoryLengthsError(UsageError):
+    """
+    Raised when the per-connection position sequences of a motion trajectory do not all
+    have the same length, breaking the lock-step replay invariant.
+    """
+
+    lengths_by_connection: Dict[PrefixedName, int]
+    """
+    The recorded sequence length for each tracked connection, by connection name.
+    """
+
+    def error_message(self) -> str:
+        return f"All position sequences of a motion trajectory must have the same length, got {self.lengths_by_connection}."
+
+    def suggest_correction(self) -> str:
+        return "record one position per connection for every simulation step."
+
+
+@dataclass
+class MissingFillLevelLimitsError(UsageError):
+    """
+    Raised when a liquid connection's fill degree of freedom has no position limits, so
+    the integrated fill level cannot be clamped.
+    """
+
+    connection_name: PrefixedName
+    """
+    The name of the liquid connection whose fill degree of freedom lacks position
+    limits.
+    """
+
+    def error_message(self) -> str:
+        return f"The fill degree of freedom of {self.connection_name} has no position limits to clamp the fill level to."
+
+    def suggest_correction(self) -> str:
+        return "create the connection via initialize_fill_level, or give its degree of freedom lower and upper position limits."
 
 
 @dataclass
@@ -802,8 +844,8 @@ class DuplicateRobotAssignmentsError(UsageError):
 @dataclass
 class RobotAlreadyInWorldError(UsageError):
     """
-    Raised when a robot annotation is created for a branch that already carries an equal
-    robot.
+    Raised when a robot annotation is created for a root body at which another robot
+    annotation is already rooted.
     """
 
     robot_root: KinematicStructureEntity
@@ -860,6 +902,105 @@ class SourceAlreadyCoupledError(UsageError):
 
     def suggest_correction(self) -> str:
         return "couple each source to a single receiver, or re-initialize the source's fill level first."
+
+
+@dataclass
+class ReceiverNotInitializedError(UsageError):
+    """
+    Raised when a container is asked to receive liquid before its fill level was
+    initialized.
+    """
+
+    receiver: HasRootBody
+    """
+    The annotation that was supposed to receive the liquid.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Cannot pour liquid into '{self.receiver.root.name}': it has no fill "
+            f"connection, so it cannot track a fill level."
+        )
+
+    def suggest_correction(self) -> str:
+        return "call receiver.initialize_fill_level(world, ...) before coupling its inflow."
+
+
+@dataclass
+class ReceiverAlreadyCoupledError(UsageError):
+    """
+    Raised when a container whose inflow is already coupled to a source is coupled to
+    another source.
+    """
+
+    receiver: HasRootBody
+    """
+    The annotation acting as the liquid receiver that is already coupled.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The inflow of '{self.receiver.root.name}' is already coupled to a source; "
+            f"coupling it to another source would overwrite the existing transfer and "
+            f"lose the first source's outflow."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "couple each receiver to a single source, or replace the existing coupling "
+            "via receiver.recouple_outflow_from(...)."
+        )
+
+
+@dataclass
+class NonPositiveContainerGeometryError(UsageError):
+    """
+    Raised when a pouring-domain container is described with a non-positive height or
+    width.
+    """
+
+    container_height: float
+    """
+    The container height that was given, in metres.
+    """
+
+    container_width: float
+    """
+    The container width that was given, in metres.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Container geometry must be strictly positive, got height="
+            f"{self.container_height} and width={self.container_width}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "describe the container with its positive inner height and width in metres."
+        )
+
+
+@dataclass
+class FillLevelAlreadyInitializedError(UsageError):
+    """
+    Raised when a fill level is initialized on a container that already carries one.
+    """
+
+    container: HasRootBody
+    """
+    The annotation whose fill level is already initialized.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The fill level of '{self.container.root.name}' is already initialized; "
+            f"initializing it again would leave a second phantom body and fill "
+            f"connection in the world."
+        )
+
+    def suggest_correction(self) -> str:
+        return "initialize each container's fill level exactly once."
 
 
 @dataclass
@@ -925,6 +1066,61 @@ class LearnedModelGeometryMismatchError(UsageError):
 
 
 @dataclass
+class NonPositiveContainerGeometryError(UsageError):
+    """
+    Raised when a fill equation is created for a container whose height or width is not
+    strictly positive, which would make the fill dynamics divide by zero.
+    """
+
+    container_height: float
+    """
+    The declared container height, in metres.
+    """
+
+    container_width: float
+    """
+    The declared container width, in metres.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Container geometry must be strictly positive, got "
+            f"(height={self.container_height}, width={self.container_width})."
+        )
+
+    def suggest_correction(self) -> str:
+        return "create the equation from the container's actual collision geometry."
+
+
+@dataclass
+class NonArticulatedDrainError(UsageError):
+    """
+    Raised when a liquid source's drain lacks the articulated cup geometry required to
+    derive a replacement drain from it.
+    """
+
+    source: HasRootBody
+    """
+    The annotation acting as the liquid source.
+    """
+
+    drain: PouringEquation
+    """
+    The source's current drain equation, which carries no container geometry.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The drain of '{self.source.root.name}' is a "
+            f"{type(self.drain).__name__}, which carries no container geometry to "
+            f"derive a learned drain from."
+        )
+
+    def suggest_correction(self) -> str:
+        return "initialize the source's fill level so it drains via an articulated pouring equation."
+
+
+@dataclass
 class MissingMotionTrajectoryError(UsageError):
     """
     Raised when a motion trajectory is required but the motion carries none.
@@ -937,6 +1133,8 @@ class MissingMotionTrajectoryError(UsageError):
     """
 
     def error_message(self) -> str:
+        if self.motion is None:
+            return "Cannot replay: no motion was given."
         return f"Cannot replay motion '{self.motion}': it carries no trajectory."
 
     def suggest_correction(self) -> str:
@@ -1430,8 +1628,9 @@ class VideoRecordingError(MultiSimError):
 @dataclass
 class VideoRecordingAlreadyStartedError(VideoRecordingError):
     """
-    Raised when :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVide
-    oRecorder.start` is called on a recorder that is already recording.
+    Raised when
+    :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder.start`
+    is called on a recorder that is already recording.
     """
 
     world: World
@@ -1449,8 +1648,9 @@ class VideoRecordingAlreadyStartedError(VideoRecordingError):
 @dataclass
 class VideoRecordingNotStartedError(VideoRecordingError):
     """
-    Raised when :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVide
-    oRecorder.stop` is called on a recorder that was never started.
+    Raised when
+    :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder.stop`
+    is called on a recorder that was never started.
     """
 
     world: World

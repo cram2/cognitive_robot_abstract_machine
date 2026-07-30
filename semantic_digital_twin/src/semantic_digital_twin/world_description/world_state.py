@@ -639,5 +639,5 @@ class WorldStateTrajectory:
         with self.world_lock():
             if dof_id not in self._index:
                 return None
-            col = self._index[dof_id]
-            return self.data[:, 0, col].copy()
+            column_index = self._index[dof_id]
+            return self.data[:, Derivatives.position, column_index].copy()

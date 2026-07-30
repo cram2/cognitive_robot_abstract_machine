@@ -605,6 +605,11 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         """
         Creates a robot from a branch in a world.
         This is useful when you have multiple of the same robots in the same world, which would normally cause naming conflicts.
+
+        :param branch_root: The entity whose branch is searched for the robot's root body.
+        :return: The robot annotation, added to the branch's world.
+        :raises RobotAlreadyInWorldError: If a robot annotation of any type is already
+            rooted at the same body.
         """
         world = branch_root._world
         robot_root = world.get_body_in_branch_by_name(
@@ -612,7 +617,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         )
         if any(
             robot.root is robot_root
-            for robot in world.get_semantic_annotations_by_type(cls)
+            for robot in world.get_semantic_annotations_by_type(AbstractRobot)
         ):
             raise RobotAlreadyInWorldError(robot_root=robot_root)
         with world.modify_world():

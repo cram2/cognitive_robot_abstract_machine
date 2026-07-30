@@ -5,8 +5,10 @@ Motion type for the Body Motion Problem framework.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, TYPE_CHECKING
 
+from typing_extensions import Optional, TYPE_CHECKING
+
+from semantic_digital_twin.exceptions import MismatchedTrajectoryLengthsError
 from semantic_digital_twin.world_description.world_entity import Connection
 
 if TYPE_CHECKING:
@@ -26,13 +28,26 @@ class MotionTrajectory:
     """
 
     data: dict[Connection, list[float]] = field(default_factory=dict)
-    """Position sequence for each connection, indexed by simulation step."""
+    """
+    Position sequence for each connection, indexed by simulation step.
+    """
 
     converged: Optional[bool] = None
     """
-    Whether the simulation that produced this trajectory reached its end condition,
-    or ``None`` when the producer does not track convergence (e.g. hand-written trajectories).
+    Whether the simulation that produced this trajectory reached its end condition, or
+    ``None`` when the producer does not track convergence (e.g. hand-written
+    trajectories).
     """
+
+    def __post_init__(self):
+        lengths_by_connection = {
+            connection.name: len(positions)
+            for connection, positions in self.data.items()
+        }
+        if len(set(lengths_by_connection.values())) > 1:
+            raise MismatchedTrajectoryLengthsError(
+                lengths_by_connection=lengths_by_connection
+            )
 
     def is_empty(self) -> bool:
         """
@@ -44,7 +59,9 @@ class MotionTrajectory:
         """
         :return: The position of every tracked connection at the given step index.
         """
-        return {conn: traj[step] for conn, traj in self.data.items()}
+        return {
+            connection: positions[step] for connection, positions in self.data.items()
+        }
 
     def positions_for(self, connection: Connection) -> list[float]:
         """
@@ -59,31 +76,34 @@ class Motion:
     """
     Represents a candidate motion as a sequence of connection positions.
 
-    When a physics model is provided and the trajectory is ``None``, the model
-    is used to generate the trajectory on demand during the causal sufficiency check.
+    When a physics model is provided and the trajectory is ``None``, the model is used
+    to generate the trajectory on demand during the causal sufficiency check.
     """
 
     connection: Connection
-    """The connection (joint) that is manipulated by this motion."""
+    """
+    The connection (joint) that is manipulated by this motion.
+    """
 
     motion_model: Optional[PhysicsModel] = field(default=None)
-    """Optional physics model used to generate the trajectory when it is absent."""
+    """
+    Optional physics model used to generate the trajectory when it is absent.
+    """
 
     motion_trajectory: Optional[MotionTrajectory] = field(default=None)
     """
     The recorded position sequences for all tracked connections.
 
-    ``None`` means the trajectory has not yet been computed. Set automatically
-    by :meth:`~semantic_digital_twin.reasoning.bmp_predicates.Causes` when a
-    :attr:`motion_model` is present, or supplied directly for pre-computed motions.
+    ``None`` means the trajectory has not yet been computed; it is then generated from
+    :attr:`motion_model` on demand, or supplied directly for pre-computed motions.
     """
 
     time_step: Optional[float] = field(default=None)
     """
     Time step between trajectory samples in seconds.
 
-    When set, :meth:`~semantic_digital_twin.reasoning.bmp_predicates.Causes` steps
-    all HasUpdateState connections after each position update, allowing coupled
-    physics (e.g. fill-level ODEs) to be inferred from the primary trajectory
-    without explicit secondary trajectories.
+    When set, replaying the trajectory also steps every
+    :class:`~semantic_digital_twin.world_description.connections.HasUpdateState`
+    connection after each position update, so coupled physics (e.g. fill-level ODEs)
+    follow the primary trajectory without explicit secondary trajectories.
     """

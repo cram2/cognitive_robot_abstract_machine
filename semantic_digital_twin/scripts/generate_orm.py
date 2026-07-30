@@ -19,6 +19,12 @@ import semantic_digital_twin.orm.model
 import semantic_digital_twin.adapters.procthor.procthor_resolver
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.ormatic import ORMatic
+from semantic_digital_twin.physics.equations.learned_pouring_equations import (
+    HasLearnedHead,
+)
+from semantic_digital_twin.physics.equations.pouring_equations import (
+    RectangularContainerGeometry,
+)
 from semantic_digital_twin.reasoning.predicates import ContainsType
 from semantic_digital_twin.semantic_annotations.position_descriptions import (
     SemanticDirection,
@@ -40,6 +46,10 @@ ignore_classes = {
     ContainsType,
     SemanticDirection,
     SubclassJSONSerializer,
+    # Behaviour mixins of the pouring equations: keeping them unmapped roots the equations'
+    # DAOs in the single PouringEquation hierarchy their fields are persisted in.
+    HasLearnedHead,
+    RectangularContainerGeometry,
 }
 
 # The trainer is a training procedure, not world state, and its module requires torch at import

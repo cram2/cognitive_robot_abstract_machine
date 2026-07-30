@@ -1,4 +1,5 @@
-"""Training for the learned pouring head-above-lip surrogate.
+"""
+Training for the learned pouring head-above-lip surrogate.
 
 Distills :meth:`~semantic_digital_twin.physics.equations.pouring_equations.ArticulatedPouringEquation.head_above_lip`
 into a small smooth MLP with Sobolev (value + gradient) supervision, so the gradients the MPC
@@ -23,13 +24,20 @@ from pathlib import Path
 import torch
 
 from semantic_digital_twin.physics.equations.head_surrogate_network import HeadSurrogate
+from semantic_digital_twin.physics.equations.learned_pouring_equations import (
+    LearnedHeadModelReference,
+)
 
 TRAINING_TILT_RANGE: tuple[float, float] = (-0.2, math.pi / 2 + 0.2)
-"""Tilt-angle interval the surrogate is trained on, in radians; extends slightly past the
-physical ``[0, π/2]`` range so the fit stays accurate at the boundaries."""
+"""
+Tilt-angle interval the surrogate is trained on, in radians; extends slightly past the
+physical ``[0, π/2]`` range so the fit stays accurate at the boundaries.
+"""
 
 TRAINING_FILL_RANGE: tuple[float, float] = (0.0, 1.0)
-"""Normalized fill-level interval the surrogate is trained on."""
+"""
+Normalized fill-level interval the surrogate is trained on.
+"""
 
 
 def analytic_head_torch(
@@ -39,7 +47,8 @@ def analytic_head_torch(
     container_width: float,
 ) -> torch.Tensor:
     """
-    Torch reimplementation of the analytic head-above-lip, the surrogate's training target.
+    Torch reimplementation of the analytic head-above-lip, the surrogate's training
+    target.
 
     :param tilt: Tilt angles about the vertical, in radians.
     :param fill: Normalized fill levels in ``[0, 1]``.
@@ -47,48 +56,69 @@ def analytic_head_torch(
     :param container_width: Inner width of the rectangular container, in metres.
     :return: Head above the pouring lip per row, in metres.
     """
-    A = container_height
-    r = container_width / 2.0
-    empty = A * (1.0 - fill)
-    L = torch.sqrt(empty**2 + r**2)
-    phi = torch.atan2(empty, torch.full_like(empty, r))
-    return torch.relu(L * torch.sin(tilt - phi))
+    half_width = container_width / 2.0
+    empty_height = container_height * (1.0 - fill)
+    lip_distance = torch.sqrt(empty_height**2 + half_width**2)
+    lip_angle = torch.atan2(empty_height, torch.full_like(empty_height, half_width))
+    return torch.relu(lip_distance * torch.sin(tilt - lip_angle))
 
 
 @dataclass
 class HeadSurrogateTrainer:
     """
-    Trains a :class:`~semantic_digital_twin.physics.equations.head_surrogate_network.HeadSurrogate`
-    for one container geometry with Sobolev (value + gradient) supervision against the analytic head.
+    Trains a :class:`~semantic_digital_twin.physics.equations.head_surrogate_network.Hea
+    dSurrogate` for one container geometry with Sobolev (value + gradient) supervision
+    against the analytic head.
     """
 
     container_height: float
-    """Inner height of the rectangular container the surrogate is trained for, in metres."""
+    """
+    Inner height of the rectangular container the surrogate is trained for, in metres.
+    """
 
     container_width: float
-    """Inner width of the rectangular container the surrogate is trained for, in metres."""
+    """
+    Inner width of the rectangular container the surrogate is trained for, in metres.
+    """
+
+    hidden_width: int = 64
+    """
+    Hidden-layer width of the surrogate network to train.
+    """
 
     seed: int = 0
-    """Random seed for the sample draw and the network initialization."""
+    """
+    Random seed for the sample draw and the network initialization.
+    """
 
     sample_count: int = 20000
-    """Number of ``(tilt, fill)`` training samples drawn uniformly from the training ranges."""
+    """
+    Number of ``(tilt, fill)`` training samples drawn uniformly from the training
+    ranges.
+    """
 
     epochs: int = 4000
-    """Number of full-batch Adam optimization steps."""
+    """
+    Number of full-batch Adam optimization steps.
+    """
 
     gradient_weight: float = 0.1
-    """Weight of the gradient-matching term relative to the value-matching term in the loss."""
+    """
+    Weight of the gradient-matching term relative to the value-matching term in the
+    loss.
+    """
 
     learning_rate: float = 2e-3
-    """Adam learning rate."""
+    """
+    Adam learning rate.
+    """
 
     def train(self) -> HeadSurrogate:
         """
         :return: The trained surrogate in evaluation mode.
         """
         torch.manual_seed(self.seed)
-        model = HeadSurrogate()
+        model = HeadSurrogate(hidden_width=self.hidden_width)
         inputs = self._sample_inputs()
         target_value, target_gradient = self._target_value_and_gradient(inputs)
         optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
@@ -108,7 +138,9 @@ class HeadSurrogateTrainer:
         return model.eval()
 
     def _sample_inputs(self) -> torch.Tensor:
-        """Uniform ``(tilt, fill)`` samples over the training ranges."""
+        """
+        Uniform ``(tilt, fill)`` samples over the training ranges.
+        """
         generator = torch.Generator().manual_seed(self.seed)
         tilt = torch.empty(self.sample_count, 1).uniform_(
             *TRAINING_TILT_RANGE, generator=generator
@@ -121,7 +153,10 @@ class HeadSurrogateTrainer:
     def _target_value_and_gradient(
         self, inputs: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Analytic head values and input gradients at ``inputs``, the Sobolev training targets."""
+        """
+        Analytic head values and input gradients at ``inputs``, the Sobolev training
+        targets.
+        """
         x = inputs.clone().requires_grad_(True)
         head = analytic_head_torch(
             x[:, 0:1], x[:, 1:2], self.container_height, self.container_width
@@ -129,9 +164,28 @@ class HeadSurrogateTrainer:
         gradient = torch.autograd.grad(head.sum(), x, create_graph=False)[0]
         return head.detach(), gradient.detach()
 
+    def model_reference(self, checkpoint_path: str) -> LearnedHeadModelReference:
+        """
+        The serializable reference describing a checkpoint this trainer produces.
+
+        Carries the trained-for geometry and the configured hidden width, so a network
+        rebuilt from the reference matches the trained checkpoint's architecture.
+
+        :param checkpoint_path: Path the trained checkpoint is (or will be) saved to.
+        :return: The matching model reference.
+        """
+        return LearnedHeadModelReference(
+            checkpoint_path=checkpoint_path,
+            trained_container_height=self.container_height,
+            trained_container_width=self.container_width,
+            hidden_width=self.hidden_width,
+        )
+
 
 def _main() -> None:
-    """Train a head surrogate for the given geometry and save its checkpoint."""
+    """
+    Train a head surrogate for the given geometry and save its checkpoint.
+    """
     parser = argparse.ArgumentParser(description=_main.__doc__)
     parser.add_argument("--container-height", type=float, required=True)
     parser.add_argument("--container-width", type=float, required=True)

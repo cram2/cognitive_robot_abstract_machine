@@ -53,14 +53,21 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Fridge,
     Drawer,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
     PrismaticConnection,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -87,6 +94,8 @@ from semantic_digital_twin.adapters.ros.messages import (
     WorldUpdate,
 )
 from semantic_digital_twin.orm.ormatic_interface import Base, WorldMappingDAO
+
+from ..test_semantic_annotations.test_liquid_transfer import _TiltingContainer
 
 
 def create_dummy_world(w: Optional[World] = None) -> World:
@@ -3268,17 +3277,6 @@ def test_liquid_transfer_coupling_synchronizes_and_rebuilds(rclpy_node):
     world must rebuild the symbolic coupling locally from that descriptor - the exact situation a
     Giskard process faces when a client couples cups and sends a transfer goal.
     """
-    from ..test_semantic_annotations.test_liquid_transfer import _TiltingContainer
-    from semantic_digital_twin.spatial_types import (
-        HomogeneousTransformationMatrix,
-        Vector3,
-    )
-    from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
-    from semantic_digital_twin.world_description.degree_of_freedom import (
-        DegreeOfFreedomLimits,
-    )
-    from semantic_digital_twin.world_description.geometry import Scale
-
     client_world = World(name="client")
     giskard_world = World(name="giskard")
     sync_client = WorldSynchronizer(node=rclpy_node, _world=client_world)
@@ -3352,12 +3350,15 @@ class AcknowledgmentRecordingSynchronizer(WorldSynchronizer):
     synchronous publisher waiting on those acknowledgments.
     """
 
-    acknowledged_messages: list = field(default_factory=list)
+    acknowledged_messages: List[WorldUpdate] = field(default_factory=list)
     """
     Messages this synchronizer acknowledged, in order.
     """
 
-    def acknowledge_message(self, message):
+    def acknowledge_message(self, message: WorldUpdate) -> None:
+        """
+        Record the message before acknowledging it.
+        """
         self.acknowledged_messages.append(message)
         super().acknowledge_message(message)
 

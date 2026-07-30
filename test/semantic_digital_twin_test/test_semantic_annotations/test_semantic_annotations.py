@@ -201,10 +201,6 @@ def test_add_semantic_annotation_deduplicates_equal_instances():
     equality is defined by type and kinematic bodies. Two :class:`Handle` annotations
     built separately over the same body are therefore equal, so the world must hold
     exactly one.
-
-    This is reproduced on a hand-built minimal world, independently of any inferred or
-    fixture world, proving the duplication is a world-level deduplication issue and not
-    an artifact of a specific test world setup.
     """
     world = World()
     root = Body(name=PrefixedName("root"))
@@ -220,6 +216,32 @@ def test_add_semantic_annotation_deduplicates_equal_instances():
 
     assert first_handle == second_handle
     assert len(world.get_semantic_annotations_by_type(Handle)) == 1
+
+
+def test_remove_semantic_annotation_ignores_equal_unbound_instance():
+    """
+    Removing with an equal annotation instance that was never added is a no-op.
+
+    Removal requires the given instance itself to be bound to the world; an equal but
+    never-added instance must not evict the resident one.
+    """
+    world = World()
+    root = Body(name=PrefixedName("root"))
+    handle_body = Body(name=PrefixedName("handle_body"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(handle_body)
+        world.add_connection(FixedConnection(parent=root, child=handle_body))
+        resident_handle = Handle(root=handle_body)
+        world.add_semantic_annotation(resident_handle)
+
+    unbound_handle = Handle(root=handle_body)
+    with world.modify_world():
+        world.remove_semantic_annotation(unbound_handle)
+
+    assert unbound_handle == resident_handle
+    assert world.get_semantic_annotations_by_type(Handle) == [resident_handle]
+    assert world.is_semantic_annotation_bound_to_this_world(resident_handle)
 
 
 def test_add_semantic_annotation_recursively_deduplicates_equal_instances():

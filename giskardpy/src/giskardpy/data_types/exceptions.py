@@ -35,7 +35,8 @@ class PlanningException(GiskardException):
 @dataclass
 class DegreeOfFreedomNotRecordedError(GiskardException):
     """
-    Raised when a recorded world-state trajectory does not contain a requested degree of freedom.
+    Raised when a recorded world-state trajectory does not contain a requested degree of
+    freedom.
     """
 
     connection_name: str
@@ -51,6 +52,53 @@ class DegreeOfFreedomNotRecordedError(GiskardException):
 
     def suggest_correction(self) -> str:
         return "make sure the connection is part of the simulated world before running the physics model."
+
+
+@dataclass
+class WorldNotEmptyError(SetupException):
+    """
+    Raised when a world config that must build its world from scratch is run on a world
+    that already contains kinematic structure.
+    """
+
+    config_name: str
+    """The name of the world config class that requires an empty world."""
+
+    def error_message(self) -> str:
+        return f"{self.config_name} requires an empty world to set up."
+
+    def suggest_correction(self) -> str:
+        return "Run setup_world() before adding anything else to the world."
+
+
+@dataclass
+class HandleActuatorMismatchError(SetupException):
+    """
+    Raised when a container handle is not driven by the actuator a physics model was
+    configured with, so the resulting motion would move a different joint than the one
+    being recorded.
+    """
+
+    handle_name: str
+    """The name of the handle body."""
+
+    actuator_name: str
+    """
+    The name of the configured actuator connection.
+    """
+
+    handle_connection_name: str
+    """The name of the 1-DOF connection that actually drives the handle."""
+
+    def error_message(self) -> str:
+        return (
+            f"Handle '{self.handle_name}' is driven by connection "
+            f"'{self.handle_connection_name}', not by the configured actuator "
+            f"'{self.actuator_name}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Pass the ActiveConnection1DOF that drives the handle as the actuator."
 
 
 @dataclass

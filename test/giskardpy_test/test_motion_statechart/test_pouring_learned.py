@@ -6,9 +6,6 @@ final fill, proving the controller is agnostic to whether the physical head mode
 learned. Requires torch + l4casadi and skips without them.
 """
 
-import math
-from dataclasses import dataclass
-
 import pytest
 
 pytest.importorskip("torch")
@@ -17,7 +14,7 @@ pytest.importorskip("l4casadi")
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
 
-from krrood.ormatic.utils import classproperty  # noqa: E402
+import krrood.symbolic_math.symbolic_math as sm  # noqa: E402
 
 from giskardpy.executor import Executor, SimulationPacer  # noqa: E402
 from giskardpy.motion_statechart.context import MotionStatechartContext  # noqa: E402
@@ -25,9 +22,6 @@ from giskardpy.motion_statechart.graph_node import EndMotion  # noqa: E402
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart  # noqa: E402
 from giskardpy.motion_statechart.tasks.pouring import PouringTask  # noqa: E402
 from giskardpy.qp.qp_controller_config import QPControllerConfig  # noqa: E402
-from semantic_digital_twin.datastructures.prefixed_name import (
-    PrefixedName,
-)  # noqa: E402
 from semantic_digital_twin.physics.equations.head_surrogate_training import (  # noqa: E402
     HeadSurrogateTrainer,
 )
@@ -38,19 +32,14 @@ from semantic_digital_twin.physics.equations.learned_pouring_equations import ( 
 from semantic_digital_twin.physics.equations.pouring_equations import (  # noqa: E402
     ArticulatedPouringEquation,
     PouringEquation,
+    SymbolicFillContext,
 )
-from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel  # noqa: E402
-from semantic_digital_twin.spatial_types import Vector3  # noqa: E402
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap  # noqa: E402
 from semantic_digital_twin.world import World  # noqa: E402
-from semantic_digital_twin.world_description.connections import (  # noqa: E402
-    RevoluteConnection,
+
+from .single_cup_world import (  # noqa: E402
+    PourableContainer,
+    build_single_cup_world,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import (  # noqa: E402
-    DegreeOfFreedomLimits,
-)
-from semantic_digital_twin.world_description.geometry import Scale  # noqa: E402
-from semantic_digital_twin.world_description.world_entity import Body  # noqa: E402
 
 CONTAINER_HEIGHT = 0.1
 CONTAINER_WIDTH = 0.08
@@ -61,9 +50,24 @@ FILL_TOLERANCE = 0.05
 SETTLE_TICKS = 20
 """Number of final ticks that must all lie within the fill tolerance to count as settled."""
 
+FINAL_FILL_AGREEMENT_TOLERANCE = 0.03
+"""Maximum allowed difference between the analytic and learned arm's final fill level."""
+
+HEAD_MODEL_VELOCITY_AGREEMENT_TOLERANCE = 0.1
+"""Maximum allowed fill-velocity difference between the learned surrogate and the analytic head
+model at a flowing operating point; larger deviations indicate a mistrained surrogate."""
+
+FLOWING_TILT_ANGLE = 1.3
+"""Tilt angle well above the spill threshold, so the head model is actively pouring."""
+
+FLOWING_FILL_LEVEL = 0.8
+"""Fill level at which the flowing operating point is evaluated."""
+
 
 @pytest.fixture(scope="module")
-def trained_model_reference(tmp_path_factory) -> LearnedHeadModelReference:
+def trained_model_reference(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> LearnedHeadModelReference:
     """A reference to a surrogate trained for the test cup's geometry, cached for the module."""
     checkpoint_path = tmp_path_factory.mktemp("learned_head") / "head_surrogate.pt"
     surrogate = HeadSurrogateTrainer(
@@ -81,36 +85,9 @@ def trained_model_reference(tmp_path_factory) -> LearnedHeadModelReference:
     )
 
 
-@dataclass(eq=False)
-class SingleCupContainer(HasFillLevel):
-    """A held container with a single tilt joint, used for the single-cup pouring A/B."""
-
-    @classproperty
-    def _parent_connection_type(self):
-        return RevoluteConnection
-
-
-def _build_single_cup_world() -> tuple[World, SingleCupContainer]:
+def _build_single_cup_world() -> tuple[World, PourableContainer]:
     """Minimal world with one tilt-jointed, fully filled container."""
-    world = World()
-    with world.modify_world():
-        world.add_body(Body(name=PrefixedName("map")))
-    with world.modify_world():
-        cup = SingleCupContainer.create_with_new_body_in_world(
-            name=PrefixedName("cup"),
-            world=world,
-            active_axis=Vector3(0, 1, 0),
-            connection_limits=DegreeOfFreedomLimits(
-                lower=DerivativeMap(position=0.0, velocity=-2.0),
-                upper=DerivativeMap(position=math.pi / 2, velocity=2.0),
-            ),
-            scale=Scale(0.4, 0.4, 1.0),
-        )
-    cup.initialize_fill_level(
-        world=world, initial_fill=1.0, outflow_rate_constant=OUTFLOW_RATE_CONSTANT
-    )
-    world.set_positions_1DOF_connection({cup.root.parent_connection: 0.1})
-    return world, cup
+    return build_single_cup_world(outflow_rate_constant=OUTFLOW_RATE_CONSTANT)
 
 
 def _run_single_cup_pour(equation: PouringEquation) -> np.ndarray:
@@ -139,7 +116,7 @@ def _run_single_cup_pour(equation: PouringEquation) -> np.ndarray:
     fill_history: list[float] = []
     original_on_tick = task.on_tick
 
-    def recording_on_tick(context):
+    def recording_on_tick(context: MotionStatechartContext):
         fill_history.append(float(cup.fill_level))
         return original_on_tick(context)
 
@@ -158,34 +135,94 @@ def _run_single_cup_pour(equation: PouringEquation) -> np.ndarray:
     return np.array(fill_history)
 
 
-def _settled_at_goal(fill_history: np.ndarray) -> bool:
-    """Whether the fill stayed within the goal tolerance over the final ticks."""
-    return bool(
-        np.all(np.abs(fill_history[-SETTLE_TICKS:] - GOAL_FILL) <= FILL_TOLERANCE)
+def _assert_settled_at_goal(fill_history: np.ndarray) -> None:
+    """Assert the fill stayed at the goal (within tolerance) over the final ticks."""
+    np.testing.assert_allclose(
+        fill_history[-SETTLE_TICKS:], GOAL_FILL, atol=FILL_TOLERANCE
     )
 
 
-def test_learned_head_pour_matches_analytic(trained_model_reference):
-    """The same controller settles at the fill goal with either head model, and both agree."""
-    analytic_history = _run_single_cup_pour(
-        ArticulatedPouringEquation(
-            container_height=CONTAINER_HEIGHT,
-            container_width=CONTAINER_WIDTH,
-            outflow_rate_constant=OUTFLOW_RATE_CONSTANT,
-        )
-    )
-    learned_history = _run_single_cup_pour(
-        LearnedPouringEquation(
-            container_height=CONTAINER_HEIGHT,
-            container_width=CONTAINER_WIDTH,
-            outflow_rate_constant=OUTFLOW_RATE_CONSTANT,
-            model_reference=trained_model_reference,
-        )
+@pytest.fixture(scope="module")
+def analytic_equation() -> ArticulatedPouringEquation:
+    """The analytic head-above-lip pouring model for the test cup's geometry."""
+    return ArticulatedPouringEquation(
+        container_height=CONTAINER_HEIGHT,
+        container_width=CONTAINER_WIDTH,
+        outflow_rate_constant=OUTFLOW_RATE_CONSTANT,
     )
 
-    assert _settled_at_goal(analytic_history), "analytic pour did not settle at goal"
-    assert _settled_at_goal(learned_history), "learned pour did not settle at goal"
-    assert abs(analytic_history[-1] - learned_history[-1]) < 0.03, (
-        "analytic and learned pours diverge in final fill: "
-        f"{analytic_history[-1]:.3f} vs {learned_history[-1]:.3f}"
+
+@pytest.fixture(scope="module")
+def learned_equation(
+    trained_model_reference: LearnedHeadModelReference,
+) -> LearnedPouringEquation:
+    """The learned pouring model backed by the module's trained surrogate."""
+    return LearnedPouringEquation(
+        container_height=CONTAINER_HEIGHT,
+        container_width=CONTAINER_WIDTH,
+        outflow_rate_constant=OUTFLOW_RATE_CONSTANT,
+        model_reference=trained_model_reference,
+    )
+
+
+@pytest.fixture(scope="module")
+def analytic_fill_history(
+    analytic_equation: ArticulatedPouringEquation,
+) -> np.ndarray:
+    """Per-tick fill levels of the closed-loop pour driven by the analytic model."""
+    return _run_single_cup_pour(analytic_equation)
+
+
+@pytest.fixture(scope="module")
+def learned_fill_history(learned_equation: LearnedPouringEquation) -> np.ndarray:
+    """Per-tick fill levels of the closed-loop pour driven by the learned model."""
+    return _run_single_cup_pour(learned_equation)
+
+
+@pytest.mark.slow
+def test_analytic_pour_settles_at_goal(analytic_fill_history: np.ndarray) -> None:
+    """The controller settles the analytic arm at the fill goal."""
+    _assert_settled_at_goal(analytic_fill_history)
+    assert analytic_fill_history[-1] == pytest.approx(GOAL_FILL, abs=FILL_TOLERANCE)
+
+
+@pytest.mark.slow
+def test_learned_pour_settles_at_goal(learned_fill_history: np.ndarray) -> None:
+    """The controller settles the learned arm at the fill goal."""
+    _assert_settled_at_goal(learned_fill_history)
+    assert learned_fill_history[-1] == pytest.approx(GOAL_FILL, abs=FILL_TOLERANCE)
+
+
+@pytest.mark.slow
+def test_learned_and_analytic_arms_agree_on_final_fill(
+    analytic_fill_history: np.ndarray, learned_fill_history: np.ndarray
+) -> None:
+    """The two head models must not steer the same controller to different final fills."""
+    assert learned_fill_history[-1] == pytest.approx(
+        analytic_fill_history[-1], abs=FINAL_FILL_AGREEMENT_TOLERANCE
+    )
+
+
+@pytest.mark.slow
+def test_learned_arm_exercises_the_learned_head_model(
+    analytic_equation: ArticulatedPouringEquation,
+    learned_equation: LearnedPouringEquation,
+) -> None:
+    """
+    The learned arm must actually run through the surrogate: its fill velocity at a flowing
+    operating point differs from the analytic model (no silent analytic fallback) while
+    staying within the surrogate's training accuracy.
+    """
+    assert isinstance(learned_equation, LearnedPouringEquation)
+    operating_point = SymbolicFillContext(
+        sm.Scalar(FLOWING_TILT_ANGLE), sm.Scalar(FLOWING_FILL_LEVEL)
+    )
+    analytic_velocity = analytic_equation.symbolic_velocity(operating_point).evaluate()[
+        0
+    ]
+    learned_velocity = learned_equation.symbolic_velocity(operating_point).evaluate()[0]
+
+    assert learned_velocity != analytic_velocity
+    assert learned_velocity == pytest.approx(
+        analytic_velocity, abs=HEAD_MODEL_VELOCITY_AGREEMENT_TOLERANCE
     )

@@ -17,59 +17,64 @@ from semantic_digital_twin.world_description.effects import Effect
 from semantic_digital_twin.world_description.motion import MotionTrajectory
 from semantic_digital_twin.world_description.world_entity import Body
 
-_DEFAULT_FILL_LEVEL_TOLERANCE: float = 0.05
-
 
 @dataclass
 class PouringMSCModel(GiskardPhysicsModel):
     """
-    Physics model that drives a :class:`~giskardpy.motion_statechart.tasks.pouring.PouringTask`
-    MSC to generate a tilt trajectory.
+    Physics model that drives a
+    :class:`~giskardpy.motion_statechart.tasks.pouring.PouringTask` motion statechart to
+    generate a tilt trajectory.
 
-    The primary trajectory records the tilt joint positions at each control step.
-    The fill-level trajectory is recorded alongside it by
-    :meth:`_build_motion_trajectory`.
+    The primary trajectory records the tilt joint positions at each control step. The
+    fill-level trajectory is recorded alongside it by :meth:`_build_motion_trajectory`.
     """
 
     fill_equation: PouringEquation
     """Pouring ODE that couples tilt angle to fill-level dynamics."""
 
     fill_connection: LiquidConnection
-    """Virtual DOF whose position encodes fill level in [0, 1]."""
+    """
+    Virtual DOF whose position encodes fill level in [0, 1].
+    """
 
     tilt_connection: ActiveConnection1DOF
     """The revolute joint that tilts the container."""
 
     root_link: Body
-    """Root of the kinematic chain used to derive the cup tilt expression."""
+    """
+    Root of the kinematic chain used to derive the cup tilt expression.
+    """
 
     tip_link: Body
     """Tip of the kinematic chain (the cup body)."""
 
     initial_tilt: Optional[float] = field(default=None)
-    """If set, the tilt connection is moved to this angle before the simulation begins."""
+    """
+    If set, the tilt connection is moved to this angle before the simulation begins.
+    """
 
     def build_motion_statechart(self, effect: Effect, world: World) -> MotionStatechart:
         """
-        Build an MSC with a :class:`~giskardpy.motion_statechart.tasks.pouring.PouringTask`
-        targeting ``effect.goal_value`` as the fill level.
+        Build a motion statechart with a
+        :class:`~giskardpy.motion_statechart.tasks.pouring.PouringTask` targeting
+        ``effect.goal_value`` as the fill level within ``effect.tolerance``.
         """
         if self.initial_tilt is not None:
             world.set_positions_1DOF_connection(
                 {self.tilt_connection: self.initial_tilt}
             )
-        msc = MotionStatechart()
+        motion_statechart = MotionStatechart()
         pouring_task = PouringTask(
             fill_equation=self.fill_equation,
             fill_connection=self.fill_connection,
             root_link=self.root_link,
             tip_link=self.tip_link,
             goal_value=effect.goal_value,
-            fill_level_tolerance=_DEFAULT_FILL_LEVEL_TOLERANCE,
+            fill_level_tolerance=effect.tolerance,
         )
-        msc.add_node(pouring_task)
-        msc.add_node(EndMotion.when_true(pouring_task))
-        return msc
+        motion_statechart.add_node(pouring_task)
+        motion_statechart.add_node(EndMotion.when_true(pouring_task))
+        return motion_statechart
 
     def _build_motion_trajectory(self, effect: Effect) -> MotionTrajectory:
         """
@@ -86,7 +91,7 @@ class PouringMSCModel(GiskardPhysicsModel):
             {self.tilt_connection: tilt_positions, self.fill_connection: fill_positions}
         )
 
-    def interaction_body(self):
+    def interaction_body(self) -> Body:
         """
         :return: The cup body that the robot physically interacts with during pouring.
         """
