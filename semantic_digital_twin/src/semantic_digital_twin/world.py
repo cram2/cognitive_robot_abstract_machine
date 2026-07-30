@@ -857,7 +857,7 @@ class World(HasSimulatorProperties):
             the current context.
         """
         self._raise_error_if_belongs_to_other_world(semantic_annotation)
-        if self.is_semantic_annotation_in_world(semantic_annotation):
+        if self.contains_semantic_annotation(semantic_annotation):
             return
         introspector = DataclassOnlyIntrospector()
 
@@ -1010,7 +1010,7 @@ class World(HasSimulatorProperties):
 
         :param semantic_annotation: The semantic annotation instance to be removed.
         """
-        if self.is_semantic_annotation_in_world(semantic_annotation):
+        if self.is_semantic_annotation_bound_to_this_world(semantic_annotation):
             self._remove_semantic_annotation(semantic_annotation)
 
     @atomic_world_modification(modification=RemoveSemanticAnnotationModification)
@@ -1379,9 +1379,15 @@ class World(HasSimulatorProperties):
         return entity
 
     # %% Existence Checks
-    def is_semantic_annotation_in_world(
+    def is_semantic_annotation_bound_to_this_world(
         self, semantic_annotation: SemanticAnnotation
     ) -> bool:
+        """
+        :return: Whether this exact annotation instance is bound to this world.
+
+        Unlike :meth:`contains_semantic_annotation`, this requires the given instance itself
+        to be stored here, so it is the right check before removing an annotation.
+        """
         return (
             semantic_annotation._world == self
             and semantic_annotation in self.semantic_annotations

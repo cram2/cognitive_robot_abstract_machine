@@ -5,7 +5,6 @@ from giskardpy.middleware.ros2.robot_interface_config import (
     RobotInterfaceConfig,
     StandAloneRobotInterfaceConfig,
 )
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy
 
 if TYPE_CHECKING:
@@ -54,7 +53,7 @@ class WorldWithTracyConfig(WorldWithFixedRobot):
     """
 
     def __init__(self, urdf: Optional[str] = None):
-        super().__init__(urdf=urdf, root_name=PrefixedName("map2"), urdf_view=Tracy)
+        super().__init__(urdf=urdf, urdf_view=Tracy)
 
     def setup_world(self, robot_name: Optional[str] = None) -> None:
         super().setup_world()

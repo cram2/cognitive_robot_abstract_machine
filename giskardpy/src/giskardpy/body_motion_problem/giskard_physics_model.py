@@ -4,6 +4,7 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional
 
+from giskardpy.data_types.exceptions import DegreeOfFreedomNotRecordedError
 from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
@@ -37,6 +38,7 @@ class GiskardPhysicsModel(PhysicsModel):
     _recorded_trajectory: Optional[WorldStateTrajectory] = field(
         init=False, repr=False, default=None
     )
+    """World-state trajectory recorded by the most recent :meth:`run` call."""
 
     @abstractmethod
     def build_motion_statechart(self, effect: Effect, world: World) -> MotionStatechart:
@@ -58,7 +60,9 @@ class GiskardPhysicsModel(PhysicsModel):
 
         :param effect: Desired effect passed to :meth:`build_motion_statechart`.
         :param world: World to simulate in.
-        :return: Recorded position sequences for all connections involved in the motion.
+        :return: Recorded position sequences for all connections involved in the motion,
+                 with :attr:`MotionTrajectory.converged` recording whether the statechart
+                 reached its end condition before the tick budget ran out.
         """
         with world.reset_state_context():
             msc = self.build_motion_statechart(effect, world)
@@ -72,10 +76,15 @@ class GiskardPhysicsModel(PhysicsModel):
             try:
                 executor.tick_until_end(timeout=self.timeout)
             except TimeoutError:
+                # An exhausted tick budget is a legitimate simulation outcome, recorded
+                # below as converged=False rather than silently dropped.
                 pass
+            converged = msc.is_end_motion()
             self._recorded_trajectory = plotter.world_state_trajectory
 
-        return self._build_motion_trajectory(effect)
+        motion_trajectory = self._build_motion_trajectory(effect)
+        motion_trajectory.converged = converged
+        return motion_trajectory
 
     @abstractmethod
     def _build_motion_trajectory(self, effect: Effect) -> MotionTrajectory:
@@ -104,8 +113,12 @@ class GiskardPhysicsModel(PhysicsModel):
         :param trajectory: Recorded world state trajectory.
         :param connection: The connection whose positions to extract.
         :return: List of connection-space positions at each recorded timestep.
+
+        :raises DegreeOfFreedomNotRecordedError: If the trajectory does not contain the
+            connection's degree of freedom; returning a shorter list instead would produce
+            a ragged :class:`MotionTrajectory` that fails much later during replay.
         """
         raw = trajectory.get_dof_positions(connection.raw_dof.id)
         if raw is None:
-            return []
+            raise DegreeOfFreedomNotRecordedError(connection_name=str(connection.name))
         return (raw[1:] * connection.multiplier + connection.offset).tolist()

@@ -83,6 +83,7 @@ from semantic_digital_twin.world_description.world_modification import (
 from semantic_digital_twin.physics.equations.pouring_equations import (
     ArticulatedPouringEquation,
     DEFAULT_DISCHARGE_COEFFICIENT,
+    DEFAULT_GATE_SHARPNESS,
     DEFAULT_POUR_EXIT_SPEED,
     GatedArticulatedPouringEquation,
     GatedInflowEquation,
@@ -1212,8 +1213,8 @@ class HasFillLevel(HasRootBody, LiquidSource):
         source: LiquidSource,
         world: World,
         exit_speed: float = DEFAULT_POUR_EXIT_SPEED,
-        height_gate_sharpness: float = 80.0,
-        overlap_gate_sharpness: float = 80.0,
+        height_gate_sharpness: float = DEFAULT_GATE_SHARPNESS,
+        overlap_gate_sharpness: float = DEFAULT_GATE_SHARPNESS,
     ) -> None:
         """
         Couple this container's inflow to the outflow of a liquid source.
@@ -1236,8 +1237,12 @@ class HasFillLevel(HasRootBody, LiquidSource):
         :param overlap_gate_sharpness: Logistic steepness of the projectile-landing gate.
 
         ..warning:: This mutates the source via :meth:`LiquidSource.couple_drain_to_gate`.
+
+        :raises MissingFillEquationError: if this receiver was never initialized with a fill level.
         """
         source.validate_can_pour()
+        if self.fill_connection is None:
+            raise MissingFillEquationError(source=self)
         if isinstance(source, WorldEntityWithID):
             coupling = LiquidTransferCoupling(
                 source_id=source.id,
@@ -1342,7 +1347,9 @@ class HasFillLevel(HasRootBody, LiquidSource):
             return False
         recorded = self.fill_connection.coupled_source_equation_json
         if recorded is None:
-            return False
+            # No provenance means the inflow equation was not built in this world (e.g. it
+            # arrived via synchronization), so it cannot be trusted and must be rebuilt.
+            return True
         return recorded != to_json(source.fill_equation)
 
     def ensure_inflow_coupling(self, world: World) -> None:
@@ -1362,7 +1369,8 @@ class HasFillLevel(HasRootBody, LiquidSource):
             return
         source = world.get_semantic_annotation_by_id(coupling.source_id)
         self._reattach_fill_connection(world)
-        source._reattach_fill_connection(world)
+        if isinstance(source, HasFillLevel):
+            source._reattach_fill_connection(world)
         if (
             self.fill_connection.inflow_equation is not None
             and not self._inflow_coupling_is_stale(source)

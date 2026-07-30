@@ -35,6 +35,7 @@ from semantic_digital_twin.physics.equations.learned_pouring_equations import ( 
     GatedLearnedPouringEquation,
     LearnedHeadModelReference,
     LearnedPouringEquation,
+    SHIPPED_HEAD_SURROGATE_CHECKPOINT,
     couple_source_with_learned_head,
 )
 from semantic_digital_twin.physics.equations.pouring_equations import (  # noqa: E402
@@ -101,7 +102,7 @@ class TestLearnedEquationSurvivesProcessBoundary:
 
         network = model_reference.load_torch_model()
         for tilt, fill in [(0.3, 0.9), (math.pi / 3, 0.5), (0.0, 1.0)]:
-            expected = float(network(torch.tensor([[tilt, fill]])).item())
+            expected = max(0.0, float(network(torch.tensor([[tilt, fill]])).item()))
             assert _evaluate_head(restored, tilt, fill) == pytest.approx(
                 expected, abs=1e-5
             )
@@ -126,14 +127,27 @@ class TestLearnedEquationSurvivesProcessBoundary:
 class TestModelReferenceResolution:
     def test_relative_checkpoint_path_resolves_against_workspace_root(self):
         reference = LearnedHeadModelReference(
-            checkpoint_path="learned_pouring/head_surrogate.pt",
+            checkpoint_path=SHIPPED_HEAD_SURROGATE_CHECKPOINT,
             trained_container_height=CONTAINER_HEIGHT,
             trained_container_width=CONTAINER_WIDTH,
         )
         resolved = reference.resolved_checkpoint_path()
         workspace_root = LearnedHeadModelReference.workspace_root()
-        assert resolved == workspace_root / "learned_pouring" / "head_surrogate.pt"
+        assert resolved == workspace_root / Path(SHIPPED_HEAD_SURROGATE_CHECKPOINT)
         assert (workspace_root / "semantic_digital_twin").is_dir()
+
+    def test_shipped_reference_checkpoint_exists_and_loads(self):
+        """The committed default checkpoint must resolve to a real file and load into the
+        surrogate architecture, so the documented default path works on a fresh clone.
+        """
+        reference = LearnedHeadModelReference(
+            checkpoint_path=SHIPPED_HEAD_SURROGATE_CHECKPOINT,
+            trained_container_height=CONTAINER_HEIGHT,
+            trained_container_width=CONTAINER_WIDTH,
+            hidden_width=64,
+        )
+        assert reference.resolved_checkpoint_path().exists()
+        assert reference.load_torch_model() is not None
 
     def test_absolute_checkpoint_path_is_used_verbatim(self, tmp_path):
         checkpoint_path = tmp_path / "head_surrogate.pt"
@@ -205,6 +219,66 @@ class TestPolymorphicGating:
         assert gated.gate is gate
 
 
+class TestLearnedHeadStaysPhysical:
+    """The learned equation never produces a negative head or a filling drain."""
+
+    @pytest.fixture
+    def undershooting_model_reference(self, tmp_path) -> LearnedHeadModelReference:
+        """A surrogate checkpoint whose raw output is negative over the whole input range,
+        as an MSE-trained network is in the non-pouring region."""
+        checkpoint_path = tmp_path / "undershooting_head_surrogate.pt"
+        torch.manual_seed(0)
+        network = HeadSurrogate(hidden_width=HIDDEN_WIDTH)
+        with torch.no_grad():
+            network.net[-1].bias.fill_(-1.0)
+        torch.save(network.state_dict(), str(checkpoint_path))
+        return LearnedHeadModelReference(
+            checkpoint_path=str(checkpoint_path),
+            trained_container_height=CONTAINER_HEIGHT,
+            trained_container_width=CONTAINER_WIDTH,
+            hidden_width=HIDDEN_WIDTH,
+        )
+
+    def _evaluate_velocity(
+        self, equation: LearnedPouringEquation, tilt: float, fill: float
+    ) -> float:
+        tilt_variable = sm.FloatVariable("test_velocity_tilt")
+        fill_variable = sm.FloatVariable("test_velocity_fill")
+        velocity = equation.symbolic_velocity(
+            SymbolicFillContext(tilt_variable, fill_variable)
+        )
+        return float(
+            velocity.substitute(
+                [tilt_variable, fill_variable], [tilt, fill]
+            ).evaluate()[0]
+        )
+
+    def test_learned_head_is_never_negative(self, undershooting_model_reference):
+        """A raw MSE-trained network undershoots below zero in the non-pouring region; the
+        equation must clamp it, or a negative head would flip the drain's sign."""
+        equation = LearnedPouringEquation(
+            container_height=CONTAINER_HEIGHT,
+            container_width=CONTAINER_WIDTH,
+            model_reference=undershooting_model_reference,
+        )
+        for tilt in np.linspace(-0.2, math.pi / 2, 12):
+            for fill in np.linspace(0.0, 1.0, 9):
+                assert _evaluate_head(equation, float(tilt), float(fill)) >= 0.0
+
+    def test_learned_drain_never_fills_the_source(self, undershooting_model_reference):
+        """The drain must be non-positive everywhere: an upright source must never gain liquid."""
+        equation = LearnedPouringEquation(
+            container_height=CONTAINER_HEIGHT,
+            container_width=CONTAINER_WIDTH,
+            model_reference=undershooting_model_reference,
+        )
+        for tilt in np.linspace(-0.2, math.pi / 2, 12):
+            for fill in np.linspace(0.0, 1.0, 9):
+                assert (
+                    self._evaluate_velocity(equation, float(tilt), float(fill)) <= 0.0
+                )
+
+
 class TestTrainedSurrogateFidelity:
     """The trained surrogate reproduces the analytic head and its tilt gradient."""
 
@@ -254,6 +328,13 @@ class TestTrainedSurrogateFidelity:
         assert (
             tilt_gradient_rmse < 0.1
         ), f"surrogate head gradient RMSE too high: {tilt_gradient_rmse:.3e}"
+
+        non_pouring_learned = learned.detach().numpy().flatten()[~pouring]
+        non_pouring_rmse = float(np.sqrt(np.mean(non_pouring_learned**2)))
+        assert non_pouring_rmse < 5e-3, (
+            f"surrogate head deviates from zero in the non-pouring region: "
+            f"{non_pouring_rmse:.3e}"
+        )
 
 
 class TestLearnedCoupling:

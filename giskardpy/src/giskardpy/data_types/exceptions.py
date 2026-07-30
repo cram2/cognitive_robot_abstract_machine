@@ -33,6 +33,27 @@ class PlanningException(GiskardException):
 
 
 @dataclass
+class DegreeOfFreedomNotRecordedError(GiskardException):
+    """
+    Raised when a recorded world-state trajectory does not contain a requested degree of freedom.
+    """
+
+    connection_name: str
+    """
+    The name of the connection whose degree of freedom was requested.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The recorded world-state trajectory contains no positions for the degree of "
+            f"freedom of connection '{self.connection_name}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return "make sure the connection is part of the simulated world before running the physics model."
+
+
+@dataclass
 class MissingActionResultError(GiskardException):
     """
     Raised when a result message is requested before one has been set.

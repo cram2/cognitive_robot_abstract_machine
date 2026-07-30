@@ -18,7 +18,6 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     OmniDrive,
-    FixedConnection,
     DifferentialDrive,
 )
 from semantic_digital_twin.world_description.world_entity import (
@@ -51,15 +50,17 @@ class EmptyWorld(WorldConfig):
 
 @dataclass
 class WorldWithFixedRobot(WorldConfig):
+    """
+    World config for a robot that is rigidly mounted: the robot's URDF root becomes the
+    world root, so no separate map frame or localization connection exists.
+    """
+
     urdf: str = field(kw_only=True)
-    root_name: PrefixedName = field(default=PrefixedName("map"))
     robot_name: PrefixedName = field(default=PrefixedName("robot"))
     robot_root: KinematicStructureEntity = field(init=False)
     urdf_view: AbstractRobot = field(kw_only=True, default=MinimalRobot)
 
     def setup_world(self):
-        map = Body(name=self.root_name)
-
         urdf_parser = URDFParser(urdf=self.urdf, prefix="")
         world_with_robot = urdf_parser.parse()
         self.urdf_view.from_world(world_with_robot)

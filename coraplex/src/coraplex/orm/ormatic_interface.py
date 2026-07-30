@@ -6286,6 +6286,29 @@ class GiskardExceptionDAO(
     }
 
 
+class DegreeOfFreedomNotRecordedErrorDAO(
+    GiskardExceptionDAO,
+    DataAccessObject[giskardpy.data_types.exceptions.DegreeOfFreedomNotRecordedError],
+):
+    __tablename__ = "DegreeOfFreedomNotRecordedErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GiskardExceptionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    connection_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "DegreeOfFreedomNotRecordedErrorDAO",
+        "inherit_condition": database_id == GiskardExceptionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class DuplicateNameExceptionDAO(
     GiskardExceptionDAO,
     DataAccessObject[giskardpy.data_types.exceptions.DuplicateNameException],
@@ -7336,11 +7359,6 @@ class WorldWithFixedRobotDAO(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
-    root_name_id: Mapped[int] = mapped_column(
-        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
     robot_name_id: Mapped[int] = mapped_column(
         ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
         nullable=True,
@@ -7352,9 +7370,6 @@ class WorldWithFixedRobotDAO(
         use_existing_column=True,
     )
 
-    root_name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[root_name_id], post_update=True
-    )
     robot_name: Mapped[PrefixedNameDAO] = relationship(
         "PrefixedNameDAO", uselist=False, foreign_keys=[robot_name_id], post_update=True
     )
@@ -12293,6 +12308,29 @@ class HardConstraintsViolatedExceptionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HardConstraintsViolatedExceptionDAO",
         "inherit_condition": database_id == InfeasibleExceptionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MultipleTerminalStateConstraintsErrorDAO(
+    QPSolverExceptionDAO,
+    DataAccessObject[giskardpy.qp.exceptions.MultipleTerminalStateConstraintsError],
+):
+    __tablename__ = "MultipleTerminalStateConstraintsErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(QPSolverExceptionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    constraint_names: Mapped[typing.List[builtins.str]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MultipleTerminalStateConstraintsErrorDAO",
+        "inherit_condition": database_id == QPSolverExceptionDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -18232,6 +18270,35 @@ class MissingLearnedModelCheckpointErrorDAO(
     }
 
 
+class MissingMotionTrajectoryErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.MissingMotionTrajectoryError],
+):
+    __tablename__ = "MissingMotionTrajectoryErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    motion_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("MotionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    motion: Mapped[MotionDAO] = relationship(
+        "MotionDAO", uselist=False, foreign_keys=[motion_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MissingMotionTrajectoryErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class MissingPublishChangesKWARGDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.MissingPublishChangesKWARG],
@@ -21848,6 +21915,10 @@ class MotionTrajectoryDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
+    )
+
+    converged: Mapped[typing.Optional[builtins.bool]] = mapped_column(
+        use_existing_column=True
     )
 
 

@@ -28,6 +28,13 @@ per cup and liquid to match the observed pour range.
 STANDARD_GRAVITY: float = 9.81
 """Gravitational acceleration used for the pouring projectile, in metres per second squared."""
 
+DEFAULT_GATE_SHARPNESS: float = 80.0
+"""Default logistic steepness of the geometric transfer gates.
+
+Shared by the live coupling construction and the serializable coupling descriptor so a coupling
+rebuilt from a default descriptor reproduces the same gate that was originally built.
+"""
+
 MINIMUM_POUR_HEAD: float = 0.01
 """Lower bound on the pour head used in the Torricelli exit speed, in metres.
 
@@ -103,6 +110,19 @@ class PouringEquation(SubclassJSONSerializer, FillEquation):
 
     outflow_rate_constant: float = field(default=1.0, kw_only=True)
     """Proportionality constant scaling the discharge gap to the normalized drain rate."""
+
+    def ungated(self) -> PouringEquation:
+        """
+        The serializable, gate-free counterpart of this equation.
+
+        The symbolic gate is bound to the world it was built in and cannot cross a process
+        boundary; serialization therefore stores the ungated drain and the receiving world
+        re-gates it when the transfer coupling is rebuilt there. Ungated equations return
+        themselves.
+
+        :return: This equation without any transfer gate.
+        """
+        return self
 
     def symbolic_ode_jacobians(
         self, tilt_expression: Scalar, fill_expression: Scalar
@@ -279,6 +299,17 @@ class GatedArticulatedPouringEquation(ArticulatedPouringEquation):
         """
         return self.gate * super().symbolic_velocity(context)
 
+    def ungated(self) -> ArticulatedPouringEquation:
+        """
+        :return: The analytic drain with this equation's parameters, without the symbolic gate.
+        """
+        return ArticulatedPouringEquation(
+            container_height=self.container_height,
+            container_width=self.container_width,
+            outflow_rate_constant=self.outflow_rate_constant,
+            discharge_coefficient=self.discharge_coefficient,
+        )
+
 
 def tilt_expression_from_fk(root_T_cup: HomogeneousTransformationMatrix) -> Scalar:
     """
@@ -349,10 +380,11 @@ class GatedInflowEquation(InflowEquation):
     """Symbolic tilt angle of the source cup whose outflow feeds this inflow."""
 
     exit_speed: float = field(default=DEFAULT_POUR_EXIT_SPEED)
-    """Horizontal speed of the liquid leaving the fully tilted source, in metres per second.
+    """Nominal horizontal speed of the liquid leaving the fully tilted source, in metres per second.
 
-    Stored so the no-spill positioning task reconstructs the same projectile landing point the
-    gate uses.
+    Both the gate construction and the no-spill positioning task prefer the source's live
+    Torricelli exit speed; this nominal value is the shared fallback they use when the source
+    exposes no live outflow model, so both still derive the same projectile landing point.
     """
 
     def symbolic_velocity(self, context: FillContext) -> Scalar:

@@ -2904,5 +2904,51 @@ def test_liquid_transfer_coupling_synchronizes_and_rebuilds(rclpy_node):
         sync_giskard.close()
 
 
+@dataclass(eq=False)
+class AcknowledgmentRecordingSynchronizer(WorldSynchronizer):
+    """Synchronizer that records which messages it acknowledged, standing in for a remote
+    synchronous publisher waiting on those acknowledgments."""
+
+    acknowledged_messages: list = field(default_factory=list)
+    """Messages this synchronizer acknowledged, in order."""
+
+    def acknowledge_message(self, message):
+        self.acknowledged_messages.append(message)
+        super().acknowledge_message(message)
+
+
+def test_apply_external_state_updates_acknowledges_fully_consumed_messages(rclpy_node):
+    """A message whose entire state was consumed by the live external-input path must be
+    acknowledged and dropped from the buffer, or a synchronous publisher blocks for its whole
+    synchronization timeout waiting on it."""
+    producer_world = create_dummy_world()
+    server_world = create_dummy_world()
+
+    producer_synchronizer = WorldSynchronizer(node=rclpy_node, _world=producer_world)
+    server_synchronizer = AcknowledgmentRecordingSynchronizer(
+        node=rclpy_node, _world=server_world
+    )
+    try:
+        server_synchronizer.pause()
+        time.sleep(0.2)
+
+        for degree_of_freedom in server_world.degrees_of_freedom:
+            degree_of_freedom.allows_external_state_update = True
+        externally_driven_dof_id = server_world.get_degree_of_freedom_by_name("x").id
+
+        producer_world.state[externally_driven_dof_id].position = 0.7
+        producer_world.notify_state_change()
+        assert wait_for_condition(lambda: len(server_synchronizer.missed_messages) >= 1)
+
+        server_synchronizer.apply_external_state_updates()
+
+        assert server_world.state[externally_driven_dof_id].position == 0.7
+        assert not server_synchronizer.missed_messages
+        assert len(server_synchronizer.acknowledged_messages) == 1
+    finally:
+        producer_synchronizer.close()
+        server_synchronizer.close()
+
+
 if __name__ == "__main__":
     unittest.main()

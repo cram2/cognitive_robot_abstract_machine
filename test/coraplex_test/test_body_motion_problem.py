@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 import math
-import random
 from copy import deepcopy
 from dataclasses import dataclass
 
 import pytest
 
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 from krrood.entity_query_language.factories import an, set_of, variable
 from krrood.entity_query_language.operators.core_logical_operators import Not
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
@@ -19,6 +15,7 @@ from giskardpy.body_motion_problem.container_physics import (
     ContainerManipulationPhysicsModel,
 )
 from giskardpy.body_motion_problem.pouring_physics import PouringMSCModel
+from giskardpy.data_types.exceptions import DegreeOfFreedomNotRecordedError
 from coraplex.body_motion_problem.predicates import MotionStatechartCanPerform
 from semantic_digital_twin.reasoning.bmp_predicates import Causes, SatisfiesRequest
 from semantic_digital_twin.semantic_annotations.effects import (
@@ -303,7 +300,6 @@ class TestContainerManipulationPredicates:
     def test_can_execute(self, mutable_model_world, rclpy_node):
         """MotionStatechartCanPerform returns False for an empty trajectory and a bool for a non-empty one."""
         world = mutable_model_world
-        # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         world.get_body_by_name("base_footprint").parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.2, 2, 0)
         )
@@ -321,6 +317,32 @@ class TestContainerManipulationPredicates:
         )
         result = MotionStatechartCanPerform(motion=motion, robot=robot)()
         assert isinstance(result, bool)
+
+
+class TestTrajectorySubsampling:
+    """Covers the waypoint cap of MotionStatechartCanPerform._subsample_trajectory."""
+
+    @pytest.mark.parametrize("length", [21, 39, 200])
+    def test_subsample_respects_waypoint_cap(self, length: int):
+        """Any over-long trajectory is reduced to at most the waypoint cap, keeping both endpoints."""
+        predicate = MotionStatechartCanPerform(motion=None, robot=None)
+        trajectory = [
+            HomogeneousTransformationMatrix.from_xyz_rpy(x=step * 0.01).to_pose()
+            for step in range(length)
+        ]
+        subsampled = predicate._subsample_trajectory(trajectory)
+        assert len(subsampled) <= predicate._max_trajectory_waypoints
+        assert subsampled[0] is trajectory[0]
+        assert subsampled[-1] is trajectory[-1]
+
+    def test_short_trajectory_is_returned_unchanged(self):
+        """A trajectory within the cap must not lose any waypoint."""
+        predicate = MotionStatechartCanPerform(motion=None, robot=None)
+        trajectory = [
+            HomogeneousTransformationMatrix.from_xyz_rpy(x=step * 0.01).to_pose()
+            for step in range(5)
+        ]
+        assert predicate._subsample_trajectory(trajectory) == trajectory
 
 
 # ---------------------------------------------------------------------------
@@ -373,6 +395,54 @@ class TestPouringPredicates:
 
         assert cup.fill_level == pytest.approx(fill_before)
         assert cup.root.parent_connection.position == pytest.approx(0.1)
+
+    def test_run_reports_convergence(self, world_with_cup):
+        """The returned trajectory records whether the statechart reached its end condition."""
+        world, cup = world_with_cup
+        physics_arguments = dict(
+            fill_equation=cup.fill_equation,
+            fill_connection=cup.fill_connection,
+            tilt_connection=cup.root.parent_connection,
+            root_link=world.root,
+            tip_link=cup.root,
+        )
+
+        achievable = PouringEffect(
+            target_object=cup, property_getter=lambda c: c.fill_level, goal_value=0.6
+        )
+        trajectory = PouringMSCModel(**physics_arguments).run(
+            effect=achievable, world=world
+        )
+        assert trajectory.converged is True
+
+        out_of_tick_budget = PouringEffect(
+            target_object=cup, property_getter=lambda c: c.fill_level, goal_value=0.2
+        )
+        truncated = PouringMSCModel(**physics_arguments, timeout=5).run(
+            effect=out_of_tick_budget, world=world
+        )
+        assert truncated.converged is False
+
+    def test_extracting_unrecorded_dof_raises(self, world_with_cup, pr2_world_with_cup):
+        """Asking for a degree of freedom the simulation never recorded must fail loudly."""
+        world, cup = world_with_cup
+        _, foreign_cup, _ = pr2_world_with_cup
+        physics = PouringMSCModel(
+            fill_equation=cup.fill_equation,
+            fill_connection=cup.fill_connection,
+            tilt_connection=cup.root.parent_connection,
+            root_link=world.root,
+            tip_link=cup.root,
+            timeout=30,
+        )
+        effect = PouringEffect(
+            target_object=cup, property_getter=lambda c: c.fill_level, goal_value=0.6
+        )
+        physics.run(effect=effect, world=world)
+        with pytest.raises(DegreeOfFreedomNotRecordedError):
+            physics._extract_dof_positions(
+                physics._recorded_trajectory, foreign_cup.fill_connection
+            )
 
     def test_causes_does_not_hold_when_effect_already_achieved(self, world_with_cup):
         """Causes returns False when the fill level is already at or below the goal."""
@@ -673,7 +743,6 @@ class TestRobotIntegration:
     ):
         """Motion querying for open task using Stretch robot in the kitchen world (drawers only)."""
         world = stretch_apartment_world
-        # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         effects, motions, open_task, _, drawers = _extend_world(
             world, only_drawers=True
         )
@@ -692,7 +761,6 @@ class TestRobotIntegration:
         )
 
         results = list(query.evaluate())
-        print(len(results))
         assert len(results) >= 1
 
     def test_query_motion_satisfying_task_request_tiago(
@@ -700,7 +768,6 @@ class TestRobotIntegration:
     ):
         """Motion querying for open task using Tiago robot in the kitchen world."""
         world = tiago_apartment_world
-        # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         effects, motions, open_task, _, _ = _extend_world(
             world, only_doors=False, only_drawers=True
         )
@@ -728,7 +795,6 @@ class TestRobotIntegration:
         )
 
         results = list(query.evaluate())
-        print(len(results))
         assert len(results) >= 1
 
     def test_query_task_and_effect_satisfying_motion_pr2(
@@ -736,7 +802,6 @@ class TestRobotIntegration:
     ):
         """Given a fixed motion on the first drawer, query recovers task and effect using PR2."""
         world = mutable_model_world
-        # VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
         effects, _, open_task, close_task, drawers = _extend_world(world)
 
         actuator = [
@@ -766,7 +831,6 @@ class TestRobotIntegration:
             )
         )
         results = list(query.evaluate())
-        print(len(results))
         assert len(results) >= 1
 
 

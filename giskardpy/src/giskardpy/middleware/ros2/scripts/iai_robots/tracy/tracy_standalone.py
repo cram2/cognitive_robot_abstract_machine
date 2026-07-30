@@ -12,10 +12,6 @@ from giskardpy.middleware.ros2.giskard import Giskard
 
 def main():
     rospy.init_node("giskard")
-    # rospy.node.declare_parameters(
-    #     namespace="", parameters=[("robot_description", Parameter.Type.STRING)]
-    # )
-    # robot_description = rospy.node.get_parameter_or("robot_description").value
     robot_description = load_xacro(
         "package://iai_tracy_description/urdf/tracy.urdf.xacro"
     )

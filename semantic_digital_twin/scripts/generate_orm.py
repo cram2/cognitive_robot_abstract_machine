@@ -7,6 +7,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 
+import importlib.util
 import logging
 from pathlib import Path
 
@@ -16,7 +17,6 @@ import semantic_digital_twin
 import semantic_digital_twin.orm.model
 
 import semantic_digital_twin.adapters.procthor.procthor_resolver
-import semantic_digital_twin.physics.equations.head_surrogate_training
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.ormatic import ORMatic
 from semantic_digital_twin.reasoning.predicates import ContainsType
@@ -40,9 +40,17 @@ ignore_classes = {
     ContainsType,
     SemanticDirection,
     SubclassJSONSerializer,
-    # A training procedure, not world state; its module also requires torch at import time.
-    semantic_digital_twin.physics.equations.head_surrogate_training.HeadSurrogateTrainer,
 }
+
+# The trainer is a training procedure, not world state, and its module requires torch at import
+# time. Without torch the package scan skips the module on its own, so ORM regeneration must not
+# hard-import it — otherwise regeneration breaks on every torch-free install.
+if importlib.util.find_spec("torch") is not None:
+    import semantic_digital_twin.physics.equations.head_surrogate_training
+
+    ignore_classes.add(
+        semantic_digital_twin.physics.equations.head_surrogate_training.HeadSurrogateTrainer
+    )
 
 
 def generate_orm():

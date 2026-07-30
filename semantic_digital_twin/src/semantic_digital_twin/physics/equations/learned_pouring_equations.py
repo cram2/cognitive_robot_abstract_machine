@@ -35,6 +35,7 @@ from krrood.symbolic_math.symbolic_math import Scalar
 
 from semantic_digital_twin.exceptions import (
     LearnedModelGeometryMismatchError,
+    MissingFillEquationError,
     MissingLearnedModelCheckpointError,
 )
 from semantic_digital_twin.physics.equations.pouring_equations import (
@@ -46,6 +47,15 @@ from semantic_digital_twin.physics.equations.pouring_equations import (
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
     from semantic_digital_twin.world import World
+
+SHIPPED_HEAD_SURROGATE_CHECKPOINT: str = (
+    "semantic_digital_twin/resources/learned_models/head_surrogate.pt"
+)
+"""Workspace-relative path of the committed reference checkpoint.
+
+Trained for the Jeroen cup geometry (container height 0.16 m, width 0.07 m, derived from
+``resources/stl/jeroen_cup.stl``) with the default hidden width. Use it as a working default;
+train a dedicated checkpoint for any other cup geometry."""
 
 
 @dataclass
@@ -154,9 +164,18 @@ class HasLearnedHead:
     )
     """Process-local l4casadi wrapper around the loaded torch model."""
 
+    _l4casadi_cache: ClassVar[Dict[str, Any]] = {}
+    """Process-local cache of l4casadi wrappers keyed by generated function name, so equations
+    built from the same checkpoint and geometry share one generated model instead of recompiling
+    per equation instance."""
+
     def head_above_lip(self, context: FillContext) -> Scalar:
         """
         Height of the liquid surface above the pouring lip, evaluated by the learned surrogate.
+
+        The surrogate output is clamped to be non-negative like the analytic head: an MSE-trained
+        network routinely undershoots below zero in the non-pouring region, and a negative head
+        would flip the drain's sign so an upright source *gains* liquid.
 
         :param context: Kinematic context providing the tilt and fill symbols.
         :return: Symbolic head above the lip.
@@ -166,7 +185,7 @@ class HasLearnedHead:
         tilt_sx = context.tilt_expression.casadi_sx
         fill_sx = context.fill_position.casadi_sx
         head_sx = self._l4casadi_head(casadi.horzcat(tilt_sx, fill_sx))
-        return sm.Scalar(head_sx[0, 0])
+        return sm.max(sm.Scalar(0.0), sm.Scalar(head_sx[0, 0]))
 
     def _materialize_head_model(self) -> Any:
         """
@@ -179,10 +198,14 @@ class HasLearnedHead:
         import l4casadi
 
         self._validate_geometry_matches_reference()
+        name = self._generated_function_name()
+        cached = self._l4casadi_cache.get(name)
+        if cached is not None:
+            return cached
         torch_model = self.model_reference.load_torch_model()
-        return l4casadi.L4CasADi(
-            torch_model, name=self._generated_function_name(), batched=True
-        )
+        wrapper = l4casadi.L4CasADi(torch_model, name=name, batched=True)
+        self._l4casadi_cache[name] = wrapper
+        return wrapper
 
     def _validate_geometry_matches_reference(self) -> None:
         reference = self.model_reference
@@ -202,11 +225,22 @@ class HasLearnedHead:
             )
 
     def _generated_function_name(self) -> str:
-        """A per-instance C identifier for the l4casadi generated code."""
+        """
+        A deterministic C identifier for the l4casadi generated code.
+
+        Derived from the checkpoint and geometry (never from object identity), so equal
+        references map to the same generated code across instances and processes.
+        """
         checkpoint_stem = re.sub(
             r"\W", "_", self.model_reference.resolved_checkpoint_path().stem
         )
-        return f"learned_head_{checkpoint_stem}_{id(self)}"
+        geometry_tag = re.sub(
+            r"\W",
+            "_",
+            f"{self.model_reference.hidden_width}"
+            f"_{self.container_height}_{self.container_width}",
+        )
+        return f"learned_head_{checkpoint_stem}_{geometry_tag}"
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
@@ -250,9 +284,23 @@ class GatedLearnedPouringEquation(HasLearnedHead, GatedArticulatedPouringEquatio
     """
     Gated pouring equation with a learned head-above-lip: the source's drain after coupling.
 
-    The gate itself is symbolic and never serialized; a deserialized instance starts with the
-    gate open and is re-gated when the transfer coupling is rebuilt against the local world.
+    The gate itself is symbolic and never serialized. World synchronization stores the drain
+    ungated (see :meth:`LiquidConnection.to_json`); an equation round-tripped directly (e.g. in
+    an action goal) starts with the gate open. Either way the transfer coupling re-gates it when
+    rebuilt against the local world.
     """
+
+    def ungated(self) -> LearnedPouringEquation:
+        """
+        :return: The learned drain with this equation's parameters, without the symbolic gate.
+        """
+        return LearnedPouringEquation(
+            container_height=self.container_height,
+            container_width=self.container_width,
+            outflow_rate_constant=self.outflow_rate_constant,
+            discharge_coefficient=self.discharge_coefficient,
+            model_reference=self.model_reference,
+        )
 
 
 def couple_source_with_learned_head(
@@ -274,8 +322,12 @@ def couple_source_with_learned_head(
     :param source: The container to pour from; must already have a fill equation.
     :param world: The world both containers live in.
     :param model_reference: Reference to the trained head surrogate for the source's geometry.
+
+    :raises MissingFillEquationError: if the source was never initialized with a fill level.
     """
     equation = source.fill_equation
+    if equation is None:
+        raise MissingFillEquationError(source=source)
     receiver.recouple_outflow_from(
         source=source,
         world=world,

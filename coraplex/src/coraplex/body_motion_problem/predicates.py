@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import gc
 from dataclasses import dataclass
 from typing import ClassVar
+
+import numpy as np
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -12,9 +13,9 @@ from giskardpy.motion_statechart.exceptions import (
 )
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
-    SelfCollisionAvoidance,
     UpdateTemporaryCollisionRules,
 )
+from giskardpy.qp.exceptions import QPSolverException
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion, CancelMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
@@ -27,10 +28,10 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
 )
 from semantic_digital_twin.reasoning.bmp_predicates import CanPerform
+from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     EndEffector,
-    MobileBase,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasHandle
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -56,7 +57,8 @@ class MotionStatechartCanPerform(CanPerform):
 
     Samples candidate base poses around the start of the trajectory to avoid
     local minima in the QP solver. For each candidate, tests whether the gripper
-    can follow the full trajectory of world-space poses.
+    can follow the full trajectory of world-space poses. Robots without a mobile
+    base are tested from their current base placement instead.
     """
 
     _timeout: ClassVar[int] = 2000
@@ -105,13 +107,11 @@ class MotionStatechartCanPerform(CanPerform):
         restored after this method returns.
         """
         world = target._world
-        dof_id = self.motion.connection.raw_dof.id
         trajectory = []
         for position in self.motion.motion_trajectory.positions_for(
             self.motion.connection
         ):
-            world.state[dof_id].position = position
-            world.notify_state_change()
+            world.set_positions_1DOF_connection({self.motion.connection: position})
             trajectory.append(target.global_pose)
         return trajectory
 
@@ -177,15 +177,15 @@ class MotionStatechartCanPerform(CanPerform):
         """
         if len(trajectory) <= self._max_trajectory_waypoints:
             return trajectory
-        step = len(trajectory) // self._max_trajectory_waypoints
-        subsampled = trajectory[::step]
-        if subsampled[-1] is not trajectory[-1]:
-            subsampled.append(trajectory[-1])
-        return subsampled
+        waypoint_indices = np.linspace(
+            0, len(trajectory) - 1, self._max_trajectory_waypoints, dtype=int
+        )
+        return [trajectory[index] for index in waypoint_indices]
 
     def _execute_for_any_gripper(self, target: Body, trajectory: list[Pose]) -> bool:
         trajectory = self._subsample_trajectory(trajectory)
         world = self.robot._world
+        base_is_relocatable = isinstance(self.robot, HasMobileBase)
         original_temporary_rules = list(world.collision_manager.temporary_rules)
         original_collision_matrix = getattr(
             world.collision_manager, "collision_matrix", None
@@ -193,44 +193,20 @@ class MotionStatechartCanPerform(CanPerform):
         original_origin = self.robot.root.parent_connection.origin
 
         try:
-            for index in range(len(list(self.robot.get_end_effectors()))):
-                gripper = list(self.robot.get_end_effectors())[index]
-                costmap = self._setup_costmap(trajectory[0], world)
+            for gripper in self.robot.get_end_effectors():
+                if not base_is_relocatable:
+                    if self._gripper_can_follow_trajectory(gripper, target, trajectory):
+                        return True
+                    continue
 
-                for base_candidate in costmap:
+                for base_candidate in self._setup_costmap(trajectory[0], world):
                     base_candidate.z = original_origin.z
                     self.robot.root.parent_connection.origin = base_candidate
-
-                    motion_statechart, sequence = self._build_motion_statechart(
-                        world.root, gripper.tool_frame, trajectory
-                    )
-                    motion_statechart.add_node(
-                        UpdateTemporaryCollisionRules(
-                            temporary_rules=self._build_temporary_collision_rules(
-                                self.robot, gripper, target
-                            ),
-                        )
-                    )
-                    self._add_motion_termination_nodes(
-                        motion_statechart, sequence, self.robot
-                    )
-
-                    executor = Executor(context=MotionStatechartContext(world=world))
-                    with world.reset_state_context():
-                        executor.compile(motion_statechart=motion_statechart)
-                        try:
-                            executor.tick_until_end(timeout=self._timeout)
-                        except (
-                            TimeoutError,
-                            CollisionViolatedError,
-                            LocalMinimumReachedError,
-                        ):
-                            pass
-
-                    if motion_statechart.is_end_motion():
+                    if self._gripper_can_follow_trajectory(gripper, target, trajectory):
                         return True
         finally:
-            self.robot.root.parent_connection.origin = original_origin
+            if base_is_relocatable:
+                self.robot.root.parent_connection.origin = original_origin
             world.collision_manager.clear_temporary_rules()
             world.collision_manager.extend_temporary_rule(original_temporary_rules)
             if original_collision_matrix is not None:
@@ -240,6 +216,45 @@ class MotionStatechartCanPerform(CanPerform):
 
         return False
 
+    def _gripper_can_follow_trajectory(
+        self, gripper: EndEffector, target: Body, trajectory: list[Pose]
+    ) -> bool:
+        """
+        :return: Whether the gripper can follow the trajectory from the robot's
+                 current base placement.
+        """
+        world = self.robot._world
+        motion_statechart, sequence = self._build_motion_statechart(
+            world.root, gripper.tool_frame, trajectory
+        )
+        motion_statechart.add_node(
+            UpdateTemporaryCollisionRules(
+                temporary_rules=self._build_temporary_collision_rules(
+                    self.robot, gripper, target
+                ),
+            )
+        )
+        self._add_motion_termination_nodes(motion_statechart, sequence, self.robot)
+
+        executor = Executor(context=MotionStatechartContext(world=world))
+        with world.reset_state_context():
+            executor.compile(motion_statechart=motion_statechart)
+            try:
+                executor.tick_until_end(timeout=self._timeout)
+            except (
+                TimeoutError,
+                CollisionViolatedError,
+                LocalMinimumReachedError,
+                QPSolverException,
+            ):
+                # Each of these means "this candidate placement cannot follow the
+                # trajectory", not a programming error: the motion ran out of ticks,
+                # violated a collision constraint, converged into a local minimum,
+                # or posed an infeasible/unsolvable QP.
+                pass
+
+        return motion_statechart.is_end_motion()
+
     def _setup_costmap(self, target_pose: Pose, world: World):
         """
         :return: An occupancy + ring costmap centred on the ground projection of target_pose.
@@ -248,7 +263,7 @@ class MotionStatechartCanPerform(CanPerform):
         ground_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=position[0], y=position[1], z=0.0
         )
-        [base] = [p for p in self.robot._robot_parts if isinstance(p, MobileBase)]
+        base = self.robot.mobile_base
         base_bb = base.bounding_box
         occupancy = OccupancyCostmap(
             distance_to_obstacle=(base_bb.depth / 2 + base_bb.width / 2) / 2,

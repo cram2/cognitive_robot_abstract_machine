@@ -164,7 +164,6 @@ class NonObservationVariableError(InvalidConditionError):
 
     def reason(self) -> str:
         return f'Contains "{self.non_observation_variable}", which is not an observation variable.'
-        super().__post_init__()
 
 
 @dataclass

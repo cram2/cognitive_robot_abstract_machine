@@ -19,6 +19,7 @@ from giskardpy.motion_statechart.graph_node import (
     Task,
 )
 from semantic_digital_twin.physics.equations.pouring_equations import (
+    GatedInflowEquation,
     PouringEquation,
     SymbolicFillContext,
     tilt_expression_from_fk,
@@ -266,6 +267,12 @@ class KeepProjectileInReceiver(Task):
             )
         exit_speed = self.source.current_outflow_velocity(context.world)
         if exit_speed is None:
+            if not isinstance(inflow_equation, GatedInflowEquation):
+                raise NodeInitializationError(
+                    self,
+                    "receiver's inflow equation carries no nominal exit speed; "
+                    "couple it via receive_outflow_from so a GatedInflowEquation is built",
+                )
             exit_speed = inflow_equation.exit_speed
         landing_point = self.receiver.projectile_landing_point(
             self.source, context.world, exit_speed

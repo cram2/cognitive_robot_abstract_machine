@@ -24,6 +24,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+    from semantic_digital_twin.world_description.motion import Motion
     from semantic_digital_twin.robots.robot_parts import (
         AbstractRobot,
         AbstractRobotPart,
@@ -779,6 +780,24 @@ class DuplicateRobotAssignmentsError(UsageError):
 
 
 @dataclass
+class RobotAlreadyInWorldError(UsageError):
+    """
+    Raised when a robot annotation is created for a branch that already carries an equal robot.
+    """
+
+    robot_root: KinematicStructureEntity
+    """
+    The root body for which a robot annotation already exists.
+    """
+
+    def error_message(self) -> str:
+        return f"A robot annotation rooted at '{self.robot_root.name}' already exists in this world."
+
+    def suggest_correction(self) -> str:
+        return "reuse the existing robot via world.get_semantic_annotations_by_type(...) instead of creating it again."
+
+
+@dataclass
 class MissingFillEquationError(UsageError):
     """
     Raised when a liquid transfer is requested from a source that has no outflow physics.
@@ -879,6 +898,27 @@ class LearnedModelGeometryMismatchError(UsageError):
 
     def suggest_correction(self) -> str:
         return "use a checkpoint trained for this cup, or retrain the surrogate for its geometry."
+
+
+@dataclass
+class MissingMotionTrajectoryError(UsageError):
+    """
+    Raised when a motion trajectory is required but the motion carries none.
+    """
+
+    motion: Optional[Motion]
+    """
+    The motion that was expected to carry a trajectory, or ``None`` if no motion was given.
+    """
+
+    def error_message(self) -> str:
+        return f"Cannot replay motion '{self.motion}': it carries no trajectory."
+
+    def suggest_correction(self) -> str:
+        return (
+            "evaluate the Causes predicate first so its physics model generates a trajectory, "
+            "or set motion.motion_trajectory explicitly."
+        )
 
 
 @dataclass

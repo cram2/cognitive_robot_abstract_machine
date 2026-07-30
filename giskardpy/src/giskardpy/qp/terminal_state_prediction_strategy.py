@@ -24,6 +24,7 @@ from krrood.symbolic_math.symbolic_math import Matrix, Scalar, Vector
 from giskardpy.qp.constraint import GiskardEqualityConstraint, LargeNumber
 from giskardpy.qp.dof_limits import DirectLimits
 from giskardpy.qp.enforcement_strategy import IntegralStrategy, normalize_slack_weight
+from giskardpy.qp.exceptions import MultipleTerminalStateConstraintsError
 
 
 def _geometric_series(base: Scalar, n: int) -> Scalar:
@@ -78,7 +79,11 @@ def horizon_normalized_weights(
     for weight in weights:
         total = total + weight
     horizon = sm.Scalar(float(control_horizon))
-    return [weight * horizon / total for weight in weights]
+    # A stiff or oscillatory linearization can cancel the raw weight sum to exactly zero;
+    # normalizing would then inject inf/nan into the QP matrix, so fall back to the raw weights.
+    return [
+        sm.if_eq_zero(total, weight, weight * horizon / total) for weight in weights
+    ]
 
 
 @dataclass
@@ -181,6 +186,22 @@ class TerminalStatePredictionStrategy(IntegralStrategy):
     """
 
     @cached_property
+    def _constraint(self) -> TerminalStatePredictionConstraint:
+        """
+        Validates and returns the single constraint this strategy enforces.
+
+        :raises ConstraintTypeMismatchError: If a constraint is not a terminal-state constraint.
+        :raises MultipleTerminalStateConstraintsError: If more than one constraint was grouped
+            into this block; the single-row terminal prediction cannot represent that.
+        """
+        self._require_constraint_type(TerminalStatePredictionConstraint)
+        if len(self.constraints) != 1:
+            raise MultipleTerminalStateConstraintsError(
+                constraint_names=[constraint.name for constraint in self.constraints]
+            )
+        return self.constraints[0]
+
+    @cached_property
     def _state_model(self) -> LinearizedScalarStateModel:
         """
         Linearizes the single constraint's ODE at the current operating point, built once per solve.
@@ -188,7 +209,7 @@ class TerminalStatePredictionStrategy(IntegralStrategy):
         The state sensitivity ``∂f/∂x`` is differentiated here from the constraint's state-rate
         expression w.r.t. its own state variable, keeping all jacobian computation in one layer.
         """
-        [constraint] = self.constraints
+        constraint = self._constraint
         state_sensitivity = constraint.expression.jacobian([constraint.state_variable])[
             0, 0
         ]
@@ -205,7 +226,7 @@ class TerminalStatePredictionStrategy(IntegralStrategy):
         Builds the constraint row by scaling the state-rate jacobian per horizon block with the
         geometric velocity weights, padding the jerk columns with zeros.
         """
-        [constraint] = self.constraints
+        constraint = self._constraint
         time_step = self.qp_controller_config.model_predictive_control_time_step
         jacobian = (
             sm.Vector([constraint.expression]).jacobian(self.position_variables)
@@ -231,8 +252,7 @@ class TerminalStatePredictionStrategy(IntegralStrategy):
             terminal overshoot; at very short horizons the prediction is too myopic to ease off in
             time and the state overshoots the goal.
         """
-        self._require_constraint_type(GiskardEqualityConstraint)
-        [constraint] = self.constraints
+        constraint = self._constraint
         bound = sm.Scalar(constraint.goal_value) - self._state_model.free_response()
         capped = self.capped_bound(
             bound,
@@ -246,7 +266,7 @@ class TerminalStatePredictionStrategy(IntegralStrategy):
         """
         Creates one normalized slack variable for the single terminal-state constraint.
         """
-        [constraint] = self.constraints
+        constraint = self._constraint
         return DirectLimits(
             lower_bounds=Vector([-LargeNumber]),
             upper_bounds=Vector([LargeNumber]),

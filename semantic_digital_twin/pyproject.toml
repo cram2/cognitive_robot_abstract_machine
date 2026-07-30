@@ -43,3 +43,7 @@ gui = [
 dev = [
     "pytest>=7.0.0,<8.0.0"
 ]
+learned_equations = [
+    "torch>=2.0",
+    "l4casadi>=1.4",
+]

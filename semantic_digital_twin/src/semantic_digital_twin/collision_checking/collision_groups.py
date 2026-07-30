@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from anyio.functools import lru_cache
 from functools import cached_property
 
 from rustworkx import rustworkx
 from typing_extensions import TYPE_CHECKING
 
-from krrood.utils import memoize
+from krrood.utils import clear_memoization_cache, memoize
 from semantic_digital_twin.collision_checking.collision_manager import (
     CollisionManager,
     CollisionConsumer,
@@ -105,6 +104,9 @@ class CollisionGroupConsumer(CollisionConsumer, ABC):
         Updates the collision groups based on the kinematic structure of the world.
         :param world: Reference to the updated world.
         """
+        # The memoized body-to-group mapping refers to the groups of the previous model;
+        # without clearing it, lookups keep returning (and mutating) those dead groups.
+        clear_memoization_cache(self)
         body_to_robot = world.robot_body_to_robot_mapping
 
         self.collision_groups = [CollisionGroup(world.root)]

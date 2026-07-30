@@ -593,6 +593,43 @@ class TestCollisionGroups:
         assert robot_base not in obstacle_group.bodies
         assert obstacle not in robot_base_group.bodies
 
+    def test_group_lookup_is_refreshed_after_model_update(self):
+        """Repeated lookups share one group object, and a model update re-resolves the lookup to
+        the rebuilt group instead of returning (and mutating) the previous model's dead group.
+        """
+        world = World()
+        with world.modify_world():
+            robot_base = Body(
+                name=PrefixedName("robot_base"),
+                collision=ShapeCollection([Sphere(radius=0.3)]),
+            )
+            world.add_body(robot_base)
+            MinimalRobot.from_world(world)
+
+        collision_manager = world.collision_manager
+        collision_manager.collision_consumers = [
+            consumer := self.MockCollisionGroupConsumer()
+        ]
+        world._notify_model_change()
+
+        first_lookup = consumer.get_collision_group(robot_base)
+        assert consumer.get_collision_group(robot_base) is first_lookup
+
+        with world.modify_world():
+            attachment = Body(
+                name=PrefixedName("attachment"),
+                collision=ShapeCollection([Sphere(radius=0.1)]),
+            )
+            world.add_connection(FixedConnection(parent=robot_base, child=attachment))
+        consumer.update_collision_groups(world)
+
+        refreshed_group = consumer.get_collision_group(robot_base)
+        assert any(
+            stored_group is refreshed_group
+            for stored_group in consumer.collision_groups
+        ), "lookup returned a group of the previous model instead of the rebuilt one"
+        assert attachment in refreshed_group.bodies
+
     def test_is_collision_groups_combination_checked(self, pr2_world_state_reset):
         group_a = CollisionGroup(
             root=pr2_world_state_reset.bodies_with_collision[0],

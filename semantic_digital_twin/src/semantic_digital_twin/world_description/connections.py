@@ -11,6 +11,7 @@ from typing_extensions import TYPE_CHECKING, Union, Optional, Dict, Any, Self
 from krrood.adapters.json_serializer import from_json, to_json, SubclassJSONSerializer
 from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.physics.equations.pouring_equations import (
+    DEFAULT_GATE_SHARPNESS,
     DEFAULT_POUR_EXIT_SPEED,
     tilt_expression_from_fk,
 )
@@ -1110,10 +1111,10 @@ class LiquidTransferCoupling(SubclassJSONSerializer):
     exit_speed: float = field(default=DEFAULT_POUR_EXIT_SPEED)
     """Horizontal speed of the liquid leaving the source, in metres per second."""
 
-    height_gate_sharpness: float = field(default=20.0)
+    height_gate_sharpness: float = field(default=DEFAULT_GATE_SHARPNESS)
     """Logistic steepness of the source-above-receiver gate."""
 
-    overlap_gate_sharpness: float = field(default=20.0)
+    overlap_gate_sharpness: float = field(default=DEFAULT_GATE_SHARPNESS)
     """Logistic steepness of the projectile-landing gate."""
 
     def to_json(self) -> Dict[str, Any]:
@@ -1195,14 +1196,20 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
         return [self.raw_dof]
 
     def to_json(self) -> Dict[str, Any]:
+        """
+        Serializes the connection with its drain in ungated form and without the inflow equation.
+
+        The symbolic gate and inflow expressions are bound to the world they were built in; a
+        deserialized gate would silently default to fully open. The receiving world rebuilds
+        both from the recorded
+        :class:`~semantic_digital_twin.world_description.connections.LiquidTransferCoupling`
+        via ``ensure_inflow_coupling``.
+        """
         result = super().to_json()
         result["outflow_equation"] = (
-            to_json(self.outflow_equation)
+            to_json(self.outflow_equation.ungated())
             if self.outflow_equation is not None
             else None
-        )
-        result["inflow_equation"] = (
-            to_json(self.inflow_equation) if self.inflow_equation is not None else None
         )
         return result
 
@@ -1212,9 +1219,6 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
         raw_outflow = data.get("outflow_equation")
         if raw_outflow is not None:
             instance.outflow_equation = from_json(raw_outflow)
-        raw_inflow = data.get("inflow_equation")
-        if raw_inflow is not None:
-            instance.inflow_equation = from_json(raw_inflow)
         return instance
 
     def copy_for_world(self, world: World) -> LiquidConnection:
@@ -1254,9 +1258,11 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
 
     def update_state(self, dt: float):
         """
-        Advances the fill level by one physics step.
+        Advances the fill level by one physics step, clamped to the fill DOF's limits.
 
-        The connection is the :class:`FillContext` its equations are evaluated in.
+        The connection is the :class:`FillContext` its equations are evaluated in. Clamping keeps
+        an empty tilted container from draining below empty and a receiving container from filling
+        past full, neither of which the drain/inflow equations guard against themselves.
 
         :param dt: Time elapsed since the previous step, in seconds.
         """
@@ -1266,4 +1272,8 @@ class LiquidConnection(ActiveConnection1DOF, HasUpdateState):
             for equation in (self.outflow_equation, self.inflow_equation)
             if equation is not None
         )
-        state[self.dof.id].position = state[self.dof.id].position + velocity * dt
+        limits = self.raw_dof.limits
+        integrated_position = state[self.raw_dof.id].position + velocity * dt
+        state[self.raw_dof.id].position = min(
+            max(integrated_position, limits.lower.position), limits.upper.position
+        )

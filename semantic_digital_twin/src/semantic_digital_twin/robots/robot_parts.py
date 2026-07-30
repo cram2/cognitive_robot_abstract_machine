@@ -35,6 +35,7 @@ from semantic_digital_twin.exceptions import (
     UselessConceptError,
     DuplicateRobotAssignmentsError,
     MissingDefaultCameraError,
+    RobotAlreadyInWorldError,
 )
 from semantic_digital_twin.robots.robot_part_mixins import (
     HasEndEffector,
@@ -609,6 +610,11 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         robot_root = world.get_body_in_branch_by_name(
             branch_root=branch_root, name=cls._get_root_body_name()
         )
+        if any(
+            robot.root is robot_root
+            for robot in world.get_semantic_annotations_by_type(cls)
+        ):
+            raise RobotAlreadyInWorldError(robot_root=robot_root)
         with world.modify_world():
             self = cls(
                 root=robot_root,

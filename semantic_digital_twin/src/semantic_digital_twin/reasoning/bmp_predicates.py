@@ -26,6 +26,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Verb,
 )
 
+from semantic_digital_twin.exceptions import MissingMotionTrajectoryError
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.effects import Effect, TaskRequest
@@ -71,7 +72,11 @@ class Causes(Predicate):
         Re-apply the computed trajectory to the world with a per-step delay.
 
         :param step_delay: Seconds to sleep between steps (default 50 ms ≈ 20 fps).
+
+        :raises MissingMotionTrajectoryError: If there is no motion or it carries no trajectory.
         """
+        if self.motion is None or self.motion.motion_trajectory is None:
+            raise MissingMotionTrajectoryError(motion=self.motion)
         length = len(
             self.motion.motion_trajectory.positions_for(self.motion.connection)
         )
@@ -85,7 +90,7 @@ class Causes(Predicate):
         """
         Replay the trajectory in a sandboxed world and check whether the effect is achieved.
         """
-        if self.motion.motion_trajectory is None:
+        if self.motion is None or self.motion.motion_trajectory is None:
             return False
 
         actuator_positions = self.motion.motion_trajectory.positions_for(

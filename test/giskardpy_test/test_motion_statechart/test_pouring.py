@@ -856,7 +856,6 @@ class TestTracyLiquidTransfer:
         assert receiving_cup.fill_level == pytest.approx(goal_fill, abs=tolerance)
 
         receiver_gain = receiving_cup.fill_level
-        print(receiver_gain)
         source_loss = source_fill_before - source_cup.fill_level
         assert source_loss > tolerance, "source cup never poured"
         assert receiver_gain == pytest.approx(source_loss, abs=tolerance), (
@@ -1098,7 +1097,6 @@ class TestPerceptionCorrectedTransfer:
             (0.0, _DEFAULT_PERCEPTION_HZ),
             (0.01, _DEFAULT_PERCEPTION_HZ),
             (0.02, _DEFAULT_PERCEPTION_HZ),
-            # (0.05, _DEFAULT_PERCEPTION_HZ),
             (0.01, 20),
             (0.01, 30),
         ],
@@ -1106,7 +1104,6 @@ class TestPerceptionCorrectedTransfer:
             "sigma=0.00_10Hz",
             "sigma=0.01_10Hz",
             "sigma=0.02_10Hz",
-            # "sigma=0.05_10Hz",
             "sigma=0.01_20Hz",
             "sigma=0.01_30Hz",
         ],

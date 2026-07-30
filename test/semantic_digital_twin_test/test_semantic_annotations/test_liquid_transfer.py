@@ -16,7 +16,6 @@ from semantic_digital_twin.exceptions import (
 from semantic_digital_twin.physics.equations.pouring_equations import (
     ArticulatedPouringEquation,
     DEFAULT_DISCHARGE_COEFFICIENT,
-    DEFAULT_POUR_EXIT_SPEED,
     GatedArticulatedPouringEquation,
     GatedInflowEquation,
     InflowEquation,
@@ -820,3 +819,82 @@ class TestNonCupLiquidSource:
         assert inflow_equation is not None
         assert inflow_equation.gate.evaluate()[0] == pytest.approx(1.0, abs=1e-2)
         assert inflow_equation.symbolic_velocity(_INFLOW_CONTEXT).evaluate()[0] > 0.0
+
+
+class TestFillLevelIntegrationLimits:
+    """Validates that physics integration keeps the fill level inside the DOF limits."""
+
+    def _lone_tilting_cup(self) -> tuple[World, _TiltingContainer]:
+        world = World()
+        with world.modify_world():
+            world.add_body(Body(name=PrefixedName("map")))
+        with world.modify_world():
+            cup = _TiltingContainer.create_with_new_body_in_world(
+                name=PrefixedName("cup"),
+                world=world,
+                active_axis=Vector3(0, 1, 0),
+                connection_limits=DegreeOfFreedomLimits(
+                    lower=DerivativeMap(position=-2.0, velocity=-1.0),
+                    upper=DerivativeMap(position=2.0, velocity=1.0),
+                ),
+                scale=Scale(0.1, 0.1, 0.2),
+            )
+        return world, cup
+
+    def test_tilted_empty_source_does_not_drain_below_empty(self):
+        """A fully tilted cup with no liquid left must stay at fill 0, not integrate negative."""
+        world, cup = self._lone_tilting_cup()
+        cup.initialize_fill_level(world=world, initial_fill=0.0)
+        world.set_positions_1DOF_connection({cup.root.parent_connection: 1.5})
+
+        for _ in range(50):
+            world.step_physics(0.05)
+
+        assert cup.fill_level == pytest.approx(0.0)
+
+    def test_receiver_saturates_at_full(self):
+        """A receiver with a steady inflow must stop at fill 1, not fill past the brim."""
+        world, cup = self._lone_tilting_cup()
+        cup.initialize_fill_level(world=world, initial_fill=0.9)
+        with world.modify_world():
+            cup.add_inflow_equation(
+                InflowEquation(
+                    container_height=0.2,
+                    container_width=0.1,
+                    inflow=sm.Scalar(0.005),
+                )
+            )
+
+        for _ in range(50):
+            world.step_physics(0.05)
+
+        assert cup.fill_level == pytest.approx(1.0)
+
+
+class TestLiquidCouplingSerialization:
+    """Validates that a serialized coupling never resurrects as a silently open transfer."""
+
+    def test_serialized_drain_is_ungated(self):
+        """The source drain crosses the process boundary ungated, so a deserialized world cannot
+        carry an always-open gate; the receiving world re-gates it when rebuilding the coupling.
+        """
+        world, source, receiver = TestTransferGate()._build_world()
+        assert isinstance(source.fill_equation, GatedArticulatedPouringEquation)
+
+        payload = source.fill_connection.to_json()
+        restored_drain = from_json(payload["outflow_equation"])
+
+        assert type(restored_drain) is ArticulatedPouringEquation
+        assert restored_drain.container_height == pytest.approx(
+            source.fill_equation.container_height
+        )
+
+    def test_symbolic_inflow_is_not_serialized(self):
+        """The symbolic inflow cannot cross a process boundary; only the coupling descriptor does,
+        so the receiving world rebuilds the inflow via ensure_inflow_coupling."""
+        world, source, receiver = TestTransferGate()._build_world()
+        assert receiver.fill_connection.inflow_equation is not None
+
+        payload = receiver.fill_connection.to_json()
+
+        assert "inflow_equation" not in payload

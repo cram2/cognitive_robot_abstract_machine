@@ -21,12 +21,18 @@ class MotionTrajectory:
     All connections produced by a single physics simulation are stored here
     in lock-step, so they can be replayed together without any distinction
     between roles. Which connection is the robot's actuator is known by the
-    caller (via :attr:`~semantic_digital_twin.world_description.motion.Motion.actuator`),
+    caller (via :attr:`~semantic_digital_twin.world_description.motion.Motion.connection`),
     not by this class.
     """
 
     data: dict[Connection, list[float]] = field(default_factory=dict)
     """Position sequence for each connection, indexed by simulation step."""
+
+    converged: Optional[bool] = None
+    """
+    Whether the simulation that produced this trajectory reached its end condition,
+    or ``None`` when the producer does not track convergence (e.g. hand-written trajectories).
+    """
 
     def is_empty(self) -> bool:
         """

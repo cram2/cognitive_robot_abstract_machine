@@ -220,6 +220,34 @@ def test_add_semantic_annotation_deduplicates_equal_instances():
     assert len(world.get_semantic_annotations_by_type(Handle)) == 1
 
 
+def test_add_semantic_annotation_recursively_deduplicates_equal_instances():
+    """Recursively adding an annotation equal to a stored one must not store it or its nested annotations twice.
+
+    :meth:`World.add_semantic_annotation_recursively` must apply the same equality-based
+    deduplication as :meth:`World.add_semantic_annotation`, including for the nested
+    annotations it adds along the way.
+    """
+    world = World()
+    root = Body(name=PrefixedName("root"))
+    drawer_body = Body(name=PrefixedName("drawer_body"))
+    handle_body = Body(name=PrefixedName("handle_body"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(drawer_body)
+        world.add_kinematic_structure_entity(handle_body)
+        world.add_connection(FixedConnection(parent=root, child=drawer_body))
+        world.add_connection(FixedConnection(parent=drawer_body, child=handle_body))
+        world.add_semantic_annotation_recursively(
+            Drawer(root=drawer_body, handle=Handle(root=handle_body))
+        )
+        world.add_semantic_annotation_recursively(
+            Drawer(root=drawer_body, handle=Handle(root=handle_body))
+        )
+
+    assert len(world.get_semantic_annotations_by_type(Drawer)) == 1
+    assert len(world.get_semantic_annotations_by_type(Handle)) == 1
+
+
 def test_handle_semantic_annotation_eql(apartment_world_copy):
     body = variable(type_=Body, domain=apartment_world_copy.bodies)
     query = an(

@@ -603,43 +603,55 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         registered_ids: List[UUID] = []
         registered_states: List[float] = []
         remaining_messages: List[WorldUpdate] = []
-        for message in self.missed_messages:
-            state_update = message.state_update
-            if state_update is None:
-                remaining_messages.append(message)
-                continue
-            deferred_ids: List[UUID] = []
-            deferred_states: List[float] = []
-            for identifier, value in zip(state_update.ids, state_update.states):
-                if identifier in externally_updatable:
-                    registered_ids.append(identifier)
-                    registered_states.append(value)
+        consumed_messages: List[WorldUpdate] = []
+        # Hold the world lock while partitioning and replacing the buffer so a message appended
+        # concurrently by the subscription callback is never silently dropped.
+        with self._world._world_lock:
+            pending_messages = self.missed_messages
+            self.missed_messages = []
+            for message in pending_messages:
+                state_update = message.state_update
+                if state_update is None:
+                    remaining_messages.append(message)
+                    continue
+                deferred_ids: List[UUID] = []
+                deferred_states: List[float] = []
+                for identifier, value in zip(state_update.ids, state_update.states):
+                    if identifier in externally_updatable:
+                        registered_ids.append(identifier)
+                        registered_states.append(value)
+                    else:
+                        deferred_ids.append(identifier)
+                        deferred_states.append(value)
+                message.state_update = (
+                    WorldStateUpdate(
+                        meta_data=state_update.meta_data,
+                        ids=deferred_ids,
+                        states=deferred_states,
+                    )
+                    if deferred_ids
+                    else None
+                )
+                if (
+                    message.modification_block is not None
+                    or message.state_update is not None
+                ):
+                    remaining_messages.append(message)
                 else:
-                    deferred_ids.append(identifier)
-                    deferred_states.append(value)
-            message.state_update = (
-                WorldStateUpdate(
-                    meta_data=state_update.meta_data,
-                    ids=deferred_ids,
-                    states=deferred_states,
+                    consumed_messages.append(message)
+            self.missed_messages = remaining_messages
+            if registered_ids:
+                self._apply_state(
+                    WorldStateUpdate(
+                        meta_data=self.meta_data,
+                        ids=registered_ids,
+                        states=registered_states,
+                    )
                 )
-                if deferred_ids
-                else None
-            )
-            if (
-                message.modification_block is not None
-                or message.state_update is not None
-            ):
-                remaining_messages.append(message)
-        self.missed_messages = remaining_messages
-        if registered_ids:
-            self._apply_state(
-                WorldStateUpdate(
-                    meta_data=self.meta_data,
-                    ids=registered_ids,
-                    states=registered_states,
-                )
-            )
+        # Fully consumed messages must be acknowledged, or a synchronous publisher blocks for
+        # its whole synchronization timeout waiting on them.
+        for message in consumed_messages:
+            self.acknowledge_message(message)
 
     def resume(self):
         """Resume publishing and subscribing. Missed messages are NOT applied automatically."""
