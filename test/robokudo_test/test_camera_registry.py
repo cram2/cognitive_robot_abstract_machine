@@ -9,17 +9,23 @@ from robokudo.descriptors.camera_configs.registry import CameraConfigRegistry
 
 class TestCameraConfigRegistry(object):
     def test_camera_registry_valid_camera_name(self) -> None:
-        """Test the creation of a valid camera config."""
+        """
+        Test the creation of a valid camera config.
+        """
         config = CameraConfigRegistry.create_config("mongo")
         assert type(config) == MongoCameraConfig
 
     def test_camera_registry_invalid_camera_name(self) -> None:
-        """Test the creation of an invalid camera config."""
+        """
+        Test the creation of an invalid camera config.
+        """
         with pytest.raises(ValueError):
             CameraConfigRegistry.create_config("invalid_camera_name")
 
     def test_camera_registry_valid_additional_config(self) -> None:
-        """Test passing of valid additional config parameters to the camera config."""
+        """
+        Test passing of valid additional config parameters to the camera config.
+        """
         loop = False
         db_name = "other_db_name"
 
@@ -34,17 +40,24 @@ class TestCameraConfigRegistry(object):
         assert config.db_name == db_name
 
     def test_camera_registry_invalid_additional_config(self) -> None:
-        """Test handling of invalid additional config parameters to the camera config."""
+        """
+        Test handling of invalid additional config parameters to the camera config.
+        """
         with pytest.raises(TypeError):
             CameraConfigRegistry.create_config("mongo", invalid_config_key="any_value")
 
     def test_camera_registry_register_multiple_times(self) -> None:
-        """Test whether registration can be called multiple times without errors if there are no type conflicts."""
+        """
+        Test whether registration can be called multiple times without errors if there
+        are no type conflicts.
+        """
         CameraConfigRegistry.register_all()
         CameraConfigRegistry.register_all()
 
     def test_camera_registry_registration_conflict(self) -> None:
-        """Test handling of conflicts in camera config registration."""
+        """
+        Test handling of conflicts in camera config registration.
+        """
         type_before = CameraConfigRegistry._registry["mongo"]
 
         # Change type in registry

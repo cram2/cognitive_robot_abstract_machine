@@ -27,14 +27,16 @@ class RoleRegistry:
     _roles_by_taker_identity: Dict[int, List[ReferenceType[Role]]] = field(
         default_factory=dict
     )
-    """Maps the identity of a taker to weak references to the roles attached to it."""
+    """
+    Maps the identity of a taker to weak references to the roles attached to it.
+    """
 
     def register(self, role: Role) -> None:
         """
         Index *role* under every taker in its taker chain.
 
-        Indexing under the whole chain, rather than only the immediate taker, lets a query
-        from any entity in the chain find the roles layered above it.
+        Indexing under the whole chain, rather than only the immediate taker, lets a
+        query from any entity in the chain find the roles layered above it.
 
         :param role: The role to index.
         """
@@ -45,14 +47,17 @@ class RoleRegistry:
         """
         Yield the live roles attached to *role_taker* directly or transitively.
 
-        Dead weak references are pruned from the taker's bucket as a side effect of reading it.
+        Dead weak references are pruned from the taker's bucket as a side effect of
+        reading it.
 
         :param role_taker: The taker to query.
         """
         bucket = self._roles_by_taker_identity.get(id(role_taker))
         if bucket is None:
             return
-        live_roles = [role for role in (reference() for reference in bucket) if role is not None]
+        live_roles = [
+            role for role in (reference() for reference in bucket) if role is not None
+        ]
         bucket[:] = [weakref.ref(role) for role in live_roles]
         yield from live_roles
 
@@ -60,8 +65,8 @@ class RoleRegistry:
         """
         Add *role* to the bucket of *role_taker*, creating the bucket on first use.
 
-        A finalizer drops the bucket when the taker is garbage collected, so a later object
-        that reuses the taker's identity never inherits stale roles.
+        A finalizer drops the bucket when the taker is garbage collected, so a later
+        object that reuses the taker's identity never inherits stale roles.
 
         :param role: The role to index.
         :param role_taker: The taker to index it under.

@@ -19,6 +19,7 @@ The module uses:
 """
 
 from __future__ import annotations
+
 import copy
 import math
 from timeit import default_timer
@@ -27,20 +28,20 @@ import cv2
 import numpy.linalg
 import open3d as o3d
 from py_trees.common import Status
-from typing_extensions import Tuple, List, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, List, Tuple
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.types.annotation import PoseAnnotation, BoundingBox3DAnnotation
+from robokudo.types.annotation import BoundingBox3DAnnotation, PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import (
-    transform_cloud_from_cam_to_world,
-    get_world_to_cam_transform_matrix,
+    get_world_to_camera_transform_matrix,
+    transform_cloud_from_camera_to_world,
 )
 from robokudo.utils.transform import (
     construct_rotation_matrix,
-    get_transform_matrix,
     get_quaternion_from_rotation_matrix,
+    get_transform_matrix,
 )
 
 if TYPE_CHECKING:
@@ -79,7 +80,7 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
                 """
 
                 self.bounding_box_visualization_color: Tuple[int, int, int] = (0, 0, 0)
-                """RGB color for box visualization, defaults to [0,0,0]"""
+                """RGB color for box visualization"""
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -87,12 +88,12 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ClusterPoseBBAnnotator",
-        descriptor: "ClusterPoseBBAnnotator.Descriptor" = Descriptor(),
+        descriptor: ClusterPoseBBAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the pose estimator.
 
-        :param name: Name of this annotator instance, defaults to "ClusterPoseBBAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
@@ -168,12 +169,12 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
             cluster_cloud = copy.deepcopy(object_hypothesis.points)
 
             try:
-                cluster_cloud_in_world = transform_cloud_from_cam_to_world(
+                cluster_cloud_in_world = transform_cloud_from_camera_to_world(
                     self.get_cas(), cluster_cloud, transform_inplace=True
                 )
             except Exception as e:
                 self.rk_logger.warning(
-                    f"Couldn't find camera viewpoint in the CAS." f"Fail. Error: {e}"
+                    f"Couldn't find camera viewpoint in the CAS.Fail. Error: {e}"
                 )
                 return Status.FAILURE
 
@@ -218,13 +219,15 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
                 rotation_matrix_in_world, translation_in_world
             )
 
-            world_to_cam_transform = get_world_to_cam_transform_matrix(self.get_cas())
-
-            cluster_transform_in_cam = numpy.matmul(
-                world_to_cam_transform, cluster_transform_in_world
+            world_to_camera_transform = get_world_to_camera_transform_matrix(
+                self.get_cas()
             )
-            cluster_translation_in_cam = cluster_transform_in_cam[:3, 3]
-            cluster_rotation_in_cam = cluster_transform_in_cam[:3, :3]
+
+            cluster_transform_in_camera = numpy.matmul(
+                world_to_camera_transform, cluster_transform_in_world
+            )
+            cluster_translation_in_camera = cluster_transform_in_camera[:3, 3]
+            cluster_rotation_in_camera = cluster_transform_in_camera[:3, :3]
             bounding_box_extents = [bb_size[0], bb_size[1], max_z - min_z]
 
             # We've finished calculating the transformation and size of the bounding box.
@@ -232,39 +235,39 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
             if self.descriptor.parameters.align_x_axis_by_max_bbox_extent:
                 aligned_orientation, aligned_extents = (
                     self.adjust_bb_orientation_by_bb_size(
-                        pose_orientation=cluster_rotation_in_cam,
+                        pose_orientation=cluster_rotation_in_camera,
                         bounding_box_extents=bounding_box_extents,
                     )
                 )
 
-                aligned_transform_in_cam = get_transform_matrix(
+                aligned_transform_in_camera = get_transform_matrix(
                     rotation=aligned_orientation,
-                    translation=cluster_translation_in_cam,
+                    translation=cluster_translation_in_camera,
                 )
 
-                cluster_transform_in_cam = aligned_transform_in_cam
-                cluster_translation_in_cam = cluster_transform_in_cam[:3, 3]
-                cluster_rotation_in_cam = cluster_transform_in_cam[:3, :3]
+                cluster_transform_in_camera = aligned_transform_in_camera
+                cluster_translation_in_camera = cluster_transform_in_camera[:3, 3]
+                cluster_rotation_in_camera = cluster_transform_in_camera[:3, :3]
                 bounding_box_extents = aligned_extents
 
             # Draw a frame in the visualization
             cluster_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2)
-            cluster_frame.transform(cluster_transform_in_cam)
+            cluster_frame.transform(cluster_transform_in_camera)
             geometries_to_visualize.append(cluster_frame)
 
             # Annotate the pose information
             pose_annotation = PoseAnnotation()
-            pose_annotation.translation = list(cluster_translation_in_cam)
+            pose_annotation.translation = list(cluster_translation_in_camera)
             pose_annotation.rotation = list(
-                get_quaternion_from_rotation_matrix(cluster_rotation_in_cam)
+                get_quaternion_from_rotation_matrix(cluster_rotation_in_camera)
             )
             pose_annotation.source = type(self).__name__
             object_hypothesis.annotations.append(pose_annotation)
 
             # Generate a BB from the cluster info for visualization
             cluster_obb = o3d.geometry.OrientedBoundingBox(
-                center=cluster_translation_in_cam,
-                R=cluster_rotation_in_cam,
+                center=cluster_translation_in_camera,
+                R=cluster_rotation_in_camera,
                 extent=numpy.array(bounding_box_extents),
             )
             cluster_obb.color = (
@@ -275,7 +278,7 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
             rk_bb.x_length = bounding_box_extents[0]
             rk_bb.y_length = bounding_box_extents[1]
             rk_bb.z_length = bounding_box_extents[2]
-            rk_bb.pose.translation = cluster_translation_in_cam
+            rk_bb.pose.translation = cluster_translation_in_camera
             rk_bb.pose.rotation = pose_annotation.rotation
             rk_bb.source = type(self).__name__
 

@@ -28,7 +28,8 @@ def test_visualize_symbol_graph():
 
 def test_memory_leak():
     """
-    Test if the SymbolGraph does not artificially keep objects alive that would be garbage collected.
+    Test if the SymbolGraph does not artificially keep objects alive that would be
+    garbage collected.
     """
 
     def create_data():

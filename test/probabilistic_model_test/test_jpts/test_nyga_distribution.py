@@ -67,7 +67,9 @@ class InductionStepTestCase(unittest.TestCase):
         distribution = self.induction_step.create_uniform_distribution()
         self.assertEqual(
             distribution,
-            UniformDistribution(variable=self.variable, interval=closed(1, 9).simple_sets[0]),
+            UniformDistribution(
+                variable=self.variable, interval=closed(1, 9).simple_sets[0]
+            ),
         )
 
     def test_create_uniform_distribution(self):
@@ -76,7 +78,9 @@ class InductionStepTestCase(unittest.TestCase):
         )
         self.assertEqual(
             distribution,
-            UniformDistribution(variable=self.variable, interval=closed_open(3.5, 8.0).simple_sets[0]),
+            UniformDistribution(
+                variable=self.variable, interval=closed_open(3.5, 8.0).simple_sets[0]
+            ),
         )
 
     def test_sum_weights(self):
@@ -87,9 +91,9 @@ class InductionStepTestCase(unittest.TestCase):
 
     def test_likelihood_of_split(self):
         """
-        Test that the calculation of the likelihood of a split is correct and as it is in the notebook.
+        Test that the calculation of the likelihood of a split is correct and as it is
+        in the notebook.
         """
-
         likelihood_without_split = self.induction_step.log_likelihood_without_split()
         self.assertAlmostEqual(likelihood_without_split, -12.48, delta=0.01)
 
@@ -188,8 +192,7 @@ class InductionStepTestCase(unittest.TestCase):
         self.assertLessEqual(
             len(pc.root.subcircuits),
             int(
-                len(data)
-                / self.induction_step.nyga_induction.min_samples_per_quantile
+                len(data) / self.induction_step.nyga_induction.min_samples_per_quantile
             ),
         )
         self.assertAlmostEqual(logsumexp(pc.root.log_weights), 0.0)
@@ -244,8 +247,18 @@ class InductionStepTestCase(unittest.TestCase):
 
     def test_from_mixture_of_uniform_distributions(self):
         pc1 = ProbabilisticCircuit()
-        u1 = leaf(UniformDistribution(variable=self.variable, interval=closed(0, 5).simple_sets[0]), pc1)
-        u2 = leaf(UniformDistribution(variable=self.variable, interval=closed(2, 3).simple_sets[0]), pc1)
+        u1 = leaf(
+            UniformDistribution(
+                variable=self.variable, interval=closed(0, 5).simple_sets[0]
+            ),
+            pc1,
+        )
+        u2 = leaf(
+            UniformDistribution(
+                variable=self.variable, interval=closed(2, 3).simple_sets[0]
+            ),
+            pc1,
+        )
         sum_unit = SumUnit(probabilistic_circuit=pc1)
         sum_unit.add_subcircuit(u1, np.log(0.5))
         sum_unit.add_subcircuit(u2, np.log(0.5))
@@ -255,9 +268,15 @@ class InductionStepTestCase(unittest.TestCase):
 
         solution_by_hand = ProbabilisticCircuit()
         root_of_solution = SumUnit(probabilistic_circuit=solution_by_hand)
-        leaf_1 = UniformDistribution(variable=self.variable, interval=closed_open(0, 2).simple_sets[0])
-        leaf_2 = UniformDistribution(variable=self.variable, interval=closed_open(2, 3).simple_sets[0])
-        leaf_3 = UniformDistribution(variable=self.variable, interval=closed(3, 5).simple_sets[0])
+        leaf_1 = UniformDistribution(
+            variable=self.variable, interval=closed_open(0, 2).simple_sets[0]
+        )
+        leaf_2 = UniformDistribution(
+            variable=self.variable, interval=closed_open(2, 3).simple_sets[0]
+        )
+        leaf_3 = UniformDistribution(
+            variable=self.variable, interval=closed(3, 5).simple_sets[0]
+        )
 
         root_of_solution.add_subcircuit(leaf(leaf_1, solution_by_hand), np.log(0.2))
         root_of_solution.add_subcircuit(leaf(leaf_2, solution_by_hand), np.log(0.6))

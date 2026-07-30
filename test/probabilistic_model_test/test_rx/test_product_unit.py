@@ -17,8 +17,14 @@ class ProductUnitTestCase(unittest.TestCase):
 
     def setUp(self):
         pc = ProbabilisticCircuit()
-        u1 = leaf(UniformDistribution(variable=self.x, interval=closed(0, 1).simple_sets[0]), pc)
-        u2 = leaf(UniformDistribution(variable=self.y, interval=closed(3, 4).simple_sets[0]), pc)
+        u1 = leaf(
+            UniformDistribution(variable=self.x, interval=closed(0, 1).simple_sets[0]),
+            pc,
+        )
+        u2 = leaf(
+            UniformDistribution(variable=self.y, interval=closed(3, 4).simple_sets[0]),
+            pc,
+        )
 
         product_unit = ProductUnit(probabilistic_circuit=pc)
         product_unit.add_subcircuit(u1)

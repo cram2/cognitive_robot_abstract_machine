@@ -46,7 +46,8 @@ def create_dummy_world():
 
 def test_get_modifications_as_json_empty_world(rclpy_node):
     """
-    Test that get_modifications_as_json returns an empty list for a world with no modifications.
+    Test that get_modifications_as_json returns an empty list for a world with no
+    modifications.
     """
     world = World()
     fetcher = FetchWorldServer(node=rclpy_node, world=world)
@@ -93,7 +94,8 @@ def test_service_callback_success(rclpy_node):
 
 def test_service_callback_with_multiple_modifications(rclpy_node):
     """
-    Test that the service callback returns all modifications when multiple changes are made.
+    Test that the service callback returns all modifications when multiple changes are
+    made.
     """
     world = World()
     fetcher = FetchWorldServer(node=rclpy_node, world=world)

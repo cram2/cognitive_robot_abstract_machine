@@ -1,7 +1,8 @@
 """
 Set operations and cartesian-product execution for the Entity Query Language.
 
-This module includes multi-arity union and abstract helpers to evaluate expressions via nested cartesian products.
+This module includes multi-arity union and abstract helpers to evaluate expressions via
+nested cartesian products.
 """
 
 from __future__ import annotations
@@ -26,7 +27,8 @@ from krrood.entity_query_language.utils import (
 @dataclass(eq=False, repr=False)
 class Union(MultiArityExpression):
     """
-    A symbolic union operation that can be used to evaluate multiple symbolic expressions in a sequence.
+    A symbolic union operation that can be used to evaluate multiple symbolic
+    expressions in a sequence.
     """
 
     def _evaluate__(
@@ -60,8 +62,11 @@ class Union(MultiArityExpression):
 @dataclass(eq=False, repr=False)
 class PerformsCartesianProduct(SymbolicExpression, ABC):
     """
-    A symbolic operation that evaluates its children in nested sequence, passing bindings from one to the next such that
-    each binding has a value from each child expression. It represents a cartesian product of all child expressions.
+    A symbolic operation that evaluates its children in nested sequence, passing
+    bindings from one to the next such that each binding has a value from each child
+    expression.
+
+    It represents a cartesian product of all child expressions.
     """
 
     @property
@@ -76,7 +81,8 @@ class PerformsCartesianProduct(SymbolicExpression, ABC):
         self, sources: Optional[OperationResult]
     ) -> Iterator[OperationResult]:
         """
-        Evaluate the symbolic expressions by generating combinations of values from their evaluation generators.
+        Evaluate the symbolic expressions by generating combinations of values from
+        their evaluation generators.
 
         :param sources: The current OperationResult carrying bindings, or None.
         :return: An Iterable of Bindings for each combination of values.
@@ -100,7 +106,8 @@ class MultiArityExpressionThatPerformsACartesianProduct(
     MultiArityExpression, PerformsCartesianProduct, ABC
 ):
     """
-    An abstract superclass of expressions that have multiple operands and performs a cartesian product on them.
+    An abstract superclass of expressions that have multiple operands and performs a
+    cartesian product on them.
     """
 
     @property

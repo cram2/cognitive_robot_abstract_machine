@@ -1,9 +1,9 @@
 """
 Classes that use isolated forward reference types under TYPE_CHECKING.
 
-This module is specifically designed to reproduce the bug where multiple
-forward references can't be resolved iteratively because they're not
-in sys.modules when the resolution happens.
+This module is specifically designed to reproduce the bug where multiple forward
+references can't be resolved iteratively because they're not in sys.modules when the
+resolution happens.
 """
 
 from __future__ import annotations
@@ -24,14 +24,18 @@ if TYPE_CHECKING:
 
 @dataclass
 class IsolatedMixinAlpha(ABC):
-    """A mixin with an isolated forward reference type."""
+    """
+    A mixin with an isolated forward reference type.
+    """
 
     alpha_ref: Optional[IsolatedTypeAlpha] = None
 
 
 @dataclass
 class IsolatedMixinBeta(ABC):
-    """Another mixin with a different isolated forward reference type."""
+    """
+    Another mixin with a different isolated forward reference type.
+    """
 
     beta_ref: Optional[IsolatedTypeBeta] = None
 

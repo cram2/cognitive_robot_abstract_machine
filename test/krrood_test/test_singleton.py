@@ -1,4 +1,6 @@
-"""Thread-safety and reentrancy behaviour of :class:`~krrood.singleton.SingletonMeta`."""
+"""
+Thread-safety and reentrancy behaviour of :class:`~krrood.singleton.SingletonMeta`.
+"""
 
 from __future__ import annotations
 
@@ -9,9 +11,11 @@ from krrood.singleton import SingletonMeta
 
 
 def test_concurrent_first_construction_does_not_raise_circular_dependency():
-    """Several threads racing to construct the same singleton for the first time must not see each
-    other's in-progress construction as a circular dependency: exactly one instance is built and every
-    thread observes it, with no exception."""
+    """
+    Several threads racing to construct the same singleton for the first time must not
+    see each other's in-progress construction as a circular dependency: exactly one
+    instance is built and every thread observes it, with no exception.
+    """
 
     class ConcurrentlyConstructedSingleton(metaclass=SingletonMeta):
         def __init__(self):
@@ -40,8 +44,10 @@ def test_concurrent_first_construction_does_not_raise_circular_dependency():
 
 
 def test_recursive_construction_within_the_same_thread_still_raises():
-    """A singleton whose own construction recursively constructs itself again, on the same thread, is
-    a genuine circular dependency and must still raise."""
+    """
+    A singleton whose own construction recursively constructs itself again, on the same
+    thread, is a genuine circular dependency and must still raise.
+    """
 
     class SelfRecursingSingleton(metaclass=SingletonMeta):
         def __init__(self, recurse: bool = True):

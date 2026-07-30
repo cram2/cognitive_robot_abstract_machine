@@ -16,14 +16,17 @@ logger = logging.getLogger(__name__)
 class ForceTorqueSensorSimulated:
     """
     Simulated force-torque sensor for a joint with a given name.
-    Reads simulated forces and torques at that joint from world and publishes geometry_msgs/Wrench messages
-    to the given topic.
+
+    Reads simulated forces and torques at that joint from world and publishes
+    geometry_msgs/Wrench messages to the given topic.
     """
 
-    def __init__(self, joint_name, world: World, fts_topic="/coraplex/fts", interval=0.1):
+    def __init__(
+        self, joint_name, world: World, fts_topic="/coraplex/fts", interval=0.1
+    ):
         """
-        The given joint_name has to be part of :py:attr:`~coraplex.world.World.robot` otherwise a
-        RuntimeError will be raised.
+        The given joint_name has to be part of :py:attr:`~coraplex.world.World.robot`
+        otherwise a RuntimeError will be raised.
 
         :param joint_name: Name of the joint for which force-torque should be simulated
         :param world: The world from which the force-torque values should be read
@@ -43,8 +46,9 @@ class ForceTorqueSensorSimulated:
 
     def _publish(self) -> None:
         """
-        Continuously publishes the force-torque values for the simulated joint. Values are published as long as the
-        kill_event is not set.
+        Continuously publishes the force-torque values for the simulated joint.
+
+        Values are published as long as the kill_event is not set.
         """
         seq = 0
         while not self.kill_event.is_set():
@@ -71,8 +75,8 @@ class ForceTorqueSensorSimulated:
 
     def _stop_publishing(self) -> None:
         """
-        Sets the kill_event and therefore terminates the Thread publishing the force-torque values as well as join the
-        threads.
+        Sets the kill_event and therefore terminates the Thread publishing the force-
+        torque values as well as join the threads.
         """
         self.kill_event.set()
         self.thread.join()
@@ -82,14 +86,15 @@ class ForceTorqueSensor:
     """
     Monitor a force-torque sensor of a supported robot and save relevant data.
 
-    Apply a specified filter and save this data as well.
-    Default filter is the low pass filter 'Butterworth'
+    Apply a specified filter and save this data as well. Default filter is the low pass
+    filter 'Butterworth'
 
     Can also calculate the derivative of (un-)filtered data
 
     :param robot_name: Name of the robot
     :param filter_config: Desired filter (default: Butterworth)
-    :param filter_order: Order of the filter. Declares the number of elements that delay the sampling
+    :param filter_order: Order of the filter. Declares the number of elements that delay
+        the sampling
     :param custom_topic: Declare a custom topic if the default topics do not fit
     """
 
@@ -197,8 +202,8 @@ class ForceTorqueSensor:
         """
         Subscribe to the specified wrench topic.
 
-        This will automatically be called on setup.
-        Only use this if you already unsubscribed before.
+        This will automatically be called on setup. Only use this if you already
+        unsubscribed before.
         """
         self.force_torque_subscriber = create_subscriber(
             self.wrench_topic_name, WrenchStamped, self._get_rospy_data
@@ -206,7 +211,7 @@ class ForceTorqueSensor:
 
     def unsubscribe(self):
         """
-        Unsubscribe from the specified topic
+        Unsubscribe from the specified topic.
         """
         self.force_torque_subscriber.unregister()
 
@@ -215,7 +220,6 @@ class ForceTorqueSensor:
         Get the most current data values.
 
         :param is_filtered: Decides about using filtered or raw data
-
         :return: A list containing the most current values (newest are first)
         """
         status = self.filtered if is_filtered else self.unfiltered
@@ -226,7 +230,8 @@ class ForceTorqueSensor:
         Calculate the derivative of current data.
 
         :param is_filtered: Decides about using filtered or raw data.
-        :return: The derivative as a WrenchStamped object. Returns a zeroed derivative if only one data point exists.
+        :return: The derivative as a WrenchStamped object. Returns a zeroed derivative
+            if only one data point exists.
         """
         status = self.filtered if is_filtered else self.unfiltered
 

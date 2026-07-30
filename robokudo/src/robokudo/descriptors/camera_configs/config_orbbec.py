@@ -19,17 +19,19 @@ class OrbbecCameraConfig(
     StableViewpointComponent,
     WorldDescriptorComponent,
 ):
-    """Configuration class for the OrbBec Astra camera."""
+    """
+    Configuration class for the OrbBec Astra camera.
+    """
 
     registry_name: ClassVar[str] = "orbbec"
 
-    interface_type = "Kinect"
+    interface_type: str = "Kinect"
 
     topic_depth: str = "/camera/depth/image_raw"
 
     topic_color: str = "/camera/color/image_raw/compressed"
 
-    topic_cam_info: str = "/camera/color/camera_info"
+    topic_camera_info: str = "/camera/color/camera_info"
 
     tf_from: str = "camera_color_optical_frame"
 

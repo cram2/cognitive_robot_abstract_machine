@@ -21,9 +21,13 @@ class WorldDescriptor(BaseWorldDescriptor):
         object_specs = [
             ObjectSpec(
                 name="cereal",
-                box_scale=Scale(0.20, 0.20, 0.20),
+                box_scale=Scale(0.10, 0.20, 0.30),
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=-1.1, y=1.0, z=1.0, reference_frame=root
+                    x=-1.3,
+                    y=0.75,
+                    z=1.0,
+                    reference_frame=root,
+                    yaw=0.3,
                 ),
             ),
             ObjectSpec(

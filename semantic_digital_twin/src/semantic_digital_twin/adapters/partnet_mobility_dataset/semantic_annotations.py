@@ -13,5 +13,6 @@ class PartNetLabel(HasRootBody):
 
     labels: ClassVar[Set[str]] = set()
     """
-    The actual names that represent this in the PartNet Mobility dataset semantics.txt files.
+    The actual names that represent this in the PartNet Mobility dataset semantics.txt
+    files.
     """

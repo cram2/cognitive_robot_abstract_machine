@@ -38,7 +38,7 @@ class TfPublisherModelCallback(ModelChangeCallback):
 
     node: Node = field(kw_only=True)
     """
-    ros2 node used to publish tf messages
+    Ros2 node used to publish tf messages.
     """
 
     ignored_kinematic_structure_entities: set[KinematicStructureEntity] = field(
@@ -46,19 +46,30 @@ class TfPublisherModelCallback(ModelChangeCallback):
     )
     """
     Kinematic structure entities that should not be published in the tf tree.
+
     Useful, if the robot is already publishing some tf.
     """
+
     connections_to_expression: dict[tuple[UUID, UUID], Matrix] = field(
         init=False, default_factory=OrderedDict
     )
     """
-    Maps kinematic structure entity ids which are directly connected to the corresponding position and quaternion expressions.
-    If either parent or child is in the ignored_kinematic_structure_entities set, the connection is not included in this dictionary.
+    Maps kinematic structure entity ids which are directly connected to the
+    corresponding position and quaternion expressions.
+
+    If either parent or child is in the ignored_kinematic_structure_entities set, the
+    connection is not included in this dictionary.
     """
+
     tf_message: TFMessage = field(init=False)
-    """Cache for the tf message that is published."""
+    """
+    Cache for the tf message that is published.
+    """
+
     compiled_tf: CompiledFunction = field(init=False)
-    """Compiled function for evaluating the tf expressions."""
+    """
+    Compiled function for evaluating the tf expressions.
+    """
 
     def on_model_change(self, **kwargs):
         self.update_connections_to_expression()
@@ -124,25 +135,39 @@ class TfPublisherModelCallback(ModelChangeCallback):
 class TFPublisher(StateChangeCallback):
     """
     On state change, publishes the TF tree of the world.
-    Puts a frame in every kinematic structure entity that is not in the ignored_bodies set.
+
+    Puts a frame in every kinematic structure entity that is not in the ignored_bodies
+    set.
     """
 
     node: Node = field(kw_only=True)
-    """ros2 node used to publish tf messages"""
+    """
+    Ros2 node used to publish tf messages.
+    """
+
     ignored_kinematic_structure_entities: set[KinematicStructureEntity] = field(
         default_factory=set
     )
     """
     Kinematic structure entities that should not be published in the tf tree.
+
     Useful, if the robot is already publishing some tf.
     """
+
     tf_topic: str = field(default="tf")
-    """Topic to which tf messages should be published."""
+    """
+    Topic to which tf messages should be published.
+    """
+
     tf_pub: Publisher = field(init=False)
-    """Publisher for tf messages."""
+    """
+    Publisher for tf messages.
+    """
 
     tf_model_cb: TfPublisherModelCallback = field(init=False)
-    """Callback for updating the tf message cache on model update."""
+    """
+    Callback for updating the tf message cache on model update.
+    """
 
     throttle_state_updates: int = 1
     """
@@ -165,6 +190,7 @@ class TFPublisher(StateChangeCallback):
     def create_with_ignore_robot(cls, robot: AbstractRobot, node: Node) -> Self:
         """
         Creates a TF publisher that ignores the robot's kinematic structure.
+
         Useful, if the robot is already publishing some tf.
         :param robot: The robot for which to create the TF publisher.
         :param node: The ROS2 node used to create the publisher.
@@ -179,7 +205,9 @@ class TFPublisher(StateChangeCallback):
     @classmethod
     def create_with_ignore_existing_tf(cls, world: World, node: Node) -> Self:
         """
-        Checks if any kinematic structure entity is already published in tf and ignores them.
+        Checks if any kinematic structure entity is already published in tf and ignores
+        them.
+
         :param world: The world for which to create the TF publisher.
         :param node: The ROS2 node used to create the publisher.
         """

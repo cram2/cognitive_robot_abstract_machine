@@ -877,8 +877,13 @@ class Application(QMainWindow):
 
 
 def handle_sigint(sig, frame):
-    """Handler for the SIGINT signal."""
-    rospy.shutdown()
+    """Handler for the SIGINT signal.
+
+    Only requests the event loop to quit here -- rospy.shutdown() joins the spinner thread and
+    destroys the rclpy node, which is unsafe to run from a signal handler interrupting Qt's event
+    loop. The single rospy.shutdown() call after app.exec_() returns handles it instead, whether the
+    loop ended via this signal or a normal window close.
+    """
     QApplication.quit()
 
 

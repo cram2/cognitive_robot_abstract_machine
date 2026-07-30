@@ -29,12 +29,14 @@ from krrood.entity_query_language.verbalization.grammar.query.planner import Que
 @dataclass
 class ClauseComposer:
     """
-    The single place that knows *which* assembler renders a query/aggregation body's clauses — the
-    subject restriction, GROUP BY, HAVING, ORDER BY — and *how* to call them.
+    The single place that knows *which* assembler renders a query/aggregation body's
+    clauses — the subject restriction, GROUP BY, HAVING, ORDER BY — and *how* to call
+    them.
 
-    A body assembler asks the composer for a clause (a plan fact it legitimately knows it has) and
-    decides its *placement* (selection modifier, block item, inline part) — its own structural
-    form. It never names or constructs the per-clause assemblers itself.
+    A body assembler asks the composer for a clause (a plan fact it legitimately knows
+    it has) and decides its *placement* (selection modifier, block item, inline part) —
+    its own structural form. It never names or constructs the per-clause assemblers
+    itself.
     """
 
     context: RuleContext

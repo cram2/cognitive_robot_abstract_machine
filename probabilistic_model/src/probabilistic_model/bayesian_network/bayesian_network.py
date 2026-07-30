@@ -21,9 +21,9 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 @dataclass
 class Node:
     """
-    A node in the bayesian network
-    These distributions do not inherit from probabilistic models,
-    since inference in Bayesian Networks is intractable.
+    A node in the bayesian network These distributions do not inherit from probabilistic
+    models, since inference in Bayesian Networks is intractable.
+
     For inference, convert the bayesian network to a probabilistic circuit.
     """
 
@@ -31,7 +31,7 @@ class Node:
         kw_only=True, repr=False, default=None
     )
     """
-    The bayesian network this node is part of. 
+    The bayesian network this node is part of.
     """
 
     index: Optional[int] = field(kw_only=True, default=None, repr=False)
@@ -43,7 +43,9 @@ class Node:
         init=False, default_factory=dict, repr=False
     )
     """
-    A dictionary from states of the variable to product units. Only needed during conversion to probabilistic circuits.
+    A dictionary from states of the variable to product units.
+
+    Only needed during conversion to probabilistic circuits.
     """
 
     def __post_init__(self):
@@ -67,6 +69,7 @@ class Node:
     def as_probabilistic_circuit(self, result: ProbabilisticCircuit):
         """
         Add this node to the probabilistic circuit.
+
         This also creates all the edges implied by this node.
 
         :param result: The probabilistic circuit to add the nodes to.
@@ -77,9 +80,12 @@ class Node:
 @dataclass
 class BayesianNetwork:
     """
-    Class for Bayesian Networks that are rooted, tree shaped and have univariate inner nodes.
-    This class does not inherit from ProbabilisticModel since it cannot perform inference.
-    Bayesian Networks can be converted to a probabilistic circuit which can perform inference.
+    Class for Bayesian Networks that are rooted, tree shaped and have univariate inner
+    nodes.
+
+    This class does not inherit from ProbabilisticModel since it cannot perform
+    inference. Bayesian Networks can be converted to a probabilistic circuit which can
+    perform inference.
     """
 
     graph: rx.PyDAG[Node] = field(default_factory=lambda: rx.PyDAG(multigraph=False))
@@ -190,6 +196,7 @@ class BayesianNetwork:
     def root(self) -> Root:
         """
         The root of the circuit is the node with in-degree 0.
+
         This is the output node, that will perform the final computation.
 
         :return: The root of the circuit.
@@ -282,6 +289,7 @@ class Root(Node):
 class ConditionalProbabilityTable(Node):
     """
     Conditional probability distribution for Bayesian Network nodes given their parents.
+
     The parent in this case must be exactly one node.
     """
 
@@ -305,7 +313,8 @@ class ConditionalProbabilityTable(Node):
         """
         Tabulate the truncated probability table.
 
-        :return: A table with the truncated probability table that can be printed using tabulate.
+        :return: A table with the truncated probability table that can be printed using
+            tabulate.
         """
         table = [[self.parent.variable.name, self.variable.name, repr(self)]]
 
@@ -355,7 +364,8 @@ class ConditionalProbabilityTable(Node):
 @dataclass
 class ConditionalProbabilisticCircuit(Node):
     """
-    Conditional probability distribution represented as Circuit for Bayesian Network nodes given their parents.
+    Conditional probability distribution represented as Circuit for Bayesian Network
+    nodes given their parents.
     """
 
     conditional_probability_distributions: Dict[int, ProbabilisticCircuit] = field(

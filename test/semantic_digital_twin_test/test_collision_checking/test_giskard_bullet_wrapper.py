@@ -64,7 +64,8 @@ def test_convert_non_convex_mesh_decomposes(
     clean_cache, cache_dir, non_convex_mesh, mesh_decomposer
 ):
     """
-    Test that for a non-convex mesh, the function produces a valid .obj file in the cache directory.
+    Test that for a non-convex mesh, the function produces a valid .obj file in the
+    cache directory.
     """
     output_path = convert_to_decomposed_obj_and_save_in_tmp(
         non_convex_mesh, mesh_decomposer=mesh_decomposer, cache_dir=cache_dir

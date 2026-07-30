@@ -2,16 +2,18 @@
 Subject-aware grouping of WHERE conjuncts into relational-binding scopes.
 
 A query subject can *introduce* a secondary entity through a relational attribute
-(``robot.assigned_to == mission``) and separately *restrict* that entity (``mission.priority > 2``).
-This module collapses such a binding together with the entity's own conjuncts into a single
-:class:`RelationalBindingFold`, so the pair reads as one nested relative clause on the subject noun
-(*"a Robot that is assigned to a Mission with priority greater than 2"*) rather than a binding clause
-plus an orphaned *"such that the priority of the Mission …"* residual.
+(``robot.assigned_to == mission``) and separately *restrict* that entity
+(``mission.priority > 2``). This module collapses such a binding together with the
+entity's own conjuncts into a single :class:`RelationalBindingFold`, so the pair reads
+as one nested relative clause on the subject noun (*"a Robot that is assigned to a
+Mission with priority greater than 2"*) rather than a binding clause plus an orphaned
+*"such that the priority of the Mission …"* residual.
 
-It runs inside :func:`~…placement.as_subject_restrictions` right after :func:`reduce_conjuncts` — where
-the subject is in hand — so it sits beside the (subject-agnostic) coordination reducer rather than
-inside it. Gathering is transitive: an entity bound within the subtree pulls its own restrictions in
-too, so nesting generalises to arbitrary depth through the placement layer's recursion.
+It runs inside :func:`~…placement.as_subject_restrictions` right after
+:func:`reduce_conjuncts` — where the subject is in hand — so it sits beside the
+(subject-agnostic) coordination reducer rather than inside it. Gathering is transitive:
+an entity bound within the subtree pulls its own restrictions in too, so nesting
+generalises to arbitrary depth through the placement layer's recursion.
 """
 
 from __future__ import annotations
@@ -42,10 +44,11 @@ from krrood.entity_query_language.verbalization.relational_attributes import (
 
 @dataclass
 class RelationalBindingFold:
-    """A subject→entity relational binding collapsed with the entity's own restrictions.
+    """
+    A subject→entity relational binding collapsed with the entity's own restrictions.
 
-    Rendered as a subject-relative clause naming the entity with its restrictions nested onto it
-    (*"that is assigned to a Mission with priority greater than 2"*).
+    Rendered as a subject-relative clause naming the entity with its restrictions nested
+    onto it (*"that is assigned to a Mission with priority greater than 2"*).
     """
 
     relation_hop: Attribute
@@ -53,7 +56,9 @@ class RelationalBindingFold:
     clause."""
 
     entity: Variable
-    """The secondary variable the relation introduces (the clause's object)."""
+    """
+    The secondary variable the relation introduces (the clause's object).
+    """
 
     nested: List[FoldNode]
     """The entity's own conjuncts, transitively (removed from the subject's list); empty for a bare
@@ -61,7 +66,10 @@ class RelationalBindingFold:
 
 
 BoundConjunct = Union[FoldNode, RelationalBindingFold]
-"""A conjunct after binding grouping: an ordinary fold node or a collapsed relational binding."""
+"""
+A conjunct after binding grouping: an ordinary fold node or a collapsed relational
+binding.
+"""
 
 
 def bind_relational_entities(

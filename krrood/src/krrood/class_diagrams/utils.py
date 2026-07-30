@@ -4,6 +4,8 @@ import builtins
 import inspect
 import os
 import sys
+import types
+import typing
 from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
@@ -12,6 +14,7 @@ from uuid import UUID
 import typing_extensions
 from typing_extensions import (
     Any,
+    Callable,
     Dict,
     List,
     Optional,
@@ -19,11 +22,17 @@ from typing_extensions import (
     Type,
     TypeVar,
     TypeVarTuple,
+    get_origin,
 )
 
 from krrood import logger
 from krrood.class_diagrams.exceptions import CouldNotResolveType
-from krrood.utils import ensure_hashable, get_scope_from_imports, is_builtin_type
+from krrood.utils import (
+    ensure_hashable,
+    get_scope_from_imports,
+    get_full_class_name,
+    is_builtin_type,
+)
 
 
 def classes_of_module(module) -> List[Type]:
@@ -33,12 +42,48 @@ def classes_of_module(module) -> List[Type]:
     :param module: The module to inspect.
     :return: All classes of the given module.
     """
-
     result = []
     for name, obj in inspect.getmembers(sys.modules[module.__name__]):
         if inspect.isclass(obj) and obj.__module__ == module.__name__:
             result.append(obj)
     return result
+
+
+def class_implements_own_method(candidate: Callable, inherited: Callable) -> bool:
+    """
+    Whether a resolved method belongs to a different implementation than the one it
+    would otherwise inherit.
+
+    Both arguments are ordinary attribute lookups on a class (e.g.
+    ``Subclass.method_name`` and ``BaseClass.method_name``), so a plain method, a
+    ``classmethod``, or a ``staticmethod`` all compare correctly. Accessing a
+    ``classmethod`` produces a new bound-method object on every lookup, bound to
+    whichever class did the accessing, so comparing those directly would report every
+    class as overriding, even one that never touched the method; unwrapping to
+    ``__func__`` first compares the underlying function instead, which is the same
+    object for every class that inherits it unchanged. A plain method or
+    ``staticmethod`` access is already the bare function, so no unwrapping is needed
+    there.
+
+    :param candidate: The method as resolved via attribute access on the candidate
+        class.
+    :param inherited: The same-named method as resolved via attribute access on the base
+        class whose implementation counts as not overridden.
+    :return: True when *candidate* is a different underlying function than *inherited*.
+    """
+    return _underlying_function(candidate) is not _underlying_function(inherited)
+
+
+def _underlying_function(method: Callable) -> Callable:
+    """
+    The plain function a resolved method wraps.
+
+    :param method: A method as resolved via attribute access on a class.
+    :return: ``method.__func__`` when *method* is a bound method (a ``classmethod``
+        accessed via its class), otherwise *method* itself (a plain function or
+        ``staticmethod`` access is already bare).
+    """
+    return method.__func__ if hasattr(method, "__func__") else method
 
 
 def behaves_like_a_built_in_type(
@@ -59,11 +104,11 @@ def behaves_like_a_built_in_type(
 
 def common_base_class(types: List[Type]) -> Optional[Type]:
     """
-    Return the lowest common ancestor of *types*, or ``None`` if the only
-    common ancestor is :class:`object`.
+    Return the lowest common ancestor of *types*, or ``None`` if the only common
+    ancestor is :class:`object`.
 
-    Non-class entries (e.g. unresolved forward references) are silently
-    skipped.  If no classes remain after filtering, ``None`` is returned.
+    Non-class entries (e.g. unresolved forward references) are silently skipped.  If no
+    classes remain after filtering, ``None`` is returned.
     """
     classes = [t for t in types if inspect.isclass(t)]
     if not classes:
@@ -87,17 +132,27 @@ def is_builtin_class(clazz: Type) -> bool:
     return clazz.__module__ == "builtins"
 
 
+def is_union_annotation(annotation: Any) -> bool:
+    """
+    :param annotation: A type annotation to inspect.
+    :return: Whether ``annotation`` is a ``typing.Union[...]`` or a ``X | Y`` union.
+    """
+    origin = get_origin(annotation)
+    return origin is typing.Union or origin is getattr(types, "UnionType", None)
+
+
 def is_external_module(module) -> bool:
     """
-    Check if a module is external to the project, i.e. one whose source is not searched when
-    resolving a project class's forward references.
+    Check if a module is external to the project, i.e. one whose source is not searched
+    when resolving a project class's forward references.
 
-    Only the standard library and builtins are treated as external. A module installed under
-    ``site-packages``/``dist-packages`` is *not* external: a pip-installed project package lives
-    there, and excluding it would leave every installed project class unable to resolve its own
-    ``TYPE_CHECKING`` forward references (:func:`resolve_name_in_hierarchy` searches each base's
-    module source). A genuinely third-party ``site-packages`` module simply will not contain the
-    project name being resolved, so searching it is harmless.
+    Only the standard library and builtins are treated as external. A module installed
+    under ``site-packages``/``dist-packages`` is *not* external: a pip-installed project
+    package lives there, and excluding it would leave every installed project class
+    unable to resolve its own ``TYPE_CHECKING`` forward references
+    (:func:`resolve_name_in_hierarchy` searches each base's module source). A genuinely
+    third-party ``site-packages`` module simply will not contain the project name being
+    resolved, so searching it is harmless.
 
     :param module: The module to check.
     :return: True if the module is external, False otherwise.
@@ -158,17 +213,20 @@ T = TypeVar("T")
 @dataclass
 class TypeHintResolutionResult:
     """
-    Represents the result of resolving generic type hints of an object using a substitution dictionary.
+    Represents the result of resolving generic type hints of an object using a
+    substitution dictionary.
     """
 
     resolved_type: TypeVar | Type | str
     """
     The resolved type or the original type hint if no substitution was made.
     """
+
     resolved: bool
     """
     Whether any substitutions have been made.
     """
+
     type_hint: TypeVar | Type | str
     """
     The original type hint.
@@ -182,8 +240,10 @@ def get_and_resolve_generic_type_hints_of_object_using_substitutions(
     Resolve generic type hints of an object using a substitution dictionary.
 
     :param object_: The object to resolve generic type hints of.
-    :param substitution: The substitution dictionary to use for resolving generic type hints.
-    :return: A dictionary mapping type variable names to TypeHintResolutionResult objects.
+    :param substitution: The substitution dictionary to use for resolving generic type
+        hints.
+    :return: A dictionary mapping type variable names to TypeHintResolutionResult
+        objects.
     """
     type_hints = get_type_hints_of_object(object_)
     return {name: resolve_type(hint, substitution) for name, hint in type_hints.items()}
@@ -197,9 +257,10 @@ def resolve_type(
     Resolve type variables in a type.
 
     :param type_to_resolve: The type to resolve.
-    :param substitution: Mapping of TypeVars to other types that will substitute the TypeVars.
-    :return: A TypeHintResolutionResult object containing the resolved type and a boolean indicating whether any
-    substitutions were made.
+    :param substitution: Mapping of TypeVars to other types that will substitute the
+        TypeVars.
+    :return: A TypeHintResolutionResult object containing the resolved type and a
+        boolean indicating whether any substitutions were made.
     """
     if isinstance(type_to_resolve, (TypeVar, TypeVarTuple)):
         type_to_resolve_key = ensure_hashable(type_to_resolve)
@@ -241,8 +302,10 @@ def get_type_hints_of_object(
     object_: Any, namespace: Tuple[Tuple[str, Any], ...] = ()
 ) -> Dict[str, Any]:
     """
-    Get the type hints of an object. This is a workaround for the fact that get_type_hints() does not work with objects
-     that are not defined in the same module or are imported through TYPE_CHECKING.
+    Get the type hints of an object.
+
+    This is a workaround for the fact that get_type_hints() does not work with objects
+    that are not defined in the same module or are imported through TYPE_CHECKING.
 
     :param object_: The object to get the type hints of.
     :param namespace: A starting namespace to use for resolving type hints.
@@ -267,7 +330,11 @@ def get_type_hints_of_object(
                 f"Could not get type hints for {object_} due to TypeError: {type_error}. This may be caused by a type"
                 f" hint that cannot be resolved."
             )
-            raise
+            raise CouldNotResolveType(
+                repr(object_),
+                extra_information=f"Could not get type hints for {object_} due to TypeError: {type_error}. This may be"
+                f" caused by a type hint that cannot be resolved.",
+            ) from type_error
     return type_hints
 
 
@@ -276,11 +343,12 @@ def _scope_from_imports_by_mtime(source_path: str, mtime: float) -> Dict[str, An
     """
     Import scope for *source_path*, cached per ``(source_path, mtime)``.
 
-    See :func:`_cached_scope_from_imports`; the *mtime* component of the key is what makes the
-    cache self-invalidate when the file changes on disk.
+    See :func:`_cached_scope_from_imports`; the *mtime* component of the key is what
+    makes the cache self-invalidate when the file changes on disk.
 
     :param source_path: Path to the source file whose import scope is built.
-    :param mtime: Last-modification time of *source_path*, used only as part of the cache key.
+    :param mtime: Last-modification time of *source_path*, used only as part of the
+        cache key.
     :return: The import scope dictionary for *source_path*.
     """
     return get_scope_from_imports(file_path=source_path)
@@ -290,16 +358,16 @@ def _cached_scope_from_imports(source_path: str) -> Dict[str, Any]:
     """
     Return the import scope of *source_path*, reusing a per-file cache.
 
-    The class-diagram type-hint fallback re-parses the same handful of library source files
-    thousands of times; caching by ``(path, mtime)`` collapses that to one parse per file while
-    self-invalidating if the file changes on disk. The returned dictionary is shared between callers
-    and must be treated as read-only, consistent with the :func:`lru_cache`-d
-    :func:`get_type_hints_of_object`.
+    The class-diagram type-hint fallback re-parses the same handful of library source
+    files thousands of times; caching by ``(path, mtime)`` collapses that to one parse
+    per file while self-invalidating if the file changes on disk. The returned
+    dictionary is shared between callers and must be treated as read-only, consistent
+    with the :func:`lru_cache`-d :func:`get_type_hints_of_object`.
 
-    This cache is intentionally local to the class-diagram resolution path and not applied to
-    :func:`~krrood.utils.get_scope_from_imports` itself, because other callers (ripple-down-rules
-    code generation) re-read regenerated files within a single process and rely on the uncached
-    behaviour.
+    This cache is intentionally local to the class-diagram resolution path and not
+    applied to :func:`~krrood.utils.get_scope_from_imports` itself, because other
+    callers (ripple-down-rules code generation) re-read regenerated files within a
+    single process and rely on the uncached behaviour.
 
     :param source_path: Path to the source file whose import scope is needed.
     :return: The import scope dictionary for *source_path*.
@@ -315,8 +383,9 @@ def _count_of_modules_that_finished_initializing() -> int:
     """
     Count the modules in ``sys.modules`` that have finished executing.
 
-    This only grows as modules complete loading, so two calls returning the same value guarantee
-    that nothing relevant to an in-progress circular import could have changed in between.
+    This only grows as modules complete loading, so two calls returning the same value
+    guarantee that nothing relevant to an in-progress circular import could have changed
+    in between.
 
     :return: The current count of fully initialized modules in ``sys.modules``.
     """
@@ -332,7 +401,8 @@ def _fallback_scope_for_import_generation(
     source_path: str, generation: int
 ) -> Dict[str, Any]:
     """
-    Recompute *source_path*'s import scope from scratch, memoized per import-system generation.
+    Recompute *source_path*'s import scope from scratch, memoized per import-system
+    generation.
 
     A ``TYPE_CHECKING`` name whose module is still mid-import fails identically on every retry
     until that module finishes loading. Keying this on *generation*
@@ -355,14 +425,15 @@ def get_object_by_name_from_another_object_in_same_module(
     """
     Get the object with the given name from another object in the same module.
 
-    If the cached import scope for the object's module was built while a dependency was still
-    partially initialized (a circular import during module load), the recovered names are merged
-    back into that cached scope so later lookups do not repeat the uncached recomputation.
+    If the cached import scope for the object's module was built while a dependency was
+    still partially initialized (a circular import during module load), the recovered
+    names are merged back into that cached scope so later lookups do not repeat the
+    uncached recomputation.
 
     :param name: The name of the type to get.
     :param object_: The object to get the type from.
     :return: The object with the given name.
-    :raises CouldNotResolveType: If the type cannot be resolved.
+    :raises CouldNotResolveType: If the object cannot be resolved.
     """
     module = inspect.getmodule(object_)
     if module is not None and hasattr(module, name):
@@ -395,3 +466,18 @@ def get_object_by_name_from_another_object_in_same_module(
         extra_information=f"Could not find {name} in {source_path}, could be a deprecated import statement or "
         f"a type defined in a module that is not imported in the source file.",
     )
+
+
+def get_class_unique_name(cls: type) -> str:
+    """
+    Returns a unique identifier for a class based on its source file and qualified name.
+
+    :param cls: The class.
+    :return: The unique name of the class
+    """
+    try:
+        source_file = os.path.abspath(inspect.getfile(cls))
+        return f"{source_file}.{cls.__qualname__}"
+    except (TypeError, OSError):
+        # Fallback for built-in classes or classes defined in the REPL
+        return get_full_class_name(cls)

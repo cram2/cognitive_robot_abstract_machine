@@ -1,4 +1,5 @@
 import json
+from dataclasses import fields
 
 import numpy as np
 import pytest
@@ -26,11 +27,12 @@ from giskardpy.motion_statechart.motion_statechart import (
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from giskardpy.motion_statechart.test_nodes.test_nodes import (
+from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstTrueNode,
     TestNestedGoal,
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from krrood.adapters.json_serializer import to_json, from_json
 from krrood.symbolic_math.symbolic_math import (
     trinary_logic_and,
     trinary_logic_not,
@@ -56,10 +58,10 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 def test_TrueMonitor():
     node = ConstTrueNode()
-    json_data = node.to_json()
+    json_data = to_json(node)
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
-    node_copy = ConstTrueNode.from_json(new_json_data)
+    node_copy = from_json(new_json_data)
     assert node_copy.name == node.name
 
 
@@ -94,11 +96,11 @@ def test_to_json_joint_position_list(mini_world):
         goal_state=JointState.from_mapping({connection: 0.5}),
         threshold=0.5,
     )
-    json_data = node.to_json()
+    json_data = to_json(node)
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
     tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
-    node_copy = JointPositionList.from_json(new_json_data, **tracker.create_kwargs())
+    node_copy = from_json(new_json_data, **tracker.create_kwargs())
     assert node_copy.name == node.name
     assert node_copy.threshold == node.threshold
     assert node_copy.goal_state == node.goal_state
@@ -346,6 +348,35 @@ def test_cancel_motion():
 
     with pytest.raises(Exception):
         kin_sim.tick_until_end()
+
+
+def test_cancel_motion_to_json_does_not_mutate_dataclass_field():
+    exception_field = next(f for f in fields(CancelMotion) if f.name == "exception")
+    assert exception_field.init is True
+
+    cancel = CancelMotion(exception=Exception("boom"))
+    to_json(cancel)
+
+    assert exception_field.init is True
+    # The class must still be constructible with the exception keyword.
+    CancelMotion(exception=Exception("again"))
+
+
+def test_to_json_does_not_accumulate_edges():
+    msc = MotionStatechart()
+    node1 = ConstTrueNode()
+    node2 = ConstTrueNode()
+    msc.add_node(node1)
+    msc.add_node(node2)
+    node2.start_condition = node1.observation_variable
+
+    first = msc.to_json()
+    edges_after_first = len(msc.edges)
+    second = msc.to_json()
+    edges_after_second = len(msc.edges)
+
+    assert edges_after_first == edges_after_second
+    assert first["unique_edges"] == second["unique_edges"]
 
 
 def test_unreachable_cart_goal(pr2_world_state_reset):

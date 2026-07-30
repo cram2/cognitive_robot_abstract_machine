@@ -26,8 +26,8 @@ if TYPE_CHECKING:
 @dataclass(unsafe_hash=True)
 class PropertyDescriptorRelation(PredicateClassRelation):
     """
-    Edge data representing a relation between two wrapped instances that is represented structurally by a property
-    descriptor attached to the source instance.
+    Edge data representing a relation between two wrapped instances that is represented
+    structurally by a property descriptor attached to the source instance.
     """
 
     @cached_property
@@ -54,8 +54,8 @@ class PropertyDescriptorRelation(PredicateClassRelation):
 
     def update_source_and_add_to_graph_and_apply_implications(self):
         """
-        Update the source wrapped-field value, add this relation to the graph, and apply all implications of adding this
-         relation.
+        Update the source wrapped-field value, add this relation to the graph, and apply
+        all implications of adding this relation.
         """
         source_updated = not self.inferred or self.update_source_wrapped_field_value()
         if not source_updated:
@@ -72,7 +72,8 @@ class PropertyDescriptorRelation(PredicateClassRelation):
 
     def infer_and_apply_implications(self):
         """
-        Infer all implications of adding this relation and apply them to the corresponding objects.
+        Infer all implications of adding this relation and apply them to the
+        corresponding objects.
         """
         self.infer_super_relations()
         self.infer_inverse_relation()
@@ -82,8 +83,8 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         Update the wrapped field value for the source instance.
 
-        :return: True if the value of the wrapped field was updated, False otherwise (i.e., if the value was already
-        set).
+        :return: True if the value of the wrapped field was updated, False otherwise
+            (i.e., if the value was already set).
         """
         return self.wrapped_field.property_descriptor.update_value(
             self.source.instance, self.target.instance
@@ -113,10 +114,11 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         Find neighboring symbols connected by super edges.
 
-        This method identifies neighboring symbols that are connected
-        through edge with relation types that are superclasses of the current relation type.
+        This method identifies neighboring symbols that are connected through edge with
+        relation types that are superclasses of the current relation type.
 
-        :return: An iterator over neighboring symbols and relations that are super relations.
+        :return: An iterator over neighboring symbols and relations that are super
+            relations.
         """
         source_type = self.source.instance_type
         property_descriptor_cls: Type[PropertyDescriptor] = (
@@ -159,7 +161,8 @@ class PropertyDescriptorRelation(PredicateClassRelation):
 
     def infer_transitive_relations(self):
         """
-        Add all transitive relations of this relation type that results from adding this relation to the graph.
+        Add all transitive relations of this relation type that results from adding this
+        relation to the graph.
         """
         if self.transitive:
             self.infer_transitive_relations_outgoing_from_source()
@@ -194,7 +197,8 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         self,
     ) -> Iterator[PredicateClassRelation]:
         """
-        Get the outgoing relations from the target that have the same property descriptor type as this relation.
+        Get the outgoing relations from the target that have the same property
+        descriptor type as this relation.
         """
         relation_condition = lambda relation: issubclass(
             relation.property_descriptor_cls, self.property_descriptor_cls
@@ -208,7 +212,8 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         self,
     ) -> Iterator[PredicateClassRelation]:
         """
-        Get the incoming relations from the source that have the same property descriptor type as this relation.
+        Get the incoming relations from the source that have the same property
+        descriptor type as this relation.
         """
         relation_condition = lambda relation: issubclass(
             relation.property_descriptor_cls, self.property_descriptor_cls

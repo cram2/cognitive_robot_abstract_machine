@@ -1,0 +1,26 @@
+schema_version: 1
+id: test-plan
+title: Test Plan
+description: A plan.
+default_repository: owner/repo
+waves:
+- id: wave-1
+  name: Wave 1
+tracks:
+- id: track-1
+  name: Track 1
+  wave: wave-1
+items:
+  - id: a
+    title: Item A
+    branch: a
+    pull_request_number: 1
+    track: track-1
+    status: in_progress
+    notes: some long note that should be left completely untouched by the patch
+  - id: b
+    title: Item B
+    branch: b
+    pull_request_number: 2
+    track: track-1
+    status: not_started

@@ -100,7 +100,8 @@ class GaussianLayer(ContinuousLayer):
         progress_bar: bool = True,
     ) -> RustworkxLayerConverter:
         """
-        Create a GaussianLayer from a list of UnivariateContinuousLeaf nodes that have the same variable and scope.
+        Create a GaussianLayer from a list of UnivariateContinuousLeaf nodes that have
+        the same variable and scope.
         """
         hash_remap = {hash(node): index for index, node in enumerate(nodes)}
 

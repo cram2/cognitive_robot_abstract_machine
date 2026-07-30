@@ -17,12 +17,12 @@ from krrood.ripple_down_rules.utils import (
     str_to_snake_case,
     get_imports_from_scope,
     make_list,
-    stringify_hint,
-    extract_function_or_class_file,
     get_types_to_import_from_type_hints,
-    extract_function_or_class_from_source,
 )
-from krrood.utils import get_imports_from_types, get_scope_from_imports
+from krrood.code_generation.imports import get_imports_from_types
+from krrood.code_generation.source_extraction_utils import extract_function_source
+from krrood.code_generation.type_hints import stringify_type_hint
+from krrood.utils import get_scope_from_imports
 
 
 def detect_available_editor() -> Optional[Editor]:
@@ -65,21 +65,25 @@ FunctionData = Tuple[Optional[List[str]], Optional[Dict[str, Callable]]]
 
 class TemplateFileCreator:
     """
-    A class to create a rule template file for a given case and prompt for the user to edit it.
+    A class to create a rule template file for a given case and prompt for the user to
+    edit it.
     """
 
     temp_file_path: Optional[str] = None
     """
     The path to the temporary file that is created for the user to edit.
     """
+
     port: int = int(os.environ.get("RDR_EDITOR_PORT", 8080))
     """
     The port to use for the code-server.
     """
+
     process: Optional[subprocess.Popen] = None
     """
     The process of the code-server.
     """
+
     all_code_lines: Optional[List[str]] = None
     """
     The list of all code lines in the function in the temporary file.
@@ -212,14 +216,14 @@ class TemplateFileCreator:
                     self.case_query.function_args_type_hints is not None
                     and k in self.case_query.function_args_type_hints
                 ):
-                    func_args[k] = stringify_hint(
+                    func_args[k] = stringify_type_hint(
                         self.case_query.function_args_type_hints[k]
                     )
                 else:
                     func_args[k] = (
-                        type(v).__name__
+                        stringify_type_hint(type(v))
                         if not isinstance(v, type)
-                        else f"Type[{v.__name__}]"
+                        else f"Type[{stringify_type_hint(v)}]"
                     )
             func_args = ", ".join(
                 [
@@ -342,8 +346,9 @@ class TemplateFileCreator:
         :param file_path: The path to the file to load.
         :param func_name: The name of the function to load.
         :param print_func: The function to use for printing messages.
-        :return: A tuple containing the function source code and the function object as a dictionary
-        with the function name as the key and the function object as the value.
+        :return: A tuple containing the function source code and the function object as
+            a dictionary with the function name as the key and the function object as
+            the value.
         """
         if not file_path:
             print_func(
@@ -373,9 +378,12 @@ class TemplateFileCreator:
                 )
                 break
         if updates:
-            all_code_lines = extract_function_or_class_from_source(
-                source, [func_name], join_lines=False
-            )[func_name]
+            extracted_function = extract_function_source([func_name], source=source)
+            all_code_lines = next(
+                definition.lines
+                for definition in extracted_function.definitions
+                if definition.name == func_name
+            )
             return all_code_lines, updates
         else:
             print_func(

@@ -39,6 +39,7 @@ class Conditioner(ABC):
 class CouplingCircuit(eqx.Module):
     """
     A probabilistic circuit that uses a function to generate parameters for a circuit.
+
     Simply speaking, this represents P(y, theta=f(x)).
     """
 
@@ -54,7 +55,8 @@ class CouplingCircuit(eqx.Module):
 
     conditioner_columns: jax.Array = eqx.field(static=True)
     """
-    The columns in a matrix that the conditioner takes as input for producing circuit parameters.
+    The columns in a matrix that the conditioner takes as input for producing circuit
+    parameters.
     """
 
     circuit_columns: jax.Array = eqx.field(static=True)
@@ -77,6 +79,7 @@ class CouplingCircuit(eqx.Module):
     def partition_circuit(self):
         """
         Partition the circuit into the parameters and the static structure.
+
         :return:
         """
         return self.circuit.partition()
@@ -104,11 +107,12 @@ class CouplingCircuit(eqx.Module):
 
     def create_circuit_from_parameters(self, params: jax.Array) -> Layer:
         """
-        Generate a circuit with the structure from self.circuit and the parameters from params.
+        Generate a circuit with the structure from self.circuit and the parameters from
+        params.
+
         :param params: The parameters to be used in the circuit.
         :return: The circuit
         """
-
         # get the parameters and circuit definition
         tree_def, static = self.partition_circuit()
 
@@ -143,7 +147,8 @@ class CouplingCircuit(eqx.Module):
 
     def validate(self):
         """
-        Check if the output of the conditioner matches the parametrization of the circuit.
+        Check if the output of the conditioner matches the parametrization of the
+        circuit.
         """
         self.circuit.validate()
         if (

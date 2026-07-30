@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{{ title }}</title>
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; font-family: sans-serif; }
+  #container { display: flex; height: 100vh; }
+  #network { flex: 3; background: #000000; }
+  #details { flex: 1; padding: 1rem; overflow: auto; border-left: 1px solid #ccc; }
+  #details h3 { margin-top: 0; }
+</style>
+</head>
+<body>
+<div id="container">
+  <div id="network"></div>
+  <div id="details"><i>Click a node to see its details</i></div>
+</div>
+<script>
+const layoutOptions = {{ layout_options_json | safe }};
+const nodes = new vis.DataSet([]);
+const edges = new vis.DataSet([]);
+const network = new vis.Network(
+  document.getElementById("network"),
+  { nodes: nodes, edges: edges },
+  Object.assign(
+    {
+      nodes: { shape: "dot", size: 15, font: { color: "#ffffff" } },
+      edges: { color: "#888888", arrows: "to" },
+    },
+    layoutOptions
+  )
+);
+
+function escapeHtml(text) {
+  const holder = document.createElement("div");
+  holder.textContent = text;
+  return holder.innerHTML;
+}
+
+async function refresh() {
+  const response = await fetch("graph");
+  const payload = await response.json();
+
+  const currentNodeIds = new Set(payload.nodes.map((node) => node.id));
+  const currentEdgeIds = new Set(payload.edges.map((edge) => edge.id));
+
+  nodes.update(payload.nodes);
+  edges.update(payload.edges);
+
+  nodes.getIds().forEach((id) => { if (!currentNodeIds.has(id)) { nodes.remove(id); } });
+  edges.getIds().forEach((id) => { if (!currentEdgeIds.has(id)) { edges.remove(id); } });
+}
+
+network.on("click", async (params) => {
+  if (params.nodes.length === 0) { return; }
+  const nodeId = params.nodes[0];
+  const response = await fetch("node/" + nodeId);
+  const payload = await response.json();
+  const lines = payload.details.map((line) => "<p>" + escapeHtml(line) + "</p>").join("");
+  document.getElementById("details").innerHTML =
+    "<h3>" + escapeHtml(nodes.get(nodeId).label) + "</h3>" + lines;
+});
+
+refresh();
+setInterval(refresh, {{ interval_ms }});
+</script>
+</body>
+</html>

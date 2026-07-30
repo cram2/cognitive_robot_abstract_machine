@@ -29,7 +29,8 @@ from robokudo.utils.error_handling import (
 
 
 class ActionServerActive(Behaviour):
-    """A behavior that checks if an action server is active.
+    """
+    A behavior that checks if an action server is active.
 
     This behavior monitors the action server's state and returns:
     * SUCCESS if the server is active and processing a goal
@@ -37,7 +38,8 @@ class ActionServerActive(Behaviour):
     """
 
     def __init__(self, name: str = "ActionServerActive") -> None:
-        """Initialize the ActionServerActive behavior.
+        """
+        Initialize the ActionServerActive behavior.
 
         :param name: Name of the behavior node, defaults to "ActionServerActive"
         """
@@ -80,14 +82,16 @@ class ActionServerCheck(Behaviour):
     """
 
     def __init__(self, name: str = "ActionServerCheck") -> None:
-        """Initialize the ActionServerCheck behavior.
+        """
+        Initialize the ActionServerCheck behavior.
 
         :param name: Name of the behavior node, defaults to "ActionServerCheck"
         """
         super().__init__(name=name)
 
     def update(self) -> Status:
-        """Check action server state.
+        """
+        Check action server state.
 
         This method:
         * Retrieves the action server from the blackboard
@@ -121,14 +125,17 @@ class ActionServerNoPreemptRequest(Behaviour):
     """
 
     def __init__(self, name: str = "ActionServerNoPreemptRequest") -> None:
-        """Initialize the ActionServerNoPreemptRequest behavior.
+        """
+        Initialize the ActionServerNoPreemptRequest behavior.
 
-        :param name: Name of the behavior node, defaults to "ActionServerNoPreemptRequest"
+        :param name: Name of the behavior node, defaults to
+            "ActionServerNoPreemptRequest"
         """
         super().__init__(name=name)
 
     def update(self) -> Status:
-        """Check for and handle preemption requests.
+        """
+        Check for and handle preemption requests.
 
         This method:
         * Checks the blackboard for preemption requests
@@ -150,15 +157,16 @@ class AbortGoal(Behaviour):
     """
     A behavior that aborts the current goal with an error message.
 
-    This behavior raises an exception that is caught and stored on the
-    blackboard to trigger goal abortion. It is used to explicitly
-    terminate goals with a specified error message.
+    This behavior raises an exception that is caught and stored on the blackboard to
+    trigger goal abortion. It is used to explicitly terminate goals with a specified
+    error message.
     """
 
     def __init__(
         self, name: str = "AbortGoal", msg: str = "Goal has been aborted"
     ) -> None:
-        """Initialize the AbortGoal behavior.
+        """
+        Initialize the AbortGoal behavior.
 
         :param name: Name of the behavior node, defaults to "AbortGoal"
         :param msg: Error message for goal abortion, defaults to "Goal has been aborted"
@@ -166,15 +174,17 @@ class AbortGoal(Behaviour):
         super().__init__(name=name)
 
         self.msg: str = msg
-        """Error message for goal abortion"""
+        """
+        Error message for goal abortion.
+        """
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:
-        """Abort the current goal.
+        """
+        Abort the current goal.
 
-        This method raises an exception with the specified message.
-        The exception is caught by the decorator and stored on the
-        blackboard.
+        This method raises an exception with the specified message. The exception is
+        caught by the decorator and stored on the blackboard.
 
         :raises Exception: Always raises an exception with the abort message
         :return: Never returns due to exception
@@ -183,11 +193,12 @@ class AbortGoal(Behaviour):
 
 
 class RunningUntilExceptionHandled(Behaviour):
-    """A behavior that waits for exception handling to complete.
+    """
+    A behavior that waits for exception handling to complete.
 
-    This behavior monitors the blackboard for active exceptions and
-    returns RUNNING until they are cleared. It is used to prevent
-    further processing until error conditions are resolved.
+    This behavior monitors the blackboard for active exceptions and returns RUNNING
+    until they are cleared. It is used to prevent further processing until error
+    conditions are resolved.
     """
 
     def __init__(
@@ -195,18 +206,24 @@ class RunningUntilExceptionHandled(Behaviour):
         name: str = "RunningUntilExceptionHandled",
         msg: str = "Running Until Exception Handled",
     ) -> None:
-        """Initialize the RunningUntilExceptionHandled behavior.
+        """
+        Initialize the RunningUntilExceptionHandled behavior.
 
-        :param name: Name of the behavior node, defaults to "RunningUntilExceptionHandled"
-        :param msg: Status message for waiting state, defaults to "Running Until Exception Handled"
+        :param name: Name of the behavior node, defaults to
+            "RunningUntilExceptionHandled"
+        :param msg: Status message for waiting state, defaults to "Running Until
+            Exception Handled"
         """
         super().__init__(name=name)
 
         self.msg: str = msg
-        """Status message for waiting state"""
+        """
+        Status message for waiting state.
+        """
 
     def update(self) -> Status:
-        """Check if exception handling is complete.
+        """
+        Check if exception handling is complete.
 
         This method:
         * Checks for active exceptions on the blackboard
@@ -228,17 +245,24 @@ class RunningUntilExceptionHandled(Behaviour):
 
 
 class ActionServerPresentAndDone(Behaviour):
-    """A behaviour that checks whether an action server is present and represents its state."""
+    """
+    A behaviour that checks whether an action server is present and represents its
+    state.
+    """
 
     def __init__(self, name: str = "ActionServerPresentAndDone") -> None:
-        """Initialize the ActionServerPresentAndDone behaviour.
+        """
+        Initialize the ActionServerPresentAndDone behaviour.
 
-        :param name: Name of the behaviour node, defaults to "ActionServerPresentAndDone"
+        :param name: Name of the behaviour node, defaults to
+            "ActionServerPresentAndDone"
         """
         super().__init__(name=name)
 
         self.rk_logger: logging.Logger = logging.getLogger(PACKAGE_NAME)
-        """Logger for this behaviour."""
+        """
+        Logger for this behaviour.
+        """
 
     def update(self) -> Status:
         blackboard = Blackboard()

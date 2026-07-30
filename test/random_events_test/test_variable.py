@@ -63,6 +63,7 @@ class SymbolicTestCase(unittest.TestCase):
 class InheritedContinuous(Continuous):
     mean: int
 
+
 class InheritanceTestCase(unittest.TestCase):
     def test_conversion(self):
         v1 = InheritedContinuous(name="david", mean=2)

@@ -17,13 +17,15 @@ The plane detection uses:
    Plane visualization includes both inlier points and a mesh model.
 """
 
+from __future__ import annotations
+
 from timeit import default_timer
 
 import numpy as np
 import open3d as o3d
 from py_trees.common import Status
 
-from robokudo.annotators.core import ThreadedAnnotator, BaseAnnotator
+from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.annotation import Plane
 from robokudo.utils.transform import get_transform_from_plane_equation
@@ -65,12 +67,12 @@ class PlaneAnnotator(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "PlaneAnnotator",
-        descriptor: "PlaneAnnotator.Descriptor" = Descriptor(),
+        descriptor: PlaneAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the plane detector.
 
-        :param name: Name of this annotator instance, defaults to "PlaneAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
 
@@ -102,7 +104,7 @@ class PlaneAnnotator(ThreadedAnnotator):
         depth_image = self.get_cas().get(
             CASViews.DEPTH_IMAGE
         )  # shape [H, W], float or uint16
-        cam_intrinsics = self.get_cas().get(CASViews.CAM_INTRINSIC)
+        camera_intrinsics = self.get_cas().get(CASViews.CAMERA_INTRINSIC)
         # print(f"Loaded cloud with {len(cloud.points)} points")
 
         plane_model, inliers = cloud.segment_plane(

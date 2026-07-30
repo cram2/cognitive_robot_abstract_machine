@@ -2,7 +2,6 @@ import logging
 
 from krrood.ripple_down_rules.datastructures.case import Case
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
-from krrood.ripple_down_rules.utils import SubclassJSONSerializer
 
 try:
     import graphviz
@@ -106,8 +105,6 @@ def generate_object_graph(
             if isinstance(obj, CaseQuery) and attr == "scope":
                 continue
             if isinstance(obj, Case) and attr in ["data"]:
-                continue
-            if isinstance(obj, SubclassJSONSerializer) and attr == "data_class_refs":
                 continue
             value = getattr(obj, attr)
             if callable(value):

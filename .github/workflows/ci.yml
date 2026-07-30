@@ -37,8 +37,27 @@ jobs:
           - lib: probabilistic_model
           - lib: physics_simulators
           - lib: robokudo
+          - lib: segmind
           - lib: experiments
+          - lib: version
     uses: ./.github/workflows/ci_reusable.yml
     with:
       lib: ${{ matrix.lib }}
       repo_lowercase: ${{ needs.to-lowercase.outputs.repo_lowercase }}
+
+  test_claude_dev_tooling:
+    # The .claude/ agent-tooling scripts (e.g. the plan-dashboard skill) are
+    # plain, dependency-light Python - they don't need the heavy docker-based
+    # matrix above, which is scoped to the robotics packages.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          source .claude/hooks/resolve-personal-notes-config.sh
+          pip install pytest -r "${PLAN_DASHBOARD_REQUIREMENTS_FILE}"
+      - run: |
+          source .claude/hooks/resolve-personal-notes-config.sh
+          python -m pytest "${PLAN_DASHBOARD_TESTS_DIRECTORY}" "${HOOKS_TESTS_DIRECTORY}"

@@ -36,7 +36,7 @@ kinds of kinematic connections between them. The hierarchy mirrors the dataset u
 from dataclasses import dataclass
 
 from krrood.entity_query_language.factories import (
-    entity, variable, match_variable, inference, exists, or_,
+    entity, variable, an, inference, exists, or_,
 )
 from krrood.entity_query_language.explanation.explanation import (
     explain_inference, ConditionAndBindings,
@@ -97,23 +97,24 @@ fixed_conns = [
 
 A `Drawer` is inferred wherever a `FixedConnection` shares a parent with a
 `PrismaticConnection`'s child, and its other end connects to a `Handle`.
-We use `match_variable` to express this structural constraint directly in the variable
-definition rather than a separate `.where()` clause.
+We use `an(Type)(...).from_(domain)` to express this structural constraint directly in the
+variable definition rather than a separate `.where()` clause.
 
 ```{code-cell} ipython3
 handle_var = variable(ExampleHandle, handles)
 prismatic_conn = variable(ExamplePrismaticConnection, prismatic_conns)
-fixed_conn = match_variable(ExampleFixedConnection, fixed_conns)(
+fixed_conn = an(ExampleFixedConnection)(
     parent=prismatic_conn.child, child=handle_var
-)
+).from_(fixed_conns)
+# .expression lowers the Match to its selection Entity for symbolic attribute access
 drawers = inference(ExampleDrawer)(
-    container=fixed_conn.parent, handle=fixed_conn.child
+    container=fixed_conn.expression.parent, handle=fixed_conn.expression.child
 ).tolist()
 
 print(f"Inferred {len(drawers)} drawer(s): {drawers}")
 ```
 
-The `match_variable` call implicitly generates two equality conditions that must hold for
+The `an(Type)(...).from_(domain)` call implicitly generates two equality conditions that must hold for
 each candidate `FixedConnection`:
 
 1. `fixed_conn.parent == prismatic_conn.child`
@@ -270,7 +271,7 @@ for the first drawer from the drawer rule above.
 ### Which conditions were satisfied?
 
 Returns all satisfied condition expressions, including `LogicalOperator` wrappers produced by
-`match_variable` and the inference root.
+`an(Type)(...).from_(domain)` and the inference root.
 
 ```{code-cell} ipython3
 conditions = expl.get_satisfied_condition_expressions_for_the_instance().tolist()

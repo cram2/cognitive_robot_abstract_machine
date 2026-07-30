@@ -29,14 +29,14 @@ class ExecutionEnvironment:
 
     collision_avoidance: bool = False
     """
-    Whether an :class:`~giskardpy.motion_statechart.goals.collision_avoidance.ExternalCollisionAvoidance`
-    is added to every motion state chart created within this environment.
+    Whether an :class:`~giskardpy.motion_statechart.goals.collision_avoidance.ExternalCo
+    llisionAvoidance` is added to every motion state chart created within this
+    environment.
     """
 
     previous_type: ExecutionType = field(init=False, default=None)
     """
-    Type of the execution environment before setting it, used for nested
-    environments.
+    Type of the execution environment before setting it, used for nested environments.
     """
 
     previous_collision_avoidance: bool = field(init=False, default=False)
@@ -49,8 +49,8 @@ class ExecutionEnvironment:
         """
         Entering function for 'with' scope, saves the previously set
         :py:attr:`~pycram.plans.executables.GiskardExecutable.execution_type` and
-        :py:attr:`~pycram.plans.executables.GiskardExecutable.collision_avoidance`
-        and sets them to the values of this environment.
+        :py:attr:`~pycram.plans.executables.GiskardExecutable.collision_avoidance` and
+        sets them to the values of this environment.
         """
         self.previous_type = GiskardExecutable.execution_type
         self.previous_collision_avoidance = GiskardExecutable.collision_avoidance
@@ -61,16 +61,16 @@ class ExecutionEnvironment:
         """
         Exit method for the 'with' scope, restores the
         :py:attr:`~pycram.plans.executables.GiskardExecutable.execution_type` and
-        :py:attr:`~pycram.plans.executables.GiskardExecutable.collision_avoidance`
-        to the previously used values.
+        :py:attr:`~pycram.plans.executables.GiskardExecutable.collision_avoidance` to
+        the previously used values.
         """
         GiskardExecutable.execution_type = self.previous_type
         GiskardExecutable.collision_avoidance = self.previous_collision_avoidance
 
     def __call__(self, collision_avoidance: bool = False):
         """
-        Configure the environment for use as a context manager, allowing
-        ``with simulated_robot(collision_avoidance=True):``.
+        Configure the environment for use as a context manager, allowing ``with
+        simulated_robot(collision_avoidance=True):``.
         """
         self.collision_avoidance = collision_avoidance
         return self

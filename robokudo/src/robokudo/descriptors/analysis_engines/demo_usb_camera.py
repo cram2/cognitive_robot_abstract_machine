@@ -1,4 +1,5 @@
-"""Analysis engine for demonstrating USB camera integration.
+"""
+Analysis engine for demonstrating USB camera integration.
 
 This module provides an analysis engine that demonstrates how to read and process
 video data from various sources using OpenCV, including:
@@ -22,11 +23,14 @@ from robokudo.annotators.object_hypothesis_visualizer import ObjectHypothesisVis
 
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for basic video capture and visualization.
+    """
+    Analysis engine for basic video capture and visualization.
 
     This class implements a simple pipeline for reading video data from various
     sources and visualizing it. It supports multiple input sources through OpenCV's
@@ -44,7 +48,8 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
@@ -71,7 +76,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         # device = "/home/user_name/Pictures/my_image.jpg"
         # device = "https://raw.githubusercontent.com/cram2/coraplex/refs/heads/dev/doc/images/boxy.gif"
 
-        cv_config = CrDescriptorFactory.create_descriptor(
+        cv_config = CollectionReaderDescriptorFactory.create_descriptor(
             "opencv",
             device=device,
             loop_mode=1,

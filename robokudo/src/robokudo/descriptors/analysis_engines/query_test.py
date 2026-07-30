@@ -1,5 +1,6 @@
 """
-This script defines a Robokudo-based behavior tree pipeline for processing queries related to numbers.
+This script defines a Robokudo-based behavior tree pipeline for processing queries
+related to numbers.
 
 Features:
 - Implements a PyTrees behavior tree to handle query processing.

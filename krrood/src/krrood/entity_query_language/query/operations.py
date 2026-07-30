@@ -18,25 +18,18 @@ from typing_extensions import (
     Iterator,
     Iterable,
     Optional,
-    Callable,
     Dict,
     FrozenSet,
     Hashable,
     Set,
 )
 
-from krrood.entity_query_language.core.variable import (
-    Literal,
-    ExternallySetVariable,
-    InstantiatedVariable,
-)
 from krrood.entity_query_language.operators.aggregators import (
     Aggregator,
     Count,
     CountAll,
 )
 from krrood.entity_query_language.core.base_expressions import (
-    DerivedExpression,
     SymbolicExpression,
     UnaryExpression,
     Bindings,
@@ -125,70 +118,6 @@ class Having(Filter, BinaryExpression):
         )
 
 
-@dataclass(eq=False, repr=False)
-class OrderedBy(BinaryExpression, DerivedExpression):
-    """
-    Represents an ordered by clause in a query. This orders the results of query according to the values of the
-    specified variable.
-    """
-
-    right: Selectable
-    """
-    The variable to order by.
-    """
-    descending: bool = False
-    """
-    Whether to order the results in descending order.
-    """
-    key: Optional[Callable] = None
-    """
-    A function to extract the key from the variable value.
-    """
-
-    @property
-    def _original_expression_(self) -> SymbolicExpression:
-        """
-        The original expression that this expression was derived from.
-        """
-        return self.left
-
-    @property
-    def variable(self) -> Selectable:
-        """
-        The variable to order by.
-        """
-        return self.right
-
-    def _evaluate__(self, sources: OperationResult) -> Iterator[OperationResult]:
-        results = list(self.left._evaluate_(sources))
-        yield from sorted(
-            results,
-            key=self.apply_key,
-            reverse=self.descending,
-        )
-
-    def apply_key(self, result: OperationResult) -> Any:
-        """
-        Apply the key function to the variable to extract the reference value to order the results by.
-        """
-        var = self.variable
-        var_id = var._id_
-        if var_id not in result.all_bindings:
-            variable_value = next(
-                var._evaluate_(OperationResult(result.all_bindings))
-            ).value
-        else:
-            variable_value = result.all_bindings[var_id]
-        if self.key:
-            return self.key(variable_value)
-        else:
-            return variable_value
-
-    @property
-    def _name_(self) -> str:
-        return f"OrderedBy({self.variable._name_})"
-
-
 GroupBindings = Dict[GroupKey, OperationResult]
 """
 A dictionary for grouped bindings which maps a group key to its corresponding bindings.
@@ -229,11 +158,13 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
 
         groups, group_key_count = self.get_groups_and_group_key_count(sources)
 
-        if self.count_occurrences_of_group_keys:
-            for group_key, group in groups.items():
+        for group_key, group in groups.items():
+            if self.count_occurrences_of_group_keys:
                 group[self.count_occurrences_of_group_keys._id_] = group_key_count[
                     group_key
                 ]
+            for count_all in self._aggregators_of_type_count_all_:
+                group[count_all._id_] = group_key_count[group_key]
 
         yield from groups.values()
 
@@ -264,8 +195,12 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
             self.update_group_from_bindings(groups[group_key], res.bindings)
 
         if len(groups) == 0:
-            # if there are no groups, add one empty group with an empty list for each aggregated variable.
+            # if there are no groups, add one empty group with an empty list for each aggregated
+            # variable. CountAll has no child to seed; the empty group's row count of zero is
+            # injected later by its own identifier.
             for aggregator in self.aggregators:
+                if isinstance(aggregator, CountAll):
+                    continue
                 groups[()][aggregator._child_._id_] = []
 
         return groups, group_key_count
@@ -319,6 +254,13 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         )
 
     @cached_property
+    def _aggregators_of_type_count_all_(self) -> Tuple[CountAll, ...]:
+        """
+        :return: The aggregators that count all rows per group.
+        """
+        return tuple(agg for agg in self.aggregators if isinstance(agg, CountAll))
+
+    @cached_property
     def aggregators_of_grouped_by_variables(self):
         """
         :return: A list of the aggregators that are aggregating over
@@ -327,7 +269,8 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         return [
             var
             for var in self.aggregators
-            if var._child_._id_ in self.ids_of_variables_to_group_by
+            if var._child_ is not None
+            and var._child_._id_ in self.ids_of_variables_to_group_by
         ]
 
     @cached_property

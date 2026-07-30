@@ -406,7 +406,9 @@ class HSRBMobileBase(MobileBase, HasTorso[HSRBTorso]):
 @dataclass(eq=False)
 class HSRB(AbstractRobot, HasMobileBase[HSRBMobileBase]):
     """
-    The HSRB Robot built by Toyota. https://robotsguide.com/robots/hsr
+    The HSRB Robot built by Toyota.
+
+    https://robotsguide.com/robots/hsr
     """
 
     @classmethod

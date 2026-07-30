@@ -1,7 +1,7 @@
 """
-The grammar is first-class data: ``RULES`` is a plain list of
-:class:`PhraseRule` values, so it can be introspected with EQL itself — the
-"queryable grammar" property of the redesign.
+The grammar is first-class data: ``RULES`` is a plain list of :class:`PhraseRule`
+values, so it can be introspected with EQL itself — the "queryable grammar" property of
+the redesign.
 """
 
 from __future__ import annotations

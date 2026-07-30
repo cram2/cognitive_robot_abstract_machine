@@ -456,7 +456,9 @@ class TiagoMobileBase(MobileBase, HasTorso[TiagoTorso]):
 @dataclass(eq=False)
 class Tiago(AbstractRobot, HasMobileBase[TiagoMobileBase]):
     """
-    The Tiago++ robot by PAL Robotics with updated Robotiq grippers. https://pal-robotics.com/blog/tiago-bi-manual-robot-research/
+    The Tiago++ robot by PAL Robotics with updated Robotiq grippers.
+
+    https://pal-robotics.com/blog/tiago-bi-manual-robot-research/
     """
 
     @classmethod
@@ -812,8 +814,11 @@ class TiagoMujocoMobileBase(MobileBase, HasTorso[TiagoMujocoTorso]):
 @dataclass(eq=False)
 class TiagoMujoco(AbstractRobot, HasMobileBase[TiagoMujocoMobileBase]):
     """
-    Class that describes the Take It And Go Robot (TIAGo). This version is based on the MuJoCo model, which contains
-    less bodies and connections than the URDF version, including missing some crucial links like the camera etc.
+    Class that describes the Take It And Go Robot (TIAGo).
+
+    This version is based on the MuJoCo model, which contains less bodies and
+    connections than the URDF version, including missing some crucial links like the
+    camera etc.
     """
 
     @classmethod

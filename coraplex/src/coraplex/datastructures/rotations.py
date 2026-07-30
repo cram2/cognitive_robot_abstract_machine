@@ -8,8 +8,10 @@ from coraplex.datastructures.enums import Grasp, ApproachDirection, VerticalAlig
 
 class Rotations(Dict[Optional[Union[Grasp, bool]], List[float]]):
     """
-    A dictionary that defines standard quaternions for different grasps and orientations. This is mainly used
-    to automatically calculate all grasp descriptions of a robot gripper for the robot description.
+    A dictionary that defines standard quaternions for different grasps and
+    orientations.
+
+    This is mainly used to automatically calculate all grasp descriptions of a robot gripper for the robot description.
 
     SIDE_ROTATIONS: The quaternions for the different approach directions (front, back, left, right)
     VERTICAL_ROTATIONS: The quaternions for the different vertical alignments, in case the object requires for

@@ -17,6 +17,7 @@ from semantic_digital_twin.world_description.world_entity import (
 class MinimalRobot(AbstractRobot):
     """
     Creates the bare minimum semantic annotation.
+
     Used when you only care that there is a robot.
     """
 
@@ -35,7 +36,9 @@ class MinimalRobot(AbstractRobot):
     def from_branch_in_world(cls, branch_root: KinematicStructureEntity) -> Self:
         """
         Creates a robot from a branch in a world.
-        This is useful when you have multiple of the same robots in the same world, which would normally cause naming conflicts.
+
+        This is useful when you have multiple of the same robots in the same world,
+        which would normally cause naming conflicts.
         """
         world = branch_root._world
         with world.modify_world():

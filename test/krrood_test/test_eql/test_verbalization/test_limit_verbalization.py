@@ -1,13 +1,13 @@
 """
-Tests for verbalizing a query's ``limit(n)`` (with optional ``ordered_by``) as a ranking phrase on
-the selection.
+Tests for verbalizing a query's ``limit(n)`` (with optional ``ordered_by``) as a ranking
+phrase on the selection.
 
-A ``limit`` reshapes the selection's leading phrase rather than adding a trailing clause:
-*"the first two Robots"*, *"the top three Employees by salary"*, *"the Employee with the highest
-salary"*. When a limit is present the standalone *"ordered by … from highest to lowest"* clause is
-suppressed;
-ordering *without* a limit keeps it. Ordering by an attribute of the selection (vs. the selection
-itself) changes where the superlative attaches.
+A ``limit`` reshapes the selection's leading phrase rather than adding a trailing
+clause: *"the first two Robots"*, *"the top three Employees by salary"*, *"the Employee
+with the highest salary"*. When a limit is present the standalone *"ordered by … from
+highest to lowest"* clause is suppressed; ordering *without* a limit keeps it. Ordering
+by an attribute of the selection (vs. the selection itself) changes where the
+superlative attaches.
 """
 
 from __future__ import annotations
@@ -38,35 +38,37 @@ def _int():
 
 
 def test_limit_without_order_first_singular():
-    assert verbalize_expression(entity(_int()).limit(1)) == "Find the first int"
+    assert verbalize_expression(entity(_int()).limit(1)) == "Find the first Integer"
 
 
 def test_limit_without_order_first_plural():
-    assert verbalize_expression(entity(_int()).limit(2)) == "Find the first two ints"
+    assert (
+        verbalize_expression(entity(_int()).limit(2)) == "Find the first two Integers"
+    )
 
 
 def test_descending_self_singular_is_highest():
     v = _int()
     q = entity(v).ordered_by(v, descending=True).limit(1)
-    assert verbalize_expression(q) == "Find the highest int"
+    assert verbalize_expression(q) == "Find the highest Integer"
 
 
 def test_descending_self_plural_is_top_n():
     v = _int()
     q = entity(v).ordered_by(v, descending=True).limit(3)
-    assert verbalize_expression(q) == "Find the top three ints"
+    assert verbalize_expression(q) == "Find the top three Integers"
 
 
 def test_ascending_self_singular_is_lowest():
     v = _int()
     q = entity(v).ordered_by(v, descending=False).limit(1)
-    assert verbalize_expression(q) == "Find the lowest int"
+    assert verbalize_expression(q) == "Find the lowest Integer"
 
 
 def test_ascending_self_plural_is_bottom_n():
     v = _int()
     q = entity(v).ordered_by(v, descending=False).limit(3)
-    assert verbalize_expression(q) == "Find the bottom three ints"
+    assert verbalize_expression(q) == "Find the bottom three Integers"
 
 
 def test_descending_attribute_singular_is_with_the_highest():
@@ -106,16 +108,20 @@ def test_limit_suppresses_the_ordered_by_clause():
 
 
 def test_ordering_without_limit_reports_the_ordered_listing():
-    """An unranked ordered query is a listing, not a search: it reports the whole (plural)
-    population and keeps the ordered-by clause."""
+    """
+    An unranked ordered query is a listing, not a search: it reports the whole (plural)
+    population and keeps the ordered-by clause.
+    """
     e = variable(Employee, [])
     text = verbalize_expression(an(entity(e).ordered_by(e.salary, descending=True)))
     assert text == "Report Employees ordered by their salaries from highest to lowest"
 
 
 def test_conditioned_ordering_still_reports():
-    """Report-ness and conditions are orthogonal: a filtered ordered query is still a report (a
-    filtered listing), so it keeps "Report" and the plural subject alongside its restriction.
+    """
+    Report-ness and conditions are orthogonal: a filtered ordered query is still a
+    report (a filtered listing), so it keeps "Report" and the plural subject alongside
+    its restriction.
     """
     e = variable(Employee, [])
     text = verbalize_expression(an(entity(e).where(e.salary > 5).ordered_by(e.salary)))
@@ -208,7 +214,9 @@ def test_cardinal_words():
     ],
 )
 def test_ranking_form_selection(n, direction, relation, expected):
-    """The registry picks the right form per (direction, count, key-relation) — OCP seam."""
+    """
+    The registry picks the right form per (direction, count, key-relation) — OCP seam.
+    """
     from krrood.entity_query_language.verbalization.grammar.query.planner import (
         SortDirection,
         RankingKeyRelation,

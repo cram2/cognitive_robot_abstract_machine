@@ -1,0 +1,16 @@
+<?xml version="1.0" ?>
+<robot name="montessori_object_2" version="1.0">
+  <link name="montessori_object_2">
+    <inertial>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <mass value="0.01134410034865141"/>
+      <inertia ixx="1.2508099871411105e-06" ixy="0.0" ixz="0.0" iyy="1.2508099871411105e-06" iyz="0.0" izz="8.338760153492331e-07"/>
+    </inertial>
+    <collision name="MontessoriObject2">
+      <origin xyz="-0.005819993559271097 1.2720914664890083e-19 3.725290298461914e-09" rpy="0.0 0.0 0.0"/>
+      <geometry>
+          <mesh filename="file://montessori_object_1/meshes/stl/montessori_object_2_MontessoriObject_002.stl" scale="1.0 1.0 1.0"/>
+       </geometry>
+    </collision>
+  </link>
+</robot>

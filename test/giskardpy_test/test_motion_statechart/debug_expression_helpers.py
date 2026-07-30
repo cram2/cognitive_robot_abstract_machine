@@ -4,10 +4,14 @@ from giskardpy.motion_statechart.graph_node import DebugExpression
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
 
 GOAL_COLOR = CartesianTask.GOAL_COLOR
-"""The color cartesian tasks use for the goal debug expression."""
+"""
+The color cartesian tasks use for the goal debug expression.
+"""
 
 CURRENT_COLOR = CartesianTask.CURRENT_COLOR
-"""The color cartesian tasks use for the current debug expression."""
+"""
+The color cartesian tasks use for the current debug expression.
+"""
 
 
 def debug_expression_by_name(

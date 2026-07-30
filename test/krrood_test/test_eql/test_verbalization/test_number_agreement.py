@@ -30,7 +30,9 @@ from ...dataset.department_and_employee import Employee
 
 
 def _realised(fragment) -> str:
-    """Apply the morphology pass (as ``build`` does), then flatten to plain text."""
+    """
+    Apply the morphology pass (as ``build`` does), then flatten to plain text.
+    """
     return flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment))
 
 

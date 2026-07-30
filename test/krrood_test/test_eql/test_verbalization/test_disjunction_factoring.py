@@ -1,15 +1,17 @@
 """
-Tests for disjunction factoring: an OR whose disjuncts are all value comparisons on the *same*
-subject chain is said with the subject and copula stated once and only the predicate tails
-coordinated — *"the battery of a Robot is greater than 50 or less than 10"* — rather than
-repeating *"the battery of … is …"* per disjunct. The disjunction is inclusive, so it is *not*
-fronted with *"either"* (which would read as exclusive-or).
+Tests for disjunction factoring: an OR whose disjuncts are all value comparisons on the
+*same* subject chain is said with the subject and copula stated once and only the
+predicate tails coordinated — *"the battery of a Robot is greater than 50 or less than
+10"* — rather than repeating *"the battery of … is …"* per disjunct.
+
+The disjunction is inclusive, so it is *not* fronted with *"either"* (which would read
+as exclusive-or).
 """
 
 from __future__ import annotations
 
 from krrood.entity_query_language.factories import or_, variable
-from krrood.entity_query_language.verbalization.example_domain import Robot
+from krrood.entity_query_language.verbalization._example_domain import Robot
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 

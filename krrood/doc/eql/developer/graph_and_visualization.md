@@ -61,7 +61,7 @@ The {py:class}`~krrood.entity_query_language.query_graph.ColorLegend` class prov
 This example shows how to generate a visualization for a nested structural query.
 
 ```{code-cell} ipython3
-from krrood.entity_query_language.factories import match_variable, match, entity, an
+from krrood.entity_query_language.factories import entity, an
 from krrood.entity_query_language.query_graph import QueryGraph
 from dataclasses import dataclass
 
@@ -74,10 +74,10 @@ class ExampleRobot:
 robots = [ExampleRobot("R2D2", 100), ExampleRobot("C3PO", 0)]
 
 # Define a complex nested query
-query = match_variable(ExampleRobot, domain=robots)(name="R2D2", battery=100)
+query = an(ExampleRobot)(name="R2D2", battery=100).from_(robots)
 
-# Visualize
-query_graph = QueryGraph(query)
+# Visualize (QueryGraph takes the lowered selection expression, not the Match builder)
+query_graph = QueryGraph(query.expression)
 
 # Note: This requires rustworkx and matplotlib
 # query_graph.visualize()

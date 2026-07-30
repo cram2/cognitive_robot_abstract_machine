@@ -1,6 +1,7 @@
 import logging
 import threading
 import time
+from abc import ABC, abstractmethod
 from dataclasses import field, dataclass
 from typing import Optional, Callable
 
@@ -20,7 +21,9 @@ class CheckControlCycleCount(MotionStatechartNode):
     """
 
     threshold: int = field(kw_only=True)
-    """After this many control cycles, the node will turn True."""
+    """
+    After this many control cycles, the node will turn True.
+    """
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
@@ -45,6 +48,7 @@ class Print(MotionStatechartNode):
 class CountSeconds(MotionStatechartNode):
     """
     This node counts X seconds and then turns True.
+
     Only counts while in state RUNNING.
     """
 
@@ -64,35 +68,78 @@ class CountSeconds(MotionStatechartNode):
         self._start_time = self._now()
 
 
-@dataclass(repr=False, eq=False)
-class CountControlCycles(MotionStatechartNode):
+@dataclass(eq=False, repr=False)
+class TickCounter(MotionStatechartNode, ABC):
     """
-    This node counts 'threshold'-many control cycles and then turns True.
+    Base for nodes that count control ticks while RUNNING and turn True once a target is
+    reached.
+
     Only counts while in state RUNNING.
     """
 
-    _counter: int = field(init=False)
-    """Keeps track of how many ticks have passed since first True"""
-    control_cycles: int = field(kw_only=True)
-    """Turns True after this many control cycles."""
+    _counter: int = field(init=False, default=0)
+    """
+    Number of ticks counted since the last start/reset.
+    """
+
+    def on_start(self, context: MotionStatechartContext):
+        self._counter = 0
 
     def on_tick(
         self, context: MotionStatechartContext
     ) -> Optional[ObservationStateValues]:
         self._counter += 1
-        if self._counter >= self.control_cycles:
+        if self._reached_target(context):
             return ObservationStateValues.TRUE
         return ObservationStateValues.FALSE
 
-    def on_start(self, context: MotionStatechartContext):
-        self._counter = 0
+    @abstractmethod
+    def _reached_target(self, context: MotionStatechartContext) -> bool:
+        """
+        Whether the counted target has been reached on the current tick.
+        """
+
+
+@dataclass(eq=False, repr=False)
+class CountSimulationTimeSeconds(TickCounter):
+    """
+    This node counts X seconds of simulation time (control cycles * simulation time
+    step) and then turns True.
+
+    Only counts while in state RUNNING.
+    """
+
+    seconds: float = field(kw_only=True)
+    """
+    How many seconds of simulation time to count.
+    """
+
+    def _reached_target(self, context: MotionStatechartContext) -> bool:
+        return context.qp_controller_config.control_dt * self._counter >= self.seconds
+
+
+@dataclass(eq=False, repr=False)
+class CountControlCycles(TickCounter):
+    """
+    This node counts 'control_cycles'-many control cycles and then turns True.
+
+    Only counts while in state RUNNING.
+    """
+
+    control_cycles: int = field(kw_only=True)
+    """
+    Turns True after this many control cycles.
+    """
+
+    def _reached_target(self, context: MotionStatechartContext) -> bool:
+        return self._counter >= self.control_cycles
 
 
 @dataclass(eq=False, repr=False)
 class ThreadedPredicateMonitor(MotionStatechartNode):
     """
-    Evaluates an arbitrary boolean predicate in a background thread and exposes
-    the result as the node's observation state.
+    Evaluates an arbitrary boolean predicate in a background thread and exposes the
+    result as the node's observation state.
 
     While the node is RUNNING:
 
@@ -113,7 +160,9 @@ class ThreadedPredicateMonitor(MotionStatechartNode):
     """
 
     predicate: Optional[Callable[[], bool]] = field(kw_only=True)
-    """The predicate to evaluate, passed as a constructor argument."""
+    """
+    The predicate to evaluate, passed as a constructor argument.
+    """
 
     _thread: Optional[threading.Thread] = field(default=None, init=False, repr=False)
     _result: Optional[bool] = field(default=None, init=False, repr=False)
@@ -122,7 +171,8 @@ class ThreadedPredicateMonitor(MotionStatechartNode):
 
     def _worker(self, predicate: Callable[[], bool]) -> None:
         """
-        Wrapper that is executed in the external thread to catch Exceptions and manage Observation variables.
+        Wrapper that is executed in the external thread to catch Exceptions and manage
+        Observation variables.
 
         :param predicate: The predicate to evaluate
         """
@@ -138,7 +188,8 @@ class ThreadedPredicateMonitor(MotionStatechartNode):
 
     def on_start(self, context: MotionStatechartContext) -> None:
         """
-        On start of this note construct the external thread with self._worker and start it as daemon
+        On start of this note construct the external thread with self._worker and start
+        it as daemon.
         """
         if self.predicate is None:
             logger.error(
@@ -161,9 +212,11 @@ class ThreadedPredicateMonitor(MotionStatechartNode):
         self, context: MotionStatechartContext
     ) -> Optional[ObservationStateValues]:
         """
-        On tick of the Motion State Chart check if the thread is finished and set the ObservationStateValues accordingly
-        to ObservationStateValues.UNKNOWN if the thread is still working ObservationStateValues.TRUE if the Thread finished
-        with true and ObservationStateValues.FALSE if the Thread finished with false or crashed with an exception.
+        On tick of the Motion State Chart check if the thread is finished and set the
+        ObservationStateValues accordingly to ObservationStateValues.UNKNOWN if the
+        thread is still working ObservationStateValues.TRUE if the Thread finished with
+        true and ObservationStateValues.FALSE if the Thread finished with false or
+        crashed with an exception.
         """
         if not self._done:
             return ObservationStateValues.UNKNOWN
@@ -204,9 +257,14 @@ class Pulse(MotionStatechartNode):
     """
 
     _counter: int = field(default=0, init=False)
-    """Keeps track of how many ticks have passed since first True"""
+    """
+    Keeps track of how many ticks have passed since first True.
+    """
+
     length: int = field(default=1, kw_only=True)
-    """Number of ticks to stay True"""
+    """
+    Number of ticks to stay True.
+    """
 
     def on_start(self, context: MotionStatechartContext):
         self._counter = 0

@@ -1,7 +1,8 @@
 """
-Tests for the shared owner-grouping aggregation primitives in the coordination home — the single
-mechanism both the match construction-pattern grouping (all same-owner attributes of a position) and
-the ``set_of`` selection grouping (a consecutive run of attributes sharing one owner) build on.
+Tests for the shared owner-grouping aggregation primitives in the coordination home —
+the single mechanism both the match construction-pattern grouping (all same-owner
+attributes of a position) and the ``set_of`` selection grouping (a consecutive run of
+attributes sharing one owner) build on.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
     group_by_owner,
     group_consecutive_by_owner,
 )
-from krrood.entity_query_language.verbalization.example_domain import (
+from krrood.entity_query_language.verbalization._example_domain import (
     Department,
     Employee,
 )

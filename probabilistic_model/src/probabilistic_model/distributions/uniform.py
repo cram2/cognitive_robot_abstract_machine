@@ -134,7 +134,8 @@ class UniformDistribution(ContinuousDistributionWithFiniteSupport):
 
     def probability_density_function_trace(self) -> go.Scatter:
         """
-        Create a Plotly trace for the probability density function (PDF) of the uniform distribution.
+        Create a Plotly trace for the probability density function (PDF) of the uniform
+        distribution.
         """
         probability_density_values = [
             0,
@@ -157,7 +158,8 @@ class UniformDistribution(ContinuousDistributionWithFiniteSupport):
 
     def cumulative_density_function_trace(self) -> go.Scatter:
         """
-        Create a Plotly trace for the cumulative distribution function (CDF) of the uniform distribution.
+        Create a Plotly trace for the cumulative distribution function (CDF) of the
+        uniform distribution.
         """
         x = self.x_axis_points_for_plotly()
         cumulative_density_values = [

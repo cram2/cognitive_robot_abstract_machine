@@ -17,7 +17,9 @@ from krrood.entity_query_language.core.base_expressions import (
     OperationResult,
     BinaryExpression,
     SymbolicExpression,
+    BinaryExpression, SymbolicExpression,
 )
+from krrood.entity_query_language.core.variable import Literal
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.factories import ConditionType
@@ -26,9 +28,11 @@ if TYPE_CHECKING:
 @dataclass(eq=False, repr=False)
 class LogicalOperator(TruthValueOperator, ABC):
     """
-    A symbolic operation that can be used to combine multiple symbolic expressions using logical constraints on their
-    truth values. Examples are conjunction (AND), disjunction (OR), negation (NOT), and conditional quantification
-    (ForALL, Exists).
+    A symbolic operation that can be used to combine multiple symbolic expressions using
+    logical constraints on their truth values.
+
+    Examples are conjunction (AND), disjunction (OR), negation (NOT), and conditional
+    quantification (ForALL, Exists).
     """
 
     @property
@@ -39,8 +43,11 @@ class LogicalOperator(TruthValueOperator, ABC):
 @dataclass(eq=False, repr=False)
 class Not(LogicalOperator, UnaryExpression):
     """
-    The logical negation of a symbolic expression. Its truth value is the opposite of its child's truth value. This is
-    used when you want bindings that satisfy the negated condition (i.e., that doesn't satisfy the original condition).
+    The logical negation of a symbolic expression.
+
+    Its truth value is the opposite of its child's truth value. This is used when you
+    want bindings that satisfy the negated condition (i.e., that doesn't satisfy the
+    original condition).
     """
 
     def _evaluate__(
@@ -48,15 +55,19 @@ class Not(LogicalOperator, UnaryExpression):
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
 
-        for v in self._evaluate_child_as_condition_(self._child_, sources):
-            is_false = v.is_true
-            yield OperationResult(v.bindings, is_false, self)
+        for child_result in self._evaluate_child_as_condition_(self._child_, sources):
+            is_false = child_result.is_true
+            # Include child_result as previous so the satisfaction-tracking chain extends
+            # through the negated child's evaluation, keeping ancestor conditions
+            # reachable in the result chain.
+            yield OperationResult(child_result.bindings, is_false, self, child_result)
 
 
 @dataclass(eq=False, repr=False)
 class LogicalBinaryOperator(LogicalOperator, BinaryExpression, ABC):
     """
-    Abstract base class for logical operators that take two operands (i.e. have two children) only.
+    Abstract base class for logical operators that take two operands (i.e. have two
+    children) only.
     """
 
     def evaluate_right(self, sources: OperationResult) -> Iterable[OperationResult]:
@@ -98,7 +109,10 @@ class AND(LogicalBinaryOperator):
 @dataclass(eq=False, repr=False)
 class OR(LogicalBinaryOperator):
     """
-    A logical OR operator that evaluates the right operand only when the left operand is False. It is like an 'ElseIf`.
+    A logical OR operator that evaluates the right operand only when the left operand is
+    False.
+
+    It is like an 'ElseIf`.
     """
 
     def _evaluate__(
@@ -109,7 +123,8 @@ class OR(LogicalBinaryOperator):
         Evaluate the left operand, if it is False, then evaluate the right operand.
 
         :param sources: The current OperationResult to use for evaluation.
-        :return: The new bindings after evaluating the left operand (and possibly right operand).
+        :return: The new bindings after evaluating the left operand (and possibly right
+            operand).
         """
         yielded: bool = False
         for left_value in self._evaluate_child_as_condition_(self.left, sources):
@@ -125,7 +140,7 @@ class OR(LogicalBinaryOperator):
 
 def chained_logic(
     operator: Type[LogicalBinaryOperator], *conditions: ConditionType
-) -> LogicalOperator:
+) -> SymbolicExpression:
     """
     A chain of logic operation over multiple conditions, e.g. cond1 | cond2 | cond3.
 
@@ -138,6 +153,8 @@ def chained_logic(
             prev_operation = condition
             continue
         prev_operation = operator(prev_operation, condition)
+    if not isinstance(prev_operation, SymbolicExpression):
+        prev_operation = Literal(_value_=True)
     return prev_operation
 
 
@@ -147,12 +164,12 @@ def flatten_operands(
     """
     Recursively flatten a homogeneous binary chain into a flat operand list.
 
-    ``flatten_operands(AND(AND(a, b), c), AND)`` yields ``[a, b, c]``.  A node that
-    is not an instance of *operator_type* is returned as a single-element list.
+    ``flatten_operands(AND(AND(a, b), c), AND)`` yields ``[a, b, c]``.  A node that is
+    not an instance of *operator_type* is returned as a single-element list.
 
     :param expr: Root of the expression tree to flatten.
-    :param operator_type: The binary operator class whose chains to flatten
-        (e.g. :class:`AND`, :class:`OR`).
+    :param operator_type: The binary operator class whose chains to flatten (e.g.
+        :class:`AND`, :class:`OR`).
     :return: Flat list of operand expressions.
     """
     if not isinstance(expr, operator_type):

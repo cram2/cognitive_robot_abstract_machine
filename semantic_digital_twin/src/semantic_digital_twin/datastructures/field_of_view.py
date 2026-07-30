@@ -6,7 +6,8 @@ from dataclasses import dataclass
 @dataclass
 class FieldOfView:
     """
-    Represents the field of view of a camera sensor, defined by the vertical and horizontal angles of the camera's view.
+    Represents the field of view of a camera sensor, defined by the vertical and
+    horizontal angles of the camera's view.
     """
 
     vertical_angle: float

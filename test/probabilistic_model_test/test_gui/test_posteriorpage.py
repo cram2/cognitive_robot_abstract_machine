@@ -76,7 +76,9 @@ class TestPosteriorGUI(unittest.TestCase):
         self.assertEqual(widget.query_vars[0], self.v1.name)
 
     def test_controller_calculate_posterior(self):
-        evidence = Event.from_simple_sets(SimpleEvent.from_data({self.v1: closed(0, 0.5)}))
+        evidence = Event.from_simple_sets(
+            SimpleEvent.from_data({self.v1: closed(0, 0.5)})
+        )
         self.controller.calculate_posterior(evidence)
         self.model.truncated.assert_called()
 

@@ -35,10 +35,14 @@ class FragmentRenderer(ABC):
     """
 
     formatter: Formatter = field(default_factory=PlainFormatter)
-    """Format-specific markup logic (plain, ANSI, HTML)."""
+    """
+    Format-specific markup logic (plain, ANSI, HTML).
+    """
 
     link_resolver: Optional[SourceLinkResolver] = field(default=None)
-    """Optional resolver that maps source references to URL strings."""
+    """
+    Optional resolver that maps source references to URL strings.
+    """
 
     @abstractmethod
     def render(self, fragment: VerbalizationFragment) -> str:
@@ -52,8 +56,8 @@ class FragmentRenderer(ABC):
 
     def _render_role(self, text: str, role, source_reference) -> str:
         """
-        Colorise *text* for *role* and, when a resolver and source reference are present, wrap the
-        result with a hyperlink.
+        Colorise *text* for *role* and, when a resolver and source reference are
+        present, wrap the result with a hyperlink.
 
         :param text: Plain display text.
         :param role: Semantic role for colour lookup.
@@ -78,8 +82,8 @@ class ParagraphRenderer(FragmentRenderer):
     """
     Flattens the entire fragment tree into a single prose string.
 
-    Block headers and items are joined with the formatter's space character; nesting adds no
-    visual structure — only content is preserved.
+    Block headers and items are joined with the formatter's space character; nesting
+    adds no visual structure — only content is preserved.
     """
 
     def render(self, fragment: VerbalizationFragment) -> str:
@@ -141,10 +145,14 @@ class HierarchicalRenderer(FragmentRenderer):
     """
 
     indent_size: IndentSize = field(default=IndentSize.TWO_SPACES)
-    """Indentation width per nesting level."""
+    """
+    Indentation width per nesting level.
+    """
 
     bullet: BulletStyle = field(default=BulletStyle.DASH)
-    """Bullet character prepended to each list item."""
+    """
+    Bullet character prepended to each list item.
+    """
 
     def render(self, fragment: VerbalizationFragment, depth: int = 0) -> str:
         """

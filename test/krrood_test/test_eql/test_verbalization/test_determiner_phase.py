@@ -1,10 +1,11 @@
 """
 Unit tests for the determiner realisation pass — the single place the determiner of a
-:class:`NounPhrase` is chosen, from its ``definiteness`` × ``number`` (the concord table).
+:class:`NounPhrase` is chosen, from its ``definiteness`` × ``number`` (the concord
+table).
 
-The pass lowers every ``NounPhrase`` to a determiner-bearing ``PhraseFragment`` and tags the
-head's number; it runs *before* the morphology pass, so plural heads are still tagged (not yet
-inflected) immediately after it.
+The pass lowers every ``NounPhrase`` to a determiner-bearing ``PhraseFragment`` and tags
+the head's number; it runs *before* the morphology pass, so plural heads are still
+tagged (not yet inflected) immediately after it.
 """
 
 from __future__ import annotations
@@ -34,7 +35,9 @@ def _noun(text: str) -> RoleFragment:
 
 
 def _realised(np: NounPhrase) -> str:
-    """Lower the DP then run morphology — the verbalizer's determiner→morphology order."""
+    """
+    Lower the DP then run morphology — the verbalizer's determiner→morphology order.
+    """
     lowered = DeterminerProcessor().process(np)
     return flatten_fragment_to_plain_text(MorphologyProcessor().process(lowered))
 

@@ -13,7 +13,7 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.plotters.gantt_chart_plotter import (
     HistoryGanttChartPlotter,
 )
-from giskardpy.motion_statechart.test_nodes.test_nodes import (
+from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     TestNestedGoal,
     ConstTrueNode,
 )
@@ -22,8 +22,8 @@ from semantic_digital_twin.world import World
 
 def _axes_width_in(ax: plt.Axes) -> float:
     """
-    Return the drawable width of an axes in inches based on its position box,
-    excluding figure margins and avoiding text extents influencing the result.
+    Return the drawable width of an axes in inches based on its position box, excluding
+    figure margins and avoiding text extents influencing the result.
     """
     fig = ax.figure
     fig.canvas.draw()

@@ -14,8 +14,8 @@ from ..dataset.ormatic_interface import *
 
 def test_shared_state_does_not_rerun_post_init(session, database, monkeypatch):
     """
-    Converting an already converted root DAO again with a shared state must not
-    re-run population and ``__post_init__``.
+    Converting an already converted root DAO again with a shared state must not re-run
+    population and ``__post_init__``.
     """
     container = ContainerGeneration(
         [ItemWithBackreference(10), ItemWithBackreference(20)]
@@ -49,9 +49,9 @@ def test_shared_state_converts_alternative_mappings_once(
     session, database, monkeypatch
 ):
     """
-    Converting two root DAOs with a shared state must not duplicate class
-    dependency graph nodes nor call ``to_domain_object`` repeatedly for the
-    same alternative mapping instance.
+    Converting two root DAOs with a shared state must not duplicate class dependency
+    graph nodes nor call ``to_domain_object`` repeatedly for the same alternative
+    mapping instance.
     """
     entity = Entity("shared")
     to_state = ToDataAccessObjectState()
@@ -88,8 +88,8 @@ def test_shared_state_converts_alternative_mappings_once(
 
 def test_alternatively_mapped_root_in_cycle_keeps_identity(session, database):
     """
-    If the root DAO is alternatively mapped and the object graph cycles back to
-    it, the returned domain object must be the same instance the cycle points to.
+    If the root DAO is alternatively mapped and the object graph cycles back to it, the
+    returned domain object must be the same instance the cycle points to.
     """
     backreference = Backreference({1: 1})
     reference = Reference(0, backreference)
@@ -110,8 +110,8 @@ def test_repeated_from_dao_on_alternatively_mapped_dao_with_shared_state_returns
     session, database
 ):
     """
-    Two ``from_dao`` calls on the same alternatively mapped DAO with a shared
-    state must return the same domain object.
+    Two ``from_dao`` calls on the same alternatively mapped DAO with a shared state must
+    return the same domain object.
     """
     backreference = Backreference({1: 1})
     reference = Reference(0, backreference)
@@ -130,8 +130,8 @@ def test_repeated_from_dao_on_alternatively_mapped_dao_with_shared_state_returns
 
 def test_from_package_includes_alternative_mappings_when_not_ignoring():
     """
-    ``ignore_krrood_test_classes=False`` must include alternative mappings
-    instead of dropping all of them.
+    ``ignore_krrood_test_classes=False`` must include alternative mappings instead of
+    dropping all of them.
     """
     ormatic = ORMatic.from_package(
         packages=[],
@@ -145,8 +145,8 @@ def test_from_package_includes_alternative_mappings_when_not_ignoring():
 
 def test_empty_collection_is_not_aliased(session, database):
     """
-    An empty collection on the domain object must be a fresh container, not
-    the DAO's live instrumented collection.
+    An empty collection on the domain object must be a fresh container, not the DAO's
+    live instrumented collection.
     """
     positions = KRROODPositions([], ["a"])
     session.add(to_dao(positions))
@@ -170,8 +170,8 @@ class _LateDomainClass:
 
 def test_dao_lookup_recovers_after_late_dao_definition():
     """
-    A failed DAO lookup must not be cached forever; defining the DAO class
-    afterwards must make the lookup succeed.
+    A failed DAO lookup must not be cached forever; defining the DAO class afterwards
+    must make the lookup succeed.
     """
     assert get_dao_class(_LateDomainClass) is None
 
@@ -183,10 +183,11 @@ def test_dao_lookup_recovers_after_late_dao_definition():
 
 def test_bare_generic_resolves_to_unique_concrete_subclass():
     """
-    A bare generic domain class maps to an empty polymorphic base DAO while its
-    single parametrization carries the data columns. A runtime instance of the bare
-    generic must therefore resolve to that unique concrete subclass, not the empty
-    base which would silently drop all data.
+    A bare generic domain class maps to an empty polymorphic base DAO while its single
+    parametrization carries the data columns.
+
+    A runtime instance of the bare generic must therefore resolve to that unique
+    concrete subclass, not the empty base which would silently drop all data.
     """
 
     class _SingleParameterGeneric(Generic[T]):
@@ -205,8 +206,8 @@ def test_bare_generic_resolves_to_unique_concrete_subclass():
 
 def test_bare_generic_with_multiple_parametrizations_stays_on_base():
     """
-    When several parametrizations exist the concrete subclass is ambiguous, so the
-    bare generic must resolve to the polymorphic base rather than guessing.
+    When several parametrizations exist the concrete subclass is ambiguous, so the bare
+    generic must resolve to the polymorphic base rather than guessing.
     """
 
     class _MultiParameterGeneric(Generic[T]):

@@ -1,10 +1,10 @@
 """
 Custom exceptions raised by the EQL verbalization subsystem.
 
-Each is a :class:`~krrood.exceptions.DataclassException` — a dataclass exception that carries the
-structured cause as fields and composes its human-readable message from ``error_message()`` /
-``suggest_correction()`` — so the failure data is inspectable (not only a formatted string),
-consistent with the rest of krrood.
+Each is a :class:`~krrood.exceptions.DataclassException` — a dataclass exception that
+carries the structured cause as fields and composes its human-readable message from
+``error_message()`` / ``suggest_correction()`` — so the failure data is inspectable (not
+only a formatted string), consistent with the rest of krrood.
 """
 
 from __future__ import annotations
@@ -54,16 +54,20 @@ class PredicateFragmentRequiredError(DataclassException):
 @dataclass
 class NonFragmentPredicateError(DataclassException):
     """
-    A predicate's ``_verbalization_fragment_`` returned something that is not a :class:`VerbalizationFragment`
-    (e.g. a leftover format string). Fragments are required so the surface composes with the
-    realisation passes (negation, coreference, morphology).
+    A predicate's ``_verbalization_fragment_`` returned something that is not a
+    :class:`VerbalizationFragment` (e.g. a leftover format string).
+
+    Fragments are required so the surface composes with the realisation passes
+    (negation, coreference, morphology).
     """
 
     predicate_type: type
     """The predicate type whose hook returned a non-fragment."""
 
     returned: object
-    """The non-fragment value the hook returned."""
+    """
+    The non-fragment value the hook returned.
+    """
 
     def error_message(self) -> str:
         return (
@@ -81,8 +85,8 @@ class NonFragmentPredicateError(DataclassException):
 @dataclass
 class UnverbalizableExpressionError(DataclassException):
     """
-    No grammar rule covers an EQL construct — a coverage gap, surfaced as an error rather than
-    silently degrading the node to its class name.
+    No grammar rule covers an EQL construct — a coverage gap, surfaced as an error
+    rather than silently degrading the node to its class name.
     """
 
     node: "SymbolicExpression"
@@ -103,8 +107,8 @@ class UnverbalizableExpressionError(DataclassException):
 @dataclass
 class UnloweredFragmentError(DataclassException):
     """
-    A fragment kind with no fold handler reached a renderer — a realisation pass was skipped,
-    leaving an un-lowered ``NounPhrase`` or ``PossessiveChain`` in the tree.
+    A fragment kind with no fold handler reached a renderer — a realisation pass was
+    skipped, leaving an un-lowered ``NounPhrase`` or ``PossessiveChain`` in the tree.
     """
 
     fragment: "VerbalizationFragment"
@@ -123,9 +127,10 @@ class UnloweredFragmentError(DataclassException):
 @dataclass
 class UndeclaredFormPositionError(DataclassException):
     """
-    A concrete :class:`~krrood.entity_query_language.verbalization.grammar.conditions.placement.ConditionForm`
-    subclass did not declare its ``position`` class variable — caught at class-definition time rather
-    than as a silent ``AttributeError`` deep in ``place``.
+    A concrete :class:`~krrood.entity_query_language.verbalization.grammar.conditions.pl
+    acement.ConditionForm` subclass did not declare its ``position`` class variable —
+    caught at class-definition time rather than as a silent ``AttributeError`` deep in
+    ``place``.
     """
 
     form: "type[ConditionForm]"
@@ -145,8 +150,9 @@ class UndeclaredFormPositionError(DataclassException):
 class UnknownAggregatorError(DataclassException):
     """
     An aggregator type has no verbalization phrase — a coverage gap surfaced when a new
-    :class:`~krrood.entity_query_language.operators.aggregators.Aggregator` subtype is added
-    without a matching entry in :class:`~krrood.entity_query_language.verbalization.vocabulary.english.Aggregations`.
+    :class:`~krrood.entity_query_language.operators.aggregators.Aggregator` subtype is
+    added without a matching entry in :class:`~krrood.entity_query_language.verbalizatio
+    n.vocabulary.english.Aggregations`.
     """
 
     aggregator_type: "type[Aggregator]"
@@ -167,8 +173,10 @@ class UnknownAggregatorError(DataclassException):
 @dataclass
 class AmbiguousRuleError(DataclassException):
     """
-    Two or more grammar rules (or specificity-ranked forms) are equally specific for the same
-    dispatch target — a collision that would otherwise resolve silently by registration order.
+    Two or more grammar rules (or specificity-ranked forms) are equally specific for the
+    same dispatch target — a collision that would otherwise resolve silently by
+    registration order.
+
     Surfaced as an error so an accidental overlap is caught rather than masked.
     """
 
@@ -176,7 +184,9 @@ class AmbiguousRuleError(DataclassException):
     """The expression or request being dispatched when the collision occurred."""
 
     candidates: "list[type]"
-    """The equally-specific rule/form classes that collided."""
+    """
+    The equally-specific rule/form classes that collided.
+    """
 
     def error_message(self) -> str:
         names = ", ".join(sorted(candidate.__name__ for candidate in self.candidates))

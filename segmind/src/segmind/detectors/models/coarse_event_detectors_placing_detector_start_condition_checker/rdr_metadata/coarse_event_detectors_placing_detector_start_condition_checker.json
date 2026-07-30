@@ -1,0 +1,72 @@
+{
+    "_type": "ripple_down_rules.rdr.GeneralRDR",
+    "start_rules": {
+        "output_": {
+            "_type": "ripple_down_rules.rdr.SingleClassRDR",
+            "start_rule": {
+                "_type": "ripple_down_rules.rules.SingleClassRule",
+                "conditions": {
+                    "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                    "user_input": "def _get_value(case):\n    def conditions_for_placing_detector_start_condition_checker(cls_: Type[PlacingDetector], event: EventWithOneTrackedObject, output_: bool) -> bool:\n        \"\"\"Get conditions on whether it's possible to conclude a value for PlacingDetector_start_condition_checker.output_  of type .\"\"\"\n        return isinstance(event, SupportEvent)\n    return conditions_for_placing_detector_start_condition_checker(**case)\n    ",
+                    "conclusion_type": [
+                        "builtins.bool"
+                    ],
+                    "scope": {
+                        "Case": "ripple_down_rules.datastructures.case.Case",
+                        "Dict": "typing.Dict",
+                        "Optional": "typing.Optional",
+                        "Type": "typing.Type",
+                        "Union": "typing.Union",
+                        "EventWithOneTrackedObject": "segmind.datastructures.events.EventWithOneTrackedObject",
+                        "SupportEvent": "segmind.datastructures.events.SupportEvent",
+                        "PlacingDetector": "segmind.detectors.coarse_event_detectors.PlacingDetector",
+                        "NoneType": "builtins.NoneType"
+                    },
+                    "conclusion": {
+                        "_type": "builtins.NoneType",
+                        "value": null
+                    },
+                    "mutually_exclusive": true
+                },
+                "conclusion": {
+                    "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                    "user_input": "def _get_value(case):\n    def placing_detector_start_condition_checker(cls_: Type[PlacingDetector], event: EventWithOneTrackedObject, output_: bool) -> bool:\n        \"\"\"Get possible value(s) for PlacingDetector_start_condition_checker.output_  of type .\"\"\"\n        return True\n    return placing_detector_start_condition_checker(**case)\n    ",
+                    "conclusion_type": [
+                        "builtins.bool"
+                    ],
+                    "scope": {
+                        "Case": "ripple_down_rules.datastructures.case.Case",
+                        "Dict": "typing.Dict",
+                        "Optional": "typing.Optional",
+                        "Type": "typing.Type",
+                        "Union": "typing.Union",
+                        "EventWithOneTrackedObject": "segmind.datastructures.events.EventWithOneTrackedObject",
+                        "SupportEvent": "segmind.datastructures.events.SupportEvent",
+                        "PlacingDetector": "segmind.detectors.coarse_event_detectors.PlacingDetector",
+                        "NoneType": "builtins.NoneType"
+                    },
+                    "conclusion": {
+                        "_type": "builtins.NoneType",
+                        "value": null
+                    },
+                    "mutually_exclusive": true
+                },
+                "parent": null,
+                "corner_case": null,
+                "conclusion_name": "output_",
+                "weight": null,
+                "uid": "124701724059586364685260806439568356831",
+                "refinement": null,
+                "alternative": null
+            },
+            "generated_python_file_name": "placing_detector_start_condition_checker_output__scrdr",
+            "name": "output_",
+            "case_type": "typing.Dict",
+            "case_name": "PlacingDetector_start_condition_checker"
+        }
+    },
+    "generated_python_file_name": "placing_detector_start_condition_checker_rdr",
+    "name": "output_",
+    "case_type": "typing.Dict",
+    "case_name": "PlacingDetector_start_condition_checker"
+}

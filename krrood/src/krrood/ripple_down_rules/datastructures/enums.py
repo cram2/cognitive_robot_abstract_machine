@@ -2,15 +2,14 @@ from __future__ import annotations
 
 from enum import auto, Enum
 
-from typing_extensions import List, Dict, Any, Type
-
-from krrood.ripple_down_rules.utils import SubclassJSONSerializer
+from typing_extensions import List
 
 
 class InferMode(Enum):
     """
     The infer mode of a predicate, whether to infer new relations or retrieve current relations.
     """
+
     Auto = auto()
     """
     Inference is done automatically depending on the world state.
@@ -29,6 +28,7 @@ class ExitStatus(Enum):
     """
     Describes the status at exit of the user interface.
     """
+
     CLOSE = auto()
     """
     The user wants to stop the program.
@@ -38,24 +38,12 @@ class ExitStatus(Enum):
     The user completed the task successfully.
     """
 
-class InteractionMode(Enum):
-    """
-    The interaction mode of the RDR.
-    """
-    IPythonOnly = auto()
-    """
-    IPythonOnly mode, the mode where the user uses only an Ipython shell to interact with the RDR.
-    """
-    GUI = auto()
-    """
-    GUI mode, the mode where the user uses a GUI to interact with the RDR.
-    """
-
 
 class Editor(str, Enum):
     """
     The editor that is used to edit the rules.
     """
+
     Pycharm = "pycharm"
     """
     PyCharm editor.
@@ -68,6 +56,7 @@ class Editor(str, Enum):
     """
     Visual Studio Code server editor.
     """
+
     @classmethod
     def from_str(cls, editor: str) -> Editor:
         """
@@ -81,7 +70,7 @@ class Editor(str, Enum):
         return cls._value2member_map_[editor]
 
 
-class Category(str, SubclassJSONSerializer, Enum):
+class Category(str, Enum):
 
     @classmethod
     def from_str(cls, value: str) -> Category:
@@ -95,19 +84,13 @@ class Category(str, SubclassJSONSerializer, Enum):
     def as_dict(self):
         return {self.__class__.__name__.lower(): self.value}
 
-    def _to_json(self) -> Dict[str, Any]:
-        return self.as_dict
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any]) -> Category:
-        return cls.from_str(data[cls.__name__.lower()])
-
 
 class Stop(Category):
     """
     A stop category is a special category that represents the stopping of the classification to prevent a wrong
     conclusion from being made.
     """
+
     stop = "stop"
 
 
@@ -115,6 +98,7 @@ class PromptFor(Enum):
     """
     The reason of the prompt. (e.g. get conditions, conclusions, or affirmation).
     """
+
     Conditions: str = "conditions"
     """
     Prompt for rule conditions about a case.
@@ -139,6 +123,7 @@ class MCRDRMode(Enum):
     """
     The modes of the MultiClassRDR.
     """
+
     StopOnly = auto()
     """
     StopOnly mode, stop wrong conclusion from being made and does not add a new rule to make the correct conclusion.

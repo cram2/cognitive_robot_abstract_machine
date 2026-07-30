@@ -47,7 +47,7 @@ arguments it returns plain text. Pass a *renderer* to control color and layout.
 ```{code-cell} ipython3
 from krrood.entity_query_language.factories import variable, entity, an
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
-from krrood.entity_query_language.verbalization.example_domain import Robot
+from krrood.entity_query_language.verbalization._example_domain import Robot
 
 robots = [Robot("R2D2", 95, True), Robot("C3PO", 20, False), Robot("BB8", 80, True)]
 r = variable(Robot, domain=robots)
@@ -72,7 +72,7 @@ print(verbalize_expression(query))
 Verbalization handles cross-variable comparisons too — the sentence describes the *relationship* between variables.
 
 ```{code-cell} ipython3
-from krrood.entity_query_language.verbalization.example_domain import Mission
+from krrood.entity_query_language.verbalization._example_domain import Mission
 
 missions = [Mission(robots[0], 1), Mission(robots[1], 3)]
 m = variable(Mission, domain=missions)
@@ -106,7 +106,7 @@ for other attributes. Grammar calls the *"is <attribute>"* form *predicative*.
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.factories import variable, not_
-from krrood.entity_query_language.verbalization.example_domain import Task, Worker
+from krrood.entity_query_language.verbalization._example_domain import Task, Worker
 
 w = variable(Worker, domain=None)
 print(verbalize_expression(w.tasks[0].completed))
@@ -240,7 +240,7 @@ print(verbalize_expression(m.assigned_to == robots[0]))   # robots[0] is Robot("
 ```
 
 The identifying field(s) are the dataclass fields marked with `GrammarMetadata.is_identifying_field`
-(via `field(metadata=FieldMetadata(other_metadata=[GrammarMetadata(is_identifying_field=True)]).as_dict())`),
+(via `field(metadata=GrammarMetadata(is_identifying_field=True).as_dict())`),
 otherwise the first present of `name` / `id` / `label` / `key` / `uuid` (`Robot` has `name`, so this
 reads *"a specific Robot with name 'R2D2'"*). With none of those, it falls back to a bare *"a
 specific Robot"*.
@@ -257,7 +257,7 @@ surfaces as *"beginning"*).
 
 ```{code-cell} ipython3
 from dataclasses import dataclass, field
-from krrood.patterns.field_metadata import FieldMetadata, GrammarMetadata
+from krrood.entity_query_language.verbalization.grammar_metadata import GrammarMetadata
 
 @dataclass
 class Date:
@@ -266,11 +266,7 @@ class Date:
 
 @dataclass
 class Period:
-    begin: Date = field(
-        metadata=FieldMetadata(
-            other_metadata=[GrammarMetadata(display_name="beginning")]
-        ).as_dict()
-    )
+    begin: Date = field(metadata=GrammarMetadata(display_name="beginning").as_dict())
     end: Date = None
 
 p = variable(Period, domain=None)
@@ -278,15 +274,15 @@ query = an(entity(p).where(p.begin.month == p.end.month, p.begin.year == p.end.y
 print(verbalize_expression(query))
 ```
 
-## Underspecified Constructions (`match` / `underspecified`)
+## Underspecified Constructions (`an`)
 
-An `underspecified(...)` construction asks the system to *make* something rather than find it —
+An underspecified `an(...)` construction asks the system to *make* something rather than find it —
 *"Generate a … given that …"*. Several single-value settings on one object are combined into one
 *"… respectively"* line (up to three; longer or phrase-length values are said separately, and a `None`
 becomes a *"has no"* line):
 
 ```{code-cell} ipython3
-from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.factories import an
 
 @dataclass
 class Point:
@@ -294,7 +290,7 @@ class Point:
     y: float
     z: float
 
-print(verbalize_expression(underspecified(Point)(x=1, y=2, z=3)))
+print(verbalize_expression(an(Point)(x=1, y=2, z=3)))
 ```
 
 ## Aggregations
@@ -307,7 +303,7 @@ a numeric field:
 import datetime
 from krrood.entity_query_language.factories import variable
 import krrood.entity_query_language.factories as eql
-from krrood.entity_query_language.verbalization.example_domain import (
+from krrood.entity_query_language.verbalization._example_domain import (
     AmountDetails,
     BankTransaction,
 )
@@ -343,7 +339,7 @@ code-like parentheses:
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.factories import a, set_of
-from krrood.entity_query_language.verbalization.example_domain import Employee
+from krrood.entity_query_language.verbalization._example_domain import Employee
 
 employee = variable(Employee, domain=None)
 print(verbalize_expression(a(set_of(eql.sum(employee.salary)))))
@@ -456,11 +452,15 @@ print(verbalize_expression(scoped_sum))
 
 ## Same-Type Variable Disambiguation
 
-When two variables of the same type appear in a query, the verbalizer distinguishes
-them by appending a numeric index — *"Employee 1"*, *"Employee 2"*.
+When two distinct variables of the same type appear in a query, the verbalizer tells
+them apart with a determiner rather than a number: the first mention reads plainly
+(*"an Employee"*), and the second reads with the indefinite alternative (*"another
+Employee"*) — the natural English form for a second, freshly introduced entity of the
+same kind. A later mention of either reduces to the matching definite form (*"the
+Employee"* / *"the other Employee"*).
 
 ```{code-cell} ipython3
-from krrood.entity_query_language.verbalization.example_domain import Employee
+from krrood.entity_query_language.verbalization._example_domain import Employee
 
 emp1 = variable(Employee, domain=None)
 emp2 = variable(Employee, domain=None)
@@ -477,9 +477,10 @@ query_agg = an(entity(eql.average(emp.salary)).where(emp.starting_salary > 20000
 print(verbalize_expression(query_agg))
 ```
 
-It also counts the *related entity* a relational attribute introduces, so two missions assigned to
-two different robots read *"Robot 1"* / *"Robot 2"* rather than two indistinguishable *"the Robot"*s
-— and a repeat of either reduces to its numbered label:
+It also tells apart the *related entity* a relational attribute introduces, so two missions
+assigned to two different robots read *"the Robot to which its primary is assigned"* / *"the other
+Robot, to which its secondary is assigned"* rather than two indistinguishable *"the Robot"*s — a
+later mention of the distinguished robot keeps its *"the other"* form:
 
 ```{code-cell} ipython3
 from dataclasses import dataclass
@@ -505,19 +506,21 @@ A custom predicate can control its verbalization by implementing
 corresponding to the predicate's dataclass fields.
 
 ```{code-cell} ipython3
-from krrood.entity_query_language.verbalization.example_domain import (
-    Location,
+from krrood.entity_query_language.verbalization._example_domain import (
     IsReachable,
+    Location,
+    Robot,
 )
 
 loc = variable(Location, domain=None)
-print(verbalize_expression(IsReachable(loc)))
+robot = variable(Robot, domain=None)
+print(verbalize_expression(IsReachable(loc, robot)))
 ```
 
 Predicates with multiple fields receive their arguments in positional order:
 
 ```{code-cell} ipython3
-from krrood.entity_query_language.verbalization.example_domain import (
+from krrood.entity_query_language.verbalization._example_domain import (
     Department,
     StaffMember,
     WorksIn,
@@ -610,7 +613,7 @@ Verbalization really shines on rule trees. The if/then structure is rendered cle
 from krrood.entity_query_language.factories import (
     variable, entity, an, deduced_variable, inference
 )
-from krrood.entity_query_language.verbalization.example_domain import (
+from krrood.entity_query_language.verbalization._example_domain import (
     Bird,
     LoveBirds,
     BirdView,
@@ -642,7 +645,7 @@ drawer-detection rule with a multi-hop path:
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.factories import variable, entity, an, inference
-from krrood.entity_query_language.verbalization.example_domain import (
+from krrood.entity_query_language.verbalization._example_domain import (
     Handle,
     Container,
     FixedConnection,
@@ -668,7 +671,7 @@ And a cabinet rule that aggregates over multiple drawers — notice the *"if"* p
 *"there are"* and the *"then"* part uses the plural *"are"* to match the several drawers:
 
 ```{code-cell} ipython3
-from krrood.entity_query_language.verbalization.example_domain import Cabinet
+from krrood.entity_query_language.verbalization._example_domain import Cabinet
 
 pc = variable(PrismaticConnection, domain=None)
 dr  = variable(Drawer, domain=None)
@@ -710,12 +713,12 @@ URL. (For a live preview from an IDE instead, `AutoAPIResolver.for_package("krro
 IDE's `localhost` server against a local `sphinx-build doc doc/_build/html`.)
 
 The demo below uses `Robot` and `Mission` from
-`krrood.entity_query_language.verbalization.example_domain` — real classes that Sphinx AutoAPI
+`krrood.entity_query_language.verbalization._example_domain` — real classes that Sphinx AutoAPI
 documents like any other module under `src`, so their hyperlinks resolve to the generated AutoAPI
 pages in any built docs tree (no hand-maintained mock API needed).
 
 ```{code-cell} ipython3
-from krrood.entity_query_language.verbalization.example_domain import Robot, Mission
+from krrood.entity_query_language.verbalization._example_domain import Robot, Mission
 from krrood.entity_query_language.factories import variable, entity, an
 from krrood.entity_query_language.verbalization.pipeline import VerbalizationPipeline
 from krrood.entity_query_language.verbalization.rendering.formatter import HTMLFormatter

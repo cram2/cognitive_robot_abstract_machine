@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 class Designator:
     """
     Abstract base class for designators.
+
     Designators are objects that can be executed and are managed by a plan node.
     """
 
@@ -56,7 +57,8 @@ class Designator:
     @property
     def fields(cls) -> List[Field]:
         """
-        The fields of this action, returns only the fields defined in the class and not inherit fields of parents
+        The fields of this action, returns only the fields defined in the class and not
+        inherit fields of parents.
 
         :return: The fields of this action
         """
@@ -74,7 +76,8 @@ class Designator:
     @classmethod
     def get_type_hints(cls) -> Dict[str, Any]:
         """
-        Returns the type hints of the __init__ method of this designator_description description.
+        Returns the type hints of the __init__ method of this designator_description
+        description.
 
         :return:
         """

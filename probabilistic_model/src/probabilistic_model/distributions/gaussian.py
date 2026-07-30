@@ -373,6 +373,7 @@ class TruncatedGaussianDistribution(
     def transform_to_standard_normal(self, number: float) -> float:
         """
         Transform the number to the standard normal distribution.
+
         :param number: The number to transform
         :return: The transformed bound
         """
@@ -380,7 +381,8 @@ class TruncatedGaussianDistribution(
 
     def robert_rejection_sample(self, amount: int) -> npt.NDArray:
         """
-        Use robert rejection sampling to sample from the truncated Gaussian distribution.
+        Use robert rejection sampling to sample from the truncated Gaussian
+        distribution.
 
         :param amount: The amount of samples to generate
         :return: The samples
@@ -423,8 +425,8 @@ class TruncatedGaussianDistribution(
         self, amount: int
     ) -> np.ndarray:
         """
-        Use robert rejection sampling to sample from the truncated standard normal distribution.
-        Resamples as long as the amount of samples is not reached.
+        Use robert rejection sampling to sample from the truncated standard normal
+        distribution. Resamples as long as the amount of samples is not reached.
 
         :param amount: The amount of samples to generate
         :return: The samples
@@ -445,10 +447,11 @@ class TruncatedGaussianDistribution(
         self, amount: int
     ) -> np.ndarray:
         """
-        Use robert rejection sampling to sample from the truncated standard normal distribution.
+        Use robert rejection sampling to sample from the truncated standard normal
+        distribution.
 
-        :param amount: The maximum number of samples to generate. The actual number of samples can be lower due to
-            rejection sampling.
+        :param amount: The maximum number of samples to generate. The actual number of
+            samples can be lower due to rejection sampling.
         :return: The samples
         """
         uniform_samples = np.random.uniform(self.lower, self.upper, amount)

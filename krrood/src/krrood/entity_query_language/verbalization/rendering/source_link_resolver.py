@@ -16,8 +16,8 @@ _log = logging.getLogger(__name__)
 
 class SourceLinkResolver(Protocol):
     """
-    Protocol: maps a source reference to a URL string, or ``None`` when the class or attribute
-    cannot be located.
+    Protocol: maps a source reference to a URL string, or ``None`` when the class or
+    attribute cannot be located.
     """
 
     def resolve(self, reference: SourceReference) -> Optional[str]:
@@ -41,8 +41,12 @@ class AutoAPIResolver:
     or ``"http://localhost:63342/project/doc/_build/html"``."""
 
     html_root: Optional[Path] = None
-    """Optional local path to the Sphinx HTML output directory.  When set, resolution verifies
-    that the AutoAPI page exists on disk and logs a warning if it does not."""
+    """
+    Optional local path to the Sphinx HTML output directory.
+
+    When set, resolution verifies that the AutoAPI page exists on disk and logs a
+    warning if it does not.
+    """
 
     def resolve(self, reference: SourceReference) -> Optional[str]:
         """
@@ -83,7 +87,8 @@ class AutoAPIResolver:
 
     @classmethod
     def for_in_site_docs(cls, levels_up: int = 2) -> AutoAPIResolver:
-        """Build a resolver for links rendered *inside* the documentation site itself.
+        """
+        Build a resolver for links rendered *inside* the documentation site itself.
 
         The verbalization output is embedded in a docs page (e.g. ``eql/user/verbalization.html``),
         and the AutoAPI tree is a sibling at the site root (``autoapi/…``). Emitting links relative
@@ -103,8 +108,9 @@ class AutoAPIResolver:
 
     @classmethod
     def for_package(cls, package_name: str, port: int = 63342) -> AutoAPIResolver:
-        """Build a resolver for *package_name*'s locally built Sphinx docs, with the base URL
-        targeting the JetBrains IDE built-in HTTP server.
+        """
+        Build a resolver for *package_name*'s locally built Sphinx docs, with the base
+        URL targeting the JetBrains IDE built-in HTTP server.
 
         .. note::
             This targets a live ``localhost`` IDE server, so it is for the local

@@ -1,4 +1,5 @@
-"""Analysis engine for recording TIAGo sensor data with transforms.
+"""
+Analysis engine for recording TIAGo sensor data with transforms.
 
 This module provides an analysis engine that demonstrates how to record sensor
 data from a TIAGo robot's camera system while preserving transformation data.
@@ -21,13 +22,16 @@ from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.storage import StorageWriter
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for TIAGo sensor data recording with transforms.
+    """
+    Analysis engine for TIAGo sensor data recording with transforms.
 
     This class implements a pipeline that records sensor data from a TIAGo
     robot's camera system while preserving coordinate transformation data.
@@ -47,14 +51,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "tiago_storage_with_transform"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline for recording TIAGo data with transforms.
+        """
+        Create a pipeline for recording TIAGo data with transforms.
 
         This method constructs a processing pipeline that captures and stores
         sensor data from a TIAGo robot's camera system. The pipeline ensures
@@ -69,7 +75,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for data recording
         """
-        tiago_config = CrDescriptorFactory.create_descriptor("tiago")
+        tiago_config = CollectionReaderDescriptorFactory.create_descriptor("tiago")
 
         seq = Pipeline()
         seq.add_children(

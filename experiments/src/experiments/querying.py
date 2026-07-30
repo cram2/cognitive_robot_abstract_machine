@@ -1,6 +1,6 @@
 """
-Queries about a robot's past execution behaviour, expressed in the KRROOD
-Entity Query Language.
+Queries about a robot's past execution behaviour, expressed in the KRROOD Entity Query
+Language.
 
 The plan mirrors the structure of the bullet-world demo
 (coraplex/demos/coraplex_bullet_world_demo/demo.py): a PR2 parks its arms, raises its
@@ -113,9 +113,9 @@ class BehaviourQueryResult(ExperimentResult):
     """
     One row of the behaviour-query experiment table.
 
-    Each row evaluates one query both via in-memory EQL and via SQL so
-    the two approaches can be compared side-by-side.  Untranslatable SQL
-    queries report ``-1`` / ``-1.0`` sentinel values.
+    Each row evaluates one query both via in-memory EQL and via SQL so the two
+    approaches can be compared side-by-side.  Untranslatable SQL queries report ``-1`` /
+    ``-1.0`` sentinel values.
     """
 
     question: str
@@ -135,8 +135,7 @@ class BehaviourQueryResult(ExperimentResult):
 
     sql_translation_duration_ms: float
     """
-    Wall-clock time in milliseconds for EQL-to-SQL translation, or -1.0 on
-    failure.
+    Wall-clock time in milliseconds for EQL-to-SQL translation, or -1.0 on failure.
     """
 
     sql_number_of_results: int
@@ -153,8 +152,8 @@ class BehaviourQueryResult(ExperimentResult):
 
 def build_plan() -> Plan:
     """
-    Set up the bullet-world scene, execute the plan in simulation, and return
-    the completed :class:`~coraplex.plans.plan.Plan`.
+    Set up the bullet-world scene, execute the plan in simulation, and return the
+    completed :class:`~coraplex.plans.plan.Plan`.
 
     The scene and action sequence mirror
     ``coraplex/demos/coraplex_bullet_world_demo/demo.py`` exactly: the PR2 parks
@@ -389,8 +388,7 @@ def build_queries(plan: Plan) -> List[BehaviourQuery]:
     """
     Construct all behaviour queries for a completed plan execution.
 
-    :param plan: The plan whose execution history the queries will
-        inspect.
+    :param plan: The plan whose execution history the queries will inspect.
     :return: All behaviour queries, in presentation order.
     """
     return [
@@ -420,8 +418,7 @@ def _count_results(raw: Any) -> int:
     Count the number of results returned by an EQL evaluation.
 
     :param raw: The raw value returned by ``BehaviourQuery.evaluate()``.
-    :return: Number of items for iterable results, 1 for a single value,
-        0 for ``None``.
+    :return: Number of items for iterable results, 1 for a single value, 0 for ``None``.
     """
     if raw is None:
         return 0
@@ -432,18 +429,15 @@ def _count_results(raw: Any) -> int:
 
 def run_experiment(plan: Plan, session: Session) -> ExperimentsTable:
     """
-    Evaluate all behaviour queries both via in-memory EQL and via SQL,
-    collecting timings and result counts for each approach in a single row per
-    query.
+    Evaluate all behaviour queries both via in-memory EQL and via SQL, collecting
+    timings and result counts for each approach in a single row per query.
 
-    EQL or SQL failures are recorded as ``-1`` / ``-1.0`` sentinels so a
-    single failing query does not abort the experiment.
+    EQL or SQL failures are recorded as ``-1`` / ``-1.0`` sentinels so a single failing
+    query does not abort the experiment.
 
     :param plan: The fully executed plan to query.
-    :param session: An open SQLAlchemy session connected to the
-        persisted plan database.
-    :return: A table with one :class:`BehaviourQueryResult` row per
-        query.
+    :param session: An open SQLAlchemy session connected to the persisted plan database.
+    :return: A table with one :class:`BehaviourQueryResult` row per query.
     """
     rows: List[BehaviourQueryResult] = []
     for query in build_queries(plan):
@@ -501,16 +495,14 @@ def run_experiment(plan: Plan, session: Session) -> ExperimentsTable:
 
 def persist_plan(plan: Plan) -> tuple[Session, Engine]:
     """
-    Serialise *plan* to a SQLite database at :data:`_DATABASE_PATH` via
-    ORMatic.
+    Serialise *plan* to a SQLite database at :data:`_DATABASE_PATH` via ORMatic.
 
-    Any pre-existing database is dropped first so each run starts from a
-    clean slate.  Returns the open session and engine so the caller can
-    run SQL queries against the same database and close them when done.
+    Any pre-existing database is dropped first so each run starts from a clean slate.
+    Returns the open session and engine so the caller can run SQL queries against the
+    same database and close them when done.
 
     :param plan: The fully executed plan to persist.
-    :return: Tuple of ``(session, engine)`` pointing at the populated
-        database.
+    :return: Tuple of ``(session, engine)`` pointing at the populated database.
     """
     engine = create_engine(f"sqlite:///{_DATABASE_PATH}")
     drop_database(engine)
@@ -532,8 +524,8 @@ def persist_plan(plan: Plan) -> tuple[Session, Engine]:
 
 def main() -> None:
     """
-    Run the bullet-world plan, persist it to a database, evaluate all behaviour
-    queries both via EQL and via SQL, and print the combined result table.
+    Run the bullet-world plan, persist it to a database, evaluate all behaviour queries
+    both via EQL and via SQL, and print the combined result table.
     """
     plan = build_plan()
     session, engine = persist_plan(plan)

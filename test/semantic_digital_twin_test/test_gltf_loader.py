@@ -21,10 +21,14 @@ import os
 
 
 class TestGLTFLoader:
-    """Test suite for GLTFLoader."""
+    """
+    Test suite for GLTFLoader.
+    """
 
     def test_invalid_file_path(self):
-        """Test handling of non-existent file."""
+        """
+        Test handling of non-existent file.
+        """
         world = World()
         invalid_path = "/nonexistent/path/file.gltf"
         loader = GLTFLoader(file_path=invalid_path)
@@ -36,7 +40,9 @@ class TestGLTFLoader:
         assert exc_info.value.__cause__ is not None
 
     def test_malformed_gltf(self):
-        """Test handling of malformed GLTF data."""
+        """
+        Test handling of malformed GLTF data.
+        """
         with tempfile.NamedTemporaryFile(suffix=".gltf", delete=False, mode="w") as f:
             f.write("{ invalid json without closing brace")
             temp_path = f.name
@@ -54,7 +60,9 @@ class TestGLTFLoader:
             os.unlink(temp_path)
 
     def test_empty_gltf_file(self):
-        """Test handling of GLTF file with only a root node (no geometry)."""
+        """
+        Test handling of GLTF file with only a root node (no geometry).
+        """
         # Create minimal scene with empty root mesh
         scene = trimesh.Scene()
         empty_mesh = trimesh.Trimesh()  # Empty mesh with 0 vertices
@@ -77,7 +85,9 @@ class TestGLTFLoader:
             os.unlink(temp_path)
 
     def test_non_geometry_nodes_only(self):
-        """Test GLTF with transform nodes that have no actual mesh data."""
+        """
+        Test GLTF with transform nodes that have no actual mesh data.
+        """
         scene = trimesh.Scene()
 
         # Root with geometry, child without geometry
@@ -123,7 +133,9 @@ class TestGLTFLoader:
             os.unlink(temp_path)
 
     def test_trimesh_to_body(self):
-        """Test converting a trimesh to Body object."""
+        """
+        Test converting a trimesh to Body object.
+        """
         mesh = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
         loader = GLTFLoader(file_path="/dummy/path.gltf")
         body = loader._trimesh_to_body(mesh, "test_cube")
@@ -136,7 +148,9 @@ class TestGLTFLoader:
         assert body.collision.combined_mesh is not None
 
     def test_fusion_meshes_single(self):
-        """Test fusing a single mesh."""
+        """
+        Test fusing a single mesh.
+        """
         mesh = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
         scene = trimesh.Scene()
         scene.add_geometry(mesh, node_name="box", geom_name="box_geom")
@@ -151,7 +165,9 @@ class TestGLTFLoader:
         assert len(fused.faces) > 0
 
     def test_fusion_meshes_multiple(self):
-        """Test fusing multiple meshes."""
+        """
+        Test fusing multiple meshes.
+        """
         mesh1 = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
         mesh2 = trimesh.creation.cylinder(radius=0.5, height=2.0)
 
@@ -173,7 +189,9 @@ class TestGLTFLoader:
         assert len(fused.vertices) == len(mesh1.vertices) + len(mesh2.vertices)
 
     def test_get_root_node_single(self):
-        """Test getting root node with single root."""
+        """
+        Test getting root node with single root.
+        """
         mesh = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
         scene = trimesh.Scene()
         scene.add_geometry(mesh, node_name="root_object", geom_name="geom")
@@ -185,7 +203,9 @@ class TestGLTFLoader:
         assert root == "root_object"
 
     def test_get_root_node_multiple_fails(self):
-        """Test that multiple roots raises error."""
+        """
+        Test that multiple roots raises error.
+        """
         mesh1 = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
         mesh2 = trimesh.creation.icosphere(radius=0.5)
 
@@ -200,7 +220,9 @@ class TestGLTFLoader:
             loader._get_root_node()
 
     def test_build_world_single_body(self):
-        """Test building world with single body."""
+        """
+        Test building world with single body.
+        """
         mesh = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
         loader = GLTFLoader(file_path="/dummy/path.gltf")
         body = loader._trimesh_to_body(mesh, "root_body")
@@ -222,7 +244,9 @@ class TestGLTFLoader:
         assert len(list(world.kinematic_structure_entities)) == 1
 
     def test_build_world_with_connections(self):
-        """Test building world with parent-child connections."""
+        """
+        Test building world with parent-child connections.
+        """
         mesh1 = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
         mesh2 = trimesh.creation.icosphere(radius=0.5)
 
@@ -256,7 +280,9 @@ class TestGLTFLoader:
         assert conn.child.name == PrefixedName("child")
 
     def test_grouping_similar_meshes_basic(self):
-        """Test grouping meshes with similar names."""
+        """
+        Test grouping meshes with similar names.
+        """
         scene = trimesh.Scene()
         mesh = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
 
@@ -277,7 +303,9 @@ class TestGLTFLoader:
         assert len(object_nodes) >= 1
 
     def test_get_relative_transform(self):
-        """Test computing relative transform between nodes."""
+        """
+        Test computing relative transform between nodes.
+        """
         mesh = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
         scene = trimesh.Scene()
 
@@ -304,7 +332,9 @@ class TestGLTFLoader:
 
 
 def test_readme_example():
-    """Test the basic example from README/docs."""
+    """
+    Test the basic example from README/docs.
+    """
     import tempfile
     import os
 

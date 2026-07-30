@@ -16,11 +16,11 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BulletVHACDMeshDecomposer(MeshDecomposer):
     """
-    Decompose meshes using Voxelized Hierarchical Approximate Convex Decomposition
-    via the Bullet binding (``giskardpy_bullet_bindings.vhacd``).
+    Decompose meshes using Voxelized Hierarchical Approximate Convex Decomposition via
+    the Bullet binding (``giskardpy_bullet_bindings.vhacd``).
 
-    Any parameter left at ``-1`` is forwarded as-is and tells V-HACD to use its
-    internal default for that parameter.
+    Any parameter left at ``-1`` is forwarded as-is and tells V-HACD to use its internal
+    default for that parameter.
     """
 
     concavity: float = -1

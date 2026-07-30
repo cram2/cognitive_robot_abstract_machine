@@ -14,7 +14,7 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 @dataclass
 class MoveJointsMotion(BaseMotion):
     """
-    Moves any joint on the robot
+    Moves any joint on the robot.
     """
 
     names: List[str]
@@ -23,27 +23,34 @@ class MoveJointsMotion(BaseMotion):
     """
     positions: List[float]
     """
-    Target positions of joints, should correspond to the list of names
+    Target positions of joints, should correspond to the list of names.
     """
+
     align: Optional[bool] = False
     """
     If True, aligns the end-effector with a specified axis (optional).
     """
+
     tip_link: Optional[str] = None
     """
     Name of the tip link to align with, e.g the object (optional).
     """
+
     tip_normal: Optional[Vector3] = None
     """
-    Normalized vector representing the current orientation axis of the end-effector (optional).
+    Normalized vector representing the current orientation axis of the end-effector
+    (optional).
     """
+
     root_link: Optional[str] = None
     """
     Base link of the robot; typically set to the torso (optional).
     """
+
     root_normal: Optional[Vector3] = None
     """
-    Normalized vector representing the desired orientation axis to align with (optional).
+    Normalized vector representing the desired orientation axis to align with
+    (optional).
     """
 
     def perform(self):
@@ -60,17 +67,17 @@ class MoveJointsMotion(BaseMotion):
 @dataclass
 class LookingMotion(BaseMotion):
     """
-    Lets the robot look at a point
+    Lets the robot look at a point.
     """
 
     target: Pose
     """
-    Target pose to look at
+    Target pose to look at.
     """
 
     camera: Camera
     """
-    Camera annotation that should look at the target
+    Camera annotation that should look at the target.
     """
 
     def perform(self):

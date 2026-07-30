@@ -1,3 +1,7 @@
+import builtins
+import importlib
+import sys
+
 import krrood.symbolic_math.symbolic_math as sm
 import numpy as np
 
@@ -45,6 +49,33 @@ def build_align_planes_task(world: World) -> AlignPlanes:
     return task
 
 
+def test_ros_executor_importable_without_rclpy(monkeypatch):
+    """
+    giskardpy.ros_executor must stay importable when rclpy is not installed.
+    """
+    modules_to_evict = [
+        name
+        for name in sys.modules
+        if name == "rclpy"
+        or name.startswith("rclpy.")
+        or name == "giskardpy.ros_executor"
+        or name == "giskardpy.motion_statechart.debug_expression_publisher"
+    ]
+    for name in modules_to_evict:
+        monkeypatch.delitem(sys.modules, name, raising=False)
+
+    real_import = builtins.__import__
+
+    def blocking_import(name, *args, **kwargs):
+        if name == "rclpy" or name.startswith("rclpy."):
+            raise ImportError(f"No module named '{name}'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", blocking_import)
+
+    importlib.import_module("giskardpy.ros_executor")
+
+
 def test_align_planes_sets_visualisation_frame(cylinder_bot_world):
     task = build_align_planes_task(cylinder_bot_world)
 
@@ -89,13 +120,27 @@ def test_vector_with_reference_frame_is_transformed_to_visualisation_frame(
     assert request.spatial_type.reference_frame is bot
 
 
+def test_stop_clears_previously_published_markers(rclpy_node, cylinder_bot_world):
+    task = build_align_planes_task(cylinder_bot_world)
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(task)
+
+    publisher = DebugExpressionPublisher(world=cylinder_bot_world, node=rclpy_node)
+    publisher.attach(motion_statechart)
+    assert publisher._publisher._published_marker_identities
+
+    publisher.stop()
+
+    assert publisher._publisher._published_marker_identities == set()
+
+
 def test_anchored_vector_tracks_moving_visualisation_frame(rclpy_node, mini_world):
     """
     A vector anchored to a moving visualisation frame stays correct as that frame moves.
 
-    A frame's own axis, expressed in the world and then anchored back into that frame, is the
-    constant local axis at every joint configuration; a stale (snapshot) anchoring transform
-    would instead let the value drift as the frame rotates.
+    A frame's own axis, expressed in the world and then anchored back into that frame,
+    is the constant local axis at every joint configuration; a stale (snapshot)
+    anchoring transform would instead let the value drift as the frame rotates.
     """
     tip = mini_world.get_body_by_name("tip")
     joint = mini_world.get_connections_by_type(RevoluteConnection)[0]

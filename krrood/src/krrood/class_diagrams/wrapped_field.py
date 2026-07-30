@@ -71,7 +71,8 @@ class WrappedField:
 
     public_name: Optional[str] = None
     """
-    If the field is a relationship managed field, this is public name of the relationship that manages the field.
+    If the field is a relationship managed field, this is public name of the
+    relationship that manages the field.
     """
 
     property_descriptor: Optional[PropertyDescriptor] = None
@@ -219,8 +220,8 @@ class WrappedField:
     @cached_property
     def is_type_type(self) -> bool:
         """
-        ``True`` for both the parametrized form (``Type[X]``, whose origin is ``type``) and the bare
-        ``type`` / ``typing.Type`` annotation, which has no origin at all.
+        ``True`` for both the parametrized form (``Type[X]``, whose origin is ``type``)
+        and the bare ``type`` / ``typing.Type`` annotation, which has no origin at all.
         """
         return (
             self.resolved_type in (type, Type) or get_origin(self.resolved_type) is type
@@ -256,9 +257,9 @@ class WrappedField:
         """
         The concrete type this field ultimately points to, ready to be used directly.
 
-        A bounded ``TypeVar`` is reduced to its bound, since the field is specified to that bound; an
-        unbounded ``TypeVar`` is returned unchanged. Predicates that must reason about the type
-        variable itself use :attr:`_unresolved_type_endpoint`.
+        A bounded ``TypeVar`` is reduced to its bound, since the field is specified to
+        that bound; an unbounded ``TypeVar`` is returned unchanged. Predicates that must
+        reason about the type variable itself use :attr:`_unresolved_type_endpoint`.
         """
         endpoint = self._unresolved_type_endpoint
         if isinstance(endpoint, TypeVar) and endpoint.__bound__ is not None:
@@ -268,9 +269,11 @@ class WrappedField:
     @cached_property
     def _unresolved_type_endpoint(self) -> Type:
         """
-        The type this field points to before a bounded ``TypeVar`` is reduced to its bound: the
-        contained type for containers and optionals, the lowest common ancestor for unions, otherwise
-        the resolved type. May be a ``TypeVar``.
+        The type this field points to before a bounded ``TypeVar`` is reduced to its
+        bound: the contained type for containers and optionals, the lowest common
+        ancestor for unions, otherwise the resolved type.
+
+        May be a ``TypeVar``.
         """
         if self.is_container or self.is_optional:
             return self.contained_type
@@ -330,7 +333,9 @@ class WrappedField:
     def is_instantiation_of_generic_class(self) -> bool:
         """
         Check if a type hint is a full parameterization of a generic class.
-        For example, `GenericClass[int]` is a full parameterization, but `GenericClass` is not.
+
+        For example, `GenericClass[int]` is a full parameterization, but `GenericClass`
+        is not.
 
         :return: True if the type hint is a full parameterization of a generic class.
         """
@@ -348,6 +353,7 @@ class WrappedField:
     def is_underspecified_generic(self) -> bool:
         """
         Check if a type hint is an underspecified generic class.
+
         For example, `GenericClass` is underspecified, but `GenericClass[int]` is not.
 
         :return: True if the type hint is an underspecified generic class.
@@ -379,15 +385,14 @@ class WrappedField:
 @lru_cache(maxsize=None)
 def manually_search_for_class_name(target_class_name: str) -> Type:
     """
-    Searches for a class with the specified name in the current module's `globals()` dictionary
-    and all loaded modules present in `sys.modules`. This function attempts to find and resolve
-    the first class that matches the given name. If multiple classes are found with the same
-    name, a warning is logged, and the first one is returned. If no matching class is found,
-    an exception is raised.
+    Searches for a class with the specified name in the current module's `globals()`
+    dictionary and all loaded modules present in `sys.modules`. This function attempts
+    to find and resolve the first class that matches the given name. If multiple classes
+    are found with the same name, a warning is logged, and the first one is returned. If
+    no matching class is found, an exception is raised.
 
     :param target_class_name: Name of the class to search for.
     :return: The resolved class with the matching name.
-
     :raises ValueError: Raised when no class with the specified name can be found.
     """
     found_classes = search_class_in_globals(target_class_name)

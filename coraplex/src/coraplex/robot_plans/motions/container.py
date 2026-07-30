@@ -11,7 +11,7 @@ from coraplex.view_manager import ViewManager
 @dataclass
 class OpeningMotion(BaseMotion):
     """
-    Designator for opening container
+    Designator for opening container.
     """
 
     object_part: Body
@@ -20,7 +20,7 @@ class OpeningMotion(BaseMotion):
     """
     arm: Arms
     """
-    Arm that should be used
+    Arm that should be used.
     """
 
     def perform(self):
@@ -35,16 +35,17 @@ class OpeningMotion(BaseMotion):
 @dataclass
 class ClosingMotion(BaseMotion):
     """
-    Designator for closing a container
+    Designator for closing a container.
     """
 
     object_part: Body
     """
-    Object designator for the drawer handle
+    Object designator for the drawer handle.
     """
+
     arm: Arms
     """
-    Arm that should be used
+    Arm that should be used.
     """
 
     def perform(self):

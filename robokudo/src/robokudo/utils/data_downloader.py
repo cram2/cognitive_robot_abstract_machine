@@ -25,7 +25,6 @@ def test_data_path() -> Path:
     .. warning::
        This function performs network I/O on first use.
     """
-
     downloader = pooch.HTTPDownloader()
 
     # Download + verify + unzip

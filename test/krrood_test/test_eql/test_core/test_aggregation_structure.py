@@ -1,7 +1,7 @@
 """
-Tests for :mod:`krrood.entity_query_language.query.aggregation_structure` — the pure structural
-queries about aggregation subqueries and result quantifiers, relocated out of the verbalization
-package (they are query-algebra facts, usable by any consumer).
+Tests for :mod:`krrood.entity_query_language.query.aggregation_structure` — the pure
+structural queries about aggregation subqueries and result quantifiers, relocated out of
+the verbalization package (they are query-algebra facts, usable by any consumer).
 """
 
 from __future__ import annotations

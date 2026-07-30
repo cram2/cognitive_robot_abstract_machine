@@ -267,16 +267,18 @@ def fold_shared_subject_conjunction(
 @dataclass(frozen=True)
 class SuperlativeFold:
     """
-    A subject restriction of the form ``subject.<chain> == max/min(<same-type>.<same chain>)``
-    folded to a superlative selection modifier — *"with the maximum <leaf>"*.
+    A subject restriction of the form ``subject.<chain> == max/min(<same-type>.<same
+    chain>)`` folded to a superlative selection modifier — *"with the maximum <leaf>"*.
 
     English's superlative is the meaning of "equal to the extreme value over the whole
     population", so this fold is meaning-preserving, not an optimisation.
     """
 
     aggregator: Aggregator
-    """The ``Max`` / ``Min`` aggregator — supplies the superlative word and the leaf attribute
-    for the *"… <leaf>"* tail."""
+    """
+    The ``Max`` / ``Min`` aggregator — supplies the superlative word and the leaf
+    attribute for the *"… <leaf>"* tail.
+    """
 
 
 def superlative_aggregation(

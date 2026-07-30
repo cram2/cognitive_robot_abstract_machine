@@ -18,7 +18,7 @@ from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
-from giskardpy.motion_statechart.test_nodes.test_nodes import (
+from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstTrueNode,
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -179,7 +179,9 @@ def test_joint_goal(tmp_path):
     msc.draw(str(tmp_path / "muh.pdf"))
     kin_sim.tick_until_end()
     msc.draw(str(tmp_path / "muh.pdf"))
-    assert len(msc.history) == 6
+    # +1 compared to the tick count without a moving dof: EndMotion now waits for the
+    # dof's velocity to settle below its convergence threshold before observing True.
+    assert len(msc.history) == 7
     assert (
         msc.history.get_observation_history_of_node(task1)[-1]
         == ObservationStateValues.TRUE

@@ -12,20 +12,30 @@ from krrood.entity_query_language.verbalization.grammar.framework.planner import
 
 @dataclass(frozen=True)
 class GroupPlan:
-    """The GROUP BY keys and the expressions aggregated over them."""
+    """
+    The GROUP BY keys and the expressions aggregated over them.
+    """
 
     keys: List[SymbolicExpression]
-    """The group-by key expressions (empty ⇒ a bare *"grouped"* / no clause)."""
+    """
+    The group-by key expressions (empty ⇒ a bare *"grouped"* / no clause).
+    """
 
     aggregated: List[SymbolicExpression]
-    """Selected expressions aggregated (not group keys) — rendered plural; empty when the query
-    selects no aggregations."""
+    """
+    Selected expressions aggregated (not group keys) — rendered plural; empty when the
+    query selects no aggregations.
+    """
 
     weaves_aggregated: bool = False
-    """``True`` when the query weaves its aggregated selections into the clause
-    (*"and the <aggregated> are grouped by …"*) — an entity query. A set-of renders its selections
-    in the tuple, so it does not. This is the *what to say* decision the assembler used to take by
-    reading the query type (``isinstance(node, SetOf)``) at render time."""
+    """
+    ``True`` when the query weaves its aggregated selections into the clause (*"and the
+    <aggregated> are grouped by …"*) — an entity query.
+
+    A set-of renders its selections in the tuple, so it does not. This is the *what to
+    say* decision the assembler used to take by reading the query type
+    (``isinstance(node, SetOf)``) at render time.
+    """
 
     @property
     def has_keys(self) -> bool:

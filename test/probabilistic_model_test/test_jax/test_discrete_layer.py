@@ -86,9 +86,9 @@ class DiscreteLayerTestCase(unittest.TestCase):
         )
 
     def test_to_rx(self):
-        rx_circuit = self.model.to_rustworkx(SortedSet([self.x]), NXProbabilisticCircuit())[
-            0
-        ].probabilistic_circuit
+        rx_circuit = self.model.to_rustworkx(
+            SortedSet([self.x]), NXProbabilisticCircuit()
+        )[0].probabilistic_circuit
         self.assertEqual(len(rx_circuit.nodes()), 2)
         self.assertEqual(len(rx_circuit.edges()), 0)
         for node in rx_circuit.nodes():

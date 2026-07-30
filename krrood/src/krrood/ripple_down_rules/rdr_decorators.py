@@ -3,6 +3,7 @@ This file contains decorators for the RDR (Ripple Down Rules) framework. Where e
 that can be used with any python function such that this function can benefit from the incremental knowledge acquisition
 of the RDRs.
 """
+
 import inspect
 import os.path
 from dataclasses import dataclass, field
@@ -10,18 +11,19 @@ from functools import wraps
 
 from typing_extensions import Callable, Optional, Type, Tuple, Dict, Any, List
 
-from krrood.ripple_down_rules.datastructures.dataclasses import CaseFactoryMetaData
 from krrood.ripple_down_rules.experts import Expert, Human
 from krrood.ripple_down_rules.rdr import GeneralRDR
-from krrood.ripple_down_rules.utils import get_origin_type_of_function_output, get_arg_type_of_function_output, fill_in_missing_kwargs
+from krrood.ripple_down_rules.utils import (
+    get_origin_type_of_function_output,
+    get_arg_type_of_function_output,
+    fill_in_missing_kwargs,
+)
 
-try:
-    from .user_interface.gui import RDRCaseViewer
-except ImportError:
-    RDRCaseViewer = None
-from krrood.ripple_down_rules.utils import get_func_rdr_model_name, make_set, \
-    make_list
-from krrood.ripple_down_rules.helpers import create_case_from_method, create_case_query_from_method
+from krrood.ripple_down_rules.utils import get_func_rdr_model_name, make_set, make_list
+from krrood.ripple_down_rules.helpers import (
+    create_case_from_method,
+    create_case_query_from_method,
+)
 
 
 @dataclass(unsafe_hash=True)
@@ -106,7 +108,7 @@ class RDRDecorator:
     result to the specified container type (e.g. a list instead of a set which is the default container type for rdr
     output).
     """
-    output_name: str = field(init=False, default='output_')
+    output_name: str = field(init=False, default="output_")
     """
     This is used to refer to the output value of the decorated function, this is used as part of the case as input to 
     the rdr model, but is never used in the rule logic to prevent cycles from happening. The correct way to use the 
@@ -116,10 +118,6 @@ class RDRDecorator:
     """
     This is a flag that indicates that a not None output for the rdr has been inferred, this is used to update the 
     generated dot file if it is set to `True`.
-    """
-    case_factory_metadata: CaseFactoryMetaData = field(init=False, default_factory=CaseFactoryMetaData)
-    """
-    Metadata that contains the case factory method, and the scenario that is being run during the case query.
     """
     generated_classifier: Optional[Callable] = field(init=False, default=None)
     """
@@ -137,7 +135,9 @@ class RDRDecorator:
                 self.origin_type = get_origin_type_of_function_output(func)
 
             if len(self.parsed_output_type) == 0:
-                self.parsed_output_type = self.parse_output_type(func, self.output_type, *args)
+                self.parsed_output_type = self.parse_output_type(
+                    func, self.output_type, *args
+                )
                 if self.origin_type:
                     self.parsed_output_type.append(self.origin_type)
 
@@ -146,23 +146,34 @@ class RDRDecorator:
 
             func_output = {self.output_name: func(*args, **kwargs)}
 
-            case, case_dict = create_case_from_method(func, func_output, *args, **kwargs)
+            case, case_dict = create_case_from_method(
+                func, func_output, *args, **kwargs
+            )
 
             @self.fitting_decorator
             def fit():
                 if self.expert is None:
-                    self.expert = Human(answers_save_path=self.models_dir + f'/{self.model_name}/expert_answers')
+                    self.expert = Human(
+                        answers_save_path=self.models_dir
+                        + f"/{self.model_name}/expert_answers"
+                    )
                 case_query = create_case_query_from_method(
-                    func, func_output,
+                    func,
+                    func_output,
                     self.parsed_output_type,
                     self.mutual_exclusive,
-                    args, kwargs,
-                    case=case, case_dict=case_dict,
-                    scenario=self.case_factory_metadata.scenario,
-                    this_case_target_value=self.case_factory_metadata.this_case_target_value)
-                output = self.rdr.fit_case(case_query, expert=self.expert,
-                                           update_existing_rules=self.update_existing_rules,
-                                           ask_now=self.ask_now, ask_now_target=self.ask_now_target)
+                    args,
+                    kwargs,
+                    case=case,
+                    case_dict=case_dict,
+                )
+                output = self.rdr.fit_case(
+                    case_query,
+                    expert=self.expert,
+                    update_existing_rules=self.update_existing_rules,
+                    ask_now=self.ask_now,
+                    ask_now_target=self.ask_now_target,
+                )
                 return output
 
             if self.fit and not self.use_generated_classifier:
@@ -171,15 +182,21 @@ class RDRDecorator:
                 if self.use_generated_classifier:
                     if self.generated_classifier is None:
                         model_path = os.path.join(self.models_dir, self.model_name)
-                        self.generated_classifier = self.rdr.get_rdr_classifier_from_python_file(model_path)
+                        self.generated_classifier = (
+                            self.rdr.get_rdr_classifier_from_python_file(model_path)
+                        )
                     output = self.generated_classifier(case)
                 else:
                     output = self.rdr.classify(case)
                     if self.generate_dot_file:
                         eval_rule_tree = self.rdr.get_evaluated_rule_tree()
-                        if not self._not_none_output_found or (eval_rule_tree and len(eval_rule_tree) > 1):
-                            self.rdr.render_evaluated_rule_tree(self.models_dir + f'/{self.model_name}',
-                                                                show_full_tree=True)
+                        if not self._not_none_output_found or (
+                            eval_rule_tree and len(eval_rule_tree) > 1
+                        ):
+                            self.rdr.render_evaluated_rule_tree(
+                                self.models_dir + f"/{self.model_name}",
+                                show_full_tree=True,
+                            )
                         if eval_rule_tree and len(eval_rule_tree) > 1:
                             self._not_none_output_found = True
 
@@ -203,7 +220,9 @@ class RDRDecorator:
     def parse_output_type(self, func: Callable, output_type: Any, *args) -> List[Type]:
         parsed_output_type = []
         for ot in make_set(output_type):
-            ot = get_arg_type_of_function_output(func, ot, *args, package_name=self.package_name)
+            ot = get_arg_type_of_function_output(
+                func, ot, *args, package_name=self.package_name
+            )
             parsed_output_type.append(ot)
         return parsed_output_type
 
@@ -212,8 +231,3 @@ class RDRDecorator:
         Load the RDR model from the specified directory, otherwise create a new one.
         """
         self.rdr = GeneralRDR(save_dir=self.models_dir, model_name=self.model_name)
-
-
-def fit_rdr_func(scenario: Callable, rdr_decorated_func: Callable, *func_args, **func_kwargs) -> None:
-    rdr_decorated_func._rdr_decorator_instance.case_factory_metadata = CaseFactoryMetaData(scenario=scenario)
-    rdr_decorated_func(*func_args, **func_kwargs)

@@ -45,12 +45,36 @@ def _build_independent_circuit() -> tuple:
     root = ProductUnit(probabilistic_circuit=circuit)
 
     sum_x = SumUnit(probabilistic_circuit=circuit)
-    sum_x.add_subcircuit(leaf(UniformDistribution(variable=x, interval=closed(0, 1).simple_sets[0]), circuit), math.log(0.6))
-    sum_x.add_subcircuit(leaf(UniformDistribution(variable=x, interval=closed(1, 2).simple_sets[0]), circuit), math.log(0.4))
+    sum_x.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=x, interval=closed(0, 1).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.6),
+    )
+    sum_x.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=x, interval=closed(1, 2).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.4),
+    )
 
     sum_y = SumUnit(probabilistic_circuit=circuit)
-    sum_y.add_subcircuit(leaf(UniformDistribution(variable=y, interval=closed(0, 1).simple_sets[0]), circuit), math.log(0.5))
-    sum_y.add_subcircuit(leaf(UniformDistribution(variable=y, interval=closed(1, 2).simple_sets[0]), circuit), math.log(0.5))
+    sum_y.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=y, interval=closed(0, 1).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.5),
+    )
+    sum_y.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=y, interval=closed(1, 2).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.5),
+    )
 
     root.add_subcircuit(sum_x)
     root.add_subcircuit(sum_y)
@@ -74,16 +98,52 @@ def _build_three_variable_circuit() -> tuple:
     root = ProductUnit(probabilistic_circuit=circuit)
 
     sum_x = SumUnit(probabilistic_circuit=circuit)
-    sum_x.add_subcircuit(leaf(UniformDistribution(variable=x, interval=closed(0, 1).simple_sets[0]), circuit), math.log(0.7))
-    sum_x.add_subcircuit(leaf(UniformDistribution(variable=x, interval=closed(1, 2).simple_sets[0]), circuit), math.log(0.3))
+    sum_x.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=x, interval=closed(0, 1).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.7),
+    )
+    sum_x.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=x, interval=closed(1, 2).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.3),
+    )
 
     sum_y = SumUnit(probabilistic_circuit=circuit)
-    sum_y.add_subcircuit(leaf(UniformDistribution(variable=y, interval=closed(0, 1).simple_sets[0]), circuit), math.log(0.4))
-    sum_y.add_subcircuit(leaf(UniformDistribution(variable=y, interval=closed(1, 2).simple_sets[0]), circuit), math.log(0.6))
+    sum_y.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=y, interval=closed(0, 1).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.4),
+    )
+    sum_y.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=y, interval=closed(1, 2).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.6),
+    )
 
     sum_z = SumUnit(probabilistic_circuit=circuit)
-    sum_z.add_subcircuit(leaf(UniformDistribution(variable=z, interval=closed(0, 1).simple_sets[0]), circuit), math.log(0.8))
-    sum_z.add_subcircuit(leaf(UniformDistribution(variable=z, interval=closed(1, 2).simple_sets[0]), circuit), math.log(0.2))
+    sum_z.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=z, interval=closed(0, 1).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.8),
+    )
+    sum_z.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=z, interval=closed(1, 2).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.2),
+    )
 
     root.add_subcircuit(sum_x)
     root.add_subcircuit(sum_y)
@@ -110,9 +170,28 @@ def _build_correlated_circuit() -> tuple:
 
     for x_range, y_range in [((0, 1), (0, 0.4)), ((1, 2), (9.6, 10))]:
         component = ProductUnit(probabilistic_circuit=circuit)
-        component.add_subcircuit(leaf(UniformDistribution(variable=x, interval=closed(*x_range).simple_sets[0]), circuit))
-        component.add_subcircuit(leaf(UniformDistribution(variable=w, interval=closed(0, 1).simple_sets[0]), circuit))
-        component.add_subcircuit(leaf(UniformDistribution(variable=y, interval=closed(*y_range).simple_sets[0]), circuit))
+        component.add_subcircuit(
+            leaf(
+                UniformDistribution(
+                    variable=x, interval=closed(*x_range).simple_sets[0]
+                ),
+                circuit,
+            )
+        )
+        component.add_subcircuit(
+            leaf(
+                UniformDistribution(variable=w, interval=closed(0, 1).simple_sets[0]),
+                circuit,
+            )
+        )
+        component.add_subcircuit(
+            leaf(
+                UniformDistribution(
+                    variable=y, interval=closed(*y_range).simple_sets[0]
+                ),
+                circuit,
+            )
+        )
         root.add_subcircuit(component, math.log(0.5))
 
     return circuit, x, w, y
@@ -134,11 +213,35 @@ def _build_confounded_circuit() -> tuple:
     circuit = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=circuit)
 
-    for x_range, y_range, z_range in [((0, 1), (0, 1), (0, 1)), ((1, 2), (1, 2), (1, 2))]:
+    for x_range, y_range, z_range in [
+        ((0, 1), (0, 1), (0, 1)),
+        ((1, 2), (1, 2), (1, 2)),
+    ]:
         component = ProductUnit(probabilistic_circuit=circuit)
-        component.add_subcircuit(leaf(UniformDistribution(variable=x, interval=closed(*x_range).simple_sets[0]), circuit))
-        component.add_subcircuit(leaf(UniformDistribution(variable=y, interval=closed(*y_range).simple_sets[0]), circuit))
-        component.add_subcircuit(leaf(UniformDistribution(variable=z, interval=closed(*z_range).simple_sets[0]), circuit))
+        component.add_subcircuit(
+            leaf(
+                UniformDistribution(
+                    variable=x, interval=closed(*x_range).simple_sets[0]
+                ),
+                circuit,
+            )
+        )
+        component.add_subcircuit(
+            leaf(
+                UniformDistribution(
+                    variable=y, interval=closed(*y_range).simple_sets[0]
+                ),
+                circuit,
+            )
+        )
+        component.add_subcircuit(
+            leaf(
+                UniformDistribution(
+                    variable=z, interval=closed(*z_range).simple_sets[0]
+                ),
+                circuit,
+            )
+        )
         root.add_subcircuit(component, math.log(0.5))
 
     return circuit, x, y, z
@@ -147,6 +250,7 @@ def _build_confounded_circuit() -> tuple:
 def _build_unnormalized_circuit() -> tuple:
     """
     ProductUnit circuit whose SumUnit over x has weights summing to 1.6.
+
     verify_support_determinism should report a normalization violation.
     """
     x = Continuous("x")
@@ -155,12 +259,36 @@ def _build_unnormalized_circuit() -> tuple:
     root = ProductUnit(probabilistic_circuit=circuit)
 
     sum_x = SumUnit(probabilistic_circuit=circuit)
-    sum_x.add_subcircuit(leaf(UniformDistribution(variable=x, interval=closed(0, 1).simple_sets[0]), circuit), math.log(0.8))
-    sum_x.add_subcircuit(leaf(UniformDistribution(variable=x, interval=closed(1, 2).simple_sets[0]), circuit), math.log(0.8))
+    sum_x.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=x, interval=closed(0, 1).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.8),
+    )
+    sum_x.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=x, interval=closed(1, 2).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.8),
+    )
 
     sum_y = SumUnit(probabilistic_circuit=circuit)
-    sum_y.add_subcircuit(leaf(UniformDistribution(variable=y, interval=closed(0, 1).simple_sets[0]), circuit), math.log(0.5))
-    sum_y.add_subcircuit(leaf(UniformDistribution(variable=y, interval=closed(1, 2).simple_sets[0]), circuit), math.log(0.5))
+    sum_y.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=y, interval=closed(0, 1).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.5),
+    )
+    sum_y.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=y, interval=closed(1, 2).simple_sets[0]),
+            circuit,
+        ),
+        math.log(0.5),
+    )
 
     root.add_subcircuit(sum_x)
     root.add_subcircuit(sum_y)
@@ -173,7 +301,9 @@ def _marginal_probability(
     lower: float,
     upper: float,
 ) -> float:
-    """Return P(variable ∈ [lower, upper]) from circuit."""
+    """
+    Return P(variable ∈ [lower, upper]) from circuit.
+    """
     event = (
         SimpleEvent.from_data({variable: closed(lower, upper)})
         .as_composite_set()
@@ -186,7 +316,9 @@ class MarginalDeterminismTreeNodeLeafTestCase(unittest.TestCase):
 
     def test_single_variable_node_is_leaf(self):
         x = Continuous("x")
-        self.assertTrue(MarginalDeterminismTreeNode(variables={x}, query_set={x}).is_leaf)
+        self.assertTrue(
+            MarginalDeterminismTreeNode(variables={x}, query_set={x}).is_leaf
+        )
 
     def test_node_with_children_is_not_leaf(self):
         x, y = Continuous("x"), Continuous("y")
@@ -197,16 +329,24 @@ class MarginalDeterminismTreeNodeLeafTestCase(unittest.TestCase):
 
     def test_node_with_empty_query_set_is_leaf(self):
         x = Continuous("x")
-        self.assertTrue(MarginalDeterminismTreeNode(variables={x}, query_set=set()).is_leaf)
+        self.assertTrue(
+            MarginalDeterminismTreeNode(variables={x}, query_set=set()).is_leaf
+        )
 
 
 class MarginalDeterminismTreeNodeFindVariableTestCase(unittest.TestCase):
 
     def setUp(self):
         self.x, self.y = Continuous("x"), Continuous("y")
-        self.root = MarginalDeterminismTreeNode(variables={self.x, self.y}, query_set={self.x})
-        MarginalDeterminismTreeNode(variables={self.x}, query_set={self.x}, parent_node=self.root)
-        MarginalDeterminismTreeNode(variables={self.y}, query_set={self.y}, parent_node=self.root)
+        self.root = MarginalDeterminismTreeNode(
+            variables={self.x, self.y}, query_set={self.x}
+        )
+        MarginalDeterminismTreeNode(
+            variables={self.x}, query_set={self.x}, parent_node=self.root
+        )
+        MarginalDeterminismTreeNode(
+            variables={self.y}, query_set={self.y}, parent_node=self.root
+        )
 
     def test_finds_variable_in_root_query_set(self):
         found = self.root.find_node_for_variable(self.x)
@@ -244,7 +384,14 @@ class MarginalDeterminismTreeNodeAllQuerySetsTestCase(unittest.TestCase):
 
     def test_empty_query_set_not_included(self):
         x = Continuous("x")
-        self.assertEqual(len(MarginalDeterminismTreeNode(variables={x}, query_set=set()).all_query_sets()), 0)
+        self.assertEqual(
+            len(
+                MarginalDeterminismTreeNode(
+                    variables={x}, query_set=set()
+                ).all_query_sets()
+            ),
+            0,
+        )
 
     def test_query_sets_returned_in_preorder(self):
         x, y, z = Continuous("x"), Continuous("y"), Continuous("z")
@@ -264,13 +411,16 @@ class MarginalDeterminismTreeNodeFromCausalGraphTestCase(unittest.TestCase):
 
     def test_root_query_set_is_first_in_priority_order(self):
         root = MarginalDeterminismTreeNode.from_causal_graph(
-            [self.x, self.y, self.z], [self.effect],
+            [self.x, self.y, self.z],
+            [self.effect],
             causal_priority_order=[self.z, self.x, self.y],
         )
         self.assertEqual(root.query_set, {self.z})
 
     def test_default_order_uses_causal_variables_order(self):
-        root = MarginalDeterminismTreeNode.from_causal_graph([self.x, self.y], [self.effect])
+        root = MarginalDeterminismTreeNode.from_causal_graph(
+            [self.x, self.y], [self.effect]
+        )
         self.assertEqual(root.query_set, {self.x})
 
     def test_every_causal_variable_appears_in_some_query_set(self):
@@ -283,7 +433,9 @@ class MarginalDeterminismTreeNodeFromCausalGraphTestCase(unittest.TestCase):
 
     def test_five_variable_tree_assigns_all_variables(self):
         causal_variables = [Continuous(f"x{i}") for i in range(1, 6)]
-        root = MarginalDeterminismTreeNode.from_causal_graph(causal_variables, [self.effect])
+        root = MarginalDeterminismTreeNode.from_causal_graph(
+            causal_variables, [self.effect]
+        )
         self.assertFalse(root.is_leaf)
         self.assertEqual(root.query_set, {causal_variables[0]})
         all_variables = set().union(*root.all_query_sets())
@@ -308,9 +460,14 @@ class SupportDeterminismVerificationResultTestCase(unittest.TestCase):
 
     def test_failing_result_contains_fail_and_violation_text(self):
         x = Continuous("x")
-        violation = OverlappingChildSupportsViolation(sum_unit_index=0, query_variable=x)
+        violation = OverlappingChildSupportsViolation(
+            sum_unit_index=0, query_variable=x
+        )
         result = SupportDeterminismVerificationResult(
-            passed=False, violations=[violation], checked_query_sets=[{x}], circuit_variables=[x]
+            passed=False,
+            violations=[violation],
+            checked_query_sets=[{x}],
+            circuit_variables=[x],
         )
         self.assertIn("FAIL", str(result))
         self.assertIn("overlapping", str(result))
@@ -335,8 +492,16 @@ class FailureDiagnosisResultTestCase(unittest.TestCase):
             recommended_region=None,
             interventional_probability_at_recommendation=0.149,
             all_variable_results={
-                self.x: {"actual_value": 1.3, "interventional_probability": 0.0, "recommended_region": None},
-                self.y: {"actual_value": 0.1, "interventional_probability": 0.089, "recommended_region": None},
+                self.x: {
+                    "actual_value": 1.3,
+                    "interventional_probability": 0.0,
+                    "recommended_region": None,
+                },
+                self.y: {
+                    "actual_value": 0.1,
+                    "interventional_probability": 0.089,
+                    "recommended_region": None,
+                },
             },
         )
 
@@ -351,7 +516,9 @@ class FailureDiagnosisResultTestCase(unittest.TestCase):
             vr["interventional_probability"]
             for vr in self.result.all_variable_results.values()
         )
-        self.assertEqual(self.result.interventional_probability_at_failure, lowest_probability)
+        self.assertEqual(
+            self.result.interventional_probability_at_failure, lowest_probability
+        )
 
 
 class CausalCircuitConstructionTestCase(unittest.TestCase):
@@ -400,7 +567,6 @@ class VerifySupportDeterminismVariableExistenceTestCase(unittest.TestCase):
         result = self._make_causal_circuit(tree).verify_support_determinism()
         self.assertTrue(result.passed)
         self.assertEqual(len(result.violations), 0)
-
 
     def test_query_variable_absent_from_circuit_fails_with_named_violation(self):
         ghost = Continuous("ghost")
@@ -458,14 +624,19 @@ class BackdoorAdjustmentStructuralTestCase(unittest.TestCase):
         self.cc = CausalCircuit.from_probabilistic_circuit(
             self.circuit,
             MarginalDeterminismTreeNode.from_causal_graph([self.x], [self.y]),
-            [self.x], [self.y],
+            [self.x],
+            [self.y],
         )
 
     def test_returns_probabilistic_circuit(self):
-        self.assertIsInstance(self.cc.backdoor_adjustment(self.x, self.y, []), ProbabilisticCircuit)
+        self.assertIsInstance(
+            self.cc.backdoor_adjustment(self.x, self.y, []), ProbabilisticCircuit
+        )
 
     def test_returned_circuit_contains_variables(self):
-        self.assertGreater(len(self.cc.backdoor_adjustment(self.x, self.y, []).variables), 0)
+        self.assertGreater(
+            len(self.cc.backdoor_adjustment(self.x, self.y, []).variables), 0
+        )
 
     def test_unregistered_cause_variable_raises_error(self):
         with self.assertRaises(UnregisteredVariableError):
@@ -497,37 +668,47 @@ class BackdoorAdjustmentIndependentCorrectnessTestCase(unittest.TestCase):
         self.cc = CausalCircuit.from_probabilistic_circuit(
             self.circuit,
             MarginalDeterminismTreeNode.from_causal_graph([self.x], [self.y]),
-            [self.x], [self.y],
+            [self.x],
+            [self.y],
         )
         self.interventional_circuit = self.cc.backdoor_adjustment(self.x, self.y, [])
 
     def test_interventional_distribution_integrates_to_one(self):
         self.assertAlmostEqual(
-            _marginal_probability(self.interventional_circuit, self.y, 0, 2), 1.0, delta=0.01
+            _marginal_probability(self.interventional_circuit, self.y, 0, 2),
+            1.0,
+            delta=0.01,
         )
 
     def test_interventional_matches_observational_marginal(self):
         observational = _marginal_probability(self.circuit, self.y, 0, 1)
-        interventional = _marginal_probability(self.interventional_circuit, self.y, 0, 1)
+        interventional = _marginal_probability(
+            self.interventional_circuit, self.y, 0, 1
+        )
         self.assertAlmostEqual(observational, 0.5, delta=0.01)
         self.assertAlmostEqual(interventional, 0.5, delta=0.05)
 
     def test_out_of_support_cause_value_has_zero_probability(self):
         self.assertAlmostEqual(
-            _marginal_probability(self.interventional_circuit, self.x, 5, 6), 0.0, delta=1e-6
+            _marginal_probability(self.interventional_circuit, self.x, 5, 6),
+            0.0,
+            delta=1e-6,
         )
 
     def test_out_of_support_effect_value_has_zero_probability(self):
         self.assertAlmostEqual(
-            _marginal_probability(self.interventional_circuit, self.y, 5, 6), 0.0, delta=1e-6
+            _marginal_probability(self.interventional_circuit, self.y, 5, 6),
+            0.0,
+            delta=1e-6,
         )
 
 
 class BackdoorAdjustmentCorrelatedCorrectnessTestCase(unittest.TestCase):
     """
-    In the correlated circuit, x and y are grouped into two equal-weight
-    components. The interventional distribution marginalised over y should
-    place all probability on y∈[0,0.4] ∪ y∈[9.6,10] and sum to 1.
+    In the correlated circuit, x and y are grouped into two equal-weight components.
+
+    The interventional distribution marginalised over y should place all probability on
+    y∈[0,0.4] ∪ y∈[9.6,10] and sum to 1.
     """
 
     @classmethod
@@ -536,24 +717,35 @@ class BackdoorAdjustmentCorrelatedCorrectnessTestCase(unittest.TestCase):
         cls.cc = CausalCircuit.from_probabilistic_circuit(
             cls.circuit,
             MarginalDeterminismTreeNode.from_causal_graph([cls.x, cls.w], [cls.y]),
-            [cls.x, cls.w], [cls.y],
+            [cls.x, cls.w],
+            [cls.y],
         )
         cls.interventional_circuit = cls.cc.backdoor_adjustment(cls.x, cls.y, [])
 
     def test_both_effect_regions_have_positive_probability(self):
-        probability_low = _marginal_probability(self.interventional_circuit, self.y, 0, 0.4)
-        probability_high = _marginal_probability(self.interventional_circuit, self.y, 9.6, 10)
+        probability_low = _marginal_probability(
+            self.interventional_circuit, self.y, 0, 0.4
+        )
+        probability_high = _marginal_probability(
+            self.interventional_circuit, self.y, 9.6, 10
+        )
         self.assertGreater(probability_low, 0.0)
         self.assertGreater(probability_high, 0.0)
 
     def test_effect_regions_account_for_all_probability_mass(self):
-        probability_low = _marginal_probability(self.interventional_circuit, self.y, 0, 0.4)
-        probability_high = _marginal_probability(self.interventional_circuit, self.y, 9.6, 10)
+        probability_low = _marginal_probability(
+            self.interventional_circuit, self.y, 0, 0.4
+        )
+        probability_high = _marginal_probability(
+            self.interventional_circuit, self.y, 9.6, 10
+        )
         self.assertAlmostEqual(probability_low + probability_high, 1.0, delta=0.05)
 
     def test_interventional_distribution_integrates_to_one(self):
         self.assertAlmostEqual(
-            _marginal_probability(self.interventional_circuit, self.y, 0, 10), 1.0, delta=0.01
+            _marginal_probability(self.interventional_circuit, self.y, 0, 10),
+            1.0,
+            delta=0.01,
         )
 
 
@@ -570,35 +762,47 @@ class BackdoorAdjustmentWithAdjustmentTestCase(unittest.TestCase):
         cls.cc = CausalCircuit.from_probabilistic_circuit(
             cls.circuit,
             MarginalDeterminismTreeNode.from_causal_graph([cls.x], [cls.y]),
-            [cls.x], [cls.y],
+            [cls.x],
+            [cls.y],
         )
 
     def test_adjusted_distribution_integrates_to_one(self):
         adjusted = self.cc.backdoor_adjustment(self.x, self.y, [self.z])
-        self.assertAlmostEqual(_marginal_probability(adjusted, self.y, 0, 2), 1.0, delta=0.01)
+        self.assertAlmostEqual(
+            _marginal_probability(adjusted, self.y, 0, 2), 1.0, delta=0.01
+        )
 
     def test_adjustment_recovers_causal_probability(self):
         adjusted = self.cc.backdoor_adjustment(self.x, self.y, [self.z])
-        self.assertAlmostEqual(_marginal_probability(adjusted, self.y, 0, 1), 0.5, delta=0.1)
+        self.assertAlmostEqual(
+            _marginal_probability(adjusted, self.y, 0, 1), 0.5, delta=0.1
+        )
 
     def test_adjustment_on_independent_data_does_not_change_result(self):
         circuit, x, y, z = _build_three_variable_circuit()
         cc = CausalCircuit.from_probabilistic_circuit(
             circuit,
             MarginalDeterminismTreeNode.from_causal_graph([x, y], [z]),
-            [x, y], [z],
+            [x, y],
+            [z],
         )
         without_adjustment = cc.backdoor_adjustment(x, z, [])
         with_adjustment = cc.backdoor_adjustment(x, z, [y])
-        self.assertAlmostEqual(_marginal_probability(without_adjustment, z, 0, 1), 0.8, delta=0.05)
-        self.assertAlmostEqual(_marginal_probability(with_adjustment, z, 0, 1), 0.8, delta=0.05)
+        self.assertAlmostEqual(
+            _marginal_probability(without_adjustment, z, 0, 1), 0.8, delta=0.05
+        )
+        self.assertAlmostEqual(
+            _marginal_probability(with_adjustment, z, 0, 1), 0.8, delta=0.05
+        )
 
 
 class ExtractLeafRegionsTestCase(unittest.TestCase):
     """
     _extract_leaf_regions_for_variable underpins both backdoor_adjustment and
-    diagnose_failure. Testing it directly ensures the probability decomposition
-    is sound before higher-level logic runs.
+    diagnose_failure.
+
+    Testing it directly ensures the probability decomposition is sound before higher-
+    level logic runs.
     """
 
     def setUp(self):
@@ -606,22 +810,31 @@ class ExtractLeafRegionsTestCase(unittest.TestCase):
         self.cc = CausalCircuit.from_probabilistic_circuit(
             self.circuit,
             MarginalDeterminismTreeNode.from_causal_graph([self.x], [self.y]),
-            [self.x], [self.y],
+            [self.x],
+            [self.y],
         )
 
     def test_at_least_one_region_returned_for_cause_variable(self):
-        self.assertGreaterEqual(len(self.cc._extract_leaf_regions_for_variable(self.x)), 1)
+        self.assertGreaterEqual(
+            len(self.cc._extract_leaf_regions_for_variable(self.x)), 1
+        )
 
     def test_at_least_one_region_returned_for_effect_variable(self):
-        self.assertGreaterEqual(len(self.cc._extract_leaf_regions_for_variable(self.y)), 1)
+        self.assertGreaterEqual(
+            len(self.cc._extract_leaf_regions_for_variable(self.y)), 1
+        )
 
     def test_cause_region_probabilities_sum_to_one(self):
         regions = self.cc._extract_leaf_regions_for_variable(self.x)
-        self.assertAlmostEqual(sum(probability for _, probability in regions), 1.0, delta=0.01)
+        self.assertAlmostEqual(
+            sum(probability for _, probability in regions), 1.0, delta=0.01
+        )
 
     def test_effect_region_probabilities_sum_to_one(self):
         regions = self.cc._extract_leaf_regions_for_variable(self.y)
-        self.assertAlmostEqual(sum(probability for _, probability in regions), 1.0, delta=0.01)
+        self.assertAlmostEqual(
+            sum(probability for _, probability in regions), 1.0, delta=0.01
+        )
 
     def test_all_region_probabilities_are_positive(self):
         for variable in [self.x, self.y]:
@@ -641,17 +854,27 @@ class DiagnoseFailureStructuralTestCase(unittest.TestCase):
         self.cc = CausalCircuit.from_probabilistic_circuit(
             circuit,
             MarginalDeterminismTreeNode.from_causal_graph([self.x], [self.y]),
-            [self.x], [self.y],
+            [self.x],
+            [self.y],
         )
 
     def test_returns_failure_diagnosis_result(self):
-        self.assertIsInstance(self.cc.diagnose_failure({self.x: 0.5}, self.y), FailureDiagnosisResult)
+        self.assertIsInstance(
+            self.cc.diagnose_failure({self.x: 0.5}, self.y), FailureDiagnosisResult
+        )
 
     def test_primary_cause_variable_is_a_continuous_variable(self):
-        self.assertIsInstance(self.cc.diagnose_failure({self.x: 0.5}, self.y).primary_cause_variable, Continuous)
+        self.assertIsInstance(
+            self.cc.diagnose_failure({self.x: 0.5}, self.y).primary_cause_variable,
+            Continuous,
+        )
 
     def test_actual_value_matches_observed_input(self):
-        self.assertAlmostEqual(self.cc.diagnose_failure({self.x: 0.5}, self.y).actual_value, 0.5, delta=1e-6)
+        self.assertAlmostEqual(
+            self.cc.diagnose_failure({self.x: 0.5}, self.y).actual_value,
+            0.5,
+            delta=1e-6,
+        )
 
     def test_all_variable_results_are_keyed_by_variable_objects(self):
         result = self.cc.diagnose_failure({self.x: 0.5}, self.y)
@@ -662,7 +885,11 @@ class DiagnoseFailureStructuralTestCase(unittest.TestCase):
     def test_all_variable_results_contain_required_fields(self):
         result = self.cc.diagnose_failure({self.x: 0.5}, self.y)
         for variable_result in result.all_variable_results.values():
-            for field in ("actual_value", "interventional_probability", "recommended_region"):
+            for field in (
+                "actual_value",
+                "interventional_probability",
+                "recommended_region",
+            ):
                 self.assertIn(field, variable_result)
 
     def test_empty_observed_values_raises_error(self):
@@ -672,19 +899,28 @@ class DiagnoseFailureStructuralTestCase(unittest.TestCase):
     def test_primary_cause_has_the_minimum_interventional_probability(self):
         result = self.cc.diagnose_failure({self.x: 0.5}, self.y)
         minimum_probability = min(
-            vr["interventional_probability"] for vr in result.all_variable_results.values()
+            vr["interventional_probability"]
+            for vr in result.all_variable_results.values()
         )
-        self.assertAlmostEqual(result.interventional_probability_at_failure, minimum_probability, delta=1e-6)
+        self.assertAlmostEqual(
+            result.interventional_probability_at_failure,
+            minimum_probability,
+            delta=1e-6,
+        )
 
     def test_recommendation_probability_is_non_negative(self):
         self.assertGreaterEqual(
-            self.cc.diagnose_failure({self.x: 0.5}, self.y).interventional_probability_at_recommendation,
+            self.cc.diagnose_failure(
+                {self.x: 0.5}, self.y
+            ).interventional_probability_at_recommendation,
             0.0,
         )
 
     def test_in_domain_observation_yields_positive_recommendation_probability(self):
         self.assertGreater(
-            self.cc.diagnose_failure({self.x: 0.5}, self.y).interventional_probability_at_recommendation,
+            self.cc.diagnose_failure(
+                {self.x: 0.5}, self.y
+            ).interventional_probability_at_recommendation,
             0.0,
         )
 
@@ -697,31 +933,39 @@ class DiagnoseFailureCorrectnessTestCase(unittest.TestCase):
         cls.cc = CausalCircuit.from_probabilistic_circuit(
             cls.circuit,
             MarginalDeterminismTreeNode.from_causal_graph([cls.x, cls.w], [cls.y]),
-            [cls.x, cls.w], [cls.y],
+            [cls.x, cls.w],
+            [cls.y],
         )
 
     def test_out_of_domain_cause_is_identified_as_primary(self):
         self.assertEqual(
-            self.cc.diagnose_failure({self.x: 5.0, self.w: 0.5}, self.y).primary_cause_variable,
+            self.cc.diagnose_failure(
+                {self.x: 5.0, self.w: 0.5}, self.y
+            ).primary_cause_variable,
             self.x,
         )
 
     def test_out_of_domain_cause_has_zero_interventional_probability(self):
         self.assertAlmostEqual(
-            self.cc.diagnose_failure({self.x: 5.0, self.w: 0.5}, self.y).interventional_probability_at_failure,
+            self.cc.diagnose_failure(
+                {self.x: 5.0, self.w: 0.5}, self.y
+            ).interventional_probability_at_failure,
             0.0,
             delta=1e-6,
         )
 
     def test_in_domain_variable_has_positive_interventional_probability(self):
         result = self.cc.diagnose_failure({self.x: 5.0, self.w: 0.5}, self.y)
-        self.assertGreater(result.all_variable_results[self.w]["interventional_probability"], 0.0)
+        self.assertGreater(
+            result.all_variable_results[self.w]["interventional_probability"], 0.0
+        )
 
     def test_all_in_domain_causes_have_positive_interventional_probability(self):
         result = self.cc.diagnose_failure({self.x: 0.5, self.w: 0.5}, self.y)
         for variable, variable_result in result.all_variable_results.items():
             self.assertGreater(
-                variable_result["interventional_probability"], 0.0,
+                variable_result["interventional_probability"],
+                0.0,
                 msg=f"Expected positive probability for {variable.name}",
             )
 
@@ -748,40 +992,47 @@ class DiagnoseFailureCorrectnessTestCase(unittest.TestCase):
 
 class EndToEndIntegrationTestCase(unittest.TestCase):
     """
-    Exercises the full pipeline — tree construction, support determinism
-    verification, backdoor adjustment, and failure diagnosis — on the
-    three-variable independent circuit and the correlated circuit.
+    Exercises the full pipeline — tree construction, support determinism verification,
+    backdoor adjustment, and failure diagnosis — on the three-variable independent
+    circuit and the correlated circuit.
     """
 
     @classmethod
     def setUpClass(cls):
         np.random.seed(69)
 
-        (cls.circuit_independent,
-         cls.x_independent,
-         cls.y_independent,
-         cls.z_independent) = _build_three_variable_circuit()
+        (
+            cls.circuit_independent,
+            cls.x_independent,
+            cls.y_independent,
+            cls.z_independent,
+        ) = _build_three_variable_circuit()
 
         cls.cc_independent = CausalCircuit.from_probabilistic_circuit(
             cls.circuit_independent,
             MarginalDeterminismTreeNode.from_causal_graph(
-                [cls.x_independent, cls.y_independent], [cls.z_independent],
+                [cls.x_independent, cls.y_independent],
+                [cls.z_independent],
                 causal_priority_order=[cls.x_independent, cls.y_independent],
             ),
-            [cls.x_independent, cls.y_independent], [cls.z_independent],
+            [cls.x_independent, cls.y_independent],
+            [cls.z_independent],
         )
 
-        (cls.circuit_correlated,
-         cls.x_correlated,
-         cls.w_correlated,
-         cls.y_correlated) = _build_correlated_circuit()
+        (
+            cls.circuit_correlated,
+            cls.x_correlated,
+            cls.w_correlated,
+            cls.y_correlated,
+        ) = _build_correlated_circuit()
 
         cls.cc_correlated = CausalCircuit.from_probabilistic_circuit(
             cls.circuit_correlated,
             MarginalDeterminismTreeNode.from_causal_graph(
                 [cls.x_correlated, cls.w_correlated], [cls.y_correlated]
             ),
-            [cls.x_correlated, cls.w_correlated], [cls.y_correlated],
+            [cls.x_correlated, cls.w_correlated],
+            [cls.y_correlated],
         )
 
     def test_support_determinism_passes_for_independent_circuit(self):
@@ -795,7 +1046,9 @@ class EndToEndIntegrationTestCase(unittest.TestCase):
             self.x_independent, self.z_independent, []
         )
         self.assertAlmostEqual(
-            _marginal_probability(interventional_circuit, self.z_independent, 0, 2), 1.0, delta=0.01
+            _marginal_probability(interventional_circuit, self.z_independent, 0, 2),
+            1.0,
+            delta=0.01,
         )
 
     def test_interventional_distribution_equals_observational_on_independent_data(self):
@@ -803,7 +1056,9 @@ class EndToEndIntegrationTestCase(unittest.TestCase):
             self.x_independent, self.z_independent, []
         )
         self.assertAlmostEqual(
-            _marginal_probability(interventional_circuit, self.z_independent, 0, 1), 0.8, delta=0.05
+            _marginal_probability(interventional_circuit, self.z_independent, 0, 1),
+            0.8,
+            delta=0.05,
         )
 
     def test_failure_diagnosis_identifies_out_of_domain_primary_cause(self):
@@ -811,7 +1066,9 @@ class EndToEndIntegrationTestCase(unittest.TestCase):
             {self.x_independent: 5.0, self.y_independent: 0.5}, self.z_independent
         )
         self.assertEqual(result.primary_cause_variable, self.x_independent)
-        self.assertAlmostEqual(result.interventional_probability_at_failure, 0.0, delta=1e-6)
+        self.assertAlmostEqual(
+            result.interventional_probability_at_failure, 0.0, delta=1e-6
+        )
 
     def test_failure_diagnosis_in_domain_gives_non_negative_probabilities(self):
         result = self.cc_independent.diagnose_failure(

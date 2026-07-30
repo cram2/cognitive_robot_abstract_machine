@@ -72,7 +72,9 @@ class CollisionVisualizationMarkerPublisher(CollisionConsumer):
         )
     )
     """
-    QoS profile for the publisher. Uses TRANSIENT_LOCAL because it shares a topic with the VizMarkerPublisher.
+    QoS profile for the publisher.
+
+    Uses TRANSIENT_LOCAL because it shares a topic with the VizMarkerPublisher.
     """
 
     _root_frame_name: str = field(init=False, default="")
@@ -117,8 +119,8 @@ class CollisionVisualizationMarkerPublisher(CollisionConsumer):
         """
         Builds a single ``LINE_LIST`` marker holding one segment per contact.
 
-        The marker uses a fixed namespace and id so that each publish fully
-        overwrites the previous one, clearing stale contacts.
+        The marker uses a fixed namespace and id so that each publish fully overwrites
+        the previous one, clearing stale contacts.
         """
         marker = Marker()
         marker.type = Marker.LINE_LIST

@@ -35,13 +35,16 @@ class PrettyResultPrinter:
 class RoboKudoActionClient(Node):
     """
     Debug Action Client for the Query Action Server.
+
     Allows sending dynamic goals and handles feedback, result, and cancellation.
     """
 
     def __init__(self, preempt_timer: Optional[float] = None) -> None:
-        """Create a new RoboKudo action client.
+        """
+        Create a new RoboKudo action client.
 
-        :param preempt_timer: Optional preempt timer to cancel the goal automatically after x seconds.
+        :param preempt_timer: Optional preempt timer to cancel the goal automatically
+            after x seconds.
         """
         super().__init__("robokudo_query_test_client")
         self.rk_logger = logging.getLogger(PACKAGE_NAME)
@@ -62,9 +65,11 @@ class RoboKudoActionClient(Node):
         self.cancel_response: Optional[Future] = None
 
     def send_goal(self, goal_type: str) -> None:
-        """Waits for the action server and sends a dynamic goal.
+        """
+        Waits for the action server and sends a dynamic goal.
 
-        :param goal_type: Content of the type field in the goal sent to the action server.
+        :param goal_type: Content of the type field in the goal sent to the action
+            server.
         """
         self.rk_logger.info("Waiting for action server...")
         if not self._action_client.wait_for_server(timeout_sec=5.0):
@@ -83,9 +88,11 @@ class RoboKudoActionClient(Node):
         send_goal_future.add_done_callback(self.goal_response_callback)
 
     def goal_response_callback(self, future: Future) -> None:
-        """Handles the response from the action server regarding goal acceptance.
+        """
+        Handles the response from the action server regarding goal acceptance.
 
-        :param future: The future of the async goal task returned by the action client upon sending a goal.
+        :param future: The future of the async goal task returned by the action client
+            upon sending a goal.
         """
         self._goal_handle = future.result()
         if not self._goal_handle.accepted:
@@ -106,7 +113,8 @@ class RoboKudoActionClient(Node):
         result_future.add_done_callback(self.result_callback)
 
     def feedback_callback(self, feedback_msg: Query_FeedbackMessage) -> None:
-        """Processes feedback messages from the action server.
+        """
+        Processes feedback messages from the action server.
 
         :param feedback_msg: The feedback message returned by the action client.
         """
@@ -115,7 +123,9 @@ class RoboKudoActionClient(Node):
         self.rk_logger.info(f"Received feedback: {feedback.feedback}")
 
     def cancel_goal(self) -> None:
-        """Sends a cancel request for the active goal."""
+        """
+        Sends a cancel request for the active goal.
+        """
         if not self._goal_handle:
             self.rk_logger.error("No active goal to cancel.")
             return
@@ -129,9 +139,11 @@ class RoboKudoActionClient(Node):
             self._cancel_timer.cancel()
 
     def cancel_done_callback(self, future: Future) -> None:
-        """Handles the response from the action server regarding goal cancellation.
+        """
+        Handles the response from the action server regarding goal cancellation.
 
-        :param future: The future of the async goal task returned by the action client upon cancelling a goal.
+        :param future: The future of the async goal task returned by the action client
+            upon cancelling a goal.
         """
         cancel_response = future.result()
         self.cancel_response = cancel_response
@@ -144,9 +156,11 @@ class RoboKudoActionClient(Node):
         # rclpy.shutdown()
 
     def result_callback(self, future: Future) -> None:
-        """Processes the result from the action server.
+        """
+        Processes the result from the action server.
 
-        :param future: The future of the async goal task returned by the action client upon getting the goal result.
+        :param future: The future of the async goal task returned by the action client
+            upon getting the goal result.
         """
         try:
             result_future = future.result()
@@ -188,7 +202,9 @@ class RoboKudoActionClient(Node):
     #         self.done = True
 
     def destroy_node(self) -> None:
-        """Cancel the goal and destroys the ROS node."""
+        """
+        Cancel the goal and destroys the ROS node.
+        """
         self.cancel_goal()
         super().destroy_node()
 

@@ -250,13 +250,18 @@ class PoseMapping(AlternativeMapping[Pose]):
         """
         Creates a Pose instance from a Point3Mapping and a QuaternionMapping.
 
-        This method constructs a Pose object by utilizing the provided Point3Mapping for the position and the
-        QuaternionMapping for the orientation. The resulting Pose is associated with the specified reference frame.
+        This method constructs a Pose object by utilizing the provided Point3Mapping for
+        the position and the QuaternionMapping for the orientation. The resulting Pose
+        is associated with the specified reference frame.
 
-        :param position: A Point3Mapping object that provides the position data for the Pose.
-        :param orientation: A QuaternionMapping object that provides the orientation data for the Pose.
-        :param reference_frame: The reference frame to which the Pose will be associated.
-        :return: A Pose instance created from the given Point3Mapping and QuaternionMapping.
+        :param position: A Point3Mapping object that provides the position data for the
+            Pose.
+        :param orientation: A QuaternionMapping object that provides the orientation
+            data for the Pose.
+        :param reference_frame: The reference frame to which the Pose will be
+            associated.
+        :return: A Pose instance created from the given Point3Mapping and
+            QuaternionMapping.
         """
         return Pose(
             position=position.to_domain_object(),
@@ -295,8 +300,8 @@ class Pose2DMapping(AlternativeMapping[Pose2D]):
 
 class TrimeshType(TypeDecorator):
     """
-    Type that casts fields that are of type `type` to their class name on serialization and converts the name
-    to the class itself through the globals on load.
+    Type that casts fields that are of type `type` to their class name on serialization
+    and converts the name to the class itself through the globals on load.
     """
 
     impl = types.LargeBinary(4 * 1024 * 1024 * 1024 - 1)  # 4 GB max

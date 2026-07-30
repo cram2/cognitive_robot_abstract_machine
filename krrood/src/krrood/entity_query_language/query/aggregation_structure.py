@@ -1,11 +1,12 @@
 """
 Pure structural queries about aggregation subqueries and result quantifiers.
 
-These helpers answer questions about an expression's aggregation *shape* — does it select an
-aggregator, what does it aggregate over, is it a collapsible calculation — without building anything
-or touching any rendering concern. They live at the query layer (next to :class:`Entity` and the
-aggregators they inspect) because the facts they expose are query-algebra knowledge usable by any
-consumer (evaluation, optimization, verbalization, …), not a verbalization-only concern.
+These helpers answer questions about an expression's aggregation *shape* — does it
+select an aggregator, what does it aggregate over, is it a collapsible calculation —
+without building anything or touching any rendering concern. They live at the query
+layer (next to :class:`Entity` and the aggregators they inspect) because the facts they
+expose are query-algebra knowledge usable by any consumer (evaluation, optimization,
+verbalization, …), not a verbalization-only concern.
 """
 
 from __future__ import annotations

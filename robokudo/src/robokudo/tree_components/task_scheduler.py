@@ -13,10 +13,14 @@ The module supports:
 """
 
 import logging
+from abc import ABC, abstractmethod
+
+from py_trees.behaviour import Behaviour
 from py_trees.common import Status
 from py_trees.composites import Sequence
-from py_trees.behaviour import Behaviour
 from typing_extensions import List, Optional
+
+from robokudo.defs import PACKAGE_NAME
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.tree import (
     add_child_to_parent,
@@ -25,7 +29,7 @@ from robokudo.utils.tree import (
 )
 
 
-class TaskSchedulerBase(Behaviour):
+class TaskSchedulerBase(Behaviour, ABC):
     """Base class for task scheduling behaviors.
 
     This Behaviour enables a dynamic arrangement of known Behaviours.
@@ -50,10 +54,10 @@ class TaskSchedulerBase(Behaviour):
         """
         super().__init__(name)
 
-        self.logger: logging.Logger = logging.getLogger(__name__)
+        self.rk_logger: logging.Logger = logging.getLogger(PACKAGE_NAME)
         """Logger for this class."""
 
-        self.logger.debug("%s.__init__()" % self.__class__.__name__)
+        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.fix_parent_relationships_after_plan: bool = True
         """Whether to fix parent relationships after planning"""
@@ -66,7 +70,7 @@ class TaskSchedulerBase(Behaviour):
 
         :raises AssertionError: If parent is not a Sequence or if the first child is not the scheduler
         """
-        self.logger.debug("%s.initialise()" % self.__class__.__name__)
+        self.rk_logger.debug("%s.initialise()" % self.__class__.__name__)
 
         # Make sanity checks that we are in a correctly configured environment
         parent = self.parent
@@ -74,6 +78,7 @@ class TaskSchedulerBase(Behaviour):
 
         assert parent.children[0] == self
 
+    @abstractmethod
     def plan_new_job(self) -> Optional[Sequence]:
         """Get the new job that should be applied by the JobScheduler.
 
@@ -84,7 +89,7 @@ class TaskSchedulerBase(Behaviour):
 
         :return: py_trees.Sequence if it can be computed or None if no plan could be found.
         """
-        return None
+        raise NotImplementedError
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:
@@ -103,7 +108,9 @@ class TaskSchedulerBase(Behaviour):
         new_job = self.plan_new_job()
 
         if new_job is None:
-            self.logger.debug("Couldn't find solution for Job Scheduling. Aborting...")
+            self.rk_logger.debug(
+                "Couldn't find solution for Job Scheduling. Aborting..."
+            )
             self.feedback_message = (
                 "Couldn't find solution for Job Scheduling. Aborting..."
             )
@@ -130,7 +137,7 @@ class IterativeTaskScheduler(TaskSchedulerBase):
         self,
         name: str = "IterativeTaskScheduler",
         tree_list: Optional[List[Sequence]] = None,
-    ):
+    ) -> None:
         """Initialize the iterative scheduler.
 
         :param name: Name of the scheduler node

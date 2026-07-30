@@ -1,4 +1,5 @@
-"""Analysis engine for object detection and world visualization from stored data.
+"""
+Analysis engine for object detection and world visualization from stored data.
 
 This module provides an analysis engine that demonstrates object detection and
 world visualization using stored camera data. It combines static object
@@ -33,11 +34,14 @@ from robokudo.annotators.world_visualizer import WorldVisualizer
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 from robokudo.annotators.static_object_detector import StaticObjectDetectorAnnotator
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for object detection and world descriptor visualization.
+    """
+    Analysis engine for object detection and world descriptor visualization.
 
     This class implements a pipeline that combines static object detection with
     various visualization components. It processes stored camera data to detect
@@ -58,14 +62,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "world_descriptor_from_storage"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline for object detection and world descriptor visualization.
+        """
+        Create a pipeline for object detection and world descriptor visualization.
 
         This method constructs a processing pipeline that reads stored camera data,
         performs object detection with predefined parameters, and visualizes the
@@ -78,7 +84,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for object detection and visualization
         """
-        cr_storage_config = CrDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
         bootstrap = WorldDescriptorBootstrapAnnotator.Descriptor()
         bootstrap.parameters.world_descriptor_name = "world_iai_kitchen20"
 

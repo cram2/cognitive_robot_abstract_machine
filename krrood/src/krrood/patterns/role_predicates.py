@@ -33,14 +33,18 @@ class IsSameSemanticEntity(Predicate):
     symbolically inside an entity-query-language ``where`` clause.
     """
 
-    entity_1: Any
-    """The first operand; unwrapped to its root persistent entity when it is a role."""
+    first_entity: Any
+    """
+    The first operand; unwrapped to its root persistent entity when it is a role.
+    """
 
-    entity_2: Any
-    """The second operand; unwrapped to its root persistent entity when it is a role."""
+    second_entity: Any
+    """
+    The second operand; unwrapped to its root persistent entity when it is a role.
+    """
 
     def __call__(self) -> bool:
-        return self._root_of(self.entity_1) is self._root_of(self.entity_2)
+        return self._root_of(self.first_entity) is self._root_of(self.second_entity)
 
     @staticmethod
     def _root_of(value: Any) -> Any:
@@ -51,11 +55,12 @@ class IsSameSemanticEntity(Predicate):
 
     @classmethod
     def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
-        """:return: the clause *"<entity_1> is the same entity as <entity_2>"*."""
+        """:return: the clause *"<first_entity> is the same semantic entity as
+        <second_entity>"*."""
         return clause(
-            Noun(fields["entity_1"]),
+            Noun(fields["first_entity"]),
             Copula(),
-            Noun.the("same entity"),
+            Noun.the("same semantic entity"),
             Prepositions.AS,
-            Noun(fields["entity_2"]),
+            Noun(fields["second_entity"]),
         )

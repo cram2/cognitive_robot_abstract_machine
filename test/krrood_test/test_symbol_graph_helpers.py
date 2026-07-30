@@ -14,8 +14,9 @@ _TTool = TypeVar("_TTool", bound=_Tool)
 
 
 def test_get_field_type_endpoint_resolves_typevar_owner():
-    """A TypeVar ``owner_class`` must be resolved to its bound before looking up the
-    field type.
+    """
+    A TypeVar ``owner_class`` must be resolved to its bound before looking up the field
+    type.
 
     Generic attributes (for example ``Connection.parent`` typed as a bound TypeVar)
     reach the symbol-graph helper as a bare TypeVar, which previously raised

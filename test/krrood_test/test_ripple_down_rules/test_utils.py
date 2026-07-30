@@ -3,11 +3,8 @@ import sys
 from os.path import dirname
 from unittest import TestCase
 
-from typing_extensions import List, Dict, Union, Tuple
-
 from krrood.ripple_down_rules.utils import (
     make_set,
-    stringify_hint,
     get_imports_from_types,
 )
 from krrood.utils import get_scope_from_imports, get_relative_import
@@ -29,25 +26,6 @@ class UtilsTestCase(TestCase):
 
         # Clean up
         os.remove(file_path)
-
-    def test_stringify_hint(self):
-
-        self.assertEqual(stringify_hint(int), "int")
-        self.assertEqual(stringify_hint(str), "str")
-        self.assertEqual(stringify_hint(List[int]), "List[int]")
-        self.assertEqual(
-            stringify_hint(Dict[str, Union[int, str]]), "Dict[str, Union[int, str]]"
-        )
-        self.assertEqual(stringify_hint(None), "None")
-        self.assertEqual(stringify_hint("CustomType"), "CustomType")
-        self.assertEqual(
-            stringify_hint(List[Dict[str, Union[int, str]]]),
-            "List[Dict[str, Union[int, str]]]",
-        )
-        self.assertEqual(
-            stringify_hint(List[Dict[str, Union[int, List[Tuple[str, float]]]]]),
-            "List[Dict[str, Union[int, List[Tuple[str, float]]]]]",
-        )
 
     def test_get_relative_import(self):
         package_dir = os.path.join(

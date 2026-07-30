@@ -567,8 +567,8 @@ class GarmiMobileBase(MobileBase, HasTorso[GarmiTorso]):
 @dataclass(eq=False)
 class Garmi(AbstractRobot, HasMobileBase[GarmiMobileBase]):
     """
-    Semantic annotation for GARMI, a mobile service robot with a mecanum base,
-    lift, two Franka FR3 arms, parallel grippers, and a pan/tilt head.
+    Semantic annotation for GARMI, a mobile service robot with a mecanum base, lift, two
+    Franka FR3 arms, parallel grippers, and a pan/tilt head.
     """
 
     @classmethod
@@ -603,7 +603,8 @@ class Garmi(AbstractRobot, HasMobileBase[GarmiMobileBase]):
 
     def _setup_collision_rules(self):
         """
-        Sets up collision avoidance rules for the robot, including SRDF-based self-collision ignore rules.
+        Sets up collision avoidance rules for the robot, including SRDF-based self-
+        collision ignore rules.
         """
         srdf_path = os.path.join(
             Path(files("semantic_digital_twin")).parent.parent,

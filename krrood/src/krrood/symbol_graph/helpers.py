@@ -4,7 +4,10 @@ from typing_extensions import Optional, Any, Type, TypeVar
 
 from krrood.symbolic_math.symbolic_math import Scalar as SymbolicScalar
 from krrood.class_diagrams.class_diagram import WrappedClass, ParseError
-from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram, CouldNotResolveType
+from krrood.class_diagrams.exceptions import (
+    ClassIsUnMappedInClassDiagram,
+    CouldNotResolveType,
+)
 from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.symbol_graph.symbol_graph import SymbolGraph

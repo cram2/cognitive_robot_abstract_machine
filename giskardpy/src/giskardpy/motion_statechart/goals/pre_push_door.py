@@ -23,11 +23,11 @@ class PrePushDoor(Goal):
     door_handle: Body
     reference_linear_velocity: float = 0.1
     reference_angular_velocity: float = 0.5
-    weight: float = DefaultWeights.WEIGHT_BELOW_CA
+    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
 
     def __post_init__(self):
         """
-        The objective is to push the object until desired rotation is reached
+        The objective is to push the object until desired rotation is reached.
         """
         object_joint_name = self.door_object.get_first_parent_connection_of_type(
             ActiveConnection1DOF

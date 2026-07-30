@@ -105,7 +105,7 @@ exactly one part-whole relationship field of its target.
 ## Declaring your own part-whole relationship field
 
 To give a custom annotation its own part-whole relationship field, declare it with
-`field(metadata=FieldMetadata(other_metadata=[IsPartWholeRelationship()]).as_dict())` and inherit
+`field(metadata=IsPartWholeRelationship().as_dict())` and inherit
 from `PartWholeRelationship`. The `IsPartWholeRelationship` marker in the field's metadata — not
 where the field sits in the class hierarchy — is what makes it a part-whole relationship field, so a
 plain `field(...)` on the same class is simply *not* one and is ignored by `add`.
@@ -114,7 +114,6 @@ plain `field(...)` on the same class is simply *not* one and is ignored by `add`
 from dataclasses import dataclass, field
 from typing import Optional
 
-from krrood.patterns.field_metadata import FieldMetadata
 from semantic_digital_twin.semantic_annotations.mixins import (
     IsPartWholeRelationship,
     PartWholeRelationship,
@@ -127,7 +126,7 @@ class ControlPanel(HasRootBody, PartWholeRelationship):
 
     handle: Optional[Handle] = field(
         default=None,
-        metadata=FieldMetadata(other_metadata=[IsPartWholeRelationship()]).as_dict(),
+        metadata=IsPartWholeRelationship().as_dict(),
     )
     """A part-whole relationship field: parts of type ``Handle`` are routed here by ``add``."""
 

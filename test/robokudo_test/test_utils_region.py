@@ -3,7 +3,7 @@ import pytest
 
 from robokudo.utils.region import (
     region_obb,
-    region_obb_in_cam_coordinates,
+    region_obb_in_camera_coordinates,
     region_pose_annotation,
 )
 from robokudo.world_descriptor import BaseWorldDescriptor, RegionSpec
@@ -44,9 +44,9 @@ class TestUtilsRegion:
         assert np.allclose(np.asarray(obb.center).reshape(-1)[:3], [3.0, 2.0, 1.0])
         assert np.allclose(obb.R, [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
 
-    def test_region_obb_in_cam_coordinates(self, world_and_region):
+    def test_region_obb_in_camera_coordinates(self, world_and_region):
         world, region = world_and_region
-        world_to_cam = np.array(
+        world_to_camera = np.array(
             [
                 [0.0, 0.0, 1.0, 1.0],
                 [-1.0, 0.0, 0.0, 2.0],
@@ -55,8 +55,8 @@ class TestUtilsRegion:
             ]
         )
 
-        obb = region_obb_in_cam_coordinates(
-            world=world, region=region, world_T_cam=world_to_cam
+        obb = region_obb_in_camera_coordinates(
+            world=world, region=region, world_T_camera=world_to_camera
         )
 
         assert np.allclose(np.asarray(obb.extent).reshape(-1)[:3], [1.0, 2.0, 3.0])

@@ -1,9 +1,9 @@
 """
-Standalone unit tests for the fragment-IR catamorphism (``fold_fragment``) and
-the plain-text flatten built on top of it.
+Standalone unit tests for the fragment-IR catamorphism (``fold_fragment``) and the
+plain-text flatten built on top of it.
 
-These exercise the fold directly — no verbalizer, no EQL — so the recursion
-scheme is validated in isolation from the rules that produce fragments.
+These exercise the fold directly — no verbalizer, no EQL — so the recursion scheme is
+validated in isolation from the rules that produce fragments.
 """
 
 from __future__ import annotations
@@ -20,7 +20,9 @@ from krrood.entity_query_language.verbalization.fragments.roles import SemanticR
 
 
 def _to_text(fragment) -> str:
-    """Fold a fragment to plain text using a trivial algebra."""
+    """
+    Fold a fragment to plain text using a trivial algebra.
+    """
     return fold_fragment(
         fragment,
         word=lambda t: t,

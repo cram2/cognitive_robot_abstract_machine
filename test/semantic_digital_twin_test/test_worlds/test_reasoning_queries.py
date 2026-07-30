@@ -20,7 +20,8 @@ from semantic_digital_twin.world_description.geometry import Color
 
 def test_load_environment_returns_world():
     """
-    Tests that loading the environment returns a World object with the correct root name.
+    Tests that loading the environment returns a World object with the correct root
+    name.
     """
     world = KitchenEnvironment().get_world()
     assert isinstance(world, World)
@@ -70,10 +71,11 @@ def test_semantic_annotations_on_surfaces(kitchen_environment_fixture):
 
 def test_get_next_object_using_planar_distance(kitchen_environment_fixture):
     """
-    Tests the functionality of the `query_get_next_object_euclidean_x_y` function to verify that it accurately identifies
-    the next objects based on their Euclidean proximity within a simulation world. The test involves setting up a virtual
-    world, retrieving specific objects and annotations, and validating the results returned by the function against
-    predetermined expectations.
+    Tests the functionality of the `query_get_next_object_euclidean_x_y` function to
+    verify that it accurately identifies the next objects based on their Euclidean
+    proximity within a simulation world. The test involves setting up a virtual world,
+    retrieving specific objects and annotations, and validating the results returned by
+    the function against predetermined expectations.
 
     :raises AssertionError: If any of the function assertions fail during testing.
     """
@@ -112,11 +114,12 @@ def test_get_next_object_using_planar_distance(kitchen_environment_fixture):
 
 def test_goal_surface_of_object(kitchen_environment_fixture):
     """
-    Tests the `goal_surface_of_object` function for determining the surface of the most suitable
-    semantic annotation object from a set of candidates based on similarity and
-    other constraints. The function is evaluated under multiple scenarios to verify
-    its logic in choosing the correct table, handling empty tables, and cases with
-    no valid candidates.
+    Tests the `goal_surface_of_object` function for determining the surface of the most
+    suitable semantic annotation object from a set of candidates based on similarity and
+    other constraints.
+
+    The function is evaluated under multiple scenarios to verify its logic in choosing
+    the correct table, handling empty tables, and cases with no valid candidates.
     """
     table1 = kitchen_environment_fixture.get_semantic_annotation_by_name("fruit_table")
     table2 = kitchen_environment_fixture.get_semantic_annotation_by_name(
@@ -149,8 +152,8 @@ def test_goal_surface_of_object(kitchen_environment_fixture):
 
 def test_filter_annotations_by_color(kitchen_environment_fixture):
     """
-    Tests the filter_annotations_by_color function by verifying the retrieval of semantic
-    annotations by their associated colors.
+    Tests the filter_annotations_by_color function by verifying the retrieval of
+    semantic annotations by their associated colors.
 
     The function validates that calling filter_annotations_by_color with different color
     parameters returns the expected list of annotations corresponding to that color
@@ -185,7 +188,8 @@ def test_filter_annotations_by_color(kitchen_environment_fixture):
 
 def test_annotation_class_by_label():
     """
-    Tests the annotation_class_by_label function by verifying the retrieval of the semantic class
+    Tests the annotation_class_by_label function by verifying the retrieval of the
+    semantic class.
     """
     assert annotation_class_by_label("candy_autodrop_box_cadillacs") == Candy
     assert annotation_class_by_label("milk_jumbo_pack_voll") == Milk
@@ -196,7 +200,8 @@ def test_annotation_class_by_label():
 
 def test_sort_annotations_by_volume(kitchen_environment_fixture):
     """
-    Tests the sort_annotations_by_volume function by verifying the order of the returned annotations.
+    Tests the sort_annotations_by_volume function by verifying the order of the returned
+    annotations.
     """
     table1 = kitchen_environment_fixture.get_semantic_annotation_by_name("fruit_table")
     table2 = kitchen_environment_fixture.get_semantic_annotation_by_name(

@@ -1,4 +1,5 @@
-"""Analysis engine for static object detection from stored data.
+"""
+Analysis engine for static object detection from stored data.
 
 This module provides an analysis engine that demonstrates static object detection
 using stored camera data. It implements a pipeline that uses predefined bounding
@@ -22,13 +23,16 @@ from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.object_hypothesis_visualizer import ObjectHypothesisVisualizer
 from robokudo.annotators.static_object_detector import StaticObjectDetectorAnnotator
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for static object detection from stored data.
+    """
+    Analysis engine for static object detection from stored data.
 
     This class implements a pipeline that performs object detection using a
     static bounding box approach. It processes stored camera data and detects
@@ -48,14 +52,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "static_detector_from_storage"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline for static object detection.
+        """
+        Create a pipeline for static object detection.
 
         This method constructs a processing pipeline that performs object
         detection using a static bounding box approach. The detector uses
@@ -68,7 +74,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for static object detection
         """
-        cr_storage_config = CrDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
         sod = StaticObjectDetectorAnnotator.Descriptor()
         sod.parameters.bounding_box_x = 40

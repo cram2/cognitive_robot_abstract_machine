@@ -8,13 +8,18 @@ class ParallelPolicy(object):
     """
     Configurable policies for :py:class:`~py_trees.composites.Parallel` behaviours.
     """
+
     class Base(object):
         """
-        Base class for parallel policies. Should never be used directly.
+        Base class for parallel policies.
+
+        Should never be used directly.
         """
+
         def __init__(self, synchronise=False):
             """
             Default policy configuration.
+
             Args:
                 synchronise (:obj:`bool`): stop ticking of children with status :py:data:`~py_trees.common.Status.SUCCESS` until the policy criteria is met
             """
@@ -22,14 +27,19 @@ class ParallelPolicy(object):
 
     class SuccessOnAll(Base):
         """
-        Return :py:data:`~py_trees.common.Status.SUCCESS` only when each and every child returns
-        :py:data:`~py_trees.common.Status.SUCCESS`. If synchronisation is requested, any children that
-        tick with :data:`~py_trees.common.Status.SUCCESS` will be skipped on subsequent ticks until
-        the policy criteria is met, or one of the children returns status :data:`~py_trees.common.Status.FAILURE`.
+        Return :py:data:`~py_trees.common.Status.SUCCESS` only when each and every child
+        returns :py:data:`~py_trees.common.Status.SUCCESS`.
+
+        If synchronisation is requested, any children that tick with
+        :data:`~py_trees.common.Status.SUCCESS` will be skipped on subsequent ticks
+        until the policy criteria is met, or one of the children returns status
+        :data:`~py_trees.common.Status.FAILURE`.
         """
+
         def __init__(self, synchronise=True):
             """
             Policy configuration.
+
             Args:
                 synchronise (:obj:`bool`): stop ticking of children with status :py:data:`~py_trees.common.Status.SUCCESS` until the policy criteria is met
             """
@@ -37,9 +47,11 @@ class ParallelPolicy(object):
 
     class SuccessOnOne(Base):
         """
-        Return :py:data:`~py_trees.common.Status.SUCCESS` so long as at least one child has :py:data:`~py_trees.common.Status.SUCCESS`
-        and the remainder are :py:data:`~py_trees.common.Status.RUNNING`
+        Return :py:data:`~py_trees.common.Status.SUCCESS` so long as at least one child
+        has :py:data:`~py_trees.common.Status.SUCCESS` and the remainder are
+        :py:data:`~py_trees.common.Status.RUNNING`
         """
+
         def __init__(self):
             """
             No configuration necessary for this policy.
@@ -48,14 +60,19 @@ class ParallelPolicy(object):
 
     class SuccessOnSelected(Base):
         """
-        Return :py:data:`~py_trees.common.Status.SUCCESS` so long as each child in a specified list returns
-        :py:data:`~py_trees.common.Status.SUCCESS`. If synchronisation is requested, any children that
-        tick with :data:`~py_trees.common.Status.SUCCESS` will be skipped on subsequent ticks until
-        the policy criteria is met, or one of the children returns status :data:`~py_trees.common.Status.FAILURE`.
+        Return :py:data:`~py_trees.common.Status.SUCCESS` so long as each child in a
+        specified list returns :py:data:`~py_trees.common.Status.SUCCESS`.
+
+        If synchronisation is requested, any children that tick with
+        :data:`~py_trees.common.Status.SUCCESS` will be skipped on subsequent ticks
+        until the policy criteria is met, or one of the children returns status
+        :data:`~py_trees.common.Status.FAILURE`.
         """
+
         def __init__(self, children, synchronise=True):
             """
             Policy configuraiton.
+
             Args:
                 children ([:class:`~py_trees.behaviour.Behaviour`]): list of children to succeed on
                 synchronise (:obj:`bool`): stop ticking of children with status :py:data:`~py_trees.common.Status.SUCCESS` until the policy criteria is met

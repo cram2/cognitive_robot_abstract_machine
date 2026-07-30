@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
@@ -48,8 +49,12 @@ class SpatialTypeVisualization:
     color: Color = field(default_factory=Color)
     """The color of the markers. Ignored for the fixed RGB axes of pose-like spatial types."""
 
-    namespace: str = "spatial_type"
-    """The marker namespace. RViz scopes marker ids per namespace, so it must be unique per request."""
+    namespace: str = field(default_factory=lambda: f"spatial_type_{uuid.uuid4().hex}")
+    """The marker namespace. RViz scopes marker ids per namespace, so it must be unique per request.
+
+    Defaults to a random value so unrelated requests don't silently collide; pass an explicit,
+    stable namespace when a request's markers should be updated in place across republishes.
+    """
 
     marker_id_offset: int = 0
     """The offset added to each marker's local id. The first marker of a request uses it directly, further markers add small increments."""

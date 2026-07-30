@@ -57,13 +57,13 @@ class DetectingMotion(BaseMotion):
     Tries to detect an object in the FOV of the robot.
 
     The detection is performed inside the motion statechart so it merges with the
-    surrounding motions; detected objects are written into the world/belief state
-    rather than returned.
+    surrounding motions; detected objects are written into the world/belief state rather
+    than returned.
     """
 
     query: PerceptionQuery
     """
-    Query for the perception system that should be answered
+    Query for the perception system that should be answered.
     """
 
     @property

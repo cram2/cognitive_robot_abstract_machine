@@ -21,6 +21,7 @@ from random_events.product_algebra import SimpleEvent, Event
 class ModeWidget(QWidget):
     """
     The Mode page widget of the GUI.
+
     Calculates and displays the Most Probable Explanation (MPE).
     """
 
@@ -325,7 +326,9 @@ class ModeWidget(QWidget):
             self.update_mode_display()
 
     def refresh(self):
-        """Called when a new model is loaded."""
+        """
+        Called when a new model is loaded.
+        """
         # Clear evidence rows
         for w in self.evidence_widgets:
             # The parent widget of VariableConstraintWidget is the row_widget

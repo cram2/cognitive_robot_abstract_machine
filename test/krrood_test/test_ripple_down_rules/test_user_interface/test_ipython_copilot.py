@@ -39,7 +39,9 @@ class ContextAwareCopilotShell:
         shell.pt_app.key_bindings = kb
 
     def _get_context(self):
-        """Create a summary of local variables for the prompt."""
+        """
+        Create a summary of local variables for the prompt.
+        """
         ctx = self.shell.user_ns.copy()
         summary = []
 

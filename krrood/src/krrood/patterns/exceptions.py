@@ -12,9 +12,9 @@ class DelegatedFactoryMethodError(DataclassException):
     """
     Raised when a role-taker factory method is invoked through a role.
 
-    A factory classmethod constructs an instance of the role taker, so delegating it through a
-    role would return a bare role taker and silently drop the role. The call is refused to keep
-    that mistake loud instead of quiet.
+    A factory classmethod constructs an instance of the role taker, so delegating it
+    through a role would return a bare role taker and silently drop the role. The call
+    is refused to keep that mistake loud instead of quiet.
     """
 
     role_type: Type
@@ -50,10 +50,11 @@ class DelegatedFactoryMethodError(DataclassException):
 @dataclass
 class RoleAttributeNotDeclaredError(DataclassException):
     """
-    Raised when assigning a name that the role does not declare as one of its own fields.
+    Raised when assigning a name that the role does not declare as one of its own
+    fields.
 
-    Assignments target the role itself and only its declared fields may be set, so a write cannot
-    silently shadow a role-taker attribute.
+    Assignments target the role itself and only its declared fields may be set, so a
+    write cannot silently shadow a role-taker attribute.
     """
 
     role_type: Type

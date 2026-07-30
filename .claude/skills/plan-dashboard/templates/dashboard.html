@@ -1,0 +1,877 @@
+<title>{{ title }}</title>
+<style>
+  :root {
+    --bg: #F4F6F7;
+    --surface: #FFFFFF;
+    --surface-alt: #EAEFF1;
+    --text: #16212B;
+    --text-muted: #55636E;
+    --border: #D8E0E3;
+    --accent: #0E7C86;
+    --accent-strong: #075E66;
+    --accent-tint: #E1F1F1;
+
+    --status-done: #2F9E44;
+    --status-done-tint: #E4F6E8;
+    --status-progress: #2B6CB8;
+    --status-progress-tint: #E5EEFA;
+    --status-blocked: #C1780A;
+    --status-blocked-tint: #FBEEDB;
+    --status-deferred: #8A6FA8;
+    --status-deferred-tint: #EEE7F5;
+    --status-notstarted: #7C8A93;
+    --status-notstarted-tint: #ECEFF0;
+    --drift: #C43D4F;
+    --drift-tint: #FBE7E9;
+
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #10161B;
+      --surface: #171F25;
+      --surface-alt: #1E272E;
+      --text: #E6ECEF;
+      --text-muted: #94A4AC;
+      --border: #2B3841;
+      --accent: #37B4BC;
+      --accent-strong: #57CBD1;
+      --accent-tint: #133136;
+
+      --status-done: #4FCB6C;
+      --status-done-tint: #123420;
+      --status-progress: #6AA6EC;
+      --status-progress-tint: #142A42;
+      --status-blocked: #E6A93F;
+      --status-blocked-tint: #3A2D0F;
+      --status-deferred: #B69BD6;
+      --status-deferred-tint: #2A2038;
+      --status-notstarted: #92A0A8;
+      --status-notstarted-tint: #22292D;
+      --drift: #F1717E;
+      --drift-tint: #3A1418;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10161B; --surface: #171F25; --surface-alt: #1E272E;
+    --text: #E6ECEF; --text-muted: #94A4AC; --border: #2B3841;
+    --accent: #37B4BC; --accent-strong: #57CBD1; --accent-tint: #133136;
+    --status-done: #4FCB6C; --status-done-tint: #123420;
+    --status-progress: #6AA6EC; --status-progress-tint: #142A42;
+    --status-blocked: #E6A93F; --status-blocked-tint: #3A2D0F;
+    --status-deferred: #B69BD6; --status-deferred-tint: #2A2038;
+    --status-notstarted: #92A0A8; --status-notstarted-tint: #22292D;
+    --drift: #F1717E; --drift-tint: #3A1418;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --bg: #F4F6F7; --surface: #FFFFFF; --surface-alt: #EAEFF1;
+    --text: #16212B; --text-muted: #55636E; --border: #D8E0E3;
+    --accent: #0E7C86; --accent-strong: #075E66; --accent-tint: #E1F1F1;
+    --status-done: #2F9E44; --status-done-tint: #E4F6E8;
+    --status-progress: #2B6CB8; --status-progress-tint: #E5EEFA;
+    --status-blocked: #C1780A; --status-blocked-tint: #FBEEDB;
+    --status-deferred: #8A6FA8; --status-deferred-tint: #EEE7F5;
+    --status-notstarted: #7C8A93; --status-notstarted-tint: #ECEFF0;
+    --drift: #C43D4F; --drift-tint: #FBE7E9;
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, .item .id, .item .branch, .pr-link, .chip, .stat-num, .wave-eyebrow,
+  .track-title, code {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  a { color: var(--accent-strong); }
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 6rem;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 2.25rem;
+    align-items: start;
+  }
+  aside.sidebar {
+    position: sticky;
+    top: 1.5rem;
+    max-height: calc(100vh - 3rem);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overflow-y: auto;
+  }
+  .sidebar-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+  }
+  .sidebar-card h3 {
+    margin: 0 0 0.75rem;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+  }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    aside.sidebar { position: static; max-height: none; overflow-y: visible; }
+  }
+
+  header.masthead {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1.5rem;
+    margin-bottom: 1.75rem;
+  }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.72rem;
+    color: var(--accent-strong);
+    margin: 0 0 0.6rem;
+  }
+  h1 {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 1.7rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.5rem;
+    text-wrap: balance;
+  }
+  .description {
+    color: var(--text-muted);
+    max-width: 62ch;
+    margin: 0 0 1.25rem;
+  }
+  .repo-line {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+  .repo-line a { color: var(--text-muted); text-decoration-color: var(--border); }
+  .tracking-link {
+    margin-left: 0.6rem;
+    padding: 0.1rem 0.55rem;
+    border-radius: 999px;
+    background: var(--accent-tint);
+    color: var(--accent-strong) !important;
+    text-decoration: none !important;
+    font-weight: 600;
+    font-size: 0.78rem;
+  }
+
+  .roadmap-details {
+    margin-top: 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .roadmap-details summary {
+    cursor: pointer;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    list-style: none;
+  }
+  .roadmap-details summary::-webkit-details-marker { display: none; }
+  .roadmap-details summary::before { content: "▸ "; }
+  .roadmap-details[open] summary::before { content: "▾ "; }
+  .roadmap-details[open] summary { border-bottom: 1px solid var(--border); }
+  .roadmap-body {
+    padding: 1rem 1.25rem 1.5rem;
+    max-height: 70vh;
+    overflow-y: auto;
+    font-size: 0.88rem;
+    line-height: 1.6;
+  }
+  .roadmap-body h4, .roadmap-body h5, .roadmap-body h6 {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    margin: 1.4rem 0 0.5rem;
+    color: var(--text);
+  }
+  .roadmap-body h4:first-child { margin-top: 0; }
+  .roadmap-body p { margin: 0 0 0.85rem; color: var(--text-muted); }
+  .roadmap-body ul { margin: 0 0 0.85rem; padding-left: 1.3rem; color: var(--text-muted); }
+  .roadmap-body li { margin-bottom: 0.3rem; }
+  .roadmap-body code {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    background: var(--surface-alt);
+    border-radius: 3px;
+    padding: 0.05rem 0.3rem;
+    font-size: 0.85em;
+  }
+  .roadmap-body pre {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    overflow-x: auto;
+  }
+  .roadmap-table-wrap { overflow-x: auto; margin: 0 0 0.85rem; }
+  .roadmap-body table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.82rem;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+  }
+  .roadmap-body th, .roadmap-body td {
+    border: 1px solid var(--border);
+    padding: 0.35rem 0.6rem;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .roadmap-body th { background: var(--surface-alt); color: var(--text); }
+  .roadmap-body a { color: var(--accent-strong); }
+  .roadmap-body strong { color: var(--text); }
+
+  .summary-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .stat {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 0.7rem;
+  }
+  .stat-num { font-weight: 700; font-size: 1.05rem; }
+  .stat-label { font-size: 0.74rem; color: var(--text-muted); }
+
+  .done-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 0.85rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .done-toggle input { accent-color: var(--accent); cursor: pointer; }
+
+  .alert-banner {
+    border-radius: 8px;
+    padding: 0.7rem 0.85rem;
+    margin-top: 0.85rem;
+    font-size: 0.84rem;
+  }
+  .alert-banner ul { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+  .clean-banner { background: var(--status-done-tint); color: var(--status-done); border: 1px solid color-mix(in srgb, var(--status-done) 35%, transparent); }
+  .drift-banner { background: var(--drift-tint); color: var(--drift); border: 1px solid color-mix(in srgb, var(--drift) 35%, transparent); }
+
+  .next-group { margin-bottom: 0.9rem; }
+  .next-group:last-child { margin-bottom: 0; }
+  .next-group h4 {
+    margin: 0 0 0.4rem;
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .next-drift h4 { color: var(--drift); }
+  .next-review h4 { color: var(--status-progress); }
+  .next-ready h4 { color: var(--status-done); }
+  .next-recheck h4 { color: var(--status-blocked); }
+  .next-group ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+  .next-group li { font-size: 0.82rem; border-left: 2px solid var(--border); }
+  .next-drift li { border-color: var(--drift); }
+  .next-review li { border-color: var(--status-progress); display: flex; align-items: flex-start; justify-content: space-between; gap: 0.4rem; }
+  .next-ready li { border-color: var(--status-done); }
+  .next-recheck li { border-color: var(--status-blocked); }
+  .next-reason { color: var(--text-muted); font-size: 0.78rem; }
+  .next-review-link {
+    flex-shrink: 0;
+    margin: 0.15rem 0.6rem 0 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--status-progress);
+    white-space: nowrap;
+  }
+  .next-empty { color: var(--text-muted); font-size: 0.85rem; font-style: italic; margin: 0; }
+  .next-item-link {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    padding: 0.15rem 0.6rem;
+    color: inherit;
+    text-decoration: none;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+  }
+  .next-item-link:hover { background: var(--surface-alt); }
+
+  .wave { margin-top: 2.5rem; }
+  .wave-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--accent-strong);
+    background: var(--accent-tint);
+    display: inline-block;
+    padding: 0.3rem 0.65rem;
+    border-radius: 5px;
+    margin-bottom: 1.1rem;
+  }
+  .wave-description { margin: -0.6rem 0 1.1rem; color: var(--text-muted); font-size: 0.85rem; }
+
+  .track { margin-top: 1.4rem; }
+  .track-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin: 0 0 0.6rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px dashed var(--border);
+  }
+  .track-empty {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    font-style: italic;
+    margin: 0 0 0.5rem;
+  }
+
+  .item-list { display: flex; flex-direction: column; gap: 0.6rem; }
+  .item {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-left: calc(var(--indent-level, 0) * 1.75rem);
+  }
+  .page.hide-done .item {
+    margin-left: calc(var(--indent-level-hidden-done, 0) * 1.75rem);
+  }
+  .page.hide-done .item.status-done { display: none; }
+  .wrap-arrow {
+    font-size: 0.72rem;
+    color: var(--accent-strong);
+    background: var(--accent-tint);
+    padding: 0.3rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .wrap-arrow.wrap-arrow-hidden-done { display: none; }
+  .page.hide-done .wrap-arrow.wrap-arrow-all { display: none; }
+  .page.hide-done .wrap-arrow.wrap-arrow-hidden-done { display: block; }
+  .wrap-parent-title { color: var(--text-muted); }
+  .item-row { display: flex; }
+  .item-spine { width: 4px; flex-shrink: 0; background: var(--status-notstarted); }
+  .item.status-done .item-spine { background: var(--status-done); }
+  .item.status-in_progress .item-spine { background: var(--status-progress); }
+  .item.status-blocked .item-spine { background: var(--status-blocked); }
+  .item.status-deferred .item-spine { background: var(--status-deferred); }
+  .item.status-not_started .item-spine { background: var(--status-notstarted); }
+  .item.has-drift { box-shadow: 0 0 0 1px var(--drift) inset; }
+  .item.item-highlighted { animation: plan-dashboard-highlight-pulse 2.2s ease-out; }
+  @keyframes plan-dashboard-highlight-pulse {
+    0% { box-shadow: 0 0 0 3px var(--accent); background: var(--accent-tint); }
+    100% { box-shadow: 0 0 0 0 transparent; background: var(--surface); }
+  }
+
+  .item-body { padding: 0.75rem 1rem; flex: 1; min-width: 0; }
+  .item-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .item-title { margin: 0; font-size: 0.96rem; font-weight: 600; text-wrap: balance; }
+  .item-badges { display: flex; gap: 0.4rem; flex-shrink: 0; }
+  .badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.18rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .status-badge.status-done { background: var(--status-done-tint); color: var(--status-done); }
+  .status-badge.status-in_progress { background: var(--status-progress-tint); color: var(--status-progress); }
+  .status-badge.status-blocked { background: var(--status-blocked-tint); color: var(--status-blocked); }
+  .status-badge.status-deferred { background: var(--status-deferred-tint); color: var(--status-deferred); }
+  .status-badge.status-not_started { background: var(--status-notstarted-tint); color: var(--status-notstarted); }
+
+  .live-badge { background: var(--surface-alt); color: var(--text-muted); border: 1px solid var(--border); }
+  .live-badge.live-merged { color: var(--status-done); }
+  .live-badge.live-open_draft { color: var(--text-muted); }
+  .live-badge.live-open_ready { color: var(--status-progress); }
+  .live-badge.live-closed_unmerged { color: var(--text-muted); text-decoration: line-through; }
+  .live-badge.live-not_found { color: var(--drift); }
+
+  .item-meta {
+    margin-top: 0.4rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+  .item-meta .id { color: var(--text); }
+  .item-meta .branch::before { content: "⎇ "; }
+  .pr-link, .session-link { font-weight: 600; }
+  .muted { color: var(--text-muted); font-style: italic; }
+  .action-group { margin-left: auto; display: flex; align-items: center; gap: 0.35rem; }
+  /* A hand-built dropdown, not a native <select> - a published Artifact page
+     runs inside a sandboxed iframe, where native select popups are known
+     not to open; position: fixed keeps the list from being clipped by
+     .item's own overflow: hidden regardless of where its button sits. */
+  .model-picker { position: relative; }
+  .model-picker-toggle {
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface-alt);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.7rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .model-picker-toggle:hover { border-color: var(--accent); color: var(--text); }
+  .model-picker-list {
+    display: none;
+    position: fixed;
+    min-width: 9.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    padding: 0.3rem;
+    margin: 0;
+    list-style: none;
+    z-index: 50;
+  }
+  .model-picker.model-picker-open .model-picker-list { display: block; }
+  .model-picker-list li {
+    padding: 0.3rem 0.55rem;
+    border-radius: 5px;
+    font-size: 0.76rem;
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .model-picker-list li:hover,
+  .model-picker-list li.model-picker-option-selected {
+    background: var(--accent-tint);
+    color: var(--accent-strong);
+  }
+  .action-button {
+    padding: 0.18rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--accent);
+    background: var(--accent-tint);
+    color: var(--accent-strong);
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .action-button:hover { background: var(--accent); color: var(--surface); }
+  .action-button.action-button-copied {
+    border-color: var(--status-done);
+    background: var(--status-done-tint);
+    color: var(--status-done);
+  }
+  .action-button.action-button-failed {
+    border-color: var(--drift);
+    background: var(--drift-tint);
+    color: var(--drift);
+  }
+  .review-button {
+    padding: 0.18rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--status-progress);
+    background: var(--status-progress-tint);
+    color: var(--status-progress);
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-decoration: none;
+  }
+  .review-button:hover { background: var(--status-progress); color: var(--surface); }
+
+  .notes { margin-top: 0.5rem; font-size: 0.86rem; color: var(--text-muted); white-space: pre-line; }
+  .drift {
+    margin-top: 0.5rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--drift);
+    background: var(--drift-tint);
+    border-radius: 5px;
+    padding: 0.35rem 0.6rem;
+    display: inline-block;
+  }
+  .deps { margin-top: 0.5rem; font-size: 0.78rem; display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+  .deps-label { color: var(--text-muted); text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.05em; }
+  .chip {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+  }
+  .blockers { margin-top: 0.5rem; }
+  .blocker { font-size: 0.82rem; color: var(--status-blocked); }
+
+  footer.page-footer {
+    margin-top: 3rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+
+  @media (max-width: 560px) {
+    .item-head { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+
+{% macro dependency_chip(chip) %}
+<span class="chip" title="{{ chip.tooltip }}">{{ chip.identifier }}</span>
+{% endmacro %}
+
+{% macro action_button(item) %}
+{% if item.action %}
+<span class="action-group">
+  <span class="model-picker" data-model="" aria-label="Model for {{ item.action.label }}">
+    <button type="button" class="model-picker-toggle" onclick="planDashboardToggleModelPicker(event, this)">{{ available_models[0].label }} ▾</button>
+    <ul class="model-picker-list" role="listbox">
+      {% for model in available_models %}
+      <li role="option" data-value="{{ model.value }}" onclick="planDashboardSelectModel(event, this)"{% if loop.first %} class="model-picker-option-selected"{% endif %}>{{ model.label }}</li>
+      {% endfor %}
+    </ul>
+  </span>
+  <button type="button" class="action-button" data-action-command="{{ item.action.command }}" onclick="planDashboardCopyActionCommand(this)">▸ {{ item.action.label }}</button>
+</span>
+{% endif %}
+{% endmacro %}
+
+{% macro item_card(stacked) %}
+{% set item = stacked.item %}
+    <article id="item-{{ item.identifier }}" class="item {{ item.status_and_drift_css_class }}" style="{{ stacked.indent_style }}">
+      {% if stacked.wrap_parent %}
+      <div class="wrap-arrow wrap-arrow-all">◄ continues from <span class="mono">{{ stacked.wrap_parent.identifier }}</span> <span class="wrap-parent-title">({{ stacked.wrap_parent.title }})</span></div>
+      {% endif %}
+      {% if stacked.wrap_parent_with_done_hidden %}
+      <div class="wrap-arrow wrap-arrow-hidden-done">◄ continues from <span class="mono">{{ stacked.wrap_parent_with_done_hidden.identifier }}</span> <span class="wrap-parent-title">({{ stacked.wrap_parent_with_done_hidden.title }})</span></div>
+      {% endif %}
+      <div class="item-row">
+        <div class="item-spine"></div>
+        <div class="item-body">
+          <div class="item-head">
+            <h4 class="item-title">{{ item.title }}</h4>
+            <div class="item-badges">
+              <span class="badge status-badge status-{{ item.status.value }}">{{ item.status.display_label }}</span>
+              <span class="badge live-badge live-{{ item.live_state.value }}">{{ item.live_state.display_label }}</span>
+            </div>
+          </div>
+          <div class="item-meta">
+            <span class="mono id">{{ item.identifier }}</span>
+            <span class="mono branch">{{ item.branch }}</span>
+            {% if item.pull_request_url %}
+            <a class="pr-link" href="{{ item.pull_request_url }}" target="_blank" rel="noopener">#{{ item.pull_request_number }}</a>
+            {% else %}
+            <span class="muted">no pull request yet</span>
+            {% endif %}
+            {% if item.session %}
+            <a class="session-link" href="{{ item.session }}" target="_blank" rel="noopener">session ↗</a>
+            {% endif %}
+            {% if item.needs_review %}
+            <a class="review-button" href="{{ item.pull_request_url }}" target="_blank" rel="noopener">↗ Review</a>
+            {% endif %}
+            {{ action_button(item) }}
+          </div>
+          {% if item.drift_description %}
+          <div class="drift">⚠ {{ item.drift_description }}</div>
+          {% endif %}
+          {% if item.notes %}
+          <div class="notes">{{ item.notes }}</div>
+          {% endif %}
+          {% if item.dependency_chips %}
+          <div class="deps">
+            <span class="deps-label">needs</span>
+            {% for chip in item.dependency_chips %}
+            {{ dependency_chip(chip) }}
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% if item.blockers %}
+          <div class="blockers">
+            {% for blocker in item.blockers %}
+            <div class="blocker">▸ {{ blocker }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </article>
+{% endmacro %}
+
+<div class="page hide-done" id="plan-dashboard-page">
+  <header class="masthead">
+    <p class="eyebrow">Plan Dashboard</p>
+    <h1>{{ title }}</h1>
+    <p class="description">{{ description }}</p>
+    <p class="repo-line">
+      {{ total_items }} tracked items · <a href="{{ repository_url }}" target="_blank" rel="noopener">{{ repository }}</a>
+      {% if tracking_url %}<a class="tracking-link" href="{{ tracking_url }}" target="_blank" rel="noopener">Propose a structural change →</a>{% endif %}
+    </p>
+    <details class="roadmap-details">
+      <summary>Background &amp; history (roadmap.md)</summary>
+      <div class="roadmap-body">{{ roadmap_html | safe }}</div>
+    </details>
+  </header>
+
+  <div class="layout">
+    <main>
+      {% for wave_section in waves %}
+      <section class="wave" id="wave-{{ wave_section.wave.id }}">
+        <div class="wave-eyebrow">{{ wave_section.wave.name }}</div>
+        {% if wave_section.wave.description %}
+        <p class="wave-description">{{ wave_section.wave.description }}</p>
+        {% endif %}
+        {% for track_section in wave_section.tracks %}
+        <section class="track">
+          <h3 class="track-title">{{ track_section.track.name }}</h3>
+          {% if track_section.stacked_items %}
+          <div class="item-list">
+            {% for stacked in track_section.stacked_items %}
+            {{ item_card(stacked) }}
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="track-empty">{{ track_section.empty_state_message }}</p>
+          {% endif %}
+        </section>
+        {% endfor %}
+      </section>
+      {% endfor %}
+    </main>
+
+    <aside class="sidebar">
+      <div class="sidebar-card">
+        <h3>Status</h3>
+        <div class="summary-strip">
+          {% for status in item_statuses %}
+          <div class="stat"><span class="stat-num">{{ status_counts[status] }}</span><span class="stat-label">{{ status.display_label }}</span></div>
+          {% endfor %}
+        </div>
+        <label class="done-toggle">
+          <input type="checkbox" id="show-done-toggle" onchange="document.getElementById('plan-dashboard-page').classList.toggle('hide-done', !this.checked)">
+          Show done / merged items
+        </label>
+        {% if drift_items %}
+        <div class="alert-banner drift-banner">
+          <strong>{{ drift_items | length }} drift flag(s)</strong>
+          <ul>
+          {% for item in drift_items %}
+            <li>{{ item.title }} — {{ item.drift_description }}</li>
+          {% endfor %}
+          </ul>
+        </div>
+        {% else %}
+        <div class="alert-banner clean-banner">No drift — every item's manual status agrees with live GitHub state.</div>
+        {% endif %}
+      </div>
+      <div class="sidebar-card">
+        <h3>What to do next</h3>
+        {% if drift_items or ready_to_review or ready_to_start or blocker_maybe_cleared %}
+          {% if drift_items %}
+          <div class="next-group next-drift">
+            <h4>Fix the manifest ({{ drift_items | length }})</h4>
+            <ul>
+            {% for item in drift_items %}
+              <li><a class="next-item-link" href="#item-{{ item.identifier }}" data-item-identifier="{{ item.identifier }}" onclick="planDashboardHighlightItem(event, this)"><strong>{{ item.title }}</strong><br><span class="next-reason">{{ item.drift_description }}</span></a></li>
+            {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+          {% if ready_to_start %}
+          <div class="next-group next-ready">
+            <h4>Ready to start ({{ ready_to_start | length }})</h4>
+            <ul>
+            {% for item in ready_to_start %}
+              <li><a class="next-item-link" href="#item-{{ item.identifier }}" data-item-identifier="{{ item.identifier }}" onclick="planDashboardHighlightItem(event, this)"><strong>{{ item.title }}</strong><br><span class="next-reason">every dependency is at least ready for review — nothing structurally blocking it</span></a></li>
+            {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+          {% if blocker_maybe_cleared %}
+          <div class="next-group next-recheck">
+            <h4>Blocker may be cleared ({{ blocker_maybe_cleared | length }})</h4>
+            <ul>
+            {% for item in blocker_maybe_cleared %}
+              <li><a class="next-item-link" href="#item-{{ item.identifier }}" data-item-identifier="{{ item.identifier }}" onclick="planDashboardHighlightItem(event, this)"><strong>{{ item.title }}</strong><br><span class="next-reason">at least one dependency is now ready for review — worth resolving the blocker</span></a></li>
+            {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+          {% if ready_to_review %}
+          <div class="next-group next-review">
+            <h4>Ready to review ({{ ready_to_review | length }})</h4>
+            <ul>
+            {% for item in ready_to_review %}
+              <li>
+                <a class="next-item-link" href="#item-{{ item.identifier }}" data-item-identifier="{{ item.identifier }}" onclick="planDashboardHighlightItem(event, this)"><strong>{{ item.title }}</strong><br><span class="next-reason">open draft pull request, ready for your review</span></a>
+                <a class="next-review-link" href="{{ item.pull_request_url }}" target="_blank" rel="noopener">Review ↗</a>
+              </li>
+            {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+        {% else %}
+        <p class="next-empty">Nothing actionable right now — every item is either in progress, fully blocked, or done.</p>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+
+  <footer class="page-footer">
+    Generated by <code>/plan-dashboard</code> from <code>plan.yaml</code>, cross-checked live against GitHub.
+    Manual status only ever reflects the plan's own assessment — draft/ready/merged/closed always comes from GitHub directly, so it can never go stale here.
+  </footer>
+</div>
+
+<script>
+  function planDashboardCopyActionCommand(button) {
+    var baseCommand = button.getAttribute("data-action-command");
+    var modelPicker = button.previousElementSibling;
+    var model = modelPicker && modelPicker.classList.contains("model-picker")
+      ? modelPicker.getAttribute("data-model")
+      : "";
+    var command = model ? "/model " + model + "\n" + baseCommand : baseCommand;
+    var originalLabel = button.textContent;
+    var resetTimeoutMilliseconds = 1800;
+
+    function showResult(className, label) {
+      button.classList.remove("action-button-copied", "action-button-failed");
+      button.classList.add(className);
+      button.textContent = label;
+      setTimeout(function () {
+        button.classList.remove(className);
+        button.textContent = originalLabel;
+      }, resetTimeoutMilliseconds);
+    }
+
+    function onCopySucceeded() {
+      showResult("action-button-copied", "Copied!");
+    }
+
+    function onCopyFailed() {
+      showResult("action-button-failed", "Copy failed");
+    }
+
+    function copyViaTemporaryTextarea() {
+      var textarea = document.createElement("textarea");
+      textarea.value = command;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      var succeeded = false;
+      try {
+        succeeded = document.execCommand("copy");
+      } catch (error) {
+        succeeded = false;
+      }
+      document.body.removeChild(textarea);
+      if (succeeded) {
+        onCopySucceeded();
+      } else {
+        onCopyFailed();
+      }
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(command).then(onCopySucceeded, copyViaTemporaryTextarea);
+    } else {
+      copyViaTemporaryTextarea();
+    }
+  }
+
+  function planDashboardHighlightItem(event, link) {
+    var identifier = link.getAttribute("data-item-identifier");
+    var target = document.getElementById("item-" + identifier);
+    var highlightMilliseconds = 2200;
+    if (!target) {
+      return;
+    }
+    event.preventDefault();
+    target.scrollIntoView({behavior: "smooth", block: "center"});
+    target.classList.remove("item-highlighted");
+    void target.offsetWidth;
+    target.classList.add("item-highlighted");
+    window.setTimeout(function () {
+      target.classList.remove("item-highlighted");
+    }, highlightMilliseconds);
+  }
+
+  function planDashboardCloseModelPickers() {
+    document.querySelectorAll(".model-picker.model-picker-open").forEach(function (picker) {
+      picker.classList.remove("model-picker-open");
+    });
+  }
+
+  function planDashboardToggleModelPicker(event, toggleButton) {
+    event.stopPropagation();
+    var picker = toggleButton.closest(".model-picker");
+    var wasOpen = picker.classList.contains("model-picker-open");
+    planDashboardCloseModelPickers();
+    if (wasOpen) {
+      return;
+    }
+    var list = picker.querySelector(".model-picker-list");
+    var toggleRect = toggleButton.getBoundingClientRect();
+    list.style.top = (toggleRect.bottom + 4) + "px";
+    list.style.left = toggleRect.left + "px";
+    picker.classList.add("model-picker-open");
+  }
+
+  function planDashboardSelectModel(event, optionElement) {
+    event.stopPropagation();
+    var picker = optionElement.closest(".model-picker");
+    var toggleButton = picker.querySelector(".model-picker-toggle");
+    picker.setAttribute("data-model", optionElement.getAttribute("data-value"));
+    toggleButton.textContent = optionElement.textContent + " ▾";
+    picker.querySelectorAll(".model-picker-option-selected").forEach(function (selected) {
+      selected.classList.remove("model-picker-option-selected");
+    });
+    optionElement.classList.add("model-picker-option-selected");
+    planDashboardCloseModelPickers();
+  }
+
+  document.addEventListener("click", planDashboardCloseModelPickers);
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      planDashboardCloseModelPickers();
+    }
+  });
+</script>

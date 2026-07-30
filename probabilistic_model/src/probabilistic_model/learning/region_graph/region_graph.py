@@ -26,9 +26,10 @@ import jax.random
 class Region:
     """
     A region in a region graph.
-    A region is a set of variables.
-    Refer to this paper https://ml-research.github.io/papers/peharz2019uai_ratspns.pdf .
 
+    A region is a set of variables. Refer to this paper
+    https://ml-research.github.io/papers/peharz2019uai_ratspns.pdf
+    .
     """
 
     variables: SortedSet
@@ -64,7 +65,9 @@ class Partition:
 
 class RegionGraph(nx.DiGraph):
     """
-    A region graph is a directed acyclic bipartite graph that represents a (potentially repeated) partition of variables.
+    A region graph is a directed acyclic bipartite graph that represents a (potentially
+    repeated) partition of variables.
+
     Bluntly speaking, a region graph is an ensemble of random Latent-Variable trees.
     """
 
@@ -76,6 +79,7 @@ class RegionGraph(nx.DiGraph):
     classes: int
     """
     The number of classes.
+
     If classes > 1, the circuit is a classifier, if 1 it is a generative model.
     """
 
@@ -92,6 +96,7 @@ class RegionGraph(nx.DiGraph):
     repetitions: int
     """
     The number of repetitions to create in the region graph.
+
     A repetition is another partitioning on the set of variables.
     """
 
@@ -181,6 +186,7 @@ class RegionGraph(nx.DiGraph):
     ) -> Union[JPC, ClassificationCircuit]:
         """
         Convert the region graph to a jax probabilistic circuit.
+
         :param input_units: The number of input units to use in each input layer.
         :param sum_units: The number of sum units to use in each sum layer.
         :param key: The random key to use for all trainable parameters.

@@ -19,10 +19,12 @@ class JointPositionReached(MotionStatechartNode):
     """
     Monitored joint connection.
     """
+
     position: float = field(kw_only=True)
     """
     Target position to monitor.
     """
+
     threshold: float = field(default=0.01, kw_only=True)
     """
     Threshold for position error.

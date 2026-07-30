@@ -138,10 +138,11 @@ class PartNetMobilityDatasetLoader:
     def _create_python_file_with_semantic_annotations_from_dataset(self):
         """
         Write all semantic annotations classes from the dataset to a Python file.
-        This requires the entire dataset to be located in the specified directory.
-        Only call this when you want to generate/update the `generated_semantic_annotations.py` file.
-        """
 
+        This requires the entire dataset to be located in the specified directory. Only
+        call this when you want to generate/update the
+        `generated_semantic_annotations.py` file.
+        """
         labels = defaultdict(set)  # a dict of class names to sets of labels
 
         # collect all labels from all semantics.txt files

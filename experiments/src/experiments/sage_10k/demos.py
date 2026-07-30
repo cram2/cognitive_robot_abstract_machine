@@ -46,6 +46,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 class Sage10kAbstractDemoHSRB:
     """
     Base class for all Sage10k demos with the HSRB robot.
+
     Extend this class to create a new demo.
     """
 
@@ -56,12 +57,15 @@ class Sage10kAbstractDemoHSRB:
 
     world: Optional[World] = field(init=False, default=None)
     """
-    The world to execute the demo in. Only available after calling `create_world()`.
+    The world to execute the demo in.
+
+    Only available after calling `create_world()`.
     """
 
     def create_world(self):
         """
         Create the world and the HSRB robot.
+
         Updated self.world `in-place`.
         """
         loader = Sage10kDatasetLoader()
@@ -72,8 +76,9 @@ class Sage10kAbstractDemoHSRB:
     def preprocess_world(self):
         """
         Preprocess the world before executing the demo `in-place`.
-        Removes every body associated with a NaturalLanguageWithTypeDescription too close to the
-        main entrance.
+
+        Removes every body associated with a NaturalLanguageWithTypeDescription too
+        close to the main entrance.
 
         Can only be used after the world has been created.
         """

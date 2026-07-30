@@ -31,7 +31,7 @@ from krrood.entity_query_language.verbalization.value_lexicon import (
     type_noun,
     value_phrase,
 )
-from krrood.patterns.field_metadata import GrammarMetadata
+from krrood.entity_query_language.verbalization.grammar_metadata import GrammarMetadata
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.microplanning.coordination import (
@@ -242,18 +242,25 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         return cls(text=value_phrase(value), role=SemanticRole.LITERAL)
 
     @classmethod
-    def for_member(cls, value: Any) -> RoleFragment:
-        """Build a fragment for one admissible member of a set or disjunction: a class renders as a
-        source-linked type reference (:meth:`for_type`), any other value as a literal
-        (:meth:`for_literal`). Lets the set/disjunction elements render members uniformly without
-        branching on whether they are types.
+    def for_value(cls, value: Any) -> RoleFragment:
+        """Render an arbitrary Python value to a fragment, picking the right kind automatically: a
+        class becomes a source-linked type reference (:meth:`for_type`, *"Robot"* linked to its
+        definition), anything else a plain literal (:meth:`for_literal`, *"42"*).
 
-        >>> RoleFragment.for_member(int).text
+        Use this — rather than choosing :meth:`for_type` or :meth:`for_literal` yourself — when the
+        value's kind is not known statically, i.e. when rendering the elements of a listing that may
+        hold either types or literals (:class:`~…vocabulary.parts_of_speech.DisjunctivePhrase` /
+        :class:`~…vocabulary.parts_of_speech.OneOf`). Prefer :meth:`for_literal` directly when the
+        value is always a literal.
+
+        >>> RoleFragment.for_value(int).text
         'Integer'
-        >>> RoleFragment.for_member(42).text
+        >>> RoleFragment.for_value(42).text
         '42'
         """
-        return cls.for_type(value) if isinstance(value, type) else cls.for_literal(value)
+        return (
+            cls.for_type(value) if isinstance(value, type) else cls.for_literal(value)
+        )
 
     @classmethod
     def for_operator(cls, label: str) -> RoleFragment:
@@ -308,6 +315,11 @@ class NounPhrase(HasNumber, VerbalizationFragment):
     head: VerbalizationFragment
     """The noun leaf or sub-phrase the determiner attaches to."""
 
+    additional_heads: List[VerbalizationFragment] = field(default_factory=list)
+    """Further disjunctive alternatives to :attr:`head`, each joined with *"or"* and given its
+    own indefinite article from its own phonology (*"a Body or a Region"*). Empty for an
+    ordinary single-headed noun phrase."""
+
     definiteness: Definiteness = Definiteness.INDEFINITE
     """Determiner-system feature — selects *"a/an"* / *"the"* / no determiner."""
 
@@ -335,10 +347,23 @@ class NounPhrase(HasNumber, VerbalizationFragment):
 
     relative_clause: bool = False
     """``True`` when the :attr:`modifiers` form a relative clause (*"to which its primary is
-    assigned"*). Such modifiers are set off by commas when the head is independently identified — a
-    disambiguation number (*"Robot 1, to which …"*) makes the clause non-restrictive — but stay
-    comma-less while the clause itself identifies the head (*"the Robot to which a Mission is
-    assigned"*)."""
+    assigned"*). Read by the coreference pass to decide whether the clause needs comma-framing on
+    repeat mention — see
+    :meth:`~…rendering.coreference_processor.CoreferenceProcessor._distinguished`."""
+
+    alternative: bool = False
+    """``True`` when this noun phrase is the second of a same-noun *pair* of distinct referents —
+    the determiner realises the fused indefinite *"another"* on first mention and *"the other"* on
+    repeat mention. Mutually exclusive with :attr:`ordinal`. Unlike :attr:`pre_head`, this survives
+    coreference reduction (:meth:`~…rendering.coreference_processor.CoreferenceProcessor._reduced`)
+    — it is part of the referent's identity, not a descriptive qualifier."""
+
+    ordinal: Optional[int] = None
+    """When set, this noun phrase is one of ≥ 3 same-noun distinct referents, and the value is its
+    position in the group, counting the first member as 1 — realised as an ordinal word in the
+    pre-head slot (*"a second Robot"*, later *"the second Robot"*). Mutually exclusive with
+    :attr:`alternative`; ``None`` for the first member of any group. Like :attr:`alternative`, this
+    survives coreference reduction."""
 
 
 @dataclass
@@ -594,3 +619,51 @@ def oxford_comma(
         result.append(WordFragment(text=Separator.COMMA))
     result.append(PhraseFragment(parts=[conjunction, tail]))
     return PhraseFragment(parts=result, separator=Separator.NONE)
+
+
+# %% Subject-verb agreement
+
+
+def apply_subject_verb_agreement(
+    part: VerbalizationFragment, number: GrammaticalNumber
+) -> VerbalizationFragment:
+    """:return: *part* re-tagged with *number* when it is the clause's inflected predicate word —
+    an ``OPERATOR`` (copula / comparison) or ``VERB`` leaf, or a phrase led by one (the factored
+    *"is greater than"*) — else *part* unchanged. The copula inflects (*"is"* → *"are"*) and a
+    lexical verb agrees (*"works"* → *"work"*); a non-copula operator (*"contains"*) is tagged too
+    but the morphology pass leaves it be, so a caller never has to single the predicate word out
+    by text.
+
+    Shared by the coreference pass (a pronominalised subject re-agrees the clause it heads) and
+    :func:`~…vocabulary.parts_of_speech.clause` (a coordinated subject is plural from the moment
+    the clause is built).
+
+    >>> from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
+    >>> from krrood.entity_query_language.verbalization.fragments.features import (
+    ...     GrammaticalNumber,
+    ... )
+    >>> from krrood.entity_query_language.verbalization.rendering.morphology_processor import (
+    ...     MorphologyProcessor,
+    ... )
+    >>> leaf = RoleFragment(text="is", role=SemanticRole.OPERATOR)
+    >>> plural_leaf = apply_subject_verb_agreement(leaf, GrammaticalNumber.PLURAL)
+    >>> MorphologyProcessor().rewrite(plural_leaf).text
+    'are'
+
+    :param part: A clause constituent, checked for the predicate-word shape.
+    :param number: The grammatical number to agree it to.
+    """
+    predicate_word_roles = (SemanticRole.OPERATOR, SemanticRole.VERB)
+    if isinstance(part, RoleFragment) and part.role in predicate_word_roles:
+        return replace(part, number=number)
+    leads_with_predicate_word = (
+        isinstance(part, PhraseFragment)
+        and part.parts
+        and isinstance(part.parts[0], RoleFragment)
+        and part.parts[0].role in predicate_word_roles
+    )
+    if leads_with_predicate_word:
+        return replace(
+            part, parts=[replace(part.parts[0], number=number), *part.parts[1:]]
+        )
+    return part

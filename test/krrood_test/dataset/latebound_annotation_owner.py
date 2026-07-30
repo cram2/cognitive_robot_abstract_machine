@@ -11,7 +11,9 @@ if TYPE_CHECKING:
 
 @dataclass
 class OwnerWithLateBoundAnnotation:
-    """A dataclass annotated with ``TYPE_CHECKING``-only types from other modules."""
+    """
+    A dataclass annotated with ``TYPE_CHECKING``-only types from other modules.
+    """
 
     value: Optional[LateBoundAnnotationType] = field(default=None)
     secondary_value: Optional[LateBoundAnnotationSecondaryType] = field(default=None)

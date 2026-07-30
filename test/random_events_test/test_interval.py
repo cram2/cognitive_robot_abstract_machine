@@ -31,7 +31,9 @@ class SimpleIntervalTestCase(unittest.TestCase):
         complement_a = a.complement()
         self.assertEqual(
             complement_a[0],
-            SimpleInterval.from_data(-float("inf"), float("inf"), Bound.OPEN, Bound.OPEN),
+            SimpleInterval.from_data(
+                -float("inf"), float("inf"), Bound.OPEN, Bound.OPEN
+            ),
         )
         b = SimpleInterval.from_data(0, 1)
         complement_b = b.complement()
@@ -77,7 +79,9 @@ class IntervalTestCase(unittest.TestCase):
         d = SimpleInterval.from_data(3, 4)
         a_b = Interval.from_simple_sets(d, a, b, c)
         a_b_simplified = a_b.simplify()
-        a_b_simplified_ = Interval.from_simple_sets(SimpleInterval.from_data(0, 2), SimpleInterval.from_data(3, 4))
+        a_b_simplified_ = Interval.from_simple_sets(
+            SimpleInterval.from_data(0, 2), SimpleInterval.from_data(3, 4)
+        )
         self.assertEqual(a_b_simplified, a_b_simplified_)
 
     def test_intersection_with_self(self):
@@ -89,7 +93,9 @@ class IntervalTestCase(unittest.TestCase):
         b_c = Interval.from_simple_sets(b, c)
 
         intersection_a_d_b_c = a_d.intersection_with(b_c)
-        intersection_expected = Interval.from_simple_sets(SimpleInterval.from_data(0.5, 1))
+        intersection_expected = Interval.from_simple_sets(
+            SimpleInterval.from_data(0.5, 1)
+        )
         self.assertEqual(intersection_a_d_b_c, intersection_expected)
 
     def test_complement(self):
@@ -114,7 +120,9 @@ class IntervalTestCase(unittest.TestCase):
 
         disjoint = a_b_c_d.make_disjoint()
 
-        a_b_c_d_expected = Interval.from_simple_sets(SimpleInterval.from_data(0, 3, Bound.CLOSED, Bound.CLOSED))
+        a_b_c_d_expected = Interval.from_simple_sets(
+            SimpleInterval.from_data(0, 3, Bound.CLOSED, Bound.CLOSED)
+        )
         self.assertEqual(disjoint, a_b_c_d_expected)
 
     def test_union(self):
@@ -126,7 +134,9 @@ class IntervalTestCase(unittest.TestCase):
         b_c = Interval.from_simple_sets(b, c)
 
         union_a_d_b_c = a_d.union_with(b_c)
-        union_a_d_b_c_ = Interval.from_simple_sets(SimpleInterval.from_data(0, 2), SimpleInterval.from_data(3, 4))
+        union_a_d_b_c_ = Interval.from_simple_sets(
+            SimpleInterval.from_data(0, 2), SimpleInterval.from_data(3, 4)
+        )
         self.assertSetEqual({*union_a_d_b_c}, {*union_a_d_b_c_})
         self.assertTrue(union_a_d_b_c.is_disjoint())
 

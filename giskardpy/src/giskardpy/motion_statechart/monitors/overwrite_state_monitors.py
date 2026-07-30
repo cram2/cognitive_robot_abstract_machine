@@ -10,7 +10,7 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.world_entity import Connection
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.exceptions import NodeInitializationError
+from giskardpy.motion_statechart.exceptions import UnexpectedWorldEntityCountError
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
 from giskardpy.motion_statechart.tasks.joint_tasks import JointState
 
@@ -18,10 +18,13 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointState
 @dataclass(eq=False, repr=False)
 class SetSeedConfiguration(MotionStatechartNode):
     """
-    Overwrite the configuration of the world to allow starting the planning from a different state.
+    Overwrite the configuration of the world to allow starting the planning from a
+    different state.
+
     CAUTION! don't use this to overwrite the robot's state outside standalone mode!
     :param seed_configuration: maps joint name to float
-    :param group_name: if joint names are not unique, it will search in this group for matches.
+    :param group_name: if joint names are not unique, it will search in this group for
+        matches.
     """
 
     seed_configuration: JointState = field(kw_only=True)
@@ -42,27 +45,37 @@ class SetOdometry(MotionStatechartNode):
     """
 
     base_pose: HomogeneousTransformationMatrix = field(kw_only=True)
-    """The pose of the robot base."""
+    """
+    The pose of the robot base.
+    """
+
     odom_connection: Optional[OmniDrive] = field(default=None, kw_only=True)
     """
-    The odometry connection to use. 
+    The odometry connection to use.
+
     If it is None and there is only one drive in the world, it will be used.
     """
+
     _odom_joints: Tuple[Type[Connection], ...] = field(default=(OmniDrive,), init=False)
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         if self.odom_connection is None:
             drive_connections = context.world.get_connections_by_type(self._odom_joints)
             if len(drive_connections) == 0:
-                raise NodeInitializationError(
-                    node=self, reason="No drive joints in world"
+                raise UnexpectedWorldEntityCountError(
+                    node=self,
+                    expected_count=1,
+                    actual_count=0,
+                    entity_type=self._odom_joints,
                 )
             elif len(drive_connections) == 1:
                 self.odom_connection = drive_connections[0]
             else:
-                raise NodeInitializationError(
+                raise UnexpectedWorldEntityCountError(
                     node=self,
-                    reason="Multiple drive joint found in world, please set 'group_name'",
+                    expected_count=1,
+                    actual_count=len(drive_connections),
+                    entity_type=self._odom_joints,
                 )
         return NodeArtifacts(observation=sm.Scalar.const_true())
 

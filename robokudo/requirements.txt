@@ -7,6 +7,6 @@ numba==0.61.2
 pyyaml
 transforms3d
 opencv-python>=4.11.0.86
-matplotlib
+matplotlib>=3.0
 setuptools
 pooch

@@ -1,0 +1,63 @@
+{
+ "name": "osrf/ros:jazzy-desktop-full-noble",
+  "build": {
+    "dockerfile": "Dockerfile",
+//    "args": {
+//      "USER_UID": "1000",
+//      "USER_GID": "1000",
+//      "USERNAME": "devuser"
+//    }
+  },
+  "runArgs": [
+    // "--cap-add=SYS_PTRACE", // Allows the container to trace processes using ptrace system call
+    // "--security-opt=seccomp=unconfined", // Disables seccomp security profiles for the container
+    // "--ipc=host", // Shares the host's IPC namespace with the container
+    "--network=host", // Shares the host's network namespace with the container
+    //  "--user", "${localEnv:UID}:${localEnv:GID}",
+//     "--pid=host", // Shares the host's PID namespace with the container
+//     "--privileged", // Gives the container full access to the host's devices and allows it to run with root privileges
+  ],
+  "workspaceMount": "source=${localWorkspaceFolder},target=/root/workspace/src/${localWorkspaceFolderBasename},type=bind",
+  "workspaceFolder": "/root/workspace/src",
+  "containerEnv": {
+    // Uncomment to allow the container to access the X server on the host e.g. to run Rviz and other GUI tools
+    "DISPLAY": "${localEnv:DISPLAY}"
+    //
+  },
+  "mounts": [
+    // Uncomment to allow the container to access the X server on the host e.g. to run Rviz and other GUI tools
+    {
+      "source": "/tmp/.X11-unix",
+      "target": "/tmp/.X11-unix",
+      "type": "bind"
+    },
+    {
+      "source": "${localEnv:XAUTHORITY:-$HOME/.Xauthority}",
+      "target": "/root/.Xauthority",
+      "type": "bind"
+    },
+    //
+
+    // Uncomment to persist bash history between sessions
+    {
+      "source": "${localEnv:HOME}${localEnv:USERPROFILE}/.bash_history",
+      "target": "/root/.bash_history",
+      "type": "bind"
+    },
+    //
+  ],
+  "forwardPorts": [8080],
+  "appPort": [8080],
+//  "postCreateCommand": "/post_create_setup.sh",
+  "postStartCommand": "/entrypoint.sh && start-code-server.sh",
+//  "customizations": {
+//     "jetbrains": {
+//       "settings": {
+//         "com.intellij:app:HttpConfigurable.use_proxy_pac": true,
+//       },
+//       "backend": "PyCharm"
+//     }
+//  },
+  // run as devuser
+  "remoteUser": "root",
+}

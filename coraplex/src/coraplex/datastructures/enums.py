@@ -1,4 +1,6 @@
-"""Module holding all enums of CoraPlex."""
+"""
+Module holding all enums of CoraPlex.
+"""
 
 from enum import Enum, auto, IntEnum
 from functools import cached_property
@@ -12,18 +14,22 @@ class VisualizationLayout(Enum):
 
     SPRING = "spring"
     """
-    Spring layout, root is in the center and nodes are ordered in circles around it 
+    Spring layout, root is in the center and nodes are ordered in circles around it.
     """
+
 
 class AdjacentBodyMethod(Enum):
     ClosestPoints = auto()
     """
-    The ClosestPoints method is used to find the closest points in other bodies to the body.
+    The ClosestPoints method is used to find the closest points in other bodies to the
+    body.
     """
+
     RayCasting = auto()
     """
-    The RayCasting method is used to find the points in other bodies that are intersected by rays cast
-     from the body bounding box to 6 directions (up, down, left, right, front, back).
+    The RayCasting method is used to find the points in other bodies that are
+    intersected by rays cast from the body bounding box to 6 directions (up, down, left,
+    right, front, back).
     """
 
 
@@ -36,6 +42,7 @@ class ContainerManipulationType(Enum):
     """
     The Opening type is used to open a container.
     """
+
     Closing = auto()
     """
     The Closing type is used to close a container.
@@ -49,22 +56,28 @@ class FindBodyInRegionMethod(Enum):
 
     FingerToCentroid = auto()
     """
-    The FingerToCentroid method is used to find the body in a region by casting a ray from each finger to the
-     centroid of the region.
+    The FingerToCentroid method is used to find the body in a region by casting a ray
+    from each finger to the centroid of the region.
     """
+
     Centroid = auto()
     """
-    The Centroid method is used to find the body in a region by calculating the centroid of the region and
-    casting two rays from opposite sides of the region to the centroid.
+    The Centroid method is used to find the body in a region by calculating the centroid
+    of the region and casting two rays from opposite sides of the region to the
+    centroid.
     """
+
     MultiRay = auto()
     """
-    The MultiRay method is used to find the body in a region by casting multiple rays covering the region.
+    The MultiRay method is used to find the body in a region by casting multiple rays
+    covering the region.
     """
 
 
 class ExecutionType(Enum):
-    """Enum for Execution Process Module types."""
+    """
+    Enum for Execution Process Module types.
+    """
 
     REAL = auto()
     SIMULATED = auto()
@@ -73,7 +86,9 @@ class ExecutionType(Enum):
 
 
 class Arms(IntEnum):
-    """Enum for Arms."""
+    """
+    Enum for Arms.
+    """
 
     # LEFT = "left"
     # RIGHT = "right"
@@ -156,15 +171,18 @@ class Grasp(Enum):
 
     @classmethod
     def from_axis_direction(cls, axis: AxisIdentifier, direction: int):
-        """Get the Grasp face from an axis-index tuple"""
+        """
+        Get the Grasp face from an axis-index tuple.
+        """
         return next((grasp for grasp in cls if grasp.value == (axis, direction)), None)
 
 
 class ApproachDirection(Grasp):
     """
     Enum for the approach direction of a gripper.
-    The AxisIdentifier is used to identify the axis of the gripper, and the int is used to identify the direction along
-     that axis.
+
+    The AxisIdentifier is used to identify the axis of the gripper, and the int is used
+    to identify the direction along  that axis.
     """
 
     FRONT = (AxisIdentifier.X, -1)
@@ -183,8 +201,9 @@ class ApproachDirection(Grasp):
 class VerticalAlignment(Grasp):
     """
     Enum for the vertical alignment of a gripper.
-    The AxisIdentifier is used to identify the axis of the gripper, and the int is used to identify the direction along
-     that axis.
+
+    The AxisIdentifier is used to identify the axis of the gripper, and the int is used
+    to identify the direction along  that axis.
     """
 
     NoAlignment = (AxisIdentifier.Undefined, 0)
@@ -278,6 +297,7 @@ class WaypointsMovementType(Enum):
 class FilterConfig(Enum):
     """
     Declare existing filter methods.
+
     Currently supported: Butterworth
     """
 
@@ -293,11 +313,125 @@ class MonitorBehavior(Enum):
     """
     Interrupt the task when the condition is met.
     """
+
     PAUSE = auto()
     """
     Pause the task when the condition is met.
     """
+
     RESUME = auto()
     """
     Resume the task when the condition is met.
+    """
+
+
+class CuttingTechnique(Enum):
+    """
+    Enum for the techniques of cutting an object.
+    """
+
+    SLICE = auto()
+    """
+    Cut the object into slices of equal thickness.
+    """
+    SAW = auto()
+    """
+    Cut with a repeated back-and-forth sawing motion.
+    """
+    HALVING = auto()
+    """
+    Cut the object into two halves.
+    """
+
+
+class SlicingPriority(Enum):
+    """
+    Decides which slicing parameter is kept when the requested slice thickness and
+    number of cuts cannot both fit the object.
+    """
+
+    THICKNESS = auto()
+    """
+    Keep the requested slice thickness and reduce the number of cuts to fit.
+    """
+    CUT_COUNT = auto()
+    """
+    Keep the requested number of cuts and shrink the slice thickness to fit.
+    """
+
+
+class ToolPathSegmentKind(Enum):
+    """
+    Enum for the geometric pattern a tool path segment follows.
+    """
+
+    APPROACH = auto()
+    """
+    Vertical approach from above onto the object.
+    """
+    DESCEND = auto()
+    """
+    Straight downward cut into the object.
+    """
+    SAW = auto()
+    """
+    Oscillatory shear motion with increasing depth.
+    """
+    RETRACT = auto()
+    """
+    Vertical retraction away from the object.
+    """
+    SPIRAL = auto()
+    """
+    Planar spiral with growing radius.
+    """
+    STIR = auto()
+    """
+    Continuous circular stirring loop.
+    """
+    SHEAR = auto()
+    """
+    Planar oscillatory shear at constant depth.
+    """
+    RASTER = auto()
+    """
+    Planar raster scan covering a rectangle.
+    """
+    SWEEP = auto()
+    """
+    Sinusoidal sweep along one axis.
+    """
+
+
+class WipingTechnique(Enum):
+    """
+    Enum for the techniques of wiping a surface.
+    """
+
+    WIPE = auto()
+    """
+    Wipe along a spiral covering the surface.
+    """
+    SHEAR = auto()
+    """
+    Wipe with an oscillatory shear motion.
+    """
+    SPREAD = auto()
+    """
+    Spread along straight lanes covering the surface.
+    """
+
+
+class MixingPattern(Enum):
+    """
+    Enum for the motion patterns of mixing the contents of a container.
+    """
+
+    SPIRAL = auto()
+    """
+    Mix along an outward spiral.
+    """
+    STIR = auto()
+    """
+    Mix along circular stirring laps.
     """

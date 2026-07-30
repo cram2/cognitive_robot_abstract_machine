@@ -26,8 +26,9 @@ class QPALMInfo(IntEnum):
 
 class QPSolverQPalm(QPSolver[QPDataTwoSidedInequality]):
     """
-    min_x 0.5 x^T Q x + q^T x
-    s.t.  lb <= Ax <= ub
+    min_x 0.5 x^T Q x + q^T x s.t.
+
+    lb <= Ax <= ub
     https://github.com/kul-optec/QPALM
     """
 

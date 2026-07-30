@@ -32,7 +32,8 @@ if TYPE_CHECKING:
 
 
 class GraphVisualizer:
-    """Responsible for rendering an RWXNode graph with a layered top-to-bottom layout.
+    """
+    Responsible for rendering an RWXNode graph with a layered top-to-bottom layout.
 
     The class encapsulates the visualization pipeline in small reusable steps while
     preserving the previous behavior.
@@ -585,7 +586,9 @@ class GraphVisualizer:
         p_end: Tuple[float, float],
         ignore: Tuple[int, int],
     ):
-        """Return True if the segment p_start->p_end intersects any obstacle rectangle.
+        """
+        Return True if the segment p_start->p_end intersects any obstacle rectangle.
+
         Uses a robust Cohen–Sutherland style clipping check to detect any intersection,
         not only corner proximity or endpoint containment.
         """
@@ -1093,14 +1096,12 @@ class GraphVisualizer:
             n.color.color if n.color else ColorLegend().color for n in ordered_nodes
         ]
         edgecolors = [
-            getattr(n, "border_color", None) or (
-                "#cccccc" if getattr(n, "faded", False) else "black"
-            )
+            getattr(n, "border_color", None)
+            or ("#cccccc" if getattr(n, "faded", False) else "black")
             for n in ordered_nodes
         ]
         linewidths = [
-            3.5 if getattr(n, "border_color", None) else 2.0
-            for n in ordered_nodes
+            3.5 if getattr(n, "border_color", None) else 2.0 for n in ordered_nodes
         ]
         # Base node markers
         ax.scatter(

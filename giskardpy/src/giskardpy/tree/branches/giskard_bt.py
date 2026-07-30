@@ -244,8 +244,8 @@ def dot_tree(
         """
         Create a more detailed string (when applicable) to use for the node name.
 
-        This prefixes the node name with additional information about the node type (e.g. with
-        or without memory). Useful when debugging.
+        This prefixes the node name with additional information about the node type
+        (e.g. with or without memory). Useful when debugging.
         """
         # Custom handling of composites provided by this library. Not currently
         # providing a generic mechanism for others to customise visualisations

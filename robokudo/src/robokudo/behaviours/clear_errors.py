@@ -44,8 +44,8 @@ class ClearErrors(Behaviour):
         """
         Initialize the behavior.
 
-        This method is called when the behavior is first ticked.
-        No initialization is needed for this behavior.
+        This method is called when the behavior is first ticked. No initialization is
+        needed for this behavior.
         """
         pass
 

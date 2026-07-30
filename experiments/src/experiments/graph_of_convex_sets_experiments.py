@@ -19,8 +19,6 @@ three runs.
 Run with::
 
     python -m experiments.graph_of_convex_sets_experiments
-
-
 """
 
 from __future__ import annotations
@@ -81,8 +79,7 @@ class GraphOfConvexSetsFreespaceExperimentResult(ExperimentResult):
 
     free_space_simple_set_count: int
     """
-    Number of simple sets (axis-aligned boxes) in the resulting free-space
-    event.
+    Number of simple sets (axis-aligned boxes) in the resulting free-space event.
     """
 
     materialise_duration_milliseconds: MeanAndStandardDeviation
@@ -113,8 +110,8 @@ class GraphOfConvexSetsFreespaceExperimentResult(ExperimentResult):
 
     end_to_end_duration_milliseconds: float
     """
-    Wall-clock time for a complete ``free_space_from_world`` call including
-    world loading.
+    Wall-clock time for a complete ``free_space_from_world`` call including world
+    loading.
     """
 
     environment_name: str
@@ -126,20 +123,19 @@ class GraphOfConvexSetsFreespaceExperimentResult(ExperimentResult):
 
 def _measure(function_to_time, repetitions: int = 1):
     """
-    Call *function_to_time* *repetitions* times and return the last result
-    together with all elapsed times.
+    Call *function_to_time* *repetitions* times and return the last result together with
+    all elapsed times.
 
-    The last result is returned rather than the first so callers can
-    directly unpack the value they want to inspect.
+    The last result is returned rather than the first so callers can directly unpack the
+    value they want to inspect.
 
     :param function_to_time: Zero-argument callable to benchmark.
     :type function_to_time: Callable[[], Any]
     :param repetitions: Number of times to invoke *function_to_time*.
     :type repetitions: int
-    :returns: A 2-tuple ``(last_result, elapsed_seconds_list)`` where
-        *last_result* is the return value of the final invocation and
-        *elapsed_seconds_list* is a list of wall-clock durations in
-        seconds, one per repetition.
+    :returns: A 2-tuple ``(last_result, elapsed_seconds_list)`` where *last_result* is
+        the return value of the final invocation and *elapsed_seconds_list* is a list of
+        wall-clock durations in seconds, one per repetition.
     :rtype: tuple[Any, list[float]]
     """
     elapsed_times: List[float] = []
@@ -155,15 +151,13 @@ def _to_mean_and_standard_deviation_milliseconds(
     elapsed_seconds: List[float],
 ) -> MeanAndStandardDeviation:
     """
-    Convert a list of raw elapsed-seconds values to a
-    :class:`MeanAndStandardDeviation` in milliseconds.
+    Convert a list of raw elapsed-seconds values to a :class:`MeanAndStandardDeviation`
+    in milliseconds.
 
-    :param elapsed_seconds: Raw timing samples in seconds, as returned
-        by the second element of :func:`_measure`.
+    :param elapsed_seconds: Raw timing samples in seconds, as returned by the second
+        element of :func:`_measure`.
     :type elapsed_seconds: list[float]
-    :returns: Mean and standard deviation of the samples converted to
-        milliseconds.
-
+    :returns: Mean and standard deviation of the samples converted to milliseconds.
     """
     return MeanAndStandardDeviation.from_measurements(
         [seconds * 1000.0 for seconds in elapsed_seconds]
@@ -172,8 +166,7 @@ def _to_mean_and_standard_deviation_milliseconds(
 
 def _collect_obstacles(world: World) -> List[BoundingBox]:
     """
-    Return all obstacle bounding boxes from world expressed at the world root
-    frame.
+    Return all obstacle bounding boxes from world expressed at the world root frame.
 
     :param world: The world to query.
     :returns: List of bounding boxes.
@@ -187,11 +180,11 @@ def _compute_search_space_from_obstacles(
     obstacle_bounding_boxes: List[BoundingBox], world, padding: float = 0.5
 ) -> BoundingBoxCollection:
     """
-    Derive a search-space bounding box from the union of obstacle bounding
-    boxes plus padding.
+    Derive a search-space bounding box from the union of obstacle bounding boxes plus
+    padding.
 
-    :param obstacle_bounding_boxes: List of bounding boxes to include in
-        the search space.
+    :param obstacle_bounding_boxes: List of bounding boxes to include in the search
+        space.
     :param world: The world to which the bounding boxes belong.
     :param padding: Amount of padding to add around the union of the
     """
@@ -241,16 +234,15 @@ def _run_benchmark(
     """
     Run all GCS free-space benchmark phases and return a single result row.
 
-    :param world_loader: Zero-argument callable that loads and returns a
-        :class:`World`. Called once for the timed world-loading phase
-        and once more inside the end-to-end phase.
-    :param search_space_factory: Callable that receives a loaded
-        :class:`World` and returns the :class:`BoundingBoxCollection` to
-        use as the navigable search volume. For URDF environments this
-        is a fixed room-scale box; for PartNet models it is derived from
-        the obstacle extents.
-    :param environment_name: Human-readable label stored in the result
-        row (e.g. ``"apartment"`` or ``"partnet_179"``).
+    :param world_loader: Zero-argument callable that loads and returns a :class:`World`.
+        Called once for the timed world-loading phase and once more inside the end-to-
+        end phase.
+    :param search_space_factory: Callable that receives a loaded :class:`World` and
+        returns the :class:`BoundingBoxCollection` to use as the navigable search
+        volume. For URDF environments this is a fixed room-scale box; for PartNet models
+        it is derived from the obstacle extents.
+    :param environment_name: Human-readable label stored in the result row (e.g.
+        ``"apartment"`` or ``"partnet_179"``).
     """
     world, world_loading_elapsed = _measure(world_loader)
     world_loading_duration_milliseconds = world_loading_elapsed[0] * 1000.0
@@ -329,9 +321,8 @@ def _perform_benchmark_for_environment(
     """
     Run the GCS benchmark for a single URDF environment file.
 
-    The search space is a fixed ±20 m × ±20 m × 3 m box centred at the
-    world root, which conservatively contains all scenes in the URDF
-    resource folder.
+    The search space is a fixed ±20 m × ±20 m × 3 m box centred at the world root, which
+    conservatively contains all scenes in the URDF resource folder.
 
     :param urdf_path: Path to the ``.urdf`` file to benchmark.
     """
@@ -386,11 +377,10 @@ def main():
     """
     Benchmark all URDF environments and the first 10 PartNet-Mobility models.
 
-    Results are collected into a single :class:`ExperimentsTable` and
-    printed as a Typst ``#table`` block ready for inclusion in a
-    scientific article. Progress is tracked via tqdm progress bars.
+    Results are collected into a single :class:`ExperimentsTable` and printed as a Typst
+    ``#table`` block ready for inclusion in a scientific article. Progress is tracked
+    via tqdm progress bars.
     """
-
     urdf_directory_path = (
         Path(__file__).parent
         / ".."

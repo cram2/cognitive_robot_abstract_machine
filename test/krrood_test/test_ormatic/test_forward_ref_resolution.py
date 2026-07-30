@@ -1,8 +1,8 @@
 """
 Tests for forward reference resolution in the ORMatic module.
 
-This test reproduces the issue where get_type_hints fails when there are
-multiple forward references that need to be resolved iteratively.
+This test reproduces the issue where get_type_hints fails when there are multiple
+forward references that need to be resolved iteratively.
 """
 
 import sys
@@ -11,7 +11,9 @@ from krrood.class_diagrams.class_diagram import ClassDiagram
 
 
 class TestForwardReferenceResolution:
-    """Tests for forward reference resolution in ClassDiagram."""
+    """
+    Tests for forward reference resolution in ClassDiagram.
+    """
 
     def test_multiple_forward_references_resolution(self):
         """

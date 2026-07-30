@@ -737,13 +737,17 @@ def euler_from_quaternion(quaternion, axes="sxyz"):
 
 
 def _reorder_input_quaternion(quaternion):
-    """Reorder quaternion to have w term first."""
+    """
+    Reorder quaternion to have w term first.
+    """
     x, y, z, w = quaternion
     return w, x, y, z
 
 
 def _reorder_output_quaternion(quaternion):
-    """Reorder quaternion to have w term last."""
+    """
+    Reorder quaternion to have w term last.
+    """
     w, x, y, z = quaternion
     return x, y, z, w
 
@@ -980,7 +984,6 @@ class Arcball(object):
         Initialize virtual trackball control.
 
         initial : quaternion or rotation matrix
-
         """
         self._axis = None
         self._axes = None
@@ -1011,29 +1014,36 @@ class Arcball(object):
             Window coordinates of trackball center.
         radius : float
             Radius of trackball in window coordinates.
-
         """
         self._radius = float(radius)
         self._center[0] = center[0]
         self._center[1] = center[1]
 
     def setaxes(self, *axes):
-        """Set axes to constrain rotations."""
+        """
+        Set axes to constrain rotations.
+        """
         if axes is None:
             self._axes = None
         else:
             self._axes = [unit_vector(axis) for axis in axes]
 
     def setconstrain(self, constrain):
-        """Set state of constrain to axis mode."""
+        """
+        Set state of constrain to axis mode.
+        """
         self._constrain = constrain is True
 
     def getconstrain(self):
-        """Return state of constrain to axis mode."""
+        """
+        Return state of constrain to axis mode.
+        """
         return self._constrain
 
     def down(self, point):
-        """Set initial cursor window coordinates and pick constrain-axis."""
+        """
+        Set initial cursor window coordinates and pick constrain-axis.
+        """
         self._vdown = arcball_map_to_sphere(point, self._center, self._radius)
         self._qdown = self._qpre = self._qnow
 
@@ -1044,7 +1054,9 @@ class Arcball(object):
             self._axis = None
 
     def drag(self, point):
-        """Update current cursor window coordinates."""
+        """
+        Update current cursor window coordinates.
+        """
         vnow = arcball_map_to_sphere(point, self._center, self._radius)
 
         if self._axis is not None:
@@ -1060,17 +1072,23 @@ class Arcball(object):
             self._qnow = quaternion_multiply(q, self._qdown)
 
     def next(self, acceleration=0.0):  # noqa: A003 (for backwards compat.)
-        """Continue rotation in direction of last drag."""
+        """
+        Continue rotation in direction of last drag.
+        """
         q = quaternion_slerp(self._qpre, self._qnow, 2.0 + acceleration, False)
         self._qpre, self._qnow = self._qnow, q
 
     def matrix(self):
-        """Return homogeneous rotation matrix."""
+        """
+        Return homogeneous rotation matrix.
+        """
         return quaternion_matrix(self._qnow)
 
 
 def arcball_map_to_sphere(point, center, radius):
-    """Return unit sphere coordinates from window coordinates."""
+    """
+    Return unit sphere coordinates from window coordinates.
+    """
     v = numpy.array(
         ((point[0] - center[0]) / radius, (center[1] - point[1]) / radius, 0.0),
         dtype=numpy.float64,
@@ -1084,7 +1102,9 @@ def arcball_map_to_sphere(point, center, radius):
 
 
 def arcball_constrain_to_axis(point, axis):
-    """Return sphere point perpendicular to axis."""
+    """
+    Return sphere point perpendicular to axis.
+    """
     v = numpy.array(point, dtype=numpy.float64, copy=True)
     a = numpy.array(axis, dtype=numpy.float64, copy=True)
     v -= a * numpy.dot(a, v)  # on plane
@@ -1100,7 +1120,9 @@ def arcball_constrain_to_axis(point, axis):
 
 
 def arcball_nearest_axis(point, axes):
-    """Return axis, which arc is nearest to point."""
+    """
+    Return axis, which arc is nearest to point.
+    """
     point = numpy.array(point, dtype=numpy.float64, copy=False)
     nearest = None
     mx = -1.0
@@ -1292,7 +1314,6 @@ def is_same_transform(matrix0, matrix1):
     True
     >>> is_same_transform(numpy.identity(4), random_rotation_matrix())
     False
-
     """
     matrix0 = numpy.array(matrix0, dtype=numpy.float64, copy=True)
     matrix0 /= matrix0[3, 3]

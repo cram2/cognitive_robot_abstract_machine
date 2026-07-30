@@ -14,6 +14,7 @@ authors = [
 description = "Cognitive robot perception framework"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "LGPL-3.0-only"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
@@ -22,15 +23,15 @@ keywords=["robotics", "perception"]
 dynamic = ["version", "dependencies"]
 
 [project.urls]
-"Source" = 'https://gitlab.informatik.uni-bremen.de/robokudo/'
-"Bug Tracker" = 'https://gitlab.informatik.uni-bremen.de/robokudo/robokudo/-/issues'
+"Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
+"Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]  # list of folders that contain the packages (["."] by default)
 include = ["robokudo*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "robokudo.__version__"}
+version = {attr = "robokudo._version.__version__"}
 dependencies = {file = "requirements.txt"}
 
 [project.optional-dependencies]

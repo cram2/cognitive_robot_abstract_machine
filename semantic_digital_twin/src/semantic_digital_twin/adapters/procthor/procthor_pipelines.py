@@ -26,8 +26,9 @@ from semantic_digital_twin.world_description.world_entity import Body
 def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
     """
     Create a DrawerFactory from a drawer body.
-    This function assumes that the drawer body has a bounding box that can be used to determine its
-    scale and that a handle can be created with a standard size.
+
+    This function assumes that the drawer body has a bounding box that can be used to
+    determine its scale and that a handle can be created with a standard size.
     """
     drawer_scale = drawer_body.collision.scale
 
@@ -58,10 +59,10 @@ def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
 def door_from_body_in_world(door_body: Body, world: World) -> Door:
     """
     Create a DoorFactory from a door body.
-    This function assumes that the door body has a bounding box that can be used to determine its
-    scale and that a handle can be created with a standard size.
-    """
 
+    This function assumes that the door body has a bounding box that can be used to
+    determine its scale and that a handle can be created with a standard size.
+    """
     semantic_handle_position = SemanticPositionDescription(
         horizontal_direction_chain=[
             HorizontalSemanticDirection.RIGHT,
@@ -109,10 +110,11 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
 def dresser_from_body_in_world(dresser: Body, world: World) -> Dresser:
     """
     Replace a dresser body with a DresserFactory.
-    This function identifies drawers and doors in the dresser based on naming conventions
-    and creates corresponding factories for them.
-    It assumes that drawer bodies have names containing '_drawer_' and door bodies have names
-    containing '_door_'.
+
+    This function identifies drawers and doors in the dresser based on naming
+    conventions and creates corresponding factories for them. It assumes that drawer
+    bodies have names containing '_drawer_' and door bodies have names containing
+    '_door_'.
     """
     drawer_pattern = re.compile(r"^.*_drawer_.*$")
     door_pattern = re.compile(r"^.*_door_.*$")

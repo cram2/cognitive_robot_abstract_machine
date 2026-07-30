@@ -25,20 +25,27 @@ class SimpleYoloAnnotator(BaseAnnotator):
         super().__init__(name=name)
 
         self.model = YOLO("yolov8n_7.pt")
-        """The YOLO model instance."""
-
+        """
+        The YOLO model instance.
+        """
         self.id2name = self.model.names
-        """The YOLO models id to name map."""
-
+        """
+        The YOLO models id to name map.
+        """
         self.roi_comparator = RoiComparator(1.0)
-        """A comparator for ROIs used to associate YOLO and RoboKudo ROIs."""
+        """
+        A comparator for ROIs used to associate YOLO and RoboKudo ROIs.
+        """
 
     def update(self) -> Status:
-        """Run YOLO inference on the cas color image and combine classifications with existing object hypotheses.
+        """
+        Run YOLO inference on the cas color image and combine classifications with
+        existing object hypotheses.
 
-        Runs objects detection on the image and uses the RoiComparator find the closest bounding box created for
-        an ObjectHypothesis by previous annotator. If there is a similar ROI present in an ObjectHypothesis,
-        a Classification is attached to it.
+        Runs objects detection on the image and uses the RoiComparator find the closest
+        bounding box created for an ObjectHypothesis by previous annotator. If there is
+        a similar ROI present in an ObjectHypothesis, a Classification is attached to
+        it.
         """
         visualization_img = copy.deepcopy(self.get_cas().get(CASViews.COLOR_IMAGE))
 
@@ -104,7 +111,10 @@ class SimpleYoloAnnotator(BaseAnnotator):
         classification: Classification,
         image: npt.NDArray[np.uint8],
     ) -> npt.NDArray[np.uint8]:
-        """Add the object hypothesis along with the classification name and confidence to the visualization image."""
+        """
+        Add the object hypothesis along with the classification name and confidence to
+        the visualization image.
+        """
         x1, y1, x2, y2 = (
             obj.roi.roi.pos.x,
             obj.roi.roi.pos.y,

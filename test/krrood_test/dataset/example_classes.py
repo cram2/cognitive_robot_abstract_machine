@@ -10,6 +10,7 @@ from pathlib import Path
 from types import FunctionType
 from typing import Set, Generic, TypeVar as TypingTypeVar
 
+from random_events.interval import Bound, SimpleInterval
 from sqlalchemy import types, TypeDecorator
 from typing_extensions import Dict, Any, Sequence, Self, Annotated
 from typing_extensions import List, Optional, Type
@@ -620,6 +621,23 @@ class JSONSerializableClass(SubclassJSONSerializer):
 class JSONWrapper:
     json_serializable_object: JSONSerializableClass
     more_objects: List[JSONSerializableClass] = field(default_factory=list)
+
+
+@dataclass
+class HolderOfSimpleInterval:
+    """
+    Its sole field's type, :class:`random_events.interval.SimpleInterval`, lives in a
+    package nothing else in this module references, which is exactly what is needed to
+    reproduce a bug where ``WrappedTable.create_custom_type`` mapped a
+    ``SubclassJSONSerializer`` field to JSON without importing that field type's own
+    module, tripping a ``MappedAnnotationError`` at class-definition time.
+    """
+
+    bounds: SimpleInterval = field(
+        default_factory=lambda: SimpleInterval.from_data(
+            0.0, 1.0, Bound.CLOSED, Bound.CLOSED
+        )
+    )
 
 
 # %% Multiple inheritance and MRO tests

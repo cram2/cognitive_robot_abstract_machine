@@ -14,7 +14,8 @@ from krrood.entity_query_language.verbalization.vocabulary.english import Aggreg
 
 
 class AggregatorRule(PhraseRule):
-    """*"the <aggregation> <plural child>"* (or *"the <aggregation> of <child>"*).
+    """
+    *"the <aggregation> <plural child>"* (or *"the <aggregation> of <child>"*).
 
     >>> verbalize_expression(max(variable(Robot, []).battery))
     'the maximum of the battery of a Robot'

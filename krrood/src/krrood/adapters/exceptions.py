@@ -10,12 +10,16 @@ JSON_TYPE_NAME = "__json_type__"  # the key used in JSON dicts to identify the c
 
 @dataclass
 class JSONSerializationError(DataclassException):
-    """Base exception for JSON (de)serialization errors."""
+    """
+    Base exception for JSON (de)serialization errors.
+    """
 
 
 @dataclass
 class MissingTypeError(JSONSerializationError):
-    """Raised when the 'type' field is missing in the JSON data."""
+    """
+    Raised when the 'type' field is missing in the JSON data.
+    """
 
     def error_message(self) -> str:
         return f"Missing {JSON_TYPE_NAME} field in JSON data"
@@ -26,7 +30,9 @@ class MissingTypeError(JSONSerializationError):
 
 @dataclass
 class InvalidTypeFormatError(JSONSerializationError):
-    """Raised when the 'type' field value is not a fully qualified class name."""
+    """
+    Raised when the 'type' field value is not a fully qualified class name.
+    """
 
     invalid_type_value: str
 
@@ -39,7 +45,9 @@ class InvalidTypeFormatError(JSONSerializationError):
 
 @dataclass
 class UnknownModuleError(JSONSerializationError):
-    """Raised when the module specified in the 'type' field cannot be imported."""
+    """
+    Raised when the module specified in the 'type' field cannot be imported.
+    """
 
     module_name: str
 
@@ -52,15 +60,15 @@ class UnknownModuleError(JSONSerializationError):
 
 @dataclass
 class ClassNotFoundError(JSONSerializationError):
-    """Raised when the class specified in the 'type' field cannot be found in the module."""
+    """
+    Raised when the class specified in the 'type' field cannot be found in the module.
+    """
 
     class_name: str
     module_name: str
 
     def error_message(self) -> str:
-        return (
-            f"Class '{self.class_name}' not found in module '{self.module_name}'"
-        )
+        return f"Class '{self.class_name}' not found in module '{self.module_name}'"
 
     def suggest_correction(self) -> str:
         return ""
@@ -68,7 +76,9 @@ class ClassNotFoundError(JSONSerializationError):
 
 @dataclass
 class ClassNotSerializableError(JSONSerializationError):
-    """Raised when the class specified cannot be JSON-serialized."""
+    """
+    Raised when the class specified cannot be JSON-serialized.
+    """
 
     clazz: Type
 
@@ -81,7 +91,9 @@ class ClassNotSerializableError(JSONSerializationError):
 
 @dataclass
 class ClassNotDeserializableError(JSONSerializationError):
-    """Raised when the class specified cannot be JSON-deserialized."""
+    """
+    Raised when the class specified cannot be JSON-deserialized.
+    """
 
     clazz: Type
 

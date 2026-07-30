@@ -49,8 +49,9 @@ class PlaceAction(ActionDescription):
     """
     target_location: Pose
     """
-    Pose in the world at which the object should be placed
+    Pose in the world at which the object should be placed.
     """
+
     arm: Arms
     """
     Arm that is currently holding the object
@@ -97,7 +98,7 @@ class PlaceAction(ActionDescription):
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> ConditionType:
         """
-        The object needs to be in the gripper frame
+        The object needs to be in the gripper frame.
         """
         end_effector = ViewManager.get_end_effector_view(
             variables["arm"], context.robot
@@ -113,7 +114,8 @@ class PlaceAction(ActionDescription):
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> ConditionType:
         """
-        the gripper must be free again and the object needs to be at the target location
+        The gripper must be free again and the object needs to be at the target
+        location.
         """
         end_effector = ViewManager.get_end_effector_view(
             variables["arm"], context.robot

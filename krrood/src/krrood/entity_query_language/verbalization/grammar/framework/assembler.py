@@ -32,10 +32,14 @@ class Assembler(Generic[TSymbolicExpression, TPlan], SubClassSafeGeneric):
     """
 
     context: RuleContext
-    """The per-node context (recursion entry and microplanning services)."""
+    """
+    The per-node context (recursion entry and microplanning services).
+    """
 
     planner: ClassVar[Optional[Type[Planner]]] = None
-    """The paired planner (set per family); ``None`` for realisation-only assemblers."""
+    """
+    The paired planner (set per family); ``None`` for realisation-only assemblers.
+    """
 
     def plan(self, node: TSymbolicExpression) -> Optional[TPlan]:
         """

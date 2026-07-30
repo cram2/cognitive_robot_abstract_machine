@@ -32,22 +32,23 @@ class JointState(SubclassJSONSerializer):
 
     connections: List[ActiveConnection1DOF] = field(default_factory=list)
     """
-    All connections in this state
+    All connections in this state.
     """
 
     target_values: List[float] = field(default_factory=list)
     """
-    All target values in this state, order has to correspond to the order of connections
+    All target values in this state, order has to correspond to the order of
+    connections.
     """
 
     state_type: Optional[JointStateType] = field(default=None)
     """
-    A type to better describe this state
+    A type to better describe this state.
     """
 
     name: PrefixedName = field(default=PrefixedName("JointState"))
     """
-    A Name for this JointState
+    A Name for this JointState.
     """
 
     _robot: AbstractRobot = field(init=False, default=None)
@@ -58,14 +59,17 @@ class JointState(SubclassJSONSerializer):
     def __hash__(self):
         """
         Returns the hash of the joint state, which is based on the joint state name.
+
         This allows for proper comparison and storage in sets or dictionaries.
         """
         return hash((self.connections, self.target_values))
 
     def assign_to_robot(self, robot: AbstractRobot):
         """
-        Assigns the joint state to the given robot. This method ensures that the joint state is only assigned
-        to one robot at a time, and raises an error if it is already assigned to another robot.
+        Assigns the joint state to the given robot.
+
+        This method ensures that the joint state is only assigned to one robot at a
+        time, and raises an error if it is already assigned to another robot.
         """
         if self._robot is not None and self._robot != robot:
             raise ValueError(
@@ -81,7 +85,9 @@ class JointState(SubclassJSONSerializer):
     def is_achieved(self) -> bool:
         """
         Checks if the defined joint state is achieved.
-        :return: True if all connections are in the specified target value, False otherwise
+
+        :return: True if all connections are in the specified target value, False
+            otherwise
         """
         return all(
             [
@@ -144,8 +150,10 @@ class JointState(SubclassJSONSerializer):
 
     def copy_for_world(self, world: World):
         """
-        Creates a copy of this JointState for the given world. This is necessary when copying a robot to another world,
-        as the connections in the new world will be different objects.
+        Creates a copy of this JointState for the given world.
+
+        This is necessary when copying a robot to another world, as the connections in
+        the new world will be different objects.
         """
         return JointState(
             connections=[c.copy_for_world(world) for c in self.connections],

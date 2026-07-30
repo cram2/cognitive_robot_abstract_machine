@@ -1,9 +1,9 @@
 """
 GUI-related behavior tree components for RoboKudo.
 
-This module provides behaviors that control GUI rendering and visualization
-in RoboKudo pipelines. The behaviors can be used to trigger redrawing of
-annotator outputs and manage pipeline visualization state.
+This module provides behaviors that control GUI rendering and visualization in RoboKudo
+pipelines. The behaviors can be used to trigger redrawing of annotator outputs and
+manage pipeline visualization state.
 """
 
 import logging
@@ -17,7 +17,8 @@ from robokudo.defs import PACKAGE_NAME
 
 
 class SetPipelineRedraw(Behaviour):
-    """A behavior that triggers GUI redraw of pipeline outputs.
+    """
+    A behavior that triggers GUI redraw of pipeline outputs.
 
     This behavior indicates that the GUI output of the owning Pipeline
     should render its AnnotatorOutputs in the next tick(). Useful when
@@ -30,7 +31,8 @@ class SetPipelineRedraw(Behaviour):
     """
 
     def __init__(self, name: str = "SetPipelineRedraw") -> None:
-        """Initialize the behavior.
+        """
+        Initialize the behavior.
 
         :param name: Name of the behavior
         """
@@ -39,11 +41,11 @@ class SetPipelineRedraw(Behaviour):
         self.rk_logger = logging.getLogger(PACKAGE_NAME)
 
     def update(self) -> Status:
-        """Execute the behavior's update step.
+        """
+        Execute the behavior's update step.
 
-        Checks if the parent is a Pipeline and sets its redraw flag.
-        Returns SUCCESS if redraw was set, FAILURE if parent is not
-        a Pipeline.
+        Checks if the parent is a Pipeline and sets its redraw flag. Returns SUCCESS if
+        redraw was set, FAILURE if parent is not a Pipeline.
 
         :return: Behavior execution status
         """

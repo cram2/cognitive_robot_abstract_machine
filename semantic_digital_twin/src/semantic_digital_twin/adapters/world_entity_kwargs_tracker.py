@@ -48,7 +48,9 @@ class WorldEntityWithIDKwargsTracker:
     @classmethod
     def from_kwargs(cls, from_json_kwargs) -> Self:
         """
-        Retrieve the tracker from the kwargs, or initialize a new one if it doesn't exist.
+        Retrieve the tracker from the kwargs, or initialize a new one if it doesn't
+        exist.
+
         Adds itself to the kwargs so that it is available for future from_json calls.
         :param from_json_kwargs: the **kwargs of a from_json call.
         """
@@ -60,7 +62,9 @@ class WorldEntityWithIDKwargsTracker:
     def from_world(cls, world: World) -> Self:
         """
         Create a new tracker from a world.
-        :param world: A world instance that will be used as a backup to look for world entities.
+
+        :param world: A world instance that will be used as a backup to look for world
+            entities.
         """
         if world is None:
             raise MissingWorldError()
@@ -71,6 +75,7 @@ class WorldEntityWithIDKwargsTracker:
     def create_kwargs(self) -> Dict[str, Self]:
         """
         Creates a new kwargs that contains the tracker.
+
         The top-level object that calls from_json should add this to its kwargs.
         :return: A new kwargs dict with the tracker.
         """
@@ -78,19 +83,19 @@ class WorldEntityWithIDKwargsTracker:
 
     def add_to_kwargs(self, kwargs: Dict[str, Any]):
         """
-        Adds the current instance to the provided keyword arguments dictionary,
-        using a specific key internally defined within the instance.
+        Adds the current instance to the provided keyword arguments dictionary, using a
+        specific key internally defined within the instance.
 
-        :param kwargs: A dictionary to which the current instance will be added.
-                       The specific key is determined by the internal attribute of
-                       the instance.
+        :param kwargs: A dictionary to which the current instance will be added. The
+            specific key is determined by the internal attribute of the instance.
         :return: None
         """
         kwargs[self.__world_entity_tracker] = self
 
     def add_world_entity_with_id(self, world_entity_with_id: WorldEntityWithID):
         """
-        Add a new world entity with id to the tracker in-place, to make it available for parsing in future from_json calls.
+        Add a new world entity with id to the tracker in-place, to make it available for
+        parsing in future from_json calls.
         """
         self._world_entities_with_id[world_entity_with_id.id] = world_entity_with_id
 
@@ -105,13 +110,13 @@ class WorldEntityWithIDKwargsTracker:
         """
         Retrieve a world entity by its UUID.
 
-        This method attempts to find a world entity from the internal
-        collection. If the entity is not found and a world object is available,
-        it will try to retrieve the entity by its UUID from the world object.
+        This method attempts to find a world entity from the internal collection. If the
+        entity is not found and a world object is available, it will try to retrieve the
+        entity by its UUID from the world object.
 
         :param id: The UUID of the world entity to retrieve.
-        :return: The world entity corresponding to the specified UUID,
-                 or None if not found.
+        :return: The world entity corresponding to the specified UUID, or None if not
+            found.
         """
         result = self._world_entities_with_id.get(id)
         if result is not None:

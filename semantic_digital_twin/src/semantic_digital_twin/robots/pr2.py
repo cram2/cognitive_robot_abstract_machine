@@ -452,7 +452,9 @@ class PR2MobileBase(MobileBase, HasTorso[PR2Torso]):
 @dataclass(eq=False)
 class PR2(AbstractRobot, HasMobileBase[PR2MobileBase]):
     """
-    The PR2 robot built by Willow Garage. https://robotsguide.com/robots/pr2
+    The PR2 robot built by Willow Garage.
+
+    https://robotsguide.com/robots/pr2
     """
 
     @classmethod

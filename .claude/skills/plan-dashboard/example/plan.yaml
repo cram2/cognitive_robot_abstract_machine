@@ -1,0 +1,72 @@
+schema_version: 1
+id: notification-retry-overhaul
+title: Notification Retry Overhaul
+description: >-
+  Fictional example plan (see example-walkthrough.md) demonstrating the
+  plan-dashboard system end to end. Not a real initiative.
+default_repository: example-org/notification-service
+
+waves:
+  - id: wave-1
+    name: "Wave 1: Retry foundations"
+    description: Land the core retry/backoff mechanism and its observability.
+
+tracks:
+  - id: retry-logic
+    name: Retry logic
+    wave: wave-1
+    description: The retry/backoff/circuit-breaker mechanism itself.
+  - id: observability
+    name: Observability
+    wave: wave-1
+    description: Metrics and alerting for the new retry behavior.
+
+items:
+  - id: retry-backoff-strategy
+    title: Exponential backoff strategy for retries
+    branch: retry-backoff-strategy
+    track: retry-logic
+    status: done
+    pull_request_number: 101
+    notes: Landed the core backoff calculation and its unit tests.
+
+  - id: retry-circuit-breaker
+    title: Circuit breaker around the retry loop
+    branch: retry-circuit-breaker
+    track: retry-logic
+    status: in_progress
+    pull_request_number: 102
+    depends_on: [retry-backoff-strategy]
+    notes: Stacks directly on the backoff strategy branch.
+
+  - id: retry-load-testing
+    title: Load-test the retry path under failure injection
+    branch: retry-load-testing
+    track: retry-logic
+    status: blocked
+    depends_on: [retry-backoff-strategy]
+    blockers:
+      - Waiting on load-test cluster capacity.
+
+  - id: retry-metrics-dashboard
+    title: Retry metrics dashboard
+    branch: retry-metrics-dashboard
+    track: observability
+    status: not_started
+    depends_on: [retry-backoff-strategy]
+
+  - id: retry-fallback-queue
+    title: Dead-letter queue for exhausted retries
+    branch: retry-fallback-queue
+    track: retry-logic
+    status: done
+    pull_request_number: 103
+    notes: Marked done here on purpose - see the dashboard's drift flag.
+
+  - id: retry-config-flag
+    title: Feature flag for the new retry behavior
+    branch: retry-config-flag
+    track: observability
+    status: in_progress
+    pull_request_number: 104
+    notes: No dependencies, so it can be reviewed independently.

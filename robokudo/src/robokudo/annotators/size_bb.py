@@ -11,8 +11,8 @@ from robokudo.cas import CASViews
 from robokudo.types.cv import BoundingBox3D
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import (
-    transform_cloud_from_cam_to_world,
-    get_world_to_cam_transform_matrix,
+    transform_cloud_from_camera_to_world,
+    get_world_to_camera_transform_matrix,
 )
 from robokudo.utils.transform import get_transform_matrix
 
@@ -37,20 +37,26 @@ Processing steps:
 
 
 class SizeBBAnnotator(BaseAnnotator):
-    """A class to analyze 3D point clouds and compute oriented bounding box sizes.
+    """
+    A class to analyze 3D point clouds and compute oriented bounding box sizes.
 
-    This annotator processes object hypotheses by computing their oriented 3D bounding boxes
-    and storing size information as annotations. It performs coordinate transformations and
-    uses minimum area rectangles to determine object dimensions.
+    This annotator processes object hypotheses by computing their oriented 3D bounding
+    boxes and storing size information as annotations. It performs coordinate
+    transformations and uses minimum area rectangles to determine object dimensions.
     """
 
     def __init__(self, name: str = "SizeBBAnnotator") -> None:
-        """Default construction. Minimal one-time init!"""
+        """
+        Default construction.
+
+        Minimal one-time init!
+        """
         super().__init__(name)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
-        """Process object hypotheses to compute and annotate their 3D bounding box sizes.
+        """
+        Process object hypotheses to compute and annotate their 3D bounding box sizes.
 
         For each object hypothesis with sufficient points:
 
@@ -76,7 +82,7 @@ class SizeBBAnnotator(BaseAnnotator):
             pcd = oh.points
             cluster_cloud = copy.deepcopy(pcd)
             try:
-                cluster_cloud_in_world = transform_cloud_from_cam_to_world(
+                cluster_cloud_in_world = transform_cloud_from_camera_to_world(
                     self.get_cas(), cluster_cloud, transform_inplace=True
                 )
             except Exception as e:
@@ -124,21 +130,23 @@ class SizeBBAnnotator(BaseAnnotator):
                 rotation_matrix_in_world, translation_in_world
             )
 
-            world_to_cam_transform = get_world_to_cam_transform_matrix(self.get_cas())
+            world_to_camera_transform = get_world_to_camera_transform_matrix(
+                self.get_cas()
+            )
 
-            cluster_transform_in_cam = np.matmul(
-                world_to_cam_transform, cluster_transform_in_world
+            cluster_transform_in_camera = np.matmul(
+                world_to_camera_transform, cluster_transform_in_world
             )
 
             # Annotate the pose information
 
-            cluster_translation_in_cam = cluster_transform_in_cam[:3, 3]
-            cluster_rotation_in_cam = cluster_transform_in_cam[:3, :3]
+            cluster_translation_in_camera = cluster_transform_in_camera[:3, 3]
+            cluster_rotation_in_camera = cluster_transform_in_camera[:3, :3]
 
             # Generate a BB from the cluster info
             cluster_obb = o3d.geometry.OrientedBoundingBox(
-                center=cluster_translation_in_cam,
-                R=cluster_rotation_in_cam,
+                center=cluster_translation_in_camera,
+                R=cluster_rotation_in_camera,
                 extent=np.array([bb_size[0], bb_size[1], max_z - min_z]),
             )
 

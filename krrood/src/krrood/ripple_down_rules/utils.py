@@ -5,13 +5,11 @@ import codecs
 import copyreg
 import importlib
 import itertools
-import json
 import os
 import re
 import shutil
 import sys
 import threading
-import uuid
 from collections import UserDict
 from collections.abc import Iterator
 from copy import deepcopy, copy
@@ -30,13 +28,13 @@ import six
 from graphviz import Source
 from sqlalchemy.exc import NoInspectionAvailable
 from krrood.ripple_down_rules import logger
+from krrood.code_generation.imports import get_imports_from_types
 from krrood.utils import (
     is_builtin_type,
     get_import_path_from_path,
     get_method_name,
     get_method_class_name_if_exists,
     get_method_file_name,
-    get_imports_from_types,
 )
 
 try:
@@ -201,22 +199,6 @@ def get_and_import_python_module(
     return module
 
 
-def str_to_snake_case(snake_str: str) -> str:
-    """
-    Convert a string to snake case.
-
-    :param snake_str: The string to convert.
-    :return: The converted string.
-    """
-    s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", snake_str)
-    s1 = re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
-    # remove redundant underscores
-    s1 = re.sub(r"_{2,}", "_", s1)
-    # remove leading and trailing underscores
-    s1 = re.sub(r"^_|_$", "", s1)
-    return s1
-
-
 def are_results_subclass_of_types(result_types: List[Any], types_: List[Type]) -> bool:
     """
     Check if all results are subclasses of the given types.
@@ -304,123 +286,6 @@ def get_imports_from_scope(scope: Dict[str, Any]) -> List[str]:
     return get_imports_from_types(list(scope.values()))
 
 
-def extract_function_or_class_file(
-    file_path: str,
-    function_names: List[str],
-    join_lines: bool = True,
-    return_line_numbers: bool = False,
-    include_signature: bool = True,
-    as_list: bool = False,
-    is_class: bool = False,
-) -> Union[
-    Dict[str, Union[str, List[str]]],
-    Tuple[Dict[str, Union[str, List[str]]], Dict[str, Tuple[int, int]]],
-]:
-    """
-    Extract the source code of a function from a file.
-
-    :param file_path: The path to the file.
-    :param function_names: The names of the functions to extract.
-    :param join_lines: Whether to join the lines of the function.
-    :param return_line_numbers: Whether to return the line numbers of the function.
-    :param include_signature: Whether to include the function signature in the source code.
-    :param as_list: Whether to return a list of function sources instead of dict (useful when there is multiple
-     functions with same name).
-    :param is_class: Whether to also look for class definitions
-    :return: A dictionary mapping function names to their source code as a string if join_lines is True,
-     otherwise as a list of strings.
-    """
-    with open(file_path, "r") as f:
-        source = f.read()
-
-    return extract_function_or_class_from_source(
-        source,
-        function_names,
-        join_lines=join_lines,
-        return_line_numbers=return_line_numbers,
-        include_signature=include_signature,
-        as_list=as_list,
-        is_class=is_class,
-    )
-
-
-def extract_function_or_class_from_source(
-    source: str,
-    function_names: List[str],
-    join_lines: bool = True,
-    return_line_numbers: bool = False,
-    include_signature: bool = True,
-    as_list: bool = False,
-    is_class: bool = False,
-) -> Union[
-    Dict[str, Union[str, List[str]]],
-    Tuple[Dict[str, Union[str, List[str]]], Dict[str, Tuple[int, int]]],
-]:
-    """
-    Extract the source code of a function from a file.
-
-    :param source: The string containing the source code.
-    :param function_names: The names of the functions to extract.
-    :param join_lines: Whether to join the lines of the function.
-    :param return_line_numbers: Whether to return the line numbers of the function.
-    :param include_signature: Whether to include the function signature in the source code.
-    :param as_list: Whether to return a list of function sources instead of dict (useful when there is multiple
-     functions with same name).
-    :param is_class: Whether to also look for class definitions
-    :return: A dictionary mapping function names to their source code as a string if join_lines is True,
-     otherwise as a list of strings.
-    """
-    # Parse the source code into an AST
-    tree = ast.parse(source)
-    function_names = make_list(function_names)
-    functions_source: Dict[str, Union[str, List[str]]] = {}
-    functions_source_list: List[Union[str, List[str]]] = []
-    line_numbers: Dict[str, Tuple[int, int]] = {}
-    line_numbers_list: List[Tuple[int, int]] = []
-    if is_class:
-        look_for_type = ast.ClassDef
-    else:
-        look_for_type = ast.FunctionDef
-
-    for node in tree.body:
-        if isinstance(node, look_for_type) and (
-            node.name in function_names or len(function_names) == 0
-        ):
-            # Get the line numbers of the function
-            lines = source.splitlines()
-            func_lines = lines[node.lineno - 1 : node.end_lineno]
-            if not include_signature:
-                func_lines = func_lines[1:]
-            if as_list:
-                line_numbers_list.append((node.lineno, node.end_lineno))
-            else:
-                line_numbers[node.name] = (node.lineno, node.end_lineno)
-            parsed_function = (
-                dedent("\n".join(func_lines)) if join_lines else func_lines
-            )
-            if as_list:
-                functions_source_list.append(parsed_function)
-            else:
-                functions_source[node.name] = parsed_function
-            if len(function_names) > 0:
-                if len(functions_source) >= len(function_names) or len(
-                    functions_source_list
-                ) >= len(function_names):
-                    break
-    if len(functions_source) < len(function_names) and len(functions_source_list) < len(
-        function_names
-    ):
-        logger.warning(
-            f"Could not find all functions: {function_names} not found, "
-            f"functions not found: {set(function_names) - set(functions_source.keys())}"
-        )
-    if return_line_numbers:
-        return functions_source if not as_list else functions_source_list, (
-            line_numbers if not as_list else line_numbers_list
-        )
-    return functions_source if not as_list else functions_source_list
-
-
 def encapsulate_user_input(
     user_input: str, func_signature: str, func_doc: Optional[str] = None
 ) -> str:
@@ -469,29 +334,20 @@ def build_user_input_from_conclusion(conclusion: Any) -> str:
         user_input = function_body
     elif isinstance(conclusion, set):
         user_input = (
-            "{" + f"{', '.join([conclusion_to_str(t) for t in conclusion])}" + "}"
+            "{" + f"{', '.join([value_to_source(t) for t in conclusion])}" + "}"
         )
     elif isinstance(conclusion, list):
         user_input = (
-            "[" + f"{', '.join([conclusion_to_str(t) for t in conclusion])}" + "]"
+            "[" + f"{', '.join([value_to_source(t) for t in conclusion])}" + "]"
         )
     elif isinstance(conclusion, tuple):
         user_input = (
-            "(" + f"{', '.join([conclusion_to_str(t) for t in conclusion])}" + ")"
+            "(" + f"{', '.join([value_to_source(t) for t in conclusion])}" + ")"
         )
     else:
-        user_input = conclusion_to_str(conclusion)
+        user_input = value_to_source(conclusion)
 
     return user_input
-
-
-def conclusion_to_str(conclusion_: Any) -> str:
-    if isinstance(conclusion_, Enum):
-        return type(conclusion_).__name__ + "." + conclusion_.name
-    elif isinstance(conclusion_, type):
-        return conclusion_.__name__
-    else:
-        return str(conclusion_)
 
 
 def update_case_in_case_query(case_query: CaseQuery, conclusions: Dict[str, Any]):
@@ -652,21 +508,6 @@ def get_case_attribute_type(
             return typing_to_python_type(hint)
 
 
-def conclusion_to_json(conclusion):
-    if is_iterable(conclusion):
-        conclusions = {"_type": get_full_class_name(type(conclusion)), "value": []}
-        for c in conclusion:
-            conclusions["value"].append(conclusion_to_json(c))
-    elif hasattr(conclusion, "to_json"):
-        conclusions = conclusion.to_json()
-    else:
-        conclusions = {
-            "_type": get_full_class_name(type(conclusion)),
-            "value": conclusion,
-        }
-    return conclusions
-
-
 def contains_return_statement(source: str) -> bool:
     """
     :param source: The source code to check.
@@ -743,129 +584,6 @@ def extract_dependencies(code_lines):
 
     required_lines.append(code_lines[-1])  # Always include return
     return required_lines
-
-
-def serialize_dataclass(obj: Any, seen=None) -> Any:
-    """
-    Recursively serialize a dataclass to a dictionary. If the dataclass contains any nested dataclasses, they will be
-    serialized as well. If the object is not a dataclass, it will be returned as is.
-
-    :param obj: The dataclass to serialize.
-    :return: The serialized dataclass as a dictionary or the object itself if it is not a dataclass.
-    """
-    if seen is None:
-        seen = {}
-
-    obj_id = id(obj)
-    if obj_id in seen:
-        return {"$ref": seen[obj_id]}
-
-    if is_dataclass(obj):
-        uid = str(uuid.uuid4())
-        seen[obj_id] = uid
-        result = {
-            "$id": uid,
-            "__dataclass__": f"{obj.__class__.__module__}.{obj.__class__.__qualname__}",
-            "fields": {},
-        }
-        for f in fields(obj):
-            value = getattr(obj, f.name)
-            result["fields"][f.name] = serialize_dataclass(value, seen)
-        return result
-    else:
-        return SubclassJSONSerializer.to_json_static(obj, seen)
-
-
-def deserialize_dataclass(data: Any, refs: Optional[Dict[str, Any]] = None) -> Any:
-    refs = {} if refs is None else refs
-    preloaded = preload_serialized_objects(data, refs)
-    return resolve_refs(preloaded, refs)
-
-
-def preload_serialized_objects(data: Any, refs: Dict[str, Any] = None) -> Any:
-    """
-    Recursively deserialize a dataclass from a dictionary, if the dictionary contains a key "__dataclass__" (Most likely
-    created by the serialize_dataclass function), it will be treated as a dataclass and deserialized accordingly,
-    otherwise it will be returned as is.
-
-    :param data: The dictionary to deserialize.
-    :return: The deserialized dataclass.
-    """
-    if refs is None:
-        refs = {}
-
-    if isinstance(data, dict):
-
-        if "$ref" in data:
-            ref_id = data["$ref"]
-            if ref_id not in refs:
-                return {"$ref": data["$ref"]}
-            return refs[ref_id]
-
-        elif "$id" in data and "__dataclass__" in data and "fields" in data:
-            cls_path = data["__dataclass__"]
-            module_name, class_name = cls_path.rsplit(".", 1)
-            cls = getattr(importlib.import_module(module_name), class_name)
-
-            dummy_instance = cls.__new__(cls)  # Don't call __init__ yet
-            refs[data["$id"]] = dummy_instance
-
-            for f in fields(cls):
-                raw_value = data["fields"].get(f.name)
-                value = preload_serialized_objects(raw_value, refs)
-                setattr(dummy_instance, f.name, value)
-
-            return dummy_instance
-
-        else:
-            return {k: preload_serialized_objects(v, refs) for k, v in data.items()}
-
-    elif isinstance(data, list):
-        return [preload_serialized_objects(item, refs) for item in data]
-    elif isinstance(data, dict):
-        return {k: preload_serialized_objects(v, refs) for k, v in data.items()}
-
-    return data  # Primitive
-
-
-def resolve_refs(obj, refs, seen=None):
-    if seen is None:
-        seen = {}
-
-    obj_id = id(obj)
-    if obj_id in seen:
-        return seen[obj_id]
-
-    # Resolve if dict with $ref
-    if isinstance(obj, dict) and "$ref" in obj:
-        ref_id = obj["$ref"]
-        if ref_id not in refs:
-            raise KeyError(f"$ref to unknown ID: {ref_id}")
-        return refs[ref_id]
-
-    elif is_dataclass(obj):
-        seen[obj_id] = obj  # Mark before diving deeper
-        for f in fields(obj):
-            val = getattr(obj, f.name)
-            resolved = resolve_refs(val, refs, seen)
-            setattr(obj, f.name, resolved)
-        return obj
-
-    elif isinstance(obj, list):
-        resolved_list = []
-        seen[obj_id] = resolved_list
-        for item in obj:
-            resolved_list.append(resolve_refs(item, refs, seen))
-        return resolved_list
-
-    elif isinstance(obj, dict):
-        resolved_dict = {}
-        seen[obj_id] = resolved_dict
-        for k, v in obj.items():
-            resolved_dict[k] = resolve_refs(v, refs, seen)
-        return resolved_dict
-
-    return obj  # Primitive
 
 
 def typing_to_python_type(typing_hint: Type) -> Type:
@@ -945,41 +663,6 @@ def get_func_rdr_model_name(func: Callable, include_file_name: bool = False) -> 
     return str_to_snake_case(model_name)
 
 
-def stringify_hint(tp):
-    """Recursively convert a type hint to a string."""
-    if isinstance(tp, str):
-        return tp
-
-    # Handle ForwardRef (string annotations not yet evaluated)
-    if isinstance(tp, ForwardRef):
-        return tp.__forward_arg__
-
-    # Handle typing generics like List[int], Dict[str, List[int]], etc.
-    origin = get_origin(tp)
-    args = get_args(tp)
-
-    if origin is not None:
-        origin_str = getattr(origin, "__name__", str(origin)).capitalize()
-        args_str = ", ".join(stringify_hint(arg) for arg in args)
-        return f"{origin_str}[{args_str}]"
-
-    # Handle built-in types like int, str, etc.
-    if isinstance(tp, type):
-        if tp.__module__ == "builtins":
-            return tp.__name__
-        return f"{tp.__qualname__}"
-
-    return str(tp)
-
-
-origin_type_to_hint = {
-    list: List,
-    set: Set,
-    dict: Dict,
-    tuple: Tuple,
-}
-
-
 def get_file_that_ends_with(directory_path: str, suffix: str) -> Optional[str]:
     """
     Get the file that ends with the given suffix in the model directory.
@@ -1020,79 +703,6 @@ def get_type_from_type_hint(type_hint: Type) -> Union[Type, Tuple[Type, ...]]:
     if args is None or len(args) == 0:
         return typing_to_python_type(type_hint)
     return args
-
-
-def extract_types(tp, seen: Set = None) -> Set[type]:
-    """Recursively extract all base types from a type hint."""
-    if seen is None:
-        seen = set()
-
-    if tp in seen or isinstance(tp, str):
-        return seen
-
-    # seen.add(tp)
-
-    if isinstance(tp, ForwardRef):
-        # Can't resolve until evaluated
-        return seen
-
-    origin = get_origin(tp)
-    args = get_args(tp)
-
-    if origin:
-        if origin in origin_type_to_hint:
-            seen.add(origin_type_to_hint[origin])
-        else:
-            seen.add(origin)
-        for arg in args:
-            extract_types(arg, seen)
-
-    elif isinstance(tp, type):
-        seen.add(tp)
-
-    return seen
-
-
-def get_types_to_import_from_func_type_hints(func: Callable) -> Set[Type]:
-    """
-    Extract importable types from a function's annotations.
-
-    :param func: The function to extract type hints from.
-    """
-    hints = get_type_hints(func)
-
-    sig = inspect.signature(func)
-    all_hints = list(hints.values())
-    if sig.return_annotation != inspect.Signature.empty:
-        all_hints.append(sig.return_annotation)
-
-    for param in sig.parameters.values():
-        if param.annotation != inspect.Parameter.empty:
-            all_hints.append(param.annotation)
-
-    return get_types_to_import_from_type_hints(all_hints)
-
-
-def get_types_to_import_from_type_hints(hints: List[Type]) -> Set[Type]:
-    """
-    Extract importable types from a list of type hints.
-
-    :param hints: A list of type hints to extract types from.
-    :return: A set of types that need to be imported.
-    """
-    seen_types = set()
-    for hint in hints:
-        extract_types(hint, seen_types)
-
-    # Filter out built-in and internal types
-    to_import = set()
-    for tp in seen_types:
-        if isinstance(tp, ForwardRef) or isinstance(tp, str):
-            continue
-        if not is_builtin_type(tp):
-            to_import.add(tp)
-
-    return to_import
 
 
 def get_class_file_path(cls):
@@ -1232,137 +842,6 @@ def recursive_subclasses(cls):
     return cls.__subclasses__() + [
         g for s in cls.__subclasses__() for g in recursive_subclasses(s)
     ]
-
-
-class SubclassJSONSerializer:
-    """
-    Originally from: https://github.com/tomsch420/random-events/blob/master/src/random_events/utils.py#L6C1-L21C101
-    Class for automatic (de)serialization of subclasses.
-    Classes that inherit from this class can be serialized and deserialized automatically by calling this classes
-    'from_json' method.
-    """
-
-    data_class_refs = {}
-
-    def to_json_file(self, filename: str):
-        """
-        Save the object to a json file.
-        """
-        data = self.to_json()
-        # save the json to a file
-        if not filename.endswith(".json"):
-            filename += ".json"
-        with open(filename, "w") as f:
-            json.dump(data, f, indent=4)
-        return data
-
-    @staticmethod
-    def to_json_static(obj, seen=None) -> Any:
-        if isinstance(obj, SubclassJSONSerializer):
-            return {"_type": get_full_class_name(obj.__class__), **obj._to_json()}
-        elif isinstance(obj, type):
-            return {"_type": get_full_class_name(obj)}
-        elif is_dataclass(obj):
-            return serialize_dataclass(obj, seen)
-        elif isinstance(obj, list):
-            return [SubclassJSONSerializer.to_json_static(v, seen) for v in obj]
-        elif isinstance(obj, dict):
-            serialized_dict = {}
-            for k, v in obj.items():
-                if not isinstance(k, (str, int, bool, float, type(None))):
-                    continue
-                serialized_dict[k] = SubclassJSONSerializer.to_json_static(v, seen)
-            return serialized_dict
-        else:
-            try:
-                json.dumps(obj)  # Check if the object is JSON serializable
-                return obj
-            except TypeError:
-                return None
-
-    def to_json(self) -> Dict[str, Any]:
-        return self.to_json_static(self)
-
-    def _to_json(self) -> Dict[str, Any]:
-        """
-        Create a json dict from the object.
-        """
-        raise NotImplementedError()
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any]) -> Self:
-        """
-        Create a variable from a json dict.
-        This method is called from the from_json method after the correct subclass is determined and should be
-        overwritten by the respective subclass.
-
-        :param data: The json dict
-        :return: The deserialized object
-        """
-        raise NotImplementedError()
-
-    @classmethod
-    def from_json_file(cls, filename: str) -> Any:
-        """
-        Create an instance of the subclass from the data in the given json file.
-
-        :param filename: The filename of the json file.
-        """
-        if not filename.endswith(".json"):
-            filename += ".json"
-        with open(filename, "r") as f:
-            rdr_json = json.load(f)
-        deserialized_obj = cls.from_json(rdr_json)
-        cls.data_class_refs.clear()
-        return deserialized_obj
-
-    @classmethod
-    def from_json(cls, data: Dict[str, Any]) -> Self:
-        """
-        Create the correct instanceof the subclass from a json dict.
-
-        :param data: The json dict
-        :return: The correct instance of the subclass
-        """
-        if data is None:
-            return None
-        if isinstance(data, list):
-            # if the data is a list, deserialize it
-            return [cls.from_json(d) for d in data]
-        elif isinstance(data, dict):
-            if "__dataclass__" in data:
-                # if the data is a dataclass, deserialize it
-                return deserialize_dataclass(data, cls.data_class_refs)
-            elif "_type" not in data:
-                return {k: cls.from_json(v) for k, v in data.items()}
-        elif not isinstance(data, dict):
-            return data
-
-        # check if type module is builtins
-        data_type = get_type_from_string(data["_type"])
-        if len(data) == 1:
-            return data_type
-        if data_type == NoneType:
-            return None
-        if data_type.__module__ == "builtins":
-            if is_iterable(data["value"]) and not isinstance(data["value"], dict):
-                return data_type([cls.from_json(d) for d in data["value"]])
-            return data_type(data["value"])
-        if get_full_class_name(cls) == data["_type"]:
-            data.pop("_type")
-            return cls._from_json(data)
-        try:
-            module = importlib.import_module(data_type.__module__)
-            return getattr(module, data_type.__qualname__)._from_json(data)
-        except (ModuleNotFoundError, AttributeError):
-            for subclass in recursive_subclasses(SubclassJSONSerializer):
-                if get_full_class_name(subclass) == data["_type"]:
-                    # subclass_data = deepcopy(data)
-                    subclass_data = data
-                    subclass_data.pop("_type")
-                    return subclass._from_json(subclass_data)
-
-        raise ValueError("Unknown type {}".format(data["_type"]))
 
 
 def _pickle_thread(thread_obj) -> Any:
@@ -2291,13 +1770,14 @@ def encapsulate_code_lines_into_a_function(
     return code
 
 
-def get_method_object_from_pytest_request(request) -> Callable:
-    test_module = request.module.__name__  # e.g., "test_my_module"
-    test_class = request.cls.__name__ if request.cls else None  # if inside a class
-    test_name = request.node.name
-    func = importlib.import_module(test_module)
-    if test_class:
-        func = getattr(getattr(func, test_class), test_name)
-    else:
-        func = getattr(func, test_name)
-    return func
+# ---------------------------------------------------------------------------
+# Backward-compat — canonical implementations moved to krrood.code_generation
+# ---------------------------------------------------------------------------
+
+from krrood.code_generation.naming import (  # noqa: E402, F401
+    to_snake_case as str_to_snake_case,
+)
+from krrood.code_generation.type_hints import (  # noqa: E402, F401
+    value_to_source,
+    get_types_to_import_from_type_hints,
+)

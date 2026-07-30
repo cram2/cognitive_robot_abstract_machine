@@ -7,7 +7,9 @@ from ..dataset.class_with_type_checking_only_annotation import (
 
 
 def test_type_checking_only_field_annotation_resolves_to_referenced_type():
-    """A field typed by a ``TYPE_CHECKING``-only import must still resolve to that exact type.
+    """
+    A field typed by a ``TYPE_CHECKING``-only import must still resolve to that exact
+    type.
 
     ``ClassWithTypeCheckingOnlyAnnotation.annotation_only_field`` is annotated with
     :class:`TypeReferencedOnlyInAnnotations`, which is imported only inside a ``TYPE_CHECKING``

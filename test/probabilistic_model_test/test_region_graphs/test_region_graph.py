@@ -8,15 +8,21 @@ import optax
 from sortedcontainers import SortedSet
 
 from probabilistic_model.distributions.gaussian import GaussianDistribution
-from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import ProbabilisticCircuit as JPC
+from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
+    ProbabilisticCircuit as JPC,
+)
 from probabilistic_model.learning.region_graph.region_graph import RegionGraph
-from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import ClassificationCircuit
+from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
+    ClassificationCircuit,
+)
 from random_events.product_algebra import SimpleEvent
 from random_events.set import Set
 from scipy.special import logsumexp
 
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
-    UnivariateDiscreteLeaf, SumUnit, UnivariateContinuousLeaf,
+    UnivariateDiscreteLeaf,
+    SumUnit,
+    UnivariateContinuousLeaf,
 )
 from random_events.variable import Continuous, Symbolic
 

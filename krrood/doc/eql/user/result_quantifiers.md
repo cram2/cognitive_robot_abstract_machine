@@ -13,8 +13,16 @@ kernelspec:
 
 # Result Quantifiers
 
-Result quantifiers are used to specify the expected number of results for a query. They wrap a query and enforce
-constraints on its cardinality during execution.
+Result quantifiers are used to specify the expected number of results for a query. The cardinality
+constraint is enforced as a stage of the query's result pipeline during execution.
+
+```{note}
+`an()` and `the()` dispatch on their argument. Given a **symbolic expression** (an `entity(...)`,
+`set_of(...)`, variable or attribute) they act as the result quantifiers described on this page.
+Given a **type** (e.g. `a(Robot)` / `a(Robot)(...).from_(domain)`) they instead build a structural match —
+see [Structural Pattern Matching](match.md). A raw variable/attribute is automatically wrapped with
+`entity(...)`, so `an(robot_variable)` is equivalent to `an(entity(robot_variable))`.
+```
 
 ## The `an()` Quantifier
 

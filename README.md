@@ -105,6 +105,51 @@ pytest test/<package>_test
 
 e.g. `pytest test/coraplex_test`
 
+## Developer / Agent Tooling
+
+`.claude/` holds tooling for AI coding agents (Claude Code) working in this
+repository - hooks that run automatically each session, and skills invoked
+on demand (`/<skill-name>`). Each is documented where it lives; the links
+below are a starting point, not a duplicate of that documentation.
+
+**New here? Start with [`.claude/hooks/README.md`](.claude/hooks/README.md)** -
+it walks through the one-time setup (a single script, no config needed) and
+everything it unlocks (personal notes, per-PR progress tracking, multi-PR
+plan dashboards) end to end, in order.
+
+- **[`.claude/hooks/`](.claude/hooks/README.md)** - a `SessionStart` hook
+  that carries a contributor's own personal workflow notes, per-PR
+  plan/progress tracking, and multi-PR plan manifests across sessions via a
+  personal (gitignored, never-merged) branch, with zero required
+  configuration.
+- **[`.claude/skills/plan-dashboard/`](.claude/skills/plan-dashboard/SKILL.md)** -
+  publishes a live status dashboard for a multi-PR/multi-session
+  initiative, cross-checked against live GitHub PR/CI/review state so a
+  plan's manually-tracked status can never silently drift from reality. See
+  [`example-walkthrough.md`](.claude/skills/plan-dashboard/example-walkthrough.md)
+  for a short, worked example - idea to dashboard, with screenshots.
+- **[`.claude/skills/plan-create/`](.claude/skills/plan-create/SKILL.md)** -
+  bootstraps a new multi-PR/multi-session plan (or migrates an existing
+  freeform roadmap doc into one), validated against the same schema
+  `plan-dashboard` reads.
+- **[`.claude/skills/plan-item-kickoff/`](.claude/skills/plan-item-kickoff/SKILL.md)** -
+  gathers everything available about one tracked plan item (its manifest
+  entry, roadmap history, dependency chain's live state, sibling-item
+  patterns) and proposes an implementation plan via plan mode, without
+  writing any code. The "Start now" button on a not-started item's
+  dashboard card copies the invoking command for this skill.
+- **[`.claude/skills/plan-item-resolve/`](.claude/skills/plan-item-resolve/SKILL.md)** -
+  gathers everything available about one already-underway item (its
+  branch/PR state, CI, review comments, tracking-issue discussion, recorded
+  blockers) and proposes a plan to resolve whatever is stalling it, via plan
+  mode, without writing any code. The "Resolve"/"Resume"/"Reconsider" button
+  on a blocked/in-progress/deferred item's dashboard card copies the
+  invoking command for this skill.
+- **[`.claude/skills/local-code-review/`](.claude/skills/local-code-review/SKILL.md)** -
+  reviews the current branch against upstream `main` for bugs and
+  `AGENTS.md` adherence, then hands back an approval-gated plan to fix every
+  finding (including adding missing tests) before you push.
+
 ## Contribution
 
 Before committing any changes, please navigate into the project root and install pre-commit hooks:

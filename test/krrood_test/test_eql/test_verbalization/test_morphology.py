@@ -2,8 +2,8 @@
 Standalone unit tests for the morphology facade
 (:mod:`krrood.entity_query_language.verbalization.morphology`).
 
-The facade is the single point of access to ``inflect`` / ``lemminflect``; these tests pin the
-behaviour each call site relies on.
+The facade is the single point of access to ``inflect`` / ``lemminflect``; these tests
+pin the behaviour each call site relies on.
 """
 
 from __future__ import annotations

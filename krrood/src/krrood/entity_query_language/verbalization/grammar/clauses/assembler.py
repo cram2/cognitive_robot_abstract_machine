@@ -36,7 +36,9 @@ _ORDERING_RANGE_WORDS = {
     SortDirection.ASCENDING: OrderingRangeWords.LOWEST_TO_HIGHEST,
     SortDirection.DESCENDING: OrderingRangeWords.HIGHEST_TO_LOWEST,
 }
-"""Maps a :class:`SortDirection` to the ORDER BY range prose it surfaces as."""
+"""
+Maps a :class:`SortDirection` to the ORDER BY range prose it surfaces as.
+"""
 
 
 class GroupedByAssembler(Assembler[Query, GroupPlan]):
@@ -182,11 +184,13 @@ class OrderedByAssembler(Assembler[OrderedByBuilder, None]):
 
 
 class HavingAssembler(Assembler[Query, None]):
-    """*"where <condition>"* — a HAVING filter as a full trailing clause. Realisation-only (no plan).
+    """
+    *"where <condition>"* — a HAVING filter as a full trailing clause.
 
-    A *grouped report* fronts its HAVING onto the group key instead (*"For each department whose
-    <aggregate> is …"*, in the query assembler), so this trailing form serves the non-fronted scope —
-    a constrained aggregation value (*"the sum … among <population> … where …"*).
+    Realisation-only (no plan).     A *grouped report* fronts its HAVING onto the group
+    key instead (*"For each department whose     <aggregate> is …"*, in the query
+    assembler), so this trailing form serves the non-fronted scope —     a constrained
+    aggregation value (*"the sum … among <population> … where …"*).
     """
 
     def realize(self, node: Query, plan: None = None) -> VerbalizationFragment:

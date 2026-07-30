@@ -38,8 +38,8 @@ from krrood.entity_query_language.verbalization.vocabulary.words import (
 
 class ConditionAssembler(Assembler[Comparator, None]):
     """
-    Render a condition in a requested surface form (predicate / modifier / …) — the single owner
-    of every surface form a condition can take.
+    Render a condition in a requested surface form (predicate / modifier / …) — the
+    single owner of every surface form a condition can take.
 
     A comparator/condition is said differently depending on where it sits: a standalone predicate
     (*"x is greater than 5"*), a post-nominal attribute modifier on a subject (the bare *"<attribute>

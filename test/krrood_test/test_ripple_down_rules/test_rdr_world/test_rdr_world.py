@@ -7,13 +7,6 @@ import pytest
 
 from krrood.ripple_down_rules.utils import draw_tree, render_tree
 
-try:
-    from PyQt6.QtWidgets import QApplication
-    from krrood.ripple_down_rules.user_interface.gui import RDRCaseViewer
-except ImportError as e:
-    QApplication = None
-    RDRCaseViewer = None
-
 from ..datasets import *
 from krrood.ripple_down_rules.helpers import is_matching
 from krrood.ripple_down_rules import *

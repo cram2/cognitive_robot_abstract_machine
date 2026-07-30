@@ -6,6 +6,13 @@ on:
       - main
   workflow_dispatch: {}
 
+# Serialize Pages deployments so concurrent runs do not race. Never cancel a run in
+# progress: the deploy job is what republishes the site, so cancelling it would leave
+# the previous merge's docs live with no further deployment coming.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   to-lowercase:
     runs-on: ubuntu-latest

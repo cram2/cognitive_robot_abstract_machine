@@ -1,8 +1,11 @@
 """
-The realisation passes share one ``RealizationPass`` contract and run as an ordered pipeline
-(Phase 5). The stateless leaf-rewriting passes (determiner, morphology) are ``RewritePass`` built on
-``map_fragment``, so they do not re-walk the tree by hand. This test pins the contract and that
-``realize_tree`` is exactly the ordered composition of those passes (no behaviour change).
+The realisation passes share one ``RealizationPass`` contract and run as an ordered
+pipeline (Phase 5).
+
+The stateless leaf-rewriting passes (determiner, morphology) are ``RewritePass`` built
+on ``map_fragment``, so they do not re-walk the tree by hand. This test pins the
+contract and that ``realize_tree`` is exactly the ordered composition of those passes
+(no behaviour change).
 """
 
 from __future__ import annotations
@@ -71,8 +74,10 @@ def _sample_tree() -> PhraseFragment:
 
 
 def test_realize_tree_is_the_ordered_pass_pipeline():
-    """``realize_tree`` equals coreference → determiner → morphology → orthography, applied in that
-    order — exercised on a tree that needs every pass (determiner-drop + pluralise + comma glue).
+    """
+    ``realize_tree`` equals coreference → determiner → morphology → orthography, applied
+    in that order — exercised on a tree that needs every pass (determiner-drop +
+    pluralise + comma glue).
     """
     tree = _sample_tree()
     manual = OrthographyProcessor().process(

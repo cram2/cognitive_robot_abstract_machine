@@ -15,7 +15,8 @@ from krrood.entity_query_language.verbalization.grammar.query.assembler import (
 
 
 class TopLevelEntityRule(PhraseRule):
-    """Top-level Entity → imperative *"Find …"* (only at query_depth 0).
+    """
+    Top-level Entity → imperative *"Find …"* (only at query_depth 0).
 
     >>> verbalize_expression(an(entity(variable(Robot, []))))
     'Find a Robot'
@@ -91,8 +92,9 @@ class NestedEntityRule(PhraseRule):
 
 
 class SetOfRule(PhraseRule):
-    """SetOf → *"Find v1 and v2 such that …"* (a search), or *"Report …"* / *"For each … report
-    …"* when the selection computes aggregates (a report).
+    """
+    SetOf → *"Find v1 and v2 such that …"* (a search), or *"Report …"* / *"For each …
+    report …"* when the selection computes aggregates (a report).
 
     >>> verbalize_expression(an(set_of(variable(Robot, []), variable(Task, []))))
     'Find a Robot and a Task'
@@ -114,10 +116,14 @@ class SetOfRule(PhraseRule):
 
 
 class InlineEntityRule(PhraseRule):
-    """Entity in chain-root position → the inline-noun form (*"a Robot"*, no *"Find"*, its WHERE
-    deferred to the binding scope). Selected when the fold recurses with ``inline`` — so the chain
-    assembler just recurses the root and the dispatch picks the form, rather than type-checking and
-    calling the query assembler by hand."""
+    """
+    Entity in chain-root position → the inline-noun form (*"a Robot"*, no *"Find"*, its
+    WHERE deferred to the binding scope).
+
+    Selected when the fold recurses with ``inline`` — so the chain assembler just
+    recurses the root and the dispatch picks the form, rather than type-checking and
+    calling the query assembler by hand.
+    """
 
     construct = Entity
 
@@ -146,8 +152,10 @@ class InlineEntityRule(PhraseRule):
 
 
 class ResultQuantifierRule(PhraseRule):
-    """Transparent wrapper (An / The / …) → delegate to the child, forwarding the render context
-    (an ``inline`` chain root stays inline through the wrapper)."""
+    """
+    Transparent wrapper (An / The / …) → delegate to the child, forwarding the render
+    context (an ``inline`` chain root stays inline through the wrapper).
+    """
 
     construct = ResultQuantifier
 

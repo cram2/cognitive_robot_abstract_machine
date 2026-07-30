@@ -61,7 +61,8 @@ class InfeasibleException(QPSolverException):
 @dataclass
 class VelocityLimitUnreachableException(QPSolverException):
     """
-    Raised when a degree of freedom cannot reach its velocity limit within the prediction horizon.
+    Raised when a degree of freedom cannot reach its velocity limit within the
+    prediction horizon.
     """
 
     degree_of_freedom_name: str
@@ -139,7 +140,8 @@ class EmptyProblemException(InfeasibleException, DontPrintStackTrace):
 @dataclass
 class MismatchedLimitLengthsError(GiskardException):
     """
-    Raised when the bounds, weights, and names of a DirectLimits do not all share the same length.
+    Raised when the bounds, weights, and names of a DirectLimits do not all share the
+    same length.
     """
 
     field_lengths: dict[str, int]
@@ -157,7 +159,8 @@ class MismatchedLimitLengthsError(GiskardException):
 @dataclass
 class ConstraintTypeMismatchError(QPSolverException):
     """
-    Raised when an enforcement strategy receives a constraint of the wrong type for the requested bounds.
+    Raised when an enforcement strategy receives a constraint of the wrong type for the
+    requested bounds.
     """
 
     strategy_name: str
@@ -193,8 +196,8 @@ class ConstraintTypeMismatchError(QPSolverException):
 @dataclass
 class MultipleTerminalStateConstraintsError(QPSolverException):
     """
-    Raised when more than one terminal-state prediction constraint is compiled into a single
-    strategy block, which the single-row terminal prediction cannot represent.
+    Raised when more than one terminal-state prediction constraint is compiled into a
+    single strategy block, which the single-row terminal prediction cannot represent.
     """
 
     constraint_names: list[str]

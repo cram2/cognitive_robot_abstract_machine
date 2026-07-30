@@ -1,5 +1,6 @@
 """
-Ratchet guardrails for the verbalization package's adherence to the AGENTS.md code-quality rules.
+Ratchet guardrails for the verbalization package's adherence to the AGENTS.md code-
+quality rules.
 
 Each test counts a forbidden construct across the verbalization source tree and asserts the count
 does not *exceed* a recorded baseline, so no new violation can slip in. The baselines are the debt
@@ -98,15 +99,21 @@ def _total(counter) -> int:
 
 
 def test_no_new_getattr_calls() -> None:
-    """No new ``getattr`` call may be added to the verbalization package."""
+    """
+    No new ``getattr`` call may be added to the verbalization package.
+    """
     assert _total(_getattr_call_sites) <= GETATTR_BASELINE
 
 
 def test_no_new_attribute_access_try_except() -> None:
-    """No new attribute-access ``try/except`` may be added to the verbalization package."""
+    """
+    No new attribute-access ``try/except`` may be added to the verbalization package.
+    """
     assert _total(_attribute_except_handlers) <= ATTRIBUTE_EXCEPT_BASELINE
 
 
 def test_no_new_module_level_mutable_state() -> None:
-    """No new module-level mutable container may be added to the verbalization package."""
+    """
+    No new module-level mutable container may be added to the verbalization package.
+    """
     assert _total(_module_level_mutable_containers) <= MODULE_MUTABLE_STATE_BASELINE

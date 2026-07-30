@@ -5,6 +5,8 @@ boundaries for object hypotheses. It can grow or shrink ROIs and their associate
 masks by a specified pixel offset.
 """
 
+from __future__ import annotations
+
 from timeit import default_timer
 
 from py_trees.common import Status
@@ -47,12 +49,12 @@ class ROIAdjusterAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ROIAdjusterAnnotator",
-        descriptor: "ROIAdjusterAnnotator.Descriptor" = Descriptor(),
+        descriptor: ROIAdjusterAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the ROI adjuster.
 
-        :param name: Name of the annotator instance, defaults to "ROIAdjusterAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of the annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
 

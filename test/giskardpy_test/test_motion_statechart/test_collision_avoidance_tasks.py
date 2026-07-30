@@ -1,6 +1,7 @@
 import json
 import time
 from copy import deepcopy
+from dataclasses import dataclass, field
 
 import numpy as np
 import pytest
@@ -45,6 +46,10 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
+from semantic_digital_twin.collision_checking.collision_detector import (
+    CollisionCheckingResult,
+)
+from semantic_digital_twin.collision_checking.collision_manager import CollisionConsumer
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionBetweenGroups,
 )
@@ -260,7 +265,7 @@ def test_external_collision_avoidance_battle():
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=1, reference_frame=weak
                 ),
-                weight=DefaultWeights.WEIGHT_BELOW_CA,
+                weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
             ),
             ExternalCollisionAvoidance(robot=weak_robot_sa),
             ExternalCollisionAvoidance(robot=strong_robot_sa),
@@ -607,7 +612,7 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
                                 angle=np.pi / 2.0,
                                 reference_frame=pr2_with_box.root,
                             ),
-                            weight=DefaultWeights.WEIGHT_BELOW_CA,
+                            weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
                         ),
                         ExternalCollisionAvoidance(robot=robot),
                     ]
@@ -633,7 +638,10 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
     kin_sim.tick_until_end(500)
 
 
-def test_avoid_self_collision_with_l_arm(pr2_with_box):
+def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
+    VizMarkerPublisher(
+        _world=pr2_with_box, node=rclpy_node
+    ).with_tf_and_collision_visualization()
     r_tip = pr2_with_box.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
     l_forearm_link = pr2_with_box.get_kinematic_structure_entity_by_name(
         "l_forearm_link"
@@ -679,7 +687,7 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box):
                             goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                                 0.2, reference_frame=r_tip
                             ),
-                            weight=DefaultWeights.WEIGHT_ABOVE_CA,
+                            weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
                         ),
                         SelfCollisionAvoidance(robot=robot),
                     ],
@@ -710,6 +718,143 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box):
     assert len(msc.nodes) == 76
 
     kin_sim.tick_until_end(500)
+
+
+# %% collision check counting
+
+
+@dataclass
+class CollisionCheckCountingObserver(CollisionConsumer):
+    """
+    Passive collision consumer that records how often collisions were computed.
+
+    Being passive, it never causes collision checking itself, so its count reflects only
+    the checks that other consumers required.
+    """
+
+    collision_check_count: int = field(init=False, default=0)
+    """
+    Number of collision computations observed while registered.
+    """
+
+    def on_compute_collisions(self, collision_results: CollisionCheckingResult):
+        self.collision_check_count += 1
+
+    def on_world_model_update(self, world: World):
+        pass
+
+    def on_collision_matrix_update(self):
+        pass
+
+
+def _build_arms_crossing_statechart(
+    world: World, collision_avoidance: bool
+) -> MotionStatechart:
+    """
+    Builds a statechart that drives the right gripper into the left arm.
+
+    :param world: The PR2 world the goal refers to.
+    :param collision_avoidance: Whether a self collision avoidance node is part of the
+        goal.
+    """
+    r_tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+    base_footprint = world.get_kinematic_structure_entity_by_name("base_footprint")
+
+    msc = MotionStatechart()
+    msc.add_node(
+        goal := Sequence(
+            [
+                SetSeedConfiguration(
+                    seed_configuration=JointState.from_str_dict(
+                        {
+                            "r_elbow_flex_joint": -1.43286344265,
+                            "r_forearm_roll_joint": -1.26465060073,
+                            "r_shoulder_lift_joint": 0.47990329056,
+                            "r_shoulder_pan_joint": -0.281272240139,
+                            "r_upper_arm_roll_joint": -0.528415402668,
+                            "r_wrist_flex_joint": -1.18811419869,
+                            "r_wrist_roll_joint": 2.26884630124,
+                            "l_elbow_flex_joint": 0.0,
+                            "l_forearm_roll_joint": 0.0,
+                            "l_shoulder_lift_joint": 0.0,
+                            "l_shoulder_pan_joint": 0.0,
+                            "l_upper_arm_roll_joint": 0.0,
+                            "l_wrist_flex_joint": 0.0,
+                            "l_wrist_roll_joint": 0.0,
+                        },
+                        world=world,
+                    )
+                ),
+                CartesianPose(
+                    root_link=base_footprint,
+                    tip_link=r_tip,
+                    goal_pose=Pose.from_xyz_rpy(0.2, reference_frame=r_tip),
+                    weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
+                ),
+            ],
+        ),
+    )
+    msc.add_node(EndMotion.when_true(goal))
+    if collision_avoidance:
+        robot = world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        msc.add_node(SelfCollisionAvoidance(robot=robot))
+    return msc
+
+
+def _run_and_count_collision_checks(
+    world: World, msc: MotionStatechart
+) -> CollisionCheckCountingObserver:
+    """
+    Executes the statechart and returns the observer that counted the collision checks.
+    """
+    observer = CollisionCheckCountingObserver()
+    world.collision_manager.add_collision_consumer(observer)
+    executor = Executor(
+        MotionStatechartContext(
+            world=world,
+            qp_controller_config=QPControllerConfig(
+                target_frequency=100,
+                prediction_horizon=30,
+            ),
+        )
+    )
+    executor.compile(motion_statechart=msc)
+    executor.tick_until_end(500)
+    world.collision_manager.remove_collision_consumer(observer)
+    return observer
+
+
+def test_collisions_are_not_computed_without_collision_nodes(pr2_with_box):
+    msc = _build_arms_crossing_statechart(pr2_with_box, collision_avoidance=False)
+
+    for node in msc.nodes:
+        assert not isinstance(node, SelfCollisionAvoidance)
+        assert not isinstance(node, ExternalCollisionAvoidance)
+
+    observer = _run_and_count_collision_checks(pr2_with_box, msc)
+    assert observer.collision_check_count == 0
+
+
+def test_collisions_are_computed_with_collision_avoidance_node(pr2_with_box):
+    msc = _build_arms_crossing_statechart(pr2_with_box, collision_avoidance=True)
+
+    observer = _run_and_count_collision_checks(pr2_with_box, msc)
+    assert observer.collision_check_count > 0
+
+
+def test_collisions_are_computed_for_a_distance_monitor_alone(pr2_with_box):
+    msc = _build_arms_crossing_statechart(pr2_with_box, collision_avoidance=False)
+    msc.add_node(
+        ExternalCollisionDistanceMonitor(
+            body=pr2_with_box.get_kinematic_structure_entity_by_name(
+                "r_gripper_palm_link"
+            ),
+            threshold=0.0,
+        )
+    )
+
+    observer = _run_and_count_collision_checks(pr2_with_box, msc)
+    assert observer.collision_check_count > 0
 
 
 def test_hard_constraints_violated(cylinder_bot_world: World):

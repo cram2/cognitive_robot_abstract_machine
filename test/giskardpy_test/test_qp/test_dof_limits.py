@@ -38,8 +38,8 @@ def _single_dof(world: World) -> DegreeOfFreedom:
 
 def _truth_value(value: object) -> bool:
     """
-    Evaluates the truth of a symbolic scalar, tolerating the native ``bool`` that symbolic
-    operations fold to when all of their inputs are constants.
+    Evaluates the truth of a symbolic scalar, tolerating the native ``bool`` that
+    symbolic operations fold to when all of their inputs are constants.
     """
     if isinstance(value, sm.Scalar):
         return bool(value.evaluate()[0])

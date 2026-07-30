@@ -18,8 +18,9 @@ from giskardpy.motion_statechart.graph_node import (
 class TryAll(Goal):
     """
     Takes a list of nodes and executes them in parallel.
-    Its observation turns True as soon as any node is True and turns False only when all nodes
-    are False, i.e. it only fails if every node fails.
+
+    Its observation turns True as soon as any node is True and turns False only when all
+    nodes are False, i.e. it only fails if every node fails.
     """
 
     nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
@@ -40,7 +41,9 @@ class TryAll(Goal):
         """
         observations = [node.observation_variable for node in self.nodes]
         observation = (
-            observations[0] if len(observations) == 1 else trinary_logic_or(*observations)
+            observations[0]
+            if len(observations) == 1
+            else trinary_logic_or(*observations)
         )
         return NodeArtifacts(observation=observation)
 
@@ -48,10 +51,12 @@ class TryAll(Goal):
 @dataclass(repr=False, eq=False)
 class TryInOrder(Goal):
     """
-    Takes a list of nodes and tries them one after another, short-circuiting on the first success.
-    The next node only starts once the previous node failed; as soon as a node succeeds the
-    remaining nodes are skipped. Its observation turns True if any node is True and turns False only
-    when all nodes are False, i.e. it only fails if every node fails.
+    Takes a list of nodes and tries them one after another, short-circuiting on the
+    first success.
+
+    The next node only starts once the previous node failed; as soon as a node succeeds
+    the remaining nodes are skipped. Its observation turns True if any node is True and
+    turns False only when all nodes are False, i.e. it only fails if every node fails.
     """
 
     nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
@@ -61,8 +66,8 @@ class TryInOrder(Goal):
 
     def expand(self, context: MotionStatechartContext) -> None:
         """
-        Add the child nodes and wire them so each one starts only after the
-        previous one failed, short-circuiting on the first success.
+        Add the child nodes and wire them so each one starts only after the previous one
+        failed, short-circuiting on the first success.
         """
         last_node: Optional[MotionStatechartNode] = None
         for node in self.nodes:
@@ -82,6 +87,8 @@ class TryInOrder(Goal):
         """
         observations = [node.observation_variable for node in self.nodes]
         observation = (
-            observations[0] if len(observations) == 1 else trinary_logic_or(*observations)
+            observations[0]
+            if len(observations) == 1
+            else trinary_logic_or(*observations)
         )
         return NodeArtifacts(observation=observation)

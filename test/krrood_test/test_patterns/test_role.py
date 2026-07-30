@@ -332,7 +332,9 @@ def test_role_overriding_factory_method_shadows_the_guard():
 
 def test_factory_method_guard_applies_through_nested_roles():
     person = PersonInRoleAndOntology(name="Bass")
-    representative = RepresentativeAsSecondRole(role_taker=CEOAsFirstRole(role_taker=person))
+    representative = RepresentativeAsSecondRole(
+        role_taker=CEOAsFirstRole(role_taker=person)
+    )
     with pytest.raises(DelegatedFactoryMethodError):
         representative.from_name("Other")
 

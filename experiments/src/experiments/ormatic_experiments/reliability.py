@@ -1,10 +1,10 @@
 """
-This module provides functionality to build an HSRB robot world, create robot
-action plans, execute plans in a simulated environment, and measure the
-performance of data operations, such as serialization and database storage.
+This module provides functionality to build an HSRB robot world, create robot action
+plans, execute plans in a simulated environment, and measure the performance of data
+operations, such as serialization and database storage.
 
-It includes tools for running experiments to evaluate the reliability
-and performance of robotic action plans and data operations.
+It includes tools for running experiments to evaluate the reliability and performance of
+robotic action plans and data operations.
 """
 
 import pathlib
@@ -31,7 +31,7 @@ from experiments.experiment_definitions import (
     TypstRenderer,
 )
 from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.factories import a, an
 from krrood.ormatic.data_access_objects.dao import selectin_loading
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine, drop_database
@@ -93,8 +93,8 @@ def _random_navigate_action(world: World):
     """
     Return an underspecified :class:`NavigateAction` with randomised pose.
     """
-    action = underspecified(NavigateAction)(
-        target_location=underspecified(Pose.from_xyz_rpy)(
+    action = a(NavigateAction)(
+        target_location=a(Pose.from_xyz_rpy)(
             x=...,
             y=...,
             z=0.0,
@@ -111,8 +111,7 @@ def _random_navigate_action(world: World):
 
 def create_plan(world: World, ctx: Context, n_actions: int):
     """
-    Create a sequential plan with *n_actions* random :class:`NavigateAction`
-    instances.
+    Create a sequential plan with *n_actions* random :class:`NavigateAction` instances.
     """
     actions = [_random_navigate_action(world) for _ in range(n_actions)]
     return sequential(actions, context=ctx).plan
@@ -178,8 +177,7 @@ class ORMaticReliabilityAggregateResult(ExperimentResult):
 
     plan_execution_duration: MeanAndStandardDeviation
     """
-    Mean and standard deviation of plan execution time under simulated_robot
-    (seconds).
+    Mean and standard deviation of plan execution time under simulated_robot (seconds).
     """
 
     to_data_access_object_duration: MeanAndStandardDeviation
@@ -189,14 +187,13 @@ class ORMaticReliabilityAggregateResult(ExperimentResult):
 
     writing_to_database_duration: MeanAndStandardDeviation
     """
-    Mean and standard deviation of session.add() + session.commit() time
-    (seconds).
+    Mean and standard deviation of session.add() + session.commit() time (seconds).
     """
 
     reading_from_database_duration: MeanAndStandardDeviation
     """
-    Mean and standard deviation of
-    session.scalars(select(PlanMappingDAO)).one() time (seconds).
+    Mean and standard deviation of session.scalars(select(PlanMappingDAO)).one() time
+    (seconds).
     """
 
     reconstruction_duration: MeanAndStandardDeviation
@@ -212,14 +209,13 @@ def reliability_experiment(
     world_building_duration: float,
 ) -> ORMaticReliabilityExperimentResult:
     """
-    Run a single reliability iteration: create and execute a plan, then write
-    it to an in-memory SQLite database, measuring each phase separately.
+    Run a single reliability iteration: create and execute a plan, then write it to an
+    in-memory SQLite database, measuring each phase separately.
 
     :param plan_size: Number of actions to include in the random plan.
     :param world: The pre-built world to create the plan in.
     :param context: The execution context.
-    :param world_building_duration: Pre-measured world building time
-        (s).
+    :param world_building_duration: Pre-measured world building time (s).
     :return: Timing breakdown for this single run.
     """
     plan = create_plan(world, context, plan_size)
@@ -271,8 +267,8 @@ def run_reliability_experiment(
     iterations: int = 10,
 ) -> tuple[ORMaticReliabilityAggregateResult, List[ORMaticReliabilityExperimentResult]]:
     """
-    Run *iterations* reliability experiment cycles for plans of *plan_size*
-    actions and aggregate the results.
+    Run *iterations* reliability experiment cycles for plans of *plan_size* actions and
+    aggregate the results.
 
     The world is rebuilt from scratch on every iteration so that
     ``world_building_duration`` is measured repeatedly and yields a meaningful
@@ -319,12 +315,10 @@ def plot_reliability(
     raw_results: List[ORMaticReliabilityExperimentResult],
 ) -> go.Figure:
     """
-    Produce a grouped violin plot of plan size vs duration for each timing
-    phase.
+    Produce a grouped violin plot of plan size vs duration for each timing phase.
 
-    :param raw_results: All per-iteration
-        :class:`ORMaticReliabilityExperimentResult` instances across
-        every plan size.
+    :param raw_results: All per-iteration :class:`ORMaticReliabilityExperimentResult`
+        instances across every plan size.
     :return: A Plotly figure ready for display or export.
     """
     phases = [

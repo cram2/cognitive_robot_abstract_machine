@@ -23,7 +23,9 @@ if TYPE_CHECKING:
 @dataclass
 class QPController:
     """
-    Wraps around QP Solver. Builds the required matrices from constraints.
+    Wraps around QP Solver.
+
+    Builds the required matrices from constraints.
     """
 
     config: QPControllerConfig

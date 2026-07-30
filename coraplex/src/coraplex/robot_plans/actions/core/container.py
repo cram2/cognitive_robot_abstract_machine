@@ -40,7 +40,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 @dataclass
 class OpenAction(ActionDescription):
     """
-    Opens a container like object
+    Opens a container like object.
     """
 
     object_designator: Body
@@ -49,8 +49,9 @@ class OpenAction(ActionDescription):
     """
     arm: Arms
     """
-    Arm that should be used for opening the container
+    Arm that should be used for opening the container.
     """
+
     grasping_prepose_distance: float = ActionConfig.grasping_prepose_distance
     """
     The distance in meters the gripper should be at in the x-axis away from the handle.
@@ -82,7 +83,8 @@ class OpenAction(ActionDescription):
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> ConditionType:
         """
-        The gripper with which to open the container has to be free and the handle has to be reachable.
+        The gripper with which to open the container has to be free and the handle has
+        to be reachable.
         """
         end_effector = ViewManager.get_end_effector_view(
             variables["arm"], context.robot
@@ -106,7 +108,8 @@ class OpenAction(ActionDescription):
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> ConditionType:
         """
-        The handle has to be in the gripper of the robot and the container has to be open.
+        The handle has to be in the gripper of the robot and the container has to be
+        open.
         """
         end_effector = ViewManager.get_end_effector_view(kwargs["arm"], context.robot)
         parent_connection = kwargs[
@@ -138,15 +141,18 @@ class CloseAction(ActionDescription):
 
     object_designator: Body
     """
-    Object designator_description describing the object that should be closed
+    Object designator_description describing the object that should be closed.
     """
+
     arm: Arms
     """
-    Arm that should be used for closing
+    Arm that should be used for closing.
     """
+
     grasping_prepose_distance: float = ActionConfig.grasping_prepose_distance
     """
-    The distance in meters between the gripper and the handle before approaching to grasp.
+    The distance in meters between the gripper and the handle before approaching to
+    grasp.
     """
 
     @property
@@ -175,7 +181,7 @@ class CloseAction(ActionDescription):
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> SymbolicExpression | bool:
         """
-        The container has to be closed
+        The container has to be closed.
         """
         close_connection = kwargs[
             "object_designator"

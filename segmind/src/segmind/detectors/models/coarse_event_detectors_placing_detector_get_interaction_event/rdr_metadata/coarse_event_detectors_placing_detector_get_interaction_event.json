@@ -1,0 +1,82 @@
+{
+    "_type": "ripple_down_rules.rdr.GeneralRDR",
+    "start_rules": {
+        "output_": {
+            "_type": "ripple_down_rules.rdr.SingleClassRDR",
+            "start_rule": {
+                "_type": "ripple_down_rules.rules.SingleClassRule",
+                "conditions": {
+                    "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                    "user_input": "def _get_value(case):\n    def conditions_for_placing_detector_get_interaction_event(self_: PlacingDetector, output_: Union[NoneType, PlacingEvent]) -> bool:\n        \"\"\"Get conditions on whether it's possible to conclude a value for PlacingDetector_get_interaction_event.output_  of type PlacingEvent.\"\"\"\n        return isinstance(self_.starter_event, SupportEvent)\n    return conditions_for_placing_detector_get_interaction_event(**case)\n    ",
+                    "conclusion_type": [
+                        "builtins.bool"
+                    ],
+                    "scope": {
+                        "Case": "ripple_down_rules.datastructures.case.Case",
+                        "PlacingDetector": "segmind.detectors.coarse_event_detectors.PlacingDetector",
+                        "Dict": "typing.Dict",
+                        "Optional": "typing.Optional",
+                        "Union": "typing.Union",
+                        "PlacingEvent": "segmind.datastructures.events.PlacingEvent",
+                        "StopTranslationEvent": "segmind.datastructures.events.StopTranslationEvent",
+                        "TranslationEvent": "segmind.datastructures.events.TranslationEvent",
+                        "SupportEvent": "segmind.datastructures.events.SupportEvent",
+                        "NoneType": "builtins.NoneType"
+                    },
+                    "conclusion": {
+                        "_type": "builtins.NoneType",
+                        "value": null
+                    },
+                    "mutually_exclusive": true
+                },
+                "conclusion": {
+                    "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                    "user_input": "def _get_value(case):\n    def placing_detector_get_interaction_event(self_: PlacingDetector, output_: Union[NoneType, PlacingEvent]) -> Union[NoneType, PlacingEvent]:\n        \"\"\"Get possible value(s) for PlacingDetector_get_interaction_event.output_  of type PlacingEvent.\"\"\"\n        # latest_translation_event = self_.starter_event.object_tracker.get_first_event_of_type_before_event(TranslationEvent, self_.starter_event)\n        return PlacingEvent(tracked_object=self_.tracked_object,\n                            timestamp=self_.starter_event.timestamp - self_.wait_time.total_seconds(),\n                            end_timestamp=self_.starter_event.timestamp)\n    return placing_detector_get_interaction_event(**case)\n    ",
+                    "conclusion_type": [
+                        "builtins.NoneType",
+                        "segmind.datastructures.events.PlacingEvent"
+                    ],
+                    "scope": {
+                        "Case": "ripple_down_rules.datastructures.case.Case",
+                        "PlacingDetector": "segmind.detectors.coarse_event_detectors.PlacingDetector",
+                        "Dict": "typing.Dict",
+                        "Optional": "typing.Optional",
+                        "Union": "typing.Union",
+                        "PlacingEvent": "segmind.datastructures.events.PlacingEvent",
+                        "StopTranslationEvent": "segmind.datastructures.events.StopTranslationEvent",
+                        "TranslationEvent": "segmind.datastructures.events.TranslationEvent",
+                        "SupportEvent": "segmind.datastructures.events.SupportEvent",
+                        "NoneType": "builtins.NoneType"
+                    },
+                    "conclusion": {
+                        "_type": "builtins.NoneType",
+                        "value": null
+                    },
+                    "mutually_exclusive": true
+                },
+                "parent": null,
+                "corner_case": {
+                    "_type": "ripple_down_rules.datastructures.case.Case",
+                    "self_": null,
+                    "output_": null,
+                    "_id": 139958829018048,
+                    "_obj_type": "builtins.dict",
+                    "_name": "PlacingDetector_get_interaction_event"
+                },
+                "conclusion_name": "output_",
+                "weight": null,
+                "uid": "73076948442184610140058021308995926047",
+                "refinement": null,
+                "alternative": null
+            },
+            "generated_python_file_name": "placing_detector_get_interaction_event_output__scrdr",
+            "name": "output_",
+            "case_type": "typing.Dict",
+            "case_name": "PlacingDetector_get_interaction_event"
+        }
+    },
+    "generated_python_file_name": "placing_detector_get_interaction_event_rdr",
+    "name": "output_",
+    "case_type": "typing.Dict",
+    "case_name": "PlacingDetector_get_interaction_event"
+}

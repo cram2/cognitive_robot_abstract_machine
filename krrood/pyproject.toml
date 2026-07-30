@@ -12,7 +12,7 @@ dynamic = ["version", "dependencies"]
 description = "A python package for Knowledge Representation and Reasoning systems based on Object Oriented Design."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "LGPL-3.0-only"
 authors = [
     {name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de"},
     {name = "Tom Schierenbeck", email = "tom_sch@uni-bremen.de"}
@@ -22,7 +22,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -37,6 +36,12 @@ classifiers = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0,<8.0.0",
+    "mypy>=1.8",
+]
+visualization = [
+    "dash",
+    "plotly",
+    "flask",
 ]
 
 [project.urls]
@@ -57,6 +62,9 @@ exclude = ["test*"]
 krrood = [
   "ormatic/templates/*.j2",
   "ormatic/templates/*.jinja",
+  "rustworkx_utils/visualization/templates/*.jinja",
+  "code_generation/templates/*.jinja",
+  "entity_query_language/testing/templates/*.jinja",
 ]
 
 [tool.pytest.ini_options]
@@ -89,5 +97,5 @@ exclude_lines = [
 ]
 
 [tool.setuptools.dynamic]
-version = {attr = "krrood.__version__"}
-dependencies = { file = ["requirements.txt"] }
+version = {attr = "krrood._version.__version__"}
+dependencies = { file = "requirements.txt" }

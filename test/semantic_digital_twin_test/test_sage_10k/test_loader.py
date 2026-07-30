@@ -27,11 +27,12 @@ from semantic_digital_twin.world import World
 def verify_scene(world: World, scene: Sage10kScene):
     """
     Verify that the object positions of the scene are the same as in the world.
-    Sometimes the scene contains two objects with the same ID. In that case, this check is skipped
+
+    Sometimes the scene contains two objects with the same ID. In that case, this check
+    is skipped
     :param world: The world created from the scene.
     :param scene: The scene.
     """
-
     for room in scene.rooms:
         for obj in room.objects:
             matching_bodies = [b for b in world.bodies if b.name.prefix == obj.id]

@@ -332,7 +332,9 @@ def test_root_frame_in_returns_none_for_unknown_package():
 
 
 def test_root_frame_in_outermost_wins():
-    """The outermost frame in the package is returned, not the innermost."""
+    """
+    The outermost frame in the package is returned, not the innermost.
+    """
 
     def inner():
         person_inf = inference(Person)

@@ -10,6 +10,7 @@ black
 ruff
 sortedcontainers
 ruff
+inflection
 
 # rdr requirements
 anytree>=2.8.0
@@ -21,6 +22,7 @@ tabulate
 ipython
 requests
 colorama
+tqdm
 pygments
 sqlalchemy
 pandas

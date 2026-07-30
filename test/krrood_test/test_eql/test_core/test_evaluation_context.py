@@ -1,4 +1,6 @@
-"""Tests for the typed per-pass state collaborators on EvaluationContext."""
+"""
+Tests for the typed per-pass state collaborators on EvaluationContext.
+"""
 
 import uuid
 
@@ -11,7 +13,10 @@ from krrood.entity_query_language.evaluation_context import (
 
 
 class _NodeStub:
-    """Minimal stand-in for a SymbolicExpression: only ``_id_`` is needed by these collaborators."""
+    """
+    Minimal stand-in for a SymbolicExpression: only ``_id_`` is needed by these
+    collaborators.
+    """
 
     def __init__(self):
         self._id_ = uuid.uuid4()
@@ -30,8 +35,10 @@ def test_active_conditions_root_claims_first_node_and_ignores_later_claims():
 
 
 def test_active_conditions_root_resolves_by_claim_not_by_construction_order():
-    """The whole point of this class: whichever node claims the pass first is the active root,
-    regardless of any other node's structural/construction history."""
+    """
+    The whole point of this class: whichever node claims the pass first is the active
+    root, regardless of any other node's structural/construction history.
+    """
     tracking = ActiveConditionsRoot()
     node = _NodeStub()
 
@@ -71,8 +78,10 @@ def test_evaluated_expression_ids_snapshot_reflects_recorded_ids():
 
 
 def test_evaluated_expression_ids_snapshot_is_reused_while_set_is_unchanged():
-    """The id set only grows, so its length is a valid version key: two snapshots taken
-    without an intervening record() share the same cached object."""
+    """
+    The id set only grows, so its length is a valid version key: two snapshots taken
+    without an intervening record() share the same cached object.
+    """
     tracked = EvaluatedExpressionIds()
     tracked.record(uuid.uuid4())
 

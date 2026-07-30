@@ -10,17 +10,19 @@ from krrood.inheritance_path_length import inheritance_path_length
 @dataclass
 class TypeDict:
     """
-    A dictionary that gets the closest key, using the inheritance path length instead of looking for direct matches.
+    A dictionary that gets the closest key, using the inheritance path length instead of
+    looking for direct matches.
     """
 
     _dict: Dict[Type, Any] = field(default_factory=dict)
     """
-    The pure data dict
+    The pure data dict.
     """
 
     def _get_inheritance_path_length_of_keys(self, clazz: Type) -> Dict[Type, int]:
         """
-        Get the inheritance path length of all keys in the dictionary relative to the given class.
+        Get the inheritance path length of all keys in the dictionary relative to the
+        given class.
 
         :param clazz: The class to get distances from.
         :return: The class distances.

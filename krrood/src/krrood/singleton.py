@@ -13,21 +13,26 @@ class SingletonMeta(type):
     """
     The available instances of the singleton classes.
     """
+
     _is_being_created: ClassVar[List[Type]] = []
     """
     A list of classes that are currently being created.
     """
+
     _construction_lock: ClassVar[threading.RLock] = threading.RLock()
     """
-    Serialises singleton construction so a different thread racing to construct the same class waits
-    for it instead of seeing the in-progress construction as a circular dependency. Reentrant so the
-    same thread recursing into its own construction is still caught by ``_is_being_created``.
+    Serialises singleton construction so a different thread racing to construct the same
+    class waits for it instead of seeing the in-progress construction as a circular
+    dependency.
+
+    Reentrant so the same thread recursing into its own construction is still caught by
+    ``_is_being_created``.
     """
 
     def __call__(cls, *args, **kwargs):
         """
-        Intercept the initialization of every class using this metaclass to check if there is an instance registered
-        already.
+        Intercept the initialization of every class using this metaclass to check if
+        there is an instance registered already.
         """
         with cls._construction_lock:
             if cls in cls._instances:
@@ -47,8 +52,8 @@ class SingletonMeta(type):
 
     def clear_instance(cls):
         """
-        Removes the single, stored instance of this class, allowing a new one
-        to be created on the next call.
+        Removes the single, stored instance of this class, allowing a new one to be
+        created on the next call.
         """
         if cls in cls._instances:
             del cls._instances[cls]

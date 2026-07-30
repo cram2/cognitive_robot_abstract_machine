@@ -30,8 +30,8 @@ _COPULA_NEGATIVE = {
 
 class MorphologyProcessor(RewritePass):
     """
-    Realise grammatical agreement and polarity on every tagged leaf — the single realisation pass
-    that turns feature decisions into surface words.
+    Realise grammatical agreement and polarity on every tagged leaf — the single
+    realisation pass that turns feature decisions into surface words.
 
     Assemblers and lexicon frames tag a leaf with grammatical ``number`` and ``negated`` features
     (decisions); this pass walks the finished fragment tree and realises them:

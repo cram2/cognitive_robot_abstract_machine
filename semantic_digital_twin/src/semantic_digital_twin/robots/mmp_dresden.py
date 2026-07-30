@@ -228,7 +228,9 @@ class MMPDresdenMobileBase(MobileBase, HasTorso[MMPDresdenTorso]):
 @dataclass(eq=False)
 class MMPDresden(AbstractRobot, HasMobileBase[MMPDresdenMobileBase]):
     """
-    The  Mobile Manipulation Platform (MMP) Dresden version. http://www.rp.mybotshop.de/projects/robot_mmp_ridgeback/html/mmp_dre.html
+    The  Mobile Manipulation Platform (MMP) Dresden version.
+
+    http://www.rp.mybotshop.de/projects/robot_mmp_ridgeback/html/mmp_dre.html
     """
 
     def _setup_collision_rules(self):

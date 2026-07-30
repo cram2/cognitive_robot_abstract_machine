@@ -1,5 +1,6 @@
 """
-This module defines some custom exception types used by the entity_query_language package.
+This module defines some custom exception types used by the entity_query_language
+package.
 """
 
 from __future__ import annotations
@@ -17,7 +18,6 @@ if TYPE_CHECKING:
         Query,
     )
     from krrood.entity_query_language.query.operations import GroupedBy
-    from krrood.entity_query_language.query.quantifiers import ResultQuantifier
     from krrood.entity_query_language.operators.aggregators import Aggregator
     from krrood.entity_query_language.query.builders import GroupedByBuilder
     from krrood.entity_query_language.core.base_expressions import (
@@ -35,17 +35,18 @@ if TYPE_CHECKING:
 @dataclass
 class QuantificationNotSatisfiedError(DataclassException, ABC):
     """
-    Represents a custom exception where the quantification constraints are not satisfied.
+    Represents a custom exception where the quantification constraints are not
+    satisfied.
 
-    This exception is used to indicate errors related to the quantification
-    of the query results.
+    This exception is used to indicate errors related to the quantification of the query
+    results.
 
     For further details, see :doc:`/krrood/doc/eql/result_quantifiers`.
     """
 
-    expression: ResultQuantifier
+    expression: SymbolicExpression
     """
-    The result quantifier expression where the error occurred.
+    The query expression whose result count violated the quantification constraint.
     """
     expected_number: int
     """
@@ -56,8 +57,7 @@ class QuantificationNotSatisfiedError(DataclassException, ABC):
 @dataclass
 class GreaterThanExpectedNumberOfSolutions(QuantificationNotSatisfiedError):
     """
-    Represents an error when the number of solutions exceeds the
-    expected threshold.
+    Represents an error when the number of solutions exceeds the expected threshold.
 
     For further details, see :doc:`/krrood/doc/eql/result_quantifiers`.
     """
@@ -72,8 +72,8 @@ class GreaterThanExpectedNumberOfSolutions(QuantificationNotSatisfiedError):
 @dataclass
 class LessThanExpectedNumberOfSolutions(QuantificationNotSatisfiedError):
     """
-    Represents an error that occurs when the number of solutions found
-    is lower than the expected number.
+    Represents an error that occurs when the number of solutions found is lower than the
+    expected number.
 
     For further details, see :doc:`/krrood/doc/eql/result_quantifiers`.
     """
@@ -96,8 +96,8 @@ class LessThanExpectedNumberOfSolutions(QuantificationNotSatisfiedError):
 @dataclass
 class MultipleSolutionFound(GreaterThanExpectedNumberOfSolutions):
     """
-    Raised when a query unexpectedly yields more than one solution where a single
-    result was expected.
+    Raised when a query unexpectedly yields more than one solution where a single result
+    was expected.
 
     For further details, see :doc:`/krrood/doc/eql/result_quantifiers`.
     """
@@ -127,7 +127,8 @@ class LogicalError(DataclassException):
 @dataclass
 class VariableCannotBeEvaluated(DataclassException):
     """
-    Raised when a variable cannot be evaluated due to missing or invalid information in the variable.
+    Raised when a variable cannot be evaluated due to missing or invalid information in
+    the variable.
     """
 
     variable: Variable
@@ -157,7 +158,8 @@ class TryingToModifyAnAlreadyBuiltQuery(UsageError):
     """
     Raised when trying to build an already built `Query`.
 
-    Check how to write queries correctly in :doc:`/krrood/doc/eql/writing_queries`.
+    Check how to write queries correctly in
+    :doc:`/krrood/doc/eql/writing_queries`.
     """
 
     query: Query
@@ -177,9 +179,9 @@ class SymbolicDunderAccessError(AttributeError, UsageError):
     """
     Raised when a dunder attribute is accessed symbolically on a query variable.
 
-    Subclasses :class:`AttributeError` so that ``copy``/``pickle`` and other machinery that probes
-    optional dunder hooks via ``getattr(obj, "__hook__", default)`` still treats the access as a
-    missing attribute instead of propagating an error.
+    Subclasses :class:`AttributeError` so that ``copy``/``pickle`` and other machinery
+    that probes optional dunder hooks via ``getattr(obj, "__hook__", default)`` still
+    treats the access as a missing attribute instead of propagating an error.
     """
 
     attribute_name: str
@@ -208,7 +210,8 @@ class UnsupportedExpressionTypeForDistinct(UsageError):
     """
     Raised when an expression type is not supported for distinct operation.
 
-    For further details, see the section on `distinct` and its usage in aggregations in :doc:`/krrood/doc/eql/result_processors`.
+    For further details, see the section on `distinct` and its usage in aggregations in
+    :doc:`/krrood/doc/eql/result_processors`.
     """
 
     unsupported_expression_type: Type[SymbolicExpression]
@@ -225,7 +228,8 @@ class NoConditionsProvided(UsageError):
     """
     Raised when no conditions are provided to the where/having statement of a query.
 
-    For further details, see the section on writing queries and `where` clauses in :doc:`/krrood/doc/eql/writing_queries`.
+    For further details, see the section on writing queries and `where` clauses in
+    :doc:`/krrood/doc/eql/writing_queries`.
     """
 
     query: Query
@@ -245,7 +249,9 @@ class NestedAggregationError(UsageError):
     """
     Raised when an aggregation is nested within another aggregation.
 
-    For further details, see the "Features and Constraints" section regarding nested aggregations in :doc:`/krrood/doc/eql/result_processors`.
+    For further details, see the "Features and Constraints" section
+    regarding nested aggregations in
+    :doc:`/krrood/doc/eql/result_processors`.
     """
 
     parent_aggregator: Aggregator
@@ -268,7 +274,8 @@ class NestedAggregationError(UsageError):
 @dataclass
 class AggregationUsageError(UsageError):
     """
-    Raised when there is an incorrect usage of aggregation in the entity query language API.
+    Raised when there is an incorrect usage of aggregation in the entity query language
+    API.
 
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
@@ -289,7 +296,8 @@ class UnsupportedAggregationOfAGroupedByVariable(AggregationUsageError):
 
     grouped_by: GroupedBy
     """
-    The grouped_by operation that contains the grouped_by variable that is being aggregated over.
+    The grouped_by operation that contains the grouped_by variable that is being
+    aggregated over.
     """
 
     def error_message(self) -> str:
@@ -306,7 +314,8 @@ class UnsupportedAggregationOfAGroupedByVariable(AggregationUsageError):
 @dataclass
 class NonAggregatedSelectedVariablesError(AggregationUsageError):
     """
-    Raised when a non-aggregated and not grouped_by variable(s) is selected along with an aggregated variable.
+    Raised when a non-aggregated and not grouped_by variable(s) is selected along with
+    an aggregated variable.
 
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
@@ -315,10 +324,12 @@ class NonAggregatedSelectedVariablesError(AggregationUsageError):
     """
     The builder class for the GroupedDataSource operation.
     """
+
     non_aggregated_variables: List[Selectable]
     """
     The non-aggregated selected variables.
     """
+
     aggregated_variables: List[Selectable]
     """
     The aggregated variables.
@@ -376,28 +387,12 @@ class AggregatorInWhereConditionsError(AggregationUsageError):
 
 
 @dataclass
-class NoKwargsInMatchVar(UsageError):
-    """
-    Raised when a match_variable is used without any keyword arguments.
-
-    For further details, see the notes on using `match_variable` vs `variable` in :doc:`/krrood/doc/eql/match`.
-    """
-
-    match_variable: Match
-
-    def error_message(self) -> str:
-        return f"The match variable {self.match_variable} was used without any keyword arguments."
-
-    def suggest_correction(self) -> str:
-        return "if you don't want to specify keyword arguments use variable() instead."
-
-
-@dataclass
 class WrongSelectableType(UsageError):
     """
     Raised when a wrong variable type is given to the select() statement.
 
-    For further details, see the sections on `entity()`, `set_of()`, and `variable()` in :doc:`/krrood/doc/eql/writing_queries`.
+    For further details, see the sections on `entity()`, `set_of()`, and `variable()` in
+    :doc:`/krrood/doc/eql/writing_queries`.
     """
 
     wrong_variable_type: Type
@@ -431,6 +426,7 @@ class LiteralConditionError(UsageError):
     """
     The query that contains the literal condition.
     """
+
     literal_conditions: List[Any]
     """
     The literal conditions that are given to the query.
@@ -450,7 +446,8 @@ class LiteralConditionError(UsageError):
 @dataclass
 class CannotProcessResultOfGivenChildType(UsageError):
     """
-    Raised when the entity query language API cannot process the results of a given child type during evaluation.
+    Raised when the entity query language API cannot process the results of a given
+    child type during evaluation.
 
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
@@ -495,7 +492,8 @@ class UnsupportedOperation(UsageError):
     """
     Raised when an operation is not supported by the entity query language API.
 
-    For further details, see :doc:`/krrood/doc/eql/logical_operators` and :doc:`/krrood/doc/eql/comparators`.
+    For further details, see :doc:`/krrood/doc/eql/logical_operators` and
+    :doc:`/krrood/doc/eql/comparators`.
     """
 
     ...
@@ -506,13 +504,15 @@ class UnSupportedOperand(UnsupportedOperation):
     """
     Raised when an operand is not supported by the operation.
 
-    For further details, see :doc:`/krrood/doc/eql/logical_operators` and :doc:`/krrood/doc/eql/comparators`.
+    For further details, see :doc:`/krrood/doc/eql/logical_operators` and
+    :doc:`/krrood/doc/eql/comparators`.
     """
 
     operation: Type[SymbolicExpression]
     """
     The operation used.
     """
+
     unsupported_operand: Any
     """
     The operand that is not supported by the operation.
@@ -530,7 +530,8 @@ class UnsupportedNegation(UnsupportedOperation):
     """
     Raised when negating quantifiers.
 
-    For further details, see the section on negation in :doc:`/krrood/doc/eql/logical_operators`.
+    For further details, see the section on negation in
+    :doc:`/krrood/doc/eql/logical_operators`.
     """
 
     operation_type: Type[SymbolicExpression]
@@ -552,7 +553,8 @@ class UnsupportedNegation(UnsupportedOperation):
 @dataclass
 class QuantificationSpecificationError(UsageError):
     """
-    Raised when the quantification constraints specified on the query results are invalid or inconsistent.
+    Raised when the quantification constraints specified on the query results are
+    invalid or inconsistent.
 
     For further details, see :doc:`/krrood/doc/eql/result_quantifiers`.
     """
@@ -561,7 +563,8 @@ class QuantificationSpecificationError(UsageError):
 @dataclass
 class QuantificationConsistencyError(QuantificationSpecificationError):
     """
-    Raised when the quantification constraints specified on the query results are inconsistent.
+    Raised when the quantification constraints specified on the query results are
+    inconsistent.
 
     For further details, see :doc:`/krrood/doc/eql/result_quantifiers`.
     """
@@ -597,7 +600,8 @@ class InvalidQuantificationRangeError(QuantificationConsistencyError):
 @dataclass
 class NegativeQuantificationError(QuantificationConsistencyError):
     """
-    Raised when the quantification constraints specified on the query results have a negative value.
+    Raised when the quantification constraints specified on the query results have a
+    negative value.
 
     For further details, see :doc:`/krrood/doc/eql/result_quantifiers`.
     """
@@ -621,6 +625,7 @@ class InvalidChildType(UsageError):
     """
     The invalid child type.
     """
+
     correct_child_types: List[Type]
     """
     The list of valid child types.
@@ -643,6 +648,7 @@ class NoExpressionFoundForGivenID(DataclassException):
     """
     The current symbolic expression being evaluated.
     """
+
     expression_id: uuid.UUID
     """
     The ID of the expression that was not found.
@@ -683,6 +689,28 @@ class NoneWrappedFieldError(ClassDiagramError):
 
 
 @dataclass
+class SelfReferentialInsertionError(DataclassException):
+    """
+    Raised when insert_at would create a self-referential selector node.
+    """
+
+    anchor: SymbolicExpression = field(kw_only=True)
+    """
+    The existing rule-tree node that the new condition would have been spliced onto.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The new condition is the same node as the anchor {self.anchor!r} — "
+            "this would create a self-referential Refinement/Alternative and corrupt "
+            "the anchor's conclusions."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Provide a condition that is a different node than the anchor."
+
+
+@dataclass
 class NoChildToReplace(DataclassException):
     """
     Raised when trying to replace a child of an expression that has no children.
@@ -692,10 +720,12 @@ class NoChildToReplace(DataclassException):
     """
     The expression that has no children.
     """
+
     old_child: SymbolicExpression
     """
     The child that was attempted to be replaced.
     """
+
     new_child: SymbolicExpression
     """
     The new child that was attempted to be set.
@@ -724,6 +754,29 @@ class GenerativeBackendQueryIsNotUnderspecifiedVariable(DataclassException):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class SelectiveBackendCannotResolveEllipsisMatch(DataclassException):
+    """
+    Exception raised when a match with an ``...`` (Ellipsis) attribute is evaluated with
+    a selective backend.
+    """
+
+    match: Match
+    """
+    The match that has an Ellipsis attribute.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.match} has an Ellipsis (...) attribute, so it cannot be resolved by a "
+            f"selective backend: selecting only finds existing instances, it cannot fill in an "
+            f"attribute left unspecified."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Evaluate with a GenerativeBackend (or ProbabilisticBackend) instead."
 
 
 @dataclass
@@ -783,8 +836,8 @@ class MatchTypeCannotBeDetermined(DataclassException):
             f"Tried to infer the type from {self.match.factory}."
             f"The factory given to the match must ether be a classmethod the returns its class or a "
             f"method where the return type is a class which has been concretely imported (not via "
-            f"TYPE_CHECKING). If that is not an option for you, set the `target_type` of the "
-            f"`underspecified` method."
+            f"TYPE_CHECKING). If that is not an option for you, set the `target_type` keyword "
+            f"argument of `an`/`the`."
         )
 
     def suggest_correction(self) -> str:
@@ -794,24 +847,28 @@ class MatchTypeCannotBeDetermined(DataclassException):
 @dataclass
 class ModelingError(DataclassException):
     """
-    Exception raised when there's an error in the model (classes, functions, etc.) definition.
+    Exception raised when there's an error in the model (classes, functions, etc.)
+    definition.
     """
 
 
 @dataclass
 class WrongPropertyReturnStatementImplementation(ModelingError):
     """
-    Exception raised when the implementation of a return statement of a property of a class is wrong.
+    Exception raised when the implementation of a return statement of a property of a
+    class is wrong.
     """
 
     property_object: property
     """
     The property that is wrongly implemented.
     """
+
     reason: str
     """
     The reason for the wrong property.
     """
+
     clazz: Optional[Type] = None
     """
     The class that has the property.
@@ -838,6 +895,7 @@ class NoReturnStatementInProperty(ModelingError):
     """
     The property that is wrongly implemented.
     """
+
     clazz: Optional[Type] = None
     """
     The class that has the property.

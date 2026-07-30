@@ -1,4 +1,5 @@
-"""Logging configuration utilities for Robokudo.
+"""
+Logging configuration utilities for Robokudo.
 
 This module provides functionality for configuring Python logging in a ROS environment.
 It handles:
@@ -22,10 +23,13 @@ import yaml
 
 
 class DynamicCompactFormatter(Formatter):
-    """Extended `logging.Formatter` that supports dynamic truncation of filenames."""
+    """
+    Extended `logging.Formatter` that supports dynamic truncation of filenames.
+    """
 
     def __init__(self, fmt: str = None, datefmt: str = None, style: str = "%"):
-        """Initialize formatter with custom format string.
+        """
+        Initialize formatter with custom format string.
 
         :param fmt: Format string used to determine line truncation
         :param datefmt: Date format string passed to `super().__init__()`
@@ -35,7 +39,9 @@ class DynamicCompactFormatter(Formatter):
         self._parse_field_width()
 
     def _parse_field_width(self) -> None:
-        """Parse format string to find filename_line width."""
+        """
+        Parse format string to find filename_line width.
+        """
         # Match %(filename_line)-WIDTHs pattern
         match = re.search(r"%\(filename_line\)-(\d+)s", self._fmt)
         if match:
@@ -44,7 +50,8 @@ class DynamicCompactFormatter(Formatter):
             self.max_file_line_width = 44  # Default
 
     def format(self, record: LogRecord) -> str:
-        """Format the given log record according to the formatter's format string.
+        """
+        Format the given log record according to the formatter's format string.
 
         :param record: Log record to format
         :return: Formatted log message as a string
@@ -82,7 +89,8 @@ class DynamicCompactFormatter(Formatter):
 
 
 def configure_logging(logging_config_file_name: str) -> None:
-    """Configure Python logging system with ROS integration.
+    """
+    Configure Python logging system with ROS integration.
 
     Sets up Python logging with:
 

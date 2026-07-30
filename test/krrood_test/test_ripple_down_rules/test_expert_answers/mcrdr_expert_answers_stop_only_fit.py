@@ -20,12 +20,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return case.milk == 1
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -50,12 +53,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return case.aquatic == 1
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -80,12 +86,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return case.feathers == 1
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -110,12 +119,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return case.backbone == 0 and case.breathes == 0
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -140,12 +152,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return case.backbone == 0
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -170,12 +185,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return case.milk == 1
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -200,12 +218,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return case.feathers == 1
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -230,7 +251,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return (
         case.eggs == 1
@@ -241,7 +265,7 @@ def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     )
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -266,12 +290,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return case.fins == 0
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -296,7 +323,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return (
         case.aquatic == 1
@@ -306,7 +336,7 @@ def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     )
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -331,12 +361,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return case.feathers == 1
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -361,12 +394,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return case.milk == 1
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -391,7 +427,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return (
         case.feathers == 0
@@ -402,7 +441,7 @@ def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     )
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -427,7 +466,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return (
         case.feathers == 0
@@ -441,7 +483,7 @@ def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     )
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -466,12 +508,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return case.fins == 1
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -496,12 +541,15 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return case.legs == 0
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -526,7 +574,10 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return (
         case.backbone == 0
@@ -539,7 +590,7 @@ def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
     )
 
 
-"===New Answer==="
+'===New Answer==='
 
 
 from typing_extensions import Any, Callable, List, Optional, Tuple, Type
@@ -564,9 +615,12 @@ from pandas.core.frame import DataFrame
 
 
 def conditions_for_animal_species_of_type_species(case: DataFrame) -> bool:
-    """Get conditions on whether it's possible to conclude a value for Animal.species  of type Species."""
+    """
+    Get conditions on whether it's possible to conclude a value for Animal.species  of
+    type Species.
+    """
     # Write your code here
     return case.aquatic == 1 and case.legs > 0
 
 
-"===New Answer==="
+'===New Answer==='

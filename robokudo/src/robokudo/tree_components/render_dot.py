@@ -11,29 +11,22 @@ The module provides:
 * Tree traversal utilities
 """
 
-import os
+from __future__ import annotations
+
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from timeit import default_timer
 
 from py_trees.behaviour import Behaviour
 from py_trees.common import Status
 from py_trees.decorators import Decorator
-from typing_extensions import Optional, List, Union
+from typing_extensions import List, Optional, Union
 
 from robokudo.display import render_dot_tree
 from robokudo.utils.tree import find_root
 
 
-def create_dir_if_not_exists(path: str) -> None:
-    """Create directory if it doesn't exist.
-
-    :param path: Directory path to create
-    """
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-
-def render_now(behaviour: Union["RenderTreeToDot", "RenderTreeToDotDecorator"]) -> None:
+def render_now(behaviour: Union[RenderTreeToDot, RenderTreeToDotDecorator]) -> None:
     """Generate behavior tree snapshot and save to disk.
 
     This method:
@@ -46,8 +39,8 @@ def render_now(behaviour: Union["RenderTreeToDot", "RenderTreeToDotDecorator"]) 
     """
     start_timer = default_timer()
 
-    if behaviour.create_dir_for_path:
-        create_dir_if_not_exists(behaviour.path)
+    if behaviour.create_dir_for_path and behaviour.path:
+        Path(behaviour.path).mkdir(parents=True, exist_ok=True)
 
     # Go up until we find the root
     root = find_root(behaviour)

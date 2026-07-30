@@ -15,20 +15,22 @@ from semantic_digital_twin.world_description.world_entity import SemanticAnnotat
 
 @dataclass
 class ProcthorResolver:
-    """Central resolver that deterministically maps a ProcTHOR name to exactly one class."""
+    """
+    Central resolver that deterministically maps a ProcTHOR name to exactly one class.
+    """
 
     classes: List[Type[HasRootBody]] = field(default_factory=list)
 
     def resolve(self, name: str) -> Optional[Type[SemanticAnnotation]]:
         """
-        Resolve a given name to a class based on the number of matching tokens
-        with the class name tokens or synonyms. The method preprocesses the
-        name by removing numbers and splitting it into tokens, and then compares
-        these tokens with the corresponding data in the available classes to
-        find the best match.
+        Resolve a given name to a class based on the number of matching tokens with the
+        class name tokens or synonyms. The method preprocesses the name by removing
+        numbers and splitting it into tokens, and then compares these tokens with the
+        corresponding data in the available classes to find the best match.
 
         :param name: The name to resolve, represented as a string.
-        :return: The class with the best match to the given name, or None if no matches are found.
+        :return: The class with the best match to the given name, or None if no matches
+            are found.
         """
         # remove all numbers from the name
         name_tokens = set(n.lower() for n in re.sub(r"\d+", "", name).split("_"))

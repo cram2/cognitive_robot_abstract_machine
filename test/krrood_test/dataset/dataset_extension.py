@@ -1,6 +1,6 @@
 """
-This file contains classes that behave like an extension to classes in example_classes.py
-This file is needed to krrood_test orm interface extension.
+This file contains classes that behave like an extension to classes in
+example_classes.py This file is needed to krrood_test orm interface extension.
 """
 
 from dataclasses import dataclass

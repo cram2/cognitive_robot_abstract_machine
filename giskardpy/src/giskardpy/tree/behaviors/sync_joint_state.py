@@ -54,7 +54,9 @@ class SyncJointState(GiskardBehavior):
 
 class SyncJointStatePosition(GiskardBehavior):
     """
-    Listens to a joint state topic, transforms it into a dict and writes it to the got map.
+    Listens to a joint state topic, transforms it into a dict and writes it to the got
+    map.
+
     Gets replace with a kinematic sim plugin during a parallel universe.
     """
 

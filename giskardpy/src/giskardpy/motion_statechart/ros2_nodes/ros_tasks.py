@@ -53,7 +53,7 @@ class ActionServerTask(
 
     message_type: Type[Action]
     """
-    Fully specified goal message that can be send out. 
+    Fully specified goal message that can be send out.
     """
 
     _action_client: ActionClient = field(init=False)
@@ -102,8 +102,8 @@ class ActionServerTask(
         """
         Handles the server's response to the goal submission.
 
-        On rejection a failure sentinel is stored so that :meth:`on_tick` can
-        return :attr:`~ObservationStateValues.FALSE` immediately.
+        On rejection a failure sentinel is stored so that :meth:`on_tick` can return
+        :attr:`~ObservationStateValues.FALSE` immediately.
         """
         goal_handle = future.result()
         if not goal_handle.accepted:
@@ -140,7 +140,7 @@ class NavigateActionServerTask(
 
     base_link: Body
     """
-    Base link of the robot, used for estimating the distance to the goal
+    Base link of the robot, used for estimating the distance to the goal.
     """
 
     def build_msg(self, context: MotionStatechartContext):
@@ -165,7 +165,9 @@ class NavigateActionServerTask(
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
-        Builds the motion state node this includes creating the action client and setting the observation expression.
+        Builds the motion state node this includes creating the action client and
+        setting the observation expression.
+
         The observation is true if the robot is within 1cm of the target pose.
         """
         super().build(context)

@@ -1,10 +1,9 @@
 """
-This module measures the maintainability of ORMatic's impact on the CRAM
-repository by analyzing lines of code and maintainability indices of developer-
-authored files versus auto-generated files.
+This module measures the maintainability of ORMatic's impact on the CRAM repository by
+analyzing lines of code and maintainability indices of developer- authored files versus
+auto-generated files.
 
-It computes various metrics to understand the reduction of manual
-maintenance effort.
+It computes various metrics to understand the reduction of manual maintenance effort.
 """
 
 import ast
@@ -61,8 +60,8 @@ def _count_mapped_classes(interface_path: pathlib.Path) -> int:
     """
     Count DataAccessObject classes in *interface_path*.
 
-    Excludes the ``DeclarativeBase`` subclass and association-table
-    helpers (those inheriting from ``AssociationDataAccessObject``).
+    Excludes the ``DeclarativeBase`` subclass and association-table helpers (those
+    inheriting from ``AssociationDataAccessObject``).
     """
     tree = ast.parse(interface_path.read_text(encoding="utf-8"))
     return sum(
@@ -79,8 +78,8 @@ class MaintainabilityResult(ExperimentResult):
     """
     Single-row summary of ORMatic's maintainability impact on CRAM.
 
-    Compares the developer-maintained model.py files (coraplex +
-    semantic_digital_twin) against the generated ormatic_interface.py.
+    Compares the developer-maintained model.py files (coraplex + semantic_digital_twin)
+    against the generated ormatic_interface.py.
     """
 
     maintainability_index: float
@@ -104,22 +103,20 @@ class MaintainabilityResult(ExperimentResult):
 
     alternative_mappings: int
     """
-    Total AlternativeMapping subclasses across coraplex's and
-    semantic_digital_twin's model.py files — the manual mapping effort that
-    ORMatic cannot automate.
+    Total AlternativeMapping subclasses across coraplex's and semantic_digital_twin's
+    model.py files — the manual mapping effort that ORMatic cannot automate.
     """
 
     maintained_lines_of_code: int
     """
-    Non-blank LOC across the coraplex and semantic_digital_twin model.py files
-    — the code a developer authors and maintains when using ORMatic.
+    Non-blank LOC across the coraplex and semantic_digital_twin model.py files — the
+    code a developer authors and maintains when using ORMatic.
     """
 
     generated_lines_of_code: int
     """
-    Non-blank LOC of coraplex's ormatic_interface.py — the SQLAlchemy mapping
-    code ORMatic generates automatically, which would otherwise need manual
-    maintenance.
+    Non-blank LOC of coraplex's ormatic_interface.py — the SQLAlchemy mapping code
+    ORMatic generates automatically, which would otherwise need manual maintenance.
     """
 
     ratio: float
@@ -130,8 +127,7 @@ class MaintainabilityResult(ExperimentResult):
 
 def _find_cram_model_files(repo_root: pathlib.Path) -> List[pathlib.Path]:
     """
-    Return ``*/orm/model.py`` files for coraplex and semantic_digital_twin
-    only.
+    Return ``*/orm/model.py`` files for coraplex and semantic_digital_twin only.
     """
     return sorted(
         p
@@ -150,14 +146,12 @@ def measure_maintainability(
     """
     Measure ORMatic's maintainability impact on the CRAM repository.
 
-    Scans the coraplex and semantic_digital_twin model.py files (the
-    developer-maintained ORMatic input) and compares them against
-    coraplex's ormatic_interface.py (the generated output that would
-    otherwise require manual maintenance).
+    Scans the coraplex and semantic_digital_twin model.py files (the developer-
+    maintained ORMatic input) and compares them against coraplex's ormatic_interface.py
+    (the generated output that would otherwise require manual maintenance).
 
     :param repo_root: Root of the CRAM repository to scan.
-    :param cram_interface: Path to the generated CRAM
-        ormatic_interface.py.
+    :param cram_interface: Path to the generated CRAM ormatic_interface.py.
     :return: A single result summarising the maintainability comparison.
     """
     model_files = _find_cram_model_files(repo_root)

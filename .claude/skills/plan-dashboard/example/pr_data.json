@@ -1,0 +1,28 @@
+{
+  "example-org/notification-service": {
+    "101": {
+      "state": "closed",
+      "draft": false,
+      "merged_at": "2026-01-10T12:00:00+00:00",
+      "labels": []
+    },
+    "102": {
+      "state": "open",
+      "draft": true,
+      "merged_at": null,
+      "labels": []
+    },
+    "103": {
+      "state": "open",
+      "draft": false,
+      "merged_at": null,
+      "labels": []
+    },
+    "104": {
+      "state": "open",
+      "draft": true,
+      "merged_at": null,
+      "labels": []
+    }
+  }
+}

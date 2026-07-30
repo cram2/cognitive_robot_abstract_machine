@@ -116,8 +116,10 @@ class HasGeneric(Generic[T]):
     @lru_cache(maxsize=None)
     def constructable_original_class(cls) -> T:
         """
-        Return the constructable original class. Use this for object allocation in from_dao cycles, as Generic Aliases
-        cannot be constructed directly.
+        Return the constructable original class.
+
+        Use this for object allocation in from_dao cycles, as Generic Aliases cannot be
+        constructed directly.
         """
         original_class = cls.original_class()
         if type(original_class) is _GenericAlias:

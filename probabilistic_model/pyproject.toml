@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.pyrefly]
@@ -17,11 +17,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 keywords=["probabilistic models", "probabilistic machine learning", "probability theory", "variables",
     "reasoning under uncertainty"]
+license = "LGPL-3.0-only"
 dynamic = ["version", "dependencies"]
 
 [project.urls]
@@ -33,5 +33,5 @@ where = ["src"]  # list of folders that contain the packages (["."] by default)
 include = ["probabilistic_model*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "probabilistic_model.__version__"}
+version = {attr = "probabilistic_model._version.__version__"}
 dependencies = {file = "requirements.txt"}

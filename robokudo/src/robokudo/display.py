@@ -84,8 +84,8 @@ def generate_pydot_graph(
         """
         Get visual attributes for a node in legacy mode.
 
-        Determines the shape, color and font color for a node based on its type
-        and blackbox level. This is the legacy version maintained for backwards
+        Determines the shape, color and font color for a node based on its type and
+        blackbox level. This is the legacy version maintained for backwards
         compatibility.
 
         :param node: The behavior tree node to get attributes for
@@ -121,11 +121,12 @@ def generate_pydot_graph(
         node: Behaviour,
         visibility_level: VisibilityLevel,
     ) -> Tuple[str, str, str]:
-        """Get visual attributes for a node.
+        """
+        Get visual attributes for a node.
 
-        Determines the shape, color and font color for a node based on its type,
-        status and blackbox level. This is the current version that includes
-        RoboKudo-specific node types and status colors.
+        Determines the shape, color and font color for a node based on its type, status
+        and blackbox level. This is the current version that includes RoboKudo-specific
+        node types and status colors.
 
         :param node: The behavior tree node to get attributes for
         :param visibility_level: The visibility level to use for collapsing subtrees
@@ -274,8 +275,7 @@ def generate_pydot_graph(
 
 def stringify_dot_tree(root: Behaviour) -> str:
     """
-    Generate dot tree graphs and return a string representation
-    of the dot graph.
+    Generate dot tree graphs and return a string representation of the dot graph.
 
     :param root: The root of a tree, or subtree
     :return: Dot graph as a string
@@ -354,11 +354,12 @@ def write_timing_info_to_csv(
     """
     Write timing information for annotators to a CSV file.
 
-    Creates a CSV file containing the runtime information for each annotator
-    in the behavior tree. The CSV has two columns: AnnotatorName and Runtime.
+    Creates a CSV file containing the runtime information for each annotator in the
+    behavior tree. The CSV has two columns: AnnotatorName and Runtime.
 
     :param filename_wo_extension: Base filename without extension to write the CSV to
-    :param timing_info_dict: Dictionary mapping annotator names to their runtime in seconds
+    :param timing_info_dict: Dictionary mapping annotator names to their runtime in
+        seconds
     """
     # Open the CSV file with write permission
     with open(f"{filename_wo_extension}.csv", "w", newline="") as csvfile:

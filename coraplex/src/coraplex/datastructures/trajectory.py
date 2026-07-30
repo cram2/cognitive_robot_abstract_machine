@@ -16,4 +16,3 @@ class PoseTrajectory:
     """
     Ordered waypoint poses.
     """
-

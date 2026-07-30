@@ -54,10 +54,10 @@ plan = sequential([navigate, park], context=context).plan
 ```
 
 This will create a simple plan which has a SequentialNode as its root and two DesignatorNodes as its children. You can 
-plot the plan using the `plot` method.
+open an interactive, real-time visualization of the plan using the `visualize` method.
 
 ```python
-plan.plot()
+plan.visualize()
 ```
 
 ## Arguments of Nodes

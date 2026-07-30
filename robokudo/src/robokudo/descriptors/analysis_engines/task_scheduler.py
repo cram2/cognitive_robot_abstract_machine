@@ -5,7 +5,9 @@ from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.outputs import ClearAnnotatorOutputs
 from robokudo.annotators.testing import SlowAnnotator, EmptyAnnotator
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.pipeline import Pipeline
 from robokudo.tree_components.task_scheduler import IterativeTaskScheduler
 
@@ -16,9 +18,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     def implementation(self) -> Pipeline:
         """
-        Create a pipeline which can schedule different perception tasks in a basic way
+        Create a pipeline which can schedule different perception tasks in a basic way.
         """
-        kinect_config = CrDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
 
         # Annotator definition
         collection_reader = CollectionReaderAnnotator(descriptor=kinect_config)

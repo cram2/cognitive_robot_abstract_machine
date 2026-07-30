@@ -6,27 +6,37 @@ All annotation types inherit from the base Annotation class.
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 
-from typing_extensions import TYPE_CHECKING, Optional, Any, List
+import cv2
+import open3d as o3d
+from semantic_digital_twin.world_description.geometry import (
+    Box as SemDTBox,
+)
+from semantic_digital_twin.world_description.geometry import (
+    Cylinder as SemDTCylinder,
+)
+from semantic_digital_twin.world_description.geometry import (
+    Shape as SemDTShape,
+)
+from semantic_digital_twin.world_description.geometry import (
+    Sphere as SemDTSphere,
+)
+from typing_extensions import TYPE_CHECKING, Any, List, Optional, Sequence
 
 from robokudo.types.core import Annotation
-from robokudo.types.cv import BoundingBox3D, Points3D
+from robokudo.types.cv import BoundingBox3D, KeyPoint, Points3D
 from robokudo.types.tf import (
-    Position,
     Pose,
+    Position,
     StampedPose,
     StampedPosition,
     StampedTransform,
 )
-from semantic_digital_twin.world_description.geometry import (
-    Shape as SemDTShape,
-    Box as SemDTBox,
-    Sphere as SemDTSphere,
-    Cylinder as SemDTCylinder,
-)
 
 if TYPE_CHECKING:
+    import numpy as np
     import numpy.typing as npt
     from semantic_digital_twin.world_description.world_entity import Region
 
@@ -301,3 +311,62 @@ class TextAnnotation(Annotation):
     """
     Text content of the annotation
     """
+
+
+@dataclass
+class SIFTAnnotation(Annotation):
+    """SIFT feature annotation."""
+
+    keypoints: List[KeyPoint] = field(default_factory=list)
+    """The SIFT keypoints."""
+
+    descriptors: Sequence[npt.NDArray[np.float32]] = field(default_factory=list)
+    """The SIFT descriptors."""
+
+    @classmethod
+    def from_cv2(
+        cls,
+        keypoints: Sequence[cv2.KeyPoint],
+        descriptors: Sequence[npt.NDArray[np.float32]],
+    ) -> SIFTAnnotation:
+        return cls(
+            keypoints=[KeyPoint.from_cv(k) for k in keypoints], descriptors=descriptors
+        )
+
+    def cv2_keypoints(self) -> List[cv2.KeyPoint]:
+        return [KeyPoint.to_cv(k) for k in self.keypoints]
+
+
+@dataclass
+class TSDFAnnotation(Annotation):
+    """A TSDF Volume annotation."""
+
+    volume: Optional[o3d.pipelines.integration.ScalableTSDFVolume] = None
+    """The Open3D TSDF Volume object."""
+
+    transform: Optional[npt.NDArray[np.float64]] = None
+    """The transform from the reference frame to the object frame."""
+
+    def get_coordinate_frame(self) -> o3d.geometry.TriangleMesh:
+        """Get the coordinate frame of the TSDF volume."""
+        frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.25)
+        frame.transform(self.transform)
+        return frame
+
+    def get_mesh(self) -> o3d.geometry.TriangleMesh:
+        """Get the mesh representation of the TSDF volume."""
+        mesh = self.volume.extract_triangle_mesh()
+        mesh.transform(self.transform)
+        return mesh
+
+    def get_point_cloud(self) -> o3d.geometry.PointCloud:
+        """Get the point cloud representation of the TSDF volume."""
+        pcd = self.volume.extract_point_cloud()
+        pcd.transform(self.transform)
+        return pcd
+
+    def get_voxel_point_cloud(self) -> o3d.geometry.PointCloud:
+        """Get the voxel point cloud representation of the TSDF volume."""
+        pcd = self.volume.extract_voxel_point_cloud()
+        pcd.transform(self.transform)
+        return pcd

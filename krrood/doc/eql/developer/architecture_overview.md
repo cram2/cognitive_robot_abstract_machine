@@ -43,7 +43,7 @@ The separation allows EQL to validate the query structure (e.g., checking if agg
 1.  **Definition**: You call `entity(v).where(...)`. This populates the internal builders of the `Query` object.
 2.  **Building**: When you call `evaluate()` method or use the query as part of another query, the `.build()` method is triggered.
 It converts all builders into their corresponding expression nodes.
-3.  **Evaluation**: The root expression (a `ResultQuantifier`) calls `_evaluate_()` on its children, starting the recursive evaluation process.
+3.  **Evaluation**: The compiled `Query` product calls `_evaluate_()` on its children to drive the recursive evaluation, then runs its result pipeline (ordering, then quantification) over the produced rows.
 
 ```{note}
 The `@modifies_query_structure` decorator ensures that once a query has been built into an execution graph, its structure cannot be modified further.

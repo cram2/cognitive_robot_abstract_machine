@@ -1,4 +1,5 @@
-"""World visualization for RoboKudo.
+"""
+World visualization for RoboKudo.
 
 This annotator visualizes predefined objects and regions from a world descriptor.
 """
@@ -10,6 +11,7 @@ from timeit import default_timer
 import numpy as np
 import open3d as o3d
 import py_trees
+from semantic_digital_twin.world_description.world_entity import Body, Region
 
 import robokudo.annotators.core
 import robokudo.utils.annotator_helper
@@ -17,13 +19,14 @@ import robokudo.utils.error_handling
 import robokudo.utils.o3d_helper
 import robokudo.world as rk_world
 from robokudo.cas import CASViews
+from robokudo.utils.region import region_obb_in_camera_coordinates
 from robokudo.world_descriptor import PredefinedObject
-from robokudo.utils.region import region_obb_in_cam_coordinates
-from semantic_digital_twin.world_description.world_entity import Body, Region
 
 
 class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
-    """Visualize predefined objects and regions from the shared world."""
+    """
+    Visualize predefined objects and regions from the shared world.
+    """
 
     class Descriptor(robokudo.annotators.core.BaseAnnotator.Descriptor):
         class Parameters:
@@ -36,7 +39,7 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
     def __init__(
         self,
         name: str = "WorldVisualizer",
-        descriptor: "WorldVisualizer.Descriptor" = Descriptor(),
+        descriptor: WorldVisualizer.Descriptor | None = None,
     ) -> None:
         super().__init__(name=name, descriptor=descriptor)
 
@@ -59,8 +62,8 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
         runtime_world = rk_world.world_instance()
 
         try:
-            world_to_cam_transform = (
-                robokudo.utils.annotator_helper.get_world_to_cam_transform_matrix(
+            world_to_camera_transform = (
+                robokudo.utils.annotator_helper.get_world_to_camera_transform_matrix(
                     self.get_cas()
                 )
             )
@@ -82,17 +85,17 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
                 if size is None:
                     continue
                 world_T_body = body.global_pose.to_np()
-                cam_T_body = world_to_cam_transform @ world_T_body
+                camera_T_body = world_to_camera_transform @ world_T_body
                 obb = robokudo.utils.o3d_helper.get_obb_from_size_and_transform(
-                    size, cam_T_body
+                    size, camera_T_body
                 )
                 visualized_geometries.append({"name": str(body.name), "geometry": obb})
 
         if self.descriptor.parameters.visualize_regions:
             regions = runtime_world.get_kinematic_structure_entity_by_type(Region)
             for region in regions:
-                obb = region_obb_in_cam_coordinates(
-                    runtime_world, region, world_to_cam_transform
+                obb = region_obb_in_camera_coordinates(
+                    runtime_world, region, world_to_camera_transform
                 )
                 visualized_geometries.append(
                     {"name": str(region.name), "geometry": obb}
@@ -104,7 +107,7 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
         visualized_geometries.append(
             {
                 "name": "world_frame",
-                "geometry": world_frame.transform(world_to_cam_transform),
+                "geometry": world_frame.transform(world_to_camera_transform),
             }
         )
 

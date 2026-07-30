@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.pyrefly]
@@ -17,12 +17,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: OS Independent",
 ]
 keywords=["robotics"]
 dynamic = ["version", "dependencies"]
-license = { text = "LGPL-3.0-only" }
+license = "LGPL-3.0-only"
 
 [project.urls]
 "Source" = 'https://github.com/cram2/semantic_digital_twin'
@@ -33,7 +32,7 @@ where = ["src"]  # list of folders that contain the packages (["."] by default)
 include = ["semantic_digital_twin*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "semantic_digital_twin.__version__"}
+version = {attr = "semantic_digital_twin._version.__version__"}
 dependencies = {file = "requirements.txt"}
 
 [project.optional-dependencies]

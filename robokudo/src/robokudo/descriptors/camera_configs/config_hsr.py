@@ -19,7 +19,9 @@ class HsrCameraConfig(
     StableViewpointComponent,
     WorldDescriptorComponent,
 ):
-    """Camera config for the HSR robot."""
+    """
+    Camera config for the HSR robot.
+    """
 
     registry_name: ClassVar[str] = "hsr"
 
@@ -29,7 +31,7 @@ class HsrCameraConfig(
 
     topic_color: str = "hsrb/head_rgbd_sensor/rgb/image_raw/compressed"
 
-    topic_cam_info: str = "hsrb/head_rgbd_sensor/rgb/camera_info"
+    topic_camera_info: str = "hsrb/head_rgbd_sensor/rgb/camera_info"
 
     tf_from: str = "head_rgbd_sensor_rgb_optical_frame"
 

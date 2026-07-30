@@ -1,5 +1,5 @@
 """
-Wording tests for the role predicates' verbalization surfaces.
+Wording tests for the role predicates' verbalization results.
 """
 
 from __future__ import annotations
@@ -13,16 +13,24 @@ from krrood.patterns.role_predicates import IsSameSemanticEntity
 
 @dataclass
 class Document:
-    """A minimal entity the identity predicate is verbalized over."""
+    """
+    A minimal entity the identity predicate is verbalized over.
+    """
 
     name: str
 
 
 def test_is_same_semantic_entity_reads_with_a_single_determiner():
-    """The identity clause reads *"… is the same entity as …"* — the complement carries exactly one
-    determiner (the definite article), not a doubled *"a the same entity"*."""
+    """
+    The identity clause reads *"… is the same semantic entity as …"* — the complement
+    carries exactly one determiner, not a doubled *"a another Document"*.
+
+    The two operands share a type and are both fresh (first mention), so they are told
+    apart by the indefinite alternative determiner (*"a Document … another Document"*)
+    rather than a number.
+    """
     first, second = variable(Document, []), variable(Document, [])
     assert (
         verbalize_expression(IsSameSemanticEntity(first, second))
-        == "Document 1 is the same entity as Document 2"
+        == "a Document is the same semantic entity as another Document"
     )

@@ -59,6 +59,7 @@ class AbstractSimpleSet(CPPWrapper, SubclassJSONSerializer, ABC):
     def contains(self, item) -> bool:
         """
         Check if this set contains an item.
+
         :param item: The item to check
         :return: Rather if the item is in the set or not
         """
@@ -121,10 +122,10 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
     """
     Abstract class for composite sets.
 
-    AbstractCompositeSet is a set composed of a union of simple sets.
-    If any operation is called on this, the resulting union will also be disjoint and simplified.
-    A simplified composite set is a set with as few simple sets in it as possible
-    to represent the necessary information.
+    AbstractCompositeSet is a set composed of a union of simple sets. If any operation
+    is called on this, the resulting union will also be disjoint and simplified. A
+    simplified composite set is a set with as few simple sets in it as possible to
+    represent the necessary information.
 
     This class wraps the C++ class AbstractCompositeSet.
     """
@@ -134,6 +135,7 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
     simple_set_example: AbstractSimpleSet
     """
     An example of a simple set that is used to create new simple sets.
+
     Fields that are python only are read from this instance when reading from cpp.
     """
 
@@ -141,8 +143,10 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
         default=None, init=False, repr=False, compare=False
     )
     """
-    Lazy cache for simple_sets. Events are immutable after construction, so this
-    is safe. Avoids O(N) Python wrapper creation on every repeated access.
+    Lazy cache for simple_sets.
+
+    Events are immutable after construction, so this is safe. Avoids O(N) Python wrapper
+    creation on every repeated access.
     """
 
     @classmethod
@@ -150,6 +154,7 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
     def from_simple_sets(cls, *simple_sets: Tuple[AbstractSimpleSet, ...]) -> Self:
         """
         Create a composite set from simple sets.
+
         :param simple_sets: The simple sets that make up the union.
         """
         raise NotImplementedError
@@ -301,9 +306,10 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
     def __lt__(self, other: Self):
         """
         Compare this set with another set.
-        The sets are compared by comparing the simple sets in order.
-        If the pair of simple sets are equal, the next pair is compared.
-        If all pairs are equal, the set with the least amount of simple sets is considered smaller.
+
+        The sets are compared by comparing the simple sets in order. If the pair of simple sets are equal, the next pair is compared.
+        If all pairs are equal, the set with the least amount of simple sets is
+        considered smaller.
 
         ..note:: This does not define a total order in the mathematical sense. In the mathematical sense, this defines
             a partial order.
@@ -311,7 +317,6 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
         :param other: The other set
         :return: Rather this set is smaller than the other set
         """
-
         return self.cpp_object < other.cpp_object
 
     def to_json(self) -> Dict[str, Any]:

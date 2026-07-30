@@ -1,6 +1,6 @@
 """
-Generic specificity-ranked selection: pick the single most-specific candidate from a set, with
-class-hierarchy depth as the usual ranking key.
+Generic specificity-ranked selection: pick the single most-specific candidate from a
+set, with class-hierarchy depth as the usual ranking key.
 
 These are domain-agnostic — they know nothing about verbalization. The grammar's
 :class:`~krrood.entity_query_language.verbalization.grammar.framework.specificity.SpecificityRule`
@@ -79,8 +79,8 @@ def mro_depth(cls: type) -> int:
 
 def concrete_subclasses(base: Type[_T]) -> List[Type[_T]]:
     """
-    Every concrete (instantiable) transitive subclass of *base*, abstract intermediates excluded —
-    the single subclass-discovery primitive.
+    Every concrete (instantiable) transitive subclass of *base*, abstract intermediates
+    excluded — the single subclass-discovery primitive.
 
     :param base: The family / rule base class.
     :return: Its concrete transitive subclasses.

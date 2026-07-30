@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import uuid
-from typing_extensions import Iterable, List, Mapping, Optional
+from typing_extensions import Iterable, List, Optional
 
 from krrood.entity_query_language.verbalization.fragments.base import (
     flatten_fragment_to_plain_text,
     VerbalizationFragment,
+)
+from krrood.entity_query_language.verbalization.microplanning.referring import (
+    DistinguisherIndex,
 )
 from krrood.entity_query_language.verbalization.rendering.coreference_processor import (
     CoreferenceProcessor,
@@ -39,7 +42,7 @@ def realize_tree(
     fragment: VerbalizationFragment,
     previously_introduced_referents: Optional[Iterable[uuid.UUID]] = None,
     discourse: DiscourseView = EMPTY_DISCOURSE,
-    numbered_labels: Optional[Mapping[uuid.UUID, str]] = None,
+    distinguisher_index: Optional[DistinguisherIndex] = None,
 ) -> VerbalizationFragment:
     """
     Run the ordered realisation passes over *fragment* — the one place the lowering passes and
@@ -53,8 +56,8 @@ def realize_tree(
     :param previously_introduced_referents: Referents introduced by prior builds on a shared context.
     :param discourse: The focus-per-scope view the coreference pass consults (empty for a local
         sub-tree, which has no query scope of its own).
-    :param numbered_labels: Disambiguation numbers for referents the rules cannot label themselves
-        (relational referents) — applied by the coreference pass.
+    :param distinguisher_index: Same-noun-group disambiguation for this pass, pre-computed by the
+        referring service — assigned lazily, in discourse order, by the coreference pass.
     :return: The fully realised fragment tree.
 
     This is the pass-running step: it returns a lowered fragment *tree*, so the example wraps it in
@@ -69,7 +72,7 @@ def realize_tree(
     pipeline: List[RealizationPass] = [
         CoreferenceProcessor(
             discourse=discourse,
-            numbered_labels=dict(numbered_labels or {}),
+            distinguisher_index=distinguisher_index or DistinguisherIndex(),
             previously_introduced_referents=tuple(
                 previously_introduced_referents or ()
             ),

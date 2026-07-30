@@ -1,4 +1,5 @@
-"""Analysis engine for continuous perception with start/stop control.
+"""
+Analysis engine for continuous perception with start/stop control.
 
 This module provides an analysis engine that demonstrates how to implement a
 continuous perception pipeline with external start/stop control through an
@@ -41,13 +42,16 @@ from robokudo.behaviours.action_server_checks import (
     ActionServerNoPreemptRequest,
     AbortGoal,
 )
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for continuous perception with external control.
+    """
+    Analysis engine for continuous perception with external control.
 
     This class implements a pipeline that runs continuous perception tasks
     while allowing external control through an action server. The pipeline
@@ -69,14 +73,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "query_startstop_pipeline_from_storage"
 
     def implementation(self) -> Pipeline:
-        """Create a continuous perception pipeline with external control.
+        """
+        Create a continuous perception pipeline with external control.
 
         This method constructs a processing pipeline that runs continuously
         until stopped or preempted. The pipeline processes stored camera data
@@ -103,7 +109,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             The pipeline will automatically fail after 30 iterations to
             demonstrate error handling mechanisms.
         """
-        cr_storage_config = CrDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
         processing_sequence = Sequence()
         processing_sequence.add_children(

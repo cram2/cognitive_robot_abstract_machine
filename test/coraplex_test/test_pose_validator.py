@@ -92,7 +92,9 @@ def test_pose_sequence_not_reachable(immutable_model_world):
 
 
 class _MoveTcpAlternativeForPr2(MoveToolCenterPointMotion, AlternativeMotion[PR2]):
-    """Minimal alternative used to exercise the unmatched-tip-link guard."""
+    """
+    Minimal alternative used to exercise the unmatched-tip-link guard.
+    """
 
     execution_type = ExecutionType.SIMULATED
 
@@ -207,7 +209,9 @@ def test_is_object_reachable_by_copies_current_world_lazily(
 def test_is_object_reachable_by_uses_target_pose_sequence(
     immutable_model_world, monkeypatch
 ):
-    """With a target pose set, the reach pose sequence is checked."""
+    """
+    With a target pose set, the reach pose sequence is checked.
+    """
     world, view, context = immutable_model_world
     milk = world.get_body_by_name("milk.stl")
     target = Pose(Point3.from_iterable([2, 1.5, 0.7]), reference_frame=world.root)
@@ -236,7 +240,9 @@ def test_is_object_reachable_by_uses_target_pose_sequence(
 def test_is_object_reachable_by_single_grasp_delegates_to_is_reachable_by(
     immutable_model_world, monkeypatch
 ):
-    """``as_single_grasp`` checks a single grasp pose at the object's pose."""
+    """
+    ``as_single_grasp`` checks a single grasp pose at the object's pose.
+    """
     world, view, context = immutable_model_world
     milk = world.get_body_by_name("milk.stl")
 
@@ -275,7 +281,9 @@ def test_is_object_reachable_by_single_grasp_delegates_to_is_reachable_by(
 
 
 def test_is_object_reachable_by_reachable(immutable_model_world):
-    """End-to-end: a graspable object in front of the robot is reachable."""
+    """
+    End-to-end: a graspable object in front of the robot is reachable.
+    """
     world, view, context = immutable_model_world
     milk = world.get_body_by_name("milk.stl")
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -294,7 +302,9 @@ def test_is_object_reachable_by_reachable(immutable_model_world):
 
 
 def test_is_object_reachable_by_not_reachable(immutable_model_world):
-    """End-to-end: an object far away from the robot is not reachable."""
+    """
+    End-to-end: an object far away from the robot is not reachable.
+    """
     world, view, context = immutable_model_world
     milk = world.get_body_by_name("milk.stl")
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(

@@ -9,7 +9,7 @@ from giskardpy.motion_statechart.data_types import (
     ObservationStateValues,
 )
 from giskardpy.motion_statechart.exceptions import (
-    NodeInitializationError,
+    UnexpectedWorldEntityCountError,
     CollisionViolatedError,
 )
 from giskardpy.motion_statechart.graph_node import (
@@ -346,8 +346,11 @@ class ExternalCollisionAvoidance(Goal):
         if self.robot is None:
             robots = context.world.get_semantic_annotations_by_type(AbstractRobot)
             if len(robots) != 1:
-                raise NodeInitializationError(
-                    self, f"Expected exactly one robot, got {len(robots)}"
+                raise UnexpectedWorldEntityCountError(
+                    node=self,
+                    expected_count=1,
+                    actual_count=len(robots),
+                    entity_type=AbstractRobot,
                 )
             self.robot = robots[0]
         self.external_collision_manager = context.external_collision_manager
@@ -648,8 +651,11 @@ class SelfCollisionAvoidance(Goal):
         if self.robot is None:
             robots = context.world.get_semantic_annotations_by_type(AbstractRobot)
             if len(robots) != 1:
-                raise NodeInitializationError(
-                    self, f"Expected exactly one robot, got {len(robots)}"
+                raise UnexpectedWorldEntityCountError(
+                    node=self,
+                    expected_count=1,
+                    actual_count=len(robots),
+                    entity_type=AbstractRobot,
                 )
             self.robot = robots[0]
 

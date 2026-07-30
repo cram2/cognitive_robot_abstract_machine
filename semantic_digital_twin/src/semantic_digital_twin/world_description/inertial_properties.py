@@ -42,15 +42,21 @@ class NPVector3(SubclassJSONSerializer):
 
     @classmethod
     def from_values(cls, x: float, y: float, z: float) -> Self:
-        """Construct from scalar components (x, y, z)."""
+        """
+        Construct from scalar components (x, y, z).
+        """
         return cls(data=np.array([x, y, z]))
 
     def to_values(self) -> Tuple[float, float, float]:
-        """Return the tuple (x,y,z)"""
+        """
+        Return the tuple (x,y,z)
+        """
         return self.data[0], self.data[1], self.data[2]
 
     def as_matrix(self) -> NPMatrix3x3:
-        """Return a 3x3 matrix with the vector on the diagonal."""
+        """
+        Return a 3x3 matrix with the vector on the diagonal.
+        """
         return NPMatrix3x3(data=np.diag(self.data))
 
     def to_json(self) -> Dict[str, Any]:
@@ -64,8 +70,11 @@ class NPVector3(SubclassJSONSerializer):
 @dataclass(eq=False)
 class PrincipalMoments(NPVector3):
     """
-    Represents the three principal moments of inertia (I1, I2, I3) about the principal axes of the body.
-    A principal moment is the eigenvalue of the inertia tensor corresponding to a principal axis.
+    Represents the three principal moments of inertia (I1, I2, I3) about the principal
+    axes of the body.
+
+    A principal moment is the eigenvalue of the inertia tensor corresponding to a
+    principal axis.
     """
 
     def __post_init__(self):
@@ -73,15 +82,20 @@ class PrincipalMoments(NPVector3):
 
     @classmethod
     def from_values(cls, i1: float, i2: float, i3: float) -> Self:
-        """Construct from scalar components (I1, I2, I3)."""
+        """
+        Construct from scalar components (I1, I2, I3).
+        """
         return cls(data=np.array([i1, i2, i3]))
 
 
 @dataclass
 class PrincipalAxes(NPMatrix3x3):
     """
-    The principal axes of the inertia tensor is a 3x3 matrix where each column is a principal axis.
-    A principal axis is an eigenvector of the inertia tensor corresponding to a principal moment of inertia.
+    The principal axes of the inertia tensor is a 3x3 matrix where each column is a
+    principal axis.
+
+    A principal axis is an eigenvector of the inertia tensor corresponding to a
+    principal moment of inertia.
     """
 
     def __post_init__(self):
@@ -98,12 +112,16 @@ class PrincipalAxes(NPMatrix3x3):
 
     @classmethod
     def from_rotation_matrix(cls, rotation_matrix: RotationMatrix):
-        """Construct PrincipalAxes from a RotationMatrix."""
+        """
+        Construct PrincipalAxes from a RotationMatrix.
+        """
         data = rotation_matrix.to_np()[:3, :3]
         return cls(data=data)
 
     def to_rotation_matrix(self) -> RotationMatrix:
-        """Convert PrincipalAxes to a RotationMatrix."""
+        """
+        Convert PrincipalAxes to a RotationMatrix.
+        """
         return RotationMatrix(self.data)
 
 
@@ -111,6 +129,7 @@ class PrincipalAxes(NPMatrix3x3):
 class InertiaTensor(NPMatrix3x3):
     """
     Represents the inertia tensor of a body in a given coordinate frame.
+
     The inertia tensor is a symmetric positive semi-definite 3x3 matrix.
     https://en.wikipedia.org/wiki/Moment_of_inertia#Definition_2
     """
@@ -133,6 +152,7 @@ class InertiaTensor(NPMatrix3x3):
     ) -> Self:
         """
         Construct inertia tensor from individual components.
+
         :param ixx: Moment of inertia about x-axis
         :param iyy: Moment of inertia about y-axis
         :param izz: Moment of inertia about z-axis
@@ -153,6 +173,7 @@ class InertiaTensor(NPMatrix3x3):
     def to_values(self) -> Tuple[float, float, float, float, float, float]:
         """
         Return the individual components of the inertia tensor.
+
         :return: (ixx, iyy, izz, ixy, ixz, iyz)
         """
         ixx = self.data[0, 0]
@@ -181,8 +202,10 @@ class InertiaTensor(NPMatrix3x3):
     ) -> Tuple[PrincipalMoments, PrincipalAxes]:
         """
         Decompose inertia tensor into principal moments and axes.
+
         The principal moments will be sorted if sorted_array is provided.
-        :param sorted_array: Optional array to sort the principal moments and axes (e.g., [2, 1, 0], [4.5, 6.4, 1.2]).
+        :param sorted_array: Optional array to sort the principal moments and axes
+            (e.g., [2, 1, 0], [4.5, 6.4, 1.2]).
         :return: (PrincipalMoments, PrincipalAxes)
         """
         eigenvalues, eigenvectors = np.linalg.eigh(self.data)
@@ -200,7 +223,9 @@ class InertiaTensor(NPMatrix3x3):
 @dataclass
 class Inertial:
     """
-    Represents the inertial properties of a body. https://mujoco.readthedocs.io/en/stable/XMLreference.html#body-inertial
+    Represents the inertial properties of a body.
+
+    https://mujoco.readthedocs.io/en/stable/XMLreference.html#body-inertial
     """
 
     mass: float = 1.0
@@ -210,12 +235,15 @@ class Inertial:
 
     center_of_mass: Point3 = field(default_factory=Point3)
     """
-    The center of mass of the body. If a force acts through the COM, the body experiences pure translation, no torque
+    The center of mass of the body.
+
+    If a force acts through the COM, the body experiences pure translation, no torque
     """
 
     inertia: InertiaTensor = field(
         default_factory=lambda: InertiaTensor.from_values(1.0, 1.0, 1.0, 0.0, 0.0, 0.0)
     )
     """
-    The inertia tensor of the body about its center of mass, expressed in the body's local coordinate frame.
+    The inertia tensor of the body about its center of mass, expressed in the body's
+    local coordinate frame.
     """

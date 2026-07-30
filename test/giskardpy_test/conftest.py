@@ -185,7 +185,8 @@ def _symmetric_prismatic_limits(
     position: float | None, velocity: float
 ) -> DegreeOfFreedomLimits:
     """
-    Builds symmetric prismatic degree-of-freedom limits with no acceleration or jerk bound.
+    Builds symmetric prismatic degree-of-freedom limits with no acceleration or jerk
+    bound.
     """
     return DegreeOfFreedomLimits(
         lower=DerivativeMap(
@@ -202,7 +203,8 @@ def _symmetric_prismatic_limits(
 
 def _make_prismatic_world(dof_limits: list[DegreeOfFreedomLimits]) -> World:
     """
-    Builds a world with one Z-axis prismatic connection per given degree-of-freedom limit set.
+    Builds a world with one Z-axis prismatic connection per given degree-of-freedom
+    limit set.
     """
     world = World()
     with world.modify_world():

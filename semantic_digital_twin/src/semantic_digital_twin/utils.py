@@ -83,7 +83,7 @@ class suppress_stdout_stderr(object):
 
 
 def hacky_urdf_parser_fix(
-        urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
+    urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
 ) -> str:
     # Parse input string
     root = ET.fromstring(urdf)
@@ -203,6 +203,7 @@ class MockedNodeClass(MockedClass):
     """
     Mocked class for Node in rclpy
     """
+
     ...
 
 
@@ -211,6 +212,7 @@ class MockedNodeModule(MockedModule):
     """
     Mocked module for rclpy.node.
     """
+
     Node: Type[MockedNodeClass] = MockedNodeClass
     """
     A mocked Node class.
@@ -222,6 +224,7 @@ class MockedRCLPY(MockedModule):
     """
     Mocked module for rclpy.
     """
+
     node: ClassVar[MockedNodeModule] = MockedNodeModule()
 
 

@@ -38,7 +38,9 @@ if TYPE_CHECKING:
 
 
 class _StaticDefault(NamedTuple):
-    """A field name paired with its static default value."""
+    """
+    A field name paired with its static default value.
+    """
 
     name: str
     """
@@ -52,7 +54,9 @@ class _StaticDefault(NamedTuple):
 
 
 class _DefaultFactory(NamedTuple):
-    """A field name paired with its zero-argument factory callable."""
+    """
+    A field name paired with its zero-argument factory callable.
+    """
 
     name: str
     """
@@ -67,17 +71,23 @@ class _DefaultFactory(NamedTuple):
 
 @dataclass(frozen=True)
 class _AllocationPlan:
-    """Precomputed default-value information for a single domain class.
+    """
+    Precomputed default-value information for a single domain class.
 
-    Separates fields with literal defaults from fields whose defaults are
-    produced by a factory, so the allocation loop can handle each case without
-    re-inspecting the dataclass on every call.
+    Separates fields with literal defaults from fields whose defaults are produced by a
+    factory, so the allocation loop can handle each case without re-inspecting the
+    dataclass on every call.
     """
 
     static_defaults: Tuple[_StaticDefault, ...]
-    """Fields whose default is a fixed value."""
+    """
+    Fields whose default is a fixed value.
+    """
+
     default_factories: Tuple[_DefaultFactory, ...]
-    """Fields whose default must be produced by calling a factory."""
+    """
+    Fields whose default must be produced by calling a factory.
+    """
 
 
 @lru_cache(maxsize=None)
@@ -137,32 +147,37 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         Tuple[int, Type[DataAccessObject]], DataAccessObject
     ] = field(default_factory=dict)
     """
-    Cache for synthetic parent DAOs to maintain identity across discovery and filling phases.
-    Synthentic DAOs are used when the parent of a DAO uses and AlternativeMapping.
-    In this case the, the parent has to be converted using its specialized routine. After that, the child can copy
-    its inherited fields from the parent.
+    Cache for synthetic parent DAOs to maintain identity across discovery and filling
+    phases.
+
+    Synthentic DAOs are used when the parent of a DAO uses and AlternativeMapping. In
+    this case the, the parent has to be converted using its specialized routine. After
+    that, the child can copy its inherited fields from the parent.
     """
 
     _class_dependencies: rustworkx.PyDiGraph = field(
         default_factory=lambda: rustworkx.PyDiGraph(multigraph=False)
     )
     """
-    A rustowkrx graph that tracks the dependencies between classes defined 
-    in `AlternativeMapping.required_pre_build_classes`
-    The nodes are the data access object types and the edges represent the dependencies.
-    An edge (source, target) means that the class `source` needs to be build before `target`.
+    A rustowkrx graph that tracks the dependencies between classes defined in
+    `AlternativeMapping.required_pre_build_classes` The nodes are the data access object
+    types and the edges represent the dependencies.
+
+    An edge (source, target) means that the class `source` needs to be build before
+    `target`.
     """
 
     _alternative_mappings_being_referenced: Dict[
         AlternativeMapping, List[Tuple[Any, MappedVariable]]
     ] = field(default_factory=lambda: defaultdict(list))
-
     """
-    A dictionary that maps remembers all occurrences of an alternative mapping in any column or relationship of a
-    domain object. This is filled during the `_fill_domain_objects` phase in the `_populate_relationship`
-    method.
-    The keys are the ids of the instances of the alternative mappings and the values are descriptions of how they are
-    referenced. The descriptions are MappedVariable instances from EQL.
+    A dictionary that maps remembers all occurrences of an alternative mapping in any
+    column or relationship of a domain object.
+
+    This is filled during the `_fill_domain_objects` phase in the
+    `_populate_relationship` method. The keys are the ids of the instances of the
+    alternative mappings and the values are descriptions of how they are referenced. The
+    descriptions are MappedVariable instances from EQL.
     """
 
     _converted_alternative_mappings: Dict[AlternativeMapping, Any] = field(
@@ -170,18 +185,20 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
     )
     """
     Cache of the final domain objects created from alternative mapping instances.
-    This guarantees that `to_domain_object` is called exactly once per alternative mapping instance,
-    keeping object identity intact when the same mapping is referenced from multiple places
-    (including the root of the conversion).
+
+    This guarantees that `to_domain_object` is called exactly once per alternative
+    mapping instance, keeping object identity intact when the same mapping is referenced
+    from multiple places (including the root of the conversion).
     """
 
     def reset_conversion_tracking(self):
         """
-        Reset the tracking structures that are only valid for a single top-level conversion.
+        Reset the tracking structures that are only valid for a single top-level
+        conversion.
 
-        This has to be called at the start of every top-level conversion, otherwise repeated
-        conversions with a shared state accumulate duplicated dependency graph nodes and stale
-        alternative mapping references.
+        This has to be called at the start of every top-level conversion, otherwise
+        repeated conversions with a shared state accumulate duplicated dependency graph
+        nodes and stale alternative mapping references.
         """
         self._class_dependencies = rustworkx.PyDiGraph(multigraph=False)
         self._alternative_mappings_being_referenced = defaultdict(list)
@@ -190,7 +207,8 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         self, alternative_mapping: AlternativeMapping
     ) -> Any:
         """
-        Convert an alternative mapping to its final domain object exactly once per instance.
+        Convert an alternative mapping to its final domain object exactly once per
+        instance.
 
         :param alternative_mapping: The alternative mapping instance to convert.
         :return: The final domain object.
@@ -248,13 +266,13 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
     ) -> Any:
         """
         Allocate a new instance and store it in the memoization dictionary.
+
         Initializes default values for dataclass fields.
 
         :param dao_instance: The DAO instance to register.
         :param original_clazz: The domain class to instantiate.
         :return: The uninitialized domain object instance.
         """
-
         result = original_clazz.__new__(original_clazz)
         plan = _get_allocation_plan(original_clazz)
         for entry in plan.static_defaults:
@@ -268,9 +286,9 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         self, alternative_mapping_types: List[Type[AlternativeMapping]]
     ):
         """
-        Build the class dependencies for the given types that can be used to infer the built order.
-        This method should only take Alternative Mapping types as input as these are the only types that can have
-        order sensitive dependencies.
+        Build the class dependencies for the given types that can be used to infer the
+        built order. This method should only take Alternative Mapping types as input as
+        these are the only types that can have order sensitive dependencies.
 
         :param alternative_mapping_types: The types to build the dependency graph for.
         """
@@ -296,13 +314,13 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         Builds the dependencies of a given alternative mapping and updates the internal
         class dependency graph.
 
-        :param alternative_mapping: The alternative mapping for which dependencies
-            are being resolved.
-        :param concrete_alternative_mappings: A list of Alternative Mapping types discovered during the discovery phase.
-        :param types_to_index: A dictionary mapping Alternative Mapping types to their respective
-            indices in the dependency graph.
+        :param alternative_mapping: The alternative mapping for which dependencies are
+            being resolved.
+        :param concrete_alternative_mappings: A list of Alternative Mapping types
+            discovered during the discovery phase.
+        :param types_to_index: A dictionary mapping Alternative Mapping types to their
+            respective indices in the dependency graph.
         """
-
         # get all concrete types that are affected by the dependencies
         for required_domain_type in alternative_mapping.required_pre_build_classes():
 
@@ -330,10 +348,12 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
 
     def convert_alternative_mappings_to_domain_objects(self):
         """
-        Convert all alternative mappings registered in `_alternative_mappings_being_referenced` to domain objects.
-        Update all the references of other domain objects to the newly created domain objects.
-        The class dependency graph determines the conversion order so that the alternative mappings
-        respect their dependencies.
+        Convert all alternative mappings registered in
+        `_alternative_mappings_being_referenced` to domain objects.
+
+        Update all the references of other domain objects to the newly created domain
+        objects. The class dependency graph determines the conversion order so that the
+        alternative mappings respect their dependencies.
         """
         instances_by_type: Dict[Type, List[AlternativeMapping]] = defaultdict(list)
         for instance in self._alternative_mappings_being_referenced:

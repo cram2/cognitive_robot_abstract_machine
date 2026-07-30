@@ -7,7 +7,12 @@ from typing import Callable
 
 from typing_extensions import Dict
 
-from coraplex.ros import get_node_names, wait_for_service, get_service_proxy, ServiceException
+from coraplex.ros import (
+    get_node_names,
+    wait_for_service,
+    get_service_proxy,
+    ServiceException,
+)
 
 try:
     from iai_apartment_kitchen_msgs.srv import Authenticateuser
@@ -45,7 +50,7 @@ def init_kitchen_interface(func: Callable) -> Callable:
 
 def authenticate_user():
     """
-    Authenticates a user at the bridge
+    Authenticates a user at the bridge.
     """
     logger.info("Waiting for authentication")
     wait_for_service("/blum_kitchen_server")
@@ -76,7 +81,7 @@ def call_kitchen_service(command, argument):
 @init_kitchen_interface
 def open_cabinet(kitchen_element):
     """
-    Opens a cabinet of the apartment kitchen
+    Opens a cabinet of the apartment kitchen.
 
     :param kitchen_element: The cabinet which should be opened
     """
@@ -86,7 +91,8 @@ def open_cabinet(kitchen_element):
 @init_kitchen_interface
 def close_cabinet(kitchen_element):
     """
-    Closes a cabinet of the apartment kitchen, currently this is only possible for the "oberschrank"
+    Closes a cabinet of the apartment kitchen, currently this is only possible for the
+    "oberschrank".
 
     :param kitchen_element: Cabinet which should be closed
     """
@@ -105,8 +111,9 @@ def modules_show():
 @init_kitchen_interface
 def kitchen_state() -> Dict[str, Dict[str, str]]:
     """
-    Returns the state of the whole kitchen as a dictionary. The mapping is "name": {"state", "type"}
+    Returns the state of the whole kitchen as a dictionary.
 
+    The mapping is "name": {"state", "type"}
     :return: A dict describing the kitchen state
     """
     state = call_kitchen_service("kitchen_state_json", " ")

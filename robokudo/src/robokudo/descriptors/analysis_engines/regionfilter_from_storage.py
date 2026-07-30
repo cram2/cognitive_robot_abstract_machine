@@ -1,4 +1,5 @@
-"""Analysis engine for region-based filtering using world descriptors.
+"""
+Analysis engine for region-based filtering using world descriptors.
 
 This module provides an analysis engine that demonstrates how to filter point
 cloud data based on predefined regions from world descriptors. It processes stored
@@ -26,13 +27,16 @@ from robokudo.annotators.region_filter import RegionFilter
 from robokudo.annotators.world_descriptor_bootstrap import (
     WorldDescriptorBootstrapAnnotator,
 )
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine for region-based point cloud filtering.
+    """
+    Analysis engine for region-based point cloud filtering.
 
     This class implements a pipeline that filters point cloud data based on
     predefined regions from world descriptors. It processes stored camera data
@@ -53,14 +57,16 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "regionfilter_from_storage"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline for region-based point cloud filtering.
+        """
+        Create a pipeline for region-based point cloud filtering.
 
         This method constructs a processing pipeline that applies region-based
         filtering to point cloud data. The regions are defined in world descriptors
@@ -82,7 +88,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             and camera viewpoint visualization, which can be useful for
             debugging and development.
         """
-        cr_storage_config = CrDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
         bootstrap = WorldDescriptorBootstrapAnnotator.Descriptor()
         bootstrap.parameters.world_descriptor_name = "world_iai_kitchen20"
 

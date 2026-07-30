@@ -59,7 +59,8 @@ def _is_concrete_statistic(variable: Variable, value: Any) -> bool:
 
     :param variable: The latent variable the value belongs to.
     :param value: The observed aggregation value, either a concrete point or a range.
-    :return: ``True`` if the value designates exactly one element of the variable's domain.
+    :return:``True`` if the value designates exactly one element of the variable's
+        domain.
     """
     composite = variable.make_value(value)
     if isinstance(composite, Interval):
@@ -75,8 +76,8 @@ def _rename_variables_with_part_prefix(
     """
     Rename each variable in the circuit to include ``prefix`` as a namespace.
 
-    Produces names of the form ``"{prefix}.{variable.name}"``.
-    Variables listed in ``excluded_variables`` are left unchanged.
+    Produces names of the form ``"{prefix}.{variable.name}"``. Variables listed in
+    ``excluded_variables`` are left unchanged.
 
     :param circuit: The circuit whose variables are renamed in-place.
     :param prefix: String prefix to prepend to every variable name.
@@ -97,9 +98,9 @@ class ExchangeableDistributionTemplate:
     """
     A fitted distribution template for one exchangeable (many-to-many) relation.
 
-    Wraps a ``RelationalProbabilisticCircuit`` that was trained on the child
-    objects of the relation together with the parent's aggregation statistics as
-    latent context variables.
+    Wraps a ``RelationalProbabilisticCircuit`` that was trained on the child objects of
+    the relation together with the parent's aggregation statistics as latent context
+    variables.
     """
 
     template_distribution: RelationalProbabilisticCircuit
@@ -119,9 +120,9 @@ class ExchangeableDistributionTemplate:
         """
         Ground and prepare the circuit for a single exchangeable part.
 
-        Conditions the template circuit on ``aggregation_statistics``, marginalizes
-        away the latent variables, renames surviving variables with the part's
-        prefix, and reindexes the graph for safe mounting.
+        Conditions the template circuit on ``aggregation_statistics``, marginalizes away
+        the latent variables, renames surviving variables with the part's prefix, and
+        reindexes the graph for safe mounting.
 
         :param part: The query part (a ``Match`` or a concrete domain object).
         :param aggregation_statistics: Observed aggregation values to condition on.
@@ -158,7 +159,8 @@ class ExchangeableDistributionTemplate:
         Build a product circuit by grounding each exchangeable part independently.
 
         :param parts_to_ground: The query parts, one per child object in the relation.
-        :param aggregation_statistics: Observed aggregation values shared across all parts.
+        :param aggregation_statistics: Observed aggregation values shared across all
+            parts.
         :return: A product circuit over the grounded distributions of all parts.
         """
         result = ProbabilisticCircuit()
@@ -202,6 +204,7 @@ class RelationalProbabilisticCircuit:
     """
     Number of Monte-Carlo samples drawn per exchangeable part to integrate out
     aggregation statistics that cannot be determined from the grounding query.
+
     Must be a positive integer.
     """
 
@@ -209,8 +212,8 @@ class RelationalProbabilisticCircuit:
         init=False, default=None
     )
     """
-    The :class:`~krrood.ormatic.data_access_objects.dao.DataAccessObjectSchema` describing
-    the DAO class's columns and relationships.
+    The :class:`~krrood.ormatic.data_access_objects.dao.DataAccessObjectSchema`
+    describing the DAO class's columns and relationships.
     """
 
     feature_extractor: Optional[FeatureExtractor] = field(init=False, default=None)
@@ -227,9 +230,11 @@ class RelationalProbabilisticCircuit:
         """
         Build the preprocessed dataframe used to fit the class-level JPT.
 
-        :param feature_extractor: The extractor used to create and preprocess the dataframe.
+        :param feature_extractor: The extractor used to create and preprocess the
+            dataframe.
         :param instances: Training instances to extract features from.
-        :param dataframe_from_parent: Pre-built dataframe from a parent fit call, or ``None``.
+        :param dataframe_from_parent: Pre-built dataframe from a parent fit call, or
+            ``None``.
         :return: A preprocessed, column-sorted dataframe ready for JPT training.
         """
         if dataframe_from_parent is not None:
@@ -247,7 +252,8 @@ class RelationalProbabilisticCircuit:
         child_feature_extractor: FeatureExtractor,
     ) -> pd.DataFrame:
         """
-        Build a dataframe combining aggregation statistics with per-child-object attributes.
+        Build a dataframe combining aggregation statistics with per-child-object
+        attributes.
 
         Each row corresponds to one child object and contains the parent instance's
         aggregation values followed by all child features (including nested unique-part
@@ -290,8 +296,10 @@ class RelationalProbabilisticCircuit:
         aggregation columns), and recursively fits a ``RelationalProbabilisticCircuit``
         on the child instances using that dataframe.
 
-        :param exchangeable_part: Field name of the one-to-many relation on each instance.
-        :param instances: Training instances whose children are used to fit the template.
+        :param exchangeable_part: Field name of the one-to-many relation on each
+            instance.
+        :param instances: Training instances whose children are used to fit the
+            template.
         :return: A fitted ``ExchangeableDistributionTemplate`` for the given part.
         """
         aggregation_functions = self.feature_extractor.exchangeable_features[
@@ -344,16 +352,16 @@ class RelationalProbabilisticCircuit:
         """
         Fit the relational probabilistic circuit from a list of DAO instances.
 
-        Builds a ``FeatureExtractor``, trains a ``JointProbabilityTree`` on the
-        class-level features, and then recursively fits one
-        ``ExchangeableDistributionTemplate`` per exchangeable part discovered in
-        the schema.
+        Builds a ``FeatureExtractor``, trains a ``JointProbabilityTree`` on the class-
+        level features, and then recursively fits one
+        ``ExchangeableDistributionTemplate`` per exchangeable part discovered in the
+        schema.
 
         :param instances: Training instances; all must share the same DAO class.
         :param dataframe_from_parent: Pre-built dataframe supplied by a parent
-            ``_fit_exchangeable_part`` call.  When provided, feature extraction
-            and preprocessing are skipped.
-        :return: ``self``, to allow chaining.
+            ``_fit_exchangeable_part`` call. When provided, feature extraction and
+            preprocessing are skipped.
+        :return:``self``, to allow chaining.
         """
         self.feature_extractor = FeatureExtractor.from_instances(instances)
         class_dataframe = self._build_class_dataframe(
@@ -386,8 +394,8 @@ class RelationalProbabilisticCircuit:
         :param aggregation_statistics: Observed aggregation values to condition on.
         :param latent_variables: Variables that link the class circuit to the
             exchangeable distribution template.
-        :return: The conditioned circuit and the surviving product
-            nodes that will be extended with the grounded exchangeable distribution.
+        :return: The conditioned circuit and the surviving product nodes that will be
+            extended with the grounded exchangeable distribution.
         """
         product_nodes_to_extend = find_lowest_product_nodes_that_model_variables(
             circuit, SortedSet(latent_variables)
@@ -408,17 +416,18 @@ class RelationalProbabilisticCircuit:
         return circuit, surviving_product_nodes
 
     def ground(self, query: Match) -> ProbabilisticCircuit:
-        """Ground the relational circuit for a specific query.
+        """
+        Ground the relational circuit for a specific query.
 
-        Starting from a deep copy of ``class_probabilistic_circuit``, each
-        exchangeable part's template is grounded for the objects specified in the
-        query and attached to the conditioning product nodes of the class circuit.
+        Starting from a deep copy of ``class_probabilistic_circuit``, each exchangeable
+        part's template is grounded for the objects specified in the query and attached
+        to the conditioning product nodes of the class circuit.
 
         :param query: An underspecified, resolved query instance whose structure
             determines which parts are grounded and how many child objects each
             exchangeable relation contains.
-        :return: A concrete ``ProbabilisticCircuit`` over all variables implied
-            by the query.
+        :return: A concrete ``ProbabilisticCircuit`` over all variables implied by the
+            query.
         :raises CircuitNotFittedError: If ``ground`` is called before ``fit``.
         """
         if self.class_probabilistic_circuit is None:
@@ -445,10 +454,10 @@ class RelationalProbabilisticCircuit:
         """
         Ground one exchangeable part and attach it to the class circuit.
 
-        Aggregation statistics determinable from the query condition the class
-        circuit directly. Monte-Carlo integrates out undetermined statistics:
-        they are sampled from the conditioned class circuit and each
-        sampled value yields its own exchangeable distribution instance.
+        Aggregation statistics determinable from the query condition the class circuit
+        directly. Monte-Carlo integrates out undetermined statistics: they are sampled
+        from the conditioned class circuit and each sampled value yields its own
+        exchangeable distribution instance.
 
         :param circuit: The current working copy of the class circuit.
         :param exchangeable_part_name: Field name of the exchangeable relation.
@@ -509,18 +518,18 @@ class RelationalProbabilisticCircuit:
         """
         Draw the distinct values of the undetermined latents to integrate over.
 
-        Samples ``monte_carlo_sample_count`` joint assignments of the
-        undetermined latents from the conditioned class circuit and deduplicates
-        them, so that each distinct value is grounded only once.
+        Samples ``monte_carlo_sample_count`` joint assignments of the undetermined
+        latents from the conditioned class circuit and deduplicates them, so that each
+        distinct value is grounded only once.
 
-        :param conditioned_circuit: The class circuit conditioned on the
-            determined statistics.
-        :param undetermined_latents: The latent variables that could not be
-            determined from the query.
-        :return: One value assignment per distinct sampled point, empty when there
-            are no undetermined latents to integrate out.
-        :raises InvalidMonteCarloSampleCountError: If there are undetermined latents
-            but the sample count is not positive.
+        :param conditioned_circuit: The class circuit conditioned on the determined
+            statistics.
+        :param undetermined_latents: The latent variables that could not be determined
+            from the query.
+        :return: One value assignment per distinct sampled point, empty when there are
+            no undetermined latents to integrate out.
+        :raises InvalidMonteCarloSampleCountError: If there are undetermined latents but
+            the sample count is not positive.
         :raises UndeterminedLatentsNotModeledError: If the conditioned class circuit
             does not model the undetermined latents and thus cannot be sampled from.
         """
@@ -632,10 +641,10 @@ class RelationalProbabilisticCircuit:
 
         For every sampled assignment one exchangeable instance is grounded on the
         determined plus sampled statistics. The undetermined latents are then
-        marginalized out of the class circuit so their distribution is carried
-        solely by the mixture weights, which are the node-local likelihoods of the
-        sampled values. Each mounting product node receives its own normalized
-        sum unit over the instances.
+        marginalized out of the class circuit so their distribution is carried solely by
+        the mixture weights, which are the node-local likelihoods of the sampled values.
+        Each mounting product node receives its own normalized sum unit over the
+        instances.
 
         :param circuit: The working class circuit.
         :param product_nodes_to_extend: The mounting product nodes.
@@ -676,9 +685,9 @@ class RelationalProbabilisticCircuit:
         """
         Attach a normalized sum unit over exchangeable instances to one node.
 
-        Instances whose node-local likelihood is zero are skipped. The instances
-        are already mounted in ``circuit`` and shared across all mounting nodes;
-        only the weighted sum-unit edges differ per node.
+        Instances whose node-local likelihood is zero are skipped. The instances are
+        already mounted in ``circuit`` and shared across all mounting nodes; only the
+        weighted sum-unit edges differ per node.
 
         :param circuit: The working class circuit.
         :param product_node: The mounting product node to extend.

@@ -9,10 +9,14 @@ from semantic_digital_twin.spatial_types.spatial_types import SpatialType
 
 @dataclass
 class CannotRenderSpatialTypeError(DataclassException):
-    """Raised when no renderer can turn a spatial type into RViz markers."""
+    """
+    Raised when no renderer can turn a spatial type into RViz markers.
+    """
 
     spatial_type_type: Type = field(kw_only=True)
-    """The type of the spatial type that could not be rendered."""
+    """
+    The type of the spatial type that could not be rendered.
+    """
 
     def error_message(self) -> str:
         return (
@@ -20,15 +24,22 @@ class CannotRenderSpatialTypeError(DataclassException):
         )
 
     def suggest_correction(self) -> str:
-        return ""
+        return (
+            f"Register a SpatialTypeMarkerRenderer subclass whose input type "
+            f"matches {self.spatial_type_type.__name__}."
+        )
 
 
 @dataclass
 class WorldNotResolvableError(DataclassException):
-    """Raised when no world can be resolved for a spatial type that should be published."""
+    """
+    Raised when no world can be resolved for a spatial type that should be published.
+    """
 
     spatial_type: SpatialType = field(kw_only=True)
-    """The spatial type whose world could not be resolved."""
+    """
+    The spatial type whose world could not be resolved.
+    """
 
     def error_message(self) -> str:
         return (

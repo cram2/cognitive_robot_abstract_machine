@@ -5,6 +5,7 @@ from typing_extensions import Dict, Iterable, List, Optional, Set, Tuple
 import uuid
 
 from krrood.entity_query_language.verbalization.fragments.base import (
+    apply_subject_verb_agreement,
     Clause,
     map_structural_children,
     NounPhrase,
@@ -12,20 +13,23 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     PhraseFragment,
     PossessiveChain,
     VerbalizationFragment,
-    RoleFragment,
 )
 from krrood.entity_query_language.verbalization.navigation_path import PathStep
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
     GrammaticalNumber,
 )
-from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.microplanning.possessive import (
     attribute_fragment,
     chain_head_number,
     coordinated_genitive,
     possessive_path,
     pronominal_path,
+)
+from krrood.entity_query_language.verbalization.microplanning.referring import (
+    DistinguisherIndex,
+    AlternativeDistinguisher,
+    OrdinalDistinguisher,
 )
 from krrood.entity_query_language.verbalization.rendering.discourse import (
     DiscourseView,
@@ -40,14 +44,21 @@ from krrood.entity_query_language.verbalization.rendering.passes import Realizat
 
 @dataclass
 class SubjectFrame:
-    """One entry of the coreference pass's subject stack — the current pronoun-eligible subject."""
+    """
+    One entry of the coreference pass's subject stack — the current pronoun-
+    eligible subject.
+    """
 
     subject_id: Optional[uuid.UUID]
     """The subject's referent id, or ``None`` for a scope with no single subject (e.g. ``SetOf``)."""
 
     number: GrammaticalNumber = GrammaticalNumber.SINGULAR
-    """The subject's grammatical number — selects *"its"* (singular) vs. *"their"* (plural). Filled
-    from the subject's own noun phrase when the pass walks it (rules supply no number)."""
+    """
+    The subject's grammatical number — selects *"its"* (singular) vs.
+
+    *"their"* (plural). Filled from the subject's own noun phrase when
+    the pass walks it (rules supply no number).
+    """
 
 
 @dataclass
@@ -81,30 +92,47 @@ class CoreferenceProcessor(RealizationPass):
     """
 
     discourse: DiscourseView = EMPTY_DISCOURSE
-    """The focus-per-scope view, consulted to open a scope at a query-sourced fragment."""
+    """
+    The focus-per-scope view, consulted to open a scope at a query-sourced
+    fragment.
+    """
 
-    numbered_labels: Dict[uuid.UUID, str] = field(default_factory=dict)
-    """Disambiguation numbers (*"Robot 1"*) for referents the rules cannot label themselves — a
-    relational referent's relative clause is built in the microplanner, with no access to the
-    referring service, so the number is stamped on here instead."""
+    distinguisher_index: DistinguisherIndex = field(default_factory=DistinguisherIndex)
+    """
+    Same-noun-group disambiguation (*"another Robot"*, *"a second Robot"*), assigned
+    lazily as this pass first encounters each referent, in discourse order — the pre-scan
+    only knows which referents share a noun and how many there are, not which will be
+    said first.
+    """
 
     previously_introduced_referents: Iterable[uuid.UUID] = ()
-    """Referents introduced by *prior* builds sharing the same context, so the same expression
-    verbalized twice against one context reads *"a Robot"* then *"the Robot"* — treated as
-    already-mentioned before the walk begins."""
+    """
+    Referents introduced by *prior* builds sharing the same context, so the
+    same expression verbalized twice against one context reads *"a Robot"* then
+    *"the Robot"* — treated as already-mentioned before the walk begins.
+    """
 
     _seen: Set[uuid.UUID] = field(init=False, default_factory=set)
-    """Referent ids already mentioned at the current point of the walk."""
+    """
+    Referent ids already mentioned at the current point of the walk.
+    """
 
     _subject_stack: List[SubjectFrame] = field(init=False, default_factory=list)
-    """Stack of :class:`SubjectFrame` entries — the number selects *"its"*/*"their"*."""
+    """
+    Stack of :class:`SubjectFrame` entries — the number selects
+    *"its"*/*"their"*.
+    """
 
     _center: Optional[uuid.UUID] = field(init=False, default=None)
-    """The local centre — the grammatical subject of the immediately preceding clause (see
-    :meth:`_chain_topic`). The next chain's attribute on that referent pronominalises to *"its …"*;
-    a clause about something else (or one headed by an attribute) clears it, so *"its"* binds only
-    to the referent that was the subject just before (centering theory, Grosz/Joshi/Weinstein
-    1995)."""
+    """
+    The local centre — the grammatical subject of the immediately preceding
+    clause (see :meth:`_chain_topic`).
+
+    The next chain's attribute on that referent pronominalises to *"its
+    …"*; a clause about something else (or one headed by an attribute)
+    clears it, so *"its"* binds only to the referent that was the
+    subject just before (centering theory, Grosz/Joshi/Weinstein 1995).
+    """
 
     def process(self, fragment: VerbalizationFragment) -> VerbalizationFragment:
         """
@@ -232,9 +260,10 @@ class CoreferenceProcessor(RealizationPass):
 
         The body's subject is the quantified population, so it reads *"they"* and the copula agrees:
 
+        >>> location = variable(Location, [])
         >>> robot = variable(Robot, [])
-        >>> verbalize_expression(for_all(robot, IsReachable(robot)))
-        'for all Robots, they are reachable'
+        >>> verbalize_expression(for_all(location, IsReachable(location, robot)))
+        'for all Locations, they are reachable for a Robot'
         """
         subject = clause.parts[0]
         if isinstance(subject, PossessiveChain):
@@ -245,7 +274,8 @@ class CoreferenceProcessor(RealizationPass):
             return rebuilt if rebuilt is not None else clause
         pronoun = Pronouns.nominative(number).as_fragment()
         agreed_rest = [
-            self._agree_finite(self._walk(part), number) for part in clause.parts[1:]
+            apply_subject_verb_agreement(self._walk(part), number)
+            for part in clause.parts[1:]
         ]
         return replace(clause, parts=[pronoun, *agreed_rest])
 
@@ -276,42 +306,8 @@ class CoreferenceProcessor(RealizationPass):
         """
         return replace(
             clause,
-            parts=[
-                CoreferenceProcessor._agree_finite(part, number)
-                for part in clause.parts
-            ],
+            parts=[apply_subject_verb_agreement(part, number) for part in clause.parts],
         )
-
-    _FINITE_ROLES = (SemanticRole.OPERATOR, SemanticRole.VERB)
-    """The clause roles a finite predicate agrees through — the copula / comparison operator and a
-    lexical verb."""
-
-    @staticmethod
-    def _agree_finite(
-        part: VerbalizationFragment, number: GrammaticalNumber
-    ) -> VerbalizationFragment:
-        """:return: *part* re-tagged with *number* when it is the clause's finite slot — an
-        ``OPERATOR`` or ``VERB`` leaf, or a phrase led by one (the factored *"is greater than"*) —
-        else *part* unchanged. The copula inflects (*"is"* → *"are"*) and a lexical verb agrees
-        (*"works"* → *"work"*); a non-copula operator (*"contains"*) is tagged too but the morphology
-        pass leaves it be, so this never has to single the finite word out by text."""
-        if (
-            isinstance(part, RoleFragment)
-            and part.role in CoreferenceProcessor._FINITE_ROLES
-        ):
-            return replace(part, number=number)
-        leads_with_finite = (
-            isinstance(part, PhraseFragment)
-            and part.parts
-            and isinstance(part.parts[0], RoleFragment)
-            and part.parts[0].role in CoreferenceProcessor._FINITE_ROLES
-        )
-        if leads_with_finite:
-            return replace(
-                part,
-                parts=[replace(part.parts[0], number=number), *part.parts[1:]],
-            )
-        return part
 
     def _owned_attributes(self, owned: OwnedAttributes) -> VerbalizationFragment:
         """:return: the owner's attributes as the possessive *"its/their <attrs>"* when the owner is
@@ -319,7 +315,7 @@ class CoreferenceProcessor(RealizationPass):
         spell-out choice :meth:`_possessive_chain` makes for a navigation chain, but for a coordinated
         attribute list whose owner has no further hops (e.g. a *"predict"* point on the selection).
 
-        >>> verbalize_expression(underspecified(Robot)(name="R2", battery=...))
+        >>> verbalize_expression(a(Robot)(name="R2", battery=...))
         "Generate a Robot and predict its battery value given that its name is 'R2'"
         """
         if self._owner_is_subject(owned):
@@ -332,19 +328,14 @@ class CoreferenceProcessor(RealizationPass):
         )
 
     def _owner_is_subject(self, owned: OwnedAttributes) -> bool:
-        """:return: whether *owned*'s owner is the current, already-introduced, non-numbered subject —
-        the gate selecting the possessive *"its <attrs>"* over the genitive (the
-        :class:`OwnedAttributes` analogue of :meth:`_pronominalises`)."""
+        """:return: whether *owned*'s owner is the current, already-introduced subject — the gate
+        selecting the possessive *"its <attrs>"* over the genitive (the :class:`OwnedAttributes`
+        analogue of :meth:`_pronominalises`)."""
         if owned.owner_referent_id is None or owned.owner_referent_id not in self._seen:
             return False
-        if (
-            not self._subject_stack
-            or self._subject_stack[-1].subject_id != owned.owner_referent_id
-        ):
-            return False
-        return not (
-            isinstance(owned.owner_fragment, NounPhrase)
-            and owned.owner_fragment.definiteness is Definiteness.BARE
+        return (
+            bool(self._subject_stack)
+            and self._subject_stack[-1].subject_id == owned.owner_referent_id
         )
 
     def _possessive_chain(
@@ -498,11 +489,13 @@ class CoreferenceProcessor(RealizationPass):
         return pronominal_path(tail, GrammaticalNumber.SINGULAR)
 
     def _pronominalises(self, possessive_chain: PossessiveChain) -> bool:
-        """:return: ``True`` when the chain root is the current, already-introduced, non-numbered subject.
+        """:return: ``True`` when the chain root is the current, already-introduced subject.
 
         It is the gate that decides pronominalisation: returning ``True`` for each chain rooted at the
         Employee subject is what renders *its salary* / *its starting_salary* instead of *the salary
         of the Employee*.
+
+        :param possessive_chain: The navigation chain to test.
 
         >>> employee = variable(Employee, [])
         >>> verbalize_expression(an(entity(employee).where(employee.salary > employee.starting_salary)))
@@ -513,38 +506,25 @@ class CoreferenceProcessor(RealizationPass):
             or possessive_chain.root_referent_id not in self._seen
         ):
             return False
-        if (
-            not self._subject_stack
-            or self._subject_stack[-1].subject_id != possessive_chain.root_referent_id
-        ):
-            return False
-        # A numbered root ("Robot 2") renders BARE and is never pronominalised.
-        return not (
-            isinstance(possessive_chain.root_fragment, NounPhrase)
-            and possessive_chain.root_fragment.definiteness is Definiteness.BARE
+        return (
+            bool(self._subject_stack)
+            and self._subject_stack[-1].subject_id == possessive_chain.root_referent_id
         )
 
     def _noun_phrase(self, noun_phrase: NounPhrase) -> VerbalizationFragment:
         """Every mention (singular or plural) marks its referent introduced.  A repeat **singular**
         mention is reduced to its head — dropping the first-mention modifiers and keeping the head
-        label (*"a Robot, where …"* → *"the Robot"*, *"Robot 1, to which …,"* → *"Robot 1"*).  A
-        plural mention (*"Robots"*) only introduces the referent (it never carries an article).
-        Relational referents are first numbered (*"Robot 1"*) when their type collides.
+        label (*"a Robot, where …"* → *"the Robot"*, *"another Robot, to which …,"* → *"the other
+        Robot"*).  A plural mention (*"Robots"*) only introduces the referent (it never carries an
+        article).  A referent whose noun is shared with another is first distinguished
+        (:meth:`_distinguished`) — *"another Robot"* / *"a second Robot"*.
 
         :return: The resolved referring noun phrase (first / repeat), or the non-referring noun
             phrase rebuilt around its recursed children.
-
-        It is the entry that marks each Robot introduced and applies numbering — here both Robots are
-        first mentions of one colliding type, so it hands them to :meth:`_numbered` and the result is
-        *Robot 1* / *Robot 2* (a lone Robot would stay *a Robot*):
-
-        >>> robot_one, robot_two = variable(Robot, []), variable(Robot, [])
-        >>> verbalize_expression(a(entity(robot_one).where(robot_one.battery > robot_two.battery)))
-        'Find Robot 1 whose battery is greater than the battery of Robot 2'
         """
         if noun_phrase.referent_id is None:
             return self._rebuilt(noun_phrase)
-        noun_phrase = self._numbered(noun_phrase)
+        noun_phrase = self._distinguished(noun_phrase)
         self._record_subject_number(noun_phrase)
         repeat = noun_phrase.referent_id in self._seen
         self._seen.add(noun_phrase.referent_id)
@@ -552,28 +532,41 @@ class CoreferenceProcessor(RealizationPass):
             return self._reduced(noun_phrase)
         return self._rebuilt(noun_phrase)
 
-    def _numbered(self, noun_phrase: NounPhrase) -> NounPhrase:
-        """Stamp a disambiguation number on a referent the rules could not label themselves — a
-        relational referent arrives as a definite *"the Robot to which …"*, and becomes a bare
-        *"Robot 1"* clause when its type collides. A rule-labelled referent (already ``BARE``) is
-        left untouched, so this never re-numbers a variable.
+    def _distinguished(self, noun_phrase: NounPhrase) -> NounPhrase:
+        """Stamp the disambiguating feature (:class:`~…microplanning.referring.Distinguisher`) on a
+        referent whose noun is shared with another referent, assigned lazily in the order referents
+        are first encountered during this walk
+        (:meth:`~…microplanning.referring.DistinguisherIndex.distinguisher_for`) — a relational
+        referent arrives as a definite *"the Robot to which …"* and, if it is the second of a
+        collision, becomes *"the other Robot to which …"*; a variable arrives indefinite and
+        becomes *"another Robot"*.
 
-        :return: The numbered noun phrase, or *noun_phrase* unchanged when it has no number.
+        :return: *noun_phrase* unchanged when it is alone in its noun group, else stamped with
+            ``alternative`` or ``ordinal`` — its own definiteness is untouched, so the determiner
+            pass realises *"another"*/*"a second"* on an indefinite first mention and *"the
+            other"*/*"the second"* on a definite one. A distinguished head that also carries a
+            relative clause becomes non-restrictive, set off by commas — it is now identified by
+            its distinguisher, not solely by the clause.
 
-        It is the step that supplies the digits: the two same-type Robots collide, so it stamps each
-        with its disambiguation label — the *1* and *2* in *Robot 1* / *Robot 2*:
+        It is the step that tells the two same-noun Robots apart: the second-encountered gets its
+        pair distinguisher — *"another"* in *"a Robot … another Robot"*:
 
         >>> robot_one, robot_two = variable(Robot, []), variable(Robot, [])
         >>> verbalize_expression(a(entity(robot_one).where(robot_one.battery > robot_two.battery)))
-        'Find Robot 1 whose battery is greater than the battery of Robot 2'
+        'Find a Robot whose battery is greater than the battery of another Robot'
         """
-        label = self.numbered_labels.get(noun_phrase.referent_id)
-        if label is None or noun_phrase.definiteness is Definiteness.BARE:
+        if noun_phrase.referent_id is None:
             return noun_phrase
-        # A numbered head is identified by its number, so a relative clause on it is non-restrictive
-        # and is set off by commas. The trailing comma never dangles: numbering requires two same-type
-        # relational referents, which only arise inside a predicate (genitive owner / "is <attribute>"
-        # subject), so following text always supplies the post-comma space.
+        distinguisher = self.distinguisher_index.distinguisher_for(
+            noun_phrase.referent_id
+        )
+        if distinguisher is None:
+            return noun_phrase
+        # A distinguished head is identified by its determiner, so a relative clause on it is
+        # non-restrictive and is set off by commas. The trailing comma never dangles: a collision
+        # requires two same-noun relational referents, which only arise inside a predicate
+        # (genitive owner / "is <attribute>" subject), so following text always supplies the
+        # post-comma space.
         modifiers = (
             self._comma_framed(noun_phrase.modifiers)
             if noun_phrase.relative_clause
@@ -581,8 +574,12 @@ class CoreferenceProcessor(RealizationPass):
         )
         return replace(
             noun_phrase,
-            head=replace(noun_phrase.head, text=label),
-            definiteness=Definiteness.BARE,
+            alternative=isinstance(distinguisher, AlternativeDistinguisher),
+            ordinal=(
+                distinguisher.ordinal
+                if isinstance(distinguisher, OrdinalDistinguisher)
+                else None
+            ),
             modifiers=modifiers,
         )
 
@@ -591,14 +588,18 @@ class CoreferenceProcessor(RealizationPass):
         modifiers: List[VerbalizationFragment],
     ) -> List[VerbalizationFragment]:
         """:return: *modifiers* set off by a leading and trailing comma, so a non-restrictive relative
-        clause reads *"Robot 1, to which its primary is assigned, is …"*. The comma's
+        clause reads *"the other Robot, to which its secondary is assigned, is …"*. The comma's
         :attr:`Spacing.LEFT` lets the orthography pass hug it to the preceding token."""
         comma = Punctuation.COMMA.as_fragment()
         return [comma, *modifiers, comma]
 
     def _reduced(self, noun_phrase: NounPhrase) -> VerbalizationFragment:
-        """:return: A repeat mention reduced to its head — the first-mention modifiers dropped — as a
-        bare label (*"Robot 1"*) when numbered, else a definite reference (*"the Robot"*).
+        """:return: A repeat mention reduced to its head — the first-mention modifiers dropped — as
+        a definite reference (*"the Robot"*), preserving any distinguishing feature already
+        stamped by :meth:`_distinguished` (*"the other Robot"*, *"the second Robot"*) so a
+        distinguished referent stays told apart on every later mention. A disjunctive head's
+        :attr:`~…fragments.base.NounPhrase.additional_heads` carry over too (*"the Circle or the
+        Square"*).
 
         Verbalizing one expression twice against a shared context reduces the repeat to *"the Robot"*:
 
@@ -613,13 +614,14 @@ class CoreferenceProcessor(RealizationPass):
         """
         return NounPhrase(
             head=self._walk(noun_phrase.head),
+            additional_heads=[
+                self._walk(additional) for additional in noun_phrase.additional_heads
+            ],
             number=noun_phrase.number,
-            definiteness=(
-                Definiteness.BARE
-                if noun_phrase.definiteness is Definiteness.BARE
-                else Definiteness.DEFINITE
-            ),
+            definiteness=Definiteness.DEFINITE,
             referent_id=noun_phrase.referent_id,
+            alternative=noun_phrase.alternative,
+            ordinal=noun_phrase.ordinal,
         )
 
     def _record_subject_number(self, noun_phrase: NounPhrase) -> None:
@@ -655,6 +657,9 @@ class CoreferenceProcessor(RealizationPass):
         'Find an Employee such that its salary is greater than its starting_salary'
         """
         head = self._walk(noun_phrase.head)
+        additional_heads = [
+            self._walk(additional) for additional in noun_phrase.additional_heads
+        ]
         if noun_phrase.referent_id is None or not noun_phrase.subject_of_modifiers:
             modifiers = [self._walk(modifier) for modifier in noun_phrase.modifiers]
         else:
@@ -665,4 +670,9 @@ class CoreferenceProcessor(RealizationPass):
                 modifiers = [self._walk(modifier) for modifier in noun_phrase.modifiers]
             finally:
                 self._subject_stack.pop()
-        return replace(noun_phrase, head=head, modifiers=modifiers)
+        return replace(
+            noun_phrase,
+            head=head,
+            additional_heads=additional_heads,
+            modifiers=modifiers,
+        )

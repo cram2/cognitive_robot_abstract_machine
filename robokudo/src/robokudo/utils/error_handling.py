@@ -1,9 +1,9 @@
-"""Error handling utilities for RoboKudo.
+"""
+Error handling utilities for RoboKudo.
 
 This module provides error handling utilities for behavior trees.
 
-:module: error_handling
-:synopsis: Error handling utilities for behavior trees
+:module: error_handling :synopsis: Error handling utilities for behavior trees
 :moduleauthor: RoboKudo Team
 """
 
@@ -13,7 +13,7 @@ from functools import wraps
 
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
-from typing_extensions import Callable, Union, Any, Optional
+from typing_extensions import Any, Callable, Optional
 
 from robokudo.identifier import BBIdentifier
 
@@ -21,7 +21,8 @@ from robokudo.identifier import BBIdentifier
 
 
 def raise_to_blackboard(exception: Optional[Exception]) -> None:
-    """Store exception in blackboard.
+    """
+    Store exception in blackboard.
 
     :param exception: Exception to store or None to clear
 
@@ -39,7 +40,8 @@ def raise_to_blackboard(exception: Optional[Exception]) -> None:
 
 
 def has_blackboard_exception() -> bool:
-    """Check if blackboard contains an exception.
+    """
+    Check if blackboard contains an exception.
 
     :return: True if exception exists and is not None
 
@@ -76,7 +78,8 @@ def get_blackboard_exception() -> Optional[Exception]:
 
 
 def clear_blackboard_exception() -> None:
-    """Clear any stored exception from blackboard.
+    """
+    Clear any stored exception from blackboard.
 
     :Example:
 
@@ -90,8 +93,9 @@ def clear_blackboard_exception() -> None:
 
 def catch_and_raise_to_blackboard(
     function: Callable[[...], Any],
-) -> Union[Status, Callable]:
-    """Catch and store exceptions in blackboard.
+) -> Callable[None, Status]:
+    """
+    Catch and store exceptions in blackboard.
 
     This decorator is used to catch exceptions in Annotators to place them into the blackboard. Mostly useful in
     analysis-engines that have a query-interface which should return a failure back to the action-server caller

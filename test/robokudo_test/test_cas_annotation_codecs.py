@@ -1,7 +1,7 @@
 import numpy as np
 
 from robokudo.io import cas_annotation_codecs
-from robokudo.types.annotation import Shape, Sphere, Cylinder
+from robokudo.types.annotation import CloudAnnotation, Shape, Sphere, Cylinder
 from semantic_digital_twin.world_description.geometry import (
     Box as SemDTBox,
     Cylinder as SemDTCylinder,
@@ -56,6 +56,29 @@ def test_numpy_scalar_json_serializer_roundtrip():
 
     assert encoded["dtype"] == "int16"
     assert restored == scalar.item()
+
+
+def test_cloud_annotation_serialization_roundtrip_preserves_point_cloud():
+    points = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    point_cloud = cas_annotation_codecs.o3d.geometry.PointCloud()
+    point_cloud.points = cas_annotation_codecs.o3d.utility.Vector3dVector(points)
+    cloud_annotation = CloudAnnotation(source="cloud_annotator", points=point_cloud)
+
+    serialized = cas_annotation_codecs.serialize_annotations([cloud_annotation])
+    restored = cas_annotation_codecs.deserialize_annotations(serialized)
+
+    assert len(restored) == 1
+    restored_cloud = restored[0]
+    assert isinstance(restored_cloud, CloudAnnotation)
+    assert restored_cloud.source == "cloud_annotator"
+    np.testing.assert_allclose(np.asarray(restored_cloud.points.points), points)
 
 
 def test_shape_annotation_serialization_roundtrip_preserves_metadata():

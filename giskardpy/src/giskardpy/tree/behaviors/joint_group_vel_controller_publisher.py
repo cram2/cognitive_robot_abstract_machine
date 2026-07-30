@@ -20,8 +20,12 @@ class JointGroupVelController(GiskardBehavior):
     connections: List[ActiveConnection1DOF]
 
     minimum_valid_velocity: float
-    """Minimum magnitude that small non-prismatic, non-finger joint velocities are raised
-    to so the hardware actually moves. A value of ``0.0`` disables clamping."""
+    """
+    Minimum magnitude that small non-prismatic, non-finger joint velocities are raised
+    to so the hardware actually moves.
+
+    A value of ``0.0`` disables clamping.
+    """
 
     def __init__(
         self,

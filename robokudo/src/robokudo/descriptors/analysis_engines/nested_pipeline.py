@@ -1,4 +1,5 @@
-"""Analysis engine demonstrating nested pipeline functionality.
+"""
+Analysis engine demonstrating nested pipeline functionality.
 
 This module provides an analysis engine that demonstrates how to create and use
 nested pipelines within the main processing pipeline. It implements a main pipeline
@@ -17,7 +18,9 @@ The pipeline implements the following functionality:
 """
 
 from robokudo.annotators.outputs import ClearAnnotatorOutputs
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.pipeline import Pipeline
 from py_trees.behaviours import Count, SuccessEveryN
@@ -31,7 +34,8 @@ from robokudo.gui import SetPipelineRedraw
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Analysis engine demonstrating nested pipeline architecture.
+    """
+    Analysis engine demonstrating nested pipeline architecture.
 
     This class implements a pipeline that combines a main processing pipeline
     with a nested belief state pipeline. It demonstrates how to structure
@@ -50,7 +54,8 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """Get the name of the analysis engine.
+        """
+        Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         :rtype: str
@@ -58,7 +63,8 @@ class AnalysisEngine(AnalysisEngineInterface):
         return "nested_pipeline"
 
     def implementation(self) -> Pipeline:
-        """Create a pipeline with nested belief state processing.
+        """
+        Create a pipeline with nested belief state processing.
 
         This method constructs a processing pipeline that includes both a main
         pipeline for camera data processing and a nested pipeline for belief
@@ -73,7 +79,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with nested belief state processing
         """
-        kinect_config = CrDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
 
         # create second 'pipeline
         second_seq = Sequence(name="BS Pipeline")

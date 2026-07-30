@@ -1,4 +1,6 @@
-"""Decorator utilities for RoboKudo annotators."""
+"""
+Decorator utilities for RoboKudo annotators.
+"""
 
 import timeit
 from collections import defaultdict
@@ -8,7 +10,8 @@ from robokudo.annotators.core import BaseAnnotator
 
 
 def timer_decorator(func: Callable[[...], Any]) -> Callable[[...], Any]:
-    """Log execution time of decorated function.
+    """
+    Log execution time of decorated function.
 
     :param func: Function to be timed
     :return: Wrapped function that logs execution time
@@ -58,7 +61,8 @@ def timer_decorator(func: Callable[[...], Any]) -> Callable[[...], Any]:
 
 
 def record_time(func: Callable[[...], Any]) -> Callable[[...], Any]:
-    """Record execution time of annotator method.
+    """
+    Record execution time of annotator method.
 
     :param func: Annotator method to time
     :return: Wrapped method that records execution time
@@ -93,7 +97,8 @@ def record_time(func: Callable[[...], Any]) -> Callable[[...], Any]:
 
 
 def publish_variables(func: Callable[[...], Any]) -> Callable[[...], Any]:
-    """Publish annotator variables after method execution.
+    """
+    Publish annotator variables after method execution.
 
     :param func: Annotator method to wrap
     :return: Wrapped method that publishes variables

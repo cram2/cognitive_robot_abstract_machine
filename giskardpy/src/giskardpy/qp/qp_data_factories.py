@@ -68,10 +68,14 @@ class QPDataFactory(Generic[T], ABC):
         float_variables: list[FloatVariable],
     ):
         """
-        Transforms the symbolic representation of the QP problem into functions that compute the parts of QPData.
+        Transforms the symbolic representation of the QP problem into functions that
+        compute the parts of QPData.
+
         :param world_state_symbols: list of variables representing the world state.
-        :param life_cycle_symbols: list of variables representing the life cycle states of a motion statechart.
-        :param float_variables: list of variables representing the additional float variables not covered by the world state and life cycle states.
+        :param life_cycle_symbols: list of variables representing the life cycle states
+            of a motion statechart.
+        :param float_variables: list of variables representing the additional float
+            variables not covered by the world state and life cycle states.
         """
 
     @abstractmethod
@@ -82,7 +86,9 @@ class QPDataFactory(Generic[T], ABC):
         float_variables: np.ndarray,
     ) -> QPData:
         """
-        Evaluates the QP problem represented by this factory using the given world state, life cycle state, and float variables.
+        Evaluates the QP problem represented by this factory using the given world
+        state, life cycle state, and float variables.
+
         .. note:: it is assumed that the input data corresponds to the input giving to `compile`.
         :param world_state: Current state of the world.
         :param life_cycle_state: Current state of the motion statechart.
@@ -104,10 +110,12 @@ class QPDataExplicitFactory(QPDataFactory[QPDataExplicit]):
     """
     Compiled casadi function computing the equality constraint matrix.
     """
+
     inequality_matrix_compiled: CompiledFunction = field(init=False)
     """
     Compiled casadi function computing the inequality constraint matrix.
     """
+
     combined_vector_f: CompiledFunctionWithViews = field(init=False)
     """
     Compiled casadi function computing all vector elements of the QP problem.
@@ -208,14 +216,15 @@ class QPDataExplicitFactory(QPDataFactory[QPDataExplicit]):
 @dataclass
 class QPDataTwoSidedInequalityFactory(QPDataFactory[QPDataTwoSidedInequality]):
     """
-    Builds a :class:`QPDataTwoSidedInequality` by combining the equality and inequality blocks into a
-    single two-sided constraint matrix.
+    Builds a :class:`QPDataTwoSidedInequality` by combining the equality and inequality
+    blocks into a single two-sided constraint matrix.
     """
 
     inequality_matrix_compiled: CompiledFunction = field(init=False)
     """
     The compiled combined constraint matrix over all free variables.
     """
+
     combined_vector_f: CompiledFunctionWithViews = field(init=False)
     """
     The compiled weights and bounds, with views for the lower and upper bound vectors.

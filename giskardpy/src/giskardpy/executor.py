@@ -46,15 +46,18 @@ class SimulationPacer(Pacer):
     real_time_factor: Optional[float] = None
     """
     Allows you to adjust the simulation speed.
-    If None, the pacer will not sleep at all.
-    If 1.0, the pacer will try to achieve the control_dt frequency, as long as the other code in the loop allows it.
+
+    If None, the pacer will not sleep at all. If 1.0, the pacer will try to achieve the
+    control_dt frequency, as long as the other code in the loop allows it.
     """
 
     _next_target_time: Optional[float] = field(default=None, init=False)
 
     def sleep(self):
         """
-        Sleep to maintain a control loop pace defined by `control_dt` and `real_time_factor`.
+        Sleep to maintain a control loop pace defined by `control_dt` and
+        `real_time_factor`.
+
         - If `real_time_factor` is None, return immediately (no pacing).
         - Otherwise, target interval is `control_dt / real_time_factor`.
         """
@@ -87,30 +90,41 @@ class Executor:
 
     context: MotionStatechartContext
 
-    tmp_folder: str = field(default="/tmp/")
-    """Path to safe temporary files."""
-
     trajectory_plotter: WorldStateTrajectoryPlotter | None = field(default=None)
-    """The trajectory plotter used to plot the robot's trajectory."""
+    """
+    The trajectory plotter used to plot the robot's trajectory.
+    """
 
     debug_expression_plotter: DebugExpressionTrajectoryPlotter | None = field(
         default=None
     )
-    """Records and plots how the debug expressions evolved during the motion."""
+    """
+    Records and plots how the debug expressions evolved during the motion.
+    """
 
     pacer: Pacer = field(default_factory=SimulationPacer)
 
     # %% init False
     motion_statechart: MotionStatechart = field(init=False)
-    """The motion statechart describing the robot's motion logic."""
+    """
+    The motion statechart describing the robot's motion logic.
+    """
+
     qp_controller: Optional[QPController] = field(default=None, init=False)
-    """Optional quadratic programming controller used for motion control."""
+    """
+    Optional quadratic programming controller used for motion control.
+    """
 
     _control_cycle_index: int = field(init=False)
-    """Tracks the index of the current control cycle."""
+    """
+    Tracks the index of the current control cycle.
+    """
 
     _time_variable: FloatVariable = field(init=False)
-    """Auxiliary variable representing the current time in seconds since the start of the simulation."""
+    """
+    Auxiliary variable representing the current time in seconds since the start of the
+    simulation.
+    """
 
     @property
     def time(self) -> float:
@@ -147,13 +161,14 @@ class Executor:
             self.debug_expression_plotter.reset(
                 self.motion_statechart.collect_debug_expressions()
             )
+            self.debug_expression_plotter.debug_expression_trajectory.append(self.time)
         self.context.collision_manager.update_collision_matrix()
         # do one tick to immediately active nodes whose start condition is constant true.
         self.motion_statechart.tick(self.context)
 
     def tick(self):
         self.control_cycles += 1
-        if self.context.collision_manager.has_consumers():
+        if self.context.requires_collision_checking:
             self.context.collision_manager.compute_collisions()
         self.motion_statechart.tick(self.context)
         if self.debug_expression_plotter is not None:
@@ -178,6 +193,7 @@ class Executor:
     def tick_until_end(self, timeout: int = 1_000):
         """
         Calls tick until is_end_motion() returns True.
+
         :param timeout: Max number of ticks to perform.
         """
         try:
@@ -224,7 +240,9 @@ class Executor:
         self.trajectory_plotter.plot_trajectory(file_name)
 
     def plot_debug_expressions(self, file_name: str = "./debug_expressions.pdf"):
-        """Plot the recorded debug expressions to the given PDF file."""
+        """
+        Plot the recorded debug expressions to the given PDF file.
+        """
         if self.debug_expression_plotter is None:
             raise PlotterNotConfiguredError("debug expression plotter")
         self.debug_expression_plotter.plot(file_name)

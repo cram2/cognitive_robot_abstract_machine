@@ -24,7 +24,9 @@ class IntervalConstants:
 
     ZERO = SimpleInterval.from_data(0, 0, Bound.CLOSED, Bound.CLOSED)
     ZERO_TO_ONE_THIRD = SimpleInterval.from_data(0, 1 / 3, Bound.CLOSED, Bound.CLOSED)
-    ONE_THIRD_TO_TWO_THIRD = SimpleInterval.from_data(1 / 3, 2 / 3, Bound.OPEN, Bound.OPEN)
+    ONE_THIRD_TO_TWO_THIRD = SimpleInterval.from_data(
+        1 / 3, 2 / 3, Bound.OPEN, Bound.OPEN
+    )
     HALF = SimpleInterval.from_data(0.5, 0.5, Bound.CLOSED, Bound.CLOSED)
     TWO_THIRD_TO_ONE = SimpleInterval.from_data(2 / 3, 1, Bound.CLOSED, Bound.CLOSED)
     ONE = SimpleInterval.from_data(1, 1, Bound.CLOSED, Bound.CLOSED)
@@ -62,13 +64,15 @@ class VerticalSemanticDirection(SemanticDirection):
 @dataclass
 class SemanticPositionDescription:
     """
-    Describes a position by mapping semantic concepts (RIGHT, CENTER, LEFT, TOP, BOTTOM) to instances of
-    random_events.intervals.SimpleInterval, which are then used to "zoom" into specific regions of an event.
-    Each DirectionInterval divides the original event into three parts, either vertically or horizontally, and zooms into
-    one of them depending on which specific direction was chosen.
-    The sequence of zooms is defined by the order of directions in the horizontal_direction_chain and
-    vertical_direction_chain lists.
-    Finally, we can sample aa 2d pose from the resulting event
+    Describes a position by mapping semantic concepts (RIGHT, CENTER, LEFT, TOP, BOTTOM)
+    to instances of random_events.intervals.SimpleInterval, which are then used to
+    "zoom" into specific regions of an event.
+
+    Each DirectionInterval divides the original event into three parts, either
+    vertically or horizontally, and zooms into one of them depending on which specific
+    direction was chosen. The sequence of zooms is defined by the order of directions in
+    the horizontal_direction_chain and vertical_direction_chain lists. Finally, we can
+    sample aa 2d pose from the resulting event
     """
 
     horizontal_direction_chain: List[HorizontalSemanticDirection]
@@ -84,8 +88,8 @@ class SemanticPositionDescription:
     @staticmethod
     def _zoom_interval(base: SimpleInterval, target: SimpleInterval) -> SimpleInterval:
         """
-        Zoom 'base' interval by the percentage interval 'target' (0..1),
-        preserving the base's boundary styles.
+        Zoom 'base' interval by the percentage interval 'target' (0..1), preserving the
+        base's boundary styles.
 
         :param base: The base interval to be zoomed in.
         :param target: The target interval defining the zoom percentage (0..1).
@@ -101,7 +105,8 @@ class SemanticPositionDescription:
         Apply zooms in order and return the resulting intervals.
 
         :param simple_event: The event to zoom in.
-        :return: A SimpleEvent containing the resulting intervals after applying all zooms.
+        :return: A SimpleEvent containing the resulting intervals after applying all
+            zooms.
         """
         simple_events = [
             self._apply_zoom_in_one_direction(
@@ -120,11 +125,13 @@ class SemanticPositionDescription:
         self, axis: Continuous, current_interval: SimpleInterval
     ) -> SimpleEvent:
         """
-        Apply zooms in one direction (Y, horizontal or Z, vertical) in order and return the resulting interval.
+        Apply zooms in one direction (Y, horizontal or Z, vertical) in order and return
+        the resulting interval.
 
         :param axis: The axis to zoom in (SpatialVariables.y or SpatialVariables.z).
         :param current_interval: The current interval to zoom in.
-        :return: A SimpleEvent containing the resulting interval after applying all zooms in the specified direction.
+        :return: A SimpleEvent containing the resulting interval after applying all
+            zooms in the specified direction.
         """
         if axis == SpatialVariables.y.value:
             directions = self.horizontal_direction_chain
@@ -140,7 +147,8 @@ class SemanticPositionDescription:
 
     def sample_point_from_event(self, event: Event) -> Tuple[float, float]:
         """
-        Sample a 2D point from the given event by applying the zooms defined in the semantic position description.
+        Sample a 2D point from the given event by applying the zooms defined in the
+        semantic position description.
 
         :param event: The event to sample from.
         :return: A sampled 2D point as a tuple (y, z).

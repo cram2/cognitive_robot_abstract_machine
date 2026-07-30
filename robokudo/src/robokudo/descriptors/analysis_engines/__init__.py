@@ -1,4 +1,5 @@
-"""Analysis engines initialization module.
+"""
+Analysis engines initialization module.
 
 This module serves as the initialization point for all analysis engines in the
 RoboKudo framework. It provides access to various analysis engine implementations

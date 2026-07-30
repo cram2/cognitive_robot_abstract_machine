@@ -32,8 +32,10 @@ BaseMotionType = TypeVar("BaseMotionType", bound=BaseMotion)
 class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
     execution_type: ClassVar[Union[ExecutionType, Iterable[ExecutionType]]]
     """
-    Execution type(s) for which this alternative motion applies. A single execution type or an
-    iterable of them; the alternative is selected when the active execution type is among these.
+    Execution type(s) for which this alternative motion applies.
+
+    A single execution type or an iterable of them; the alternative is selected when the
+    active execution type is among these.
     """
 
     def perform(self):
@@ -46,10 +48,11 @@ class AlternativeMotion(HasGeneric[AbstractRobotType], ABC):
         motion: Type[BaseMotionType],
     ) -> Optional[Type[BaseMotionType]]:
         """
-        Checks if there is an alternative motion for the given robot view, motion and execution type
-        among the provided alternatives.
+        Checks if there is an alternative motion for the given robot view, motion and
+        execution type among the provided alternatives.
 
-        :param alternatives: The alternative motion mappings to search through (e.g. from the context)
+        :param alternatives: The alternative motion mappings to search through (e.g.
+            from the context)
         :param robot_view: The robot for which the alternative motion should be found
         :param motion: The motion class for which an alternative should be found
         :return: The alternative motion class if found, None otherwise

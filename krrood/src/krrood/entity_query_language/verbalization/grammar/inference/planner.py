@@ -30,80 +30,127 @@ class AggregationStatus(Enum):
     """
 
     GROUP_KEY = auto()
-    """This expression is one of the ``grouped_by`` key variables."""
+    """
+    This expression is one of the ``grouped_by`` key variables.
+    """
+
     AGGREGATED = auto()
-    """Present in the query but not a group key — rendered in plural form."""
+    """
+    Present in the query but not a group key — rendered in plural form.
+    """
+
     NONE = auto()
-    """No grouping context in this query."""
+    """
+    No grouping context in this query.
+    """
 
 
 @dataclass
 class AntecedentInformation:
-    """Descriptor for one antecedent variable in the IF clause."""
+    """
+    Descriptor for one antecedent variable in the IF clause.
+    """
 
     root: Union[Variable, Entity]
-    """The underlying Variable/Entity (unwrapped from any ResultQuantifier)."""
+    """
+    The underlying Variable/Entity (unwrapped from any ResultQuantifier).
+    """
 
     variable: Optional[Variable]
-    """The antecedent's restriction subject — the variable its conditions attach to (``root`` for a
-    Variable root, the selected variable for an Entity root)."""
+    """
+    The antecedent's restriction subject — the variable its conditions attach
+    to (``root`` for a Variable root, the selected variable for an Entity
+    root).
+    """
 
     type_name: str
-    """Human-readable Python type name of *root* (e.g. ``"Robot"``)."""
+    """
+    Human-readable Python type name of *root* (e.g. ``"Robot"``).
+    """
 
     aggregation_status: AggregationStatus
-    """Whether this antecedent is a group key, aggregated, or neither."""
+    """
+    Whether this antecedent is a group key, aggregated, or neither.
+    """
 
     conditions: List[SymbolicExpression] = field(default_factory=list)
-    """The raw WHERE conditions attributable to this antecedent; their surface form/slot is the
-    condition-form registry's concern at render time, not the plan's."""
+    """
+    The raw WHERE conditions attributable to this antecedent; their surface
+    form/slot is the condition-form registry's concern at render time, not the
+    plan's.
+    """
 
 
 @dataclass
 class ConsequentBinding:
-    """Descriptor for one field binding in the THEN clause."""
+    """
+    Descriptor for one field binding in the THEN clause.
+    """
 
     field_name: str
-    """Python attribute name on the consequent type (e.g. ``"tasks"``)."""
+    """
+    Python attribute name on the consequent type (e.g. ``"tasks"``).
+    """
 
     value_expression: SymbolicExpression
-    """EQL expression providing the value for *field_name*."""
+    """
+    EQL expression providing the value for *field_name*.
+    """
 
     is_plural_field: bool
-    """``True`` when *field_name* is already plural."""
+    """
+    ``True`` when *field_name* is already plural.
+    """
 
     aggregation_status: AggregationStatus
-    """Whether the value is a group key, aggregated, or neither."""
+    """
+    Whether the value is a group key, aggregated, or neither.
+    """
 
 
 @dataclass
 class RuleStructure:
-    """Complete decomposition of an inference-rule Entity query (the plan)."""
+    """
+    Complete decomposition of an inference-rule Entity query (the plan).
+    """
 
     primary_antecedents: List[AntecedentInformation]
-    """Antecedents with at least one condition — items in the IF block."""
+    """
+    Antecedents with at least one condition — items in the IF block.
+    """
 
     secondary_antecedents: List[AntecedentInformation]
-    """Antecedents with no conditions — only registered for coreference."""
+    """
+    Antecedents with no conditions — only registered for coreference.
+    """
 
     consequent_type: str
-    """Python type name of the inferred variable (e.g. ``"Drawer"``)."""
+    """
+    Python type name of the inferred variable (e.g. ``"Drawer"``).
+    """
 
     consequent_bindings: List[ConsequentBinding]
-    """Ordered field bindings for the THEN clause."""
+    """
+    Ordered field bindings for the THEN clause.
+    """
 
     unmatched_conditions: List[SymbolicExpression]
-    """Outer WHERE conditions not attributable to any antecedent."""
+    """
+    Outer WHERE conditions not attributable to any antecedent.
+    """
 
     group_key_ids: FrozenSet[uuid.UUID]
-    """``_id_`` values of the GROUP BY key variables."""
+    """
+    ``_id_`` values of the GROUP BY key variables.
+    """
 
 
 @dataclass
 class InferencePlanner(Planner[Entity, RuleStructure]):
     """
-    Decompose an inference-rule query (an entity whose selected variable is an instantiated
-    variable) into a ``RuleStructure`` (the IF/THEN decomposition).
+    Decompose an inference-rule query (an entity whose selected variable is an
+    instantiated variable) into a ``RuleStructure`` (the IF/THEN
+    decomposition).
 
     Reference: :cite:t:`reiter2000building` — content/structure determination (microplanning).
     """
@@ -248,8 +295,8 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
 
         >>> handle = variable(Handle, [])
         >>> prismatic = variable(PrismaticConnection, [])
-        >>> fixed = match_variable(FixedConnection, [])(parent=prismatic.child, child=handle)
-        >>> planner = InferencePlanner(entity(inference(Drawer)(container=fixed.parent, handle=fixed.child)))
+        >>> fixed = a(FixedConnection)(parent=prismatic.child, child=handle).from_([])
+        >>> planner = InferencePlanner(entity(inference(Drawer)(container=fixed.expression.parent, handle=fixed.expression.child)))
         >>> _ = planner.node.build()
         >>> antecedents, unmatched = planner._plan_antecedents(frozenset())
         >>> (len(antecedents), len(unmatched))
@@ -267,8 +314,8 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
 
         >>> handle = variable(Handle, [])
         >>> prismatic = variable(PrismaticConnection, [])
-        >>> fixed = match_variable(FixedConnection, [])(parent=prismatic.child, child=handle)
-        >>> planner = InferencePlanner(entity(inference(Drawer)(container=fixed.parent, handle=fixed.child)))
+        >>> fixed = a(FixedConnection)(parent=prismatic.child, child=handle).from_([])
+        >>> planner = InferencePlanner(entity(inference(Drawer)(container=fixed.expression.parent, handle=fixed.expression.child)))
         >>> _ = planner.node.build()
         >>> [antecedent.type_name for antecedent in planner._discover_antecedents(frozenset())]
         ['FixedConnection']

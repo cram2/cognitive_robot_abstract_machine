@@ -19,7 +19,8 @@ class RealsenseCameraConfig(
     StableViewpointComponent,
     WorldDescriptorComponent,
 ):
-    """Configuration class for Intel RealSense cameras.
+    """
+    Configuration class for Intel RealSense cameras.
 
     This class defines the configuration parameters for RealSense cameras,
     particularly tested with the D435 model. It assumes the use of aligned depth
@@ -38,7 +39,7 @@ class RealsenseCameraConfig(
 
     topic_color: str = "/camera/color/image_raw/compressed"
 
-    topic_cam_info: str = "/camera/color/camera_info"
+    topic_camera_info: str = "/camera/color/camera_info"
 
     tf_from: str = "/camera_color_optical_frame"
 

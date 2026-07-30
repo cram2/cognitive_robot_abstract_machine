@@ -28,7 +28,7 @@ The {py:class}`~krrood.entity_query_language.core.base_expressions.SymbolicExpre
 
 To simplify implementation, EQL provides base classes for different numbers of children:
 
-- **{py:class}`~krrood.entity_query_language.core.base_expressions.UnaryExpression`**: Operations with exactly one child (e.g., `Not`, `ResultQuantifier`, `Aggregator`).
+- **{py:class}`~krrood.entity_query_language.core.base_expressions.UnaryExpression`**: Operations with exactly one child (e.g., `Not`, `Aggregator`).
 - **{py:class}`~krrood.entity_query_language.core.base_expressions.BinaryExpression`**: Operations with two children (e.g., `AND`, `OR`, `Comparator`, `Conclusion`).
 - **{py:class}`~krrood.entity_query_language.core.base_expressions.MultiArityExpression`**: Operations with N children (e.g., `Union`, `Query`).
 
@@ -44,7 +44,7 @@ EQL uses mixins to define common behaviors across different parts of the hierarc
 Used for expressions that contribute to the truth value of a condition. Parents of these nodes only request evaluation when their truth value is relevant (e.g., short-circuiting logic).
 
 ### 2. `DerivedExpression`
-Represents operations that transform the result stream (like sorting or quantification) without owning the primary data.
+Represents operations that derive their value from another expression (like attribute access) without owning the primary data.
 
 ### 3. `Selectable`
 A specialized expression that can be "selected" in a query's result set. Variables and aggregators are selectables.

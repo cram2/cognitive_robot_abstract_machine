@@ -12,7 +12,8 @@ from giskardpy.motion_statechart.data_types import ObservationStateValues
 @dataclass(eq=False, repr=False)
 class ForceTorqueNode(TopicSubscriberNode[WrenchStamped]):
     """
-    Superclass for all nodes that subscribe to a ROS topic that contains force and torque data.
+    Superclass for all nodes that subscribe to a ROS topic that contains force and
+    torque data.
     """
 
     msg_type: WrenchStamped = field(init=False, default=WrenchStamped)

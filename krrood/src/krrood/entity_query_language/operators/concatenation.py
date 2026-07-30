@@ -1,7 +1,8 @@
 """
 Concatenation utilities for the Entity Query Language.
 
-This module defines the Concatenation operator that merges values from multiple selectable expressions.
+This module defines the Concatenation operator that merges values from multiple
+selectable expressions.
 """
 
 from __future__ import annotations
@@ -27,7 +28,9 @@ class Concatenation(Union, CanBehaveLikeAVariable[T]):
 
     _operation_children_: Tuple[Selectable, ...] = field(default_factory=tuple)
     """
-    The children of the concatenate operation. They must be selectables.
+    The children of the concatenate operation.
+
+    They must be selectables.
     """
 
     def __post_init__(self):

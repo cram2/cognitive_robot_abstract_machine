@@ -84,11 +84,15 @@ def create_timer(duration, callback, node, oneshot=False):
 
 class ResourceNotFound(Exception):
     def __init__(self, *args, **kwargs):
-        """Create a new plan failure."""
+        """
+        Create a new plan failure.
+        """
         Exception.__init__(self, *args, **kwargs)
 
 
 class ServiceException(Exception):
     def __init__(self, *args, **kwargs):
-        """Create a new plan failure."""
+        """
+        Create a new plan failure.
+        """
         Exception.__init__(self, *args, **kwargs)

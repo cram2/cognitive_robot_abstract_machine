@@ -4,8 +4,17 @@ import operator
 import uuid
 from dataclasses import dataclass
 from enum import Enum
+from functools import lru_cache
 
-from typing_extensions import Callable, ClassVar, Dict, List, Optional, Type
+from typing_extensions import (
+    Callable,
+    ClassVar,
+    Dict,
+    FrozenSet,
+    List,
+    Optional,
+    Type,
+)
 
 from krrood.entity_query_language.core.base_expressions import Selectable
 from krrood.entity_query_language.operators.aggregators import (
@@ -33,6 +42,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.fragments.features import Spacing
+from krrood.entity_query_language.verbalization.value_lexicon import type_noun
 from krrood.entity_query_language.verbalization.vocabulary.words import (
     AggregationWord,
     KeyWord,
@@ -55,8 +65,8 @@ class SingularExistential(PlainWord):
     """
     Parameterised existential phrase: *"there's a/an TypeName"*.
 
-    The article (*a* / *an*) is computed phonologically at call time using the
-    ``inflect`` library.
+    The article (*a* / *an*) is computed phonologically at call time
+    using the ``inflect`` library.
     """
 
     def build_phrase(
@@ -126,7 +136,8 @@ class PluralExistential(PlainWord):
 @dataclass(frozen=True)
 class FallbackNounWord(PlainWord):
     """
-    A fallback noun used when no type information is available from the expression.
+    A fallback noun used when no type information is available from the
+    expression.
 
     Provides both a singular and a plural fragment.
     """
@@ -173,7 +184,9 @@ class CommonGroupKeyWord(PlainWord):
 
 
 class Keywords(VocabEnum):
-    """EQL structural keywords (IF, THEN, FIND, WHERE, etc.)."""
+    """
+    EQL structural keywords (IF, THEN, FIND, WHERE, etc.).
+    """
 
     IF = KeyWord("If")
     THEN = KeyWord("then")
@@ -197,26 +210,19 @@ class Keywords(VocabEnum):
 
 
 class Directive(VocabEnum):
-    """The imperative verb that opens a request: *"Find"* a match in the domain, or *"Generate"*
-    an underspecified one."""
+    """
+    The imperative verb that opens a request: *"Find"* a match in the domain,
+    or *"Generate"* an underspecified one.
+    """
 
     FIND = KeyWord("Find")
     GENERATE = KeyWord("Generate")
 
-    @classmethod
-    def for_underspecified(cls, underspecified: bool) -> "Directive":
-        """:return: ``GENERATE`` for an underspecified (generative) request, else ``FIND``.
-
-        >>> Directive.for_underspecified(True).text
-        'Generate'
-        >>> Directive.for_underspecified(False).text
-        'Find'
-        """
-        return cls.GENERATE if underspecified else cls.FIND
-
 
 class Logicals(VocabEnum):
-    """Logical connectives (NOT, FOR ALL, THERE EXISTS, EITHER)."""
+    """
+    Logical connectives (NOT, FOR ALL, THERE EXISTS, EITHER).
+    """
 
     NOT = LogicalWord("not")
     EITHER = LogicalWord("either")
@@ -225,7 +231,9 @@ class Logicals(VocabEnum):
 
 
 class Aggregations(VocabEnum):
-    """Aggregation function phrases (number of, sum of, average of, etc.)."""
+    """
+    Aggregation function phrases (number of, sum of, average of, etc.).
+    """
 
     COUNT = AggregationWord("number")
     COUNT_ALL = AggregationWord("count of all", child_form=None)
@@ -328,7 +336,10 @@ _AGGREGATOR_PHRASES: Dict[Type[Aggregator], Aggregations] = {
 
 
 class Copulas(VocabEnum):
-    """Copula verbs (IS, IS NOT, ARE) — role is OPERATOR so they share colouring with comparators."""
+    """
+    Copula verbs (IS, IS NOT, ARE) — role is OPERATOR so they share colouring
+    with comparators.
+    """
 
     IS = OperatorWord("is")
     IS_NOT = OperatorWord("is not")
@@ -347,7 +358,9 @@ class Copulas(VocabEnum):
 
 
 class Prepositions(VocabEnum):
-    """The closed-class inventory of English prepositions — the single preposition vocabulary.
+    """
+    The closed-class inventory of English prepositions — the single preposition
+    vocabulary.
 
     One enum serves every use of a preposition: the words the verbalizer *emits* (the genitive
     *"of"*, the aggregate scope *"among"*, the comitative *"with"*), the prepositions a clause links
@@ -446,18 +459,31 @@ class Prepositions(VocabEnum):
     WITHOUT = PlainWord("without")
     WORTH = PlainWord("worth")
 
+    @classmethod
+    @lru_cache(maxsize=None)
+    def texts(cls) -> FrozenSet[str]:
+        """:return: the surface word of every preposition, for testing whether a token already reads
+        as a preposition."""
+        return frozenset(preposition.text for preposition in cls)
+
 
 class Conjunctions(VocabEnum):
-    """Coordinating conjunctions (AND, OR)."""
+    """
+    Coordinating conjunctions (AND, OR).
+    """
 
     AND = PlainWord("and")
     OR = PlainWord("or")
 
 
 class Absence(VocabEnum):
-    """Absence-of-attribute verb — the *"has no"* / *"have no"* of *"the Pose has no orientation"*,
-    produced for an owned attribute compared ``== None``. Number-agreeing, but selected explicitly
-    (the morphology pass only agrees the copula), so the right member is chosen here."""
+    """
+    Absence-of-attribute verb — the *"has no"* / *"have no"* of *"the Pose has
+    no orientation"*, produced for an owned attribute compared ``== None``.
+
+    Number-agreeing, but selected explicitly (the morphology pass only
+    agrees the copula), so the right member is chosen here.
+    """
 
     HAS_NO = OperatorWord("has no")
     HAVE_NO = OperatorWord("have no")
@@ -475,8 +501,10 @@ class Absence(VocabEnum):
 
 
 class NonExistence(VocabEnum):
-    """Non-existence verb — the *"does not exist"* / *"do not exist"* of *"the Robot does not
-    exist"*, produced for a bare variable compared ``== None`` (no attribute to name).
+    """
+    Non-existence verb — the *"does not exist"* / *"do not exist"* of *"the
+    Robot does not exist"*, produced for a bare variable compared ``== None``
+    (no attribute to name).
     """
 
     DOES_NOT_EXIST = OperatorWord("does not exist")
@@ -499,10 +527,15 @@ class NonExistence(VocabEnum):
 
 
 class PassiveAbsence(VocabEnum):
-    """Passive absence verb for a *relational* (past-participle) attribute — the *"has not been"* /
-    *"have not been"* of *"a Mission has not been assigned to any Robot"*, produced for a
-    ``<participle>_<preposition>`` attribute compared ``== None``. Number-agreeing, selected
-    explicitly (the morphology pass only agrees the copula)."""
+    """
+    Passive absence verb for a *relational* (past-participle) attribute — the
+    *"has not been"* / *"have not been"* of *"a Mission has not been assigned
+    to any Robot"*, produced for a ``<participle>_<preposition>`` attribute
+    compared ``== None``.
+
+    Number-agreeing, selected explicitly (the morphology pass only
+    agrees the copula).
+    """
 
     HAS_NOT_BEEN = OperatorWord("has not been")
     HAVE_NOT_BEEN = OperatorWord("have not been")
@@ -524,8 +557,10 @@ class PassiveAbsence(VocabEnum):
 
 
 class Quantifiers(VocabEnum):
-    """Indefinite quantifier for the object of a passive absence — the *"any"* of *"… assigned to
-    any Robot"*, or the bare *"anything"* when the related type is not a nameable class.
+    """
+    Indefinite quantifier for the object of a passive absence — the *"any"* of
+    *"… assigned to any Robot"*, or the bare *"anything"* when the related type
+    is not a nameable class.
     """
 
     ANY = PlainWord("any")
@@ -533,32 +568,47 @@ class Quantifiers(VocabEnum):
 
 
 class SetMembership(VocabEnum):
-    """Membership phrase for a domain-constrained value variable — the *"one of"* of *"one of
-    OPTION_A, OPTION_B, or OPTION_C"*."""
+    """
+    Membership phrase for a domain-constrained value variable — the *"one of"*
+    of *"one of OPTION_A, OPTION_B, or OPTION_C"*.
+    """
 
     ONE_OF = PlainWord("one of")
 
 
 class GroupingPhrases(VocabEnum):
-    """The words a grouped query fronts itself with — *"For each <key>, report all <selection>"*,
-    or *"Report the distinct <keys>"* when the selection is exactly the group key."""
+    """
+    The words a grouped query fronts itself with — *"For each <key>, report all
+    <selection>"*, or *"Report the distinct <keys>"* when the selection is
+    exactly the group key.
+    """
 
     ALL = PlainWord("all")
-    """Quantifies a per-group selection listing (*"report all Employees"*)."""
+    """
+    Quantifies a per-group selection listing (*"report all Employees"*).
+    """
+
     DISTINCT = PlainWord("distinct")
-    """Marks a key-only grouped selection as a distinct listing (*"the distinct departments"*)."""
+    """
+    Marks a key-only grouped selection as a distinct listing (*"the distinct
+    departments"*).
+    """
 
 
 class Specificity(VocabEnum):
-    """Pre-head marking a concrete object literal as a specific instance (its identity, not its
-    repr) — the *"specific"* of *"a specific Body"*."""
+    """
+    Pre-head marking a concrete object literal as a specific instance (its
+    identity, not its repr) — the *"specific"* of *"a specific Body"*.
+    """
 
     SPECIFIC = PlainWord("specific")
 
 
 class Punctuation(VocabEnum):
-    """Structural punctuation tokens — role-less, like the brackets around a tuple (*"(v1, v2)"*)
-    and the comma in a coordinated list (*"a, b, or c"*)."""
+    """
+    Structural punctuation tokens — role-less, like the brackets around a tuple
+    (*"(v1, v2)"*) and the comma in a coordinated list (*"a, b, or c"*).
+    """
 
     COMMA = PunctuationWord(",", spacing=Spacing.LEFT)
     OPEN_PAREN = PunctuationWord("(", spacing=Spacing.RIGHT)
@@ -566,7 +616,9 @@ class Punctuation(VocabEnum):
 
 
 class Pronouns(VocabEnum):
-    """Coreference pronouns standing in for a previously introduced variable."""
+    """
+    Coreference pronouns standing in for a previously introduced variable.
+    """
 
     ITS = PronounWord("its")
     THEIR = PronounWord("their")
@@ -598,59 +650,93 @@ class Pronouns(VocabEnum):
 
 class RangePhrases(VocabEnum):
     """
-    Range (``between``) operator core, produced when a lower-bound and an upper-bound comparison on
-    the same attribute are folded together. The single source for *"between"*, shared by its
-    copula-less (HAVING) surface and its copula-led predicative surface — agreement on the latter is
-    realised by the copula (:func:`copula_with`), not by a duplicated plural member.
+    Range (``between``) operator core, produced when a lower-bound and an
+    upper-bound comparison on the same attribute are folded together.
+
+    The single source for *"between"*, shared by its copula-less
+    (HAVING) surface and its copula-led predicative surface — agreement
+    on the latter is realised by the copula (:func:`copula_with`), not
+    by a duplicated plural member.
     """
 
     BETWEEN = OperatorWord("between")
 
 
 class CoindexedPhrases(VocabEnum):
-    """Fixed phrases for the factored co-indexed comparison rendering: the *"those of"* anaphor of
-    the faithful form, and the *"have the same"* verb of the natural equality form."""
+    """
+    Fixed phrases for the factored co-indexed comparison rendering: the *"those
+    of"* anaphor of the faithful form, and the *"have the same"* verb of the
+    natural equality form.
+    """
 
     THOSE_OF = PlainWord("those of")
     HAVE_THE_SAME = PlainWord("have the same")
 
 
 class OrderingRangeWords(VocabEnum):
-    """The range an ORDER BY clause runs over, read as plain English rather than a parenthetical SQL
-    keyword. Looked up from a :class:`SortDirection` by the ordered-by assembler."""
+    """
+    The range an ORDER BY clause runs over, read as plain English rather than a
+    parenthetical SQL keyword.
+
+    Looked up from a :class:`SortDirection` by the ordered-by assembler.
+    """
 
     LOWEST_TO_HIGHEST = PlainWord("from lowest to highest")
     HIGHEST_TO_LOWEST = PlainWord("from highest to lowest")
 
 
 class RankingWords(VocabEnum):
-    """The qualifier words a ``limit`` (+ ordering) puts on the selection — *"the first two"*,
-    *"the top three"*, *"the lowest"*, *"… by salary"*."""
+    """
+    The qualifier words a ``limit`` (+ ordering) puts on the selection — *"the
+    first two"*, *"the top three"*, *"the lowest"*, *"… by salary"*.
+    """
 
     FIRST = PlainWord("first")
-    """No ordering — the first *n* in natural order."""
+    """
+    No ordering — the first *n* in natural order.
+    """
+
     TOP = PlainWord("top")
-    """Descending order, *n > 1* (*"the top three …"*)."""
+    """
+    Descending order, *n > 1* (*"the top three …"*).
+    """
+
     BOTTOM = PlainWord("bottom")
-    """Ascending order, *n > 1* (*"the bottom three …"*)."""
+    """
+    Ascending order, *n > 1* (*"the bottom three …"*).
+    """
+
     HIGHEST = PlainWord("highest")
     """Descending order, *n = 1* (*"the highest …"* / *"with the highest …"*)."""
     LOWEST = PlainWord("lowest")
     """Ascending order, *n = 1* (*"the lowest …"* / *"with the lowest …"*)."""
     BY = PlainWord("by")
-    """Introduces the order key for a plural attribute ranking (*"… by salary"*)."""
+    """
+    Introduces the order key for a plural attribute ranking (*"… by salary"*).
+    """
 
 
 class Articles(VocabEnum):
     """
-    Definite articles (THE, THE UNIQUE) and a static helper for indefinite articles.
+    Definite articles (THE, THE UNIQUE), the fused *another* / *the other* alternative
+    determiners, and a static helper for indefinite articles.
     """
 
+    A = PlainWord("a")
+    AN = PlainWord("an")
     THE = PlainWord("the")
     THE_UNIQUE = PlainWord("the unique")
+    ANOTHER = PlainWord("another")
+    """The fused indefinite alternative determiner — a second, distinct, freshly-introduced
+    same-noun referent (*"another Robot"*), not *"an other Robot"* (:class:`NounPhrase.alternative`
+    on first mention). Reference: :cite:t:`gundel1993givenness` — the given/new status of an
+    indefinite alternative."""
+    THE_OTHER = PlainWord("the other")
+    """The definite alternative determiner — the same referent once the pair is discourse-old
+    (:class:`NounPhrase.alternative` on repeat mention)."""
 
-    @staticmethod
-    def indefinite(following_word: str) -> WordFragment:
+    @classmethod
+    def indefinite(cls, following_word: str) -> WordFragment:
         """
         :param following_word: The word immediately following the article.
         :return: A word fragment containing *"a"* or *"an"* based on the phonological context of
@@ -661,16 +747,21 @@ class Articles(VocabEnum):
         >>> Articles.indefinite("robot").text
         'a'
         """
-        text = morphology.indefinite_article(following_word) if following_word else "a"
+        text = (
+            morphology.indefinite_article(following_word)
+            if following_word
+            else cls.A.text
+        )
         return WordFragment(text=text)
 
 
 class ExistentialPhrase(VocabEnum):
     """
-    Parameterised existential phrases (*"there's a/an TypeName"*, *"there are TypeNames"*).
+    Parameterised existential phrases (*"there's a/an TypeName"*, *"there are
+    TypeNames"*).
     """
 
-    THERE_IS_A = SingularExistential("there's")
+    THERE_IS = SingularExistential("there's")
     THERE_ARE = PluralExistential("there are")
 
     @classmethod
@@ -682,7 +773,7 @@ class ExistentialPhrase(VocabEnum):
         >>> ExistentialPhrase.for_number(GrammaticalNumber.SINGULAR).text
         "there's"
         """
-        return cls.THERE_ARE if number is GrammaticalNumber.PLURAL else cls.THERE_IS_A
+        return cls.THERE_ARE if number is GrammaticalNumber.PLURAL else cls.THERE_IS
 
     def build_phrase(
         self, type_name: str, referent_id: Optional[uuid.UUID] = None
@@ -695,17 +786,18 @@ class ExistentialPhrase(VocabEnum):
         :return: Existential phrase fragment.
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-        >>> flatten_fragment_to_plain_text(ExistentialPhrase.THERE_IS_A.build_phrase("Apple"))
+        >>> flatten_fragment_to_plain_text(ExistentialPhrase.THERE_IS.build_phrase("Apple"))
         "there's an Apple"
         """
-        if referent_id is not None and self is ExistentialPhrase.THERE_IS_A:
+        if referent_id is not None and self is ExistentialPhrase.THERE_IS:
             return self.value.build_phrase(type_name, referent_id=referent_id)
         return self.value.build_phrase(type_name)
 
 
 class FallbackNouns(VocabEnum):
     """
-    Fallback noun used when no type information is available (e.g. *"entity"* / *"entities"*).
+    Fallback noun used when no type information is available (e.g. *"entity"* /
+    *"entities"*).
     """
 
     ENTITY = FallbackNounWord("entity")
@@ -722,9 +814,9 @@ class FallbackNouns(VocabEnum):
     def name_of(self, node: object) -> str:
         """
         :param node: A variable/entity-like node, or ``None``.
-        :return: *node*'s type name (``_type_.__name__``), or this fallback noun's text when *node*
-            is ``None`` or carries no type. Centralises the one optional-``_type_`` read every
-            planner/assembler would otherwise repeat.
+        :return: *node*'s type noun (:func:`~…value_lexicon.type_noun`), or this fallback noun's
+            text when *node* is ``None`` or carries no type. Centralises the one optional-
+            ``_type_`` read every planner/assembler would otherwise repeat.
 
         >>> FallbackNouns.ENTITY.name_of(variable(Robot, []))
         'Robot'
@@ -732,7 +824,7 @@ class FallbackNouns(VocabEnum):
         'entity'
         """
         node_type = node._type_ if isinstance(node, Selectable) else None
-        return node_type.__name__ if node_type is not None else self.text
+        return type_noun(node_type) if node_type is not None else self.text
 
 
 class GroupKeyPhrases(VocabEnum):

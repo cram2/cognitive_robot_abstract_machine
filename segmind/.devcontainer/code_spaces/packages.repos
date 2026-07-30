@@ -1,0 +1,18 @@
+repositories:
+  # Ripple Down Rules
+  ripple_down_rules:
+    type: git
+    url: https://github.com/AbdelrhmanBassiouny/ripple_down_rules.git
+    version: main
+  external-robots:
+    type: git
+    url: https://github.com/AbdelrhmanBassiouny/external-robots.git
+    version: master
+  semantic_world:
+    type: git
+    url: https://github.com/AbdelrhmanBassiouny/semantic_world.git
+    version: icub_demo
+  giskardpy_ros:
+    type: git
+    url: https://github.com/SemRoCo/giskardpy_ros.git
+    version: ros1-noetic-main

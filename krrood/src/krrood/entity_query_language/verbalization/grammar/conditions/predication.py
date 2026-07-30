@@ -133,7 +133,9 @@ class PredicateTransform(SpecificityRule):
 
 
 class GenericComparator(PredicateTransform):
-    """The unguarded default: *"<left> <operator> <right>"* (the right side in value position).
+    """
+    The unguarded default: *"<left> <operator> <right>"* (the right side in value
+    position).
 
     >>> verbalize_expression(variable(Robot, []).battery > 50)
     'the battery of a Robot is greater than 50'
@@ -141,11 +143,13 @@ class GenericComparator(PredicateTransform):
 
     @classmethod
     def applies(cls, comparator: Comparator, negated: bool) -> bool:
-        """The unguarded base applies to every comparator.
+        """
+        The unguarded base applies to every comparator.
 
-        Returning ``True`` unconditionally, it is the catch-all gate that wins whenever no specific
-        transform fires — which is why the class example takes the value-comparison form *is greater
-        than 50* rather than an absence or boolean-polarity phrasing.
+        Returning ``True`` unconditionally, it is the catch-all gate that wins whenever
+        no specific transform fires — which is why the class example takes the value-
+        comparison form *is greater than 50* rather than an absence or boolean-polarity
+        phrasing.
         """
         return True
 
@@ -153,10 +157,11 @@ class GenericComparator(PredicateTransform):
     def render(
         cls, comparator: Comparator, context: RuleContext, negated: bool
     ) -> VerbalizationFragment:
-        """Render *"<left> <operator> <right>"* with the right side in value position.
+        """
+        Render *"<left> <operator> <right>"* with the right side in value position.
 
-        It owns the whole *the battery of a Robot is greater than 50* span, placing the left chain,
-        the selected operator, and the right side in value position.
+        It owns the whole *the battery of a Robot is greater than 50* span, placing the
+        left chain, the selected operator, and the right side in value position.
         """
         return PhraseFragment(
             parts=[
@@ -168,8 +173,9 @@ class GenericComparator(PredicateTransform):
 
 
 class AbsenceTransform(GenericComparator):
-    """A non-negated ``<chain> == None`` comparison → the absence predicate (*"has no …"* / *"does
-    not exist"*) instead of a value comparison.
+    """
+    A non-negated ``<chain> == None`` comparison → the absence predicate (*"has no …"* /
+    *"does not exist"*) instead of a value comparison.
 
     >>> verbalize_expression(variable(Mission, []).priority == None)
     'a Mission has no priority'
@@ -177,11 +183,12 @@ class AbsenceTransform(GenericComparator):
 
     @classmethod
     def applies(cls, comparator: Comparator, negated: bool) -> bool:
-        """Fires on a non-negated ``<chain> == None`` comparison.
+        """
+        Fires on a non-negated ``<chain> == None`` comparison.
 
-        Recognising the ``== None`` shape is the gate that selects this transform over the generic
-        comparator, which is why the class example reads *has no priority* instead of a literal *is
-        equal to None* value comparison.
+        Recognising the ``== None`` shape is the gate that selects this transform over
+        the generic comparator, which is why the class example reads *has no priority*
+        instead of a literal *is equal to None* value comparison.
         """
         return (
             not negated
@@ -193,10 +200,11 @@ class AbsenceTransform(GenericComparator):
     def render(
         cls, comparator: Comparator, context: RuleContext, negated: bool
     ) -> VerbalizationFragment:
-        """Render the absence predicate instead of a value comparison.
+        """
+        Render the absence predicate instead of a value comparison.
 
-        Delegating to :func:`render_absence` is what supplies the *a Mission has no priority* phrasing,
-        flipping owner and attribute into the *has no* frame.
+        Delegating to :func:`render_absence` is what supplies the *a Mission has no
+        priority* phrasing, flipping owner and attribute into the *has no* frame.
         """
         return render_absence(comparator, context)
 
@@ -219,11 +227,13 @@ def _lone_coindexed_fold(comparator: Comparator) -> Optional[CoindexedFold]:
 
 
 class CoindexedEqualityTransform(GenericComparator):
-    """A lone co-indexed equality over *sibling* prefixes (``p.begin.month == p.end.month``) → the
-    natural *"the begin and end of <shared> have the same <leaf>"* form. It is the single-terminal
-    case of the co-indexed fold, rendered by the very same rule (``context.child`` on a one-terminal
-    :class:`CoindexedFold`) so the phrasing has one home. Guarded to the sibling case the natural
-    form covers; a non-sibling lone equality keeps *"the <leaf> of a is the <leaf> of b"*.
+    """
+    A lone co-indexed equality over *sibling* prefixes (``p.begin.month ==
+    p.end.month``) → the natural *"the begin and end of <shared> have the same <leaf>"*
+    form. It is the single-terminal case of the co-indexed fold, rendered by the very
+    same rule (``context.child`` on a one-terminal :class:`CoindexedFold`) so the
+    phrasing has one home. Guarded to the sibling case the natural form covers; a non-
+    sibling lone equality keeps *"the <leaf> of a is the <leaf> of b"*.
 
     >>> verbalize_expression(
     ...     a(set_of(p.period.begin.month).such_that(p.period.begin.month == p.period.end.month))
@@ -233,11 +243,14 @@ class CoindexedEqualityTransform(GenericComparator):
 
     @classmethod
     def applies(cls, comparator: Comparator, negated: bool) -> bool:
-        """Fires on a non-negated co-indexed equality whose sibling prefixes the natural form covers.
+        """
+        Fires on a non-negated co-indexed equality whose sibling prefixes the natural
+        form covers.
 
-        Recognising the single-terminal co-indexed shape is the gate that selects this transform over
-        the generic comparator, which is why the example reads *the begin and end … have the same
-        month* instead of the verbose *the month of the begin … is the month of the end …*.
+        Recognising the single-terminal co-indexed shape is the gate that selects this
+        transform over the generic comparator, which is why the example reads *the begin
+        and end … have the same month* instead of the verbose *the month of the begin …
+        is the month of the end …*.
         """
         if negated:
             return False
@@ -248,15 +261,18 @@ class CoindexedEqualityTransform(GenericComparator):
     def render(
         cls, comparator: Comparator, context: RuleContext, negated: bool
     ) -> VerbalizationFragment:
-        """Render the lone equality through the one-terminal co-indexed fold so the *have the same*
-        phrasing has a single home, rather than re-emitting it here."""
+        """
+        Render the lone equality through the one-terminal co-indexed fold so the *have
+        the same* phrasing has a single home, rather than re-emitting it here.
+        """
         return context.child(_lone_coindexed_fold(comparator))
 
 
 class BooleanPolarityTransform(GenericComparator):
-    """A boolean attribute compared to a boolean value → a predicative folding the value into the
-    verb's polarity (*"is decaf"* / *"is not decaf"* / *"is either decaf or not"*), never *"is decaf
-    is True"*.
+    """
+    A boolean attribute compared to a boolean value → a predicative folding the value
+    into the verb's polarity (*"is decaf"* / *"is not decaf"* / *"is either decaf or
+    not"*), never *"is decaf is True"*.
 
     >>> verbalize_expression(variable(Task, []).completed == True)
     'a Task is completed'
@@ -266,11 +282,12 @@ class BooleanPolarityTransform(GenericComparator):
 
     @classmethod
     def applies(cls, comparator: Comparator, negated: bool) -> bool:
-        """Fires on a boolean attribute compared to a boolean value/domain.
+        """
+        Fires on a boolean attribute compared to a boolean value/domain.
 
-        Recognising a boolean attribute against a boolean value is the gate that selects this
-        transform over the generic comparator, which is why the class example folds to *is completed*
-        instead of the literal *is completed is True*.
+        Recognising a boolean attribute against a boolean value is the gate that selects
+        this transform over the generic comparator, which is why the class example folds
+        to *is completed* instead of the literal *is completed is True*.
         """
         return (
             comparator.operation in (operator.eq, operator.ne)
@@ -282,10 +299,11 @@ class BooleanPolarityTransform(GenericComparator):
     def render(
         cls, comparator: Comparator, context: RuleContext, negated: bool
     ) -> VerbalizationFragment:
-        """Fold the boolean value into the verb's polarity, never *"is completed is True"*.
+        """
+        Fold the boolean value into the verb's polarity, never *"is completed is True"*.
 
-        It owns the *is not completed* span, reading the ``False`` constraint to negate the
-        predicative copula rather than appending the value as a separate term.
+        It owns the *is not completed* span, reading the ``False`` constraint to negate
+        the predicative copula rather than appending the value as a separate term.
         """
         constraint = _boolean_constraint(comparator.right)
         plan = context.microplan.plan_for(comparator.left, ChainPlanner)
@@ -317,8 +335,10 @@ class RelationalIdentityTransform(GenericComparator):
 
     @classmethod
     def applies(cls, comparator: Comparator, negated: bool) -> bool:
-        """Fires on a non-negated equality whose one side is a relational hop and the other a
-        variable — the identity shape the active predicate collapses."""
+        """
+        Fires on a non-negated equality whose one side is a relational hop and the other
+        a variable — the identity shape the active predicate collapses.
+        """
         return (
             not negated
             and comparator.operation is operator.eq
@@ -329,8 +349,10 @@ class RelationalIdentityTransform(GenericComparator):
     def render(
         cls, comparator: Comparator, context: RuleContext, negated: bool
     ) -> VerbalizationFragment:
-        """Render *"<subject> is <participle> <preposition> <owner>"*, the relation's verb supplying
-        the participle and preposition and the recursion supplying subject and owner phrases.
+        """
+        Render *"<subject> is <participle> <preposition> <owner>"*, the relation's verb
+        supplying the participle and preposition and the recursion supplying subject and
+        owner phrases.
         """
         relation_hop, subject = cls._relational_identity(comparator)
         verb = relational_verb(relation_hop._attribute_name_)
@@ -378,8 +400,8 @@ def comparator_operator(
     copula: bool = True,
 ) -> VerbalizationFragment:
     """
-    Select the operator fragment for *comparator* (e.g. *"is greater than"*,
-    *"is not equal to"*, *"is before"*).
+    Select the operator fragment for *comparator* (e.g. *"is greater than"*, *"is not
+    equal to"*, *"is before"*).
 
     Handles these orthogonal concerns declaratively:
 
@@ -532,9 +554,10 @@ def render_absence(
     number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
 ) -> VerbalizationFragment:
     """
-    Render an ``<chain> == None`` comparison as an absence predicate rather than a value: an owned
-    attribute reads *"<owner> has no <attribute>"* (the owner is the chain minus its terminal), and a
-    bare variable reads *"<subject> does not exist"* (no attribute to name).
+    Render an ``<chain> == None`` comparison as an absence predicate rather than a
+    value: an owned attribute reads *"<owner> has no <attribute>"* (the owner is the
+    chain minus its terminal), and a bare variable reads *"<subject> does not exist"*
+    (no attribute to name).
 
     Both flip the subject and object relative to the *"<attribute> of <owner> is <value>"* frame, so
     they are standalone predicates — never folded into a *"whose"* / *"respectively"* coordination

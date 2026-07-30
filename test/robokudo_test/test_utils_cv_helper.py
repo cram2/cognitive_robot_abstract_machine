@@ -36,11 +36,11 @@ class TestUtilsCVHelper(object):
 
     @pytest.fixture()
     def kinect_intrinsics(self) -> o3d.camera.PinholeCameraIntrinsic:
-        cam_intrinsics = o3d.camera.PinholeCameraIntrinsic()
-        cam_intrinsics.set_intrinsics(
+        camera_intrinsics = o3d.camera.PinholeCameraIntrinsic()
+        camera_intrinsics.set_intrinsics(
             width=1024, height=1280, fx=1050.0, fy=1050.0, cx=639.5, cy=479.5
         )
-        return cam_intrinsics
+        return camera_intrinsics
 
     @pytest.mark.parametrize(
         ["image_dim_xy", "crop_xy", "crop_wh", "expected_yx_shape"],
@@ -132,7 +132,7 @@ class TestUtilsCVHelper(object):
 
         cas.set(robokudo.cas.CASViews.COLOR2DEPTH_RATIO, (scalex, scaley))
 
-        annotator_in_pipeline.cam_intrinsics = copy.deepcopy(kinect_intrinsics)
+        annotator_in_pipeline.camera_intrinsics = copy.deepcopy(kinect_intrinsics)
 
         scaled_image = get_scaled_color_image_for_depth_image(cas, image)
         assert scaled_image.shape[:2] == (

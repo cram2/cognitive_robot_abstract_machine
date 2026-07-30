@@ -1,12 +1,13 @@
 """
 Pure structural and semantic queries over EQL expression trees.
 
-These helpers answer questions about an expression's *shape* — its navigation chain, its chain
-root, whether it ends in a boolean attribute, whether it denotes a temporal value — without
-building anything or touching any rendering concern. They live in the core (next to the expression
-classes) because the facts they expose are domain knowledge of the query algebra, usable by any
-consumer (evaluation, optimization, verbalization, …), and they delegate to the existing
-:class:`MappedVariable` access-path properties rather than re-walking the tree.
+These helpers answer questions about an expression's *shape* — its navigation chain, its
+chain root, whether it ends in a boolean attribute, whether it denotes a temporal value
+— without building anything or touching any rendering concern. They live in the core
+(next to the expression classes) because the facts they expose are domain knowledge of
+the query algebra, usable by any consumer (evaluation, optimization, verbalization, …),
+and they delegate to the existing :class:`MappedVariable` access-path properties rather
+than re-walking the tree.
 """
 
 from __future__ import annotations

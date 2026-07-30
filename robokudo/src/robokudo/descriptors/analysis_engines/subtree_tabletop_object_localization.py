@@ -8,7 +8,8 @@ from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterEx
 class Subtree(SubtreeInterface):
     def implementation(self) -> Sequence:
         """
-        Returns a sequence which will find objects on the biggest plane in available 3d data.
+        Returns a sequence which will find objects on the biggest plane in available 3d
+        data.
         """
         seq = Sequence("TT Object Localization", memory=True)
         seq.add_children(

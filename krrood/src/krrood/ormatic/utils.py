@@ -54,7 +54,6 @@ def classes_of_module(module: types.ModuleType) -> List[Type]:
     :param module: The module to inspect.
     :return: All classes of the given module.
     """
-
     result = []
     for name, obj in inspect.getmembers(module):
         if inspect.isclass(obj) and obj.__module__ == module.__name__:
@@ -65,6 +64,7 @@ def classes_of_module(module: types.ModuleType) -> List[Type]:
 def classes_of_package(package: types.ModuleType, recursive=True) -> List[Type]:
     """
     Get all classes that are defined in a given python package.
+
     This does not include classes that are imported from other packages.
 
     :param package: The package to inspect.
@@ -107,14 +107,13 @@ def _drop_fk_constraints(engine: Engine, tables: Iterable[str]) -> None:
     """
     Drops foreign key constraints for the specified tables in the given engine.
 
-    This function removes all foreign key constraints for the specified list
-    of tables using the provided database engine. It supports multiple
-    SQL dialects, including MySQL, PostgreSQL, SQLite, and others.
+    This function removes all foreign key constraints for the specified list of tables
+    using the provided database engine. It supports multiple SQL dialects, including
+    MySQL, PostgreSQL, SQLite, and others.
 
-    :param engine: The SQLAlchemy Engine instance used to interact with
-        the database.
-    :param tables: An iterable of table names whose foreign key constraints
-        need to be dropped.
+    :param engine: The SQLAlchemy Engine instance used to interact with the database.
+    :param tables: An iterable of table names whose foreign key constraints need to be
+        dropped.
     """
     insp = sqlalchemy.inspect(engine)
     dialect = engine.dialect.name.lower()
@@ -137,18 +136,20 @@ def _drop_fk_constraints(engine: Engine, tables: Iterable[str]) -> None:
 
 def drop_database(engine: Engine) -> None:
     """
-     Drops all tables in the given database engine. This function removes foreign key
-     constraints and tables in reverse dependency order to ensure that proper
-     dropping of objects occurs without conflict. For MySQL/MariaDB, foreign key
-    checks are disabled temporarily during the process.
+    Drops all tables in the given database engine.
 
-     This method differs from sqlalchemy `MetaData.drop_all <https://docs.sqlalchemy.org/en/20/core/metadata.html#sqlalchemy.schema.MetaData.drop_all>`_ such that databases containing cyclic
-     backreferences are also droppable.
+    This function removes foreign key constraints and tables in reverse dependency
+    order to ensure that proper  dropping of objects occurs without conflict. For
+    MySQL/MariaDB, foreign key checks are disabled temporarily during the process.
 
-     :param engine: The SQLAlchemy Engine instance connected to the target database
-         where tables will be dropped.
-     :type engine: Engine
-     :return: None
+    This method differs from sqlalchemy
+    `MetaData.drop_all <https://docs.sqlalchemy.org/en/20/core/metadata.html#sqlalchemy.schema.MetaData.drop_all>`_
+    such that databases containing cyclic     backreferences are also droppable.
+
+    :param engine: The SQLAlchemy Engine instance connected to the target database where
+        tables will be dropped.
+    :type engine: Engine
+    :return: None
     """
     metadata = MetaData()
     metadata.reflect(bind=engine)
@@ -197,7 +198,6 @@ def create_engine(url: Union[str, URL], **kwargs: Any) -> Engine:
     :param url: The database URL.
     :return: An SQLAlchemy engine that uses the JSON (de)serializer from KRROOD.
     """
-
     return create_sqlalchemy_engine(
         url,
         json_serializer=lambda x: json.dumps(to_json(x)),
@@ -244,6 +244,7 @@ def _get_default_type_mappings():
 def get_python_type_from_sqlalchemy_column(column: Column):
     """
     This function returns the python type of an sqlalchemy column.
+
     :param column: The sqlalchemy column.
     :return: The python type of the column.
     """
@@ -251,9 +252,7 @@ def get_python_type_from_sqlalchemy_column(column: Column):
 
     if type(column.type) in type_mappings.values():
         python_type = [
-            key
-            for key, value in type_mappings.items()
-            if value == type(column.type)
+            key for key, value in type_mappings.items() if value == type(column.type)
         ]
     else:
         try:

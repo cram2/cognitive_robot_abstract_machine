@@ -1,15 +1,19 @@
+from __future__ import annotations
+
 import copy
 
 import numpy as np
 import open3d as o3d
 import supervision as sv
 from py_trees.common import Status
+from supervision.config import CLASS_NAME_DATA_FIELD
+from trackers import ByteTrackTracker
+from typing_extensions import TYPE_CHECKING, List
+
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.annotation import Classification
 from robokudo.types.scene import ObjectHypothesis
-from supervision.detection.tools.transformers import append_class_names_to_data
-from typing_extensions import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -28,7 +32,7 @@ class ByteTrackAnnotator(BaseAnnotator):
     def __init__(self, name: str = "ByteTrackAnnotator"):
         super().__init__(name)
 
-        self.tracker: sv.ByteTrack = sv.ByteTrack()
+        self.tracker: ByteTrackTracker = ByteTrackTracker()
         """Main ByteTrack instance for object instance tracking."""
 
         self.last_ts: float = 0.0
@@ -50,7 +54,7 @@ class ByteTrackAnnotator(BaseAnnotator):
         data_ts = cas.get(CASViews.DATA_TIMESTAMP)
         if data_ts < self.last_ts:
             # This is expected when looping data
-            self.rk_logger.debug(f"Time moved backward, resetting tracker.")
+            self.rk_logger.debug("Time moved backward, resetting tracker.")
             self.tracker.reset()
         self.last_ts = data_ts
 
@@ -72,15 +76,15 @@ class ByteTrackAnnotator(BaseAnnotator):
         masks = [oh.roi.mask for oh in ohs]
         masks = list(filter(lambda m: m is not None, masks))
         if len(masks) == len(rois_xyxy):
-            cam_intrinsic: o3d.cuda.pybind.camera.PinholeCameraIntrinsic = cas.get(
-                CASViews.CAM_INTRINSIC
+            camera_intrinsic: o3d.cuda.pybind.camera.PinholeCameraIntrinsic = cas.get(
+                CASViews.CAMERA_INTRINSIC
             )
 
             # Masks must be restored to full color image size
             restored_masks = []
             for roi, mask in zip(rois_xyxy, masks):
                 restored_mask = np.zeros(
-                    (cam_intrinsic.height, cam_intrinsic.width), dtype=np.uint8
+                    (camera_intrinsic.height, camera_intrinsic.width), dtype=np.uint8
                 )
                 restored_mask[roi[1] : roi[3], roi[0] : roi[2]] = mask
                 restored_masks.append(restored_mask)
@@ -97,27 +101,21 @@ class ByteTrackAnnotator(BaseAnnotator):
                 break
             classifications.append(classification[0])
         if len(classifications) == len(rois_xyxy):
-            id2label = {}
-            class_ids = []
-            class_names = []
-            class_confidences = []
-
-            for oh, cls in zip(ohs, classifications):
-                id2label[cls.class_id] = cls.classname
-                class_ids.append(cls.class_id)
-                class_names.append(cls.classname)
-                class_confidences.append(cls.confidence)
-
-            detections["class_id"] = np.array(class_ids)
-            detections["confidence"] = np.array(class_confidences)
-            detections["data"] = append_class_names_to_data(class_ids, id2label, {})
-
-            self.rk_logger.debug(
-                f"Using {len(class_ids)} class ids for object tracking."
+            detections["class_id"] = np.zeros(len(ohs))
+            detections["confidence"] = np.zeros(len(ohs))
+            detections["data"][CLASS_NAME_DATA_FIELD] = np.full(
+                len(ohs), "NONE", dtype=str
             )
 
+            for i, (oh, cls) in enumerate(zip(ohs, classifications)):
+                detections["class_id"][i] = cls.class_id
+                detections["confidence"][i] = cls.confidence
+                detections["data"][CLASS_NAME_DATA_FIELD] = cls.classname
+
+            self.rk_logger.debug(f"Using {len(ohs)} class ids for object tracking.")
+
         detections = sv.Detections(**detections)
-        tracked_detections = self.tracker.update_with_detections(detections)
+        tracked_detections = self.tracker.update(detections)
 
         self.visualize(tracked_detections)
 

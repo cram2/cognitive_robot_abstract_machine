@@ -30,7 +30,9 @@ class GripperOccupancy:
     def check_man_occupancy(self, condition: Callable[List[Body], bool]) -> bool:
         """
         Checks the occupancy of the gripper against a condition.
-        The condition get the list of bodies that are under the TCP in the kinematic structure and returns a boolean.
+
+        The condition get the list of bodies that are under the TCP in the kinematic
+        structure and returns a boolean.
 
         :param condition: The condition that should be evaluated.
         :return: True if the condition is satisfied, False otherwise.
@@ -48,7 +50,9 @@ class GripperOccupancy:
 @dataclass
 class GripperIsFree(GripperOccupancy, Predicate):
     """
-    Checks if the gripper is holding something. Checks this by looking at the kinematic structure of the end_effector.
+    Checks if the gripper is holding something.
+
+    Checks this by looking at the kinematic structure of the end_effector.
     """
 
     def __call__(self) -> bool:
@@ -62,8 +66,9 @@ class GripperIsFree(GripperOccupancy, Predicate):
 @dataclass
 class GripperIsNotFree(GripperOccupancy, Predicate):
     """
-    Checks if the gripper is free at the moment, so it can be used to grab something. This is checked by looking at the
-    kinematic structure.
+    Checks if the gripper is free at the moment, so it can be used to grab something.
+
+    This is checked by looking at the kinematic structure.
     """
 
     def __call__(self) -> bool:

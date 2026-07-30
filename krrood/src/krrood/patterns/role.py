@@ -86,24 +86,35 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
     """
 
     _cache_instances_: ClassVar[bool] = False
-    """Roles are not cached as instances in the :class:`SymbolGraph
-    <krrood.symbol_graph.symbol_graph.SymbolGraph>`. Membership queries use :attr:`_role_registry`
-    and persistence uses the role's own ORM mapping, so a role need not be a graph node. Role
-    classes still take part in the class diagram and ORM through ``Symbol`` subclassing.
+    """
+    Roles are not cached as instances in the :class:`SymbolGraph
+    <krrood.symbol_graph.symbol_graph.SymbolGraph>`. Membership queries use
+    :attr:`_role_registry` and persistence uses the role's own ORM mapping, so a role
+    need not be a graph node. Role classes still take part in the class diagram and ORM
+    through ``Symbol`` subclassing.
 
-    A subclass that needs its instances enumerable through the SymbolGraph (for example to match an
-    entity-query-language query) may override this to ``True`` for itself; the override applies to
-    that subclass and its descendants and does not affect membership queries."""
+    A subclass that needs its instances enumerable through the SymbolGraph (for example
+    to match an entity-query-language query) may override this to ``True`` for itself;
+    the override applies to that subclass and its descendants and does not affect
+    membership queries.
+    """
 
     _role_registry: ClassVar[RoleRegistry] = RoleRegistry()
-    """Inverse index from takers to roles, shared by all role types, that backs the membership
-    queries (:meth:`has_role`, :meth:`roles_for`). Replace it with a fresh
-    :class:`RoleRegistry <krrood.patterns.role_registry.RoleRegistry>` to isolate state."""
+    """
+    Inverse index from takers to roles, shared by all role types, that backs the
+    membership queries (:meth:`has_role`, :meth:`roles_for`).
+
+    Replace it with a fresh
+    :class:`RoleRegistry <krrood.patterns.role_registry.RoleRegistry>` to isolate state.
+    """
 
     role_taker: T = field(kw_only=True)
-    """The role taker instance wrapped by this role. Keyword-only and required: constructing a
-    role always passes the taker explicitly as ``role_taker=...``. Reading an undeclared attribute
-    delegates to this taker; assigning ``role_taker`` rebinds the underlying entity."""
+    """
+    The role taker instance wrapped by this role.
+
+    Keyword-only and required: constructing a role always passes the taker explicitly as ``role_taker=...``. Reading an undeclared attribute
+    delegates to this taker; assigning ``role_taker`` rebinds the underlying entity.
+    """
 
     @classmethod
     def role_taker_field_name(cls) -> str:
@@ -184,11 +195,13 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
 
     def _delegated_factory_guard(self, role_taker: T, item: str):
         """
-        Build a callable that refuses to run a role-taker factory method delegated through a role.
+        Build a callable that refuses to run a role-taker factory method delegated
+        through a role.
 
         :param role_taker: The role taker that declares the factory method.
         :param item: The name of the factory method.
-        :return: A callable that raises :class:`DelegatedFactoryMethodError` when invoked.
+        :return: A callable that raises :class:`DelegatedFactoryMethodError` when
+            invoked.
         """
 
         def guard(*args: Any, **kwargs: Any):
@@ -213,14 +226,15 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
         """
         Set an attribute on the role itself; assignment never modifies the role taker.
 
-        Only the role's own declared fields and private (underscore-prefixed) attributes may be
-        assigned. Any other name raises :class:`RoleAttributeNotDeclaredError`, so a write cannot
-        silently shadow a role-taker attribute. To change the role taker, assign through
-        :attr:`role_taker`.
+        Only the role's own declared fields and private (underscore-prefixed) attributes
+        may be assigned. Any other name raises :class:`RoleAttributeNotDeclaredError`,
+        so a write cannot silently shadow a role-taker attribute. To change the role
+        taker, assign through :attr:`role_taker`.
 
         :param key: The attribute name being set.
         :param value: The value to set.
-        :raises RoleAttributeNotDeclaredError: If *key* is neither a declared field nor private.
+        :raises RoleAttributeNotDeclaredError: If *key* is neither a declared field nor
+            private.
         """
         if key.startswith("_") or key in type(self)._declared_field_names():
             super().__setattr__(key, value)
@@ -298,13 +312,13 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
 
     def __eq__(self, other: Any) -> bool:
         """
-        A role is equal only to itself (identity), never to its taker; "same underlying entity?"
-         is answered by the ``IsSameSemanticEntity`` predicate instead.
+        A role is equal only to itself (identity), never to its taker; "same underlying
+        entity?" is answered by the ``IsSameSemanticEntity`` predicate instead.
         """
         return self is other
 
     __hash__ = object.__hash__
     """
-    ``__hash__`` is set explicitly because defining ``__eq__`` here,
-         like the plain-dataclass base, would otherwise reset it to ``None`` (unhashable).
+    ``__hash__`` is set explicitly because defining ``__eq__`` here, like the plain-
+    dataclass base, would otherwise reset it to ``None`` (unhashable).
     """

@@ -42,7 +42,8 @@ def _maps_parametrization_of(dao_clazz: Type, generic_clazz: Type) -> bool:
 
     :param dao_clazz: The candidate DAO class.
     :param generic_clazz: The bare generic domain class.
-    :return: True if the DAO maps a parametrization (e.g. ``C[float]``) of ``generic_clazz``.
+    :return: True if the DAO maps a parametrization (e.g. ``C[float]``) of
+        ``generic_clazz``.
     """
     try:
         mapped_class = dao_clazz.original_class()
@@ -59,14 +60,16 @@ def _get_concrete_generic_subclass(
     Find the unique concrete DAO subclass for a bare generic domain class.
 
     A bare generic domain class (for example ``DerivativeMap``) maps to an empty
-    polymorphic base DAO, while its parametrizations (for example ``DerivativeMap[float]``)
-    map to concrete data-bearing leaf DAOs. A runtime instance of the bare generic carries
-    no type argument, so it must be persisted through such a concrete leaf.
+    polymorphic base DAO, while its parametrizations (for example
+    ``DerivativeMap[float]``) map to concrete data-bearing leaf DAOs. A runtime instance
+    of the bare generic carries no type argument, so it must be persisted through such a
+    concrete leaf.
 
     :param base_dao: The DAO resolved for the bare generic class.
     :param original_clazz: The bare generic domain class.
-    :return: The unique concrete leaf subclass DAO, or None when ``original_clazz`` is not a
-        bare generic, ``base_dao`` already maps a parametrization, or the leaf is ambiguous.
+    :return: The unique concrete leaf subclass DAO, or None when ``original_clazz`` is
+        not a bare generic, ``base_dao`` already maps a parametrization, or the leaf is
+        ambiguous.
     """
     if not getattr(original_clazz, "__parameters__", ()):
         return None
@@ -139,9 +142,9 @@ def clear_dao_lookup_caches() -> None:
     """
     Clear all caches that map domain classes to DAO classes.
 
-    This has to be called whenever a new DataAccessObject or AlternativeMapping
-    subclass is created, since previously failed lookups (cached as None) would
-    otherwise stay stale forever.
+    This has to be called whenever a new DataAccessObject or AlternativeMapping subclass
+    is created, since previously failed lookups (cached as None) would otherwise stay
+    stale forever.
     """
     _get_clazz_by_original_clazz.cache_clear()
     _get_concrete_generic_subclass.cache_clear()
@@ -176,7 +179,6 @@ def to_dao(
     :param state: The conversion state.
     :return: The converted DAO instance.
     """
-
     from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 
     dao_clazz = get_dao_class(type(source_object))

@@ -1,14 +1,5 @@
-import sys
-
 import pytest
 from typing_extensions import Type
-
-try:
-    from PyQt6.QtWidgets import QApplication
-    from krrood.ripple_down_rules.user_interface.gui import RDRCaseViewer
-except ImportError as e:
-    QApplication = None
-    RDRCaseViewer = None
 
 from .conf.world.handles_and_containers import HandlesAndContainersWorld
 from .datasets import *
@@ -16,14 +7,6 @@ from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 from krrood.ripple_down_rules.experts import Human
 from krrood.ripple_down_rules.helpers import is_matching
 from krrood.ripple_down_rules.rdr import GeneralRDR
-
-app: Optional[QApplication] = None
-viewer: Optional[RDRCaseViewer] = None
-use_gui: bool = False
-
-if RDRCaseViewer is not None and QApplication is not None and use_gui:
-    app = QApplication(sys.argv)
-    viewer = RDRCaseViewer(save_dir="./test_generated_rdrs")
 
 
 def pytest_generate_tests(metafunc):
