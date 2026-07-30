@@ -414,39 +414,65 @@ class WorldModelModificationBlock:
 
 
 @dataclass
-class SetDofHasHardwareInterface(WorldModification):
+class SetDofFlag(WorldModification, ABC):
+    """
+    Sets a boolean flag on a set of degrees of freedom.
+
+    Concrete subclasses choose which flag of
+    :class:`~semantic_digital_twin.world_description.degree_of_freedom.DegreeOfFreedom`
+    is assigned.
+    """
+
     degree_of_freedom_ids: List[UUID]
+    """
+    Ids of the degrees of freedom whose flag is set.
+    """
+
     value: bool
+    """
+    The value assigned to the flag.
+    """
+
+    @abstractmethod
+    def assign_flag(self, degree_of_freedom: DegreeOfFreedom) -> None:
+        """
+        Assign :attr:`value` to this modification's flag on the given degree of freedom.
+
+        :param degree_of_freedom: The degree of freedom to modify.
+        """
 
     def apply(self, world: World):
-        for dof_id in self.degree_of_freedom_ids:
-            world.get_degree_of_freedom_by_id(dof_id).has_hardware_interface = (
-                self.value
-            )
+        for degree_of_freedom_id in self.degree_of_freedom_ids:
+            self.assign_flag(world.get_degree_of_freedom_by_id(degree_of_freedom_id))
 
     @classmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]) -> Self:
-        dofs = kwargs["dofs"]
-        degree_of_freedom_ids = [dof.id for dof in dofs]
-        return cls(degree_of_freedom_ids=degree_of_freedom_ids, value=kwargs["value"])
-
-    def to_json(self) -> Dict[str, Any]:
-        return {
-            **super().to_json(),
-            "degree_of_freedom_ids": [
-                to_json(dof_id) for dof_id in self.degree_of_freedom_ids
-            ],
-            "value": self.value,
-        }
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls(
             degree_of_freedom_ids=[
-                from_json(_id) for _id in data["degree_of_freedom_ids"]
+                degree_of_freedom.id for degree_of_freedom in kwargs["dofs"]
             ],
-            value=data["value"],
+            value=kwargs["value"],
         )
+
+
+@dataclass
+class SetDofHasHardwareInterface(SetDofFlag):
+    """
+    Sets the ``has_hardware_interface`` flag on the given degrees of freedom.
+    """
+
+    def assign_flag(self, degree_of_freedom: DegreeOfFreedom) -> None:
+        degree_of_freedom.has_hardware_interface = self.value
+
+
+@dataclass
+class SetDofAllowExternalStateUpdate(SetDofFlag):
+    """
+    Sets the ``allows_external_state_update`` flag on the given degrees of freedom.
+    """
+
+    def assign_flag(self, degree_of_freedom: DegreeOfFreedom) -> None:
+        degree_of_freedom.allows_external_state_update = self.value
 
 
 @dataclass

@@ -7,6 +7,7 @@ from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     OmniDrive,
 )
+from ..behaviors.apply_external_state_updates import ApplyExternalStateUpdates
 from ..behaviors.notify_state_change import NotifyStateChange
 from ..behaviors.plugin import GiskardBehavior
 from ..behaviors.sync_joint_state import SyncJointState, SyncJointStatePosition
@@ -22,6 +23,10 @@ class Synchronization(Sequence):
     def __init__(self):
         super().__init__("synchronize", memory=True)
         self.sync_tf_frames = None
+        # Apply externally-sensed DOF state (e.g. perception) before the controller reads the
+        # world. Every synchronization branch carries it, so it also runs in standalone
+        # (projection) runtime, not only closed loop against real hardware.
+        self.add_child(ApplyExternalStateUpdates())
         self.add_child(NotifyStateChange())
         self.added_behaviors = []
 

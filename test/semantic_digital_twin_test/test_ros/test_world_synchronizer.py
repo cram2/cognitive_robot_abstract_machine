@@ -53,14 +53,21 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Fridge,
     Drawer,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
     PrismaticConnection,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -87,6 +94,8 @@ from semantic_digital_twin.adapters.ros.messages import (
     WorldUpdate,
 )
 from semantic_digital_twin.orm.ormatic_interface import Base, WorldMappingDAO
+
+from ..test_semantic_annotations.test_liquid_transfer import _TiltingContainer
 
 
 def create_dummy_world(w: Optional[World] = None) -> World:
@@ -472,6 +481,89 @@ def test_callback_pausing(rclpy_node):
     assert len(w2.connections) == 1
 
 
+def test_registered_external_state_dof_applies_while_paused(rclpy_node):
+    """
+    A DOF registered as externally driven is applied by ``apply_external_state_updates``
+    even while the synchronizer is paused, while an unregistered DOF from the same
+    update stays deferred.
+
+    This is the mechanism that lets perception (or any external sensor) write a passive
+    DOF into the server world *during* a running motion, without accepting stale
+    overwrites of the DOFs the controller owns. The deferred DOF must still be delivered
+    by the normal between-goals drain.
+    """
+    producer_world = create_dummy_world()
+    server_world = create_dummy_world()
+
+    producer_synchronizer = WorldSynchronizer(node=rclpy_node, _world=producer_world)
+    server_synchronizer = WorldSynchronizer(node=rclpy_node, _world=server_world)
+    server_synchronizer.pause()
+
+    time.sleep(0.2)
+
+    externally_driven_dof = server_world.get_degree_of_freedom_by_name("x").id
+    unregistered_dof = server_world.get_degree_of_freedom_by_name("y").id
+    server_world.get_degree_of_freedom_by_name("x").allows_external_state_update = True
+
+    producer_world.state[externally_driven_dof].position = 0.7
+    producer_world.state[unregistered_dof].position = 0.4
+    producer_world.notify_state_change()
+
+    assert wait_for_condition(lambda: len(server_synchronizer.missed_messages) >= 1)
+
+    server_synchronizer.apply_external_state_updates()
+    assert server_world.state[externally_driven_dof].position == 0.7
+    assert server_world.state[unregistered_dof].position == 0.0
+
+    server_synchronizer.apply_missed_messages()
+    assert server_world.state[unregistered_dof].position == 0.4
+
+    producer_synchronizer.close()
+    server_synchronizer.close()
+
+
+def test_apply_external_state_updates_defers_model_changes(rclpy_node):
+    """
+    ``apply_external_state_updates`` never applies a buffered model change while paused.
+
+    Model updates recompile the world structure and would invalidate the compiled
+    controller, so they must stay deferred to the between-goals drain even when external
+    state input is live.
+    """
+    producer_world = create_dummy_world()
+    server_world = create_dummy_world()
+
+    producer_synchronizer = WorldSynchronizer(node=rclpy_node, _world=producer_world)
+    server_synchronizer = WorldSynchronizer(node=rclpy_node, _world=server_world)
+    server_synchronizer.pause()
+
+    time.sleep(0.2)
+
+    # Flag a DOF so the live path actually runs its drain body rather than returning early.
+    server_world.get_degree_of_freedom_by_name("x").allows_external_state_update = True
+
+    with producer_world.modify_world():
+        new_body = Body(name=PrefixedName("b3"))
+        producer_world.add_body(new_body)
+        producer_world.add_connection(
+            FixedConnection(
+                parent=producer_world.get_kinematic_structure_entity_by_name("b2"),
+                child=new_body,
+            )
+        )
+
+    assert wait_for_condition(lambda: len(server_synchronizer.missed_messages) >= 1)
+
+    server_synchronizer.apply_external_state_updates()
+    assert len(server_world.kinematic_structure_entities) == 2
+
+    server_synchronizer.apply_missed_messages()
+    assert len(server_world.kinematic_structure_entities) == 3
+
+    producer_synchronizer.close()
+    server_synchronizer.close()
+
+
 def test_ChangeDifHasHardwareInterface(rclpy_node):
     w1 = World(name="w1")
     w2 = World(name="w2")
@@ -520,6 +612,49 @@ def test_ChangeDifHasHardwareInterface(rclpy_node):
         assert w1.connections[0].dof.has_hardware_interface
         assert w2.connections[0].dof.has_hardware_interface
 
+    finally:
+        synchronizer_1.close()
+        synchronizer_2.close()
+
+
+def test_allow_external_state_update_flag_syncs(rclpy_node):
+    """
+    Setting ``allows_external_state_update`` in a modify_world block propagates to other
+    worlds.
+
+    This is what lets the client (which adds the object) declare the flag and have the
+    Giskard server learn it; without a synchronized modification the flag stays local
+    and the server never applies external updates for that DOF.
+    """
+    w1 = World(name="w1")
+    w2 = World(name="w2")
+
+    synchronizer_1 = WorldSynchronizer(node=rclpy_node, _world=w1)
+    synchronizer_2 = WorldSynchronizer(node=rclpy_node, _world=w2)
+
+    try:
+        with w1.modify_world():
+            body1 = Body(name=PrefixedName("b1"))
+            body2 = Body(name=PrefixedName("b2"))
+            w1.add_kinematic_structure_entity(body1)
+            w1.add_kinematic_structure_entity(body2)
+            dof = DegreeOfFreedom(name=PrefixedName("dof"))
+            w1.add_degree_of_freedom(dof)
+            connection = PrismaticConnection(
+                raw_dof=dof, parent=body1, child=body2, axis=Vector3(1, 1, 1)
+            )
+            w1.add_connection(connection)
+
+        wait_for_sync_kse_and_return_ids(w1, w2)
+        time.sleep(0.2)
+        assert not w2.connections[0].dof.allows_external_state_update
+
+        with w1.modify_world():
+            w1.set_dofs_allow_external_state_update(w1.degrees_of_freedom, True)
+
+        time.sleep(0.2)
+        assert w1.connections[0].dof.allows_external_state_update
+        assert w2.connections[0].dof.allows_external_state_update
     finally:
         synchronizer_1.close()
         synchronizer_2.close()
@@ -997,9 +1132,9 @@ def test_synchronous_publish_settles_promptly_with_multiple_real_subscribers(
     """
     Regression test against real ROS discovery (no fakes): with several concurrently
     created real subscribers and no graph churn, the highest-observed-count fallback in
-    :meth:`Synchronizer._snapshot_subscribers_after_discovery_settles` must settle on the
-    true, stable subscriber count, so synchronous publication returns promptly instead of
-    paying the ``wait_for_synchronization_timeout`` wait.
+    :meth:`Synchronizer._snapshot_subscribers_after_discovery_settles` must settle on
+    the true, stable subscriber count, so synchronous publication returns promptly
+    instead of paying the ``wait_for_synchronization_timeout`` wait.
     """
     w1 = create_dummy_world()
     synchronizer_1 = WorldSynchronizer(
@@ -1156,13 +1291,15 @@ def test_subscriber_disconnecting_during_discovery_grace_period_does_not_hang_fo
 ):
     """
     Exercises real ROS graph churn (no fakes): a subscriber that appears and then
-    disconnects again while :meth:`Synchronizer._snapshot_subscribers_after_discovery_settles`
-    is still polling can make the settled count reflect a subscriber that is no longer
-    actually there by the time :meth:`Synchronizer.publish` sends the message. Whether
-    this particular run manages to trigger an over-count depends on ROS discovery timing
-    and is intentionally not asserted directly; what must always hold is that publish is
-    bounded by ``wait_for_synchronization_timeout``, never blocks forever, and recovers
-    on the next publish once the graph has settled.
+    disconnects again while
+    :meth:`Synchronizer._snapshot_subscribers_after_discovery_settles` is still polling
+    can make the settled count reflect a subscriber that is no longer actually there by
+    the time :meth:`Synchronizer.publish` sends the message.
+
+    Whether this particular run manages to trigger an over-count depends on ROS
+    discovery timing and is intentionally not asserted directly; what must always hold
+    is that publish is bounded by ``wait_for_synchronization_timeout``, never blocks
+    forever, and recovers on the next publish once the graph has settled.
     """
     w1 = create_dummy_world()
     synchronizer_1 = WorldSynchronizer(
@@ -1186,7 +1323,9 @@ def test_subscriber_disconnecting_during_discovery_grace_period_does_not_hang_fo
         time.sleep(0.05)
         flapping_node.destroy_subscription(flapping_subscription)
 
-    flap_thread = threading.Thread(target=disconnect_shortly_after_appearing, daemon=True)
+    flap_thread = threading.Thread(
+        target=disconnect_shortly_after_appearing, daemon=True
+    )
     flap_thread.start()
 
     try:
@@ -3126,6 +3265,137 @@ def test_combined_update_model_and_state_applied_atomically(rclpy_node):
         "_world_lock was released between applying the model block and the state update; "
         "a combined WorldUpdate must be applied atomically under a single lock."
     )
+
+
+def test_liquid_transfer_coupling_synchronizes_and_rebuilds(rclpy_node):
+    """
+    A cup-to-cup transfer coupling established in one world is reconstructable in a
+    second, synchronized world.
+
+    The coupling's symbolic inflow and gate expressions are bound to the world they were built in
+    and cannot be serialized, so only a parametric descriptor crosses the boundary. The receiving
+    world must rebuild the symbolic coupling locally from that descriptor - the exact situation a
+    Giskard process faces when a client couples cups and sends a transfer goal.
+    """
+    client_world = World(name="client")
+    giskard_world = World(name="giskard")
+    sync_client = WorldSynchronizer(node=rclpy_node, _world=client_world)
+    sync_giskard = WorldSynchronizer(node=rclpy_node, _world=giskard_world)
+    time.sleep(0.2)
+
+    wide_limits = DegreeOfFreedomLimits(
+        lower=DerivativeMap(position=-2.0, velocity=-1.0),
+        upper=DerivativeMap(position=2.0, velocity=1.0),
+    )
+    with client_world.modify_world():
+        client_world.add_body(Body(name=PrefixedName("map")))
+    with client_world.modify_world():
+        receiver = _TiltingContainer.create_with_new_body_in_world(
+            name=PrefixedName("receiver"),
+            world=client_world,
+            active_axis=Vector3(1, 0, 0),
+            connection_limits=wide_limits,
+            scale=Scale(0.1, 0.1, 0.2),
+        )
+        source = _TiltingContainer.create_with_new_body_in_world(
+            name=PrefixedName("source"),
+            world=client_world,
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=0.3),
+            active_axis=Vector3(0, 1, 0),
+            connection_limits=wide_limits,
+            scale=Scale(0.1, 0.1, 0.2),
+        )
+    receiver.initialize_fill_level(world=client_world, initial_fill=0.0)
+    source.initialize_fill_level(world=client_world, initial_fill=1.0)
+    receiver.receive_outflow_from(source=source, world=client_world)
+
+    try:
+        assert wait_for_condition(
+            lambda: len(giskard_world.semantic_annotations)
+            == len(client_world.semantic_annotations)
+            and len(giskard_world.connections) == len(client_world.connections)
+        )
+        time.sleep(0.5)
+
+        receiver_giskard = giskard_world.get_semantic_annotation_by_id(receiver.id)
+
+        # The symbolic inflow equation is not serializable, so it did not cross the boundary.
+        synced_connection = giskard_world.get_connection(
+            receiver_giskard.fill_connection.parent,
+            receiver_giskard.fill_connection.child,
+        )
+        assert synced_connection.inflow_equation is None
+        # The parametric descriptor did cross and names the source.
+        assert receiver_giskard.inflow_coupling is not None
+        assert receiver_giskard.inflow_coupling.source_id == source.id
+
+        # The receiving world rebuilds the symbolic coupling against its own entities.
+        receiver_giskard.ensure_inflow_coupling(giskard_world)
+        rebuilt_inflow = synced_connection.inflow_equation
+        assert rebuilt_inflow is not None
+        source_giskard = giskard_world.get_semantic_annotation_by_id(source.id)
+        giskard_world.set_positions_1DOF_connection(
+            {source_giskard.root.parent_connection: 0.0}
+        )
+        assert rebuilt_inflow.gate.evaluate()[0] == pytest.approx(1.0, abs=1e-2)
+    finally:
+        sync_client.close()
+        sync_giskard.close()
+
+
+@dataclass(eq=False)
+class AcknowledgmentRecordingSynchronizer(WorldSynchronizer):
+    """
+    Synchronizer that records which messages it acknowledged, standing in for a remote
+    synchronous publisher waiting on those acknowledgments.
+    """
+
+    acknowledged_messages: List[WorldUpdate] = field(default_factory=list)
+    """
+    Messages this synchronizer acknowledged, in order.
+    """
+
+    def acknowledge_message(self, message: WorldUpdate) -> None:
+        """
+        Record the message before acknowledging it.
+        """
+        self.acknowledged_messages.append(message)
+        super().acknowledge_message(message)
+
+
+def test_apply_external_state_updates_acknowledges_fully_consumed_messages(rclpy_node):
+    """
+    A message whose entire state was consumed by the live external-input path must be
+    acknowledged and dropped from the buffer, or a synchronous publisher blocks for its
+    whole synchronization timeout waiting on it.
+    """
+    producer_world = create_dummy_world()
+    server_world = create_dummy_world()
+
+    producer_synchronizer = WorldSynchronizer(node=rclpy_node, _world=producer_world)
+    server_synchronizer = AcknowledgmentRecordingSynchronizer(
+        node=rclpy_node, _world=server_world
+    )
+    try:
+        server_synchronizer.pause()
+        time.sleep(0.2)
+
+        for degree_of_freedom in server_world.degrees_of_freedom:
+            degree_of_freedom.allows_external_state_update = True
+        externally_driven_dof_id = server_world.get_degree_of_freedom_by_name("x").id
+
+        producer_world.state[externally_driven_dof_id].position = 0.7
+        producer_world.notify_state_change()
+        assert wait_for_condition(lambda: len(server_synchronizer.missed_messages) >= 1)
+
+        server_synchronizer.apply_external_state_updates()
+
+        assert server_world.state[externally_driven_dof_id].position == 0.7
+        assert not server_synchronizer.missed_messages
+        assert len(server_synchronizer.acknowledged_messages) == 1
+    finally:
+        producer_synchronizer.close()
+        server_synchronizer.close()
 
 
 if __name__ == "__main__":

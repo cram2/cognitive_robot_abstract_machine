@@ -22,7 +22,7 @@ from semantic_digital_twin.spatial_types.math import inverse_frame
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@dataclass
+@dataclass(eq=False)
 class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
     """
     Base class for collision variable managers that handles symbolic caching and data
@@ -115,7 +115,7 @@ class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
         pass
 
 
-@dataclass
+@dataclass(eq=False)
 class ExternalCollisionVariableManager(BaseCollisionVariableManager):
     """
     Transforms collision results for registered groups into local frames convenient for
@@ -318,7 +318,7 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
         )
 
 
-@dataclass
+@dataclass(eq=False)
 class SelfCollisionVariableManager(BaseCollisionVariableManager):
     """
     Transforms collision results for registered groups into local frames convenient for

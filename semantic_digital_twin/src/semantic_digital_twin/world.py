@@ -103,6 +103,7 @@ from semantic_digital_twin.world_description.world_modification import (
     WorldModification,
     WorldModelModificationBlock,
     SetDofHasHardwareInterface,
+    SetDofAllowExternalStateUpdate,
     AddDegreeOfFreedomModification,
     RemoveDegreeOfFreedomModification,
     AddKinematicStructureEntityModification,
@@ -870,7 +871,7 @@ class World(HasSimulatorProperties):
             name must be unique within the current context.
         """
         self._raise_error_if_belongs_to_other_world(semantic_annotation)
-        if self.is_semantic_annotation_in_world(semantic_annotation):
+        if self.contains_semantic_annotation(semantic_annotation):
             return
         self._add_semantic_annotation(semantic_annotation)
 
@@ -887,7 +888,7 @@ class World(HasSimulatorProperties):
             name must be unique within the current context.
         """
         self._raise_error_if_belongs_to_other_world(semantic_annotation)
-        if self.is_semantic_annotation_in_world(semantic_annotation):
+        if self.contains_semantic_annotation(semantic_annotation):
             return
         introspector = DataclassOnlyIntrospector()
 
@@ -1050,7 +1051,7 @@ class World(HasSimulatorProperties):
 
         :param semantic_annotation: The semantic annotation instance to be removed.
         """
-        if self.is_semantic_annotation_in_world(semantic_annotation):
+        if self.is_semantic_annotation_bound_to_this_world(semantic_annotation):
             self._remove_semantic_annotation(semantic_annotation)
 
     @atomic_world_modification(modification=RemoveSemanticAnnotationModification)
@@ -1101,6 +1102,25 @@ class World(HasSimulatorProperties):
         """
         for dof in dofs:
             dof.has_hardware_interface = value
+
+    @atomic_world_modification(modification=SetDofAllowExternalStateUpdate)
+    def set_dofs_allow_external_state_update(
+        self, dofs: Iterable[DegreeOfFreedom], value: bool
+    ) -> None:
+        """
+        Sets whether the specified degrees of freedom may be updated from an external
+        source.
+
+        Call this inside a :meth:`modify_world` block so the change is tracked and
+        synchronized to other processes.
+
+        :param dofs: The degrees of freedom whose ``allows_external_state_update`` flag
+            is set.
+        :param value: Whether the DOFs may be updated externally (``True``) or not
+            (``False``).
+        """
+        for dof in dofs:
+            dof.allows_external_state_update = value
 
     # %% Getter
     def get_connection(
@@ -1413,12 +1433,33 @@ class World(HasSimulatorProperties):
         return entity
 
     # %% Existence Checks
-    def is_semantic_annotation_in_world(
+    def is_semantic_annotation_bound_to_this_world(
         self, semantic_annotation: SemanticAnnotation
     ) -> bool:
+        """
+        :return: Whether this exact annotation instance is bound to this world.
+
+        Unlike :meth:`contains_semantic_annotation`, an equal but distinct instance does
+        not count; the given instance itself must be stored here.
+        """
         return (
             semantic_annotation._world == self
             and semantic_annotation in self.semantic_annotations
+        )
+
+    def contains_semantic_annotation(
+        self, semantic_annotation: SemanticAnnotation
+    ) -> bool:
+        """
+        :return: Whether a semantic annotation equal to the given one is already stored.
+
+        Equality is defined by :meth:`SemanticAnnotation.__eq__` (annotation type and kinematic
+        bodies), so a freshly built annotation matches an already-stored one describing the same
+        bodies even though it is a different instance, independently of whether the given
+        annotation has been bound to a world yet.
+        """
+        return self._is_world_entity_with_hash_in_world_from_iterable(
+            hash(semantic_annotation)
         )
 
     def is_body_in_world(self, body: Body) -> bool:
@@ -2347,6 +2388,9 @@ class World(HasSimulatorProperties):
         Updates the state of a system by applying control commands at a specified
         derivative level, followed by backward integration to update lower derivatives.
 
+        After the commands are integrated, all self-integrating connections are stepped
+        forward by ``dt`` via :meth:`step_physics`.
+
         :param commands: Control commands to be applied at the specified derivative
             level. The array length must match the number of free variables in the
             system.
@@ -2355,6 +2399,14 @@ class World(HasSimulatorProperties):
             applied.
         """
         self.state._apply_control_commands(commands, dt, derivative)
+        self.step_physics(dt=dt)
+
+    def step_physics(self, dt: float) -> None:
+        """
+        Step all HasUpdateState connections forward by dt.
+
+        :param dt: Time elapsed since the previous step, in seconds.
+        """
         for connection in self.connections:
             match connection:
                 case HasUpdateState():

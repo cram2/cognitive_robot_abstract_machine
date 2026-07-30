@@ -3,7 +3,7 @@ from giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs import (
     WorldWithTracyConfig,
     TracyStandAloneRobotInterfaceConfig,
 )
-from rclpy import Parameter
+from giskardpy.middleware.ros2.utils.utils import load_xacro
 
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.middleware.ros2.behavior_tree_config import StandAloneBTConfig
@@ -12,17 +12,26 @@ from giskardpy.middleware.ros2.giskard import Giskard
 
 def main():
     rospy.init_node("giskard")
-    rospy.node.declare_parameters(
-        namespace="", parameters=[("robot_description", Parameter.Type.STRING)]
-    )
-    robot_description = rospy.node.get_parameter_or("robot_description").value
-    # robot_description = load_xacro("package://iai_tracy_description/urdf/tracy.urdf.xacro")
+    rospy.node.declare_parameter("robot_description", "")
+    robot_description = rospy.node.get_parameter("robot_description").value
+    if not robot_description:
+        robot_description = load_xacro(
+            "package://iai_tracy_description/urdf/tracy.urdf.xacro"
+        )
 
     giskard = Giskard(
         world_config=WorldWithTracyConfig(urdf=robot_description),
         robot_interface_config=TracyStandAloneRobotInterfaceConfig(),
-        behavior_tree_config=StandAloneBTConfig(debug_mode=True),
-        qp_controller_config=QPControllerConfig(target_frequency=33),
+        behavior_tree_config=StandAloneBTConfig(
+            debug_mode=True, add_debug_marker_publisher=True
+        ),
+        qp_controller_config=QPControllerConfig(
+            target_frequency=80,
+            # Calibrated against the terminal-state prediction row's scaling convention
+            # (mean-normalized lookahead weights, single time-step factor); see
+            # TerminalStatePredictionStrategy.create_matrix.
+            prediction_horizon=120,
+        ),
     )
     giskard.live()
 

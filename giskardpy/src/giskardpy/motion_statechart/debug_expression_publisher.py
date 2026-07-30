@@ -73,6 +73,10 @@ class DebugExpressionPublisher:
         """
         Express a vector in its visualisation frame so the rendered arrow points
         correctly.
+
+        The visualisation frame moves with the robot, so the re-expression must use the
+        live forward-kinematics expression rather than a snapshot; otherwise the
+        rendered arrow drifts away from the true direction as the frame rotates.
         """
         if not isinstance(expression, Vector3):
             return expression
@@ -82,7 +86,12 @@ class DebugExpressionPublisher:
             return expression
         if visualisation_frame is reference_frame:
             return expression
-        return self.world.transform(expression, visualisation_frame)
+        visualisation_frame_T_reference_frame = (
+            self.world.compose_forward_kinematics_expression(
+                visualisation_frame, reference_frame
+            )
+        )
+        return visualisation_frame_T_reference_frame @ expression
 
     def stop(self) -> None:
         """

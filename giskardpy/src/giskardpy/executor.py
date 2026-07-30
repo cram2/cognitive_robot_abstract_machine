@@ -190,23 +190,35 @@ class Executor:
                 self.context.world.state, self.time
             )
 
-    def tick_until_end(self, timeout: int = 1_000):
+    def tick_until_end_or_timeout(self, timeout: int = 1_000) -> bool:
         """
-        Calls tick until is_end_motion() returns True.
+        Calls tick until is_end_motion() returns True or the tick budget is exhausted.
 
         :param timeout: Max number of ticks to perform.
+        :return:``True`` if the motion reached its end condition, ``False`` if the tick
+            budget ran out first.
         """
         try:
             for i in range(timeout):
                 self.tick()
                 self.pacer.sleep()
                 if self.motion_statechart.is_end_motion():
-                    return
-            raise TimeoutError("Timeout reached while waiting for end of motion.")
+                    return True
+            return False
         finally:
             self._set_velocity_acceleration_jerk_to_zero()
             self.motion_statechart.cleanup_nodes(context=self.context)
             self.context.cleanup()
+
+    def tick_until_end(self, timeout: int = 1_000):
+        """
+        Calls tick until is_end_motion() returns True.
+
+        :param timeout: Max number of ticks to perform.
+        :raises TimeoutError: if the motion did not end within the tick budget.
+        """
+        if not self.tick_until_end_or_timeout(timeout):
+            raise TimeoutError("Timeout reached while waiting for end of motion.")
 
     def _set_velocity_acceleration_jerk_to_zero(self):
         self.context.world.state.velocities[:] = 0
