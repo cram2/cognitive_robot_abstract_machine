@@ -158,6 +158,55 @@ class ResetStateContextManager:
 
 
 @dataclass
+class WorldStateBatchContextManager:
+    """
+    Context manager collapsing many state changes of a `World` into a single
+    notification.
+
+    Writing a whole configuration one degree of freedom at a time otherwise recomputes
+    the forward kinematics and notifies every observer once per degree of freedom, which
+    turns one logical change into a burst of individual ones.
+    """
+
+    publish_changes: bool = True
+    """
+    Whether the single notification of this batch publishes the changes it collected.
+    """
+
+    world: World = field(kw_only=True, repr=False)
+    """
+    The world whose state changes are collected.
+    """
+
+    def __enter__(self) -> WorldStateBatchContextManager:
+        if self.world._state_change_batch_depth == 0:
+            self.world._state_change_batch_publishes_changes = self.publish_changes
+        elif self.world._state_change_batch_publishes_changes != self.publish_changes:
+            raise MismatchingPublishChangesAttribute(
+                self.world._state_change_batch_publishes_changes, self.publish_changes
+            )
+        self.world._state_change_batch_depth += 1
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_val: Optional[Exception],
+        exc_tb: Optional[type],
+    ) -> None:
+        self.world._state_change_batch_depth -= 1
+        if self.world._state_change_batch_depth > 0:
+            return
+        has_collected_change = self.world._state_change_batch_has_collected_change
+        publish_changes = self.world._state_change_batch_publishes_changes
+        self.world._state_change_batch_has_collected_change = False
+        self.world._state_change_batch_publishes_changes = True
+        if not has_collected_change:
+            return
+        self.world.notify_state_change(publish_changes=publish_changes)
+
+
+@dataclass
 class WorldModelUpdateContextManager:
     """
     Context manager for updating the state of a given `World` instance.
@@ -467,6 +516,25 @@ class World(HasSimulatorProperties):
     world_is_being_modified: bool = False
     """
     Is set to True, when a world.modify_world context is used.
+    """
+
+    _state_change_batch_depth: int = field(default=0, init=False, repr=False)
+    """
+    How many nested :meth:`batch_state_changes` contexts are currently open.
+    """
+
+    _state_change_batch_has_collected_change: bool = field(
+        default=False, init=False, repr=False
+    )
+    """
+    Whether a state change was notified while the current batch is open.
+    """
+
+    _state_change_batch_publishes_changes: bool = field(
+        default=True, init=False, repr=False
+    )
+    """
+    The ``publish_changes`` the currently open batch was entered with.
     """
 
     name: Optional[str] = None
@@ -1769,7 +1837,15 @@ class World(HasSimulatorProperties):
         """
         If you have changed the state of the world, call this function to trigger
         necessary events and increase the state version.
+
+        Inside a :meth:`batch_state_changes` context the notification is collected and
+        emitted once when that context ends, with the ``publish_changes`` of that
+        context: the setters that write the state cannot know they are part of a batch,
+        so the batch is what decides whether its changes are published.
         """
+        if self._state_change_batch_depth > 0:
+            self._state_change_batch_has_collected_change = True
+            return
         if not self.is_empty():
             self._forward_kinematic_manager.recompute()
         self.state._notify_state_change(publish_changes=publish_changes, **kwargs)
@@ -2363,6 +2439,22 @@ class World(HasSimulatorProperties):
         self, publish_changes: bool = True
     ) -> WorldModelUpdateContextManager:
         return WorldModelUpdateContextManager(
+            world=self, publish_changes=publish_changes
+        )
+
+    def batch_state_changes(
+        self, publish_changes: bool = True
+    ) -> WorldStateBatchContextManager:
+        """
+        Collect the state changes made inside the context into a single notification.
+
+        Use this when writing several degrees of freedom that belong to one logical
+        change, such as a whole configuration.
+
+        :param publish_changes: Whether the resulting notification publishes the
+            changes.
+        """
+        return WorldStateBatchContextManager(
             world=self, publish_changes=publish_changes
         )
 

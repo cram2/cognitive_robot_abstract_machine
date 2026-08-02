@@ -11,11 +11,14 @@ import numpy as np
 import objgraph
 import pytest
 from numpy.testing import assert_raises
+from typing_extensions import Optional
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.exceptions import (
     DuplicateWorldEntityError,
+    MismatchingPublishChangesAttribute,
     UsageError,
     MissingWorldModificationContextError,
     DofNotInWorldStateError,
@@ -229,6 +232,99 @@ def test_nested_with_blocks_illegal_state(world_setup):
             world.remove_connection(connection2)
         world.add_connection(connection1)
         world.add_connection(connection2)
+
+
+# %% batching state changes
+
+
+@dataclass(eq=False)
+class StateChangeCounter(StateChangeCallback):
+    """
+    Counts how often the world announced a state change.
+    """
+
+    count: int = field(default=0, init=False)
+    """
+    Number of state changes announced since this callback was registered.
+    """
+
+    publish_changes_of_last_call: Optional[bool] = field(default=None, init=False)
+    """
+    The ``publish_changes`` the most recent announcement carried.
+    """
+
+    def on_state_change(self, **kwargs):
+        self.count += 1
+        self.publish_changes_of_last_call = kwargs.get("publish_changes")
+
+
+def test_batching_state_changes_announces_them_once(world_setup):
+    world, l1, l2, _, _, _ = world_setup
+    prismatic_connection = world.get_connection(l1, l2)
+    counter = StateChangeCounter(_world=world)
+
+    with world.batch_state_changes():
+        prismatic_connection.position = 1.0
+        prismatic_connection.position = 2.0
+
+    assert counter.count == 1
+    assert prismatic_connection.position == 2.0
+
+
+def test_state_changes_outside_a_batch_are_announced_individually(world_setup):
+    world, l1, l2, _, _, _ = world_setup
+    prismatic_connection = world.get_connection(l1, l2)
+    counter = StateChangeCounter(_world=world)
+
+    prismatic_connection.position = 1.0
+    prismatic_connection.position = 2.0
+
+    assert counter.count == 2
+
+
+def test_batching_without_a_state_change_announces_nothing(world_setup):
+    world, _, _, _, _, _ = world_setup
+    counter = StateChangeCounter(_world=world)
+
+    with world.batch_state_changes():
+        pass
+
+    assert counter.count == 0
+
+
+def test_nested_batches_of_state_changes_announce_them_once(world_setup):
+    world, l1, l2, _, _, _ = world_setup
+    prismatic_connection = world.get_connection(l1, l2)
+    counter = StateChangeCounter(_world=world)
+
+    with world.batch_state_changes():
+        prismatic_connection.position = 1.0
+        with world.batch_state_changes():
+            prismatic_connection.position = 2.0
+        assert counter.count == 0
+
+    assert counter.count == 1
+
+
+def test_batching_state_changes_forwards_its_publish_changes(world_setup):
+    world, l1, l2, _, _, _ = world_setup
+    prismatic_connection = world.get_connection(l1, l2)
+    counter = StateChangeCounter(_world=world)
+
+    with world.batch_state_changes(publish_changes=False):
+        prismatic_connection.position = 1.0
+
+    assert counter.count == 1
+    assert counter.publish_changes_of_last_call is False
+
+
+def test_a_nested_batch_disagreeing_about_publishing_is_rejected(world_setup):
+    world, _, _, _, _, _ = world_setup
+
+    with pytest.raises(MismatchingPublishChangesAttribute):
+        with world.batch_state_changes(publish_changes=False):
+            with world.batch_state_changes(publish_changes=True):
+                pass
 
 
 def test_compute_fk_connection6dof(world_setup):
