@@ -186,6 +186,16 @@ class TFPublisher(StateChangeCallback):
         self.tf_model_cb.notify_model_change()
         self.on_state_change()
 
+    def stop(self):
+        """
+        Deregister this publisher and the model callback it owns.
+
+        The model callback registers itself on the world, so stopping only the state
+        callback would leave it publishing on a node that may already be gone.
+        """
+        self.tf_model_cb.stop()
+        super().stop()
+
     @classmethod
     def create_with_ignore_robot(cls, robot: AbstractRobot, node: Node) -> Self:
         """
