@@ -6,6 +6,7 @@ import inspect
 import logging
 import threading
 import uuid
+from contextlib import contextmanager
 from copy import deepcopy, copy
 from dataclasses import dataclass, field
 from functools import wraps, cached_property
@@ -26,6 +27,7 @@ from typing_extensions import (
     Callable,
     Any,
     Iterable,
+    Iterator,
     TYPE_CHECKING,
     get_args,
 )
@@ -309,12 +311,16 @@ class WorldModelUpdateContextManager:
                 self.world.world_is_being_modified = False
                 model_manager._current_modifications_will_be_published = None
         finally:
-            # keep outside the if block, as it needs to be released as many times as it was acquired
-            self.world._world_lock.release()
-            # Flush deferred publications only after the lock is fully released, so a synchronous
-            # publish does not block the receiving executor that needs the lock to apply/acknowledge.
-            if run_pending_publications:
-                self.world._model_manager.flush_pending_publications()
+            # Claim the turn of this modification in the stream of publications before the
+            # world lock is released, so that a thread waiting for that lock cannot publish
+            # what it then reads before this modification has published its own changes.
+            with self.world._model_manager.publishing_in_order():
+                # keep outside the if block, as it needs to be released as many times as it was acquired
+                self.world._world_lock.release()
+                # Flush deferred publications only after the lock is fully released, so that
+                # the modification they describe is complete and readable by whoever reacts to them.
+                if run_pending_publications:
+                    self.world._model_manager.flush_pending_publications()
 
 
 def atomic_world_modification(func=None, modification: Type[WorldModification] = None):
@@ -437,10 +443,31 @@ class WorldModelManager:
     """
     Network publications deferred while the world is being modified.
 
-    They are flushed (executed) only after ``_world_lock`` has been released, so that a
-    synchronous publish waiting for acknowledgments never blocks the receiving executor
-    that must acquire the lock to apply/ack.
+    They are flushed (executed) only after ``_world_lock`` has been released, so that
+    what they describe is complete by the time it leaves this process.
     """
+
+    _publication_order_lock: threading.RLock = field(
+        init=False, default_factory=threading.RLock, repr=False
+    )
+    """
+    Serializes the publications leaving this world.
+
+    Reentrant, because flushing the deferred publications holds it while each of them
+    publishes.
+    """
+
+    @contextmanager
+    def publishing_in_order(self) -> Iterator[None]:
+        """
+        Claim the turn of the caller in the stream of publications of this world.
+
+        A modification claims its turn before it releases ``_world_lock``, so a thread
+        that was waiting for that lock cannot announce the state it then reads before
+        the model change it belongs to has been published.
+        """
+        with self._publication_order_lock:
+            yield
 
     def update_model_version_and_notify_callbacks(self, **kwargs) -> None:
         """
@@ -457,9 +484,8 @@ class WorldModelManager:
         Execute and clear all publications that were deferred during a world
         modification.
 
-        Must be called *after* ``_world_lock`` is released so that publishing (and, in
-        synchronous mode, waiting for acknowledgments) does not happen while holding the
-        lock.
+        Must be called *after* ``_world_lock`` is released, so that the modification the
+        publications describe is complete.
         """
         pending = self.pending_publications
         self.pending_publications = []

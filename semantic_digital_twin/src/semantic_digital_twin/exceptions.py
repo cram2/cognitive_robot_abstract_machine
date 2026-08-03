@@ -2,7 +2,7 @@ from __future__ import annotations, absolute_import
 
 from dataclasses import dataclass, field, Field
 from pathlib import Path
-from typing import Dict, Set, Any
+from typing import Dict, Set
 from uuid import UUID
 
 import mujoco
@@ -17,8 +17,8 @@ from typing_extensions import (
 )
 
 from krrood.adapters.exceptions import JSONSerializationError
-from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from krrood.exceptions import DataclassException
+from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
@@ -837,6 +837,52 @@ class StateUpdateContainsUnknownDegreesOfFreedomError(UsageError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class WorldHasNoSynchronizerError(UsageError):
+    """
+    Raised when the synchronizer of a world is asked for, but the world publishes its
+    changes nowhere.
+    """
+
+    world: World
+    """
+    The world without a synchronizer.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.world} does not publish its changes to other processes."
+
+    def suggest_correction(self) -> str:
+        return "Create a WorldSynchronizer for this world."
+
+
+@dataclass
+class WorldHasMultipleSynchronizersError(UsageError):
+    """
+    Raised when the synchronizer of a world is asked for, but several of them publish
+    its changes, leaving it undecided which stream a watermark would refer to.
+    """
+
+    world: World
+    """
+    The world with more than one synchronizer.
+    """
+
+    synchronizer_count: int
+    """
+    How many synchronizers publish the changes of the world.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.synchronizer_count} synchronizers publish the changes of "
+            f"{self.world}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Close all but one of them."
 
 
 @dataclass
