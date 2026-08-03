@@ -162,30 +162,41 @@ class PickUpAction(ActionDescription):
         _, _, lift_to_pose = self.grasp_description.grasp_pose_sequence(
             self.object_designator
         )
-        return sequential(
-            children=[
-                MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm),
-                ReachAction(
-                    target_pose=self.object_designator.global_pose,
-                    object_designator=self.object_designator,
-                    arm=self.arm,
-                    grasp_description=self.grasp_description,
-                ),
-                MoveGripperMotion(motion=GripperState.CLOSE, gripper=self.arm),
+        children = [
+            MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm),
+            ReachAction(
+                target_pose=self.object_designator.global_pose,
+                object_designator=self.object_designator,
+                arm=self.arm,
+                grasp_description=self.grasp_description,
+            ),
+            MoveGripperMotion(
+                motion=GripperState.CLOSE,
+                gripper=self.arm,
+                # Size the close to the object instead of the gripper's
+                # nominal fully-closed state, which a grasped object makes
+                # unreachable and which therefore squeezes it back out.
+                grasped_object=self.object_designator,
+            ),
+        ]
+        if self.context.update_world_model_attachment:
+            children.append(
                 AttachNode(
                     body=self.object_designator,
                     new_parent=ViewManager.get_end_effector_view(
                         self.arm, self.robot
                     ).tool_frame,
-                ),
-                MoveToolCenterPointMotion(
-                    lift_to_pose,
-                    self.arm,
-                    allow_gripper_collision=True,
-                    movement_type=MovementType.TRANSLATION,
-                ),
-            ],
+                )
+            )
+        children.append(
+            MoveToolCenterPointMotion(
+                lift_to_pose,
+                self.arm,
+                allow_gripper_collision=True,
+                movement_type=MovementType.TRANSLATION,
+            )
         )
+        return sequential(children=children)
 
     @staticmethod
     def pre_condition(

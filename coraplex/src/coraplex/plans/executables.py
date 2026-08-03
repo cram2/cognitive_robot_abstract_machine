@@ -19,6 +19,7 @@ from giskardpy.motion_statechart.goals.collision_avoidance import (
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion, Task
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from giskardpy.executor import Pacer, SimulationPacer, SimulationTimePacer
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.ros_executor import Ros2Executor
 from krrood.entity_query_language.factories import evaluate_condition
@@ -127,6 +128,30 @@ class GiskardExecutable(Executable):
     Whether an :class:`~giskardpy.motion_statechart.goals.collision_avoidance.ExternalCo
     llisionAvoidance` is added to the motion state chart, managed by
     :py:class:`pycram.motion_executor.ExecutionEnvironment`.
+    """
+
+    real_time_pacing: ClassVar[bool] = False
+    """
+    Whether the simulated tick loop is paced to wall-clock time
+    (via :class:`~giskardpy.executor.SimulationPacer`) instead of running as fast
+    as the QP solve allows, managed by
+    :py:class:`pycram.motion_executor.ExecutionEnvironment`.
+    """
+
+    max_ticks_per_motion_mapping: ClassVar[int] = 2000
+    """
+    Per-motion tick budget for :meth:`_execute_simulation`'s tick loop,
+    managed by :py:class:`pycram.motion_executor.ExecutionEnvironment`.
+
+    The overall loop bound is this value multiplied by the number of motion
+    mappings, so a stuck motion is bounded to roughly
+    ``max_ticks_per_motion_mapping`` ticks before :class:`MotionDidNotFinish`
+    is raised, instead of hanging (or taking minutes) indefinitely.
+
+    Matters most together with ``real_time_pacing``: a paced tick sleeps for a
+    full control period, so the default budget of 2000 ticks per mapping is
+    ~40 s of wall clock *per mapping* before a stuck motion gives up, during
+    which the robot simply appears frozen. Lower it when pacing is on.
     """
 
     _current_motion_state_chart: MotionStatechart = field(init=False, default=None)
@@ -315,6 +340,25 @@ class GiskardExecutable(Executable):
             case _:
                 raise UnknownExecutionType(GiskardExecutable.execution_type)
 
+    def _build_pacer(self) -> Pacer:
+        """
+        The pacer for the control loop: simulated time when the context knows
+        how to read a simulation clock, wall-clock time otherwise.
+
+        Pacing against a simulation that cannot hold real time keeps one
+        control cycle of simulation between commands, rather than letting the
+        controller outrun the plant by however far the simulation happens to
+        be lagging.
+        """
+        if self.context.simulation_clock is not None:
+            return SimulationTimePacer(
+                target_frequency=50,
+                simulation_clock=self.context.simulation_clock,
+            )
+        return SimulationPacer(
+            real_time_factor=1.0 if GiskardExecutable.real_time_pacing else None
+        )
+
     def _execute_simulation(self) -> None:
         """
         Compiles the motion state chart and ticks it in the world of the context until
@@ -328,12 +372,16 @@ class GiskardExecutable(Executable):
                 ),
             ),
             ros_node=self.context.ros_node,
+            pacer=self._build_pacer(),
         )
         motion_state_chart = self.motion_state_chart
         executor.compile(motion_state_chart)
 
         counter = 0
-        while counter < len(self.motion_mappings) * 2000:
+        while (
+            counter
+            < len(self.motion_mappings) * GiskardExecutable.max_ticks_per_motion_mapping
+        ):
             # Interrupting and pausing are handled inside the motion state chart by
             # per-task monitors (see motion_state_chart): an interrupt ends the
             # motion via EndMotion, a pause holds the active task via its
@@ -344,6 +392,7 @@ class GiskardExecutable(Executable):
                 continue
 
             executor.tick()
+            executor.pacer.sleep()
             counter += 1
             if executor.motion_statechart.is_end_motion():
                 break

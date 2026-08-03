@@ -77,21 +77,23 @@ class PlaceAction(ActionDescription):
             self.target_location, self.object_designator, reverse=True
         )
 
-        return sequential(
-            [
-                ReachAction(
-                    self.target_location,
-                    self.arm,
-                    previous_grasp,
-                    self.object_designator,
-                    reverse_reach_order=True,
-                ),
-                MoveGripperMotion(GripperState.OPEN, self.arm),
-                DetachNode(body=self.object_designator, new_parent=self.world.root),
-                MoveToolCenterPointMotion(retract_pose, self.arm),
-            ],
-            self.context,
-        )
+        children = [
+            ReachAction(
+                self.target_location,
+                self.arm,
+                previous_grasp,
+                self.object_designator,
+                reverse_reach_order=True,
+            ),
+            MoveGripperMotion(GripperState.OPEN, self.arm),
+        ]
+        if self.context.update_world_model_attachment:
+            children.append(
+                DetachNode(body=self.object_designator, new_parent=self.world.root)
+            )
+        children.append(MoveToolCenterPointMotion(retract_pose, self.arm))
+
+        return sequential(children, self.context)
 
     @staticmethod
     def pre_condition(

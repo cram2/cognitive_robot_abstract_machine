@@ -117,17 +117,82 @@ class MoveGripperMotion(BaseMotion):
     If the gripper is allowed to collide with something
     """
 
+    grasped_object: Optional[Body] = None
+    """
+    Object the gripper is closing around, used to size the closing motion.
+
+    The fully-closed :class:`GripperState` targets a finger opening of zero,
+    which for a grasped object is unreachable: the object holds the fingers
+    apart at its own half-width, so the goal can only ever be satisfied by
+    squeezing the object out from between them. Two converging fingers acting
+    on an object that is not perfectly centred wedge it sideways, which
+    happens regardless of how small the squeezing force is.
+
+    Setting this closes to the object's *actual* half-width instead (minus
+    :attr:`squeeze_margin`), so the fingers stop where the object really is
+    and hold. Only used when :attr:`motion` is ``GripperState.CLOSE``;
+    ``None`` keeps the nominal fully-closed behaviour, which is still what
+    you want when closing an empty gripper.
+    """
+
+    squeeze_margin: float = 0.001
+    """
+    How far past the object's half-width (in meters) the fingers are told to
+    close, so they press into it rather than merely touching. Kept small: it
+    is the *commanded* penetration, and the whole point of sizing the goal to
+    the object is to keep that penetration bounded and deliberate.
+    """
+
     def perform(self):
         return
+
+    def _goal_state(self, end_effector: EndEffector) -> JointState:
+        """
+        The finger joint state this motion commands: the GripperState's own
+        state, or -- when closing around a known :attr:`grasped_object` -- the
+        same finger connections remapped to that object's half-width.
+
+        The object's extent is measured in the gripper's own root frame, in
+        which the fingers slide along the y axis, so the y extent is the width
+        the fingers actually have to span. Measuring it there rather than in
+        the object's own frame keeps this correct for an object approached at
+        an angle, where its bounding box is not axis-aligned with the grasp.
+        """
+        state = end_effector.get_joint_state_by_type(self.motion)
+        if self.grasped_object is None or self.motion != GripperState.CLOSE:
+            return state
+
+        bounding_box = self.grasped_object.collision.as_bounding_box_collection_in_frame(
+            end_effector.root
+        ).bounding_box()
+        half_width = (bounding_box.max_y - bounding_box.min_y) / 2
+        opening = max(0.0, half_width - self.squeeze_margin)
+        return JointState.from_mapping(
+            mapping={connection: opening for connection in state.connections},
+        )
 
     @property
     def _motion_chart(self):
         arm = ViewManager().get_end_effector_view(self.gripper, self.robot)
 
+        closing_on_object = (
+            self.grasped_object is not None and self.motion == GripperState.CLOSE
+        )
         return JointPositionList(
-            goal_state=arm.get_joint_state_by_type(self.motion),
+            goal_state=self._goal_state(arm),
             name=(
                 "OpenGripper" if self.motion == GripperState.OPEN else "CloseGripper"
+            ),
+            # The default threshold (1cm) is coarser than squeeze_margin, so the
+            # task would report "done" before the fingers actually reach the
+            # object. Since the goal itself commands squeeze_margin of
+            # penetration into a rigid object, the steady-state error can never
+            # drop below squeeze_margin -- doubling it keeps the threshold
+            # reachable while still requiring the fingers to be at the object.
+            **(
+                {"threshold": self.squeeze_margin * 2}
+                if closing_on_object
+                else {}
             ),
         )
 

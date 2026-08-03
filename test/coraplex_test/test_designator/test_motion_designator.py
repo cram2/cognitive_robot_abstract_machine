@@ -19,7 +19,8 @@ from coraplex.robot_plans import MoveMotion
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
-from semantic_digital_twin.datastructures.definitions import TorsoState
+from coraplex.robot_plans.motions.gripper import MoveGripperMotion
+from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.spatial_types import Point3, Quaternion
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -81,6 +82,30 @@ def test_pick_up_motion(immutable_model_world):
     assert all(mc is not None for mc in motion_charts)
     assert CartesianPose in motion_charts
     assert JointPositionList in motion_charts
+
+
+def test_close_gripper_on_object_uses_a_tight_convergence_threshold(
+    immutable_simple_pr2_world,
+):
+    """
+    The commanded finger target for a grasped object stops only
+    ``squeeze_margin`` short of the object's surface, so the motion must not be
+    considered converged before the fingers are within that same margin -- the
+    default :class:`JointPositionList` threshold (1cm) is 10x looser than the
+    squeeze margin (1mm), which lets the plan advance to lifting before the
+    fingers have actually made contact.
+    """
+    world, robot_view, context = immutable_simple_pr2_world
+    milk = world.get_body_by_name("milk.stl")
+
+    motion = MoveGripperMotion(
+        motion=GripperState.CLOSE,
+        gripper=Arms.LEFT,
+        grasped_object=milk,
+    )
+    execute_single(motion, context=context)
+
+    assert motion.motion_chart.threshold <= motion.squeeze_margin * 2
 
 
 def test_move_motion_chart(immutable_model_world):

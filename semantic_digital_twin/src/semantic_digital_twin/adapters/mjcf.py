@@ -127,7 +127,54 @@ class MJCFParser:
             for mujoco_actuator in self.spec.actuators:
                 self.parse_actuator(mujoco_actuator=mujoco_actuator)
 
+        self.parse_keyframe()
+
         return self.world
+
+    def parse_keyframe(self, key_name: str = "home") -> None:
+        """
+        Applies a keyframe's joint positions to the world state, so a scene's
+        declared starting pose -- e.g. a robot arm's folded ``home``/ready pose
+        -- is the pose the world actually starts in.
+
+        Without this the world state defaults to zero for every joint no matter
+        what the keyframe says: an arm whose scene defines a folded home pose
+        instead starts fully extended, and anything that later exports the world
+        back out (see MujocoBuilder._end_build) bakes that zero pose in as the
+        new home, so the pose is lost rather than merely ignored.
+
+        Only single-DOF joints (hinge/slide) are applied. Free joints are
+        deliberately skipped: a keyframe's free-joint block is an *absolute*
+        pose, whereas a Connection6DoF's DOFs are relative to that connection's
+        own ``parent_T_connection`` baseline (taken from the body's ``pos``/
+        ``quat``), so the two are not interchangeable. Scenes also commonly
+        leave those entries at zero while still placing the bodies via ``pos``
+        -- true of the stacking scene, whose keyframe carries 28 zeros for its
+        four cubes -- and applying that literally would teleport every
+        free-floating body to the origin.
+        """
+        key = next((k for k in self.spec.keys if k.name == key_name), None)
+        if key is None:
+            return
+        qpos = list(key.qpos)
+        if not qpos:
+            return
+
+        model = self.spec.compile()
+        single_dof_types = (mujoco.mjtJoint.mjJNT_HINGE, mujoco.mjtJoint.mjJNT_SLIDE)
+        for joint_id in range(model.njnt):
+            if model.jnt_type[joint_id] not in single_dof_types:
+                continue
+            joint_name = mujoco.mj_id2name(
+                model, mujoco.mjtObj.mjOBJ_JOINT, joint_id
+            )
+            if joint_name is None:
+                continue
+            connection = self.world.get_connection_by_name(joint_name)
+            self.world.state[connection.raw_dof.id].position = float(
+                qpos[model.jnt_qposadr[joint_id]]
+            )
+        self.world.notify_state_change()
 
     def parse_body(self, mujoco_body: mujoco.MjsBody):
         """

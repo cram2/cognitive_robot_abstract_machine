@@ -1,4 +1,5 @@
 import time
+from typing_extensions import Callable
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
@@ -79,6 +80,57 @@ class SimulationPacer(Pacer):
         # advance next target time to the next slot strictly after current time
         while self._next_target_time is not None and self._next_target_time <= now:
             self._next_target_time += dt
+
+
+@dataclass
+class SimulationTimePacer(Pacer):
+    """
+    Paces a control loop against a simulation's own clock instead of the wall
+    clock.
+
+    A simulator that cannot hold real time still advances its own clock
+    correctly, just slower. Pacing on the wall clock therefore lets the
+    controller issue commands faster than the simulated plant can execute
+    them, so setpoints outrun the hardware by a margin that varies with
+    whatever else the machine is doing. Waiting on simulated time instead
+    keeps one control cycle worth of simulation between commands however
+    fast the simulation happens to run.
+    """
+
+    target_frequency: float
+    """
+    Control cycles per simulated second.
+    """
+
+    simulation_clock: Callable[[], float]
+    """
+    Returns the simulation's current time in seconds.
+    """
+
+    poll_interval: float = 0.0002
+    """
+    How long to wait between checks that simulated time has advanced.
+    """
+
+    _next_target_time: Optional[float] = field(default=None, init=False)
+    """
+    Simulated time the next control cycle may start at.
+    """
+
+    def sleep(self):
+        """
+        Block until the simulation has advanced one control cycle.
+        """
+        cycle = 1 / self.target_frequency
+        if self._next_target_time is None:
+            self._next_target_time = self.simulation_clock() + cycle
+        while self.simulation_clock() < self._next_target_time:
+            time.sleep(self.poll_interval)
+        # A simulation that ran ahead while we were busy must not leave a
+        # backlog of instantly-satisfied cycles behind it.
+        now = self.simulation_clock()
+        while self._next_target_time <= now:
+            self._next_target_time += cycle
 
 
 @dataclass
