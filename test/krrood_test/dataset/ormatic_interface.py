@@ -20,8 +20,10 @@ import datetime
 import enum
 import krrood.adapters.json_serializer
 import krrood.entity_query_language.explanation.explanation
+import krrood.entity_query_language.factories
 import krrood.entity_query_language.orm.model
 import krrood.entity_query_language.predicate
+import krrood.inheritance_path_length
 import krrood.ormatic.custom_types
 import krrood.ormatic.data_access_objects.alternative_mappings
 import krrood.ormatic.type_dict
@@ -660,18 +662,73 @@ class InferenceExplanationDAO(
     }
 
 
-class PredicateDAO(
-    SymbolDAO, DataAccessObject[krrood.entity_query_language.predicate.Predicate]
+class SymbolicCallableDAO(
+    SymbolDAO, DataAccessObject[krrood.entity_query_language.predicate.SymbolicCallable]
 ):
-    __tablename__ = "PredicateDAO"
+    __tablename__ = "SymbolicCallableDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "PredicateDAO",
+        "polymorphic_identity": "SymbolicCallableDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PredicateDAO(
+    SymbolicCallableDAO,
+    DataAccessObject[krrood.entity_query_language.predicate.Predicate],
+):
+    __tablename__ = "PredicateDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolicCallableDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PredicateDAO",
+        "inherit_condition": database_id == SymbolicCallableDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class IsClassDAO(
+    PredicateDAO, DataAccessObject[krrood.entity_query_language.factories.IsClass]
+):
+    __tablename__ = "IsClassDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(PredicateDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "IsClassDAO",
+        "inherit_condition": database_id == PredicateDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class IsSubclassDAO(
+    PredicateDAO, DataAccessObject[krrood.entity_query_language.factories.IsSubclass]
+):
+    __tablename__ = "IsSubclassDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(PredicateDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    subclass: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "IsSubclassDAO",
+        "inherit_condition": database_id == PredicateDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -690,6 +747,175 @@ class IsDAO(PredicateDAO, DataAccessObject[krrood.entity_query_language.predicat
     }
 
 
+class SymbolicFunctionDAO(
+    SymbolicCallableDAO,
+    DataAccessObject[krrood.entity_query_language.predicate.SymbolicFunction],
+):
+    __tablename__ = "SymbolicFunctionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolicCallableDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SymbolicFunctionDAO",
+        "inherit_condition": database_id == SymbolicCallableDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class AttributeOwnerClassDAO(
+    SymbolicFunctionDAO,
+    DataAccessObject[krrood.entity_query_language.factories.AttributeOwnerClass],
+):
+    __tablename__ = "AttributeOwnerClassDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolicFunctionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "AttributeOwnerClassDAO",
+        "inherit_condition": database_id == SymbolicFunctionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class NodeChildrenDAO(
+    SymbolicFunctionDAO,
+    DataAccessObject[krrood.entity_query_language.factories.NodeChildren],
+):
+    __tablename__ = "NodeChildrenDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolicFunctionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NodeChildrenDAO",
+        "inherit_condition": database_id == SymbolicFunctionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class NodeDescendantsDAO(
+    SymbolicFunctionDAO,
+    DataAccessObject[krrood.entity_query_language.factories.NodeDescendants],
+):
+    __tablename__ = "NodeDescendantsDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolicFunctionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NodeDescendantsDAO",
+        "inherit_condition": database_id == SymbolicFunctionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class NodeIdDAO(
+    SymbolicFunctionDAO, DataAccessObject[krrood.entity_query_language.factories.NodeId]
+):
+    __tablename__ = "NodeIdDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolicFunctionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NodeIdDAO",
+        "inherit_condition": database_id == SymbolicFunctionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class NodeParentsDAO(
+    SymbolicFunctionDAO,
+    DataAccessObject[krrood.entity_query_language.factories.NodeParents],
+):
+    __tablename__ = "NodeParentsDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolicFunctionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NodeParentsDAO",
+        "inherit_condition": database_id == SymbolicFunctionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class NodeTypeDAO(
+    SymbolicFunctionDAO,
+    DataAccessObject[krrood.entity_query_language.factories.NodeType],
+):
+    __tablename__ = "NodeTypeDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolicFunctionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NodeTypeDAO",
+        "inherit_condition": database_id == SymbolicFunctionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class RuntimeTypeDAO(
+    SymbolicFunctionDAO,
+    DataAccessObject[krrood.entity_query_language.factories.RuntimeType],
+):
+    __tablename__ = "RuntimeTypeDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolicFunctionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "RuntimeTypeDAO",
+        "inherit_condition": database_id == SymbolicFunctionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class LengthDAO(
+    SymbolicFunctionDAO, DataAccessObject[krrood.entity_query_language.predicate.Length]
+):
+    __tablename__ = "LengthDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolicFunctionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "LengthDAO",
+        "inherit_condition": database_id == SymbolicFunctionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class TripleDAO(
     PredicateDAO, DataAccessObject[krrood.entity_query_language.predicate.Triple]
 ):
@@ -702,6 +928,32 @@ class TripleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TripleDAO",
         "inherit_condition": database_id == PredicateDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class InheritancePathLengthDAO(
+    SymbolicFunctionDAO,
+    DataAccessObject[krrood.inheritance_path_length.InheritancePathLength],
+):
+    __tablename__ = "InheritancePathLengthDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolicFunctionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    child_class: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+    parent_class: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "InheritancePathLengthDAO",
+        "inherit_condition": database_id == SymbolicFunctionDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -1415,6 +1667,29 @@ class JSONWrapperDAO(
     more_objects: Mapped[
         typing.List[test.krrood_test.dataset.example_classes.JSONSerializableClass]
     ] = mapped_column(JSON, nullable=False, use_existing_column=True)
+
+
+class KRROODBarePositionTypeWrapperDAO(
+    SymbolDAO,
+    DataAccessObject[
+        test.krrood_test.dataset.example_classes.KRROODBarePositionTypeWrapper
+    ],
+):
+    __tablename__ = "KRROODBarePositionTypeWrapperDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    position_type: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "KRROODBarePositionTypeWrapperDAO",
+        "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
 
 
 class KRROODKinematicChainDAO(

@@ -46,7 +46,7 @@ def scenario():
 
 
 @pytest.fixture
-def rpc(scenario):
+def relational_probabilistic_circuit(scenario):
     room_dao, room2_dao = scenario
     model = RelationalProbabilisticCircuit(SceneRoom)
     model.fit([room_dao, room2_dao])
@@ -70,13 +70,16 @@ def test_ground_before_fit_raises(room_query_4):
         model.ground(room_query_4)
 
 
-def test_fit_class_circuit_is_valid(rpc):
-    assert rpc.class_probabilistic_circuit is not None
-    assert rpc.class_probabilistic_circuit.is_valid()
+def test_fit_class_circuit_is_valid(relational_probabilistic_circuit):
+    assert relational_probabilistic_circuit.class_probabilistic_circuit is not None
+    assert relational_probabilistic_circuit.class_probabilistic_circuit.is_valid()
 
 
-def test_fit_class_circuit_has_room_scalar_variables(rpc):
-    names = {v.name for v in rpc.class_probabilistic_circuit.variables}
+def test_fit_class_circuit_has_room_scalar_variables(relational_probabilistic_circuit):
+    names = {
+        v.name
+        for v in relational_probabilistic_circuit.class_probabilistic_circuit.variables
+    }
     assert "SceneRoom.position.x" in names
     assert "SceneRoom.position.y" in names
     assert "SceneRoom.position.z" in names
@@ -86,56 +89,78 @@ def test_fit_class_circuit_has_room_scalar_variables(rpc):
     assert "SceneRoom.orientation.w" in names
 
 
-def test_fit_class_circuit_has_aggregation_variable(rpc):
-    names = {v.name for v in rpc.class_probabilistic_circuit.variables}
+def test_fit_class_circuit_has_aggregation_variable(relational_probabilistic_circuit):
+    names = {
+        v.name
+        for v in relational_probabilistic_circuit.class_probabilistic_circuit.variables
+    }
     assert "SceneRoomAggregations.total_count()" in names
 
 
-def test_fit_creates_exchangeable_template_for_objects(rpc):
-    assert "objects" in rpc.exchangeable_distribution_templates
-    template = rpc.exchangeable_distribution_templates["objects"]
+def test_fit_creates_exchangeable_template_for_objects(
+    relational_probabilistic_circuit,
+):
+    assert (
+        "objects"
+        in relational_probabilistic_circuit.exchangeable_distribution_templates
+    )
+    template = relational_probabilistic_circuit.exchangeable_distribution_templates[
+        "objects"
+    ]
     assert template.template_distribution.class_probabilistic_circuit is not None
 
 
-def test_fit_exchangeable_template_latent_is_total_count(rpc):
-    template = rpc.exchangeable_distribution_templates["objects"]
+def test_fit_exchangeable_template_latent_is_total_count(
+    relational_probabilistic_circuit,
+):
+    template = relational_probabilistic_circuit.exchangeable_distribution_templates[
+        "objects"
+    ]
     latent_names = {v.name for v in template.latent_variables}
     assert "SceneRoomAggregations.total_count()" in latent_names
 
 
-def test_fit_exchangeable_template_models_object_type(rpc):
-    template = rpc.exchangeable_distribution_templates["objects"]
+def test_fit_exchangeable_template_models_object_type(relational_probabilistic_circuit):
+    template = relational_probabilistic_circuit.exchangeable_distribution_templates[
+        "objects"
+    ]
     pc = template.template_distribution.class_probabilistic_circuit
     names = {v.name for v in pc.variables}
     assert "type" in names
 
 
-def test_ground_circuit_is_valid(rpc, room_query_4):
-    model = rpc.ground(room_query_4)
+def test_ground_circuit_is_valid(relational_probabilistic_circuit, room_query_4):
+    model = relational_probabilistic_circuit.ground(room_query_4)
     assert model.is_valid()
 
 
-def test_ground_has_per_object_type_variables(rpc, room_query_4):
-    model = rpc.ground(room_query_4)
+def test_ground_has_per_object_type_variables(
+    relational_probabilistic_circuit, room_query_4
+):
+    model = relational_probabilistic_circuit.ground(room_query_4)
     names = {v.name for v in model.variables}
     for i in range(4):
         assert f"SceneRoom.objects[{i}].type" in names
 
 
-def test_ground_preserves_room_scalar_variables(rpc, room_query_4):
-    model = rpc.ground(room_query_4)
+def test_ground_preserves_room_scalar_variables(
+    relational_probabilistic_circuit, room_query_4
+):
+    model = relational_probabilistic_circuit.ground(room_query_4)
     names = {v.name for v in model.variables}
     assert "SceneRoom.position.x" in names
     assert "SceneRoom.orientation.w" in names
 
 
-def test_ground_integrates_out_unavailable_aggregates(rpc, room_query_4):
+def test_ground_integrates_out_unavailable_aggregates(
+    relational_probabilistic_circuit, room_query_4
+):
     """
     ``chair_count`` and ``table_count`` cannot be determined from the underspecified
     query, so the Monte-Carlo path must integrate them out: they must not survive as
     variables, while the object-type variables remain.
     """
-    model = rpc.ground(room_query_4)
+    model = relational_probabilistic_circuit.ground(room_query_4)
     names = {v.name for v in model.variables}
     assert "SceneRoomAggregations.chair_count()" not in names
     assert "SceneRoomAggregations.table_count()" not in names
@@ -143,37 +168,51 @@ def test_ground_integrates_out_unavailable_aggregates(rpc, room_query_4):
         assert f"SceneRoom.objects[{i}].type" in names
 
 
-def test_ground_with_unavailable_aggregate_is_valid(rpc, room_query_4):
+def test_ground_with_unavailable_aggregate_is_valid(
+    relational_probabilistic_circuit, room_query_4
+):
     np.random.seed(0)
-    assert rpc.ground(room_query_4).is_valid()
+    assert relational_probabilistic_circuit.ground(room_query_4).is_valid()
 
 
-def test_non_positive_sample_count_raises_when_integration_needed(rpc, room_query_4):
+def test_non_positive_sample_count_raises_when_integration_needed(
+    relational_probabilistic_circuit, room_query_4
+):
     """
     Monte-Carlo integration cannot be disabled: a non-positive sample count is rejected
     when undetermined aggregates must be integrated out.
     """
-    rpc.monte_carlo_sample_count = 0
+    relational_probabilistic_circuit.monte_carlo_sample_count = 0
     with pytest.raises(InvalidMonteCarloSampleCountError):
-        rpc.ground(room_query_4)
+        relational_probabilistic_circuit.ground(room_query_4)
 
 
-def test_monte_carlo_sample_count_controls_mixture_size(rpc, room_query_4):
+def test_monte_carlo_sample_count_controls_mixture_size(
+    relational_probabilistic_circuit, room_query_4
+):
     """
     Drawing more samples discovers more distinct aggregate values, each adding an
     exchangeable-distribution instance (and its sum units) to the mixture.
     """
     np.random.seed(0)
-    rpc.monte_carlo_sample_count = 1
-    single = sum(1 for n in rpc.ground(room_query_4).nodes() if isinstance(n, SumUnit))
+    relational_probabilistic_circuit.monte_carlo_sample_count = 1
+    single = sum(
+        1
+        for n in relational_probabilistic_circuit.ground(room_query_4).nodes()
+        if isinstance(n, SumUnit)
+    )
     np.random.seed(0)
-    rpc.monte_carlo_sample_count = 50
-    many = sum(1 for n in rpc.ground(room_query_4).nodes() if isinstance(n, SumUnit))
+    relational_probabilistic_circuit.monte_carlo_sample_count = 50
+    many = sum(
+        1
+        for n in relational_probabilistic_circuit.ground(room_query_4).nodes()
+        if isinstance(n, SumUnit)
+    )
     assert many > single
 
 
 @pytest.fixture
-def deserialized_rpc(rpc):
+def deserialized_relational_probabilistic_circuit(relational_probabilistic_circuit):
     """
     The circuit after a round-trip through actual JSON text.
 
@@ -181,58 +220,80 @@ def deserialized_rpc(rpc):
     intermediate dict is what exposes encoding losses such as integer node keys becoming
     strings.
     """
-    return from_json(json.loads(json.dumps(to_json(rpc))))
+    return from_json(json.loads(json.dumps(to_json(relational_probabilistic_circuit))))
 
 
-def test_deserialization_restores_class(deserialized_rpc):
-    assert isinstance(deserialized_rpc, RelationalProbabilisticCircuit)
-    assert deserialized_rpc.class_ is SceneRoom
+def test_deserialization_restores_class(deserialized_relational_probabilistic_circuit):
+    assert isinstance(
+        deserialized_relational_probabilistic_circuit, RelationalProbabilisticCircuit
+    )
+    assert deserialized_relational_probabilistic_circuit.class_ is SceneRoom
 
 
-def test_deserialization_restores_class_circuit_variables(rpc, deserialized_rpc):
-    original_names = {v.name for v in rpc.class_probabilistic_circuit.variables}
+def test_deserialization_restores_class_circuit_variables(
+    relational_probabilistic_circuit, deserialized_relational_probabilistic_circuit
+):
+    original_names = {
+        v.name
+        for v in relational_probabilistic_circuit.class_probabilistic_circuit.variables
+    }
     restored_names = {
-        v.name for v in deserialized_rpc.class_probabilistic_circuit.variables
+        v.name
+        for v in deserialized_relational_probabilistic_circuit.class_probabilistic_circuit.variables
     }
     assert restored_names == original_names
 
 
-def test_deserialization_restores_exchangeable_templates(rpc, deserialized_rpc):
+def test_deserialization_restores_exchangeable_templates(
+    relational_probabilistic_circuit, deserialized_relational_probabilistic_circuit
+):
     assert (
-        deserialized_rpc.exchangeable_distribution_templates.keys()
-        == rpc.exchangeable_distribution_templates.keys()
+        deserialized_relational_probabilistic_circuit.exchangeable_distribution_templates.keys()
+        == relational_probabilistic_circuit.exchangeable_distribution_templates.keys()
     )
-    template = deserialized_rpc.exchangeable_distribution_templates["objects"]
+    template = deserialized_relational_probabilistic_circuit.exchangeable_distribution_templates[
+        "objects"
+    ]
     latent_names = {v.name for v in template.latent_variables}
     assert latent_names == {
         v.name
-        for v in rpc.exchangeable_distribution_templates["objects"].latent_variables
+        for v in relational_probabilistic_circuit.exchangeable_distribution_templates[
+            "objects"
+        ].latent_variables
     }
 
 
 def test_deserialized_circuit_grounds_to_the_same_variables(
-    rpc, deserialized_rpc, room_query_4
+    relational_probabilistic_circuit,
+    deserialized_relational_probabilistic_circuit,
+    room_query_4,
 ):
     np.random.seed(0)
-    original = rpc.ground(room_query_4)
+    original = relational_probabilistic_circuit.ground(room_query_4)
     np.random.seed(0)
-    restored = deserialized_rpc.ground(room_query_4)
+    restored = deserialized_relational_probabilistic_circuit.ground(room_query_4)
     assert restored.is_valid()
     assert {v.name for v in restored.variables} == {v.name for v in original.variables}
 
 
-def test_deserialized_circuit_preserves_likelihoods(rpc, deserialized_rpc):
+def test_deserialized_circuit_preserves_likelihoods(
+    relational_probabilistic_circuit, deserialized_relational_probabilistic_circuit
+):
     """
     The class distribution itself must be preserved numerically, not only structurally.
     """
-    samples = rpc.class_probabilistic_circuit.sample(10)
+    samples = relational_probabilistic_circuit.class_probabilistic_circuit.sample(10)
     assert np.allclose(
-        rpc.class_probabilistic_circuit.log_likelihood(samples),
-        deserialized_rpc.class_probabilistic_circuit.log_likelihood(samples),
+        relational_probabilistic_circuit.class_probabilistic_circuit.log_likelihood(
+            samples
+        ),
+        deserialized_relational_probabilistic_circuit.class_probabilistic_circuit.log_likelihood(
+            samples
+        ),
     )
 
 
-def test_ground_variable_count_scales_with_query_size(rpc):
+def test_ground_variable_count_scales_with_query_size(relational_probabilistic_circuit):
     query_2 = a(SceneRoom)(
         position=a(KRROODPosition)(x=..., y=..., z=...),
         orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
@@ -245,4 +306,6 @@ def test_ground_variable_count_scales_with_query_size(rpc):
         objects=[a(SceneObject)(type=...) for _ in range(4)],
     )
     query_4.resolve()
-    assert len(rpc.ground(query_4).variables) > len(rpc.ground(query_2).variables)
+    assert len(relational_probabilistic_circuit.ground(query_4).variables) > len(
+        relational_probabilistic_circuit.ground(query_2).variables
+    )
