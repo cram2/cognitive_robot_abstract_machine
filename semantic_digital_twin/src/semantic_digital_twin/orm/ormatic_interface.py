@@ -11208,6 +11208,28 @@ class WorldModelManagerDAO(
     )
 
 
+class WorldStateBatchContextManagerDAO(
+    Base, DataAccessObject[semantic_digital_twin.world.WorldStateBatchContextManager]
+):
+    __tablename__ = "WorldStateBatchContextManagerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    publish_changes: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+
+
 class JointDynamicsDAO(
     Base,
     DataAccessObject[
