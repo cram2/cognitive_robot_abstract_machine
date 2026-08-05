@@ -312,10 +312,14 @@ class TestCartesianTasks:
         executor.compile(motion_statechart=motion_statechart)
         executor.tick_until_end()
 
+        forward_kinematics = cylinder_bot_world.compute_forward_kinematics(
+            cylinder_bot_world.root, tip
+        )
         assert np.allclose(
-            cylinder_bot_world.compute_forward_kinematics(cylinder_bot_world.root, tip),
-            goal.goal_pose,
-            atol=goal.threshold,
+            forward_kinematics, goal.goal_pose, atol=goal.linear_threshold
+        )
+        assert np.allclose(
+            forward_kinematics, goal.goal_pose, atol=goal.angular_threshold
         )
 
     def test_end_motion_waits_for_convergence(self, cylinder_bot_world: World):
@@ -457,10 +461,18 @@ class TestCartesianTasks:
         executor.compile(motion_statechart=motion_statechart)
         executor.tick_until_end()
 
+        forward_kinematics = executor.context.world.compute_forward_kinematics(
+            root, tip
+        )
         assert np.allclose(
-            executor.context.world.compute_forward_kinematics(root, tip),
+            forward_kinematics,
             expected,
-            atol=cart_goal.threshold,
+            atol=cart_goal.linear_threshold,
+        )
+        assert np.allclose(
+            forward_kinematics,
+            expected,
+            atol=cart_goal.angular_threshold,
         )
 
     def test_front_facing_orientation(self, _hsr_world_setup: World):
@@ -562,11 +574,14 @@ class TestCartesianTasks:
         executor.compile(motion_statechart=motion_statechart)
         executor.tick_until_end()
 
-        forward_kinematics = pr2_world_state_reset.compute_forward_kinematics_np(
-            root, tip
+        forward_kinematics = pr2_world_state_reset.compute_forward_kinematics(root, tip)
+        assert np.allclose(
+            forward_kinematics, tip_goal2, atol=cart_goal2.linear_threshold
         )
         assert np.allclose(
-            forward_kinematics, tip_goal2.to_np(), atol=cart_goal2.threshold
+            forward_kinematics,
+            tip_goal2,
+            atol=cart_goal2.angular_threshold,
         )
 
     def test_cart_goal_sequence_on_start(self, pr2_world_state_reset: World):
@@ -619,7 +634,14 @@ class TestCartesianTasks:
             root, tip
         )
         expected = np.eye(4)
-        assert np.allclose(forward_kinematics, expected, atol=cart_goal2.threshold)
+        assert np.allclose(
+            forward_kinematics, expected, atol=cart_goal2.linear_threshold
+        )
+        assert np.allclose(
+            forward_kinematics,
+            expected,
+            atol=cart_goal2.angular_threshold,
+        )
 
     def test_CartesianOrientation(self, pr2_world_state_reset: World):
         """
@@ -999,8 +1021,8 @@ class TestCartesianTasks:
 
     def test_soft_trunk_cartesian_position(self):
         """
-        Verifies that Giskardpy can solve and execute a CartesianPosition task
-        for the procedurally built Piecewise Constant Curvature SoftTrunk robot.
+        Verifies that Giskardpy can solve and execute a CartesianPosition task for the
+        procedurally built Piecewise Constant Curvature SoftTrunk robot.
         """
         from semantic_digital_twin.datastructures.soft_trunk import (
             SoftTrunk,

@@ -42,7 +42,6 @@ from krrood.symbolic_math.symbolic_math import (
 )
 
 if TYPE_CHECKING:
-    from giskardpy.middleware.ros2.python_interface import GiskardWrapper
     from coraplex.robot_plans.actions.base import ActionDescription
 
     from coraplex.plans.condition_nodes import ConditionNode
@@ -367,11 +366,7 @@ class GiskardExecutable(Executable):
         Executes the motion state chart on the real robot via giskard while monitoring
         for interrupts.
         """
-        from giskardpy.middleware.ros2.python_interface import GiskardWrapper
-
-        giskard = GiskardWrapper(self.context.ros_node, world=self.context.world)
-
-        giskard.execute(self.motion_state_chart)
+        self.context.giskard_wrapper.execute(self.motion_state_chart)
 
 
 @dataclass

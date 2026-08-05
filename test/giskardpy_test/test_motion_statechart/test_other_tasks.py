@@ -25,6 +25,7 @@ from giskardpy.motion_statechart.tasks.feature_functions import (
     AlignPerpendicular,
     DistanceGoal,
     HeightGoal,
+    ReachPoint,
 )
 from giskardpy.motion_statechart.tasks.pointing import Pointing, PointingCone
 from giskardpy.utils.math import angle_between_vector
@@ -151,6 +152,50 @@ class TestFeatureFunctions:
         assert (
             lower_limit <= height_diff <= upper_limit
         ), f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
+
+    def test_reach_point_drives_offset_point_onto_reference(
+        self, pr2_world_state_reset: World
+    ):
+        """
+        Test that ReachPoint drives a controlled tip point onto a reference point.
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "base_footprint"
+        )
+
+        tip_point = Point3(0.0, 0.0, 0.0, reference_frame=tip)
+        root_P_tip_start = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=tip_point
+        )
+        reference_point = root_P_tip_start + Vector3(
+            -0.1, 0.05, -0.05, reference_frame=root
+        )
+
+        msc = MotionStatechart()
+        reach_point = ReachPoint(
+            root_link=root,
+            tip_link=tip,
+            tip_point=tip_point,
+            reference_point=reference_point,
+        )
+        msc.add_node(reach_point)
+        msc.add_node(EndMotion.when_true(reach_point))
+
+        kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+        assert reach_point.observation_state == ObservationStateValues.TRUE
+
+        root_P_tip_final = pr2_world_state_reset.transform(
+            target_frame=root, spatial_object=tip_point
+        )
+        assert (
+            np.linalg.norm(root_P_tip_final - reference_point) <= reach_point.threshold
+        )
 
     def test_distance_goal_within_bounds(self, pr2_world_state_reset: World):
         """

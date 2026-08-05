@@ -296,6 +296,58 @@ class DistanceGoal(FeatureFunctionGoal):
 
 
 @dataclass(eq=False, repr=False)
+class ReachPoint(FeatureFunctionGoal):
+    """
+    Drives a controlled point on the tip onto a reference point.
+    """
+
+    tip_point: Point3 = field(kw_only=True)
+    """
+    The point to be controlled, defined in the tip link frame.
+    """
+
+    reference_point: Point3 = field(kw_only=True)
+    """
+    The target point to reach, defined in the root link frame.
+    """
+
+    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True)
+    """
+    Priority weight for the reach constraint in the optimization problem.
+    """
+
+    maximum_velocity: float = field(default=0.2, kw_only=True)
+    """
+    Maximum allowed velocity for the reaching motion in meters per second.
+    """
+
+    threshold: float = field(default=0.01, kw_only=True)
+    """
+    Distance below which the goal is considered achieved, in meters.
+    """
+
+    def get_controlled_and_reference_features(self):
+        return self.tip_point, self.reference_point
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        artifacts = super().build(context)
+
+        artifacts.geometry.add_point_goal_constraints(
+            frame_P_current=self.root_P_controlled_feature,
+            frame_P_goal=self.root_P_reference_feature,
+            reference_velocity=self.maximum_velocity,
+            quadratic_weight=self.weight,
+        )
+        artifacts.observation = (
+            self.root_P_controlled_feature.euclidean_distance(
+                self.root_P_reference_feature
+            )
+            < self.threshold
+        )
+        return artifacts
+
+
+@dataclass(eq=False, repr=False)
 class AngleGoal(FeatureFunctionGoal):
     """
     Controls the angle between the `tip_vector` and the `reference_vector` to be between

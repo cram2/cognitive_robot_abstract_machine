@@ -2003,7 +2003,8 @@ class TestMaxManipulability:
         fk = pr2_world_state_reset.compute_forward_kinematics_np(
             pr2_world_state_reset.root, tip
         )
-        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.threshold)
+        assert np.allclose(fk, goal_pose, atol=cart_goal.linear_threshold)
+        assert np.allclose(fk, goal_pose, atol=cart_goal.angular_threshold)
 
 
 class TestEagerStateVariables:
