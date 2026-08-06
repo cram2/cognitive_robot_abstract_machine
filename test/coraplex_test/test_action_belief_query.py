@@ -8,8 +8,10 @@ from coraplex.action_belief.results import ActionBeliefResult
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.robot_plans.actions.core.container import OpenAction
+from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
 def _right_front_grasp(view):
@@ -82,7 +84,8 @@ def test_materialize_kwargs_resyncs_end_effector_to_the_candidates_arm(
 
 def test_run_ranks_feasible_candidates_and_rejects_the_rest(immutable_model_world):
     """
-    End to end, on the same reachable milk pose :mod:`test_pose_validator` uses for
+    End to end, on the same reachable milk pose :mod:`test_pose_validator` uses for.
+
     ``test_is_object_reachable_by_reachable``: 6 of the 24 candidates are feasible
     (all right-arm), and the rest - both left-arm and the other right-arm
     approach/alignment combinations - are rejected.
@@ -218,3 +221,74 @@ def test_run_on_open_action_has_a_single_choice_point(immutable_model_world):
     assert result.candidates_enumerated == 2
     assert result.candidates_feasible == 1
     assert result.chosen["arm"] == Arms.LEFT
+
+
+def test_rank_grounded_actions_bounds_a_long_candidate_stream(immutable_model_world):
+    """
+    ``rank_grounded_actions`` must not eagerly exhaust its whole input: each
+    candidate re-checks ``pre_condition`` against a fresh deep copy of the world, so
+    for a registered type with a bucket-B choice point (e.g.
+    ``NavigateAction.target_location``) -- where the query backend can supply far
+    more candidates than are ever useful -- exhausting everything up front would
+    make ranking impractically expensive.
+    """
+    world, view, context = immutable_model_world
+
+    consumed = []
+
+    def many_candidates():
+        for i in range(1000):
+            consumed.append(i)
+            yield NavigateAction(
+                Pose.from_xyz_rpy(float(i), 0.0, 0.0, reference_frame=world.root)
+            )
+
+    ranked = ActionBeliefQuery(
+        action_type=NavigateAction,
+        fixed_kwargs={},
+        context=context,
+        max_location_candidates=5,
+    ).rank_grounded_actions(many_candidates())
+
+    first_five = [next(ranked) for _ in range(5)]
+
+    assert len(consumed) == 5
+    assert sorted(
+        float(action.target_location.to_position().x) for action in first_five
+    ) == [
+        0.0,
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+    ]
+
+
+def test_rank_grounded_actions_still_yields_candidates_beyond_the_bound(
+    immutable_model_world,
+):
+    """
+    Candidates past :attr:`ActionBeliefQuery.max_location_candidates` are not
+    dropped -- they are appended afterward, unranked, in their original order, so
+    every candidate the query backend produced remains triable.
+    """
+    world, view, context = immutable_model_world
+
+    def candidates():
+        for i in range(7):
+            yield NavigateAction(
+                Pose.from_xyz_rpy(float(i), 0.0, 0.0, reference_frame=world.root)
+            )
+
+    ranked = list(
+        ActionBeliefQuery(
+            action_type=NavigateAction,
+            fixed_kwargs={},
+            context=context,
+            max_location_candidates=3,
+        ).rank_grounded_actions(candidates())
+    )
+
+    assert len(ranked) == 7
+    unranked_tail = [action.target_location.to_position().x for action in ranked[3:]]
+    assert unranked_tail == [3.0, 4.0, 5.0, 6.0]

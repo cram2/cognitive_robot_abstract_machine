@@ -72,9 +72,11 @@ class ActionBeliefQuery:
 
     max_location_candidates: int = 10
     """
-    Cutoff for how many poses to draw from a bucket-B choice point's ``Location``
-    before ranking. Bounding an otherwise-lazy generator to a small prefix keeps
-    enumeration cheap.
+    Cutoff for how many candidates to evaluate eagerly before ranking: how many poses
+    :meth:`enumerate_candidates` draws from a bucket-B choice point's ``Location``, and
+    how many already-grounded actions :meth:`rank_grounded_actions` evaluates up front.
+
+    Bounding an otherwise-lazy stream to a small prefix keeps both cheap.
     """
 
     @property
@@ -212,13 +214,22 @@ class ActionBeliefQuery:
         any: this ranks a query backend's output for retry ordering, unlike
         :meth:`run`, which builds and evaluates its own candidates from scratch.
 
+        Only the first :attr:`max_location_candidates` of ``actions`` are evaluated
+        and ranked eagerly. Each evaluation re-checks ``pre_condition`` against a
+        fresh deep copy of the world, so for a registered type with a bucket-B
+        choice point (e.g. ``NavigateAction.target_location``) the query backend can
+        supply far more candidates than are ever useful to check up front. Anything
+        beyond that prefix is appended afterward, unranked, in its original
+        streaming order -- still triable, just not evaluated ahead of time.
+
         :param actions: Already-grounded instances of :attr:`action_type`, e.g. from
             ``context.query_backend.evaluate(...)``.
-        :return: ``actions`` whose ``pre_condition`` holds first (ranked by prior
-            weight among themselves), then the rest, each group in its original
-            relative order.
+        :return: The ranked prefix (``pre_condition``-holding candidates first, by
+            prior weight, then the ones that failed), followed by the unranked
+            remainder of ``actions``.
         """
-        materialized = list(actions)
+        action_iterator = iter(actions)
+        buffered = list(itertools.islice(action_iterator, self.max_location_candidates))
         prior = (
             self.prior
             if self.prior is not None
@@ -227,7 +238,7 @@ class ActionBeliefQuery:
 
         feasible: List[Tuple[ActionDescription, float]] = []
         infeasible: List[ActionDescription] = []
-        for action in materialized:
+        for action in buffered:
             if self.predict_feasible(action):
                 weight = (
                     prior.get(_candidate_key(self._extract_candidate(action)), 1.0)
@@ -242,6 +253,7 @@ class ActionBeliefQuery:
         for action, _ in feasible:
             yield action
         yield from infeasible
+        yield from action_iterator
 
     def run(self) -> ActionBeliefResult:
         """
