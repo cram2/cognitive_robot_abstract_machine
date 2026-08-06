@@ -248,6 +248,29 @@ class UsageError(LogicalError):
 
 
 @dataclass
+class InvalidCameraResolutionError(UsageError):
+    """
+    Raised when a camera resolution cannot describe a ray tracing image.
+    """
+
+    resolution: Any
+    """
+    The invalid camera resolution value.
+    """
+
+    reason: str
+    """
+    Details about why the camera resolution is invalid.
+    """
+
+    def error_message(self) -> str:
+        return f"Invalid camera resolution {self.resolution!r}: {self.reason}"
+
+    def suggest_correction(self) -> str:
+        return "provide a positive integer or a two-element width-height pair of positive integers."
+
+
+@dataclass
 class WorldValidationError(LogicalError):
     """
     Raised when the world fails validation, e.g., when the kinematic structure is not a
