@@ -65,6 +65,13 @@ class ScratchRepository:
     The bare repository the notes branch is pushed to and fetched from.
     """
 
+    work_remote_path: Path | None = None
+    """
+    The bare repository standing in for the project's own remote, created only by
+    :meth:`add_work_remote` so a test that never publishes a work branch has no
+    ``origin`` it did not ask for.
+    """
+
     @classmethod
     def create(cls, parent_directory: Path) -> ScratchRepository:
         """
@@ -88,16 +95,19 @@ class ScratchRepository:
         repository.run_git("config", "user.email", "scratch-repo@example.com")
         return repository
 
-    def run_git(self, *arguments: str) -> subprocess.CompletedProcess[str]:
+    def run_git(
+        self, *arguments: str, cwd: Path | None = None
+    ) -> subprocess.CompletedProcess[str]:
         """
         Run git in the project root, failing the test if it reports an error.
 
         :param arguments: The arguments to pass to git.
+        :param cwd: Where to run it, defaulting to the project root.
         :return: The finished subprocess.
         """
         result = subprocess.run(
             ["git", *arguments],
-            cwd=self.project_root,
+            cwd=cwd or self.project_root,
             capture_output=True,
             text=True,
         )
@@ -176,6 +186,41 @@ class ScratchRepository:
             str(destination),
         )
         return destination
+
+    def update_notes_branch_file(self, relative_path: str, content: str) -> None:
+        """
+        Change one file on the already-published notes branch, the way an edit made from
+        another clone would reach it.
+
+        :param relative_path: Path relative to the notes branch's root.
+        :param content: The content to commit there.
+        """
+        checkout = self.project_root.parent / "notes-update-checkout"
+        shutil.rmtree(checkout, ignore_errors=True)
+        self.clone_notes_branch(checkout)
+        self.run_git("config", "user.name", "Scratch Repo", cwd=checkout)
+        self.run_git("config", "user.email", "scratch-repo@example.com", cwd=checkout)
+
+        destination = checkout / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(content)
+        self.run_git("add", relative_path, cwd=checkout)
+        self.run_git("commit", "--quiet", "-m", f"Set {relative_path}", cwd=checkout)
+        self.run_git("push", "--quiet", "origin", NOTES_BRANCH, cwd=checkout)
+        shutil.rmtree(checkout)
+
+    def add_work_remote(self) -> Path:
+        """
+        Create a bare repository standing in for the project's own remote and register
+        it as ``origin``, for a hook that publishes a work branch rather than notes.
+
+        :return: The work remote's path.
+        """
+        self.work_remote_path = initialize_bare_repository(
+            self.project_root.parent / "work-remote.git"
+        )
+        self.run_git("remote", "add", "origin", str(self.work_remote_path))
+        return self.work_remote_path
 
     def resolve_notes_remote_to(self, remote: Path | None = None) -> None:
         """

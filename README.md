@@ -145,6 +145,16 @@ plan dashboards) end to end, in order.
   mode, without writing any code. The "Resolve"/"Resume"/"Reconsider" button
   on a blocked/in-progress/deferred item's dashboard card copies the
   invoking command for this skill.
+- **[`.claude/skills/stacked-pr-maintenance/`](.claude/skills/stacked-pr-maintenance/SKILL.md)** -
+  runs one maintenance pass over a stacked-PR fork-staging workflow: reparents any pull
+  request whose base has landed, closes what has landed by fast-forwarding, restacks
+  branches whose parent moved, and builds the promotion link for every approved,
+  unblocked branch. Deliberately never writes code - a conflict it cannot merge cleanly,
+  or a red check, is reported to the branch's owner and skipped. Invoke it by hand when
+  the stack needs a pass, or register it as a scheduled Routine using the template in
+  [`routine-prompt.md`](.claude/skills/stacked-pr-maintenance/routine-prompt.md). The
+  workflow it maintains, and the read-only tool it computes with, are described in
+  [`.claude/stack/README.md`](.claude/stack/README.md).
 - **[`.claude/skills/local-code-review/`](.claude/skills/local-code-review/SKILL.md)** -
   reviews the current branch against upstream `main` for bugs and
   `AGENTS.md` adherence, then hands back an approval-gated plan to fix every

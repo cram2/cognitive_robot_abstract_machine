@@ -27,6 +27,7 @@ from giskardpy.motion_statechart.exceptions import (
     NonObservationVariableError,
     NodeAlreadyBelongsToDifferentNodeError,
     ConditionScopeError,
+    EmptyDegreesOfFreedomError,
 )
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import (
@@ -393,6 +394,155 @@ def test_two_goals(pr2_world_state_reset: World):
     assert np.allclose(pr2_world_state_reset.state.velocities, 0)
     assert np.allclose(pr2_world_state_reset.state.accelerations, 0)
     assert np.allclose(pr2_world_state_reset.state.jerks, 0)
+
+
+def test_parallel_local_minimum_reached_tolerates_stall(pr2_world_state_reset: World):
+    """
+    A :class:`JointPositionList` goal and a :class:`LocalMinimumReached` monitor
+    combined via ``Parallel(..., minimum_success=1)`` must finish once the commanded
+    joint's velocity has settled near zero, even though the goal task itself never
+    reaches its nominal target -- simulating a joint that got physically stopped (e.g.
+    a gripper finger against a grasped object) before arriving. Capping the joint's own
+    velocity limit to a tiny value makes it provably unable to traverse the requested
+    distance within the tick budget, while its tracked velocity still settles below the
+    stall threshold almost immediately.
+
+    This is the pattern that replaces baking stall-tolerance into a task's own
+    observation: the goal's observation still means "goal reached", nothing else, and
+    the ``Parallel`` node is what tolerates the stall.
+    """
+    torso_joint = pr2_world_state_reset.get_connection_by_name("torso_lift_joint")
+    torso_joint.raw_dof.limits.lower.velocity = -1e-3
+    torso_joint.raw_dof.limits.upper.velocity = 1e-3
+
+    msc = MotionStatechart()
+    msc.add_node(
+        combined := Parallel(
+            [
+                joint_goal := JointPositionList(
+                    goal_state=JointState.from_mapping({torso_joint: 1.0}),
+                ),
+                LocalMinimumReached(
+                    degrees_of_freedom=[torso_joint.raw_dof],
+                    minimum_time=0.2,
+                    measure_from_own_start=True,
+                ),
+            ],
+            minimum_success=1,
+        )
+    )
+    msc.add_node(EndMotion.when_true(combined))
+
+    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+    kin_sim.compile(motion_statechart=msc)
+    kin_sim.tick_until_end(timeout=1000)
+
+    assert not np.isclose(torso_joint.position, 1.0, atol=1e-2), (
+        "the joint should not have reached its nominal target -- its velocity "
+        "was capped far too low to traverse the distance within the timeout, "
+        "this test is only meaningful if it stayed far away"
+    )
+    assert msc.observation_state[joint_goal] == ObservationStateValues.FALSE, (
+        "the goal task's own observation must still mean 'goal reached' -- it must "
+        "not be the thing that turned true here, only the surrounding Parallel"
+    )
+
+
+def test_joint_position_list_alone_times_out_on_stall(
+    pr2_world_state_reset: World,
+):
+    """
+    Regression control for test_parallel_local_minimum_reached_tolerates_stall: a bare
+    :class:`JointPositionList`, without the surrounding ``Parallel`` +
+    :class:`LocalMinimumReached`, must never reach EndMotion in the same stalled
+    scenario -- proving the monitor is what unblocks it, not some unrelated change.
+    """
+    torso_joint = pr2_world_state_reset.get_connection_by_name("torso_lift_joint")
+    torso_joint.raw_dof.limits.lower.velocity = -1e-3
+    torso_joint.raw_dof.limits.upper.velocity = 1e-3
+
+    msc = MotionStatechart()
+    msc.add_node(
+        joint_goal := JointPositionList(
+            goal_state=JointState.from_mapping({torso_joint: 1.0}),
+        )
+    )
+    msc.add_node(EndMotion.when_true(joint_goal))
+
+    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+    kin_sim.compile(motion_statechart=msc)
+
+    with pytest.raises(TimeoutError):
+        kin_sim.tick_until_end(timeout=200)
+
+
+def test_local_minimum_reached_only_depends_on_given_degrees_of_freedom(
+    pr2_world_state_reset: World,
+):
+    """
+    LocalMinimumReached(degrees_of_freedom=[...]) must only depend on the given subset
+    of degrees of freedom, not every active one in the world -- otherwise passing a
+    subset to tolerate a stall on one joint could be defeated by unrelated motion
+    elsewhere in the robot.
+    """
+    torso_joint = pr2_world_state_reset.get_connection_by_name("torso_lift_joint")
+    moving_joint = pr2_world_state_reset.get_connection_by_name("r_wrist_roll_joint")
+
+    msc = MotionStatechart()
+    msc.add_nodes(
+        [
+            JointPositionList(goal_state=JointState.from_mapping({moving_joint: 2.0})),
+            local_min := LocalMinimumReached(
+                degrees_of_freedom=[torso_joint.raw_dof], minimum_time=0.1
+            ),
+        ]
+    )
+    msc.add_node(EndMotion.when_true(local_min))
+
+    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+    kin_sim.compile(motion_statechart=msc)
+
+    # Checked directly against local_min's own observation state, not against
+    # is_end_motion()/tick_until_end(): EndMotion additionally waits for every active
+    # DOF's velocity to settle before actually ending the whole motion (see
+    # test_end_motion_waits_for_convergence), so it is no longer a reliable proxy for
+    # "when did this specific monitor become true".
+    for _ in range(10):
+        kin_sim.tick()
+    assert msc.observation_state[local_min] == ObservationStateValues.TRUE, (
+        "the scoped monitor should have settled almost immediately -- torso_joint "
+        "never moves"
+    )
+    assert not np.isclose(moving_joint.position, 2.0, atol=1e-2), (
+        "r_wrist_roll_joint should still be mid-motion at this point -- otherwise "
+        "this test doesn't prove the monitor ignored it"
+    )
+
+
+def test_local_minimum_reached_measures_minimum_time_from_own_start_by_default():
+    """
+    measure_from_own_start must default to True: LocalMinimumReached is normally used to
+    detect a stall on one specific, possibly late-starting motion (e.g. wrapped in a
+    Parallel around it), so minimum_time should count from when the monitor itself
+    started running, not from the start of the whole motion chart, even if the caller
+    never sets the flag explicitly.
+    """
+    assert LocalMinimumReached().measure_from_own_start is True
+
+
+def test_local_minimum_reached_raises_on_explicitly_empty_degrees_of_freedom(
+    pr2_world_state_reset,
+):
+    """
+    Passing an explicit empty degrees_of_freedom list is a caller misconfiguration (e.g.
+    an empty set of connections upstream) and must raise, rather than silently turning
+    the monitor into a constant-true observation that could mask the bug.
+    """
+    monitor = LocalMinimumReached(degrees_of_freedom=[])
+    context = MotionStatechartContext(world=pr2_world_state_reset)
+
+    with pytest.raises(EmptyDegreesOfFreedomError):
+        monitor.build(context)
 
 
 @dataclass(eq=False, repr=False)
@@ -2003,7 +2153,7 @@ class TestMaxManipulability:
         fk = pr2_world_state_reset.compute_forward_kinematics_np(
             pr2_world_state_reset.root, tip
         )
-        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.threshold)
+        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.translation_threshold)
 
 
 class TestEagerStateVariables:

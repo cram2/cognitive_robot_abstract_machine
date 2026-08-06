@@ -40,6 +40,11 @@ from semantic_digital_twin.collision_checking.pybullet_collision_detector import
     BulletCollisionDetector,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import (
+    BodyHasNoGeometryError,
+    InvalidBodiesInCollisionCheckError,
+    NegativeCollisionCheckingDistanceError,
+)
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
@@ -636,3 +641,115 @@ class TestCollisionGroups:
             }
         )
         assert not root_matrix.is_collision_groups_combination_checked(group_a, group_b)
+
+
+# %% constructing collision checks
+
+
+@dataclass
+class GeometryInspectionCounter:
+    """
+    Counts how often the collision geometry of a body was inspected.
+
+    Inspecting it builds a mesh of every collision shape, so it is worth knowing how
+    often it happens.
+    """
+
+    inspections: int = 0
+    """
+    How often the geometry of any body was inspected since the counter was installed.
+    """
+
+    def install(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """
+        Count every geometry inspection until the test ends.
+        """
+        original_has_collision = Body.has_collision
+
+        def counting_has_collision(body: Body, *args, **kwargs) -> bool:
+            self.inspections += 1
+            return original_has_collision(body, *args, **kwargs)
+
+        monkeypatch.setattr(Body, "has_collision", counting_has_collision)
+
+
+def create_body_with_collision(name: str) -> Body:
+    """
+    A body whose collision geometry is big enough to be checked.
+    """
+    return Body(
+        name=PrefixedName(name), collision=ShapeCollection([Sphere(radius=0.1)])
+    )
+
+
+class TestCollisionCheckConstruction:
+    """
+    A collision check keeps its bodies in a canonical order, so that two checks for the
+    same pair are the same check.
+    """
+
+    def test_bodies_are_sorted(self):
+        body_a = create_body_with_collision("a")
+        body_b = create_body_with_collision("b")
+        first, second = sorted([body_a, body_b], key=lambda body: body.id)
+
+        check = CollisionCheck.create_for_bodies_with_collision(second, first)
+
+        assert check.body_a is first
+        assert check.body_b is second
+
+    def test_identical_bodies_are_rejected(self):
+        body = create_body_with_collision("a")
+
+        with pytest.raises(InvalidBodiesInCollisionCheckError):
+            CollisionCheck.create_for_bodies_with_collision(body, body)
+
+    def test_negative_distance_is_rejected(self):
+        with pytest.raises(NegativeCollisionCheckingDistanceError):
+            CollisionCheck.create_for_bodies_with_collision(
+                create_body_with_collision("a"),
+                create_body_with_collision("b"),
+                distance=-0.1,
+            )
+
+    def test_a_body_without_geometry_is_rejected_when_validated(self):
+        with pytest.raises(BodyHasNoGeometryError):
+            CollisionCheck.create_and_validate(
+                create_body_with_collision("a"), Body(name=PrefixedName("empty"))
+            )
+
+    def test_geometry_is_not_inspected_for_bodies_that_were_already_filtered(self):
+        """
+        The bodies come from ``world.bodies_with_collision``, so inspecting their
+        geometry again would only repeat an answer that is already known.
+        """
+        body_with_collision = create_body_with_collision("a")
+        body_without_collision = Body(name=PrefixedName("empty"))
+
+        check = CollisionCheck.create_for_bodies_with_collision(
+            body_with_collision, body_without_collision
+        )
+
+        assert set(check.bodies()) == {body_with_collision, body_without_collision}
+
+
+class TestGeometryInspectionWhileBuildingRules:
+    """
+    A rule that covers every body pair must not inspect the geometry of a body once per
+    pair, because that grows quadratically with the size of the world.
+    """
+
+    def test_geometry_is_inspected_once_per_body(self, monkeypatch):
+        world = World()
+        with world.modify_world():
+            root = create_body_with_collision("root")
+            world.add_body(root)
+            for index in range(5):
+                body = create_body_with_collision(f"body_{index}")
+                world.add_connection(FixedConnection(parent=root, child=body))
+        counter = GeometryInspectionCounter()
+        counter.install(monkeypatch)
+
+        AvoidAllCollisions().update(world)
+
+        assert counter.inspections == len(world.bodies)

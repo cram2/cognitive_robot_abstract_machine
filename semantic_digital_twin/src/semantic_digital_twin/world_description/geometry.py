@@ -17,9 +17,20 @@ import trimesh.exchange.stl
 from PIL import Image
 from plyfile import PlyData
 from trimesh.visual.texture import TextureVisuals, SimpleMaterial
-from typing_extensions import Optional, List, Dict, Any, Self, Tuple, TYPE_CHECKING
+from typing_extensions import (
+    Optional,
+    List,
+    Dict,
+    Any,
+    Self,
+    Tuple,
+    TYPE_CHECKING,
+    Generic,
+    TypeVar,
+)
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from random_events.interval import SimpleInterval, Bound, closed
 from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
@@ -338,7 +349,7 @@ class Scale:
     @property
     def xy(self):
         """
-        Returns the scale in the xy-plane with a zero for z
+        Returns the scale in the xy-plane with a zero for z.
 
         :return: The scale in the xy-plane
         """
@@ -392,6 +403,18 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
 
         This should be implemented by subclasses.
         """
+
+    def mesh_in_frame(self, target_frame: KinematicStructureEntity) -> trimesh.Trimesh:
+        """
+        :param target_frame: The kinematic structure entity to express the mesh
+            relative to.
+        :return: A copy of :attr:`mesh` transformed from this shape's own frame into
+            *target_frame*.
+        """
+        world = self.origin.reference_frame._world
+        world_mesh = self.mesh.copy()
+        world_mesh.apply_transform(world.transform(self.origin, target_frame).to_np())
+        return world_mesh
 
     def to_json(self) -> Dict[str, Any]:
         return {
@@ -505,9 +528,30 @@ class Mesh(Shape):
         """
         return BoundingBox.from_mesh(self.mesh, self.origin)
 
+    @staticmethod
+    def _load_in_meters(filename: str, process: bool = True) -> trimesh.Trimesh:
+        """
+        Load a mesh file, converting its coordinates to meters when the file declares
+        the unit they are written in.
+
+        A file that declares no unit is read as it is written, because there is nothing to
+        convert from.
+
+        ..note:: The scale a renderer applies on top of this must stay free of the
+            conversion. RViz is handed the file itself and converts its units again.
+
+        :param filename: The path of the mesh file.
+        :param process: Whether trimesh merges vertices and drops degenerate faces.
+        :return: The loaded mesh, measured in meters.
+        """
+        mesh = trimesh.load_mesh(filename, process=process)
+        if mesh.units is not None:
+            mesh.convert_units("meters")
+        return mesh
+
     def to_json(self) -> Dict[str, Any]:
         # Serialize the raw (unscaled, unprocessed) mesh geometry and the scale separately
-        base_mesh = trimesh.load_mesh(self.filename, process=False)
+        base_mesh = self._load_in_meters(self.filename, process=False)
         # Bake materials/textures down to per-vertex colors so the mesh's color
         # survives serialization (e.g. across the ROS world synchronizer).
         if isinstance(base_mesh.visual, TextureVisuals):
@@ -587,7 +631,7 @@ class Mesh(Shape):
         """
         The mesh object.
         """
-        mesh = trimesh.load_mesh(self.filename)
+        mesh = self._load_in_meters(self.filename)
         mesh.apply_scale(self.scale.to_np())
         # Apply the shape's color only when it was explicitly set, so a mesh's own
         # materials or per-vertex colors (e.g. from a .dae or from serialization)
@@ -1063,6 +1107,26 @@ class Box(Shape):
         )
 
 
+T = TypeVar("T")
+
+
+@dataclass
+class Bounds(Generic[T], SubClassSafeGeneric):
+    """
+    The lower and upper corner of an axis-aligned region.
+    """
+
+    lower: T
+    """
+    The corner with the smallest coordinate on every axis.
+    """
+
+    upper: T
+    """
+    The corner with the largest coordinate on every axis.
+    """
+
+
 @dataclass(eq=False)
 class BoundingBox:
     min_x: float
@@ -1141,6 +1205,40 @@ class BoundingBox:
             Bound.CLOSED,
             Bound.CLOSED,
         )
+
+    def to_array_bounds(self) -> Bounds[np.ndarray]:
+        """
+        Express this bounding box's lower and upper corners as plain-float 3-vectors.
+
+        :return: The corners, in the same frame as ``origin``.
+        """
+        lower = np.array(
+            [self.x_interval.lower, self.y_interval.lower, self.z_interval.lower]
+        )
+        upper = np.array(
+            [self.x_interval.upper, self.y_interval.upper, self.z_interval.upper]
+        )
+        return Bounds(lower, upper)
+
+    def to_point3_bounds(self) -> Bounds[Point3]:
+        """
+        Express this bounding box's lower and upper corners as ``Point3`` instances.
+
+        :return: The corners, in the same frame as ``origin``.
+        """
+        lower = Point3(
+            self.x_interval.lower,
+            self.y_interval.lower,
+            self.z_interval.lower,
+            reference_frame=self.origin.reference_frame,
+        )
+        upper = Point3(
+            self.x_interval.upper,
+            self.y_interval.upper,
+            self.z_interval.upper,
+            reference_frame=self.origin.reference_frame,
+        )
+        return Bounds(lower, upper)
 
     @property
     def scale(self) -> Scale:

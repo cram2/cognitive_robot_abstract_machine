@@ -683,8 +683,8 @@ def test_motion_order_pick_up(mutable_model_world):
     motion_names = [motion.name for motion in all_motions]
 
     assert motion_names == [
-        "OpenGripper",
         "MoveTCP",
+        "OpenGripper",
         "MoveTCP",
         "CloseGripper",
         "MoveTCP",
@@ -770,7 +770,7 @@ def test_node_expansion(immutable_model_world):
 
     expanded_children = pick_node.children
     assert len(expanded_children) == 3
-    assert len(expanded_children[1].children) == 5
+    assert len(expanded_children[1].children) == 4
 
 
 def test_expand_move_torso(immutable_model_world):

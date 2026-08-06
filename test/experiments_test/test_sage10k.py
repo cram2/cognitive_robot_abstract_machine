@@ -107,9 +107,11 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
 
 
 def test_translate_free_space_to_where_condition(wall_door_handle_world):
-    from semantic_digital_twin.world_description.graph_of_convex_sets import (
-        navigation_map_at_target,
+    from semantic_digital_twin.world_description.graph_of_convex_sets.base import (
         translate_free_space_to_where_condition,
+    )
+    from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
+        navigation_map_at_target,
     )
 
     world, wall, door, handle = wall_door_handle_world

@@ -282,6 +282,16 @@ def test_world_specification_from_mjcf_environment():
     assert world.root is not None
 
 
+def test_world_specification_from_gazebo_environment():
+    world = WorldSpecification.from_gazebo(
+        os.path.join(RESOURCES, "gazebo", "mini_warehouse", "worlds", "mini.world"),
+        objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
+    ).to_domain_object()
+
+    assert not world.is_empty()
+    assert world.get_body_by_name("obj") is not None
+
+
 # %% shape constructors
 
 

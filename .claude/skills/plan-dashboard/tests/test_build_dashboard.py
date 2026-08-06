@@ -25,6 +25,7 @@ from build_dashboard import (
     LiveState,
     MalformedPullRequestDataError,
     MAXIMUM_DEPENDENCY_STACK_LEVEL,
+    MissingMergeTimestampError,
     Plan,
     PlanValidationError,
     PullRequestLabel,
@@ -306,6 +307,31 @@ def test_was_merged_false_for_an_open_pull_request():
     assert not record.was_merged
 
 
+# %% PullRequestRecord.from_mapping - merge signal
+
+
+def test_from_mapping_rejects_a_closed_entry_without_a_merge_timestamp():
+    # An omitted key is a gatherer that never asked GitHub for merged_at, not a
+    # statement that the pull request went unmerged - accepting it silently
+    # reports every merged pull request as closed-unmerged.
+    with pytest.raises(MissingMergeTimestampError):
+        PullRequestRecord.from_mapping(
+            {"state": "closed", "draft": False, "labels": ["bug"]}
+        )
+
+
+def test_from_mapping_accepts_a_closed_entry_whose_merge_timestamp_is_null():
+    record = PullRequestRecord.from_mapping(
+        {"state": "closed", "draft": False, "merged_at": None, "labels": ["bug"]}
+    )
+    assert record == PullRequestRecord(state=PullRequestState.CLOSED, labels=["bug"])
+
+
+def test_from_mapping_accepts_an_open_entry_without_a_merge_timestamp():
+    record = PullRequestRecord.from_mapping({"state": "open", "draft": True})
+    assert record == PullRequestRecord(state=PullRequestState.OPEN, draft=True)
+
+
 # %% PullRequestRecord.identified_labels
 
 
@@ -351,6 +377,13 @@ def test_load_pull_requests_by_repository_reports_repository_and_number_for_a_mi
 def test_load_pull_requests_by_repository_reports_repository_and_number_for_an_invalid_state():
     with pytest.raises(MalformedPullRequestDataError, match="owner/repo#7"):
         load_pull_requests_by_repository({"owner/repo": {"7": {"state": "sideways"}}})
+
+
+def test_load_pull_requests_by_repository_reports_repository_and_number_for_a_closed_entry_without_a_merge_timestamp():
+    with pytest.raises(MalformedPullRequestDataError, match="owner/repo#103"):
+        load_pull_requests_by_repository(
+            {"owner/repo": {"103": {"state": "closed", "draft": False}}}
+        )
 
 
 # %% Item / StackedItem - precomputed template values

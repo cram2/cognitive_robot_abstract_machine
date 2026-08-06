@@ -1,0 +1,36 @@
+<?xml version="1.0" ?>
+<sdf version="1.7">
+  <model name="drawer">
+    <link name="cabinet"/>
+    <link name="tray">
+      <pose>0.2 0 0.3 0 0 0</pose>
+    </link>
+    <link name="wheel">
+      <pose>0 0.4 0.1 0 0 0</pose>
+    </link>
+    <joint name="slide" type="prismatic">
+      <parent>cabinet</parent>
+      <child>tray</child>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>0.0</lower>
+          <upper>0.45</upper>
+          <velocity>0.5</velocity>
+        </limit>
+      </axis>
+    </joint>
+    <joint name="spin" type="continuous">
+      <parent>cabinet</parent>
+      <child>wheel</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+          <velocity>3.0</velocity>
+        </limit>
+      </axis>
+    </joint>
+  </model>
+</sdf>

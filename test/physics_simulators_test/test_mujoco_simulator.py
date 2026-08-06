@@ -462,6 +462,40 @@ class TestMujocoSimulator:
 
         simulator.stop()
 
+    def test_set_geom_friction_overrides_the_model_value(self, simulator):
+        """
+        set_geom_friction must write directly into the compiled MuJoCo model, so a
+        subsequent get_geom_friction observes the new value -- no simulation step is
+        needed, since friction is a static model property rather than simulation state.
+        """
+        new_friction = numpy.array([1.5, 0.05, 0.0005])
+
+        result = simulator.callbacks["set_geom_friction"](
+            geom_name="box", friction=new_friction
+        )
+        assert (
+            result.type
+            is SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA
+        )
+
+        result = simulator.callbacks["get_geom_friction"](geom_name="box")
+        assert (
+            result.type is SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION
+        )
+        assert numpy.allclose(result.result, new_friction)
+
+    def test_set_geom_friction_fails_for_unknown_geom(self, simulator):
+        """
+        set_geom_friction must report failure rather than raising or silently doing
+        nothing when the requested geom does not exist in the model.
+        """
+        result = simulator.callbacks["set_geom_friction"](
+            geom_name="this_geom_does_not_exist", friction=numpy.array([1.0, 0.0, 0.0])
+        )
+        assert (
+            result.type is SimulatorCallbackResult.ResultType.FAILURE_WITHOUT_EXECUTION
+        )
+
 
 class TestMujocoSimulatorComplex:
     file_path = os.path.join(resources_path, "mjx_single_cube_no_mesh.xml")

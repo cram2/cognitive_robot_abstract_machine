@@ -277,7 +277,7 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         Apply the mapping to the child's values.
         """
         yield from (
-            self._build_operation_result_and_update_truth_value_(
+            self._build_operation_result_(
                 child_result.bindings | {self._id_: mapped_value}, child_result
             )
             for child_result in self._child_._evaluate_(sources)

@@ -38,6 +38,30 @@ except ImportError as e:
 
 
 @dataclass
+class MotionToleranceConfig:
+    """
+    Default goal-achievement tolerances for motions that leave their own thresholds
+    unset.
+    """
+
+    default_tcp_position_threshold: float = 0.005
+    """
+    Default position tolerance in meters for tool-center-point poses, tighter than
+    Giskard's own task default so an approach doesn't stop short of a small object.
+    """
+
+    tool_orientation_threshold: float = 0.02
+    """
+    Default orientation tolerance in rad for tool-center-point poses.
+
+    .. note:: A physically simulated arm's PD-tracked joints settle with a small
+        residual orientation error, so reusing the (much tighter) position tolerance
+        as the rotation tolerance can leave the task perpetually unfinished, stalling
+        the rest of the plan behind it.
+    """
+
+
+@dataclass
 class Context(PlanEntity):
     """
     A dataclass for storing the context of a plan.
@@ -87,6 +111,19 @@ class Context(PlanEntity):
     _debug: bool = field(default=False)
     """
     Should debug information be printed or visualized.
+    """
+
+    teleport_to_navigate_in_simulation: bool = False
+    """
+    If True, the robot will teleport to navigate when in ExecutionType.SIMULATED. Otherwise, CartesianPose will be used
+    """
+
+    motion_tolerances: MotionToleranceConfig = field(
+        default_factory=MotionToleranceConfig
+    )
+    """
+    Default goal-achievement tolerances motions fall back to when they leave their own
+    thresholds unset.
     """
 
     @property

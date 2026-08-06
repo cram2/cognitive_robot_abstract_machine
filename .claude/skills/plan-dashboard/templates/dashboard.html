@@ -517,6 +517,18 @@
   .review-button:hover { background: var(--status-progress); color: var(--surface); }
 
   .notes { margin-top: 0.5rem; font-size: 0.86rem; color: var(--text-muted); white-space: pre-line; }
+  .notes-details { margin-top: 0.5rem; }
+  .notes-details summary {
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    list-style: none;
+  }
+  .notes-details summary::-webkit-details-marker { display: none; }
+  .notes-details summary::before { content: "▸ "; }
+  .notes-details[open] summary::before { content: "▾ "; }
+  .notes-details .notes { margin-top: 0.4rem; }
   .drift {
     margin-top: 0.5rem;
     font-size: 0.82rem;
@@ -619,7 +631,10 @@
           <div class="drift">⚠ {{ item.drift_description }}</div>
           {% endif %}
           {% if item.notes %}
-          <div class="notes">{{ item.notes }}</div>
+          <details class="notes-details">
+            <summary>Notes</summary>
+            <div class="notes">{{ item.notes }}</div>
+          </details>
           {% endif %}
           {% if item.dependency_chips %}
           <div class="deps">

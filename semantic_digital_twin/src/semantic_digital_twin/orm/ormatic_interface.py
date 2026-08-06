@@ -23,6 +23,7 @@ import krrood.ormatic.data_access_objects.alternative_mappings
 import krrood.ormatic.type_dict
 import pathlib
 import semantic_digital_twin.adapters.fbx
+import semantic_digital_twin.adapters.gazebo
 import semantic_digital_twin.adapters.mesh
 import semantic_digital_twin.adapters.mjcf
 import semantic_digital_twin.adapters.mujoco_video_recording
@@ -83,8 +84,6 @@ import semantic_digital_twin.pipeline.mesh_decomposition.coacd
 import semantic_digital_twin.pipeline.mesh_decomposition.vhacd
 import semantic_digital_twin.pipeline.pipeline
 import semantic_digital_twin.reasoning.predicates
-import semantic_digital_twin.reasoning.reasoner
-import semantic_digital_twin.reasoning.world_reasoner
 import semantic_digital_twin.robots.armar7
 import semantic_digital_twin.robots.daisy
 import semantic_digital_twin.robots.garmi
@@ -2199,6 +2198,109 @@ class FBXGlobalSettingsDAO(
     )
 
 
+class GazeboParserDAO(
+    Base, DataAccessObject[semantic_digital_twin.adapters.gazebo.GazeboParser]
+):
+    __tablename__ = "GazeboParserDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    sdf: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    prefix: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+
+class JointDescriptionDAO(
+    Base, DataAccessObject[semantic_digital_twin.adapters.gazebo.JointDescription]
+):
+    __tablename__ = "JointDescriptionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    connection_type: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+    name_id: Mapped[int] = mapped_column(
+        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    parent_id: Mapped[int] = mapped_column(
+        ForeignKey("BodyDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    child_id: Mapped[int] = mapped_column(
+        ForeignKey("BodyDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    parent_T_connection_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "HomogeneousTransformationMatrixMappingDAO.database_id", use_alter=True
+        ),
+        nullable=True,
+        use_existing_column=True,
+    )
+    connection_T_child_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "HomogeneousTransformationMatrixMappingDAO.database_id", use_alter=True
+        ),
+        nullable=True,
+        use_existing_column=True,
+    )
+    axis_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    dynamics_id: Mapped[int] = mapped_column(
+        ForeignKey("JointDynamicsDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    name: Mapped[PrefixedNameDAO] = relationship(
+        "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
+    )
+    parent: Mapped[BodyDAO] = relationship(
+        "BodyDAO", uselist=False, foreign_keys=[parent_id], post_update=True
+    )
+    child: Mapped[BodyDAO] = relationship(
+        "BodyDAO", uselist=False, foreign_keys=[child_id], post_update=True
+    )
+    parent_T_connection: Mapped[HomogeneousTransformationMatrixMappingDAO] = (
+        relationship(
+            "HomogeneousTransformationMatrixMappingDAO",
+            uselist=False,
+            foreign_keys=[parent_T_connection_id],
+            post_update=True,
+        )
+    )
+    connection_T_child: Mapped[HomogeneousTransformationMatrixMappingDAO] = (
+        relationship(
+            "HomogeneousTransformationMatrixMappingDAO",
+            uselist=False,
+            foreign_keys=[connection_T_child_id],
+            post_update=True,
+        )
+    )
+    axis: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO", uselist=False, foreign_keys=[axis_id], post_update=True
+    )
+    dynamics: Mapped[JointDynamicsDAO] = relationship(
+        "JointDynamicsDAO", uselist=False, foreign_keys=[dynamics_id], post_update=True
+    )
+
+
 class MeshParserDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.mesh.MeshParser]
 ):
@@ -3789,6 +3891,21 @@ class FileUriResolverDAO(
     )
 
 
+class ModelUriResolverDAO(
+    Base,
+    DataAccessObject[semantic_digital_twin.adapters.package_resolver.ModelUriResolver],
+):
+    __tablename__ = "ModelUriResolverDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    model_directories: Mapped[typing.List[builtins.str]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+
 class PackageUriResolverDAO(
     Base,
     DataAccessObject[
@@ -3823,6 +3940,23 @@ class ROSPackagePathLocatorDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class SearchPathFileResolverDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.package_resolver.SearchPathFileResolver
+    ],
+):
+    __tablename__ = "SearchPathFileResolverDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    root_directories: Mapped[typing.List[builtins.str]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
     )
 
 
@@ -7756,6 +7890,161 @@ class ParsingErrorDAO(
     }
 
 
+class MalformedPoseDAO(
+    ParsingErrorDAO,
+    DataAccessObject[semantic_digital_twin.adapters.gazebo.MalformedPose],
+):
+    __tablename__ = "MalformedPoseDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ParsingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    text: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MalformedPoseDAO",
+        "inherit_condition": database_id == ParsingErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MissingRootElementDAO(
+    ParsingErrorDAO,
+    DataAccessObject[semantic_digital_twin.adapters.gazebo.MissingRootElement],
+):
+    __tablename__ = "MissingRootElementDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ParsingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    expected_elements: Mapped[typing.List[builtins.str]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MissingRootElementDAO",
+        "inherit_condition": database_id == ParsingErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class UnsupportedAxisReferenceDAO(
+    ParsingErrorDAO,
+    DataAccessObject[semantic_digital_twin.adapters.gazebo.UnsupportedAxisReference],
+):
+    __tablename__ = "UnsupportedAxisReferenceDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ParsingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    joint_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    reference: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "UnsupportedAxisReferenceDAO",
+        "inherit_condition": database_id == ParsingErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class UnsupportedGeometryTypeDAO(
+    ParsingErrorDAO,
+    DataAccessObject[semantic_digital_twin.adapters.gazebo.UnsupportedGeometryType],
+):
+    __tablename__ = "UnsupportedGeometryTypeDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ParsingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    geometry_type: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    supported_types: Mapped[typing.List[builtins.str]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "UnsupportedGeometryTypeDAO",
+        "inherit_condition": database_id == ParsingErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class UnsupportedJointTypeDAO(
+    ParsingErrorDAO,
+    DataAccessObject[semantic_digital_twin.adapters.gazebo.UnsupportedJointType],
+):
+    __tablename__ = "UnsupportedJointTypeDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ParsingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    joint_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    joint_type: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    supported_types: Mapped[typing.List[builtins.str]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "UnsupportedJointTypeDAO",
+        "inherit_condition": database_id == ParsingErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class UnsupportedPoseReferenceDAO(
+    ParsingErrorDAO,
+    DataAccessObject[semantic_digital_twin.adapters.gazebo.UnsupportedPoseReference],
+):
+    __tablename__ = "UnsupportedPoseReferenceDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ParsingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    attribute: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    reference: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "UnsupportedPoseReferenceDAO",
+        "inherit_condition": database_id == ParsingErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class PackageResolutionErrorDAO(
     ParsingErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.PackageResolutionError],
@@ -10320,40 +10609,6 @@ class RightOfDAO(
         "inherit_condition": database_id == ViewDependentSpatialRelationDAO.database_id,
         "polymorphic_load": "selectin",
     }
-
-
-class CaseReasonerDAO(
-    Base, DataAccessObject[semantic_digital_twin.reasoning.reasoner.CaseReasoner]
-):
-    __tablename__ = "CaseReasonerDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    model_directory: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-
-class WorldReasonerDAO(
-    Base, DataAccessObject[semantic_digital_twin.reasoning.world_reasoner.WorldReasoner]
-):
-    __tablename__ = "WorldReasonerDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    world_id: Mapped[int] = mapped_column(
-        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
-    )
 
 
 class RobotPartMixinDAO(

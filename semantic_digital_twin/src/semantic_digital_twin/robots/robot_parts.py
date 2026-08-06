@@ -281,6 +281,17 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
                 return j
         raise NoJointStateWithType(state_type)
 
+    def has_joint_state_of_type(self, state_type: JointStateType) -> bool:
+        """
+        Whether this part can be commanded into the given joint state.
+
+        :param state_type: The state type to search for
+        :return: True if a joint state of that type is defined
+        """
+        return any(
+            joint_state.state_type == state_type for joint_state in self.joint_states
+        )
+
     @classmethod
     def create_with_new_body_in_world(
         cls,
@@ -889,6 +900,15 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
     def get_torso(self):
         [torso] = [p for p in self._robot_parts if isinstance(p, Torso)]
         return torso
+
+    def get_torso_if_specified(self) -> Optional[Torso]:
+        """
+        :return: The robot's torso, or None for a robot built without one.
+        """
+        for part in self._robot_parts:
+            if isinstance(part, Torso):
+                return part
+        return None
 
     def get_left_arm_if_specified(self) -> Optional[Arm]:
         if isinstance(self, HasLeftRightArm):

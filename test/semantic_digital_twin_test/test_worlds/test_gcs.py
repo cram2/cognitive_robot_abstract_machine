@@ -1,3 +1,5 @@
+import os.path
+
 import numpy as np
 import plotly.graph_objects as go
 import pytest
@@ -7,9 +9,7 @@ from numpy import allclose
 
 from random_events.interval import SimpleInterval
 from random_events.product_algebra import SimpleEvent
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
+from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import PointOccupiedError
@@ -20,36 +20,48 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import BoundingBox, Box, Scale
-from semantic_digital_twin.world_description.graph_of_convex_sets import (
-    GraphOfConvexSets,
+from semantic_digital_twin.world_description.graph_of_convex_sets.base import (
     create_reference_frame_with_only_yaw_from_body,
+)
+from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
+    GraphOfBoundingBoxes,
 )
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
+MJCF_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..",
+    "..",
+    "..",
+    "semantic_digital_twin",
+    "resources",
+    "mjcf",
+)
+
 
 @dataclass
-class GraphOfConvexSetsFixture:
+class GraphOfBoundingBoxesFixture:
     """
     Data class for Graph of Convex Sets test fixture.
     """
 
     world: World
-    graph_of_convex_sets: GraphOfConvexSets
+    graph_of_convex_sets: GraphOfBoundingBoxes
 
 
 @pytest.fixture
-def graph_of_convex_sets_unit_box() -> GraphOfConvexSetsFixture:
+def graph_of_convex_sets_unit_box() -> GraphOfBoundingBoxesFixture:
     """
-    Create a GraphOfConvexSets for navigation around a unit box.
+    Create a GraphOfBoundingBoxes for navigation around a unit box.
     """
     world = World()
     with world.modify_world():
         world.add_kinematic_structure_entity(Body())
 
-    graph_of_convex_sets = GraphOfConvexSets(world)
+    graph_of_convex_sets = GraphOfBoundingBoxes(world)
 
     obstacle = BoundingBox(0, 0, 0, 1, 1, 1, world.root.global_pose)
 
@@ -71,10 +83,10 @@ def graph_of_convex_sets_unit_box() -> GraphOfConvexSetsFixture:
         graph_of_convex_sets.add_node(bounding_box)
 
     graph_of_convex_sets.calculate_connectivity()
-    return GraphOfConvexSetsFixture(world, graph_of_convex_sets)
+    return GraphOfBoundingBoxesFixture(world, graph_of_convex_sets)
 
 
-def test_reachability(graph_of_convex_sets_unit_box: GraphOfConvexSetsFixture):
+def test_reachability(graph_of_convex_sets_unit_box: GraphOfBoundingBoxesFixture):
     """
     Verify if a path can be found around the unit box.
     """
@@ -91,7 +103,7 @@ def test_reachability(graph_of_convex_sets_unit_box: GraphOfConvexSetsFixture):
     assert len(path) == 4
 
 
-def test_plot(graph_of_convex_sets_unit_box: GraphOfConvexSetsFixture):
+def test_plot(graph_of_convex_sets_unit_box: GraphOfBoundingBoxesFixture):
     """
     Verify if the free and occupied space can be plotted.
     """
@@ -125,7 +137,7 @@ def test_from_world(table_world: World):
         ],
         table_world.root,
     )
-    graph_of_convex_sets = GraphOfConvexSets.free_space_from_world(
+    graph_of_convex_sets = GraphOfBoundingBoxes.free_space_from_world(
         table_world, search_space=search_space
     )
     assert graph_of_convex_sets is not None
@@ -166,7 +178,7 @@ def test_navigation_map_from_world(table_world: World):
         ],
         table_world.root,
     )
-    graph_of_convex_sets = GraphOfConvexSets.navigation_map_from_world(
+    graph_of_convex_sets = GraphOfBoundingBoxes.navigation_map_from_world(
         table_world, search_space=search_space
     )
     assert len(graph_of_convex_sets.graph.nodes()) > 0
@@ -228,7 +240,7 @@ def test_from_world_with_rotated_box():
         reference_frame=vertical_stabilized_base,
     )
 
-    graph_of_convex_sets = GraphOfConvexSets.free_space_from_world(
+    graph_of_convex_sets = GraphOfBoundingBoxes.free_space_from_world(
         world, search_space=search_space
     )
 
@@ -248,3 +260,42 @@ def test_from_world_with_rotated_box():
         assert bounding_box_T_world.roll == 0
         assert bounding_box_T_world.pitch == 0
         assert allclose(bounding_box_T_world.yaw, rotated_box_body_pose.to_pose().yaw)
+
+
+def test_path_from_to_scales_to_a_real_apartment_scene():
+    """
+    Regression test for a real scalability bug: ``path_from_to`` used to enumerate *all*
+    shortest (by hop count) paths via ``rustworkx.all_shortest_paths`` before picking
+    the first one, which never finished once the free-space decomposition of a real-
+    sized scene reached a few thousand nodes (there can be exponentially many equally-
+    short paths).
+
+    It now runs a single-source Dijkstra search instead.
+    """
+    world = MJCFParser(os.path.join(MJCF_DIR, "iai_apartment.xml")).parse()
+    search_space = BoundingBoxCollection(
+        [
+            BoundingBox(
+                min_x=-0.2,
+                max_x=3.0,
+                min_y=1.0,
+                max_y=2.4,
+                min_z=0.0,
+                max_z=1.2,
+                origin=HomogeneousTransformationMatrix(reference_frame=world.root),
+            )
+        ],
+        world.root,
+    )
+    graph_of_convex_sets = GraphOfBoundingBoxes.free_space_from_world(
+        world, search_space=search_space, bloat_obstacles=0.06
+    )
+    # Confirms this is a genuinely large graph, not an accidentally-trivial one.
+    assert len(graph_of_convex_sets.graph.nodes()) > 1000
+
+    start = Point3(0.8, 1.0, 0.6, reference_frame=world.root)
+    goal = Point3(0.8, 2.3, 0.6, reference_frame=world.root)
+    path = graph_of_convex_sets.path_from_to(start, goal)
+
+    assert path is not None
+    assert len(path) > 1

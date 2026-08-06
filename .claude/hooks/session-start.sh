@@ -66,6 +66,14 @@ set -euo pipefail
 # the BEGIN-PERSONAL-NOTES/END-PERSONAL-NOTES markers, then runs the save
 # script to push the change back.
 #
+# Personal settings: the same branch may also carry a
+# `.claude/personal/settings.local.json`, which is copied verbatim into this
+# clone's `.claude/settings.local.json` - the file Claude Code reads as local
+# settings, so personal permission rules, env vars and the like follow you into
+# every clone the same way your notes do. It is never merged (gitignored, exactly
+# like CLAUDE.local.md), and local edits to it are never overwritten - see the
+# settings block near the bottom of this script and ./save-personal-settings.sh.
+#
 # PR progress: on any branch with a sensible "current PR" (i.e. not the
 # default branch, a detached HEAD, or the personal-notes branch itself - see
 # pr_progress_path in ./resolve-personal-notes-config.sh), CLAUDE.local.md
@@ -99,6 +107,13 @@ set -euo pipefail
 # it in real time - see plan-schema.md's "Proposing structural changes"
 # section for the full convention.
 #
+# Recheck stamp: every run also records the personal-notes commit this
+# clone just fetched (gitignored, see PLAN_STATE_SYNC_STAMP in
+# ./resolve-personal-notes-config.sh), regardless of whether this branch
+# tracks a plan. ./plan-updates-since.sh diffs from that stamp instead of a
+# session rereading whole plan files to answer "what changed since I last
+# looked" - see that script and cram-notes.md's recheck-deltas convention.
+#
 # How this script gets invoked (see ../settings.json): Claude Code registers it
 # as a SessionStart hook via `$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh`.
 # CLAUDE_PROJECT_DIR is an env var Claude Code itself injects into every hook
@@ -121,6 +136,15 @@ fetch_personal_notes_branch || exit 0
 # FETCH_HEAD, not "${ACTIVE_NOTES_REMOTE}/${NOTES_BRANCH}": a URL-form remote
 # creates no remote-tracking ref, but FETCH_HEAD always points at what was
 # just fetched, whether the serving remote was a name or a raw URL.
+
+# Stamp this run's baseline unconditionally - not only when the current
+# branch turns out to track a plan below. This is the whole branch's tip,
+# fetched regardless, so it's just as valid a "last time I looked" baseline
+# for a session working on a plan more broadly (e.g. a plan-item-kickoff
+# session on a branch that isn't itself a tracked item) as for one on a
+# tracked item's own branch. See ./plan-updates-since.sh, the recheck tool
+# this stamp exists for.
+record_plan_state_sync_stamp
 
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 # Sanitized copy for embedding into this script's <!-- ... --> HTML comment
@@ -272,6 +296,29 @@ else
   rm -f "${OUTPUT_FILE}"
 fi
 
+# Personal settings: unlike everything above, these don't go into CLAUDE.local.md -
+# they are copied verbatim to .claude/settings.local.json, the file Claude Code
+# itself reads as this project's local settings (see PERSONAL_SETTINGS_PATH in
+# ./resolve-personal-notes-config.sh). No header or markers: it is strict JSON,
+# which has no comment syntax to carry them.
+#
+# Locally modified settings are never overwritten. Claude Code writes to this same
+# file whenever a permission is granted with "don't ask again", so a blind copy
+# every session start would silently drop those grants - see
+# personal_settings_are_locally_modified. Run ./save-personal-settings.sh to push
+# such edits up, which makes them the new baseline and lets syncing resume.
+SUMMARY_SETTINGS="none on '${NOTES_BRANCH}' (${PERSONAL_SETTINGS_PATH})"
+if git cat-file -e "FETCH_HEAD:${PERSONAL_SETTINGS_PATH}" 2>/dev/null; then
+  if personal_settings_are_locally_modified; then
+    SUMMARY_SETTINGS="kept local edits to ${LOCAL_SETTINGS_RELATIVE_PATH} - run save-personal-settings.sh to push them"
+  else
+    mkdir -p "$(dirname "${LOCAL_SETTINGS_JSON}")"
+    git show "FETCH_HEAD:${PERSONAL_SETTINGS_PATH}" > "${LOCAL_SETTINGS_JSON}"
+    record_personal_settings_sync
+    SUMMARY_SETTINGS="synced to ${LOCAL_SETTINGS_RELATIVE_PATH}"
+  fi
+fi
+
 # Deterministic session-start report: what this run found and wrote, printed
 # once by the script itself rather than left for a session to notice and
 # describe secondhand from CLAUDE.local.md's content. SessionStart hook
@@ -281,6 +328,8 @@ fi
 cat <<SUMMARY
 session-start.sh summary:
   personal notes:  ${SUMMARY_NOTES}
+  local settings:  ${SUMMARY_SETTINGS}
   PR progress:     ${SUMMARY_PROGRESS}
   plan:            ${SUMMARY_PLAN}
+  plan state SHA:  $(git rev-parse FETCH_HEAD) (run plan-updates-since.sh <plan-id> to recheck from here later)
 SUMMARY

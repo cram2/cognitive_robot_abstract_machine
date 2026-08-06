@@ -22,6 +22,7 @@ from typing_extensions import (
     Iterator,
     List,
     Optional,
+    Set,
     Tuple,
     Type,
     TYPE_CHECKING,
@@ -132,6 +133,39 @@ class ActiveConditionsRoot:
     def is_active_root(self, node: SymbolicExpression) -> bool:
         """:return: ``True`` if *node* is the active conditions root for this pass."""
         return self._root_id == node._id_
+
+
+@dataclass
+class TruthValueOperatorChildren:
+    """
+    Tracks which nodes were evaluated as a direct child of a
+    :class:`~krrood.entity_query_language.core.base_expressions.TruthValueOperator` during
+    the current evaluation pass.
+
+    Whether a node counts as a condition participant depends on which parent evaluated it
+    in this pass, not on the node's construction history: a node reused elsewhere in the
+    :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression`'s own
+    directed acyclic graph of parents keeps a structural parent per position, but only
+    the first-ever attachment is its primary ``_parent_``, which may belong to an
+    unrelated position. Recording the dynamic, per-pass parent here instead of reading
+    the node's primary ``_parent_`` avoids that ambiguity.
+    """
+
+    _ids: Set[uuid.UUID] = field(default_factory=set, init=False)
+    """
+    Identifiers of the nodes evaluated as a direct child of a ``TruthValueOperator`` so
+    far this pass.
+    """
+
+    def record(self, expression_id: uuid.UUID) -> None:
+        """
+        Record *expression_id* as evaluated as a direct child of a
+        ``TruthValueOperator`` during the current pass.
+        """
+        self._ids.add(expression_id)
+
+    def __contains__(self, expression_id: uuid.UUID) -> bool:
+        return expression_id in self._ids
 
 
 @dataclass
@@ -283,6 +317,14 @@ class EvaluationContext:
     Tracks which node is the active conditions root for the current evaluation pass.
     """
 
+    truth_value_operator_children: TruthValueOperatorChildren = field(
+        default_factory=TruthValueOperatorChildren
+    )
+    """
+    Tracks which nodes were evaluated as a direct child of a ``TruthValueOperator``
+    during the current evaluation pass.
+    """
+
     evaluated_expression_ids: EvaluatedExpressionIds = field(
         default_factory=EvaluatedExpressionIds
     )
@@ -310,6 +352,14 @@ class EvaluationContext:
     """
     Caches each nested subquery's result stream for the current evaluation pass.
     """
+
+    def is_child_of_truth_value_operator(self, expression: SymbolicExpression) -> bool:
+        """
+        :param expression: The symbolic expression to test.
+        :return: ``True`` if *expression* was evaluated as a direct child of a
+            ``TruthValueOperator`` during the current evaluation pass.
+        """
+        return expression._id_ in self.truth_value_operator_children
 
     def on_evaluate_enter(
         self,

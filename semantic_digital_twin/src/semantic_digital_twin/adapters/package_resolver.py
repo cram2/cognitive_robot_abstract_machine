@@ -151,6 +151,86 @@ class FileUriResolver(PathResolver):
 
 
 @dataclass
+class SearchPathFileResolver(PathResolver):
+    """
+    Resolves relative paths and relative ``file://`` URIs against several root
+    directories, returning the first root that holds the file.
+
+    Descriptions that are meant to be read with a resource search path state their
+    relative paths from the root of the package rather than from the file that contains
+    them, so the root has to be searched for.
+    """
+
+    root_directories: List[str] = field(default_factory=list)
+    """
+    The directories that relative paths are resolved against, in order of precedence.
+    """
+
+    def supports(self, uri: str) -> bool:
+        return uri.startswith("file://") or "://" not in uri
+
+    def resolve(self, uri: str) -> str:
+        path = uri[len("file://") :] if uri.startswith("file://") else uri
+        if os.path.isabs(path):
+            return os.path.abspath(path)
+
+        for directory in self.root_directories:
+            candidate = os.path.join(directory, path)
+            if os.path.exists(candidate):
+                return os.path.abspath(candidate)
+
+        raise PathResolutionError(
+            uri=uri,
+            details=f"not found below {', '.join(self.root_directories)}",
+        )
+
+
+@dataclass
+class ModelUriResolver(PathResolver):
+    """
+    Resolves ``model://`` URIs against Gazebo model directories.
+
+    A bare ``model://NAME`` resolves to the model's directory. Interpreting the
+    ``model.config`` inside that directory is left to the format parser.
+    """
+
+    model_directories: List[str] = field(default_factory=list)
+    """
+    Directories that are searched for models before the environment is consulted.
+    """
+
+    def supports(self, uri: str) -> bool:
+        return uri.startswith("model://")
+
+    def search_directories(self) -> List[str]:
+        """
+        :return: All directories searched for models, in order of precedence.
+        """
+        environment_directories = [
+            directory
+            for directory in os.environ.get("GAZEBO_MODEL_PATH", "").split(":")
+            if directory
+        ]
+        default_directory = os.path.join(os.path.expanduser("~"), ".gazebo", "models")
+        return [*self.model_directories, *environment_directories, default_directory]
+
+    def resolve(self, uri: str) -> str:
+        rest = uri[len("model://") :]
+        model_name, _, relative_path = rest.partition("/")
+        search_directories = self.search_directories()
+        for directory in search_directories:
+            model_directory = os.path.join(directory, model_name)
+            if not os.path.isdir(model_directory):
+                continue
+            return os.path.abspath(os.path.join(model_directory, relative_path))
+
+        raise PathResolutionError(
+            uri=uri,
+            details=f"model '{model_name}' not found in {', '.join(search_directories)}",
+        )
+
+
+@dataclass
 class CompositePathResolver(PathResolver):
     """
     Tries multiple path resolvers in order.

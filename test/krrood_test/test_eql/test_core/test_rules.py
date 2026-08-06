@@ -738,6 +738,69 @@ def test_rule_tree_anchors_when_where_condition_is_reused_in_a_sibling():
     }
 
 
+# %% shared-anchor splice parentage
+
+
+def test_splice_keeps_an_earlier_branchs_comparator_operand_intact():
+    """
+    Splicing under a shared anchor must not rewire an unrelated earlier operand.
+
+    ``drawer.correct`` is a shared-identity singleton. Using it first inside
+    ``alternative(drawer.correct == False)`` makes that ``Comparator`` its primary
+    ``_parent_``, so a nested refinement anchored on the later bare
+    ``refinement(drawer.correct)`` must splice above the parent that branch owns it by,
+    not above the comparator.
+    """
+    drawer = variable(Drawer, domain=[])
+    views = deduced_variable(View)
+    query = an(entity(views).where(drawer.container))
+
+    with query:
+        add(views, inference(Door)(handle=drawer.handle, body=drawer.container))
+        with alternative(drawer.correct == False) as earlier_comparator:
+            add(views, inference(Door)(handle=drawer.handle, body=drawer.container))
+        with refinement(drawer.correct):
+            add(views, inference(Door)(handle=drawer.handle, body=drawer.container))
+            with refinement(drawer.handle):
+                add(views, inference(Door)(handle=drawer.handle, body=drawer.container))
+
+    assert earlier_comparator.left is drawer.correct
+
+
+def test_nested_refinement_fires_when_its_anchor_was_attached_in_an_earlier_branch():
+    """
+    A refinement nested under a reused anchor must stay in the rule tree and fire.
+
+    The splice that drags the nested branch above an earlier sibling's comparator
+    detaches it from the rule tree, so its conclusion never replaces the one it refines.
+    """
+    correct_drawer = Drawer(
+        handle=Handle("Handle1"), container=Container("Container1"), correct=True
+    )
+    incorrect_drawer = Drawer(
+        handle=Handle("Handle2"), container=Container("Container2"), correct=False
+    )
+    drawer = variable(Drawer, domain=[correct_drawer, incorrect_drawer])
+    views = deduced_variable(View)
+    query = an(entity(views).where(drawer.container))
+
+    with query:
+        add(views, inference(Door)(handle=drawer.handle, body=drawer.container))
+        with alternative(drawer.correct == False):
+            add(views, inference(Door)(handle=drawer.handle, body=drawer.container))
+        with refinement(drawer.correct):
+            add(
+                views,
+                inference(Drawer)(handle=drawer.handle, container=drawer.container),
+            )
+            with refinement(drawer.handle.name == "Handle1"):
+                add(views, inference(Cabinet)(container=drawer.container))
+
+    all_solutions = list(query.evaluate())
+
+    assert any(isinstance(view, Cabinet) for view in all_solutions)
+
+
 def test_conclusions_fire_without_an_active_evaluation_context(
     handles_and_containers_world,
 ):

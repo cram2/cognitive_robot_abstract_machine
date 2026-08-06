@@ -8,6 +8,7 @@ from typing import Tuple
 
 import time
 import trimesh
+import PIL.ImageFile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import IntEnum
@@ -1358,29 +1359,36 @@ class MujocoMeshConverter(MujocoGeomConverter, MeshConverter):
             entity.mesh.visual.material.name, str
         ):
             texture_file_path = self._resolve_texture_file_path(
-                entity.mesh.visual.material
+                entity.mesh.visual.material, os.path.dirname(entity.filename)
             )
             if texture_file_path is not None:
                 shape_props["texture_file_path"] = texture_file_path
         return shape_props
 
     @staticmethod
-    def _resolve_texture_file_path(material: Any) -> Optional[str]:
+    def _resolve_texture_file_path(material: Any, mesh_directory: str) -> Optional[str]:
         """
         Resolves the on-disk file backing a mesh's texture.
 
+        trimesh reports a texture path relative to the mesh file that references it, so
+        every candidate is resolved against that mesh's directory rather than the process
+        working directory. An already absolute candidate passes through unchanged.
+
         :param material: The trimesh material (``TextureVisuals.material``) to resolve.
+        :param mesh_directory: Directory of the mesh file the material came from.
         :return: The texture's file path, or ``None`` if the texture is a programmatically
             generated image (for example a flat "glass" material) with no backing file.
         """
-        if os.path.isfile(material.name):
-            return material.name
         image = material.image
-        if hasattr(image, "filename") and os.path.isfile(image.filename):
-            return image.filename
-        file_path = image.info.get("file_path", "")
-        if os.path.isfile(file_path):
-            return file_path
+        candidates = [material.name, image.info.get("file_path", "")]
+        if isinstance(image, PIL.ImageFile.ImageFile):
+            candidates.append(image.filename)
+        for candidate in candidates:
+            if not isinstance(candidate, str) or not candidate:
+                continue
+            resolved = os.path.join(mesh_directory, candidate)
+            if os.path.isfile(resolved):
+                return resolved
         return None
 
 

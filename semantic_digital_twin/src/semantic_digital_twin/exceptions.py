@@ -2,7 +2,7 @@ from __future__ import annotations, absolute_import
 
 from dataclasses import dataclass, field, Field
 from pathlib import Path
-from typing import Dict, Set, Any
+from typing import Dict, Set
 from uuid import UUID
 
 import mujoco
@@ -1383,8 +1383,9 @@ class VideoRecordingError(MultiSimError):
 @dataclass
 class VideoRecordingAlreadyStartedError(VideoRecordingError):
     """
-    Raised when :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder.start` is
-    called on a recorder that is already recording.
+    Raised when
+    :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder.start`
+    is called on a recorder that is already recording.
     """
 
     world: World
@@ -1402,8 +1403,9 @@ class VideoRecordingAlreadyStartedError(VideoRecordingError):
 @dataclass
 class VideoRecordingNotStartedError(VideoRecordingError):
     """
-    Raised when :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder.stop` is
-    called on a recorder that was never started.
+    Raised when
+    :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder.stop`
+    is called on a recorder that was never started.
     """
 
     world: World

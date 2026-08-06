@@ -31,6 +31,7 @@ from krrood.patterns.field_metadata import JSONMetadata
 from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar, trinary_logic_not
 from krrood.exceptions import DataclassException
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.spatial_types import (
     Point3,
     Vector3,
@@ -891,11 +892,14 @@ def velocity_convergence_expression(
     joint_convergence_threshold: float,
     minimum_threshold: float,
     maximum_threshold: float,
+    degrees_of_freedom: Optional[List[DegreeOfFreedom]] = None,
+    minimum_time: float = 1.0,
+    reference_cycle_variable: Optional[FloatVariable] = None,
 ) -> Scalar:
     """
-    Builds a trinary expression that is true once every active degree of freedom's
+    Builds a trinary expression that is true once every given degree of freedom's
     velocity has dropped below a threshold derived from its own maximum velocity, and
-    at least one simulated second of trajectory time has elapsed.
+    at least ``minimum_time`` simulated seconds of trajectory time have elapsed.
 
     :param context: Supplies the world's active degrees of freedom and control cycle
         timing.
@@ -905,12 +909,26 @@ def velocity_convergence_expression(
         threshold.
     :param maximum_threshold: Upper bound for the per-degree-of-freedom velocity
         threshold.
+    :param degrees_of_freedom: Degrees of freedom to check for convergence. Defaults to
+        every active degree of freedom in the world when ``None``.
+    :param minimum_time: Minimum elapsed control time before the expression can become
+        true.
+    :param reference_cycle_variable: Cycle count elapsed time is measured from, instead
+        of the start of the whole motion chart. Pass a variable a caller updates in its
+        own ``on_start`` so ``minimum_time`` gates on how long that caller has been
+        active, not on how many cycles the entire chart has already ticked through.
+        ``None`` keeps the chart-wide behaviour.
     :return: A trinary :class:`~krrood.symbolic_math.symbolic_math.Scalar` expression,
-        true once the world has settled.
+        true once the given degrees of freedom have settled.
     """
+    degrees_of_freedom = (
+        degrees_of_freedom
+        if degrees_of_freedom is not None
+        else context.world.active_degrees_of_freedom
+    )
     ref = []
     symbols = []
-    for dof in context.world.active_degrees_of_freedom:
+    for dof in degrees_of_freedom:
         velocity_limit = dof.limits.upper.velocity * joint_convergence_threshold
         velocity_limit = min(max(minimum_threshold, velocity_limit), maximum_threshold)
         ref.append(velocity_limit)
@@ -920,9 +938,12 @@ def velocity_convergence_expression(
         context.qp_controller_config.control_dt
         or context.qp_controller_config.model_predictive_control_time_step
     )
-    trajectory_longer_than_one_second = context.control_cycle_variable * dt > 1
+    elapsed_cycles = context.control_cycle_variable
+    if reference_cycle_variable is not None:
+        elapsed_cycles = elapsed_cycles - reference_cycle_variable
+    trajectory_longer_than_minimum_time = elapsed_cycles * dt > minimum_time
     return sm.trinary_logic_and(
-        trajectory_longer_than_one_second,
+        trajectory_longer_than_minimum_time,
         sm.logic_all(sm.abs(sm.Vector(symbols)) < sm.Vector(ref)),
     )
 

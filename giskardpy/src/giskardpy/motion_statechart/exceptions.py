@@ -104,6 +104,19 @@ class EmptyGoalStateError(NodeInitializationError):
 
 
 @dataclass
+class EmptyDegreesOfFreedomError(NodeInitializationError):
+    """
+    Raised when a node is explicitly given an empty list of degrees of freedom.
+    """
+
+    def error_message(self) -> str:
+        return "Degrees of freedom list is empty."
+
+    def suggest_correction(self) -> str:
+        return "Pass at least one degree of freedom, or leave it None to use every active degree of freedom in the world."
+
+
+@dataclass
 class GoalPointsReferenceFrameMismatchError(NodeInitializationError):
     reference_frame_a: KinematicStructureEntity
     reference_frame_b: KinematicStructureEntity

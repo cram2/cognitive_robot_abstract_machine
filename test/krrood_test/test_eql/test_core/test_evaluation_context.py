@@ -10,6 +10,7 @@ from ordered_set import OrderedSet
 from krrood.entity_query_language.evaluation_context import (
     ActiveConditionsRoot,
     EvaluatedExpressionIds,
+    EvaluationContext,
 )
 
 
@@ -78,6 +79,17 @@ def test_active_conditions_root_has_condition_defaults_false_before_anything_is_
     tracking = ActiveConditionsRoot()
 
     assert not tracking.has_condition
+
+
+def test_is_child_of_truth_value_operator_reflects_only_recorded_nodes():
+    context = EvaluationContext()
+    recorded = _NodeStub()
+    unrecorded = _NodeStub()
+
+    context.truth_value_operator_children.record(recorded._id_)
+
+    assert context.is_child_of_truth_value_operator(recorded)
+    assert not context.is_child_of_truth_value_operator(unrecorded)
 
 
 def test_evaluated_expression_ids_records_and_iterates():

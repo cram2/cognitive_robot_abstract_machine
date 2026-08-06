@@ -1,6 +1,6 @@
 ---
 name: plan-item-kickoff
-description: Gather everything available about one tracked plan item (its plan.yaml entry, roadmap.md history/design context, its dependency chain's live GitHub state, and patterns from already-landed sibling items in the same track) and propose a concrete implementation plan via plan mode, without writing any code. Invoke as "/plan-item-kickoff <plan-id> <item-id>". Use when starting work on a specific item from a plan-dashboard's "Start now" link, or when the user asks to "start", "kick off", or "plan out" a specific tracked item.
+description: Gather everything available about one tracked plan item (its plan.yaml entry, roadmap.md history/design context, its dependency chain's live GitHub state, and patterns from already-landed sibling items in the same track), propose a concrete implementation plan via plan mode without writing any code, and once it is approved open the item's branch and draft pull request and record its manifest state before implementation starts. Invoke as "/plan-item-kickoff <plan-id> <item-id>". Use when starting work on a specific item from a plan-dashboard's "Start now" link, or when the user asks to "start", "kick off", or "plan out" a specific tracked item.
 allowed-tools: Bash, Read, Grep, Glob, AskUserQuestion, Skill, EnterPlanMode, ExitPlanMode, mcp__github__list_pull_requests, mcp__github__pull_request_read, mcp__github__get_file_contents, mcp__Claude_Code_Remote__subscribe_pr_activity
 ---
 
@@ -9,10 +9,14 @@ allowed-tools: Bash, Read, Grep, Glob, AskUserQuestion, Skill, EnterPlanMode, Ex
 Generic, plan-agnostic — nothing here may hardcode a specific plan id, item,
 or branch. Gathers everything a session doing this item's work would
 actually want before starting, then hands the user a concrete
-implementation plan via plan mode. **This skill never writes code, creates a
-branch, or pushes anything** — it is a research-and-planning skill, not an
-implementation one. Whether to implement the approved plan in this session
-or a fresh one is the user's call, made after they see it.
+implementation plan via plan mode. **This skill never writes code, and
+creates nothing at all until the user has approved a plan** — steps 1-5 are
+research and planning only. Once a plan *is* approved, step 6 opens the
+item's branch and draft pull request and records its manifest state, before
+any implementation begins. Whether to implement the approved plan in this
+session or a fresh one is the user's call, made after they see it; step 6
+runs either way, so the item stops reading as `not_started` the moment it
+isn't.
 
 ## 0. Check the setup is in place, and offer it if not
 
@@ -129,5 +133,81 @@ it. Flag explicitly, never silently paper over:
 - Anything the gathered context left genuinely unresolved after the check
   above — say so rather than filling the gap with an assumption.
 
-Do not touch git, create a branch, or write any code in this skill — its
-only output is the plan itself.
+Do not touch git, create a branch, or write any code in this step — its only
+output is the plan itself. Everything below happens after the user approves
+it, never before.
+
+## 6. Bootstrap the item — before implementing, not after
+
+The moment a plan is approved, the branch, the draft pull request, the
+item's `branch`/`session`/`pull_request_number` fields and its roadmap
+section are all derivable, and none of them depends on a line of the
+implementation. Doing them at the end instead means the manifest says
+`not_started` with no branch for the entire length of the work, which every
+dashboard, kickoff and resolve run downstream reads as truth.
+
+So run this first, before the first edit:
+
+Create the branch and its draft pull request yourself, then hand the number
+over:
+
+```bash
+git checkout -b <branch> <base-branch>
+git commit --allow-empty -m "Bootstrap <item-id>"
+git push -u origin <branch>
+# then create the draft pull request with your GitHub tool, and:
+source .claude/hooks/resolve-personal-notes-config.sh
+python3 "${PLAN_ITEM_BOOTSTRAP_SCRIPT}" open \
+    --plan <plan-id> --item <item-id> \
+    --branch <branch> --base <base-branch> \
+    --session <this session's url> \
+    --pull-request-number <number>
+python3 "${PLAN_ITEM_BOOTSTRAP_SCRIPT}" record \
+    --plan <plan-id> --item <item-id> \
+    --status in_progress --roadmap-section <file>
+```
+
+`open` before `record`: the pull request number does not exist until the pull
+request does. `open` writes the branch, session and pull request number onto
+the item and flips it to `in_progress`; `record` appends the approved plan to
+`roadmap.md`. Both print a one-line JSON report led by `status` and
+`exit_code`.
+
+**Why a session creates the pull request rather than the script.** The script
+can create one — with `--pull-request-title`/`--pull-request-body` instead of
+`--pull-request-number`, verified live — but a pull request it creates is
+attributed to the app its requests are proxied through rather than to the
+person whose work it is, the same authorship problem `AGENTS.md` rules out for
+commits. Creating it yourself keeps your identity on it. The creating path is
+there for an unattended run whose credential is a real one; if you use it,
+`open` publishes the branch too, so the three git commands above are yours to
+skip.
+
+The branch name and the base branch are this skill's judgment, not the
+script's: the base comes from step 2's dependency readiness, and the branch
+from whatever this session is designated to develop on.
+
+**Write the approved plan down in both places it belongs**, rather than
+leaving it only in the conversation that produced it:
+
+- **`roadmap.md`**, via `record`'s `--roadmap-section` — the durable record of
+  what was decided and *why*, including any assumption or open question the
+  plan carries. Not a restatement of the diff.
+- **The PR-progress note** — the plan, what is done, and what is next, kept
+  current as the work goes. Write it between `CLAUDE.local.md`'s
+  `BEGIN-PR-PROGRESS`/`END-PR-PROGRESS` markers and run
+  `.claude/hooks/save-pr-progress.sh` to push it. Do this as soon as the
+  branch exists, not at the end: a note written afterwards is a summary, and
+  the point of it is that another session can pick the work up mid-flight.
+
+Then republish the dashboard yourself:
+
+```
+/plan-dashboard <plan-id>
+```
+
+Both operations end here rather than doing it, because only a live session
+can call the `Artifact` tool — the script's report hands the command back
+rather than pretending it ran. Do not skip it: a published dashboard that is
+older than the manifest behind it is the exact staleness this step exists to
+close.

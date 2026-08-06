@@ -6,9 +6,11 @@ import weakref
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache, wraps
+from pathlib import Path
 from typing import List
 
 from krrood.class_diagrams.mocking import MockedModule, MockedClass
+from platformdirs import user_cache_dir
 
 try:
     from ament_index_python import PackageNotFoundError
@@ -18,6 +20,20 @@ from xml.etree import ElementTree as ET
 
 from typing_extensions import Any, Tuple, ClassVar, Type
 
+
+def create_cache_dir(folder_name: str) -> Path:
+    """
+    Returns a directory inside the user's cache that downloaded and generated data can be
+    kept in, creating it if it does not exist yet.
+
+    :param folder_name: The name of the directory inside the package's cache.
+    :return: The path of the directory.
+    """
+    package_name = __package__.split(".", 1)[0]
+
+    cache_dir = Path(user_cache_dir(package_name)) / folder_name
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
 
 class suppress_stdout_stderr(object):
     """

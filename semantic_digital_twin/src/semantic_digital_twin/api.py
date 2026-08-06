@@ -1256,6 +1256,40 @@ class WorldSpecification:
             objects=objects or [],
         )
 
+    @classmethod
+    def from_gazebo(
+        cls,
+        file_path: str,
+        *,
+        prefix: str | None = None,
+        path_resolver: PathResolver | None = None,
+        robots: list[RobotSpecification] | None = None,
+        objects: list[SpawnSpecification] | None = None,
+    ) -> Self:
+        """
+        Build a specification whose environment is parsed from a Gazebo SDF world or
+        model file.
+
+        :param file_path: Path to the environment world or model file. This is never a
+            robot description; robots are supplied through ``robots``.
+        :param prefix: Optional name prefix for the parsed environment.
+        :param path_resolver: Resolver for the ``model://`` and mesh URIs the file
+            references. Defaults to one that searches next to the file.
+        :param robots: The robots merged into the environment.
+        :param objects: Specifications spawned once the robots are in place.
+        :return: The created specification.
+        """
+        from semantic_digital_twin.adapters.gazebo import GazeboParser
+
+        world = GazeboParser.from_file(
+            file_path, prefix=prefix, path_resolver=path_resolver
+        ).parse()
+        return cls(
+            world=world,
+            robots=robots or [],
+            objects=objects or [],
+        )
+
     def to_domain_object(self) -> World:
         """
         Materialize a new World from this specification.

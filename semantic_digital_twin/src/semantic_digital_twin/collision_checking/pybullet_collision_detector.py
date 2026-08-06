@@ -13,7 +13,6 @@ import numpy as np
 import trimesh
 from giskardpy.utils.utils import create_path
 from krrood.utils import memoize, clear_memoization_cache
-from platformdirs import user_cache_dir
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionDetector,
     CollisionCheckingResult,
@@ -22,7 +21,7 @@ from semantic_digital_twin.collision_checking.collision_detector import (
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionMatrix
 from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
-from semantic_digital_twin.utils import suppress_stdout_stderr
+from semantic_digital_twin.utils import create_cache_dir, suppress_stdout_stderr
 from semantic_digital_twin.world_description.geometry import (
     Shape,
     Box,
@@ -34,14 +33,6 @@ from semantic_digital_twin.world_description.geometry import (
 from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
-
-
-def create_cache_dir(folder_name: str) -> Path:
-    pkg_name = __package__.split(".", 1)[0]
-
-    cache_dir = Path(user_cache_dir(pkg_name)) / folder_name
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir
 
 
 CACHE_DIR = create_cache_dir("convex_decompositions")

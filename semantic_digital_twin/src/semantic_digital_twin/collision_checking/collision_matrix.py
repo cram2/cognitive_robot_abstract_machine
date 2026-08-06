@@ -57,17 +57,23 @@ class CollisionCheck(SubclassJSONSerializer):
         )
 
     @classmethod
-    def create_and_validate(
+    def create_for_bodies_with_collision(
         cls, body_a: Body, body_b: Body, distance: float | None = None
     ) -> Self:
         """
-        Creates a CollisionCheck instance and validates its properties.
+        Creates a CollisionCheck instance for two bodies that are already known to have
+        collision geometry, for example because they come from
+        :attr:`World.bodies_with_collision`.
 
         Makes sure body_a and body_b are sorted properly.
+        .. note:: Inspecting the geometry of a body builds a mesh of every collision
+            shape, so a caller that covers every body pair would pay for it
+            quadratically. Use :meth:`create_and_validate` where the bodies were not
+            filtered yet.
         :param body_a: First body in the collision check.
         :param body_b: Second body in the collision check.
         :param distance: Minimum distance to check for collisions.
-        :return: Validated CollisionCheck instance.
+        :return: CollisionCheck instance with sorted bodies.
         """
         self = cls(body_a=body_a, body_b=body_b, distance=distance)
         if self.distance is not None and self.distance < 0:
@@ -75,13 +81,29 @@ class CollisionCheck(SubclassJSONSerializer):
 
         if self.body_a == self.body_b:
             raise InvalidBodiesInCollisionCheckError(self)
+        self.sort_bodies()
+        return self
 
+    @classmethod
+    def create_and_validate(
+        cls, body_a: Body, body_b: Body, distance: float | None = None
+    ) -> Self:
+        """
+        Creates a CollisionCheck instance and validates its properties, including that
+        both bodies have collision geometry.
+
+        Makes sure body_a and body_b are sorted properly.
+        :param body_a: First body in the collision check.
+        :param body_b: Second body in the collision check.
+        :param distance: Minimum distance to check for collisions.
+        :return: Validated CollisionCheck instance.
+        """
+        self = cls.create_for_bodies_with_collision(body_a, body_b, distance)
         if not self.body_a.has_collision():
             raise BodyHasNoGeometryError(self)
 
         if not self.body_b.has_collision():
             raise BodyHasNoGeometryError(self)
-        self.sort_bodies()
         return self
 
     def __repr__(self):

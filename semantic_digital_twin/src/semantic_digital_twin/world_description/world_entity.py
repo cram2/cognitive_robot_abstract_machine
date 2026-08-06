@@ -58,6 +58,9 @@ from semantic_digital_twin.world_description.shape_collection import (
     ShapeCollection,
     BoundingBoxCollection,
 )
+from semantic_digital_twin.world_description.world_modification import (
+    synchronized_attribute_modification,
+)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -113,6 +116,15 @@ class WorldEntity(Symbol):
     def remove_from_world(self):
         self._world._world_entity_hash_table.pop(hash(self), None)
         self._world = None
+
+    @synchronized_attribute_modification
+    def update_name(self, name: PrefixedName) -> None:
+        """
+        Rename this world entity and record the change in the world's modification history.
+
+        :param name: The new name for this world entity.
+        """
+        self.name = name
 
 
 @dataclass(eq=False)

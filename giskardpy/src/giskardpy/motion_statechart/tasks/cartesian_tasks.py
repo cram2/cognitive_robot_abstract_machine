@@ -598,8 +598,18 @@ class CartesianPose(CartesianTask):
     )
     """Unit: rad/s. This is used for normalization, for real limits use CartesianVelocityLimit."""
 
-    threshold: float = field(default=0.01, kw_only=True)
-    """If the error falls below this threshold, the goal is achieved. This is used for both position and orientation. Units are m and rad."""
+    translation_threshold: float = field(default=0.01, kw_only=True)
+    """If the position error falls below this threshold (in meters), that half of the goal is achieved."""
+
+    orientation_threshold: float = field(default=0.01, kw_only=True)
+    """
+    If the orientation error falls below this threshold (in rad), that half of the goal
+    is achieved.
+
+    ..note:: A physically tracked arm settles with a residual orientation error, so a
+        rotation tolerance as tight as a typical translation tolerance in meters may
+        never be reached -- set this independently of :attr:`translation_threshold`.
+    """
 
     @property
     def goal_reference_frame(self) -> KinematicStructureEntity:
@@ -656,8 +666,8 @@ class CartesianPose(CartesianTask):
 
         rotation_error = root_R_current.rotational_error(root_R_goal)
         artifacts.observation = sm.logic_and(
-            sm.abs(rotation_error) < self.threshold,
-            distance_to_goal < self.threshold,
+            sm.abs(rotation_error) < self.orientation_threshold,
+            distance_to_goal < self.translation_threshold,
         )
         self.add_goal_and_current_debug_expressions(
             artifacts,

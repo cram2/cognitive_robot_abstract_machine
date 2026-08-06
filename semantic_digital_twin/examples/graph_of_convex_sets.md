@@ -59,14 +59,14 @@ be unable to fly by constraining the z-axis. Otherwise, he would get the idea to
 
 ```{code-cell} ipython3
 from random_events.interval import SimpleInterval
-from semantic_digital_twin.world_description.graph_of_convex_sets import GraphOfConvexSets
+from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import GraphOfBoundingBoxes
 from semantic_digital_twin.world_description.geometry import BoundingBox
 
 search_space = BoundingBoxCollection([BoundingBox(min_x=-1, max_x=1,
                            min_y=-1, max_y=1,
                            min_z=0.1, max_z=0.2, origin=HomogeneousTransformationMatrix(reference_frame=box_world.root))], box_world.root)
                            
-gcs = GraphOfConvexSets.free_space_from_world(box_world, search_space=search_space)
+graph_of_bounding_boxes = GraphOfBoundingBoxes.free_space_from_world(box_world, search_space=search_space)
 ```
 
 Let's have a look at the free space constructed. We can see that it is a rectangular catwalk around the obstacle.
@@ -76,7 +76,7 @@ import plotly
 plotly.offline.init_notebook_mode()
 import plotly.graph_objects as go
 
-fig = go.Figure(gcs.plot_free_space())
+fig = go.Figure(graph_of_bounding_boxes.plot_free_space())
 fig.show()
 ```
 
@@ -84,7 +84,7 @@ Looking at the connectivity graph, we can see that it is still possible to go fr
 just not directly. Intuitively, we can see that we just have to go around the obstacle.
 
 ```{code-cell} ipython3
-gcs.draw()
+graph_of_bounding_boxes.draw()
 ```
 
 Let's use graph theory to find a path!
@@ -94,7 +94,7 @@ from semantic_digital_twin.spatial_types import Point3
 
 start = Point3(-0.75, 0, 0.15, reference_frame=box_world.root)
 goal = Point3(0.75, 0, 0.15, reference_frame=box_world.root)
-path = gcs.path_from_to(start, goal)
+path = graph_of_bounding_boxes.path_from_to(start, goal)
 print("A potential path is", [(point.x, point.y) for point in path])
 ```
 
@@ -115,7 +115,7 @@ world = apartment_parser.parse()
 search_space = BoundingBoxCollection([BoundingBox(min_x=-2, max_x=2,
                            min_y=-2, max_y=2,
                            min_z=0., max_z=2, origin=HomogeneousTransformationMatrix(reference_frame=world.root))], world.root)
-gcs = GraphOfConvexSets.free_space_from_world(world, search_space=search_space)
+graph_of_bounding_boxes = GraphOfBoundingBoxes.free_space_from_world(world, search_space=search_space)
 ```
 
 We can now see the algebraic representation of the occupied and free space. The free space is the complement of the occupied space.
@@ -126,9 +126,9 @@ from plotly.subplots import make_subplots
 
 fig = make_subplots(rows=1, cols=2,  specs=[[{'type': 'surface'}, {'type': 'surface'}]], subplot_titles=["Occupied Space", "Free Space"])
 
-occupied_traces = gcs.plot_occupied_space()
+occupied_traces = graph_of_bounding_boxes.plot_occupied_space()
 fig.add_traces(occupied_traces, rows=[1 for _ in occupied_traces], cols=[1 for _ in occupied_traces])
-free_traces = gcs.plot_free_space()
+free_traces = graph_of_bounding_boxes.plot_free_space()
 fig.add_traces(free_traces, rows=[1 for _ in free_traces], cols=[2 for _ in free_traces])
 fig.show()
 ```
@@ -136,7 +136,7 @@ fig.show()
 Now let's look at the connectivity of the entire world!
 
 ```{code-cell} ipython3
-gcs.draw()
+graph_of_bounding_boxes.draw()
 ```
 
 We can see that all spaces are somehow reachable from everywhere besides one isolated region! Amazing!
@@ -146,7 +146,7 @@ Finally, let's find a way from here to there:
 ```{code-cell} ipython3
 start = Point3(-0.75, 0, 1.15, reference_frame=world.root)
 goal = Point3(0.75, 0, 1.15, reference_frame=world.root)
-path = gcs.path_from_to(start, goal)
+path = graph_of_bounding_boxes.path_from_to(start, goal)
 print("A potential path is", [(point.x, point.y, point.z) for point in path])
 ```
 

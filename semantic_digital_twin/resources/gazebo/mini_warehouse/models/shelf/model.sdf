@@ -1,0 +1,33 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <model name="shelf">
+    <static>1</static>
+    <link name="link">
+      <inertial>
+        <mass>40.0</mass>
+        <inertia>
+          <ixx>1.0</ixx>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyy>2.0</iyy>
+          <iyz>0.0</iyz>
+          <izz>3.0</izz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <box>
+            <size>1.2 0.5 2.0</size>
+          </box>
+        </geometry>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <box>
+            <size>1.2 0.5 2.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

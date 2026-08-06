@@ -101,7 +101,6 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         yield from (
             OperationResult(
                 sources.bindings | aggregation_result,
-                False,
                 self,
                 child_result,
             )
@@ -199,7 +198,7 @@ class CountAll(Count[T]):
         Surface the per-group row count that the grouping already bound to this aggregator's
         identifier.
         """
-        yield OperationResult(sources.bindings, False, self)
+        yield OperationResult(sources.bindings, self)
 
 
 @dataclass(eq=False, repr=False)

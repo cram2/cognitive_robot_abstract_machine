@@ -22,9 +22,14 @@ from coraplex.datastructures.enums import (
     MovementType,
 )
 from coraplex.datastructures.grasp import GraspDescription
-from coraplex.plans.factories import sequential, execute_single
+from coraplex.plans.factories import sequential
 from coraplex.querying.predicates import GripperIsFree
 from coraplex.robot_plans.actions.base import ActionDescription
+from coraplex.robot_plans.mixins import (
+    HasGraspDetectionThreshold,
+    PickUpTuningParameters,
+    ReachTuningParameters,
+)
 from coraplex.robot_plans.motions.gripper import (
     MoveGripperMotion,
     MoveToolCenterPointMotion,
@@ -32,7 +37,7 @@ from coraplex.robot_plans.motions.gripper import (
 from coraplex.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.reasoning.predicates import allclose
-from semantic_digital_twin.reasoning.robot_predicates import is_body_in_gripper
+from semantic_digital_twin.reasoning.robot_predicates import is_body_gripped
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
@@ -41,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ReachAction(ActionDescription):
+class ReachAction(ActionDescription, ReachTuningParameters, HasGraspDetectionThreshold):
     """
     Let the robot reach a specific pose.
     """
@@ -71,24 +76,39 @@ class ReachAction(ActionDescription):
     Whether the grasp pose sequence should be approached in reverse order.
     """
 
+    open_gripper_at_pre_pose: bool = False
+    """
+    Whether to open the gripper once the pre-pose is reached, used by
+    :class:`PickUpAction` to open before its slower final approach.
+    """
+
     @property
     def _action_plan(self) -> PlanNode:
         target_pre_pose, target_pose, _ = self.grasp_description.pose_sequence(
             self.target_pose, self.object_designator, reverse=self.reverse_reach_order
         )
-        return sequential(
-            children=[
-                MoveToolCenterPointMotion(
-                    target_pre_pose, self.arm, allow_gripper_collision=False
-                ),
-                MoveToolCenterPointMotion(
-                    target_pose,
-                    self.arm,
-                    allow_gripper_collision=False,
-                    movement_type=MovementType.CARTESIAN,
-                ),
-            ],
+        children = [
+            MoveToolCenterPointMotion(
+                target_pre_pose,
+                self.arm,
+                allow_gripper_collision=False,
+                max_linear_velocity=self.pre_approach_linear_velocity,
+            ),
+        ]
+        if self.open_gripper_at_pre_pose:
+            children.append(
+                MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm)
+            )
+        children.append(
+            MoveToolCenterPointMotion(
+                target_pose,
+                self.arm,
+                allow_gripper_collision=False,
+                movement_type=MovementType.CARTESIAN,
+                max_linear_velocity=self.final_approach_linear_velocity,
+            )
         )
+        return sequential(children=children)
 
     def execute(self) -> Any:
         self.add_subplan(self.action_plan).perform()
@@ -125,8 +145,11 @@ class ReachAction(ActionDescription):
         """
         end_effector = ViewManager.get_end_effector_view(kwargs["arm"], context.robot)
         return or_(
-            is_body_in_gripper(variable_from(kwargs["object_designator"]), end_effector)
-            > 0.9,
+            is_body_gripped(
+                variable_from(kwargs["object_designator"]),
+                end_effector,
+                threshold=kwargs["grasp_detection_threshold"],
+            ),
             allclose(
                 variable_from(kwargs["object_designator"]).global_pose.to_position(),
                 variable_from(end_effector.tool_frame).global_pose.to_position(),
@@ -136,7 +159,9 @@ class ReachAction(ActionDescription):
 
 
 @dataclass
-class PickUpAction(ActionDescription):
+class PickUpAction(
+    ActionDescription, PickUpTuningParameters, HasGraspDetectionThreshold
+):
     """
     Let the robot pick up an object.
     """
@@ -156,33 +181,63 @@ class PickUpAction(ActionDescription):
     The GraspDescription that should be used for picking up the object.
     """
 
-    @property
-    def _action_plan(self) -> PlanNode:
+    tolerate_grasp_stall: bool = False
+    """
+    Whether the CLOSE motion's completion also tolerates a stalled grasp (see
+    :attr:`~coraplex.robot_plans.motions.gripper.MoveGripperMotion.tolerate_stall`).
 
-        _, _, lift_to_pose = self.grasp_description.grasp_pose_sequence(
-            self.object_designator
-        )
+    Opt-in rather than always on: building the stall monitor needs a velocity variable
+    for every one of the gripper's connections, which is not guaranteed for every robot
+    -- it crashes on Tracy's real-execution gripper, whose connections do not all have
+    one.
+    """
+
+    def _grasp_attempt_plan(self) -> PlanNode:
+        """
+        :return: One reach-and-close attempt at grasping :attr:`object_designator`,
+            without lifting it.
+        """
         return sequential(
             children=[
-                MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm),
                 ReachAction(
                     target_pose=self.object_designator.global_pose,
                     object_designator=self.object_designator,
                     arm=self.arm,
                     grasp_description=self.grasp_description,
+                    pre_approach_linear_velocity=self.pre_approach_linear_velocity,
+                    final_approach_linear_velocity=self.final_approach_linear_velocity,
+                    open_gripper_at_pre_pose=True,
                 ),
-                MoveGripperMotion(motion=GripperState.CLOSE, gripper=self.arm),
+                MoveGripperMotion(
+                    motion=GripperState.CLOSE,
+                    gripper=self.arm,
+                    finger_velocity=self.grasp_closing_velocity,
+                    stall_minimum_time=self.grasp_stall_minimum_time,
+                    tolerate_stall=self.tolerate_grasp_stall,
+                ),
                 AttachNode(
                     body=self.object_designator,
                     new_parent=ViewManager.get_end_effector_view(
                         self.arm, self.robot
                     ).tool_frame,
                 ),
+            ],
+        )
+
+    @property
+    def _action_plan(self) -> PlanNode:
+        _, _, lift_to_pose = self.grasp_description.grasp_pose_sequence(
+            self.object_designator
+        )
+        return sequential(
+            children=[
+                self._grasp_attempt_plan(),
                 MoveToolCenterPointMotion(
                     lift_to_pose,
                     self.arm,
                     allow_gripper_collision=True,
                     movement_type=MovementType.TRANSLATION,
+                    max_linear_velocity=self.lift_linear_velocity,
                 ),
             ],
         )
@@ -224,8 +279,11 @@ class PickUpAction(ActionDescription):
         )
         return or_(
             not_(GripperIsFree(end_effector)),
-            is_body_in_gripper(variable_from(kwargs["object_designator"]), end_effector)
-            > 0.9,
+            is_body_gripped(
+                variable_from(kwargs["object_designator"]),
+                end_effector,
+                threshold=kwargs["grasp_detection_threshold"],
+            ),
         )
 
 

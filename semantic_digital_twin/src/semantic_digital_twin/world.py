@@ -558,6 +558,15 @@ class World(HasSimulatorProperties):
             world.add_body(root_body)
         return world
 
+    def force_root_name(self, name: PrefixedName) -> None:
+        """
+        Rename the world's root body.
+
+        :param name: The new name for the root body.
+        """
+        with self.modify_world():
+            self.root.update_name(name)
+
     def __hash__(self):
         return hash((id(self), self._model_manager.version))
 

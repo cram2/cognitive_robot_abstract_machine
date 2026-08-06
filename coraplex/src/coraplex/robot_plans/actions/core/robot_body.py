@@ -20,6 +20,7 @@ from coraplex.datastructures.enums import AxisIdentifier, Arms
 from coraplex.datastructures.trajectory import PoseTrajectory
 from coraplex.plans.factories import execute_single, sequential
 from coraplex.robot_plans.actions.base import ActionDescription, DescriptionType
+from coraplex.robot_plans.mixins import HasMaxJointVelocity
 from coraplex.robot_plans.motions.gripper import (
     MoveGripperMotion,
     MoveTCPWaypointsMotion,
@@ -93,7 +94,7 @@ class SetGripperAction(ActionDescription):
 
 
 @dataclass
-class ParkArmsAction(ActionDescription):
+class ParkArmsAction(ActionDescription, HasMaxJointVelocity):
     """
     Park the arms of the robot.
     """
@@ -108,7 +109,11 @@ class ParkArmsAction(ActionDescription):
         joint_names, joint_poses = self.get_joint_poses()
 
         return execute_single(
-            MoveJointsMotion(names=joint_names, positions=joint_poses)
+            MoveJointsMotion(
+                names=joint_names,
+                positions=joint_poses,
+                max_joint_velocity=self.max_joint_velocity,
+            )
         )
 
     def get_joint_poses(self) -> Tuple[List[str], List[float]]:

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import List
 
 from krrood.class_diagrams.utils import get_type_hints_of_object
+from semantic_digital_twin.world_description.geometry import Bounds
 
 
 from krrood.class_diagrams.attribute_introspector import (
@@ -43,6 +44,53 @@ class MeanAndStandardDeviation:
             mean=round(statistics.mean(measurements), 2),
             standard_deviation=round(std, 4),
         )
+
+
+@dataclass
+class VolumeBound(Bounds[float]):
+    """
+    A :class:`Bounds` interval known to contain some volume, for tables that report a
+    bounded estimate instead of a single point value.
+
+    Use this in experiment results whenever the true volume cannot be measured exactly
+    (e.g. it was estimated by sampling) but valid lower and/or upper bounds can be.
+    """
+
+    def __str__(self) -> str:
+        return f"[{round(self.lower, 4)}, {round(self.upper, 4)}]"
+
+
+@dataclass
+class PercentageBound(Bounds[float]):
+    """
+    A :class:`Bounds` interval, in percent, bounding the ratio of two
+    :class:`VolumeBound` quantities.
+
+    Use this to express one bounded volume as a share of another (e.g. how much of the
+    true free volume a covering is known to reach) without collapsing either bound into
+    a single, falsely precise point estimate.
+    """
+
+    def __str__(self) -> str:
+        return f"[{round(self.lower, 2)}%, {round(self.upper, 2)}%]"
+
+    @classmethod
+    def ratio_of(
+        cls, numerator: VolumeBound, denominator: VolumeBound
+    ) -> PercentageBound:
+        """
+        :param numerator: Bound on the covered quantity.
+        :param denominator: Bound on the reference quantity.
+        :return: A percentage bound on ``numerator / denominator``, clipped to
+            ``[0, 100]``. The worst case for each end is used: the lower end pairs the
+            smallest numerator with the largest denominator, and vice versa for the
+            upper end.
+        """
+        raw_lower = 100.0 * numerator.lower / denominator.upper
+        raw_upper = 100.0 * numerator.upper / denominator.lower
+        lower = max(0.0, min(raw_lower, 100.0))
+        upper = max(lower, min(raw_upper, 100.0))
+        return cls(lower=lower, upper=upper)
 
 
 @dataclass

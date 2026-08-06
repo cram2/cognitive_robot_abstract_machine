@@ -18,9 +18,10 @@ Usage:
 
 pr_data.json shape: {"<owner>/<repo>": {"<pr_number>": {"state": "open"|
 "closed", "draft": bool, "merged_at": str|null, "labels": [str, ...]}}} -
-one entry per pull request number referenced by any item. See
-pr-data-fetching.md (next to this script) for how a session should gather
-it.
+one entry per pull request number referenced by any item. A closed entry
+must carry merged_at explicitly, null included; omitting it is rejected
+rather than read as unmerged. See pr-data-fetching.md (next to this script)
+for how a session should gather it.
 
 Prints a one-line JSON summary to stdout (status counts, drift count,
 ready-to-start/blocker-maybe-cleared item titles) so the calling skill can
@@ -418,6 +419,12 @@ def validate_plan(plan: dict[str, Any]) -> None:
         raise PlanValidationError(problems)
 
 
+class MissingMergeTimestampError(ValueError):
+    """Raised when a closed pull request's ``pr_data.json`` entry omits the
+    ``merged_at`` key altogether, which leaves no way to tell a merged pull
+    request from one closed unmerged."""
+
+
 @dataclass
 class PullRequestRecord:
     """The live GitHub state of one pull request, as gathered by the skill."""
@@ -459,10 +466,23 @@ class PullRequestRecord:
 
     @classmethod
     def from_mapping(cls, data: dict[str, Any]) -> PullRequestRecord:
-        """Build a record from one entry of ``pr_data.json``."""
+        """Build a record from one entry of ``pr_data.json``.
+
+        A closed entry must carry ``merged_at`` explicitly, ``null`` included:
+        a gatherer that never requested the field would otherwise be
+        indistinguishable from GitHub reporting no merge, silently turning
+        every merged pull request into a closed-unmerged one.
+
+        :raises MissingMergeTimestampError: If a closed entry omits ``merged_at``.
+        """
+        state = PullRequestState(data["state"])
+        if state is PullRequestState.CLOSED and "merged_at" not in data:
+            raise MissingMergeTimestampError(
+                "a closed pull request entry must carry merged_at (null included)"
+            )
         merged_at = data.get("merged_at")
         return cls(
-            state=PullRequestState(data["state"]),
+            state=state,
             draft=data.get("draft", False),
             merged_at=datetime.fromisoformat(merged_at) if merged_at else None,
             labels=list(data.get("labels") or []),

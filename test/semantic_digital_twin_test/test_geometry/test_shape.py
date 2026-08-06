@@ -8,7 +8,10 @@ import pytest
 import trimesh
 
 from krrood.adapters.json_serializer import from_json, to_json
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (
     Box,
     Cylinder,
@@ -17,6 +20,7 @@ from semantic_digital_twin.world_description.geometry import (
     Sphere,
     Texture,
 )
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 def test_recenter_origin_centers_bounding_box():
@@ -179,3 +183,112 @@ def test_mesh_volume(tmp_path):
     mesh = Mesh.from_trimesh(mesh=source, dirname=str(tmp_path), file_type="stl")
 
     assert mesh.volume == pytest.approx(8.0)
+
+
+# %% the units a mesh file declares
+
+
+def collada_fixture_path(file_name: str) -> str:
+    """
+    :param file_name: The name of the COLLADA file inside the collada resources.
+    :return: The absolute path of that file.
+    """
+    return os.path.join(
+        Path(files("semantic_digital_twin")).parent.parent,
+        "resources",
+        "collada",
+        file_name,
+    )
+
+
+def test_mesh_declaring_centimeters_loads_in_meters():
+    """
+    A mesh file stating that its coordinates are centimeters loads at its real size.
+
+    The world is in meters throughout, so a file measuring its cube as 100 across in
+    centimeters must arrive as a cube of one meter.
+    """
+    mesh = Mesh(filename=collada_fixture_path("centimeter_cube.dae"))
+
+    assert mesh.mesh.extents == pytest.approx([1.0, 1.0, 1.0])
+
+
+def test_mesh_declaring_no_units_is_taken_as_meters():
+    """
+    A mesh file that states no units is read as it is written.
+
+    Without a declaration there is nothing to convert from, so the coordinates are
+    already the meters the world expects.
+    """
+    mesh = Mesh(filename=collada_fixture_path("unitless_cube.dae"))
+
+    assert mesh.mesh.extents == pytest.approx([100.0, 100.0, 100.0])
+
+
+def test_declared_units_compose_with_the_meshs_own_scale():
+    """
+    A mesh keeps scaling by its own :attr:`~Mesh.scale` on top of the file's units.
+
+    The two are independent: the file says what its numbers mean, the shape says how
+    much to resize the result.
+    """
+    mesh = Mesh(
+        filename=collada_fixture_path("centimeter_cube.dae"), scale=Scale(2, 2, 2)
+    )
+
+    assert mesh.mesh.extents == pytest.approx([2.0, 2.0, 2.0])
+
+
+def test_stl_without_unit_metadata_loads_unchanged(tmp_path):
+    """
+    An STL carries no unit metadata at all, which must not be mistaken for a conversion
+    request.
+    """
+    source = trimesh.creation.box(extents=(1.0, 2.0, 4.0))
+
+    mesh = Mesh.from_trimesh(mesh=source, dirname=str(tmp_path), file_type="stl")
+
+    assert mesh.mesh.extents == pytest.approx([1.0, 2.0, 4.0])
+
+
+# %% expressing a shape's mesh in another frame
+
+
+def test_mesh_in_frame_applies_the_owning_bodys_world_transform():
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("map"))
+        world.add_kinematic_structure_entity(root)
+        obstacle = Body(name=PrefixedName("obstacle"))
+        world.add_connection(
+            FixedConnection(
+                root,
+                child=obstacle,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=2.0, y=0.0, z=0.0, reference_frame=root
+                ),
+            )
+        )
+        shape = Box(scale=Scale(1.0, 1.0, 1.0))
+        obstacle.collision.append(shape)
+
+    world_mesh = shape.mesh_in_frame(root)
+
+    np.testing.assert_allclose(
+        world_mesh.bounds, shape.mesh.bounds + np.array([2.0, 0.0, 0.0])
+    )
+
+
+def test_mesh_in_frame_in_the_shapes_own_frame_matches_its_local_mesh():
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("map"))
+        world.add_kinematic_structure_entity(root)
+        obstacle = Body(name=PrefixedName("obstacle"))
+        world.add_connection(FixedConnection.create_with_dofs(world, root, obstacle))
+        shape = Box(scale=Scale(1.0, 1.0, 1.0))
+        obstacle.collision.append(shape)
+
+    world_mesh = shape.mesh_in_frame(obstacle)
+
+    np.testing.assert_allclose(world_mesh.bounds, shape.mesh.bounds)

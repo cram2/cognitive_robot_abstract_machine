@@ -315,8 +315,54 @@ class TestCartesianTasks:
         assert np.allclose(
             cylinder_bot_world.compute_forward_kinematics(cylinder_bot_world.root, tip),
             goal.goal_pose,
-            atol=goal.threshold,
+            atol=goal.translation_threshold,
         )
+
+    def test_orientation_threshold_decouples_rotation_tolerance(
+        self, cylinder_bot_world: World
+    ):
+        """
+        A residual orientation error above ``threshold`` but below
+        ``orientation_threshold`` must count as goal reached -- a physically tracked arm
+        settles with a small orientation error that a shared position/rotation threshold
+        (meant as a position tolerance in meters) wrongly rejects, leaving the task
+        running forever.
+
+        The goal pose here only differs from the start pose by a 0.05 rad yaw, so on the
+        very first tick the position error is exactly zero while the rotation error is
+        0.05 rad -- isolating the rotation half of the observation.
+        """
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        goal_pose = Pose.from_xyz_rpy(yaw=0.05, reference_frame=cylinder_bot_world.root)
+
+        motion_statechart = MotionStatechart()
+        motion_statechart.add_nodes(
+            [
+                strict := CartesianPose(
+                    root_link=cylinder_bot_world.root,
+                    tip_link=tip,
+                    goal_pose=goal_pose,
+                    translation_threshold=0.01,
+                    name="strict",
+                ),
+                loose := CartesianPose(
+                    root_link=cylinder_bot_world.root,
+                    tip_link=tip,
+                    goal_pose=goal_pose,
+                    translation_threshold=0.01,
+                    orientation_threshold=0.1,
+                    name="loose",
+                ),
+            ]
+        )
+        motion_statechart.add_node(EndMotion.when_true(loose))
+
+        executor = Executor(MotionStatechartContext(world=cylinder_bot_world))
+        executor.compile(motion_statechart=motion_statechart)
+        executor.tick()
+
+        assert strict.observation_state == ObservationStateValues.FALSE
+        assert loose.observation_state == ObservationStateValues.TRUE
 
     def test_end_motion_waits_for_convergence(self, cylinder_bot_world: World):
         """
@@ -338,7 +384,7 @@ class TestCartesianTasks:
                     goal_pose=Pose.from_xyz_rpy(
                         x=1, reference_frame=cylinder_bot_world.root
                     ),
-                    threshold=0.5,
+                    translation_threshold=0.5,
                 ),
             ]
         )
@@ -460,7 +506,7 @@ class TestCartesianTasks:
         assert np.allclose(
             executor.context.world.compute_forward_kinematics(root, tip),
             expected,
-            atol=cart_goal.threshold,
+            atol=cart_goal.translation_threshold,
         )
 
     def test_front_facing_orientation(self, _hsr_world_setup: World):
@@ -566,7 +612,7 @@ class TestCartesianTasks:
             root, tip
         )
         assert np.allclose(
-            forward_kinematics, tip_goal2.to_np(), atol=cart_goal2.threshold
+            forward_kinematics, tip_goal2.to_np(), atol=cart_goal2.translation_threshold
         )
 
     def test_cart_goal_sequence_on_start(self, pr2_world_state_reset: World):
@@ -619,7 +665,9 @@ class TestCartesianTasks:
             root, tip
         )
         expected = np.eye(4)
-        assert np.allclose(forward_kinematics, expected, atol=cart_goal2.threshold)
+        assert np.allclose(
+            forward_kinematics, expected, atol=cart_goal2.translation_threshold
+        )
 
     def test_CartesianOrientation(self, pr2_world_state_reset: World):
         """
@@ -999,8 +1047,8 @@ class TestCartesianTasks:
 
     def test_soft_trunk_cartesian_position(self):
         """
-        Verifies that Giskardpy can solve and execute a CartesianPosition task
-        for the procedurally built Piecewise Constant Curvature SoftTrunk robot.
+        Verifies that Giskardpy can solve and execute a CartesianPosition task for the
+        procedurally built Piecewise Constant Curvature SoftTrunk robot.
         """
         from semantic_digital_twin.datastructures.soft_trunk import (
             SoftTrunk,
@@ -1089,6 +1137,32 @@ class TestDiffDriveBaseGoal:
             goal_pose,
             atol=1e-2,
         )
+
+    def test_custom_threshold_applies_to_both_translation_and_orientation(
+        self, cylinder_bot_diff_world
+    ):
+        """
+        DifferentialDriveBaseGoal exposes a single ``threshold`` field for its callers,
+        so it must feed both of CartesianPose's translation_threshold and
+        orientation_threshold -- otherwise a caller raising ``threshold`` only relaxes
+        the position tolerance while the rotation tolerance silently stays at
+        CartesianPose's own hardcoded default.
+        """
+        goal_pose = Pose.from_xyz_rpy(
+            x=1, y=1, yaw=np.pi / 4, reference_frame=cylinder_bot_diff_world.root
+        )
+        motion_statechart = MotionStatechart()
+        motion_statechart.add_node(
+            goal := DifferentialDriveBaseGoal(goal_pose=goal_pose, threshold=0.3)
+        )
+        motion_statechart.add_node(EndMotion.when_true(goal))
+
+        executor = Executor(MotionStatechartContext(world=cylinder_bot_diff_world))
+        executor.compile(motion_statechart=motion_statechart)
+
+        for step in goal.nodes[1:]:
+            assert step.translation_threshold == 0.3
+            assert step.orientation_threshold == 0.3
 
 
 class TestVelocityTasks:

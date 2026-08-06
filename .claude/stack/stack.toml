@@ -1,0 +1,29 @@
+# Stacked-PR config - the fork-staging / cram2-review workflow.
+#
+# This file carries the committed defaults only. A `.claude/personal/stack.toml` on the
+# personal-notes branch, if present, layers per-user overrides on top of these values (see
+# `stack.py`'s `load_configuration`) - so a contributor whose fork/remotes differ never has to hand-edit
+# this checked-in file.
+#
+# The stack itself (which branches exist, how they depend on each other, and their review state) is
+# read live from GitHub, not declared here:
+#
+#   * the dependency TREE  = each fork PR's BASE branch (base = parent). Set it on GitHub.
+#   * draft <-> ready      = the fork PR's draft toggle. Un-draft to approve for review.
+#   * in-review            = the `in_review_label` on the fork PR (set at promote time; cram2 itself
+#                            is not readable from the cloud, so the label carries that fact).
+#   * merged               = branch is an ancestor of `<upstream_remote>/<upstream_base>` (pure git).
+#   * needs-resolution     = the `needs_resolution_label` on the fork PR (set by the routine when it
+#                            delegates a restack conflict to the branch's owning session; withholds
+#                            the branch from promotion until cleared).
+
+in_review_label = "in-review"  # fork-PR label marking "promoted to cram2, under review"
+rebase_label = "rebase"        # fork-PR label opting a branch into rebase instead of the default merge
+needs_resolution_label = "needs-resolution"  # set by the routine on a delegated restack conflict
+# fork_repository: deliberately unset - the fork is derived from `fork_remote`'s URL, so this file
+# names nobody's fork. Set it (here or in a personal override) only for a checkout whose fork remote
+# is not the fork. `ROUTINE.md` reads the resolved value rather than naming an owner.
+fork_remote = "origin"
+upstream_repository = "cram2/cognitive_robot_abstract_machine"  # constant for every contributor; the fork is whichever remote is not this
+upstream_remote = "cram2"        # name to give the upstream remote when one has to be added
+upstream_base = "main"
