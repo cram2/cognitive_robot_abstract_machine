@@ -79,13 +79,18 @@ class ActionBeliefQuery:
     prior (uniform if that is also unset).
     """
 
-    max_location_candidates: int = 10
+    max_location_candidates: int = 3
     """
     Cutoff for how many candidates to evaluate eagerly before ranking: how many poses
     :meth:`enumerate_candidates` draws from a bucket-B choice point's ``Location``, and
     how many already-grounded actions :meth:`rank_grounded_actions` evaluates up front.
 
-    Bounding an otherwise-lazy stream to a small prefix keeps both cheap.
+    Bounding an otherwise-lazy stream to a small prefix keeps both cheap -- "cheap" is
+    not just candidate count: a registered type's ``pre_condition`` can be a full
+    Giskard motion-statechart simulation against its own deep-copied world (e.g.
+    ``PickUpAction``/``ReachAction``/``GraspingAction`` via ``IsObjectReachableBy``),
+    not just a boolean check, so each extra candidate in this prefix is a full
+    simulation run, not a cheap comparison.
     """
 
     # %% construction
