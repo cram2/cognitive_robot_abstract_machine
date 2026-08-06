@@ -52,7 +52,20 @@ class AllChildrenFailed(PlanFailure):
         return f"All children of {self.language_node} failed"
 
     def suggest_correction(self) -> str:
-        return ""
+        # Local imports: action_belief.intervention imports action_belief_query,
+        # which imports robot_plans.actions.base, which imports PlanNode from
+        # plan_node.py, which itself imports PlanFailure from this module -- the
+        # same circular-import constraint documented in
+        # UnderspecifiedNode._build_action_iterator.
+        from coraplex.action_belief import intervention
+        from coraplex.plans.plan_node import DesignatorNode
+
+        results = [
+            intervention.diagnose(child.designator)
+            for child in self.language_node.children
+            if isinstance(child, DesignatorNode)
+        ]
+        return intervention.format_suggestions(results)
 
 
 @dataclass

@@ -287,6 +287,7 @@ class GiskardExecutable(Executable):
             pre_condition=condition_node.pre_condition,
             action=action_node.__class__,
             condition=condition_node.condition,
+            failed_action=action_node,
         )
 
     @property
@@ -395,6 +396,7 @@ class ConditionExecutable(Executable):
             pre_condition=self.condition_node.pre_condition,
             action=self.condition_node.__class__,
             condition=self.condition_node.condition,
+            failed_action=self.condition_node.action_node.action,
         )
 
 

@@ -138,7 +138,7 @@ class ActionBeliefQuery:
             )
         return kwargs
 
-    def _extract_candidate(self, action: ActionDescription) -> Dict[str, Any]:
+    def extract_candidate(self, action: ActionDescription) -> Dict[str, Any]:
         """
         :return: The current value of each registered choice-point field, read
             directly off ``action`` -- the inverse of :meth:`_materialize_kwargs`.
@@ -150,6 +150,21 @@ class ActionBeliefQuery:
                 value = getattr(value, segment)
             candidate[point.field_name] = value
         return candidate
+
+    def perturbed_action(
+        self, action: ActionDescription, field_name: str, value: Any
+    ) -> ActionDescription:
+        """
+        :return: A copy of ``action`` with ``field_name`` overridden to ``value``;
+            every other constructor kwarg is taken from ``action`` itself.
+
+        :attr:`fixed_kwargs` must equal ``action.designator_parameter`` for this to
+        carry over the rest of ``action``'s own field values correctly -- this is a
+        different use of that field than :meth:`enumerate_candidates`'s (a template
+        held fixed across many candidates), one field template for one action here.
+        """
+        kwargs = self._materialize_kwargs({field_name: value}, robot=action.robot)
+        return self.action_type(**kwargs)
 
     def _fresh_context(self) -> Context:
         """
@@ -241,7 +256,7 @@ class ActionBeliefQuery:
         for action in buffered:
             if self.predict_feasible(action):
                 weight = (
-                    prior.get(_candidate_key(self._extract_candidate(action)), 1.0)
+                    prior.get(_candidate_key(self.extract_candidate(action)), 1.0)
                     if prior
                     else 1.0
                 )

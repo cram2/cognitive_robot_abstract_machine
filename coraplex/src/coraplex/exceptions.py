@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing_extensions import TYPE_CHECKING, Type, List
+from typing_extensions import TYPE_CHECKING, Optional, Type, List
 
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from krrood.entity_query_language.factories import ConditionType, get_false_statements
@@ -132,6 +132,14 @@ class ConditionNotSatisfied(PlanFailure):
     action: Type[ActionDescription]
     condition: ConditionType
 
+    failed_action: Optional[ActionDescription] = None
+    """
+    The action instance whose condition failed, when the raise site has it in scope.
+
+    Lets :meth:`suggest_correction` diagnose a real fix instead of guessing; ``None`` at
+    raise sites that only have :attr:`action`'s type, not an instance.
+    """
+
     def error_message(self) -> str:
         prefix = "Pre" if self.pre_condition else "Post"
         if isinstance(self.condition, bool):
@@ -140,7 +148,15 @@ class ConditionNotSatisfied(PlanFailure):
         return f"{prefix}-Condition for Action '{self.action.__name__}' is not satisfied, following statements are false: {[s._name_ for s in false_statements]}"
 
     def suggest_correction(self) -> str:
-        return ""
+        if self.failed_action is None:
+            return ""
+        # Local import: action_belief.intervention imports action_belief_query,
+        # which imports robot_plans.actions.base, which imports ContextIsUnavailable
+        # from this module -- the same circular-import constraint documented in
+        # UnderspecifiedNode._build_action_iterator.
+        from coraplex.action_belief import intervention
+
+        return str(intervention.diagnose(self.failed_action))
 
 
 @dataclass

@@ -3898,6 +3898,19 @@ class ConditionNotSatisfiedDAO(
         TypeType, nullable=False, use_existing_column=True
     )
 
+    failed_action_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("ActionDescriptionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    failed_action: Mapped[ActionDescriptionDAO] = relationship(
+        "ActionDescriptionDAO",
+        uselist=False,
+        foreign_keys=[failed_action_id],
+        post_update=True,
+    )
+
     __mapper_args__ = {
         "polymorphic_identity": "ConditionNotSatisfiedDAO",
         "inherit_condition": database_id == PlanFailureDAO.database_id,
