@@ -64,8 +64,9 @@ class ActionBeliefPoint:
 @dataclass
 class ActionBeliefSpace:
     """
-    The choice points :class:`~coraplex.action_belief.action_belief_query.ActionBeliefQuery`
-    enumerates and ranks for one registered action type.
+    The choice points
+    :class:`~coraplex.action_belief.action_belief_query.ActionBeliefQuery` enumerates
+    and ranks for one registered action type.
     """
 
     action_type: Type[ActionDescription]
