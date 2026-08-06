@@ -77,7 +77,12 @@ def diagnose(action: ActionDescription) -> InterventionResult:
     action only carries the one concrete pose it was built with, not the ``Location``
     that produced it, so there is no alternative-pose domain left to retry here.
 
-    :param action: The already-grounded, already-failing action to diagnose.
+    :param action: The already-grounded, already-failing action to diagnose. Runs
+        as a side effect of :class:`~coraplex.plans.failures.AllChildrenFailed` and
+        :class:`~coraplex.exceptions.ConditionNotSatisfied`'s ``__post_init__``, so
+        it relies on ``action.context``/``action.robot`` already being valid at
+        that point -- every current raise site guarantees this by only ever
+        setting a real, plan-attached action.
     :return: The first fix found (if any), plus every perturbation tried.
     """
     action_type = type(action)
@@ -93,7 +98,7 @@ def diagnose(action: ActionDescription) -> InterventionResult:
 
     trials: List[Tuple[str, Any, Any, bool]] = []
     fixes: List[Tuple[str, Any, Any]] = []
-    for point in ACTION_BELIEF_SPACES[action_type].choice_points:
+    for point in query.choice_points:
         if point.bucket != "A":
             continue
         current_value = current_values[point.field_name]

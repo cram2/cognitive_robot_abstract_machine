@@ -335,6 +335,7 @@ def test_ranked_children_keeps_unregistered_and_non_designator_children_in_place
         ],
         context,
     )
+    layer_indices_before = [child.layer_index for child in root.children]
 
     ranked = root._ranked_children()
 
@@ -343,12 +344,18 @@ def test_ranked_children_keeps_unregistered_and_non_designator_children_in_place
         root.children[2].designator,
         root.children[1].designator,
     ]
+    # _ranked_children only reorders the local list it returns; the graph's own
+    # layer_index (and everything derived from it: children, siblings, path) is
+    # untouched.
+    assert [child.layer_index for child in root.children] == layer_indices_before
 
 
 def test_try_in_order_notify_visits_ranked_children_in_order(immutable_model_world):
     """
     ``notify`` must drive execution from ``_ranked_children``, not the structural
-    ``children`` order. Each child's own ``perform`` is stubbed to record visit order
+    ``children`` order.
+
+    Each child's own ``perform`` is stubbed to record visit order
     instead of running a real motion: ``TryInOrderNode.parse`` separately merges
     ``children`` (unranked) into one Giskard ``TryInOrder`` template, exercised on its
     own in test_giskard_templates.py, so driving a full ``plan.perform()`` here would

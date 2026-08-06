@@ -58,12 +58,15 @@ class ActionBeliefResult:
     """
 
     def __str__(self) -> str:
+        name = self.action_type.__name__
+        if not self.chosen:
+            return f"{name}: no feasible candidate (0/{self.candidates_enumerated})"
         fields_repr = ", ".join(
             f"{field_name.rsplit('.', 1)[-1]}={value}"
             for field_name, value in self.chosen.items()
         )
         return (
-            f"{self.action_type.__name__} grounded: {fields_repr} "
+            f"{name} grounded: {fields_repr} "
             f"({self.candidates_feasible}/{self.candidates_enumerated} feasible, "
             f"p={self.posterior:.2f})"
         )

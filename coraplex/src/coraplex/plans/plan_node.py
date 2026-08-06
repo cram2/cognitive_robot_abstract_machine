@@ -442,21 +442,20 @@ class UnderspecifiedNode(PlanNode):
             :data:`~coraplex.action_belief.action_belief_space.ACTION_BELIEF_SPACES`
             entry, unchanged otherwise.
         """
-        # Local imports: action_belief_space imports robot_plans.actions.base, which
-        # already imports PlanNode/ActionNode from this module.
+        # Local import: action_belief_space (imported transitively by
+        # ActionBeliefQuery) imports robot_plans.actions.base, which already
+        # imports PlanNode/ActionNode from this module.
         from coraplex.action_belief.action_belief_query import ActionBeliefQuery
-        from coraplex.action_belief.action_belief_space import ACTION_BELIEF_SPACES
 
         query_backend_iterator = self.plan.context.query_backend.evaluate(
             self.underspecified_action
         )
-        if self.designator_type not in ACTION_BELIEF_SPACES:
+        query = ActionBeliefQuery.for_registered_type(
+            self.designator_type, self.plan.context
+        )
+        if query is None:
             return query_backend_iterator
-        return ActionBeliefQuery(
-            action_type=self.designator_type,
-            fixed_kwargs={},
-            context=self.plan.context,
-        ).rank_grounded_actions(query_backend_iterator)
+        return query.rank_grounded_actions(query_backend_iterator)
 
     def stop_grounding(self) -> None:
         """

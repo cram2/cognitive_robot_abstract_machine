@@ -69,11 +69,15 @@ def test_iter_with_scorer_ranks_candidates_by_score(immutable_model_world):
     assert ranked_xs == list(reversed(unscored_xs))
 
 
-def test_iter_with_scorer_only_ranks_the_buffered_prefix(immutable_model_world):
+def test_iter_with_scorer_ranks_only_the_buffered_prefix_and_appends_the_rest(
+    immutable_model_world,
+):
     """
-    ``max_candidates_before_rank`` bounds how many candidates are buffered before
-    ranking: with it set below the number of real candidates, only that many are
-    considered, and the rest of the generator is never even reached.
+    ``max_candidates_before_rank`` bounds how many candidates are ranked, not how
+    many are yielded: with it set below the number of real candidates, only the
+    first that many are buffered and sorted by score -- the rest are still yielded
+    afterward, unranked, in their original generator order. Nothing is dropped,
+    matching ``ActionBeliefQuery.rank_grounded_actions``'s sibling contract.
     """
     world, robot_view, context = immutable_model_world
     unscored_location = _three_isolated_candidates_location(world, robot_view, context)
@@ -85,10 +89,31 @@ def test_iter_with_scorer_only_ranks_the_buffered_prefix(immutable_model_world):
     )
 
     ranked_poses = list(scored_location)
-
-    assert len(ranked_poses) == 2
     ranked_xs = [pose.to_position().x for pose in ranked_poses]
     unscored_xs = [pose.to_position().x for pose in list(unscored_location)]
-    # only the first two candidates in generator order were ever buffered, then
-    # ranked among themselves -- the third (largest x) never entered the buffer
-    assert sorted(ranked_xs) == sorted(unscored_xs[:2])
+
+    assert len(ranked_poses) == 3
+    # the first two candidates in generator order were buffered and ranked
+    # (descending by score); the third was never buffered, so it is appended
+    # afterward unranked, in its original generator-order position
+    assert ranked_xs == [unscored_xs[1], unscored_xs[0], unscored_xs[2]]
+
+
+def test_merge_preserves_scorer_and_max_candidates_before_rank(immutable_model_world):
+    """
+    ``Location.merge``/``__and__`` must carry the ranking configuration through to the
+    merged location -- previously it silently reverted to the defaults.
+    """
+    world, robot_view, context = immutable_model_world
+    location = _three_isolated_candidates_location(world, robot_view, context)
+    other = _three_isolated_candidates_location(world, robot_view, context)
+
+    def scorer(pose, collisions):
+        return pose.to_position().x
+
+    scored_location = replace(location, scorer=scorer, max_candidates_before_rank=2)
+
+    merged = scored_location & other
+
+    assert merged.scorer is scorer
+    assert merged.max_candidates_before_rank == 2

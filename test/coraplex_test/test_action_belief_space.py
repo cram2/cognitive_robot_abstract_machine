@@ -89,7 +89,6 @@ def test_place_action_choice_points():
     ]
     target_location_point = space.choice_points[-1]
     assert target_location_point.bucket == "B"
-    assert target_location_point.location_field == "target_location"
     assert target_location_point.domain is None
 
 
@@ -109,7 +108,6 @@ def test_navigate_action_choice_points():
     assert space.choice_points[0].bucket == "A"
     assert space.choice_points[0].domain == [False, True]
     assert space.choice_points[1].bucket == "B"
-    assert space.choice_points[1].location_field == "target_location"
 
 
 def test_cutting_action_choice_points():

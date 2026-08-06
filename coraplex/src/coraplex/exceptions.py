@@ -127,6 +127,9 @@ class MissingToolFrame(DataclassException):
 
 @dataclass
 class ConditionNotSatisfied(PlanFailure):
+    """
+    Raised when an action's pre- or post-condition is observed false during execution.
+    """
 
     pre_condition: bool
     action: Type[ActionDescription]

@@ -11,18 +11,27 @@ from krrood.entity_query_language.factories import (
     evaluate_condition,
     get_false_statements,
 )
-from coraplex.action_belief.action_belief_space import ACTION_BELIEF_SPACES
+from coraplex.action_belief.action_belief_space import (
+    ACTION_BELIEF_SPACES,
+    ActionBeliefPoint,
+)
 from coraplex.action_belief.results import ActionBeliefResult
 from coraplex.datastructures.dataclasses import Context
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.view_manager import ViewManager
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
+# %% candidate keys
+
 
 def _candidate_key(candidate: Dict[str, Any]) -> str:
     """
     :return: A deterministic string key for a candidate, for looking it up in an
         :class:`~coraplex.action_belief.action_belief_space.ActionBeliefSpace`'s prior.
+
+    Only meaningful for bucket-A fields: it stringifies each value verbatim, so a
+    bucket-B field's value (e.g. a ``Pose``) would need an exact ``repr()`` match to
+    ever hit a ``prior`` entry, which is impractical for continuous values.
     """
     return str(
         sorted(candidate.items(), key=lambda field_and_value: field_and_value[0])
@@ -79,9 +88,33 @@ class ActionBeliefQuery:
     Bounding an otherwise-lazy stream to a small prefix keeps both cheap.
     """
 
+    # %% construction
+
+    @classmethod
+    def for_registered_type(
+        cls, action_type: Type[ActionDescription], context: Context
+    ) -> Optional["ActionBeliefQuery"]:
+        """
+        :return: An :class:`ActionBeliefQuery` for ``action_type`` with no fixed
+            kwargs, or ``None`` if ``action_type`` isn't registered in
+            :data:`~coraplex.action_belief.action_belief_space.ACTION_BELIEF_SPACES`.
+
+        For callers that only rank or check already-grounded actions (e.g.
+        :meth:`rank_grounded_actions`, :meth:`predict_feasible`), which don't need a
+        real :attr:`fixed_kwargs` template.
+        """
+        if action_type not in ACTION_BELIEF_SPACES:
+            return None
+        return cls(action_type=action_type, fixed_kwargs={}, context=context)
+
     @property
-    def _choice_points(self):
+    def choice_points(self) -> List[ActionBeliefPoint]:
+        """
+        :return: Every registered choice point for :attr:`action_type`.
+        """
         return ACTION_BELIEF_SPACES[self.action_type].choice_points
+
+    # %% candidate construction
 
     def enumerate_candidates(self) -> Iterator[Dict[str, Any]]:
         """
@@ -89,7 +122,7 @@ class ActionBeliefQuery:
             drawn from bucket A's declared domain or bucket B's ``Location``, in the
             order ``itertools.product`` produces them.
         """
-        field_names = [point.field_name for point in self._choice_points]
+        field_names = [point.field_name for point in self.choice_points]
         value_options = [
             (
                 point.domain
@@ -101,7 +134,7 @@ class ActionBeliefQuery:
                     )
                 )
             )
-            for point in self._choice_points
+            for point in self.choice_points
         ]
         for combination in itertools.product(*value_options):
             yield dict(zip(field_names, combination))
@@ -114,6 +147,8 @@ class ActionBeliefQuery:
             applied on top of :attr:`fixed_kwargs`. A nested field (e.g.
             ``grasp_description.approach_direction``) is applied via
             :func:`dataclasses.replace` on its :attr:`fixed_kwargs` template object.
+            Supports exactly one level of dotted nesting -- no registered choice
+            point nests deeper than that today.
 
         If ``candidate`` sets ``arm``, ``grasp_description.end_effector`` is
         re-resolved from it, since the grasp orientation is computed relative to
@@ -144,7 +179,7 @@ class ActionBeliefQuery:
             directly off ``action`` -- the inverse of :meth:`_materialize_kwargs`.
         """
         candidate = {}
-        for point in self._choice_points:
+        for point in self.choice_points:
             value = action
             for segment in point.field_name.split("."):
                 value = getattr(value, segment)
@@ -165,6 +200,8 @@ class ActionBeliefQuery:
         """
         kwargs = self._materialize_kwargs({field_name: value}, robot=action.robot)
         return self.action_type(**kwargs)
+
+    # %% feasibility evaluation
 
     def _fresh_context(self) -> Context:
         """
@@ -220,6 +257,8 @@ class ActionBeliefQuery:
         """
         passed, _ = self._evaluate_pre_condition(action, self._fresh_context())
         return passed
+
+    # %% ranking and reporting
 
     def rank_grounded_actions(
         self, actions: Iterable[ActionDescription]

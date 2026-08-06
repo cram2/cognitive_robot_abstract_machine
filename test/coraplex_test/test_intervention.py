@@ -28,6 +28,9 @@ def test_diagnose_finds_the_arm_that_fixes_an_infeasible_open_action(
 
     assert result.fix == ("arm", Arms.RIGHT, Arms.LEFT)
     assert result.other_fixes_count == 0
+    # OpenAction registers only "arm", with domain [LEFT, RIGHT]: starting at
+    # RIGHT, the only other value to try is LEFT.
+    assert result.trials == [("arm", Arms.RIGHT, Arms.LEFT, True)]
 
 
 def test_diagnose_reports_no_fix_when_nothing_reproduces_success(

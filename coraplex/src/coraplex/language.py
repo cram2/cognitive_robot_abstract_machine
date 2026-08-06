@@ -19,7 +19,6 @@ from typing_extensions import (
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import Goal
 from coraplex.action_belief.action_belief_query import ActionBeliefQuery
-from coraplex.action_belief.action_belief_space import ACTION_BELIEF_SPACES
 from coraplex.language_giskard_templates import TryAll, TryInOrder
 from coraplex.plans.executables import (
     GiskardExecutable,
@@ -273,12 +272,11 @@ class TryInOrderNode(ExecutesSequentially):
         def predicted_infeasible(child: PlanNode) -> bool:
             if not isinstance(child, DesignatorNode):
                 return False
-            action_type = type(child.designator)
-            if action_type not in ACTION_BELIEF_SPACES:
-                return False
-            query = ActionBeliefQuery(
-                action_type=action_type, fixed_kwargs={}, context=self.plan.context
+            query = ActionBeliefQuery.for_registered_type(
+                type(child.designator), self.plan.context
             )
+            if query is None:
+                return False
             return not query.predict_feasible(child.designator)
 
         return sorted(self.children, key=predicted_infeasible)

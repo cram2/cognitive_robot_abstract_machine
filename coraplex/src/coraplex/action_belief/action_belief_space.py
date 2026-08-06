@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing_extensions import Any, Dict, List, Literal, Optional, Type
+from types import MappingProxyType
+from typing_extensions import Any, Dict, List, Literal, Mapping, Optional, Type
 
 from coraplex.datastructures.enums import (
     Arms,
@@ -54,12 +55,6 @@ class ActionBeliefPoint:
     bucket ``"B"``.
     """
 
-    location_field: Optional[str] = None
-    """
-    Name of the :class:`~coraplex.locations.base.Location`-backed field, for a bucket
-    ``"B"`` choice point. ``None`` for bucket ``"A"``.
-    """
-
 
 @dataclass
 class ActionBeliefSpace:
@@ -87,87 +82,93 @@ class ActionBeliefSpace:
 
 # %% registry
 
-ACTION_BELIEF_SPACES: Dict[Type[ActionDescription], ActionBeliefSpace] = {
-    PickUpAction: ActionBeliefSpace(
-        PickUpAction,
-        [
-            ActionBeliefPoint("arm", "A", domain=[Arms.LEFT, Arms.RIGHT]),
-            ActionBeliefPoint(
-                "grasp_description.approach_direction",
-                "A",
-                domain=list(ApproachDirection),
+ACTION_BELIEF_SPACES: Mapping[Type[ActionDescription], ActionBeliefSpace] = (
+    MappingProxyType(
+        {
+            PickUpAction: ActionBeliefSpace(
+                PickUpAction,
+                [
+                    ActionBeliefPoint("arm", "A", domain=[Arms.LEFT, Arms.RIGHT]),
+                    ActionBeliefPoint(
+                        "grasp_description.approach_direction",
+                        "A",
+                        domain=list(ApproachDirection),
+                    ),
+                    ActionBeliefPoint(
+                        "grasp_description.vertical_alignment",
+                        "A",
+                        domain=list(VerticalAlignment),
+                    ),
+                ],
             ),
-            ActionBeliefPoint(
-                "grasp_description.vertical_alignment",
-                "A",
-                domain=list(VerticalAlignment),
+            ReachAction: ActionBeliefSpace(
+                ReachAction,
+                [
+                    ActionBeliefPoint("arm", "A", domain=[Arms.LEFT, Arms.RIGHT]),
+                    ActionBeliefPoint(
+                        "grasp_description.approach_direction",
+                        "A",
+                        domain=list(ApproachDirection),
+                    ),
+                    ActionBeliefPoint(
+                        "grasp_description.vertical_alignment",
+                        "A",
+                        domain=list(VerticalAlignment),
+                    ),
+                    ActionBeliefPoint("reverse_reach_order", "A", domain=[False, True]),
+                ],
             ),
-        ],
-    ),
-    ReachAction: ActionBeliefSpace(
-        ReachAction,
-        [
-            ActionBeliefPoint("arm", "A", domain=[Arms.LEFT, Arms.RIGHT]),
-            ActionBeliefPoint(
-                "grasp_description.approach_direction",
-                "A",
-                domain=list(ApproachDirection),
+            GraspingAction: ActionBeliefSpace(
+                GraspingAction,
+                [
+                    ActionBeliefPoint("arm", "A", domain=[Arms.LEFT, Arms.RIGHT]),
+                    ActionBeliefPoint(
+                        "grasp_description.approach_direction",
+                        "A",
+                        domain=list(ApproachDirection),
+                    ),
+                    ActionBeliefPoint(
+                        "grasp_description.vertical_alignment",
+                        "A",
+                        domain=list(VerticalAlignment),
+                    ),
+                ],
             ),
-            ActionBeliefPoint(
-                "grasp_description.vertical_alignment",
-                "A",
-                domain=list(VerticalAlignment),
+            PlaceAction: ActionBeliefSpace(
+                PlaceAction,
+                [
+                    ActionBeliefPoint("arm", "A", domain=[Arms.LEFT, Arms.RIGHT]),
+                    ActionBeliefPoint("target_location", "B"),
+                ],
             ),
-            ActionBeliefPoint("reverse_reach_order", "A", domain=[False, True]),
-        ],
-    ),
-    GraspingAction: ActionBeliefSpace(
-        GraspingAction,
-        [
-            ActionBeliefPoint("arm", "A", domain=[Arms.LEFT, Arms.RIGHT]),
-            ActionBeliefPoint(
-                "grasp_description.approach_direction",
-                "A",
-                domain=list(ApproachDirection),
+            OpenAction: ActionBeliefSpace(
+                OpenAction,
+                [ActionBeliefPoint("arm", "A", domain=[Arms.LEFT, Arms.RIGHT])],
             ),
-            ActionBeliefPoint(
-                "grasp_description.vertical_alignment",
-                "A",
-                domain=list(VerticalAlignment),
+            CloseAction: ActionBeliefSpace(
+                CloseAction,
+                [ActionBeliefPoint("arm", "A", domain=[Arms.LEFT, Arms.RIGHT])],
             ),
-        ],
-    ),
-    PlaceAction: ActionBeliefSpace(
-        PlaceAction,
-        [
-            ActionBeliefPoint("arm", "A", domain=[Arms.LEFT, Arms.RIGHT]),
-            ActionBeliefPoint("target_location", "B", location_field="target_location"),
-        ],
-    ),
-    OpenAction: ActionBeliefSpace(
-        OpenAction,
-        [ActionBeliefPoint("arm", "A", domain=[Arms.LEFT, Arms.RIGHT])],
-    ),
-    CloseAction: ActionBeliefSpace(
-        CloseAction,
-        [ActionBeliefPoint("arm", "A", domain=[Arms.LEFT, Arms.RIGHT])],
-    ),
-    NavigateAction: ActionBeliefSpace(
-        NavigateAction,
-        [
-            ActionBeliefPoint("keep_joint_states", "A", domain=[False, True]),
-            ActionBeliefPoint("target_location", "B", location_field="target_location"),
-        ],
-    ),
-    CuttingAction: ActionBeliefSpace(
-        CuttingAction,
-        [
-            ActionBeliefPoint("technique", "A", domain=list(CuttingTechnique)),
-            ActionBeliefPoint("slicing_priority", "A", domain=list(SlicingPriority)),
-        ],
-    ),
-    WipingAction: ActionBeliefSpace(
-        WipingAction,
-        [ActionBeliefPoint("technique", "A", domain=list(WipingTechnique))],
-    ),
-}
+            NavigateAction: ActionBeliefSpace(
+                NavigateAction,
+                [
+                    ActionBeliefPoint("keep_joint_states", "A", domain=[False, True]),
+                    ActionBeliefPoint("target_location", "B"),
+                ],
+            ),
+            CuttingAction: ActionBeliefSpace(
+                CuttingAction,
+                [
+                    ActionBeliefPoint("technique", "A", domain=list(CuttingTechnique)),
+                    ActionBeliefPoint(
+                        "slicing_priority", "A", domain=list(SlicingPriority)
+                    ),
+                ],
+            ),
+            WipingAction: ActionBeliefSpace(
+                WipingAction,
+                [ActionBeliefPoint("technique", "A", domain=list(WipingTechnique))],
+            ),
+        }
+    )
+)

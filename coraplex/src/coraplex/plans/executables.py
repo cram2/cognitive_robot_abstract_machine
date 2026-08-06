@@ -200,7 +200,7 @@ class GiskardExecutable(Executable):
             pre_cancel = CancelMotion(
                 exception=self._condition_not_satisfied(
                     self.pre_condition_node,
-                    action_node=self.pre_condition_node.action_node.action,
+                    action=self.pre_condition_node.action_node.action,
                 )
             )
             pre_cancel.start_condition = trinary_logic_not(
@@ -218,7 +218,7 @@ class GiskardExecutable(Executable):
             post_cancel = CancelMotion(
                 exception=self._condition_not_satisfied(
                     self.post_condition_node,
-                    action_node=self.post_condition_node.action_node.action,
+                    action=self.post_condition_node.action_node.action,
                 )
             )
             post_cancel.start_condition = trinary_logic_not(
@@ -281,13 +281,18 @@ class GiskardExecutable(Executable):
     @staticmethod
     def _condition_not_satisfied(
         condition_node: ConditionNode,
-        action_node: ActionDescription,
+        action: ActionDescription,
     ) -> ConditionNotSatisfied:
+        # No failed_action here: this builds the CancelMotion exception eagerly at
+        # chart-compile time, before the condition is ever checked, so setting
+        # failed_action would run intervention.diagnose() (a real world deep-copy
+        # and pre_condition recheck) on every execution, success or failure alike.
+        # ConditionExecutable.execute() sets failed_action instead, since it only
+        # constructs the exception once the condition has actually failed.
         return ConditionNotSatisfied(
             pre_condition=condition_node.pre_condition,
-            action=action_node.__class__,
+            action=action.__class__,
             condition=condition_node.condition,
-            failed_action=action_node,
         )
 
     @property

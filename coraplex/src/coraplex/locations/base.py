@@ -91,13 +91,15 @@ class Location(Iterable[Pose]):
 
     max_candidates_before_rank: int = 10
     """
-    How many passing candidates to buffer before ranking them by :attr:`scorer`.
+    How many passing candidates to buffer and rank by :attr:`scorer` before the rest are
+    yielded unranked, in their original order.
 
     Only consulted when :attr:`scorer` is set. Ranking needs the whole candidate set to
     sort it, which trades the otherwise-lazy generator's "yield the first valid
     candidate immediately" behaviour for a bounded buffer, so this cutoff keeps ranking
     cheap instead of eagerly exhausting a generator that may have far more candidates
-    than are ever needed.
+    than are ever needed. Nothing is dropped -- candidates beyond this prefix are still
+    yielded afterward, just not scored.
     """
 
     @property
@@ -129,20 +131,24 @@ class Location(Iterable[Pose]):
                 _world=test_world, node=self.context.ros_node
             ).with_tf_publisher()
 
-        candidates = self._valid_candidates(test_world, test_robot)
+        candidate_iterator = self._valid_candidates(test_world, test_robot)
 
         if self.scorer is None:
-            for pose_candidate, _ in candidates:
+            for pose_candidate, _ in candidate_iterator:
                 yield pose_candidate
             return
 
-        buffered = itertools.islice(candidates, self.max_candidates_before_rank)
+        buffered = list(
+            itertools.islice(candidate_iterator, self.max_candidates_before_rank)
+        )
         ranked = sorted(
             buffered,
             key=lambda candidate_and_collisions: self.scorer(*candidate_and_collisions),
             reverse=True,
         )
         for pose_candidate, _ in ranked:
+            yield pose_candidate
+        for pose_candidate, _ in candidate_iterator:
             yield pose_candidate
 
     def _valid_candidates(
@@ -152,6 +158,13 @@ class Location(Iterable[Pose]):
         :return: Every pose candidate from :attr:`generator` that is collision-free
             and passes every validator, paired with the collision check computed for
             it, in generator order.
+
+        .. note::
+            The paired :class:`CollisionCheckingResult` always has an empty
+            ``contacts`` list here: any candidate with contacts is skipped below
+            before it would ever be paired and yielded. A :attr:`scorer` therefore
+            has no distance signal available from it -- only from the pose itself
+            or from checks a caller supplies independently.
         """
         for pose_candidate in self.generator:
 
@@ -191,6 +204,8 @@ class Location(Iterable[Pose]):
             self.target_pose,
             self.generator.merge(other.generator),
             self.validators + other.validators,
+            scorer=self.scorer,
+            max_candidates_before_rank=self.max_candidates_before_rank,
         )
 
     def __and__(self, other: Location) -> Location:

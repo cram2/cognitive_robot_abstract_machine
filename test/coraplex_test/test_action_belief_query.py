@@ -7,6 +7,7 @@ from coraplex.action_belief.action_belief_query import (
 from coraplex.action_belief.results import ActionBeliefResult
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
+from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
@@ -20,6 +21,9 @@ def _right_front_grasp(view):
         VerticalAlignment.NoAlignment,
         view.right_arm.end_effector,
     )
+
+
+# %% enumerate_candidates and _materialize_kwargs
 
 
 def test_enumerate_candidates_is_full_cartesian_product(immutable_model_world):
@@ -82,6 +86,74 @@ def test_materialize_kwargs_resyncs_end_effector_to_the_candidates_arm(
     assert kwargs["object_designator"] is milk
 
 
+# %% extract_candidate, perturbed_action, predict_feasible
+
+
+def test_extract_candidate_reads_choice_point_values_off_an_action(
+    immutable_model_world,
+):
+    world, view, context = immutable_model_world
+    milk = world.get_body_by_name("milk.stl")
+    action = PickUpAction(milk, Arms.LEFT, _right_front_grasp(view))
+    query = ActionBeliefQuery(
+        action_type=PickUpAction, fixed_kwargs={}, context=context
+    )
+
+    assert query.extract_candidate(action) == {
+        "arm": Arms.LEFT,
+        "grasp_description.approach_direction": ApproachDirection.FRONT,
+        "grasp_description.vertical_alignment": VerticalAlignment.NoAlignment,
+    }
+
+
+def test_perturbed_action_overrides_one_field_and_keeps_the_rest(
+    immutable_model_world,
+):
+    world, view, context = immutable_model_world
+    action = OpenAction(world.get_body_by_name("handle_cab10_m"), Arms.RIGHT)
+    execute_single(action_like=action, context=context)
+    query = ActionBeliefQuery(
+        action_type=OpenAction,
+        fixed_kwargs=action.designator_parameter,
+        context=context,
+    )
+
+    perturbed = query.perturbed_action(action, "arm", Arms.LEFT)
+
+    assert perturbed is not action
+    assert perturbed.arm == Arms.LEFT
+    assert perturbed.object_designator is action.object_designator
+
+
+def test_predict_feasible_matches_run_on_the_same_scenario(immutable_model_world):
+    """
+    Same reachable milk pose ``test_run_ranks_feasible_candidates_and_rejects_the_rest``
+    uses: the chosen candidate from ``run()`` must independently predict feasible via
+    ``predict_feasible`` on the actual grounded action.
+    """
+    world, view, context = immutable_model_world
+    milk = world.get_body_by_name("milk.stl")
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        2, 1.5, 0.7, 0, 0, 0
+    )
+    action = PickUpAction(milk, Arms.RIGHT, _right_front_grasp(view))
+    execute_single(action_like=action, context=context)
+    query = ActionBeliefQuery(
+        action_type=PickUpAction,
+        fixed_kwargs=action.designator_parameter,
+        context=context,
+    )
+
+    assert query.predict_feasible(action) is True
+
+    infeasible_action = query.perturbed_action(action, "arm", Arms.LEFT)
+
+    assert query.predict_feasible(infeasible_action) is False
+
+
+# %% run() / ActionBeliefResult
+
+
 def test_run_ranks_feasible_candidates_and_rejects_the_rest(immutable_model_world):
     """
     End to end, on the same reachable milk pose :mod:`test_pose_validator` uses for.
@@ -127,6 +199,12 @@ def test_run_ranks_feasible_candidates_and_rejects_the_rest(immutable_model_worl
         candidate["arm"] == Arms.LEFT for candidate, _ in result.rejected_examples
     ) == len(ApproachDirection) * len(VerticalAlignment)
     assert all(reason for _, reason in result.rejected_examples)
+    assert str(result) == (
+        f"PickUpAction grounded: arm={Arms.RIGHT}, "
+        f"approach_direction={ApproachDirection.FRONT}, "
+        f"vertical_alignment={VerticalAlignment.NoAlignment} "
+        f"(6/24 feasible, p=0.17)"
+    )
 
 
 def test_run_reports_zero_posterior_when_nothing_is_feasible(immutable_model_world):
@@ -157,6 +235,7 @@ def test_run_reports_zero_posterior_when_nothing_is_feasible(immutable_model_wor
     assert result.posterior == 0.0
     assert result.ranked_candidates == []
     assert len(result.rejected_examples) == 24
+    assert str(result) == "PickUpAction: no feasible candidate (0/24)"
 
 
 def test_prior_reweights_the_chosen_candidate(immutable_model_world):
@@ -221,6 +300,9 @@ def test_run_on_open_action_has_a_single_choice_point(immutable_model_world):
     assert result.candidates_enumerated == 2
     assert result.candidates_feasible == 1
     assert result.chosen["arm"] == Arms.LEFT
+
+
+# %% rank_grounded_actions
 
 
 def test_rank_grounded_actions_bounds_a_long_candidate_stream(immutable_model_world):
