@@ -5,7 +5,7 @@ import itertools
 from copy import deepcopy
 from dataclasses import dataclass
 
-from typing_extensions import Any, Dict, Iterator, List, Optional, Tuple, Type
+from typing_extensions import Any, Dict, Iterable, Iterator, List, Optional, Tuple, Type
 
 from krrood.entity_query_language.factories import (
     evaluate_condition,
@@ -137,21 +137,41 @@ class ActionBeliefQuery:
             )
         return kwargs
 
-    def evaluate_candidate(
-        self, candidate: Dict[str, Any]
-    ) -> Tuple[bool, Optional[str]]:
+    def _extract_candidate(self, action: ActionDescription) -> Dict[str, Any]:
         """
-        :return: Whether ``candidate``'s ``pre_condition`` holds against a throwaway
-            copy of the live world, and (if not) which statements were false.
+        :return: The current value of each registered choice-point field, read
+            directly off ``action`` -- the inverse of :meth:`_materialize_kwargs`.
+        """
+        candidate = {}
+        for point in self._choice_points:
+            value = action
+            for segment in point.field_name.split("."):
+                value = getattr(value, segment)
+            candidate[point.field_name] = value
+        return candidate
+
+    def _fresh_context(self) -> Context:
+        """
+        :return: A :class:`~coraplex.datastructures.dataclasses.Context` wrapping a
+            throwaway deep copy of the live world and robot, so a candidate can be
+            checked without mutating the live plan state.
         """
         world = deepcopy(self.context.world)
         robot = world.get_semantic_annotation_by_id(self.context.robot.id)
-        fresh_context = Context(
+        return Context(
             world=world,
             robot=robot,
             alternative_motion_mappings=self.context.alternative_motion_mappings,
         )
-        action = self.action_type(**self._materialize_kwargs(candidate, robot))
+
+    @staticmethod
+    def _evaluate_pre_condition(
+        action: ActionDescription, fresh_context: Context
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        :return: Whether ``action``'s ``pre_condition`` holds under ``fresh_context``,
+            and (if not) which statements were false.
+        """
         condition = action.pre_condition(
             action.bound_variables, fresh_context, action.designator_parameter
         )
@@ -159,6 +179,59 @@ class ActionBeliefQuery:
             return True, None
         false_statements = get_false_statements(condition)
         return False, ", ".join(statement._name_ for statement in false_statements)
+
+    def evaluate_candidate(
+        self, candidate: Dict[str, Any]
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        :return: Whether ``candidate``'s ``pre_condition`` holds against a throwaway
+            copy of the live world, and (if not) which statements were false.
+        """
+        fresh_context = self._fresh_context()
+        action = self.action_type(
+            **self._materialize_kwargs(candidate, fresh_context.robot)
+        )
+        return self._evaluate_pre_condition(action, fresh_context)
+
+    def rank_grounded_actions(
+        self, actions: Iterable[ActionDescription]
+    ) -> Iterator[ActionDescription]:
+        """
+        Reorder already-grounded actions by predicted feasibility, without dropping
+        any: this ranks a query backend's output for retry ordering, unlike
+        :meth:`run`, which builds and evaluates its own candidates from scratch.
+
+        :param actions: Already-grounded instances of :attr:`action_type`, e.g. from
+            ``context.query_backend.evaluate(...)``.
+        :return: ``actions`` whose ``pre_condition`` holds first (ranked by prior
+            weight among themselves), then the rest, each group in its original
+            relative order.
+        """
+        materialized = list(actions)
+        prior = (
+            self.prior
+            if self.prior is not None
+            else ACTION_BELIEF_SPACES[self.action_type].prior
+        )
+
+        feasible: List[Tuple[ActionDescription, float]] = []
+        infeasible: List[ActionDescription] = []
+        for action in materialized:
+            passed, _ = self._evaluate_pre_condition(action, self._fresh_context())
+            if passed:
+                weight = (
+                    prior.get(_candidate_key(self._extract_candidate(action)), 1.0)
+                    if prior
+                    else 1.0
+                )
+                feasible.append((action, weight))
+            else:
+                infeasible.append(action)
+
+        feasible.sort(key=lambda action_and_weight: action_and_weight[1], reverse=True)
+        for action, _ in feasible:
+            yield action
+        yield from infeasible
 
     def run(self) -> ActionBeliefResult:
         """
