@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import logging
 from abc import abstractmethod
 from copy import deepcopy
@@ -11,6 +12,7 @@ from typing_extensions import (
     Iterator,
     Optional,
     Iterable,
+    Tuple,
     Type,
     TYPE_CHECKING,
 )
@@ -36,6 +38,9 @@ try:
     )
 except ImportError:
     VizMarkerPublisher = None
+from semantic_digital_twin.collision_checking.collision_detector import (
+    CollisionCheckingResult,
+)
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AllowSelfCollisions,
@@ -74,6 +79,27 @@ class Location(Iterable[Pose]):
     Validators that are used to check if a generated pose is valid.
     """
 
+    scorer: Optional[Callable[[Pose, CollisionCheckingResult], float]] = None
+    """
+    Ranks candidates that passed every validator, highest first, instead of yielding
+    them in generator order.
+
+    ``None`` (the default) preserves the original streaming behaviour: a candidate is
+    yielded as soon as it passes, and :attr:`max_candidates_before_rank` is not
+    consulted.
+    """
+
+    max_candidates_before_rank: int = 10
+    """
+    How many passing candidates to buffer before ranking them by :attr:`scorer`.
+
+    Only consulted when :attr:`scorer` is set. Ranking needs the whole candidate set to
+    sort it, which trades the otherwise-lazy generator's "yield the first valid
+    candidate immediately" behaviour for a bounded buffer, so this cutoff keeps ranking
+    cheap instead of eagerly exhausting a generator that may have far more candidates
+    than are ever needed.
+    """
+
     @property
     def world(self):
         return self.context.world
@@ -103,6 +129,30 @@ class Location(Iterable[Pose]):
                 _world=test_world, node=self.context.ros_node
             ).with_tf_publisher()
 
+        candidates = self._valid_candidates(test_world, test_robot)
+
+        if self.scorer is None:
+            for pose_candidate, _ in candidates:
+                yield pose_candidate
+            return
+
+        buffered = itertools.islice(candidates, self.max_candidates_before_rank)
+        ranked = sorted(
+            buffered,
+            key=lambda candidate_and_collisions: self.scorer(*candidate_and_collisions),
+            reverse=True,
+        )
+        for pose_candidate, _ in ranked:
+            yield pose_candidate
+
+    def _valid_candidates(
+        self, test_world: World, test_robot: AbstractRobot
+    ) -> Iterator[Tuple[Pose, CollisionCheckingResult]]:
+        """
+        :return: Every pose candidate from :attr:`generator` that is collision-free
+            and passes every validator, paired with the collision check computed for
+            it, in generator order.
+        """
         for pose_candidate in self.generator:
 
             test_robot.root.parent_connection.origin = pose_candidate
@@ -125,7 +175,7 @@ class Location(Iterable[Pose]):
                 validator(pose_candidate=pose_candidate)
                 for validator in self.validators
             ):
-                yield pose_candidate
+                yield pose_candidate, collisions
 
     def merge(self, other: Location) -> Location:
         """

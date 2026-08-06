@@ -3220,6 +3220,10 @@ class LocationDAO(Base, DataAccessObject[coraplex.locations.base.Location]):
         Integer, primary_key=True, use_existing_column=True
     )
 
+    max_candidates_before_rank: Mapped[builtins.int] = mapped_column(
+        use_existing_column=True
+    )
+
     context_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
         ForeignKey("ContextDAO.database_id", use_alter=True),
         nullable=True,

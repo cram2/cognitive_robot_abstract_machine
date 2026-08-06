@@ -18,15 +18,6 @@ from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.view_manager import ViewManager
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
-MAX_LOCATION_CANDIDATES = 10
-"""
-Cutoff for how many poses to draw from a bucket-B choice point's ``Location`` before
-ranking.
-
-Mirrors Phase 4's ``max_candidates_before_rank`` rationale: bounding an otherwise-lazy
-generator to a small prefix keeps enumeration cheap.
-"""
-
 
 def _candidate_key(candidate: Dict[str, Any]) -> str:
     """
@@ -79,6 +70,13 @@ class ActionBeliefQuery:
     prior (uniform if that is also unset).
     """
 
+    max_location_candidates: int = 10
+    """
+    Cutoff for how many poses to draw from a bucket-B choice point's ``Location``
+    before ranking. Bounding an otherwise-lazy generator to a small prefix keeps
+    enumeration cheap.
+    """
+
     @property
     def _choice_points(self):
         return ACTION_BELIEF_SPACES[self.action_type].choice_points
@@ -96,7 +94,8 @@ class ActionBeliefQuery:
                 if point.bucket == "A"
                 else list(
                     itertools.islice(
-                        self.fixed_kwargs[point.field_name], MAX_LOCATION_CANDIDATES
+                        self.fixed_kwargs[point.field_name],
+                        self.max_location_candidates,
                     )
                 )
             )
