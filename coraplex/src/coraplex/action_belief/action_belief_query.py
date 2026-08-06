@@ -193,6 +193,18 @@ class ActionBeliefQuery:
         )
         return self._evaluate_pre_condition(action, fresh_context)
 
+    def predict_feasible(self, action: ActionDescription) -> bool:
+        """
+        :return: Whether ``action``'s ``pre_condition`` holds against a throwaway
+            copy of the live world.
+
+        Unlike :meth:`evaluate_candidate`, this takes an already fully-specified
+        action rather than a candidate dict, for callers that only need a yes/no
+        prediction for one concrete grounding.
+        """
+        passed, _ = self._evaluate_pre_condition(action, self._fresh_context())
+        return passed
+
     def rank_grounded_actions(
         self, actions: Iterable[ActionDescription]
     ) -> Iterator[ActionDescription]:
@@ -217,8 +229,7 @@ class ActionBeliefQuery:
         feasible: List[Tuple[ActionDescription, float]] = []
         infeasible: List[ActionDescription] = []
         for action in materialized:
-            passed, _ = self._evaluate_pre_condition(action, self._fresh_context())
-            if passed:
+            if self.predict_feasible(action):
                 weight = (
                     prior.get(_candidate_key(self._extract_candidate(action)), 1.0)
                     if prior
