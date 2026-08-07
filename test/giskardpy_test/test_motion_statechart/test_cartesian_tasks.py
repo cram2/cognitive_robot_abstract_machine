@@ -331,6 +331,9 @@ class TestCartesianTasks:
         The goal pose here only differs from the start pose by a 0.05 rad yaw, so on the
         very first tick the position error is exactly zero while the rotation error is
         0.05 rad -- isolating the rotation half of the observation.
+
+        The orientation sub-tasks are inspected directly, because the observation of the
+        enclosing :class:`Parallel` only reflects its children on the following tick.
         """
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         goal_pose = Pose.from_xyz_rpy(yaw=0.05, reference_frame=cylinder_bot_world.root)
@@ -361,8 +364,14 @@ class TestCartesianTasks:
         executor.compile(motion_statechart=motion_statechart)
         executor.tick()
 
-        assert strict.observation_state == ObservationStateValues.FALSE
-        assert loose.observation_state == ObservationStateValues.TRUE
+        strict_orientation = next(
+            node for node in strict.nodes if isinstance(node, CartesianOrientation)
+        )
+        loose_orientation = next(
+            node for node in loose.nodes if isinstance(node, CartesianOrientation)
+        )
+        assert strict_orientation.observation_state == ObservationStateValues.FALSE
+        assert loose_orientation.observation_state == ObservationStateValues.TRUE
 
     def test_end_motion_waits_for_convergence(self, cylinder_bot_world: World):
         """
@@ -1428,6 +1437,11 @@ class TestDebugExpressions:
         assert current.color == CURRENT_COLOR
 
     def test_cartesian_pose_uses_prefixed_names(self, cylinder_bot_world: World):
+        """
+        CartesianPose is a Parallel over a position and an orientation task, so its
+        debug expressions are registered by those children, each prefixed with its own
+        name.
+        """
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = CartesianPose(
@@ -1436,17 +1450,21 @@ class TestDebugExpressions:
             goal_pose=Pose.from_xyz_rpy(x=1, reference_frame=root),
             name="pose",
         )
+        motion_statechart = MotionStatechart()
+        motion_statechart.add_node(task)
+        motion_statechart.add_node(EndMotion.when_true(task))
 
-        artifacts = task.build(MotionStatechartContext(world=cylinder_bot_world))
+        executor = Executor(MotionStatechartContext(world=cylinder_bot_world))
+        executor.compile(motion_statechart=motion_statechart)
 
-        goal = debug_expression_by_name(artifacts.debug_expressions, "pose/goal")
-        current = debug_expression_by_name(artifacts.debug_expressions, "pose/current")
         names = {
-            debug_expression.name for debug_expression in artifacts.debug_expressions
+            debug_expression.name
+            for child in task.nodes
+            for debug_expression in child.debug_expressions
         }
-        assert names == {"pose/goal", "pose/current"}
-        assert goal.color == GOAL_COLOR
-        assert current.color == CURRENT_COLOR
-        pose_like = (Pose, HomogeneousTransformationMatrix)
-        assert isinstance(goal.expression, pose_like)
-        assert isinstance(current.expression, pose_like)
+        assert names == {
+            "pose/position/goal",
+            "pose/position/current",
+            "pose/orientation/goal",
+            "pose/orientation/current",
+        }

@@ -14,9 +14,8 @@ from typing_extensions import (
 )
 
 from giskardpy.motion_statechart.graph_node import (
-    EndMotion,
-    CancelMotion,
     MotionStatechartNode,
+    TerminalNode,
 )
 from giskardpy.motion_statechart.graph_node import (
     Goal,
@@ -129,7 +128,7 @@ class MotionStatechartGraphviz:
             f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
             f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">start:{start_condition}</FONT></TD></TR>'
         )
-        if not isinstance(node, (EndMotion, CancelMotion)):
+        if not isinstance(node, TerminalNode):
             label += (
                 f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
                 f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">pause:{pause_condition}</FONT></TD></TR>'

@@ -4,7 +4,7 @@ import ast
 import logging
 import threading
 import uuid
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import field, dataclass, fields
 from functools import cached_property
 
@@ -55,7 +55,11 @@ from giskardpy.motion_statechart.exceptions import (
     SelfInStartConditionError,
     NonObservationVariableError,
     NodeAlreadyBelongsToDifferentNodeError,
+    NodeNotBuiltError,
+    TerminalNodeInConditionError,
+    MissingErrorSignalError,
 )
+from giskardpy.motion_statechart.error_signals import ErrorSignal
 from giskardpy.motion_statechart.plotters.plot_specs import NodePlotSpec
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.qp.constraint_collection import ConstraintCollection
@@ -133,6 +137,7 @@ class TrinaryCondition(SubclassJSONSerializer):
         self._check_condition_is_variable_or_expression(new_expression)
         self._check_owner_not_in_start_condition(new_expression)
         self._check_only_observation_variables(new_expression)
+        self._check_no_terminal_node(new_expression)
 
     def _check_condition_is_variable_or_expression(self, new_expression: Scalar):
         if not isinstance(new_expression, Scalar):
@@ -146,6 +151,21 @@ class TrinaryCondition(SubclassJSONSerializer):
                     condition=self,
                     non_observation_variable=variable,
                     new_expression=new_expression,
+                )
+
+    def _check_no_terminal_node(self, new_expression: Scalar):
+        """
+        Rejects references to nodes that end the motion.
+
+        .. note:: Runs after :meth:`_check_only_observation_variables`, so every free
+            variable is known to be an :class:`ObservationVariable`.
+        """
+        for variable in new_expression.free_variables():
+            if isinstance(variable.motion_statechart_node, TerminalNode):
+                raise TerminalNodeInConditionError(
+                    condition=self,
+                    new_expression=new_expression,
+                    terminal_node=variable.motion_statechart_node,
                 )
 
     def _check_owner_not_in_start_condition(self, new_expression: Scalar):
@@ -349,7 +369,7 @@ class DebugExpression:
 @dataclass
 class NodeArtifacts:
     """
-    Represents the artifacts produced by the `build` method of a node.
+    Represents the artifacts produced by the `build_artifacts` method of a node.
     It makes explicit what artifacts are produced by a node.
     """
 
@@ -363,6 +383,11 @@ class NodeArtifacts:
     Instead of setting this attribute directly, you may also implement the `on_tick` method of a node.
     The advantage of using observation is that you can reuse the expressions used in constraints.
     .. warning:: the result of `on_tick` takes precedence over the observation expression.
+    """
+    error: Optional[ErrorSignal] = field(default=None)
+    """
+    How far this node is from its goal. Set by :class:`ConvergingTask`, which derives
+    :attr:`observation` from it, and used to watch whether the node is still converging.
     """
     debug_expressions: List[DebugExpression] = field(default_factory=list)
     """
@@ -423,6 +448,8 @@ class MotionStatechartNode:
     _constraint_collection: ConstraintCollection = field(init=False, repr=False)
     """The parameter is set after build() using its NodeArtifacts."""
     _observation_expression: Scalar = field(init=False, repr=False)
+    """The parameter is set after build() using its NodeArtifacts."""
+    _error_signal: Optional[ErrorSignal] = field(init=False, repr=False, default=None)
     """The parameter is set after build() using its NodeArtifacts."""
     _debug_expressions: List[DebugExpression] = field(default_factory=list, init=False)
     """The parameter is set after build() using its NodeArtifacts."""
@@ -496,6 +523,16 @@ class MotionStatechartNode:
         :return: The debug expressions registered by this node during build.
         """
         return self._debug_expressions
+
+    @property
+    def prerequisite_nodes(self) -> List[MotionStatechartNode]:
+        """
+        Nodes that must be expanded and built before this one, because this node reads
+        artifacts they only produce during expansion or build.
+
+        :return: The nodes this node depends on, empty unless a subclass declares any.
+        """
+        return []
 
     @property
     def depth(self) -> int:
@@ -744,8 +781,18 @@ class MotionStatechartNode:
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
         Called exactly once during motion statechart compilation.
-        Use this method for any setup steps.
+        Override this method for setup steps that produce no artifacts.
         .. warning:: Don't create other nodes within this function.
+        .. warning:: An override must return ``super().build(context)``, otherwise
+            :meth:`build_artifacts` never runs.
+        :param context: The context that contains data that can be used to build this node.
+        :return: A NodeArtifacts instance that describes this node.
+        """
+        return self.build_artifacts(context)
+
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+        """
+        Describe this node in terms of constraints, observation and debug expressions.
         :param context: The context that contains data that can be used to build this node.
         :return: A NodeArtifacts instance that describes this node. It is normal for nodes that don't directly affect the motion to return empty NodeArtifacts.
         """
@@ -965,6 +1012,64 @@ class Task(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
+class ConvergingTask(ABC, Task):
+    """
+    A task that drives a single scalar error towards zero and succeeds once that error is
+    within :attr:`threshold`.
+
+    Subclasses declare the error rather than the success condition, so that "reached the
+    goal" is defined in one place, and so that how fast the goal is being approached can
+    be measured. Tasks that enforce an invariant instead of converging, such as a
+    velocity limit or a collision predicate, are plain :class:`Task` and write their own
+    observation.
+    """
+
+    threshold: float = field(default=0.01, kw_only=True)
+    """Error at or below which the goal counts as reached, in the task's own units."""
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        """
+        Build the task and derive its observation from its error.
+        """
+        artifacts = super().build(context)
+        if artifacts.error is None:
+            raise MissingErrorSignalError(node=self)
+        artifacts.observation = artifacts.error.expression <= self.threshold
+        return artifacts
+
+    @abstractmethod
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+        """
+        Add the motion constraints of this task and set :attr:`NodeArtifacts.error` to
+        the error they drive to zero.
+
+        :param context: The context that contains data that can be used to build this
+            task.
+        :return: The artifacts describing this task.
+        """
+
+    @property
+    def error_signal(self) -> ErrorSignal:
+        """
+        :return: The error signal produced during build.
+        """
+        if self._error_signal is None:
+            raise NodeNotBuiltError(node=self)
+        return self._error_signal
+
+    @property
+    def normalized_error(self) -> Scalar:
+        """
+        The error divided by :attr:`threshold`, so that a value of at most 1 means the
+        goal is reached.
+
+        Dividing out the threshold makes errors of different tasks, and of different
+        units, comparable against a single convergence rate.
+        """
+        return self.error_signal.expression / self.threshold
+
+
+@dataclass(eq=False, repr=False)
 class Goal(MotionStatechartNode):
     nodes: List[MotionStatechartNode] = field(default_factory=list, init=False)
     plot_specs: NodePlotSpec = field(
@@ -1006,7 +1111,7 @@ class Goal(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
-class ThreadPayloadMonitor(MotionStatechartNode, ABC):
+class ThreadPayloadMonitor(ABC, MotionStatechartNode):
     """
     Payload monitor that evaluates _compute_observation in a background thread.
 
@@ -1075,7 +1180,16 @@ class ThreadPayloadMonitor(MotionStatechartNode, ABC):
 
 
 @dataclass(eq=False, repr=False)
-class EndMotion(MotionStatechartNode):
+class TerminalNode(ABC, MotionStatechartNode):
+    """
+    A node that ends the whole motion once its observation state turns true.
+
+    No transition can happen afterwards, so conditions may not reference such a node.
+    """
+
+
+@dataclass(eq=False, repr=False)
+class EndMotion(TerminalNode):
 
     plot_specs: NodePlotSpec = field(
         default_factory=NodePlotSpec.create_end_style, kw_only=True, init=False
@@ -1098,7 +1212,7 @@ class EndMotion(MotionStatechartNode):
     Upper bound for the per-degree-of-freedom velocity threshold.
     """
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
         Reports "done" only once the world has actually settled, so the motion isn't
         cut short while the controller is still commanding nonzero velocity.
@@ -1157,7 +1271,7 @@ class EndMotion(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
-class CancelMotion(MotionStatechartNode):
+class CancelMotion(TerminalNode):
     exception: DataclassException = field(kw_only=True)
     observation_expression: Scalar = field(
         default_factory=Scalar.const_true, init=False
@@ -1167,7 +1281,7 @@ class CancelMotion(MotionStatechartNode):
         default_factory=NodePlotSpec.create_cancel_style, kw_only=True, init=False
     )
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=Scalar.const_true())
 
     def on_tick(self, context: MotionStatechartContext) -> Optional[float]:

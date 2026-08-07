@@ -295,8 +295,8 @@ def test_compressed_copy_can_be_plotted(pr2_world_state_reset: World, tmp_path):
 
     msc_copy = MotionStatechart.from_json(new_json_data)
     msc_copy._add_transitions()
-    assert isinstance(msc_copy.nodes[-2], EndMotion)
-    assert isinstance(msc_copy.nodes[-1], CancelMotion)
+    assert len(msc_copy.get_nodes_by_type(EndMotion)) == 1
+    assert len(msc_copy.get_nodes_by_type(CancelMotion)) == 1
     msc.draw(str(tmp_path / "muh.pdf"))
 
 

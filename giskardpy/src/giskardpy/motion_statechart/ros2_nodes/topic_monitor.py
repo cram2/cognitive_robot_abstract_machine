@@ -44,7 +44,7 @@ class TopicNode(MotionStatechartNode, Generic[MsgType]):
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         ros_context_extension = context.require_extension(RosContextExtension)
         self.ros2_node = ros_context_extension.ros_node
-        return NodeArtifacts()
+        return super().build(context)
 
 
 @dataclass(eq=False, repr=False)

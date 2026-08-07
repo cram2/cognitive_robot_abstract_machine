@@ -78,7 +78,7 @@ class Open(Goal):
             ]
         )
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(
             observation=trinary_logic_and(
                 *[node.observation_variable for node in self.nodes]
@@ -148,7 +148,7 @@ class Close(Open):
             ]
         )
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(
             observation=trinary_logic_and(
                 *[node.observation_variable for node in self.nodes]

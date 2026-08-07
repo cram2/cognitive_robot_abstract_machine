@@ -29,7 +29,7 @@ class SetSeedConfiguration(MotionStatechartNode):
 
     seed_configuration: JointState = field(kw_only=True)
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar.const_true())
 
     def on_start(self, context: MotionStatechartContext):
@@ -58,7 +58,7 @@ class SetOdometry(MotionStatechartNode):
 
     _odom_joints: Tuple[Type[Connection], ...] = field(default=(OmniDrive,), init=False)
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         if self.odom_connection is None:
             drive_connections = context.world.get_connections_by_type(self._odom_joints)
             if len(drive_connections) == 0:

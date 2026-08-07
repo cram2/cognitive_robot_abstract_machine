@@ -26,7 +26,7 @@ A `DebugExpression`
 - a `color`, used when the expression is rendered.
 
 A node registers a debug expression by appending it to `artifacts.debug_expressions` inside its
-`build()` method:
+`build_artifacts()` method:
 
 ```python
 from semantic_digital_twin.world_description.geometry import Color

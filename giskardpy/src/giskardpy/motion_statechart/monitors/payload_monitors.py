@@ -25,7 +25,7 @@ class CheckControlCycleCount(MotionStatechartNode):
     After this many control cycles, the node will turn True.
     """
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
         artifacts.observation = context.control_cycle_variable > self.threshold
         return artifacts

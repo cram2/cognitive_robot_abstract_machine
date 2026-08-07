@@ -12,17 +12,18 @@ from giskardpy.motion_statechart.data_types import (
     DefaultWeights,
     ObservationStateValues,
 )
+from giskardpy.motion_statechart.error_signals import SymbolicErrorSignal
 from giskardpy.motion_statechart.graph_node import (
+    ConvergingTask,
     DebugExpression,
     NodeArtifacts,
-    Task,
 )
 from semantic_digital_twin.spatial_types import Point3, Vector3, RotationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False, repr=False)
-class WiggleInsert(Task):
+class WiggleInsert(ConvergingTask):
     """
     Presses the tip link down towards a hole while wiggling it with random translational
     and angular noise.
@@ -160,9 +161,15 @@ class WiggleInsert(Task):
     Auxiliary variable holding the current angular noise.
     """
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
-        artifacts = NodeArtifacts()
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+        """
+        Build motion constraints that press the tip into the hole while wiggling.
 
+        :param context: Provides access to world model and kinematic expressions.
+        :return: The artifacts of this task, whose error is the distance between the tip
+            and the hole.
+        """
+        artifacts = NodeArtifacts()
         # The previous default was a zero vector, which has no well-defined perpendicular plane;
         # the root z-axis is used instead so the default is usable.
         hole_normal = context.world.transform(
@@ -235,8 +242,9 @@ class WiggleInsert(Task):
             DebugExpression(f"{self.name}/root_P_hole_wiggled", root_P_hole_wiggled)
         )
 
-        distance = root_P_current.euclidean_distance(root_P_hole)
-        artifacts.observation = distance <= self.threshold
+        artifacts.error = SymbolicErrorSignal(
+            root_P_current.euclidean_distance(root_P_hole)
+        )
         return artifacts
 
     def on_tick(

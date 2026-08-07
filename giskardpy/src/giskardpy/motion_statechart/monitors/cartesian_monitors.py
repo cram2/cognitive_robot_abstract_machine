@@ -89,7 +89,7 @@ class PoseReached(RootRelativeGoalMonitor):
     def goal(self) -> HomogeneousTransformationMatrix:
         return self.goal_pose
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         root_T_goal = self.resolve_root_goal(context)
 
         root_P_goal = root_T_goal.to_position()
@@ -128,7 +128,7 @@ class PositionReached(RootRelativeGoalMonitor):
     def goal(self) -> Point3:
         return self.goal_point
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         root_P_goal = self.resolve_root_goal(context)
 
         root_P_current = context.world.compose_forward_kinematics_expression(
@@ -155,7 +155,7 @@ class OrientationReached(RootRelativeGoalMonitor):
     def goal(self) -> RotationMatrix:
         return self.goal_orientation
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         root_R_goal = self.resolve_root_goal(context)
 
         root_R_current = context.world.compose_forward_kinematics_expression(
@@ -183,7 +183,7 @@ class PointingAt(MotionStatechartNode):
     threshold: float = field(default=0.01, kw_only=True)
     """Distance threshold between the goal point and the pointing line in meters."""
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         root_P_goal_point = context.world.transform(
             target_frame=self.root_link, spatial_object=self.goal_point
         )
@@ -221,7 +221,7 @@ class VectorsAligned(MotionStatechartNode):
     threshold: float = field(default=0.01, kw_only=True)
     """Angle threshold between the two normals in radians."""
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         tip_V_tip_normal = context.world.transform(
             target_frame=self.tip_link, spatial_object=self.tip_normal
         )
@@ -260,7 +260,7 @@ class DistanceToLine(MotionStatechartNode):
     threshold: float = field(default=0.01, kw_only=True)
     """Distance threshold to the line segment in meters."""
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         root_P_current = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         ).to_position()

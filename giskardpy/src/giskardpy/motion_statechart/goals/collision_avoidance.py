@@ -116,7 +116,7 @@ class _ExternalCollisionHasData(_ExternalCollisionAvoidanceNode):
     Monitors whether data was computed for the external collision avoidance task.
     """
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
         artifacts.observation = self.has_collision_data
@@ -174,7 +174,7 @@ class _ExternalCollisionAvoidanceTask(_ExternalCollisionAvoidanceNode):
             ]
         )
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
         root_T_group_a = context.world.compose_forward_kinematics_expression(
@@ -216,7 +216,7 @@ class _CancelBecauseExternalCollisionViolated(CancelMotion):
     Set to init=False, because this class creates its own exception.
     """
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         if len(self.tasks) == 1:
             self.start_condition = sm.trinary_logic_not(
                 self.tasks[0].observation_variable
@@ -258,7 +258,7 @@ class UpdateTemporaryCollisionRules(MotionStatechartNode):
     temporary_rules: list[CollisionRule] = field(kw_only=True)
     collision_matrix: CollisionMatrix = field(init=False)
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
         # safe old rules
         old_temporary_rules = context.collision_manager.temporary_rules
@@ -293,7 +293,7 @@ class SetInitialTemporaryCollisionRules(MotionStatechartNode):
     set_on_build: bool = field(default=True, kw_only=True)
     """Whether to set the collision matrix on build."""
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
         # safe old rules
         old_temporary_rules = context.collision_manager.temporary_rules
@@ -412,7 +412,7 @@ class ExternalCollisionDistanceMonitor(MotionStatechartNode):
     collision_index: int = field(default=0, kw_only=True)
     """Index of the closest collision (0 = closest, 1 = second closest, etc.)."""
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         # 1. Access the shared external collision manager
         # This automatically registers the manager with the CollisionManager
         manager = context.external_collision_manager
@@ -504,7 +504,7 @@ class _SelfCollisionHasData(_SelfCollisionAvoidanceNode):
     Monitors whether data was computed for the self collision avoidance task.
     """
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
         artifacts.observation = self.has_collision_data
@@ -528,7 +528,7 @@ class _SelfCollisionAvoidanceTask(_SelfCollisionAvoidanceNode):
     def is_collision_not_violated(self) -> Scalar:
         return self.contact_distance >= self.violated_distance
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
         group_b_T_group_a = context.world.compose_forward_kinematics_expression(
@@ -574,7 +574,7 @@ class _CancelBecauseSelfCollisionViolated(CancelMotion):
     Set to init=False, because this class creates its own exception.
     """
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         if len(self.tasks) == 1:
             self.start_condition = sm.trinary_logic_not(
                 self.tasks[0].observation_variable
@@ -729,7 +729,7 @@ class SelfCollisionDistanceMonitor(MotionStatechartNode):
     threshold: float = field(kw_only=True)
     """Distance threshold in meters."""
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         manager = context.self_collision_manager
 
         manager.register_groups_of_body_combination(self.body_a, self.body_b)

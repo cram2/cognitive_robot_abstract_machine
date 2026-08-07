@@ -27,15 +27,19 @@ from giskardpy.motion_statechart.exceptions import (
     NonObservationVariableError,
     NodeAlreadyBelongsToDifferentNodeError,
     ConditionScopeError,
+    TerminalNodeInConditionError,
     EmptyDegreesOfFreedomError,
+    MissingErrorSignalError,
 )
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import (
+    ConvergingTask,
     EndMotion,
     CancelMotion,
     Goal,
     MotionStatechartNode,
     NodeArtifacts,
+    TerminalNode,
     TrinaryCondition,
 )
 from giskardpy.motion_statechart.graph_node import ThreadPayloadMonitor
@@ -228,6 +232,13 @@ def test_draw_with_invisible_node(tmp_path):
     msc.draw(str(tmp_path / "muh.pdf"))
 
 
+@dataclass(eq=False, repr=False)
+class _NodeThatEndsTheMotion(TerminalNode):
+    """
+    A terminal node other than the two the statechart ships with.
+    """
+
+
 class TestConditions:
     def test_trinary_condition_default_expression_is_scalar(self):
         condition = TrinaryCondition(kind=TransitionKind.START)
@@ -250,6 +261,63 @@ class TestConditions:
         msc.add_node(node := ConstTrueNode())
         with pytest.raises(NonObservationVariableError):
             node.start_condition = FloatVariable(name="muh")
+
+    def test_end_motion_cannot_gate_another_node(self):
+        """
+        The motion is over once an EndMotion is true, so no transition can depend on it.
+        """
+        msc = MotionStatechart()
+        msc.add_nodes([node := ConstTrueNode(), end := EndMotion()])
+        with pytest.raises(TerminalNodeInConditionError) as exception_info:
+            node.start_condition = end.observation_variable
+
+        assert exception_info.value.terminal_node is end
+
+    def test_cancel_motion_cannot_gate_another_node(self):
+        """
+        A CancelMotion ends the motion just like an EndMotion does.
+        """
+        msc = MotionStatechart()
+        cancel = CancelMotion(exception=Exception("cancelled"))
+        msc.add_nodes([node := ConstTrueNode(), cancel])
+        with pytest.raises(TerminalNodeInConditionError) as exception_info:
+            node.start_condition = cancel.observation_variable
+
+        assert exception_info.value.terminal_node is cancel
+
+    def test_terminal_nodes_are_rejected_in_every_condition_kind(self):
+        """
+        No transition of any kind can happen after the motion has ended.
+        """
+        msc = MotionStatechart()
+        msc.add_nodes([node := ConstTrueNode(), end := EndMotion()])
+        with pytest.raises(TerminalNodeInConditionError):
+            node.pause_condition = end.observation_variable
+        with pytest.raises(TerminalNodeInConditionError):
+            node.end_condition = end.observation_variable
+        with pytest.raises(TerminalNodeInConditionError):
+            node.reset_condition = end.observation_variable
+
+    def test_any_terminal_node_cannot_gate_another_node(self):
+        """
+        The rule follows from ending the motion, not from being one of the two nodes
+        that happen to do so today.
+        """
+        msc = MotionStatechart()
+        msc.add_nodes([node := ConstTrueNode(), terminal := _NodeThatEndsTheMotion()])
+        with pytest.raises(TerminalNodeInConditionError) as exception_info:
+            node.start_condition = terminal.observation_variable
+
+        assert exception_info.value.terminal_node is terminal
+
+    def test_a_terminal_node_cannot_reference_itself(self):
+        """
+        A terminal node's own transitions are as unreachable as everyone else's.
+        """
+        msc = MotionStatechart()
+        msc.add_node(end := EndMotion())
+        with pytest.raises(TerminalNodeInConditionError):
+            end.end_condition = end.observation_variable
 
     def test_add_node_to_multiple_goals(self):
         msc = MotionStatechart()
@@ -291,7 +359,7 @@ class _BuildCountingNode(MotionStatechartNode):
     Number of times build() has run on this node.
     """
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         self.build_count += 1
         return NodeArtifacts(observation=sm.Scalar.const_true())
 
@@ -316,7 +384,7 @@ class _BuildCountingGoal(Goal):
         self.child = _BuildCountingNode(name="counting_child")
         self.add_node(self.child)
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         self.build_count += 1
         return NodeArtifacts(observation=self.child.observation_variable)
 
@@ -337,6 +405,63 @@ def test_each_node_is_built_exactly_once():
 
     assert goal.build_count == 1
     assert goal.child.build_count == 1
+
+
+# %% build orchestration and artifact production
+
+
+@dataclass(eq=False, repr=False)
+class _SetupThenArtifactsNode(MotionStatechartNode):
+    """
+    Node that performs setup in :meth:`build` and describes itself in
+    :meth:`build_artifacts`.
+    """
+
+    hook_calls: list[str] = field(default_factory=list, init=False)
+    """
+    Names of the build hooks that ran, in the order they ran.
+    """
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        self.hook_calls.append("build")
+        return super().build(context)
+
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+        self.hook_calls.append("build_artifacts")
+        return NodeArtifacts(observation=sm.Scalar.const_true())
+
+
+@dataclass(eq=False, repr=False)
+class _ConvergingTaskWithoutErrorSignal(ConvergingTask):
+    """
+    Converging task whose artifacts leave the error unset.
+    """
+
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+        return NodeArtifacts()
+
+
+def test_build_delegates_to_build_artifacts():
+    msc = MotionStatechart()
+    node = _SetupThenArtifactsNode()
+    msc.add_node(node)
+    msc.add_node(EndMotion.when_true(node))
+
+    executor = _compile_msc(msc)
+
+    assert node.hook_calls == ["build", "build_artifacts"]
+    executor.tick()
+    assert node.observation_state == ObservationStateValues.TRUE
+
+
+def test_converging_task_without_error_signal_is_rejected():
+    msc = MotionStatechart()
+    task = _ConvergingTaskWithoutErrorSignal()
+    msc.add_node(task)
+    msc.add_node(EndMotion.when_true(task))
+
+    with pytest.raises(MissingErrorSignalError):
+        _compile_msc(msc)
 
 
 def test_state_iteration_yields_nodes():
@@ -1519,6 +1644,23 @@ class TestTemplates:
         assert msc.nodes[3].life_cycle_state == LifeCycleValues.DONE
         assert msc.nodes[4].life_cycle_state == LifeCycleValues.DONE
         assert msc.nodes[5].life_cycle_state == LifeCycleValues.DONE
+
+    def test_sequence_gives_a_terminal_step_no_end_condition(self):
+        """
+        A sequence ends each step by its own observation, but a step that ends the whole
+        motion has nothing left to transition to.
+        """
+        msc = MotionStatechart()
+        cancel = CancelMotion(exception=Exception("cancelled"))
+        msc.add_node(
+            sequence := Sequence(nodes=[CountControlCycles(control_cycles=3), cancel])
+        )
+        msc.add_node(EndMotion.when_true(sequence))
+
+        kin_sim = Executor(MotionStatechartContext(world=World()))
+        kin_sim.compile(motion_statechart=msc)
+
+        assert cancel.end_condition.free_variables() == []
 
     def test_parallel(self):
         msc = MotionStatechart()

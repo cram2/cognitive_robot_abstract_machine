@@ -105,7 +105,7 @@ class LocalMinimumReached(MotionStatechartNode):
                 context.control_cycle_variable.evaluate()[0],
             )
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         if self.degrees_of_freedom is not None and not self.degrees_of_freedom:
             raise EmptyDegreesOfFreedomError(node=self)
         if self.measure_from_own_start:

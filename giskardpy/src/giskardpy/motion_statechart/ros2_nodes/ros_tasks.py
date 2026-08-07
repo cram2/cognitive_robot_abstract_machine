@@ -89,7 +89,7 @@ class ActionServerTask(
         self.build_msg(context)
         logger.info(f"Waiting for action server {self.action_topic}")
         self._action_client.wait_for_server()
-        return NodeArtifacts()
+        return super().build(context)
 
     def on_start(self, context: MotionStatechartContext):
         """
@@ -163,14 +163,10 @@ class NavigateActionServerTask(
         )
         self._msg = NavigateToPose.Goal(pose=pose_stamped)
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
-        Builds the motion state node this includes creating the action client and
-        setting the observation expression.
-
-        The observation is true if the robot is within 1cm of the target pose.
+        Observes whether the robot is within 1cm of the target pose.
         """
-        super().build(context)
         artifacts = NodeArtifacts()
         root_T_goal = context.world.transform(
             target_frame=context.world.root, spatial_object=self.target_pose
