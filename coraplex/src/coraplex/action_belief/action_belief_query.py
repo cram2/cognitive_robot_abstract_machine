@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+import math
 from copy import deepcopy
 from dataclasses import dataclass
 
@@ -36,6 +37,26 @@ def _candidate_key(candidate: Dict[str, Any]) -> str:
     return str(
         sorted(candidate.items(), key=lambda field_and_value: field_and_value[0])
     )
+
+
+_EAGER_EVALUATION_CEILING = 3
+"""
+Upper bound on how many candidates :class:`ActionBeliefQuery` ever evaluates eagerly
+before ranking, regardless of a registered type's own domain size.
+
+Each eager evaluation deep-copies the live world (:meth:`ActionBeliefQuery._fresh_context`)
+to check one candidate in isolation, and that throwaway world is not reliably released
+afterward. This value was found empirically, against the full ``coraplex`` test suite
+(not just the one module that exercises it most): 3 is clean, 4 already reproduces the
+world-leak failure in ``test/conftest.py`` (``count_worlds``) at
+``test_transport_open_container[pr2]`` in
+``test/coraplex_test/test_designator/test_multi_robot_action_designator.py`` -- a
+composite ``TransportAction`` chains several registered choice points (two
+``NavigateAction`` groundings, ``PickUpAction``, ``PlaceAction``) across four robot
+parametrizations in that module, and the margin against the suite's leak-detection
+threshold is this tight. Raising this ceiling is not safe without first addressing why
+a throwaway world outlives the candidate check it was built for.
+"""
 
 
 @dataclass
@@ -79,19 +100,42 @@ class ActionBeliefQuery:
     prior (uniform if that is also unset).
     """
 
-    max_location_candidates: int = 3
+    max_location_candidates: Optional[int] = None
     """
     Cutoff for how many candidates to evaluate eagerly before ranking: how many poses
     :meth:`enumerate_candidates` draws from a bucket-B choice point's ``Location``, and
     how many already-grounded actions :meth:`rank_grounded_actions` evaluates up front.
 
-    Bounding an otherwise-lazy stream to a small prefix keeps both cheap -- "cheap" is
-    not just candidate count: a registered type's ``pre_condition`` can be a full
-    Giskard motion-statechart simulation against its own deep-copied world (e.g.
-    ``PickUpAction``/``ReachAction``/``GraspingAction`` via ``IsObjectReachableBy``),
-    not just a boolean check, so each extra candidate in this prefix is a full
-    simulation run, not a cheap comparison.
+    ``None`` (the default) resolves in :meth:`__post_init__` via
+    :meth:`_default_max_location_candidates`, scaling with :attr:`action_type`'s own
+    domain: a type with a small bucket-A domain (e.g. ``OpenAction``'s two arms) gets
+    it fully ranked for free, while a larger bucket-A domain (e.g. ``ReachAction``'s 48
+    arm/approach/alignment/reverse combinations) or any bucket-B choice point is capped
+    at :data:`_EAGER_EVALUATION_CEILING` instead of paying for its full domain.
+
+    Pass an explicit value to override this for one query -- e.g. in a test that wants
+    a specific prefix length regardless of the registered domain.
     """
+
+    def __post_init__(self) -> None:
+        if self.max_location_candidates is None:
+            self.max_location_candidates = self._default_max_location_candidates()
+
+    def _default_max_location_candidates(self) -> int:
+        """
+        :return: :attr:`action_type`'s own bucket-A domain size (the product of every
+            registered bucket-A choice point's domain length), capped at
+            :data:`_EAGER_EVALUATION_CEILING` -- or the ceiling itself if
+            :attr:`action_type` has a bucket-B (``Location``-backed) choice point,
+            since a ``Location`` can produce arbitrarily many poses and has no fixed
+            domain to size against.
+        """
+        if any(point.bucket == "B" for point in self.choice_points):
+            return _EAGER_EVALUATION_CEILING
+        domain_size = math.prod(
+            (len(point.domain) for point in self.choice_points), start=1
+        )
+        return min(domain_size, _EAGER_EVALUATION_CEILING)
 
     # %% construction
 
@@ -191,6 +235,22 @@ class ActionBeliefQuery:
             candidate[point.field_name] = value
         return candidate
 
+    def perturb(
+        self, action: ActionDescription, changes: Dict[str, Any]
+    ) -> ActionDescription:
+        """
+        :return: A copy of ``action`` with every field in ``changes`` overridden to
+            its paired value; every other constructor kwarg is taken from ``action``
+            itself.
+
+        :attr:`fixed_kwargs` must equal ``action.designator_parameter`` for this to
+        carry over the rest of ``action``'s own field values correctly -- this is a
+        different use of that field than :meth:`enumerate_candidates`'s (a template
+        held fixed across many candidates), one field template for one action here.
+        """
+        kwargs = self._materialize_kwargs(changes, robot=action.robot)
+        return self.action_type(**kwargs)
+
     def perturbed_action(
         self, action: ActionDescription, field_name: str, value: Any
     ) -> ActionDescription:
@@ -198,13 +258,9 @@ class ActionBeliefQuery:
         :return: A copy of ``action`` with ``field_name`` overridden to ``value``;
             every other constructor kwarg is taken from ``action`` itself.
 
-        :attr:`fixed_kwargs` must equal ``action.designator_parameter`` for this to
-        carry over the rest of ``action``'s own field values correctly -- this is a
-        different use of that field than :meth:`enumerate_candidates`'s (a template
-        held fixed across many candidates), one field template for one action here.
+        A single-field convenience wrapper around :meth:`perturb`.
         """
-        kwargs = self._materialize_kwargs({field_name: value}, robot=action.robot)
-        return self.action_type(**kwargs)
+        return self.perturb(action, {field_name: value})
 
     # %% feasibility evaluation
 

@@ -10,7 +10,7 @@ from coraplex.datastructures.grasp import GraspDescription
 from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
-from coraplex.robot_plans.actions.core.pick_up import PickUpAction
+from coraplex.robot_plans.actions.core.pick_up import PickUpAction, ReachAction
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
@@ -21,6 +21,69 @@ def _right_front_grasp(view):
         VerticalAlignment.NoAlignment,
         view.right_arm.end_effector,
     )
+
+
+# %% adaptive max_location_candidates
+
+
+def test_default_max_location_candidates_fully_covers_a_small_bucket_a_domain(
+    immutable_model_world,
+):
+    """
+    ``OpenAction`` registers only ``arm``, with a domain of 2: the adaptive default must
+    rank it fully rather than applying the ceiling meant for larger domains.
+    """
+    world, view, context = immutable_model_world
+
+    query = ActionBeliefQuery.for_registered_type(OpenAction, context)
+
+    assert query.max_location_candidates == 2
+
+
+def test_default_max_location_candidates_caps_a_large_bucket_a_domain(
+    immutable_model_world,
+):
+    """
+    ``ReachAction`` registers arm/approach_direction/vertical_alignment/
+    reverse_reach_order, a domain of 48: the adaptive default must cap eager evaluation
+    instead of paying for the full domain on every grounding decision.
+    """
+    world, view, context = immutable_model_world
+
+    query = ActionBeliefQuery.for_registered_type(ReachAction, context)
+
+    assert query.max_location_candidates == 3
+
+
+def test_default_max_location_candidates_caps_a_location_backed_type(
+    immutable_model_world,
+):
+    """
+    ``NavigateAction`` registers a bucket-B ``target_location``: its ``Location`` can
+    produce arbitrarily many poses, so the adaptive default must fall back to the
+    ceiling rather than sizing against ``keep_joint_states``'s bucket-A domain of 2
+    alone, which would under-rank the field that actually matters for this type.
+    """
+    world, view, context = immutable_model_world
+
+    query = ActionBeliefQuery.for_registered_type(NavigateAction, context)
+
+    assert query.max_location_candidates == 3
+
+
+def test_explicit_max_location_candidates_overrides_the_adaptive_default(
+    immutable_model_world,
+):
+    world, view, context = immutable_model_world
+
+    query = ActionBeliefQuery(
+        action_type=ReachAction,
+        fixed_kwargs={},
+        context=context,
+        max_location_candidates=1,
+    )
+
+    assert query.max_location_candidates == 1
 
 
 # %% enumerate_candidates and _materialize_kwargs
