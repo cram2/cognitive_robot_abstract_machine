@@ -5,6 +5,7 @@ from krrood.entity_query_language.factories import (
     evaluate_condition,
     ConditionType,
 )
+from coraplex.action_belief import intervention
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.exceptions import ConditionNotSatisfied, MotionDidNotFinish
@@ -147,6 +148,48 @@ def test_pick_up_post_condition(mutable_model_world):
     )
 
     assert _construct_and_evaluate_condition(pick_action, pick_action.post_condition)
+
+
+def test_pick_up_success_does_not_trigger_diagnosis(mutable_model_world, monkeypatch):
+    """
+    ``GiskardExecutable._condition_not_satisfied`` builds its ``ConditionNotSatisfied``
+    eagerly, at chart-compile time, before the condition is ever checked -- so it must
+    never set ``failed_action``, or ``intervention.diagnose()`` (a real world deep copy
+    plus ``pre_condition`` recheck) would run on every successful execution too, not
+    just failures.
+
+    Verified here by spying on the real ``diagnose()`` (still calling through to it),
+    not replacing it.
+    """
+    diagnosed_actions = []
+    original_diagnose = intervention.diagnose
+
+    def spying_diagnose(action):
+        diagnosed_actions.append(action)
+        return original_diagnose(action)
+
+    monkeypatch.setattr(intervention, "diagnose", spying_diagnose)
+
+    world, view, context = mutable_model_world
+    pick_action = PickUpAction(
+        world.get_body_by_name("milk.stl"),
+        Arms.LEFT,
+        GraspDescription(
+            ApproachDirection.FRONT,
+            VerticalAlignment.NoAlignment,
+            view.left_arm.end_effector,
+        ),
+    )
+    view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        1.8, 2, 0
+    )
+
+    plan = sequential([pick_action], context)
+
+    with simulated_robot:
+        plan.perform()
+
+    assert diagnosed_actions == []
 
 
 def test_context_evaluate_condition(mutable_model_world):

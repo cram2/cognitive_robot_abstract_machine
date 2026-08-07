@@ -6,6 +6,10 @@ from dataclasses import is_dataclass
 import numpy as np
 
 import giskardpy  # type: ignore
+import coraplex.action_belief.action_belief_query
+import coraplex.action_belief.action_belief_space
+import coraplex.action_belief.intervention
+import coraplex.action_belief.results
 import coraplex.locations.costmaps
 import semantic_digital_twin.orm.ormatic_interface
 from krrood.adapters.json_serializer import SubclassJSONSerializer
@@ -25,6 +29,10 @@ import giskardpy.qp.solvers
 
 ignored_classes = set(classes_of_package(giskardpy.qp.solvers))
 ignored_classes |= set(classes_of_module(coraplex.locations.costmaps))
+ignored_classes |= set(classes_of_module(coraplex.action_belief.action_belief_space))
+ignored_classes |= set(classes_of_module(coraplex.action_belief.action_belief_query))
+ignored_classes |= set(classes_of_module(coraplex.action_belief.intervention))
+ignored_classes |= set(classes_of_module(coraplex.action_belief.results))
 ignored_classes |= {SubclassJSONSerializer}
 
 dependencies = [semantic_digital_twin.orm.ormatic_interface]

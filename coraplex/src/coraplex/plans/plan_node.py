@@ -422,9 +422,7 @@ class UnderspecifiedNode(PlanNode):
         :return: The new candidate node, or None if the iterator is exhausted.
         """
         if self._action_iterator is None:
-            self._action_iterator = self.plan.context.query_backend.evaluate(
-                self.underspecified_action
-            )
+            self._action_iterator = self._build_action_iterator()
 
         grounded_action = next(self._action_iterator, None)
         if grounded_action is None:
@@ -435,6 +433,29 @@ class UnderspecifiedNode(PlanNode):
         self.add_child(candidate)
         self.current_candidate = candidate
         return candidate
+
+    def _build_action_iterator(self) -> Iterator[ActionDescription]:
+        """
+        :return: The grounded-action iterator for :attr:`underspecified_action`,
+            ranked by predicted feasibility if :attr:`designator_type` is a
+            registered
+            :data:`~coraplex.action_belief.action_belief_space.ACTION_BELIEF_SPACES`
+            entry, unchanged otherwise.
+        """
+        # Local import: action_belief_space (imported transitively by
+        # ActionBeliefQuery) imports robot_plans.actions.base, which already
+        # imports PlanNode/ActionNode from this module.
+        from coraplex.action_belief.action_belief_query import ActionBeliefQuery
+
+        query_backend_iterator = self.plan.context.query_backend.evaluate(
+            self.underspecified_action
+        )
+        query = ActionBeliefQuery.for_registered_type(
+            self.designator_type, self.plan.context
+        )
+        if query is None:
+            return query_backend_iterator
+        return query.rank_grounded_actions(query_backend_iterator)
 
     def stop_grounding(self) -> None:
         """
