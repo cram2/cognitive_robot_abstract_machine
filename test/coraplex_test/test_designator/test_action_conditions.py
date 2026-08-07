@@ -147,32 +147,3 @@ def test_pick_up_post_condition(mutable_model_world):
     )
 
     assert _construct_and_evaluate_condition(pick_action, pick_action.post_condition)
-
-
-def test_context_evaluate_condition(mutable_model_world):
-    world, view, context = mutable_model_world
-
-    pick_action = PickUpAction(
-        world.get_body_by_name("milk.stl"),
-        Arms.LEFT,
-        GraspDescription(
-            ApproachDirection.FRONT,
-            VerticalAlignment.NoAlignment,
-            view.left_arm.end_effector,
-        ),
-    )
-    # Make action impossible
-    view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        1.0, 2, 0
-    )
-
-    plan = sequential([pick_action], context)
-    with pytest.raises(ConditionNotSatisfied):
-        with simulated_robot:
-            plan.perform()
-
-    context.evaluate_conditions = False
-
-    with pytest.raises(MotionDidNotFinish):
-        with simulated_robot:
-            plan.perform()

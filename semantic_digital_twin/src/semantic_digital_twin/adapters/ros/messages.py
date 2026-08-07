@@ -51,6 +51,23 @@ class MetaData(SubclassJSONSerializer):
 
 
 @dataclass
+class StreamPosition:
+    """
+    A position in the stream of messages that one publisher sent.
+
+    Positions of different publishers are not comparable, which is why the publisher is
+    part of the position. A process that has to know whether it caught up with a change
+    of another process compares this against what it applied from that publisher.
+    """
+
+    origin: MetaData
+    """The publisher whose stream this position belongs to."""
+
+    sequence_number: int
+    """The position in the stream of that publisher."""
+
+
+@dataclass
 class Message(ABC):
     """
     Abstract base class for all messages.
@@ -59,28 +76,22 @@ class Message(ABC):
     meta_data: MetaData
     """Message origin meta data."""
 
-    publication_event_id: UUID = field(default_factory=uuid.uuid4, kw_only=True)
-    """UUID uniquely identifying the event (world update / state update / ...) that originated this message.
+    sequence_number: int = field(default=0, kw_only=True)
+    """Position of this message in the stream of messages its publisher sent.
 
-    Recipients can use this UUID in responses to refer to this event.
-    Allows the publication/subscription mechanism to track what messages have been received and acknowledged.
+    Counts up by one per publication, so a recipient can tell how far it has caught up
+    with that publisher, and a publisher can tell others what to catch up with. Assigned
+    when the message is published; a message that was never published has no position.
     """
 
-
-@dataclass
-class Acknowledgment:
-    """
-    Message acknowledging receipt of a published event.
-
-    :param publication_event_id: The UUID of the publication event being acknowledged.
-    :param node_meta_data: The metadata identifying the acknowledging node.
-    """
-
-    publication_event_id: UUID
-    """The UUID of the publication event being acknowledged."""
-
-    node_meta_data: MetaData
-    """The metadata identifying the acknowledging node."""
+    @property
+    def position(self) -> StreamPosition:
+        """
+        Where this message sits in the stream of its publisher.
+        """
+        return StreamPosition(
+            origin=self.meta_data, sequence_number=self.sequence_number
+        )
 
 
 @dataclass

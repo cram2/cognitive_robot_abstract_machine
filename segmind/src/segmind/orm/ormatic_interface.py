@@ -16,8 +16,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 
 import builtins
-import coraplex.datastructures.enums
-import coraplex.orm.model
 import datetime
 import enum
 import krrood.adapters.json_serializer
@@ -60,7 +58,7 @@ from krrood.ormatic.custom_types import TypeType
 
 class Base(DeclarativeBase):
     type_mappings = {
-        numpy.ndarray: coraplex.orm.model.NumpyType,
+        numpy.ndarray: krrood.ormatic.custom_types.NumpyType,
         typing.Type: krrood.ormatic.custom_types.TypeType,
         builtins.type: krrood.ormatic.custom_types.TypeType,
         enum.Enum: krrood.ormatic.custom_types.PolymorphicEnumType,
@@ -72,27 +70,6 @@ class Base(DeclarativeBase):
 
 
 # Association tables for many-to-many relationships
-
-
-class PlanMappingDAO(Base, DataAccessObject[coraplex.orm.model.PlanMapping]):
-    __tablename__ = "PlanMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    initial_world_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    initial_world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO",
-        uselist=False,
-        foreign_keys=[initial_world_id],
-        post_update=True,
-    )
 
 
 class FunctionMappingDAO(
@@ -1212,9 +1189,6 @@ class PoseMappingDAO(
     ] = mapped_column(
         sqlalchemy.sql.sqltypes.JSON, nullable=True, use_existing_column=True
     )
-    polymorphic_type: Mapped[str] = mapped_column(
-        String(255), nullable=False, use_existing_column=True
-    )
 
     position_id: Mapped[int] = mapped_column(
         ForeignKey("Point3MappingDAO.database_id", use_alter=True),
@@ -1236,35 +1210,6 @@ class PoseMappingDAO(
         foreign_keys=[orientation_id],
         post_update=True,
     )
-
-    __mapper_args__ = {
-        "polymorphic_on": "polymorphic_type",
-        "polymorphic_identity": "PoseMappingDAO",
-    }
-
-
-class GrasPoseMappingDAO(
-    PoseMappingDAO, DataAccessObject[coraplex.orm.model.GrasPoseMapping]
-):
-    __tablename__ = "GrasPoseMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(PoseMappingDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    arm: Mapped[typing.Optional[coraplex.datastructures.enums.Arms]] = mapped_column(
-        krrood.ormatic.custom_types.PolymorphicEnumType,
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "GrasPoseMappingDAO",
-        "inherit_condition": database_id == PoseMappingDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
 
 
 class Pose2DMappingDAO(

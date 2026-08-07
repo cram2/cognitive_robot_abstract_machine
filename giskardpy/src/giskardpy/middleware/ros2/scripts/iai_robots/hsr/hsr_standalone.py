@@ -8,7 +8,7 @@ from giskardpy.middleware.ros2.utils.utils import load_xacro
 from rclpy import Parameter
 
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from giskardpy.middleware.ros2.behavior_tree_config import StandAloneBTConfig
+from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
 
 
@@ -26,7 +26,9 @@ def main():
     giskard = Giskard(
         world_config=WorldWithHSRConfig(urdf=robot_description),
         robot_interface_config=HSRStandaloneInterface(),
-        behavior_tree_config=StandAloneBTConfig(debug_mode=True),
+        server_config=GiskardServerConfig(
+            execution_mode=ExecutionMode.STANDALONE, debug_mode=True
+        ),
         qp_controller_config=QPControllerConfig(target_frequency=20),
     )
     giskard.live()

@@ -11,6 +11,7 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.qp.solvers.qp_solver import QPSolver
 from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.robots.pr2 import PR2Joint
 
 logger = logging.getLogger(__name__)
 
@@ -53,12 +54,12 @@ def test_joint_goal(solver, pr2_world_state_reset):
             [
                 JointPositionList(
                     goal_state=JointState.from_str_dict(
-                        {"torso_lift_joint": 0.1}, world=pr2_world_state_reset
+                        {PR2Joint.TORSO_LIFT: 0.1}, world=pr2_world_state_reset
                     )
                 ),
                 JointPositionList(
                     goal_state=JointState.from_str_dict(
-                        {"torso_lift_joint": 0.2}, world=pr2_world_state_reset
+                        {PR2Joint.TORSO_LIFT: 0.2}, world=pr2_world_state_reset
                     )
                 ),
             ]

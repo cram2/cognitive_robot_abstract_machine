@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
 from typing import Self, List
@@ -34,6 +35,33 @@ from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+
+class DAiSyJoint(StrEnum):
+    """
+    Names of the DAiSy's commandable connections, as spelled in its URDF.
+
+    Members are usable wherever a connection name is expected, so a configuration keyed
+    by them stays a plain mapping of names to positions.
+    """
+
+    LEFT_SHOULDER_PAN = "left_shoulder_pan_joint"
+    LEFT_SHOULDER_LIFT = "left_shoulder_lift_joint"
+    LEFT_ELBOW = "left_elbow_joint"
+    LEFT_WRIST_1 = "left_wrist_1_joint"
+    LEFT_WRIST_2 = "left_wrist_2_joint"
+    LEFT_WRIST_3 = "left_wrist_3_joint"
+    LEFT_GRIPPER_FINGER = "left_gripper_finger_joint"
+    LEFT_GRIPPER_RIGHT_FINGER = "left_gripper_right_finger_joint"
+
+    RIGHT_SHOULDER_PAN = "right_shoulder_pan_joint"
+    RIGHT_SHOULDER_LIFT = "right_shoulder_lift_joint"
+    RIGHT_ELBOW = "right_elbow_joint"
+    RIGHT_WRIST_1 = "right_wrist_1_joint"
+    RIGHT_WRIST_2 = "right_wrist_2_joint"
+    RIGHT_WRIST_3 = "right_wrist_3_joint"
+    RIGHT_GRIPPER_FINGER = "right_gripper_finger_joint"
+    RIGHT_GRIPPER_RIGHT_FINGER = "right_gripper_right_finger_joint"
 
 
 @dataclass(eq=False)
@@ -138,7 +166,7 @@ class DAiSyLeftGripper(
 
     def setup_joint_states(self) -> List[JointState]:
         left_gripper_joints = [
-            self._world.get_connection_by_name("left_gripper_finger_joint"),
+            self._world.get_connection_by_name(DAiSyJoint.LEFT_GRIPPER_FINGER),
         ]
 
         gripper_open = JointState.from_mapping(
@@ -187,7 +215,7 @@ class DAiSyRightGripper(
 
     def setup_joint_states(self) -> List[JointState]:
         right_gripper_joints = [
-            self._world.get_connection_by_name("right_gripper_finger_joint"),
+            self._world.get_connection_by_name(DAiSyJoint.RIGHT_GRIPPER_FINGER),
         ]
 
         gripper_open = JointState.from_mapping(
@@ -281,6 +309,7 @@ class DAiSyRightArm(Arm[DAiSyRightGripper]):
 class DAiSyCamera(Camera):
     """
     DAiSy does not currently have a dedicated camera.
+
     Setup a fake camera link in URDF to satisfy SemDT
     """
 
@@ -312,6 +341,7 @@ class DAiSy(
 ):
     """
     Represents two UR5 Arms mounted on a table.
+
     The arms are equipped with WEISS WPG 300-120 grippers
     """
 

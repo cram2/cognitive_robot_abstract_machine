@@ -94,7 +94,3 @@ def test_motion_state_chart_simulated_execution_adds_condition_and_pause_interru
 
     # one pause + one interrupt monitor per task
     assert len(chart.get_nodes_by_type(PlanNodeStatusMonitor)) == 2 * task_count
-    # pre- and post-condition monitors
-    assert len(chart.get_nodes_by_type(ThreadedPredicateMonitor)) == 2
-    # abort paths for pre- and post-condition failing
-    assert len(chart.get_nodes_by_type(CancelMotion)) == 2

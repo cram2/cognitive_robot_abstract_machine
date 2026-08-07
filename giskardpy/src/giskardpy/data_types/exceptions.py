@@ -38,11 +38,52 @@ class MissingActionResultError(GiskardException):
     Raised when a result message is requested before one has been set.
     """
 
+    action_server_name: str
+    """
+    The name of the action server whose result was requested.
+    """
+
+    goal_id: int
+    """
+    The id of the goal whose result was requested.
+    """
+
     def error_message(self) -> str:
-        return "No result message set."
+        return (
+            f"'{self.action_server_name}' goal #{self.goal_id} has no result message."
+        )
 
     def suggest_correction(self) -> str:
         return "You tried to access something before it was set."
+
+
+@dataclass
+class MissingGoalOutcomeError(GiskardException):
+    """
+    Raised when a goal is answered without having been marked succeeded, aborted or
+    canceled.
+    """
+
+    action_server_name: str
+    """
+    The name of the action server whose goal is being answered.
+    """
+
+    goal_id: int
+    """
+    The id of the goal that is being answered.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"'{self.action_server_name}' goal #{self.goal_id} is being answered "
+            f"without an outcome."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Mark the goal as succeeded, aborted or canceled before sending its result."
+        )
 
 
 @dataclass
@@ -74,6 +115,24 @@ class NoControlledJointsError(SetupException):
 
     def suggest_correction(self) -> str:
         return "Make sure robot_interface_config of Giskard is setup correctly."
+
+
+@dataclass
+class NonPositiveRealTimeFactorError(SetupException):
+    """
+    Raised when a simulation is configured to run at a non positive speed.
+    """
+
+    real_time_factor: float
+    """
+    The rejected factor.
+    """
+
+    def error_message(self) -> str:
+        return f"A real time factor of {self.real_time_factor} would never advance the simulation."
+
+    def suggest_correction(self) -> str:
+        return "Use a positive factor, or NoPacing to run as fast as possible."
 
 
 @dataclass

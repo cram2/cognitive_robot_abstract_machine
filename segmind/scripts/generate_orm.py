@@ -14,7 +14,11 @@ from pathlib import Path
 import numpy as np
 
 import segmind
-from coraplex.orm.model import NumpyType
+
+# imported for its alternative mappings, which are collected through a global subclass
+# scan: without it segmind's spatial fields degrade to JSON columns
+import semantic_digital_twin.orm.model
+from krrood.ormatic.custom_types import NumpyType
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.ormatic import ORMatic
 
@@ -25,9 +29,7 @@ dependencies = []
 type_mappings = {np.ndarray: NumpyType}
 
 # Create an ORMatic object with the classes to be mapped
-ormatic = ORMatic.from_package(
-    [segmind], dependencies, ignored_classes, type_mappings
-)
+ormatic = ORMatic.from_package([segmind], dependencies, ignored_classes, type_mappings)
 logging.getLogger("krrood").setLevel(logging.DEBUG)
 
 

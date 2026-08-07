@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import os
-from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
+from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
-from typing import Self, Union, List
+from typing import Self, List
 
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
@@ -21,6 +21,7 @@ from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     TorsoState,
 )
+from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_part_mixins import (
@@ -30,8 +31,6 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasMobileBase,
     HasTwoFingers,
     HasSensors,
-    HasArms,
-    HasLeftRightArm,
 )
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
@@ -43,7 +42,6 @@ from semantic_digital_twin.robots.robot_parts import (
     MobileBase,
     EndEffector,
 )
-from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
@@ -51,6 +49,32 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+
+class HSRBJoint(StrEnum):
+    """
+    Names of the HSRB's commandable connections, as spelled in its URDF.
+
+    Members are usable wherever a connection name is expected, so a configuration keyed by
+    them stays a plain mapping of names to positions.
+
+    ..note:: Connections that no controller commands, such as the drive and passive base
+        wheels and the hand's spring and distal joints, are left out.
+    """
+
+    TORSO_LIFT = "torso_lift_joint"
+    HEAD_PAN = "head_pan_joint"
+    HEAD_TILT = "head_tilt_joint"
+
+    ARM_LIFT = "arm_lift_joint"
+    ARM_FLEX = "arm_flex_joint"
+    ARM_ROLL = "arm_roll_joint"
+    WRIST_FLEX = "wrist_flex_joint"
+    WRIST_ROLL = "wrist_roll_joint"
+
+    HAND_MOTOR = "hand_motor_joint"
+    HAND_LEFT_PROXIMAL = "hand_l_proximal_joint"
+    HAND_RIGHT_PROXIMAL = "hand_r_proximal_joint"
 
 
 @dataclass(eq=False)
@@ -108,9 +132,9 @@ class HSRBGripper(EndEffector, HasTwoFingers[HSRBLeftFinger, HSRBRightFinger]):
     def setup_joint_states(self) -> List[JointState]:
         world = self._world
         gripper_joints = [
-            world.get_connection_by_name("hand_l_proximal_joint"),
-            world.get_connection_by_name("hand_r_proximal_joint"),
-            world.get_connection_by_name("hand_motor_joint"),
+            world.get_connection_by_name(HSRBJoint.HAND_LEFT_PROXIMAL),
+            world.get_connection_by_name(HSRBJoint.HAND_RIGHT_PROXIMAL),
+            world.get_connection_by_name(HSRBJoint.HAND_MOTOR),
         ]
 
         gripper_open = JointState.from_mapping(
@@ -176,11 +200,11 @@ class HSRBArm(Arm[HSRBGripper], HasSensors[HSRBHandCamera]):
 
     def setup_hardware_interfaces(self):
         controlled_joints = [
-            "arm_flex_joint",
-            "arm_lift_joint",
-            "arm_roll_joint",
-            "wrist_flex_joint",
-            "wrist_roll_joint",
+            HSRBJoint.ARM_FLEX,
+            HSRBJoint.ARM_LIFT,
+            HSRBJoint.ARM_ROLL,
+            HSRBJoint.WRIST_FLEX,
+            HSRBJoint.WRIST_ROLL,
         ]
         for joint_name in controlled_joints:
             connection = self._world.get_connection_by_name(joint_name)
@@ -323,7 +347,7 @@ class HSRBNeck(
 ):
 
     def setup_hardware_interfaces(self):
-        controlled_joints = ["head_pan_joint", "head_tilt_joint"]
+        controlled_joints = [HSRBJoint.HEAD_PAN, HSRBJoint.HEAD_TILT]
         for joint_name in controlled_joints:
             connection = self._world.get_connection_by_name(joint_name)
             connection.has_hardware_interface = True

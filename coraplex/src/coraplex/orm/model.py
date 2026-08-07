@@ -1,12 +1,10 @@
 from dataclasses import dataclass
 from typing import List, Self
 
-import numpy as np
 from krrood.ormatic.data_access_objects.alternative_mappings import (
     AlternativeMapping,
     T,
 )
-from sqlalchemy import TypeDecorator, types
 from typing_extensions import Optional
 
 from coraplex.datastructures.dataclasses import Context
@@ -98,27 +96,3 @@ class GrasPoseMapping(PoseMapping, AlternativeMapping[GraspPose]):
             grasp_description=self.grasp_description,
             arm=self.arm,
         )
-
-
-class NumpyType(TypeDecorator):
-    """
-    Type that casts field which are of numpy nd array type.
-    """
-
-    impl = types.LargeBinary(4 * 1024 * 1024 * 1024 - 1)  # 4 GB max
-    cache_ok = True  # SQLAlchemy 1.4/2.x type caching hint
-
-    def process_bind_param(self, value, dialect):
-        # Allow NULLs
-        if value is None:
-            return None
-        # Accept lists/tuples and ensure float64 dtype without copying if possible
-        arr = np.asarray(value, dtype=np.float64)
-        return arr.tobytes(order="C")
-
-    def process_result_value(self, value, dialect):
-        # Propagate NULLs
-        if value is None:
-            return None
-        # Recreate as 1-D float64 array; shape information is not stored
-        return np.frombuffer(value, dtype=np.float64)

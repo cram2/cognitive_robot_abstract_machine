@@ -1,12 +1,14 @@
 import os
 
 import pytest
+import sqlalchemy
 
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
+from krrood.ormatic.utils import create_engine, drop_database
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.adapters.urdf import URDFParser
 
@@ -34,6 +36,27 @@ def pytest_configure(config):
         introspector=DescriptorAwareIntrospector(),
     )
     SymbolGraph(_class_diagram=class_diagram)
+
+
+@pytest.fixture
+def in_memory_session_maker():
+    """
+    A session maker for an empty database that several sessions can share.
+
+    ``uri=true`` belongs into the query string: the pysqlite dialect reads it from there,
+    and without it sqlite opens a file named ``file::memory:`` in the working directory
+    instead of a shared in-memory database, which then outlives the test.
+    """
+    from semantic_digital_twin.orm.ormatic_interface import Base
+
+    engine = create_engine(
+        "sqlite+pysqlite:///file::memory:?cache=shared&uri=true",
+        connect_args={"check_same_thread": False},
+    )
+    drop_database(engine)
+    Base.metadata.create_all(engine)
+    yield sqlalchemy.orm.sessionmaker(bind=engine)
+    engine.dispose()
 
 
 @pytest.fixture

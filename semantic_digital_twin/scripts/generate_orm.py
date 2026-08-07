@@ -25,15 +25,19 @@ from semantic_digital_twin.semantic_annotations.position_descriptions import (
 from semantic_digital_twin.spatial_computations.forward_kinematics import (
     ForwardKinematicsManager,
 )
+from semantic_digital_twin.testing import StateChangeCounter
 from semantic_digital_twin.world import (
     ResetStateContextManager,
     WorldModelUpdateContextManager,
+    WorldStateBatchContextManager,
 )
 
 # remove classes that should not be mapped
 ignore_classes = {
     ResetStateContextManager,
     WorldModelUpdateContextManager,
+    WorldStateBatchContextManager,
+    StateChangeCounter,
     ForwardKinematicsManager,
     semantic_digital_twin.adapters.procthor.procthor_resolver.ProcthorResolver,
     ContainsType,

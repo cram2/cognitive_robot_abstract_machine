@@ -73,6 +73,7 @@ from test.giskardpy_test.test_motion_statechart.debug_expression_helpers import 
     GOAL_COLOR,
     debug_expression_by_name,
 )
+from semantic_digital_twin.robots.pr2 import PR2Joint
 
 
 class TestCartesianPositionTrajectory:
@@ -437,23 +438,23 @@ class TestCartesianTasks:
                 JointPositionList(
                     goal_state=JointState.from_str_dict(
                         {
-                            "torso_lift_joint": 0.2999225173357618,
-                            "head_pan_joint": 0.042,
-                            "head_tilt_joint": -0.37,
-                            "r_upper_arm_roll_joint": -0.9487714747527726,
-                            "r_shoulder_pan_joint": -1.0047307505973626,
-                            "r_shoulder_lift_joint": 0.48736790658811985,
-                            "r_forearm_roll_joint": -14.895833882874182,
-                            "r_elbow_flex_joint": -1.392377908925028,
-                            "r_wrist_flex_joint": -0.4548695149411013,
-                            "r_wrist_roll_joint": 0.11426798984097819,
-                            "l_upper_arm_roll_joint": 1.7383062350263658,
-                            "l_shoulder_pan_joint": 1.8799810286792007,
-                            "l_shoulder_lift_joint": 0.011627231224188975,
-                            "l_forearm_roll_joint": 312.67276414458695,
-                            "l_elbow_flex_joint": -2.0300928925694675,
-                            "l_wrist_flex_joint": -0.1,
-                            "l_wrist_roll_joint": -6.062015047706399,
+                            PR2Joint.TORSO_LIFT: 0.2999225173357618,
+                            PR2Joint.HEAD_PAN: 0.042,
+                            PR2Joint.HEAD_TILT: -0.37,
+                            PR2Joint.RIGHT_UPPER_ARM_ROLL: -0.9487714747527726,
+                            PR2Joint.RIGHT_SHOULDER_PAN: -1.0047307505973626,
+                            PR2Joint.RIGHT_SHOULDER_LIFT: 0.48736790658811985,
+                            PR2Joint.RIGHT_FOREARM_ROLL: -14.895833882874182,
+                            PR2Joint.RIGHT_ELBOW_FLEX: -1.392377908925028,
+                            PR2Joint.RIGHT_WRIST_FLEX: -0.4548695149411013,
+                            PR2Joint.RIGHT_WRIST_ROLL: 0.11426798984097819,
+                            PR2Joint.LEFT_UPPER_ARM_ROLL: 1.7383062350263658,
+                            PR2Joint.LEFT_SHOULDER_PAN: 1.8799810286792007,
+                            PR2Joint.LEFT_SHOULDER_LIFT: 0.011627231224188975,
+                            PR2Joint.LEFT_FOREARM_ROLL: 312.67276414458695,
+                            PR2Joint.LEFT_ELBOW_FLEX: -2.0300928925694675,
+                            PR2Joint.LEFT_WRIST_FLEX: -0.1,
+                            PR2Joint.LEFT_WRIST_ROLL: -6.062015047706399,
                         },
                         world=pr2_world_state_reset,
                     )

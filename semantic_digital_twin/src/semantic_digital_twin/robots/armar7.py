@@ -1,21 +1,15 @@
 from __future__ import annotations
 
-import os
-from abc import ABC
-from collections import defaultdict
 from dataclasses import dataclass
-from importlib.resources import files
-from pathlib import Path
-from typing import Self, Union, List
+from enum import StrEnum
+from typing import Self, List
 
-from semantic_digital_twin.collision_checking.collision_rules import (
-    SelfCollisionMatrixRule,
-)
 from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
     TorsoState,
 )
+from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_part_mixins import (
@@ -24,10 +18,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasTorso,
     HasMobileBase,
     HasFingers,
-    TGenericFingerOtherThanThumb,
-    HasSensors,
 )
-from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
@@ -38,11 +29,55 @@ from semantic_digital_twin.robots.robot_parts import (
     MobileBase,
     EndEffector,
 )
-from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
+from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+
+class Armar7Joint(StrEnum):
+    """
+    Names of the Armar7's commandable connections, as spelled in its URDF.
+
+    Members are usable wherever a connection name is expected, so a configuration keyed by
+    them stays a plain mapping of names to positions.
+
+    ..note:: Each hand exposes its four actuators; the phalanx joints they drive and the
+        virtual gaze connections are left out.
+    """
+
+    ANKLE = "Ankle"
+    KNEE = "Knee"
+    HIP = "Hip"
+    NECK_YAW = "Neck_1_Yaw"
+    NECK_PITCH = "Neck_2_Pitch"
+
+    LEFT_ARM_1 = "ArmL1_Cla1"
+    LEFT_ARM_2 = "ArmL2_Sho1"
+    LEFT_ARM_3 = "ArmL3_Sho2"
+    LEFT_ARM_4 = "ArmL4_Sho3"
+    LEFT_ARM_5 = "ArmL5_Elb1"
+    LEFT_ARM_6 = "ArmL6_Elb2"
+    LEFT_ARM_7 = "ArmL7_Wrist_Hemisphere_A"
+    LEFT_ARM_8 = "ArmL8_Wrist_Hemisphere_B"
+    LEFT_HAND_FINGERS = "LeftHandFingers"
+    LEFT_HAND_INDEX = "LeftHandIndex"
+    LEFT_HAND_THUMB_CIRCUMDUCTION = "LeftHandThumbCircumduction"
+    LEFT_HAND_THUMB_FLEXION = "LeftHandThumbFlexion"
+
+    RIGHT_ARM_1 = "ArmR1_Cla1"
+    RIGHT_ARM_2 = "ArmR2_Sho1"
+    RIGHT_ARM_3 = "ArmR3_Sho2"
+    RIGHT_ARM_4 = "ArmR4_Sho3"
+    RIGHT_ARM_5 = "ArmR5_Elb1"
+    RIGHT_ARM_6 = "ArmR6_Elb2"
+    RIGHT_ARM_7 = "ArmR7_Wrist_Hemisphere_A"
+    RIGHT_ARM_8 = "ArmR8_Wrist_Hemisphere_B"
+    RIGHT_HAND_FINGERS = "RightHandFingers"
+    RIGHT_HAND_INDEX = "RightHandIndex"
+    RIGHT_HAND_THUMB_CIRCUMDUCTION = "RightHandThumbCircumduction"
+    RIGHT_HAND_THUMB_FLEXION = "RightHandThumbFlexion"
 
 
 @dataclass(eq=False)
