@@ -472,6 +472,59 @@ def test_callback_pausing(rclpy_node):
     assert len(w2.connections) == 1
 
 
+def test_paused_messages_resolve_entities_from_preceding_messages(rclpy_node):
+    source_world = World(name="cross_message_source")
+    receiver_world = World(name="cross_message_receiver")
+    receiver_synchronizer = WorldSynchronizer(node=rclpy_node, _world=receiver_world)
+    receiver_synchronizer.pause()
+    source_meta_data = MetaData(node_name="source", process_id=os.getpid())
+
+    parent = Body(name=PrefixedName("parent"))
+    with source_world.modify_world():
+        source_world.add_body(parent)
+    parent_update = WorldUpdate(
+        meta_data=source_meta_data,
+        modification_block=ModificationBlock(
+            meta_data=source_meta_data,
+            modifications=source_world.get_world_model_manager().model_modification_blocks[
+                -1
+            ],
+        ),
+    )
+
+    child = Body(name=PrefixedName("child"))
+    with source_world.modify_world():
+        source_world.add_body(child)
+        source_world.add_connection(FixedConnection(parent=parent, child=child))
+    child_update = WorldUpdate(
+        meta_data=source_meta_data,
+        modification_block=ModificationBlock(
+            meta_data=source_meta_data,
+            modifications=source_world.get_world_model_manager().model_modification_blocks[
+                -1
+            ],
+        ),
+    )
+
+    receiver_synchronizer.subscription_callback(
+        std_msgs.msg.String(data=json.dumps(to_json(parent_update)))
+    )
+    receiver_synchronizer.subscription_callback(
+        std_msgs.msg.String(data=json.dumps(to_json(child_update)))
+    )
+
+    receiver_synchronizer.apply_missed_messages()
+
+    synchronized_parent = receiver_world.get_world_entity_with_id_by_id(parent.id)
+    synchronized_child = receiver_world.get_world_entity_with_id_by_id(child.id)
+    assert len(receiver_world.connections) == 1
+    synchronized_connection = receiver_world.connections[0]
+    assert synchronized_connection.parent is synchronized_parent
+    assert synchronized_connection.child is synchronized_child
+
+    receiver_synchronizer.close()
+
+
 def test_ChangeDifHasHardwareInterface(rclpy_node):
     w1 = World(name="w1")
     w2 = World(name="w2")
