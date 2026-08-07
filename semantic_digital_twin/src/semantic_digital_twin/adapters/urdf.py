@@ -10,6 +10,7 @@ from semantic_digital_twin.adapters.package_resolver import (
     CompositePathResolver,
     PathResolver,
 )
+from semantic_digital_twin.adapters.world_model_parser import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import NegativeConnectionVelocity
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
@@ -108,7 +109,7 @@ def urdf_joint_to_limits(
 
 
 @dataclass
-class URDFParser:
+class URDFParser(WorldModelParser):
     """
     Class to parse URDF files to worlds.
 
@@ -154,7 +155,7 @@ class URDFParser:
                 # Since parsing URDF causes a lot of warning messages which can't be deactivated, we suppress them
                 with suppress_stdout_stderr():
                     urdf = file.read()
-        urdf_parser = URDFParser(urdf=urdf, prefix=prefix)
+        urdf_parser = cls(urdf=urdf, prefix=prefix)
         urdf_parser.path_resolver = path_resolver
         return urdf_parser
 

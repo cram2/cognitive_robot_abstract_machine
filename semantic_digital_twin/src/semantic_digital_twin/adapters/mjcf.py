@@ -6,7 +6,7 @@ import mujoco
 import numpy
 import trimesh
 from scipy.spatial.transform import Rotation
-from typing_extensions import Optional, Dict
+from typing_extensions import Optional, Dict, Self
 from xml.etree import ElementTree as ET
 
 from semantic_digital_twin.adapters.multi_sim import (
@@ -20,6 +20,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoLight,
     MujocoTendon,
 )
+from semantic_digital_twin.adapters.world_model_parser import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
 from semantic_digital_twin.spatial_types import (
@@ -64,7 +65,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class MJCFParser:
+class MJCFParser(WorldModelParser):
     """
     Class to parse an MJCF file and convert it into a World object.
     """
@@ -89,10 +90,27 @@ class MJCFParser:
             self.prefix = os.path.basename(self.file_path).split(".")[0]
         self.spec: mujoco.MjSpec = mujoco.MjSpec.from_file(self.file_path)
         self.tree = ET.fromstring(self.spec.to_xml())
-        self.world = World()
 
     @classmethod
-    def from_xml_string(cls, xml_string: str) -> "MJCFParser":
+    def from_file(
+        cls,
+        file_path: str,
+        prefix: Optional[str] = None,
+        mimic_joints: Optional[Dict[str, str]] = None,
+    ) -> "MJCFParser":
+        """
+        Creates a parser for a scene file.
+
+        :param file_path: The path of the file to parse.
+        :param prefix: The prefix for every name used in this world.
+        :param mimic_joints: A mapping of joint names to the names of the joints they
+            mimic.
+        :return: A parser for the world described by that file.
+        """
+        return cls(file_path=file_path, mimic_joints=mimic_joints or {}, prefix=prefix)
+
+    @classmethod
+    def from_xml_string(cls, xml_string: str) -> Self:
         file_path = "/tmp/scene.xml"
         with open(file_path, "w") as f:
             f.write(xml_string)
@@ -102,8 +120,12 @@ class MJCFParser:
         """
         Parse the MJCF file and convert it into a World object.
 
+        The world is built per call, so parsing repeatedly yields independent worlds
+        that share no entity identifiers.
+
         :return: The World object representing the MJCF scene.
         """
+        self.world = World()
         worldbody: mujoco.MjsBody = self.spec.worldbody
         with self.world.modify_world():
             self.parse_equalities()
@@ -670,7 +692,8 @@ class MJCFParser:
                 body=body,
                 name=mujoco_light.name,
                 mode=mujoco_light.mode,
-                directional=mujoco_light.type == mujoco.mjtLightType.mjLIGHT_DIRECTIONAL,
+                directional=mujoco_light.type
+                == mujoco.mjtLightType.mjLIGHT_DIRECTIONAL,
                 active=bool(mujoco_light.active),
                 cast_shadow=bool(mujoco_light.castshadow),
                 position=mujoco_light.pos.tolist(),

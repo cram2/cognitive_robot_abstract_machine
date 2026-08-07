@@ -241,25 +241,23 @@ def test_nested_annotation_on_non_part_whole_field_raises():
 # %% world specifications
 
 
-def test_world_specification_robotless(empty_world):
+def test_world_specification_robotless():
     world = WorldSpecification(
-        world=empty_world,
+        world_parser=None,
         objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
     ).to_domain_object()
     assert not world.is_empty()
     assert world.get_body_by_name("obj") is not None
 
 
-def test_to_domain_object_does_not_mutate_stored_world(empty_world):
+def test_to_domain_object_is_repeatable():
     spec = WorldSpecification(
-        world=empty_world,
+        world_parser=None,
         objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
     )
     first = spec.to_domain_object()
     second = spec.to_domain_object()
 
-    assert len(spec.world.bodies) == 1
-    assert first is not spec.world
     assert first is not second
     assert len(first.bodies) == 2
     assert len(second.bodies) == 2
@@ -271,6 +269,19 @@ def test_world_specification_from_urdf_environment():
     ).to_domain_object()
     assert not world.is_empty()
     assert world.root is not None
+
+
+def test_materialized_environments_share_no_entity_ids():
+    specification = WorldSpecification.from_urdf(
+        os.path.join(RESOURCES, "urdf", "table.urdf")
+    )
+    first = specification.to_domain_object()
+    second = specification.to_domain_object()
+
+    first_ids = {body.id for body in first.bodies}
+    second_ids = {body.id for body in second.bodies}
+    assert len(first_ids) == len(first.bodies)
+    assert first_ids.isdisjoint(second_ids)
 
 
 def test_world_specification_from_mjcf_environment():
@@ -509,10 +520,10 @@ def _odom_bodies(world: World) -> list[Body]:
     return [body for body in world.bodies if body.name.name == "odom"]
 
 
-def test_world_specification_with_robot(empty_world):
+def test_world_specification_with_robot():
     try:
         world = WorldSpecification(
-            world=empty_world,
+            world_parser=None,
             robots=[
                 RobotSpecification(
                     semantic_annotation_type=PR2,
@@ -564,10 +575,10 @@ def test_robot_specification_returns_spawned_annotation(empty_world):
     assert robot in empty_world.get_semantic_annotations_by_type(PR2)
 
 
-def test_world_specification_with_several_robots(empty_world):
+def test_world_specification_with_several_robots():
     try:
         world = WorldSpecification(
-            world=empty_world,
+            world_parser=None,
             robots=[
                 RobotSpecification(
                     semantic_annotation_type=PR2,
@@ -601,9 +612,9 @@ def test_world_specification_with_several_robots(empty_world):
 # %% world specifications with starting objects
 
 
-def test_world_specification_annotation_starting_object(empty_world):
+def test_world_specification_annotation_starting_object():
     world = WorldSpecification(
-        world=empty_world,
+        world_parser=None,
         objects=[
             Milk.get_specification(
                 "milk",

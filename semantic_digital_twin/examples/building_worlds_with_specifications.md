@@ -587,10 +587,10 @@ field, a key that is not a part-whole field, or a part-whole field smuggled in t
 ## World specifications
 
 The largest building block is `WorldSpecification`, which describes an entire scene: an
-environment, an optional robot, and the objects placed around them. Its environment is a concrete
-`World` — usually parsed from a model file with the `from_urdf` or `from_mjcf` classmethods.
-Calling `to_domain_object` returns a fresh, augmented world every time; the stored environment is
-deep-copied and never mutated, so one specification can produce many independent worlds.
+environment, an optional robot, and the objects placed around them. Its environment is held as the
+parser that builds it — usually obtained from a model file with the `from_urdf` or `from_mjcf`
+classmethods. Calling `to_domain_object` re-parses the environment every time, so one specification
+can produce many independent worlds and no two of them share an entity identifier.
 
 ```{code-cell} ipython3
 import os
