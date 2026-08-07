@@ -114,11 +114,6 @@ class Context(PlanEntity):
     Should debug information be printed or visualized.
     """
 
-    teleport_to_navigate_in_simulation: bool = False
-    """
-    If True, the robot will teleport to navigate when in ExecutionType.SIMULATED. Otherwise, CartesianPose will be used
-    """
-
     motion_tolerances: MotionToleranceConfig = field(
         default_factory=MotionToleranceConfig
     )
@@ -126,6 +121,9 @@ class Context(PlanEntity):
     Default goal-achievement tolerances motions fall back to when they leave their own
     thresholds unset.
     """
+
+    def __post_init__(self):
+        self.debug = self._debug
 
     @property
     def debug(self):

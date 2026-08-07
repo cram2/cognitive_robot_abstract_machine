@@ -132,7 +132,9 @@ def test_set_state(world_setup):
     c3: Connection6DoF = world.get_connection(world.root, bf)
     transform = RotationMatrix.from_rpy(1, 0, 0).to_np()
     transform[0, 3] = 69
-    c3.origin = transform
+    c3.origin = HomogeneousTransformationMatrix(
+        data=transform, reference_frame=world.root, child_frame=bf
+    )
     assert np.allclose(world.compute_forward_kinematics_np(world.root, bf), transform)
 
     world.set_positions_1DOF_connection({c1: 2})
@@ -384,13 +386,17 @@ def test_compute_relative_pose(world_setup):
 
 def test_compute_relative_pose_both(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
-    world.get_connection(world.root, bf).origin = np.array(
-        [
-            [0.0, -1.0, 0.0, 1.0],
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
+    world.get_connection(world.root, bf).origin = HomogeneousTransformationMatrix(
+        data=np.array(
+            [
+                [0.0, -1.0, 0.0, 1.0],
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]
+        ),
+        reference_frame=world.root,
+        child_frame=bf,
     )
     world.notify_state_change()
 
@@ -748,8 +754,10 @@ def test_copy_world(world_setup):
         original_bf_con.parent, original_bf_con.child
     )
     assert id(copy_connection) != id(original_bf_con)
-    bf.parent_connection.origin = np.array(
-        [[1, 0, 0, 1.5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+    bf.parent_connection.origin = HomogeneousTransformationMatrix(
+        data=np.array([[1, 0, 0, 1.5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
+        reference_frame=bf.parent_connection.parent,
+        child_frame=bf,
     )
     assert (
         float(

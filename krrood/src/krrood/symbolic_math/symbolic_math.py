@@ -572,6 +572,10 @@ class SymbolicMathType(ABC):
         Transforms the data into a numpy array.
 
         Only works if the expression has no free variables.
+
+        ..note::
+            This does not need to be called to do numpy operations on the expression.
+            One can just pass the expression directly
         """
         if not self.is_constant():
             raise HasFreeVariablesError(self.free_variables())

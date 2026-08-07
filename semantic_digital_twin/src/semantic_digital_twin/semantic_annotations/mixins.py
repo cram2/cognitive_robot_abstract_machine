@@ -88,6 +88,7 @@ if TYPE_CHECKING:
         MechanicalJoint,
         Leg,
         Sink,
+        ShelfLayer,
     )
     from semantic_digital_twin.world import World
 
@@ -532,6 +533,37 @@ class HasMechanicalJoint(HasRootBody, PartWholeRelationship):
     The mechanical joint of the semantic annotation.
     """
 
+    def _mount_strategy(
+        self,
+        main_has_root_body_annotation: HasRootBody,
+        relationship: IsPartWholeRelationship,
+    ) -> None:
+        """
+        Mount this annotation onto the whole through its mechanical joint, so the joint
+        keeps carrying it.
+
+        Moving this annotation on its own would pull it out from under its joint and
+        leave a door or drawer rigidly attached to the whole, unable to move.
+
+        :param main_has_root_body_annotation: The annotation (the whole) this one is
+            being added to as a part.
+        :param relationship: The metadata of the part-whole relationship field being
+            mounted into, describing how the mount affects the whole.
+        """
+        if (
+            self.mechanical_joint is None
+            or self.root.parent_kinematic_structure_entity
+            is not self.mechanical_joint.root
+        ):
+            super()._mount_strategy(main_has_root_body_annotation, relationship)
+            return
+
+        main_has_root_body_annotation._world.move_branch(
+            self.mechanical_joint.root,
+            main_has_root_body_annotation.root,
+            enable_unsafe_inside_world_block=True,
+        )
+
     def _kinematic_structure_entities(
         self, visited: Set[int]
     ) -> list[KinematicStructureEntity]:
@@ -560,6 +592,23 @@ class HasDrawers(PartWholeRelationship):
     )
     """
     The drawers of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasShelfLayers(PartWholeRelationship):
+    """
+    A mixin class for semantic annotations that have shelf layers.
+    """
+
+    shelf_layers: List[ShelfLayer] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The shelf layers of the semantic annotation.
     """
 
 

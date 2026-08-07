@@ -201,6 +201,16 @@ class KitchenEnvironment:
         """
         Adds furniture items and room layouts to the scene graph.
         """
+
+        # Angular velocity limit of a hinged door in rad/s.
+        # Taken from the revolute joint limits of the apartment description in ``iai_apartment``,
+        # which uses this value for every one of its hinged doors.
+        hinged_door_velocity_limit = np.pi / 2
+
+        # Linear velocity limit of a sliding drawer in m/s.
+        # Taken from the prismatic joint limits of the apartment description in ``iai_apartment``.
+        sliding_drawer_velocity_limit = 0.5
+
         with world.modify_world():
             # --- TRASH CAN ---
             trash_can = TrashCan.get_specification(
@@ -247,8 +257,12 @@ class KitchenEnvironment:
                 parent_connection_specification=Hinge.parent_connection_specification(
                     axis=Vector3.Z(),
                     dof_limits=DegreeOfFreedomLimits(
-                        lower=DerivativeMap[float](position=0.0),
-                        upper=DerivativeMap[float](position=np.pi / 2),
+                        lower=DerivativeMap[float](
+                            position=0.0, velocity=-hinged_door_velocity_limit
+                        ),
+                        upper=DerivativeMap[float](
+                            position=np.pi / 2, velocity=hinged_door_velocity_limit
+                        ),
                     ),
                 ),
             )
@@ -287,8 +301,12 @@ class KitchenEnvironment:
                 parent_connection_specification=Slider.parent_connection_specification(
                     axis=Vector3.NEGATIVE_X(),
                     dof_limits=DegreeOfFreedomLimits(
-                        lower=DerivativeMap[float](position=0.0),
-                        upper=DerivativeMap[float](position=0.5),
+                        lower=DerivativeMap[float](
+                            position=0.0, velocity=-sliding_drawer_velocity_limit
+                        ),
+                        upper=DerivativeMap[float](
+                            position=0.5, velocity=sliding_drawer_velocity_limit
+                        ),
                     ),
                 ),
             )
@@ -403,8 +421,12 @@ class KitchenEnvironment:
                 parent_connection_specification=Hinge.parent_connection_specification(
                     axis=Vector3.Z(),
                     dof_limits=DegreeOfFreedomLimits(
-                        lower=DerivativeMap[float](position=0.0),
-                        upper=DerivativeMap[float](position=np.pi / 2),
+                        lower=DerivativeMap[float](
+                            position=0.0, velocity=-hinged_door_velocity_limit
+                        ),
+                        upper=DerivativeMap[float](
+                            position=np.pi / 2, velocity=hinged_door_velocity_limit
+                        ),
                     ),
                 ),
             )
@@ -469,8 +491,12 @@ class KitchenEnvironment:
                 parent_connection_specification=Hinge.parent_connection_specification(
                     axis=Vector3.NEGATIVE_Y(),
                     dof_limits=DegreeOfFreedomLimits(
-                        lower=DerivativeMap[float](position=0.0),
-                        upper=DerivativeMap[float](position=np.pi / 2),
+                        lower=DerivativeMap[float](
+                            position=0.0, velocity=-hinged_door_velocity_limit
+                        ),
+                        upper=DerivativeMap[float](
+                            position=np.pi / 2, velocity=hinged_door_velocity_limit
+                        ),
                     ),
                 ),
             )
@@ -554,8 +580,12 @@ class KitchenEnvironment:
                     parent_connection_specification=Slider.parent_connection_specification(
                         axis=Vector3.NEGATIVE_X(),
                         dof_limits=DegreeOfFreedomLimits(
-                            lower=DerivativeMap[float](position=0.0),
-                            upper=DerivativeMap[float](position=0.25),
+                            lower=DerivativeMap[float](
+                                position=0.0, velocity=-sliding_drawer_velocity_limit
+                            ),
+                            upper=DerivativeMap[float](
+                                position=0.25, velocity=sliding_drawer_velocity_limit
+                            ),
                         ),
                     ),
                 )
@@ -619,7 +649,15 @@ class KitchenEnvironment:
                     name=f"oven_side_drawer_{side_name}_slider",
                     world_root_T_self=drawer_pose,
                     parent_connection_specification=Slider.parent_connection_specification(
-                        axis=Vector3.NEGATIVE_X()
+                        axis=Vector3.NEGATIVE_X(),
+                        dof_limits=DegreeOfFreedomLimits(
+                            lower=DerivativeMap[float](
+                                velocity=-sliding_drawer_velocity_limit
+                            ),
+                            upper=DerivativeMap[float](
+                                velocity=sliding_drawer_velocity_limit
+                            ),
+                        ),
                     ),
                 )
                 drawer.add(slider)
@@ -662,8 +700,12 @@ class KitchenEnvironment:
                 parent_connection_specification=Hinge.parent_connection_specification(
                     axis=Vector3.Z(),
                     dof_limits=DegreeOfFreedomLimits(
-                        lower=DerivativeMap[float](position=0.0),
-                        upper=DerivativeMap[float](position=np.pi / 2),
+                        lower=DerivativeMap[float](
+                            position=0.0, velocity=-hinged_door_velocity_limit
+                        ),
+                        upper=DerivativeMap[float](
+                            position=np.pi / 2, velocity=hinged_door_velocity_limit
+                        ),
                     ),
                 ),
             )
@@ -715,8 +757,12 @@ class KitchenEnvironment:
                 parent_connection_specification=Slider.parent_connection_specification(
                     axis=Vector3.NEGATIVE_X(),
                     dof_limits=DegreeOfFreedomLimits(
-                        lower=DerivativeMap[float](position=0.0),
-                        upper=DerivativeMap[float](position=0.25),
+                        lower=DerivativeMap[float](
+                            position=0.0, velocity=-sliding_drawer_velocity_limit
+                        ),
+                        upper=DerivativeMap[float](
+                            position=0.25, velocity=sliding_drawer_velocity_limit
+                        ),
                     ),
                 ),
             )
@@ -753,8 +799,12 @@ class KitchenEnvironment:
                 parent_connection_specification=Hinge.parent_connection_specification(
                     axis=Vector3.NEGATIVE_Y(),
                     dof_limits=DegreeOfFreedomLimits(
-                        lower=DerivativeMap[float](position=0.0),
-                        upper=DerivativeMap[float](position=np.pi / 2),
+                        lower=DerivativeMap[float](
+                            position=0.0, velocity=-hinged_door_velocity_limit
+                        ),
+                        upper=DerivativeMap[float](
+                            position=np.pi / 2, velocity=hinged_door_velocity_limit
+                        ),
                     ),
                 ),
             )
@@ -873,8 +923,14 @@ class KitchenEnvironment:
                         parent_connection_specification=Slider.parent_connection_specification(
                             axis=Vector3.NEGATIVE_X(),
                             dof_limits=DegreeOfFreedomLimits(
-                                lower=DerivativeMap[float](position=0.0),
-                                upper=DerivativeMap[float](position=0.25),
+                                lower=DerivativeMap[float](
+                                    position=0.0,
+                                    velocity=-sliding_drawer_velocity_limit,
+                                ),
+                                upper=DerivativeMap[float](
+                                    position=0.25,
+                                    velocity=sliding_drawer_velocity_limit,
+                                ),
                             ),
                         ),
                     )
@@ -964,8 +1020,14 @@ class KitchenEnvironment:
                     parent_connection_specification=Hinge.parent_connection_specification(
                         axis=Vector3.Z(),
                         dof_limits=DegreeOfFreedomLimits(
-                            lower=DerivativeMap[float](position=limits[0]),
-                            upper=DerivativeMap[float](position=limits[1]),
+                            lower=DerivativeMap[float](
+                                position=limits[0],
+                                velocity=-hinged_door_velocity_limit,
+                            ),
+                            upper=DerivativeMap[float](
+                                position=limits[1],
+                                velocity=hinged_door_velocity_limit,
+                            ),
                         ),
                     ),
                 )
@@ -1127,8 +1189,12 @@ class KitchenEnvironment:
                     parent_connection_specification=Slider.parent_connection_specification(
                         axis=Vector3.NEGATIVE_X(),
                         dof_limits=DegreeOfFreedomLimits(
-                            lower=DerivativeMap[float](position=0.0),
-                            upper=DerivativeMap[float](position=0.40),
+                            lower=DerivativeMap[float](
+                                position=0.0, velocity=-sliding_drawer_velocity_limit
+                            ),
+                            upper=DerivativeMap[float](
+                                position=0.40, velocity=sliding_drawer_velocity_limit
+                            ),
                         ),
                     ),
                 )

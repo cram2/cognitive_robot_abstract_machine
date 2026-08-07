@@ -513,6 +513,11 @@ def _stretch_world_setup():
     return world_with_urdf_factory(Stretch)
 
 
+@pytest.fixture(scope="function")
+def stretch_world_copy(_stretch_world_setup):
+    return deepcopy(_stretch_world_setup)
+
+
 @pytest.fixture(scope="session")
 def _tiago_world_setup():
     return world_with_urdf_factory(Tiago)

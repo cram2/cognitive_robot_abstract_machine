@@ -199,8 +199,10 @@ class PickUpAction(
         """
         return sequential(
             children=[
+                # defining the target_pose relative to the object ensures it stays correct even if the object pose is
+                # updated after defining the goal
                 ReachAction(
-                    target_pose=self.object_designator.global_pose,
+                    target_pose=Pose(reference_frame=self.object_designator),
                     object_designator=self.object_designator,
                     arm=self.arm,
                     grasp_description=self.grasp_description,

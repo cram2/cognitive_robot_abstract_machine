@@ -38,6 +38,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     IsStorageSpace,
     HasLegs,
     HasSink,
+    HasShelfLayers,
 )
 from semantic_digital_twin.spatial_types import (
     Point3,
@@ -1028,7 +1029,7 @@ class Bread(Food):
 
 
 @dataclass(eq=False)
-class CheezeIt(Food):
+class CheezeIt(Food, IsPerceivable):
     """
     Some type of cracker.
     """
@@ -1230,9 +1231,12 @@ class TrashCan(HasCaseAsRootBody, Furniture):
 
 
 @dataclass(eq=False)
-class ShelvingUnit(Furniture):
+class Shelf(Cabinet, HasShelfLayers):
     """
-    A shelving unit.
+    A shelving unit whose storage surfaces are modelled as explicit shelf layers.
+
+    Each layer is a separate :class:`ShelfLayer` annotation, so objects can be placed on
+    and reasoned about per layer.
     """
 
 

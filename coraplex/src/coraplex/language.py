@@ -22,16 +22,11 @@ from coraplex.language_giskard_templates import TryAll, TryInOrder
 from coraplex.plans.executables import (
     GiskardExecutable,
     Executable,
-    ModelChangeExecutable,
 )
 from coraplex.datastructures.enums import TaskStatus, MonitorBehavior
-from coraplex.plans.attachment_nodes import ModelChangeNode
 from coraplex.plans.failures import PlanFailure, AllChildrenFailed
 from coraplex.fluent import Fluent
-from coraplex.plans.plan_node import (
-    PlanNode,
-    UnderspecifiedNode,
-)
+from coraplex.plans.plan_node import PlanNode, ExecutionBoundaryNode
 from coraplex.utils import split_list_by_type
 
 logger = logging.getLogger(__name__)
@@ -63,13 +58,9 @@ class LanguageNode(PlanNode, ABC):
             child.notify()
 
     def parse(self) -> Executable:
-        # Nodes that do not parse into a single motion chart (model changes, and
-        # underspecified nodes that are only grounded during execution) split the
-        # plan into sequential execution groups instead of one merged chart.
-        if any(
-            isinstance(child, (ModelChangeNode, UnderspecifiedNode))
-            for child in self.descendants
-        ):
+        # Nodes that do not parse into a single motion chart split the plan into
+        # sequential execution groups instead of one merged chart.
+        if any(isinstance(child, ExecutionBoundaryNode) for child in self.descendants):
             return self.parse_with_non_giskard_executable()
         child_execs = [child.parse() for child in self.children]
 

@@ -105,7 +105,9 @@ class Location(Iterable[Pose]):
 
         for pose_candidate in self.generator:
 
-            test_robot.root.parent_connection.origin = pose_candidate
+            test_robot.root.parent_connection.origin = (
+                pose_candidate.to_homogeneous_matrix()
+            )
 
             test_world.collision_manager.clear_temporary_rules()
             test_world.collision_manager.add_temporary_rule(

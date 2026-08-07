@@ -697,7 +697,7 @@ def test_motion_order_place(mutable_model_world):
     milk_body = world.get_body_by_name("milk.stl")
     milk_body.parent_connection.origin = world.get_body_by_name(
         "l_gripper_tool_frame"
-    ).global_pose
+    ).global_pose.to_homogeneous_matrix()
 
     with world.modify_world():
 

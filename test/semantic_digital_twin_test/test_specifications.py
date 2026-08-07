@@ -39,6 +39,7 @@ from semantic_digital_twin.exceptions import (
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobotPart
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Cabinet,
     Milk,
     Slider,
     Handle,
@@ -1089,6 +1090,67 @@ def test_nested_mechanical_joint_reparents_whole(empty_world):
     assert drawer.mechanical_joint.root.parent_connection.parent is empty_world.root
     assert isinstance(
         drawer.mechanical_joint.root.parent_connection, RevoluteConnection
+    )
+
+
+def test_hinge_survives_mounting_its_whole_as_a_part(empty_world):
+    """
+    A door hangs off its hinge, and mounting the door onto a cabinet must not bypass
+    that hinge: a door attached rigidly to the cabinet can no longer be opened.
+    """
+    hinge_part = Hinge.get_specification(
+        "hinge",
+        Hinge.get_default_root_specification(scale=Scale(0.05, 0.05, 0.05)),
+        parent_connection_specification=Hinge.parent_connection_specification(
+            axis=Vector3.Z()
+        ),
+    )
+    door_part = Door.get_specification(
+        "door",
+        Door.get_default_root_specification(scale=Scale(0.03, 1, 2)),
+        part_specifications={"mechanical_joint": hinge_part},
+    )
+
+    cabinet = _spawn_with_parts(
+        empty_world, Cabinet, Scale(0.5, 1, 2), {"doors": door_part}
+    )
+
+    [door] = cabinet.doors
+    # cabinet -(revolute)-> hinge -(fixed)-> door
+    assert door.root.parent_connection.parent is door.mechanical_joint.root
+    assert door.mechanical_joint.root.parent_connection.parent is cabinet.root
+    assert isinstance(door.mechanical_joint.root.parent_connection, RevoluteConnection)
+
+
+def test_slider_survives_mounting_its_whole_as_a_part(empty_world):
+    """
+    A drawer slides on its slider, and mounting the drawer into a cabinet must not
+    bypass that slider: a drawer attached rigidly to the cabinet can no longer be
+    pulled out.
+    """
+    slider_part = Slider.get_specification(
+        "slider",
+        Slider.get_default_root_specification(scale=Scale(0.05, 0.05, 0.05)),
+        parent_connection_specification=Slider.parent_connection_specification(
+            axis=Vector3.X()
+        ),
+    )
+    drawer_part = Drawer.get_specification(
+        "drawer",
+        Drawer.get_default_root_specification(scale=Scale(0.4, 0.5, 0.6)),
+        part_specifications={"mechanical_joint": slider_part},
+    )
+
+    cabinet = _spawn_with_parts(
+        empty_world, Cabinet, Scale(0.5, 1, 2), {"drawers": drawer_part}
+    )
+
+    [drawer] = cabinet.drawers
+    # cabinet -(prismatic)-> slider -(fixed)-> drawer
+    assert drawer.root.parent_connection.parent is drawer.mechanical_joint.root
+    assert drawer.mechanical_joint.root.parent_connection.parent is cabinet.root
+    assert isinstance(
+        drawer.mechanical_joint.root.parent_connection, PrismaticConnection
     )
 
 

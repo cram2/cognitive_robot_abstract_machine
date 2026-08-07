@@ -472,6 +472,45 @@ def test_callback_pausing(rclpy_node):
     assert len(w2.connections) == 1
 
 
+def test_synchronizer_keeps_receiving_while_its_world_is_modified(rclpy_node):
+    """
+    A pause makes the synchronizer buffer inbound updates into ``missed_messages``
+    instead of applying them, and nothing drains that buffer on its own.
+
+    Modifying the
+    world must therefore not pause it: outgoing publications are already deferred by
+    :meth:`WorldSynchronizer._publish_or_defer`.
+    """
+    world = World(name="modified_world")
+    synchronizer = WorldSynchronizer(node=rclpy_node, _world=world)
+
+    with world.modify_world():
+        assert not synchronizer._is_paused
+        world.add_kinematic_structure_entity(Body(name=PrefixedName("b1")))
+
+    assert not synchronizer._is_paused
+
+    synchronizer.close()
+
+
+def test_modify_world_preserves_a_deliberate_pause(rclpy_node):
+    """
+    A caller that paused a synchronizer on purpose keeps it paused across a
+    ``modify_world`` block, so buffered updates are not silently applied behind its
+    back.
+    """
+    world = World(name="paused_world")
+    synchronizer = WorldSynchronizer(node=rclpy_node, _world=world)
+    synchronizer.pause()
+
+    with world.modify_world():
+        world.add_kinematic_structure_entity(Body(name=PrefixedName("b1")))
+
+    assert synchronizer._is_paused
+
+    synchronizer.close()
+
+
 def test_ChangeDifHasHardwareInterface(rclpy_node):
     w1 = World(name="w1")
     w2 = World(name="w2")

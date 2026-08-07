@@ -2,13 +2,12 @@ from __future__ import division
 
 import asyncio
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import sleep
 from typing import Set
 
 import numpy as np
 import pytest
-from docutils.nodes import field
 from geometry_msgs.msg import (
     PoseStamped,
     Point,
