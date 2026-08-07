@@ -4,7 +4,7 @@ import time
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 
-from krrood.ormatic.dao import to_dao
+from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import drop_database
 from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
 from semantic_digital_twin.orm.ormatic_interface import Base

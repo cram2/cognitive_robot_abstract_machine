@@ -102,5 +102,9 @@ This tutorial used an in memory database for the purpose of demonstration.
 If you want to permanently store worlds, you have to
 - Install an RDBMS that is supported by SQLAlchemy. (I recommend [PostgreSQL](https://www.postgresql.org/download/))
 - Create a user and database in your RDBMS, for instance with [this script](https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/semantic_digital_twin/scripts/create_postgres_database_and_user_if_not_exists.sql). The script contains the documentation on how to run itself.
-- Set the environment variable `SEMANTIC_DIGITAL_TWIN_DATABASE_URI` to the connection string of your RDBMS, for instance by adding `export SEMANTIC_DIGITAL_TWIN_DATABASE_URI=postgresql://semantic_digital_twin:a_very_strong_password_here@localhost:5432/semantic_digital_twin` to your bashrc.
+- Set the environment variable `SEMANTIC_DIGITAL_TWIN_DATABASE_URI` to the connection string of your RDBMS, for instance by adding `export SEMANTIC_DIGITAL_TWIN_DATABASE_URI=postgresql+psycopg://semantic_digital_twin:a_very_strong_password_here@localhost:5432/semantic_digital_twin` to your bashrc.
+  Note the `+psycopg`: it selects the psycopg 3 driver, which is what this
+  project depends on. A bare `postgresql://` URI makes SQLAlchemy default to
+  psycopg2 instead, which is not installed, so connecting fails with
+  `ModuleNotFoundError: No module named 'psycopg2'`.
 - Create a session for database interaction, for instance with `semantic_digital_twin_sessionmaker()()`
