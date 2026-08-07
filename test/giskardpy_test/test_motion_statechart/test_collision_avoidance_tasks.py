@@ -13,6 +13,7 @@ from giskardpy.motion_statechart.data_types import (
 )
 from giskardpy.motion_statechart.exceptions import CollisionViolatedError
 from giskardpy.motion_statechart.goals.collision_avoidance import (
+    _CancelBecauseSelfCollisionViolated,
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
     ExternalCollisionDistanceMonitor,
@@ -507,6 +508,36 @@ def test_multiple_external_collision_avoidance_motions(cylinder_bot_world: World
     # Second motion
     run_motion(0.5)
     assert len(cylinder_bot_world.collision_manager.collision_consumers) == 0
+
+
+def test_cancel_node_without_tasks_never_starts():
+    msc = MotionStatechart()
+    msc.add_node(cancel := _CancelBecauseSelfCollisionViolated(name="cancel", tasks=[]))
+
+    cancel.build(MotionStatechartContext.empty())
+
+    assert cancel.start_condition.is_const_false()
+
+
+def test_self_collision_avoidance_without_checked_body_combinations(
+    cylinder_bot_world: World,
+):
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+
+    msc = MotionStatechart()
+    msc.add_nodes(
+        [
+            goal := SelfCollisionAvoidance(robot=robot),
+            local_min := LocalMinimumReached(),
+        ]
+    )
+    msc.add_node(EndMotion.when_true(local_min))
+
+    Executor(MotionStatechartContext(world=cylinder_bot_world)).compile(
+        motion_statechart=msc
+    )
+
+    assert goal.nodes == msc.get_nodes_by_type(CancelMotion)
 
 
 def test_self_collision_avoidance(self_collision_bot_world: World):

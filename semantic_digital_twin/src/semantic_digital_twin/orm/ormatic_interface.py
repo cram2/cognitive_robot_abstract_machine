@@ -84,6 +84,8 @@ import semantic_digital_twin.pipeline.mesh_decomposition.coacd
 import semantic_digital_twin.pipeline.mesh_decomposition.vhacd
 import semantic_digital_twin.pipeline.pipeline
 import semantic_digital_twin.reasoning.predicates
+import semantic_digital_twin.reasoning.reasoner
+import semantic_digital_twin.reasoning.world_reasoner
 import semantic_digital_twin.robots.armar7
 import semantic_digital_twin.robots.daisy
 import semantic_digital_twin.robots.garmi
@@ -113,6 +115,10 @@ import semantic_digital_twin.world_description.connection_properties
 import semantic_digital_twin.world_description.connections
 import semantic_digital_twin.world_description.degree_of_freedom
 import semantic_digital_twin.world_description.geometry
+import semantic_digital_twin.world_description.graph_of_convex_sets.base
+import semantic_digital_twin.world_description.graph_of_convex_sets.boxes
+import semantic_digital_twin.world_description.graph_of_convex_sets.exceptions
+import semantic_digital_twin.world_description.graph_of_convex_sets.polygons
 import semantic_digital_twin.world_description.inertial_properties
 import semantic_digital_twin.world_description.shape_collection
 import semantic_digital_twin.world_description.soft_connections
@@ -789,6 +795,44 @@ class WorldModelManagerDAO_model_modification_blocks_association(
     target: Mapped[WorldModelModificationBlockDAO] = relationship(
         "WorldModelModificationBlockDAO",
         foreign_keys=[target_worldmodelmodificationblockdao_id],
+        lazy="selectin",
+    )
+
+
+class GraphOfConvexPolygonsDAO_obstacles_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_10097511437740384067152589240138880074945231015404257411712969"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_graphofconvexpolygonsdao_id: Mapped[int] = mapped_column(
+        ForeignKey("GraphOfConvexPolygonsDAO.database_id")
+    )
+    target__mockedconvexsetdao_id: Mapped[int] = mapped_column(
+        ForeignKey("_MockedConvexSetDAO.database_id")
+    )
+
+    target: Mapped[_MockedConvexSetDAO] = relationship(
+        "_MockedConvexSetDAO",
+        foreign_keys=[target__mockedconvexsetdao_id],
+        lazy="selectin",
+    )
+
+
+class GraphOfConvexPolygonsDAO_regions_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_21683303155680797721654562863218184758483517575191610116427927"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_graphofconvexpolygonsdao_id: Mapped[int] = mapped_column(
+        ForeignKey("GraphOfConvexPolygonsDAO.database_id")
+    )
+    target__mockedhpolyhedrondao_id: Mapped[int] = mapped_column(
+        ForeignKey("_MockedHPolyhedronDAO.database_id")
+    )
+
+    target: Mapped[_MockedHPolyhedronDAO] = relationship(
+        "_MockedHPolyhedronDAO",
+        foreign_keys=[target__mockedhpolyhedrondao_id],
         lazy="selectin",
     )
 
@@ -10611,6 +10655,40 @@ class RightOfDAO(
     }
 
 
+class CaseReasonerDAO(
+    Base, DataAccessObject[semantic_digital_twin.reasoning.reasoner.CaseReasoner]
+):
+    __tablename__ = "CaseReasonerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    model_directory: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+
+class WorldReasonerDAO(
+    Base, DataAccessObject[semantic_digital_twin.reasoning.world_reasoner.WorldReasoner]
+):
+    __tablename__ = "WorldReasonerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+
+
 class RobotPartMixinDAO(
     Base,
     DataAccessObject[semantic_digital_twin.robots.robot_part_mixins.RobotPartMixin],
@@ -11642,6 +11720,16 @@ class BoundingBoxDAO(
     )
 
 
+class BoundsDAO(
+    Base, DataAccessObject[semantic_digital_twin.world_description.geometry.Bounds]
+):
+    __tablename__ = "BoundsDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
 class ColorDAO(
     Base, DataAccessObject[semantic_digital_twin.world_description.geometry.Color]
 ):
@@ -11831,6 +11919,264 @@ class TextureDAO(
 
     repeat: Mapped[typing.List[builtins.float]] = mapped_column(
         JSON, nullable=False, use_existing_column=True
+    )
+
+
+class GraphOfConvexSetsDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.graph_of_convex_sets.base.GraphOfConvexSets
+    ],
+):
+    __tablename__ = "GraphOfConvexSetsDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    search_space_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("BoundingBoxCollectionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+    search_space: Mapped[BoundingBoxCollectionDAO] = relationship(
+        "BoundingBoxCollectionDAO",
+        uselist=False,
+        foreign_keys=[search_space_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "GraphOfConvexSetsDAO",
+    }
+
+
+class GraphOfBoundingBoxesDAO(
+    GraphOfConvexSetsDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.graph_of_convex_sets.boxes.GraphOfBoundingBoxes
+    ],
+):
+    __tablename__ = "GraphOfBoundingBoxesDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GraphOfConvexSetsDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GraphOfBoundingBoxesDAO",
+        "inherit_condition": database_id == GraphOfConvexSetsDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class UnboundedSearchSpaceErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.graph_of_convex_sets.exceptions.UnboundedSearchSpaceError
+    ],
+):
+    __tablename__ = "UnboundedSearchSpaceErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "UnboundedSearchSpaceErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class GraphOfConvexPolygonsDAO(
+    GraphOfConvexSetsDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.graph_of_convex_sets.polygons.GraphOfConvexPolygons
+    ],
+):
+    __tablename__ = "GraphOfConvexPolygonsDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GraphOfConvexSetsDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    obstacles: Mapped[builtins.list[GraphOfConvexPolygonsDAO_obstacles_association]] = (
+        relationship(
+            "GraphOfConvexPolygonsDAO_obstacles_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[GraphOfConvexPolygonsDAO_obstacles_association.source_graphofconvexpolygonsdao_id]",
+            lazy="selectin",
+        )
+    )
+    regions: Mapped[builtins.list[GraphOfConvexPolygonsDAO_regions_association]] = (
+        relationship(
+            "GraphOfConvexPolygonsDAO_regions_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[GraphOfConvexPolygonsDAO_regions_association.source_graphofconvexpolygonsdao_id]",
+            lazy="selectin",
+        )
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GraphOfConvexPolygonsDAO",
+        "inherit_condition": database_id == GraphOfConvexSetsDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class IrisSeedingSettingsDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.graph_of_convex_sets.polygons.IrisSeedingSettings
+    ],
+):
+    __tablename__ = "IrisSeedingSettingsDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    grid_resolution: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    max_regions: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+    iris_options_id: Mapped[int] = mapped_column(
+        ForeignKey("_MockedIrisOptionsDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    iris_options: Mapped[_MockedIrisOptionsDAO] = relationship(
+        "_MockedIrisOptionsDAO",
+        uselist=False,
+        foreign_keys=[iris_options_id],
+        post_update=True,
+    )
+
+
+class _MockedConvexSetDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.graph_of_convex_sets.polygons._MockedConvexSet
+    ],
+):
+    __tablename__ = "_MockedConvexSetDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class _MockedGcsTrajectoryOptimizationDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.graph_of_convex_sets.polygons._MockedGcsTrajectoryOptimization
+    ],
+):
+    __tablename__ = "_MockedGcsTrajectoryOptimizationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class _MockedHPolyhedronDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.graph_of_convex_sets.polygons._MockedHPolyhedron
+    ],
+):
+    __tablename__ = "_MockedHPolyhedronDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class _MockedIrisDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.graph_of_convex_sets.polygons._MockedIris
+    ],
+):
+    __tablename__ = "_MockedIrisDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class _MockedIrisOptionsDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.graph_of_convex_sets.polygons._MockedIrisOptions
+    ],
+):
+    __tablename__ = "_MockedIrisOptionsDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class _MockedPointDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.graph_of_convex_sets.polygons._MockedPoint
+    ],
+):
+    __tablename__ = "_MockedPointDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class _MockedSubgraphDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.graph_of_convex_sets.polygons._MockedSubgraph
+    ],
+):
+    __tablename__ = "_MockedSubgraphDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class _MockedVPolytopeDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.graph_of_convex_sets.polygons._MockedVPolytope
+    ],
+):
+    __tablename__ = "_MockedVPolytopeDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
     )
 
 

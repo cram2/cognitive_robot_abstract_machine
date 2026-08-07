@@ -97,6 +97,16 @@ class NotSquareMatrixError(WrongDimensionsError):
 
 
 @dataclass
+class NotColumnVectorError(WrongDimensionsError):
+    """
+    Raised when data that is expected to describe a vector has more than one column.
+    """
+
+    expected_dimensions: str = field(default="(n, 1)", init=False)
+    actual_dimensions: Tuple[int, int]
+
+
+@dataclass
 class HasFreeVariablesError(SymbolicMathError):
     """
     Raised when an operation can't be performed on an expression with free variables.
@@ -143,6 +153,32 @@ class WrongNumberOfArgsError(ExpressionEvaluationError):
 
     def error_message(self) -> str:
         return f"Expected {self.expected_number_of_args} arguments, but got {self.actual_number_of_args}."
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class NotEnoughArgumentsError(SymbolicMathError):
+    """
+    Raised when an operation is called with fewer arguments than it requires.
+    """
+
+    minimum_number_of_arguments: int
+    """
+    The smallest number of arguments the operation accepts.
+    """
+
+    actual_number_of_arguments: int
+    """
+    The number of arguments the operation was called with.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Expected at least {self.minimum_number_of_arguments} arguments, "
+            f"but got {self.actual_number_of_arguments}."
+        )
 
     def suggest_correction(self) -> str:
         return ""
