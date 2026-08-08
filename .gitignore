@@ -173,3 +173,9 @@ CLAUDE.local.md
 # at (written by session-start.sh, read/advanced by plan-updates-since.sh).
 # Never committed - it's a per-clone baseline, not shared state.
 .claude/.plan-state-sync-sha
+
+# The stacked-PR board snapshot, re-exported from GitHub by
+# `.claude/stack/maintenance.py board --write` at the start of every maintenance pass.
+# Scratch state, never committed: a stale copy read as current is a pass acting on a
+# stack that has since moved.
+.claude/stack/board.json

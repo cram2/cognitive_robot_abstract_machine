@@ -60,7 +60,7 @@ You never hand-edit a ledger. The stack is read from **GitHub itself** plus git:
     **complete** label set to write back, one per line. GitHub's label write replaces the whole set,
     so computing it from the intended change alone silently strips the rest; this is what the
     maintenance skill passes to every label write rather than working it out itself.
-  - `python .claude/stack/stack.py preflight --action push --source B --destination B
+  - `python .claude/stack/stack.py check-move --action push --source B --destination B
     --destination-remote <remote>` - exits `0` when the move is safe and `5` with its reasons on
     stderr when it is not: wrong branch checked out, a push naming different branches on each
     side, a destination that is not the fork, or a push that would make a child an ancestor of its

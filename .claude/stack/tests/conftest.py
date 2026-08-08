@@ -17,6 +17,28 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "hooks" / "tests"))
 
 import pytest  # noqa: E402
 from scratch_repository import ScratchRepository  # noqa: E402
+from stack import BOARD_PATH  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def board_snapshot_set_aside() -> None:
+    """
+    Hide any board snapshot this checkout happens to be carrying, for every test.
+
+    ``board.json`` lives beside ``stack.py`` rather than in the scratch repository a
+    test runs in, so a developer who has run a maintenance pass has one - and the tests
+    that assert on a *missing* board would fail for a reason that has nothing to do with
+    them. Setting it aside makes the suite independent of whether a pass has been run
+    here, and restores it afterwards so running the tests never costs somebody their
+    snapshot.
+    """
+    if not BOARD_PATH.exists():
+        yield
+        return
+    set_aside = BOARD_PATH.with_suffix(".json.set-aside-for-tests")
+    BOARD_PATH.rename(set_aside)
+    yield
+    set_aside.rename(BOARD_PATH)
 
 
 @pytest.fixture

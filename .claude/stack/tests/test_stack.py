@@ -30,7 +30,7 @@ from stack import (
     LabelWrite,
     MalformedRepositoryError,
     IntegrationStrategy,
-    PreFlight,
+    CommitMoveChecks,
     ProposedCommitMove,
     RefusalReason,
     PromotionLink,
@@ -805,7 +805,7 @@ def test_asking_to_add_and_remove_one_label_at_once_is_refused():
         )
 
 
-# %% pre-flight
+# %% move check
 
 
 def a_proposed_push(
@@ -829,17 +829,17 @@ def a_proposed_push(
     )
 
 
-def a_preflight_over_that_stack(
+def checks_over_that_stack(
     checked_out_branch: str = "engine", ancestors: Container[str] = frozenset()
-) -> PreFlight:
+) -> CommitMoveChecks:
     """
-    A pre-flight over the stack above.
+    A move check over the stack above.
 
     :param checked_out_branch: What ``git branch --show-current`` would report.
     :param ancestors: Branches already contained in the move's source.
-    :return: The pre-flight to ask for refusals.
+    :return: The move check to ask for refusals.
     """
-    return PreFlight(
+    return CommitMoveChecks(
         stack=a_deep_stack_beside_an_independent_branch(),
         checked_out_branch=checked_out_branch,
         is_ancestor=lambda candidate, _descendant: candidate in ancestors,
@@ -847,7 +847,7 @@ def a_preflight_over_that_stack(
 
 
 def test_pushing_the_checked_out_branch_onto_itself_is_allowed():
-    assert a_preflight_over_that_stack().refusals(a_proposed_push()) == []
+    assert checks_over_that_stack().refusals(a_proposed_push()) == []
 
 
 def test_pushing_while_another_branch_is_checked_out_is_refused():
@@ -855,7 +855,7 @@ def test_pushing_while_another_branch_is_checked_out_is_refused():
     The checked-out branch is the one whose content actually moves, so a mismatch moves
     something other than what was intended.
     """
-    refusals = a_preflight_over_that_stack(checked_out_branch="parser").refusals(
+    refusals = checks_over_that_stack(checked_out_branch="parser").refusals(
         a_proposed_push()
     )
 
@@ -864,7 +864,7 @@ def test_pushing_while_another_branch_is_checked_out_is_refused():
 
 
 def test_a_push_naming_a_different_branch_on_each_side_is_refused():
-    refusals = a_preflight_over_that_stack().refusals(
+    refusals = checks_over_that_stack().refusals(
         a_proposed_push(destination="engine-ui")
     )
 
@@ -878,7 +878,7 @@ def test_a_destination_on_the_upstream_remote_is_refused():
     Every push in this workflow goes to the fork; the upstream is written only by
     opening a pull request against it.
     """
-    refusals = a_preflight_over_that_stack().refusals(
+    refusals = checks_over_that_stack().refusals(
         a_proposed_push(destination_remote="cram2")
     )
 
@@ -891,7 +891,7 @@ def test_a_push_that_would_make_a_child_an_ancestor_of_its_parent_is_refused():
     GitHub reads a pull request whose head is contained in its base as merged, so this
     push would falsely close the child.
     """
-    refusals = a_preflight_over_that_stack(ancestors={"engine-ui"}).refusals(
+    refusals = checks_over_that_stack(ancestors={"engine-ui"}).refusals(
         a_proposed_push()
     )
 
@@ -904,8 +904,7 @@ def test_an_unrelated_branch_contained_in_the_source_is_not_a_false_merge():
     Only a child of the destination can be falsely merged by pushing to it.
     """
     assert (
-        a_preflight_over_that_stack(ancestors={"parser"}).refusals(a_proposed_push())
-        == []
+        checks_over_that_stack(ancestors={"parser"}).refusals(a_proposed_push()) == []
     )
 
 
@@ -914,7 +913,7 @@ def test_every_reason_to_refuse_is_reported_rather_than_only_the_first():
     Fixing one problem and re-running to discover the next is how a half-applied move
     gets made.
     """
-    refusals = a_preflight_over_that_stack(checked_out_branch="parser").refusals(
+    refusals = checks_over_that_stack(checked_out_branch="parser").refusals(
         a_proposed_push(destination="engine-ui", destination_remote="cram2")
     )
 
