@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass, field
 from io import BytesIO
 from uuid import UUID
@@ -34,6 +35,12 @@ from semantic_digital_twin.world_description.world_modification import (
     WorldModelModificationBlock,
 )
 from semantic_digital_twin.world_description.world_state import WorldState
+from semantic_digital_twin.exceptions import (
+    BrokenWorldModificationHistoryError,
+    WorldEntityNotFoundError,
+)
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(eq=False)
@@ -60,15 +67,100 @@ class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
         )
 
     def to_domain_object(self) -> World:
-        result = World(name=self.name)
+        """
+        Rebuild the world, replaying its recorded history when that history can
+        stand on its own and falling back to the stored contents when it cannot.
+
+        Replaying is the primary path because it reproduces how the world was
+        built. It is only sufficient, though, for a world whose history starts
+        from nothing. A world assembled before recording began has a history that
+        opens by removing a connection it never added, and replaying that against
+        an empty world raises instead of rebuilding it.
+
+        Such a world is not missing anything: `from_domain_object` stores the
+        entities, connections, degrees of freedom and annotations next to the
+        history, and those describe the finished world directly. So a history
+        that cannot rebuild the world is not fatal - the contents are used
+        instead, and the world still comes back.
+        """
+        try:
+            result = self._replay_modification_history()
+        except (WorldEntityNotFoundError, BrokenWorldModificationHistoryError):
+            logger.warning(
+                "The modification history of world %r does not start from an empty "
+                "world, so it cannot be replayed. Rebuilding from the stored "
+                "contents instead.",
+                self.name,
+            )
+            result = self._rebuild_from_contents()
 
         with result.modify_world():
-            for modification_block in self.modification_history:
-                modification_block.apply(result)
-
             result.state = self.state
             result.state._world = result
         return result
+
+    def _replay_modification_history(self) -> World:
+        """
+        Rebuild the world by replaying every recorded modification onto an empty
+        world.
+
+        :return: The rebuilt world.
+        :raises WorldEntityNotFoundError: A modification referred to an entity the
+            replay had not created, i.e. the history does not start from empty.
+        :raises BrokenWorldModificationHistoryError: The history is not applicable
+            in the order it was recorded.
+        """
+        result = World(name=self.name)
+        with result.modify_world():
+            for modification_block in self.modification_history:
+                modification_block.apply(result)
+        return result
+
+    def _rebuild_from_contents(self) -> World:
+        """
+        Rebuild the world from its stored contents, ignoring the history.
+
+        Connections are added before the loose entities because adding one also
+        adds the entities it joins, which keeps the kinematic structure connected
+        rather than seeding it with orphan nodes. Degrees of freedom come first,
+        since a connection may refer to one.
+
+        :return: The rebuilt world.
+        """
+        self._detach_contents_from_any_world()
+
+        result = World(name=self.name)
+        with result.modify_world():
+            for dof in self.degrees_of_freedom:
+                result.add_degree_of_freedom(dof)
+
+            for connection in self.connections:
+                result.add_connection(connection)
+
+            for entity in self.kinematic_structure_entities:
+                result.add_kinematic_structure_entity(entity)
+
+            for semantic_annotation in self.semantic_annotations:
+                result.add_semantic_annotation(semantic_annotation)
+        return result
+
+    def _detach_contents_from_any_world(self) -> None:
+        """
+        Release the stored contents from any world that already claims them.
+
+        A replay that fails partway leaves the entities it managed to add
+        attached to the world it was building, and that world is then discarded.
+        The contents here are those same objects, so without detaching them the
+        rebuild would be refused: an entity may belong to at most one world.
+        """
+        for item in (
+            *self.degrees_of_freedom,
+            *self.connections,
+            *self.kinematic_structure_entities,
+            *self.semantic_annotations,
+        ):
+            if getattr(item, "_world", None) is not None:
+                item.remove_from_world()
 
     @classmethod
     def required_pre_build_classes(cls) -> List[Type]:

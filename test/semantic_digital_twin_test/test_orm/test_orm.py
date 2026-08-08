@@ -17,7 +17,14 @@ from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.connections import (
+    RevoluteConnection,
+    FixedConnection,
+)
+from semantic_digital_twin.world_description.world_modification import (
+    WorldModelModificationBlock,
+    RemoveConnectionModification,
+)
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -41,6 +48,9 @@ from krrood.class_diagrams.class_diagram import WrappedClass
 from semantic_digital_twin.orm.ormatic_interface import *
 from krrood.ormatic.data_access_objects.helper import to_dao
 
+
+from uuid import uuid4
+from semantic_digital_twin.orm.model import WorldMapping
 
 import pytest
 
@@ -311,3 +321,61 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
     # The field values themselves survived the round trip.
     assert isinstance(reconstructed_drawer.handle, Handle)
     assert isinstance(reconstructed_drawer.mechanical_joint, Slider)
+
+
+def _two_body_world() -> World:
+    """A minimal world: two bodies joined by one fixed connection."""
+    world = World(name="assembled_world")
+    with world.modify_world():
+        parent = Body(name=PrefixedName("parent"))
+        child = Body(name=PrefixedName("child"))
+        world.add_connection(FixedConnection(parent=parent, child=child))
+    return world
+
+
+def test_world_history_that_does_not_start_from_empty_still_rebuilds():
+    """
+    A world whose recorded history opens with a removal is still reconstructed.
+
+    A world assembled before its history began recording has no Add modifications
+    for the entities it already held, so its history starts by removing a
+    connection that a replay onto an empty world never created. Replaying that
+    raises. The stored contents describe the finished world regardless, so
+    reconstruction has to fall back to them rather than surfacing the error.
+    """
+    world = _two_body_world()
+    mapping = WorldMapping.from_domain_object(world)
+
+    # The shape 541 worlds in the shared database actually have: the first thing
+    # the history mentions is a connection nothing ever added.
+    mapping.modification_history = [
+        WorldModelModificationBlock(
+            modifications=[RemoveConnectionModification(uuid4(), uuid4())]
+        )
+    ]
+
+    reconstructed = mapping.to_domain_object()
+
+    assert len(reconstructed.kinematic_structure_entities) == 2
+    assert len(reconstructed.connections) == 1
+    assert {body.name.name for body in reconstructed.kinematic_structure_entities} == {
+        "parent",
+        "child",
+    }
+
+
+def test_world_with_a_replayable_history_is_still_replayed():
+    """
+    The fallback must not quietly become the normal path.
+
+    A history that does start from empty replays as before, so worlds keep being
+    rebuilt the way they were built rather than from their contents.
+    """
+    world = _two_body_world()
+    mapping = WorldMapping.from_domain_object(world)
+    assert mapping.modification_history, "expected a recorded history to replay"
+
+    reconstructed = mapping._replay_modification_history()
+
+    assert len(reconstructed.kinematic_structure_entities) == 2
+    assert len(reconstructed.connections) == 1

@@ -1767,7 +1767,14 @@ class World(HasSimulatorProperties):
             for connection in child_body_parent_connections:
                 self.remove_kinematic_structure_entity(connection.parent)
                 self.remove_kinematic_structure_entity(connection.child)
-                new_world.remove_connection(connection)
+                # Clean the connection up in the world that actually holds it.
+                # Removing its parent and child above already dropped the edge
+                # from this world's kinematic structure, which is exactly the
+                # case `remove_connection` documents as still needing an explicit
+                # removal on our side. Doing this to `new_world` instead records
+                # a removal as the first entry of a history that has not added
+                # anything yet, and that history can no longer be replayed.
+                self.remove_connection(connection)
                 new_world.add_connection(connection)
             self.remove_connection(root_connection)
 
