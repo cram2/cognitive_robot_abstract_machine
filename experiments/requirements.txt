@@ -1,1 +1,2 @@
 line_profiler
+scikit-learn
