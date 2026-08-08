@@ -772,8 +772,7 @@ class Item:
 
     @property
     def has_open_pull_request(self) -> bool:
-        """Whether this item currently has an open (draft or ready) pull request -
-        used to decide whether a dependent's pull request is safe to review yet."""
+        """Whether this item currently has an open (draft or ready) pull request."""
         return self.live_state in (LiveState.OPEN_DRAFT, LiveState.OPEN_READY)
 
     @property
@@ -820,6 +819,19 @@ class Item:
         draft is the one state that isn't safe to build on top of, since it
         can still see heavy rework."""
         return self.is_effectively_done() or self.live_state is LiveState.OPEN_READY
+
+    def is_ready_for_dependent_review(self) -> bool:
+        """Whether a dependent's pull request is worth reviewing yet: this item's
+        own pull request exists and has reached review, whether it is still open
+        or has already landed. Having no pull request at all is the one state
+        that makes a dependent premature to review.
+
+        ..note:: Deliberately weaker than :meth:`is_ready_to_unblock_dependents`,
+            which additionally requires being out of draft: building a branch on
+            a dependency that can still see heavy rework is unsafe, while merely
+            reviewing the branch above it is not.
+        """
+        return self.has_open_pull_request or self.is_effectively_done()
 
 
 @dataclass
@@ -1215,10 +1227,11 @@ class DashboardRenderer:
 
     def _compute_ready_to_review(self) -> list[Item]:
         """Items with an open draft pull request that are actually reviewable right
-        now: not blocked, and every dependency (if any) already has its own
-        open pull request - reviewing a stacked pull request before its base even has one open
-        yet is premature, even though the base need not itself be past
-        review. A deferred item never reaches here in the first place -
+        now: not blocked, and every dependency (if any) has itself reached review
+        (:meth:`Item.is_ready_for_dependent_review`) - reviewing a stacked pull
+        request before its base even has one open yet is premature, even though
+        the base need not itself be past review, nor still be open once it has
+        landed. A deferred item never reaches here in the first place -
         :attr:`Item.needs_review` is already ``False`` for it."""
         ready_to_review: list[Item] = []
         for item in self.plan.items:
@@ -1229,7 +1242,10 @@ class DashboardRenderer:
                 for identifier in item.depends_on
                 if identifier in self.items_by_identifier
             ]
-            if all(dependency.has_open_pull_request for dependency in dependencies):
+            if all(
+                dependency.is_ready_for_dependent_review()
+                for dependency in dependencies
+            ):
                 ready_to_review.append(item)
         return ready_to_review
 
