@@ -484,6 +484,13 @@ class HomogeneousTransformationMatrix(
         result.reference_frame = self.reference_frame
         return result
 
+    def to_position_quaternion_list(self) -> List[float]:
+        """
+        :return: This transform's position and orientation, as
+            ``[x, y, z, qx, qy, qz, qw]``.
+        """
+        return self.to_pose().to_position_quaternion_list()
+
     def __deepcopy__(self, memo) -> HomogeneousTransformationMatrix:
         """
         Even in a deep copy, we don't want to copy the reference and child frame, just
@@ -2068,6 +2075,14 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def to_quaternion(self) -> Quaternion:
         return self.to_rotation_matrix().to_quaternion()
+
+    def to_position_quaternion_list(self) -> List[float]:
+        """
+        :return: This pose's position and orientation, as ``[x, y, z, qx, qy, qz, qw]``.
+        """
+        translation = self.to_position().to_np().flatten()
+        quaternion = self.to_quaternion().to_np().flatten()
+        return [float(value) for value in (*translation[:3], *quaternion[:4])]
 
     def to_homogeneous_matrix(self) -> HomogeneousTransformationMatrix:
         return HomogeneousTransformationMatrix(

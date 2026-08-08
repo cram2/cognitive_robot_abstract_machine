@@ -39,6 +39,7 @@ jobs:
           - lib: robokudo
           - lib: segmind
           - lib: experiments
+          - lib: cram_viz
           - lib: version
     uses: ./.github/workflows/ci_reusable.yml
     with:

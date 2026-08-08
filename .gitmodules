@@ -1,0 +1,3 @@
+[submodule "cram_viz/scenes"]
+	path = cram_viz/scenes
+	url = https://github.com/cram2/cram-scenes.git

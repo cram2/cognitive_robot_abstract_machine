@@ -20,6 +20,8 @@ msg/_*.py
 *.txt
 *.png
 !.claude/skills/plan-dashboard/example/screenshots/*.png
+!cram_viz/src/cram_viz/web/img/aicor-logo.png
+!cram_viz/src/cram_viz/web/img/ai-picture.png
 *.lprof
 tmp_data/
 tmp/

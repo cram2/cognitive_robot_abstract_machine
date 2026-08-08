@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cram_viz"
+authors = [
+    { name = "Vanessa Hassouna", email = "hassouna@uni-bremen.de" },
+]
+description = "Browser-based visualization for the CRAM architecture: 3D scene, EQL knowledge panel and execution graphs as swappable panels."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+keywords = ["robotics", "visualization"]
+dynamic = ["version", "dependencies"]
+license = { text = "GPL-3.0-only" }
+
+[project.urls]
+"Source" = 'https://github.com/cram2/cognitive_robot_abstract_machine'
+
+[project.scripts]
+cram-viz = "cram_viz.server:main"
+cram-viz-live = "cram_viz.live.runner:main"
+cram-viz-onboard = "cram_viz.onboard.demo:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["cram_viz*"]
+
+[tool.setuptools.package-data]
+# the web frontend ships with the package (all local assets, no CDN)
+cram_viz = ["web/**/*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "cram_viz.__version__" }
+dependencies = { file = "requirements.txt" }
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0,<8.0.0",
+]
