@@ -252,6 +252,26 @@ class InvalidDependsOn(ValidationProblem):
 
 
 @dataclass
+class InvalidBlockers(ValidationProblem):
+    """An item's ``blockers`` isn't a list.
+
+    A plain string is iterable character-by-character in Python, so without
+    this check a string ``blockers`` would silently be misread as one
+    blocker per character instead of failing loudly.
+    """
+
+    item_identifier: str
+    """The offending item's effective id."""
+
+    actual_type: type
+    """The type ``blockers`` actually held, instead of ``list``."""
+
+    def describe(self) -> str:
+        """See :meth:`ValidationProblem.describe`."""
+        return f"item {self.item_identifier!r} blockers must be a list, got {self.actual_type.__name__}"
+
+
+@dataclass
 class UnknownDependency(ValidationProblem):
     """An item's ``depends_on`` names an id that doesn't resolve to another item."""
 
@@ -406,6 +426,10 @@ def validate_plan(plan: dict[str, Any]) -> None:
                     problems.append(
                         UnknownDependency(item_identifier, dependency_identifier)
                     )
+
+        blockers = item.get("blockers")
+        if blockers is not None and not isinstance(blockers, list):
+            problems.append(InvalidBlockers(item_identifier, type(blockers)))
 
     cycle = _find_dependency_cycle(item_identifiers, depends_on_by_identifier)
     if cycle is not None:

@@ -17,6 +17,7 @@ from build_dashboard import (
     DashboardRenderer,
     DependencyCycle,
     DuplicateItemId,
+    InvalidBlockers,
     InvalidDependsOn,
     InvalidManifestRoot,
     InvalidSchemaVersion,
@@ -177,6 +178,24 @@ def test_validate_plan_rejects_depends_on_that_is_not_a_list():
     assert any(
         isinstance(problem, InvalidDependsOn) for problem in error.value.problems
     )
+
+
+def test_validate_plan_rejects_blockers_that_is_not_a_list():
+    # A plain string is iterable char-by-char - must be rejected outright,
+    # not silently misinterpreted as one blocker per character.
+    items = [
+        {
+            "id": "a",
+            "title": "A",
+            "branch": "a",
+            "track": "track-1",
+            "status": "not_started",
+            "blockers": "some prose describing the blocker",
+        }
+    ]
+    with pytest.raises(PlanValidationError) as error:
+        validate_plan(minimal_plan(items=items))
+    assert any(isinstance(problem, InvalidBlockers) for problem in error.value.problems)
 
 
 def test_validate_plan_rejects_unknown_status():
