@@ -98,6 +98,16 @@ class JointState(SubclassJSONSerializer):
             ]
         )
 
+    def apply_to(self, world: World) -> None:
+        """
+        Write the target values of this joint state into the world.
+
+        The whole state is announced as a single change.
+        """
+        with world.batch_state_changes():
+            for connection, target_value in self.items():
+                connection.position = target_value
+
     @classmethod
     def from_str_dict(cls, mapping: Dict[str, float], world: World):
         connections = [world.get_connection_by_name(name) for name in mapping.keys()]

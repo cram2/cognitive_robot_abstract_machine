@@ -1,5 +1,5 @@
 from giskardpy.middleware.ros2 import rospy
-from giskardpy.middleware.ros2.behavior_tree_config import ClosedLoopBTConfig
+from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
 from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
     WorldWithStretchConfigDiffDrive,
     StretchVelocityInterface,
@@ -18,7 +18,7 @@ def main():
     giskard = Giskard(
         world_config=WorldWithStretchConfigDiffDrive(urdf=robot_description),
         robot_interface_config=StretchVelocityInterface(),
-        behavior_tree_config=ClosedLoopBTConfig(),
+        server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
         qp_controller_config=QPControllerConfig(
             target_frequency=25, prediction_horizon=30
         ),

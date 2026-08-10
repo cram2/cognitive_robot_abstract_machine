@@ -1560,7 +1560,6 @@ class MujocoSimulator(BaseSimulator):
         :return: A SimulatorCallbackResult object with the segmentation data as the
             result.
         """
-
         with self._model_lock:
             with mujoco.Renderer(self._mj_model, height, width) as renderer:
                 renderer.enable_segmentation_rendering()

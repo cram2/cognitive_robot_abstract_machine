@@ -48,8 +48,8 @@ class OrmPackage:
 
     def clear_interface(self) -> None:
         """
-        Empty the generated interface without deleting the file, so that a stale
-        version cannot be imported while the new one is being generated.
+        Empty the generated interface without deleting the file, so that a stale version
+        cannot be imported while the new one is being generated.
         """
         if not self.interface.exists():
             raise FileNotFoundError(f"Interface not found: {self.interface}")
@@ -72,6 +72,7 @@ class OrmPackage:
 # packages listed before it.
 ORM_PACKAGES = [
     OrmPackage("semantic_digital_twin"),
+    OrmPackage("giskardpy"),
     OrmPackage("coraplex"),
     OrmPackage("segmind"),
     OrmPackage("experiments"),

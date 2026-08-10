@@ -68,22 +68,11 @@ class Executable:
     Coraplex context which should be used to execute this executable.
     """
 
-    synchronize_time_delta: timedelta = field(
-        default=timedelta(seconds=1), kw_only=True
-    )
-    """
-    Time delta that is waited between executables when executing on the real robot.
-
-    Is done to prevent synchronization issues
-    """
-
     def execute(self) -> None:
         """
         Executes the unit.
         """
         for executable in self.execution_list:
-            if GiskardExecutable.execution_type == ExecutionType.REAL:
-                time.sleep(self.synchronize_time_delta.seconds)
             executable.execute()
 
 
@@ -171,7 +160,6 @@ class GiskardExecutable(Executable):
             if skip_end_conditions:
                 end_trigger = trinary_logic_or(end_trigger, *skip_end_conditions)
 
-            self._add_condition_monitors(first_task, end_trigger)
         if GiskardExecutable.collision_avoidance:
             self._current_motion_state_chart.add_node(ExternalCollisionAvoidance())
 
@@ -348,7 +336,7 @@ class GiskardExecutable(Executable):
             if executor.motion_statechart.is_end_motion():
                 break
 
-        executor._set_velocity_acceleration_jerk_to_zero()
+        executor.set_velocity_acceleration_jerk_to_zero()
         executor.motion_statechart.cleanup_nodes(context=executor.context)
         executor.context.cleanup()
 

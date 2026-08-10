@@ -194,6 +194,28 @@ class ConstraintTypeMismatchError(QPSolverException):
 
 
 @dataclass
+class MultipleTerminalStateConstraintsError(QPSolverException):
+    """
+    Raised when more than one terminal-state prediction constraint is compiled into a
+    single strategy block, which the single-row terminal prediction cannot represent.
+    """
+
+    constraint_names: list[str]
+    """
+    The names of the terminal-state constraints that were grouped together.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"TerminalStatePredictionStrategy supports exactly one constraint per block, "
+            f"but received {len(self.constraint_names)}: {self.constraint_names}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "use at most one terminal-state task (e.g. one fill goal) per motion statechart."
+
+
+@dataclass
 class NoFactoryForQPDataTypeError(QPSolverException):
     """
     Raised when no registered factory handles the requested QPData type.

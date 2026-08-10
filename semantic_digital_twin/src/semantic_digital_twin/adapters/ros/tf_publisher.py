@@ -164,7 +164,7 @@ class TFPublisher(StateChangeCallback):
     Publisher for tf messages.
     """
 
-    tf_model_cb: TfPublisherModelCallback = field(init=False)
+    tf_model_callback: TfPublisherModelCallback = field(init=False)
     """
     Callback for updating the tf message cache on model update.
     """
@@ -178,13 +178,23 @@ class TFPublisher(StateChangeCallback):
         super().__post_init__()
         self.tf_pub = self.node.create_publisher(TFMessage, self.tf_topic, 10)
         sleep(0.2)
-        self.tf_model_cb = TfPublisherModelCallback(
+        self.tf_model_callback = TfPublisherModelCallback(
             node=self.node,
             _world=self._world,
             ignored_kinematic_structure_entities=self.ignored_kinematic_structure_entities,
         )
-        self.tf_model_cb.notify_model_change()
+        self.tf_model_callback.notify_model_change()
         self.on_state_change()
+
+    def stop(self):
+        """
+        Deregister this publisher and the model callback it owns.
+
+        The model callback registers itself on the world, so stopping only the state
+        callback would leave it publishing on a node that may already be gone.
+        """
+        self.tf_model_callback.stop()
+        super().stop()
 
     @classmethod
     def create_with_ignore_robot(cls, robot: AbstractRobot, node: Node) -> Self:
@@ -234,5 +244,5 @@ class TFPublisher(StateChangeCallback):
     def on_state_change(self, **kwargs):
         if self._world.state.version % self.throttle_state_updates != 0:
             return
-        self.tf_model_cb.update_tf_message()
-        self.tf_pub.publish(self.tf_model_cb.tf_message)
+        self.tf_model_callback.update_tf_message()
+        self.tf_pub.publish(self.tf_model_callback.tf_message)

@@ -33,16 +33,126 @@ class PlanningException(GiskardException):
 
 
 @dataclass
+class DegreeOfFreedomNotRecordedError(GiskardException):
+    """
+    Raised when a recorded world-state trajectory does not contain a requested degree of
+    freedom.
+    """
+
+    connection_name: str
+    """
+    The name of the connection whose degree of freedom was requested.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The recorded world-state trajectory contains no positions for the degree of "
+            f"freedom of connection '{self.connection_name}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return "make sure the connection is part of the simulated world before running the physics model."
+
+
+@dataclass
+class WorldNotEmptyError(SetupException):
+    """
+    Raised when a world config that must build its world from scratch is run on a world
+    that already contains kinematic structure.
+    """
+
+    config_name: str
+    """The name of the world config class that requires an empty world."""
+
+    def error_message(self) -> str:
+        return f"{self.config_name} requires an empty world to set up."
+
+    def suggest_correction(self) -> str:
+        return "Run setup_world() before adding anything else to the world."
+
+
+@dataclass
+class HandleActuatorMismatchError(SetupException):
+    """
+    Raised when a container handle is not driven by the actuator a physics model was
+    configured with, so the resulting motion would move a different joint than the one
+    being recorded.
+    """
+
+    handle_name: str
+    """The name of the handle body."""
+
+    actuator_name: str
+    """
+    The name of the configured actuator connection.
+    """
+
+    handle_connection_name: str
+    """The name of the 1-DOF connection that actually drives the handle."""
+
+    def error_message(self) -> str:
+        return (
+            f"Handle '{self.handle_name}' is driven by connection "
+            f"'{self.handle_connection_name}', not by the configured actuator "
+            f"'{self.actuator_name}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Pass the ActiveConnection1DOF that drives the handle as the actuator."
+
+
+@dataclass
 class MissingActionResultError(GiskardException):
     """
     Raised when a result message is requested before one has been set.
     """
 
+    action_server_name: str
+    """
+    The name of the action server whose result was requested.
+    """
+
+    goal_id: int
+    """
+    The id of the goal whose result was requested.
+    """
+
     def error_message(self) -> str:
-        return "No result message set."
+        return (
+            f"'{self.action_server_name}' goal #{self.goal_id} has no result message."
+        )
 
     def suggest_correction(self) -> str:
         return "You tried to access something before it was set."
+
+
+@dataclass
+class MissingGoalOutcomeError(GiskardException):
+    """
+    Raised when a goal is answered without having been marked succeeded, aborted or
+    canceled.
+    """
+
+    action_server_name: str
+    """
+    The name of the action server whose goal is being answered.
+    """
+
+    goal_id: int
+    """
+    The id of the goal that is being answered.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"'{self.action_server_name}' goal #{self.goal_id} is being answered "
+            f"without an outcome."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Mark the goal as succeeded, aborted or canceled before sending its result."
+        )
 
 
 @dataclass
@@ -74,6 +184,24 @@ class NoControlledJointsError(SetupException):
 
     def suggest_correction(self) -> str:
         return "Make sure robot_interface_config of Giskard is setup correctly."
+
+
+@dataclass
+class NonPositiveRealTimeFactorError(SetupException):
+    """
+    Raised when a simulation is configured to run at a non positive speed.
+    """
+
+    real_time_factor: float
+    """
+    The rejected factor.
+    """
+
+    def error_message(self) -> str:
+        return f"A real time factor of {self.real_time_factor} would never advance the simulation."
+
+    def suggest_correction(self) -> str:
+        return "Use a positive factor, or NoPacing to run as fast as possible."
 
 
 @dataclass

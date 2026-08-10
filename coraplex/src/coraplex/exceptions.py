@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from coraplex.plans.designator import Designator
     from coraplex.robot_plans.actions.base import ActionDescription
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
+    from semantic_digital_twin.world_description.motion import Motion
     from semantic_digital_twin.world_description.world_entity import (
         KinematicStructureEntity,
         SemanticAnnotation,
@@ -155,6 +156,28 @@ class MotionDidNotFinish(PlanFailure):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class UntrackedMotionConnection(DataclassException):
+    """
+    Raised when a motion's trajectory holds no positions for the connection the motion
+    manipulates, so no body trajectory can be derived from it.
+    """
+
+    motion: Motion
+    """
+    The motion whose connection is not tracked by its trajectory.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"the trajectory of {self.motion} has no positions for "
+            f"connection {self.motion.connection}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "record positions for the motion's connection when building the motion trajectory."
 
 
 @dataclass

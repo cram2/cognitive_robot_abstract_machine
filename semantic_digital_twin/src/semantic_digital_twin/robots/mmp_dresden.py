@@ -5,6 +5,7 @@ from abc import ABC
 import numpy as np
 from collections import defaultdict
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Self, List
 
 from semantic_digital_twin.datastructures.definitions import (
@@ -36,6 +37,26 @@ from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+
+class MMPDresdenJoint(StrEnum):
+    """
+    Names of the MMPDresden's commandable connections, as spelled in its URDF.
+
+    Members are usable wherever a connection name is expected, so a configuration keyed by
+    them stays a plain mapping of names to positions.
+
+    ..note:: Connections that no controller commands, such as the base wheels and the
+        gripper's coupled knuckle and finger tip joints, are left out.
+    """
+
+    SHOULDER_PAN = "arm_0_shoulder_pan_joint"
+    SHOULDER_LIFT = "arm_0_shoulder_lift_joint"
+    ELBOW = "arm_0_elbow_joint"
+    WRIST_1 = "arm_0_wrist_1_joint"
+    WRIST_2 = "arm_0_wrist_2_joint"
+    WRIST_3 = "arm_0_wrist_3_joint"
+    GRIPPER_LEFT_KNUCKLE = "arm_0_gripper_robotiq_85_left_knuckle_joint"
 
 
 @dataclass(eq=False)

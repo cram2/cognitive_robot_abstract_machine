@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from giskardpy.middleware.ros2 import rospy
-from giskardpy.middleware.ros2.behavior_tree_config import StandAloneBTConfig
+from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
 from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
     StretchStandaloneInterface,
     WorldWithStretchConfigDiffDrive,
@@ -17,7 +17,9 @@ def main():
     giskard = Giskard(
         world_config=WorldWithStretchConfigDiffDrive(urdf=robot_description),
         robot_interface_config=StretchStandaloneInterface(),
-        behavior_tree_config=StandAloneBTConfig(debug_mode=True),
+        server_config=GiskardServerConfig(
+            execution_mode=ExecutionMode.STANDALONE, debug_mode=True
+        ),
         qp_controller_config=QPControllerConfig(
             target_frequency=25, prediction_horizon=30
         ),

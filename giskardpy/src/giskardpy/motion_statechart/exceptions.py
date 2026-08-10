@@ -43,8 +43,102 @@ class MotionStatechartError(DataclassException, ABC):
 
 
 @dataclass
+class LocalMinimumReachedError(MotionStatechartError):
+    """
+    Raised when the QP solver converges to a local minimum and can no longer make
+    progress.
+    """
+
+    def error_message(self) -> str:
+        return "Motion planning reached a local minimum."
+
+    def suggest_correction(self) -> str:
+        return "Try a different starting configuration or base placement."
+
+
+@dataclass
 class NodeInitializationError(MotionStatechartError, ABC):
     node: MotionStatechartNode
+
+
+@dataclass
+class RootLinkNotWorldRootError(NodeInitializationError):
+    """
+    Raised when a task requiring the vertical world-root frame is built with a different
+    root link.
+    """
+
+    root_link: KinematicStructureEntity
+    """
+    The root link the task was built with.
+    """
+
+    world_root: KinematicStructureEntity
+    """
+    The world root the task requires.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f'root_link "{self.root_link.name}" of node "{self.node.name}" is not the world root '
+            f'"{self.world_root.name}"; the cup tilt is derived against the vertical world-root '
+            f"frame and is otherwise mispredicted."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Pass the world root as root_link."
+
+
+@dataclass
+class MissingInflowEquationError(NodeInitializationError):
+    """
+    Raised when a task needs a receiver's inflow equation but the receiver was never
+    coupled to a source.
+    """
+
+    def error_message(self) -> str:
+        return f'The receiver of node "{self.node.name}" has no inflow equation.'
+
+    def suggest_correction(self) -> str:
+        return "Couple the receiver to a source via receive_outflow_from first."
+
+
+@dataclass
+class MissingExitSpeedError(NodeInitializationError):
+    """
+    Raised when neither the source nor the receiver's inflow equation provides an exit
+    speed for the poured liquid.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f'Node "{self.node.name}" found no nominal exit speed: the source reports none and '
+            f"the receiver's inflow equation does not carry one."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Couple the receiver via receive_outflow_from so a GatedInflowEquation is built."
+
+
+@dataclass
+class NonPositiveClearanceError(NodeInitializationError):
+    """
+    Raised when a rim-clearance band does not lie entirely above the receiver rim.
+    """
+
+    minimum_clearance: float
+    """
+    The rejected clearance floor, in metres.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f'minimum_clearance of node "{self.node.name}" must be positive to keep the rims '
+            f"apart, got {self.minimum_clearance}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Choose a clearance floor above zero."
 
 
 @dataclass
@@ -267,8 +361,8 @@ class DuplicateContextExtensionError(MotionStatechartError):
 @dataclass
 class ActionClientTypeMismatchError(MotionStatechartError):
     """
-    Raised when an action topic is requested with a different message type than the
-    one its cached action client was created with.
+    Raised when an action topic is requested with a different message type than the one
+    its cached action client was created with.
     """
 
     action_topic: str

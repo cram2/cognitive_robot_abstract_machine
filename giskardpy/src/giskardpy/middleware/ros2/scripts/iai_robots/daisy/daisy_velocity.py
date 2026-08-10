@@ -1,5 +1,5 @@
 from giskardpy.middleware.ros2 import rospy
-from giskardpy.middleware.ros2.behavior_tree_config import ClosedLoopBTConfig
+from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
     DAiSyVelocityInterface,
@@ -25,7 +25,7 @@ def main():
     giskard = Giskard(
         world_config=WorldWithDaisyConfig(urdf=robot_description),
         robot_interface_config=DAiSyVelocityInterface(),
-        behavior_tree_config=ClosedLoopBTConfig(),
+        server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
         qp_controller_config=QPControllerConfig(
             target_frequency=80, prediction_horizon=30
         ),

@@ -74,3 +74,27 @@ def test_register_constant_expression():
     with pytest.raises(NoFreeVariablesError):
         data.register_expression(vector)
     assert len(data.data) == 0
+
+
+# %% reading values back
+
+
+def test_read_value_of_registered_variable():
+    data = FloatVariableData()
+    v1 = FloatVariable("v1")
+    v2 = FloatVariable("v2")
+    data.register_expression(v1)
+    data.register_expression(v2)
+    data.set_value(v1, 1.0)
+    data.set_value(v2, 2.0)
+
+    assert data.get_value(v1) == 1.0 == v1.evaluate()
+    assert data.get_value(v2) == 2.0 == v2.evaluate()
+
+
+def test_read_value_of_unregistered_variable():
+    data = FloatVariableData()
+    data.register_expression(FloatVariable("v1"))
+
+    with pytest.raises(SymbolicMathExpressionNotRegisteredError):
+        data.get_value(FloatVariable("v2"))

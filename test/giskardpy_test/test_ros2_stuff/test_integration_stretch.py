@@ -1,7 +1,7 @@
 """
 Standalone-controller coverage for Stretch.
 
-This runs the real QP controller, behaviour tree and robot description in a closed loop
+This runs the real QP controller, motion server and robot description in a closed loop
 with no hardware, which is the closest offline proxy for whether a goal the demo sends
 will actually be reached on the robot.
 """
@@ -43,7 +43,19 @@ def robot():
     try:
         yield tester
     finally:
-        tester.print_stats()
+        tester.close()
+
+
+def tool_frame_height(giskard: StretchTester) -> float:
+    """
+    The height of the tool frame above the base, which the lift motions change.
+    """
+    base_link = giskard.world.get_kinematic_structure_entity_by_name("base_link")
+    return (
+        giskard.world.compute_forward_kinematics(root=base_link, tip=giskard.tool_frame)
+        .to_position()
+        .to_np()[2]
+    )
 
 
 # %% controller setup
@@ -91,9 +103,7 @@ def test_lift_goal_moves_the_tool_frame(giskard: StretchTester):
     A joint goal reaches the controller and moves the arm: raising the lift raises the
     tool frame by the commanded amount.
     """
-    height_before = giskard.compute_fk_pose(
-        "base_link", "link_grasp_center"
-    ).pose.position.z
+    height_before = tool_frame_height(giskard)
 
     motion_statechart = MotionStatechart()
     motion_statechart.add_node(
@@ -106,9 +116,7 @@ def test_lift_goal_moves_the_tool_frame(giskard: StretchTester):
     motion_statechart.add_node(EndMotion.when_true(lift_goal))
     giskard.api.execute(motion_statechart)
 
-    height_after = giskard.compute_fk_pose(
-        "base_link", "link_grasp_center"
-    ).pose.position.z
+    height_after = tool_frame_height(giskard)
     np.testing.assert_allclose(
         height_after - height_before, LIFT_GOAL_HEIGHT - LIFT_SEED_HEIGHT, atol=1e-2
     )
@@ -120,9 +128,7 @@ def test_local_minimum_ends_a_motion(giskard: StretchTester):
     ended only by :class:`LocalMinimumReached` has to terminate on its own and still
     arrive at the goal.
     """
-    height_before = giskard.compute_fk_pose(
-        "base_link", "link_grasp_center"
-    ).pose.position.z
+    height_before = tool_frame_height(giskard)
 
     motion_statechart = MotionStatechart()
     motion_statechart.add_node(
@@ -139,9 +145,7 @@ def test_local_minimum_ends_a_motion(giskard: StretchTester):
 
     giskard.api.execute(motion_statechart)
 
-    height_after = giskard.compute_fk_pose(
-        "base_link", "link_grasp_center"
-    ).pose.position.z
+    height_after = tool_frame_height(giskard)
     np.testing.assert_allclose(
         height_after - height_before, LIFT_GOAL_HEIGHT - LIFT_SEED_HEIGHT, atol=5e-2
     )

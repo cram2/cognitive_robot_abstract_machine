@@ -491,7 +491,7 @@ class TestCollisionRules:
 
 class TestCollisionGroups:
 
-    @dataclass
+    @dataclass(eq=False)
     class MockCollisionGroupConsumer(CollisionGroupConsumer):
         def on_compute_collisions(self, collision_results: CollisionCheckingResult): ...
         def on_collision_matrix_update(self): ...
@@ -597,6 +597,103 @@ class TestCollisionGroups:
         assert robot_base_group is not obstacle_group
         assert robot_base not in obstacle_group.bodies
         assert obstacle not in robot_base_group.bodies
+
+    def test_group_lookup_is_refreshed_after_model_update(self):
+        """
+        Repeated lookups share one group object, and a model update re-resolves the
+        lookup to the rebuilt group instead of returning (and mutating) the previous
+        model's dead group.
+        """
+        world = World()
+        with world.modify_world():
+            robot_base = Body(
+                name=PrefixedName("robot_base"),
+                collision=ShapeCollection([Sphere(radius=0.3)]),
+            )
+            world.add_body(robot_base)
+            MinimalRobot.from_world(world)
+
+        collision_manager = world.collision_manager
+        collision_manager.collision_consumers = [
+            consumer := self.MockCollisionGroupConsumer()
+        ]
+        world._notify_model_change()
+
+        first_lookup = consumer.get_collision_group(robot_base)
+        assert consumer.get_collision_group(robot_base) is first_lookup
+
+        with world.modify_world():
+            attachment = Body(
+                name=PrefixedName("attachment"),
+                collision=ShapeCollection([Sphere(radius=0.1)]),
+            )
+            world.add_connection(FixedConnection(parent=robot_base, child=attachment))
+        consumer.update_collision_groups(world)
+
+        refreshed_group = consumer.get_collision_group(robot_base)
+        assert any(
+            stored_group is refreshed_group
+            for stored_group in consumer.collision_groups
+        ), "lookup returned a group of the previous model instead of the rebuilt one"
+        assert attachment in refreshed_group.bodies
+
+    def test_hash_is_stable_across_body_changes(self):
+        root = Body(
+            name=PrefixedName("group_root"),
+            collision=ShapeCollection([Sphere(radius=0.1)]),
+        )
+        group = CollisionGroup(root=root)
+        initial_hash = hash(group)
+        assert initial_hash == hash(root)
+
+        group.add_body(
+            Body(
+                name=PrefixedName("added_body"),
+                collision=ShapeCollection([Sphere(radius=0.1)]),
+            )
+        )
+        assert hash(group) == initial_hash
+
+    def test_group_resolves_in_dict_after_bodies_change(self):
+        root = Body(
+            name=PrefixedName("group_root"),
+            collision=ShapeCollection([Sphere(radius=0.1)]),
+        )
+        group = CollisionGroup(root=root)
+        registered_group_combinations = {group: "combination"}
+
+        group.add_body(
+            Body(
+                name=PrefixedName("added_body"),
+                collision=ShapeCollection([Sphere(radius=0.1)]),
+            )
+        )
+        assert registered_group_combinations[group] == "combination"
+
+        rebuilt_group = CollisionGroup(root=root)
+        assert registered_group_combinations[rebuilt_group] == "combination"
+
+    def test_lookup_of_body_whose_group_was_filtered_out_raises(self):
+        """
+        A rebuild that filters out a collision-less group must not leave memoized
+        lookups resolving to that dead group.
+        """
+        world = World()
+        root_body = Body(name=PrefixedName("collision_less_root"))
+        with world.modify_world():
+            world.add_body(root_body)
+        with world.modify_world():
+            middle_body = Body(name=PrefixedName("collision_less_middle"))
+            leaf_body = Body(name=PrefixedName("collision_less_leaf"))
+            world.add_connection(FixedConnection(parent=root_body, child=middle_body))
+            world.add_connection(FixedConnection(parent=middle_body, child=leaf_body))
+
+        consumer = self.MockCollisionGroupConsumer()
+        consumer.update_collision_groups(world)
+
+        assert consumer.collision_groups == []
+        with pytest.raises(Exception, match="No collision group"):
+            consumer.get_collision_group(middle_body)
 
     def test_is_collision_groups_combination_checked(self, pr2_world_state_reset):
         group_a = CollisionGroup(

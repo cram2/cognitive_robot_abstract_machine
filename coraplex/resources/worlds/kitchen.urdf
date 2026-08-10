@@ -277,9 +277,9 @@
     <parent link="sink_area"/>
     <child link="sink_area_trash_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     <!--
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="0" velocity="1"/>
 -->
   </joint>
   <joint name="sink_area_trash_drawer_handle_joint" type="fixed">
@@ -287,7 +287,7 @@
     <parent link="sink_area_trash_drawer_main"/>
     <child link="sink_area_trash_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
   </joint>
   <link name="sink_area_left_upper_drawer_main">
     <inertial>
@@ -332,9 +332,9 @@
     <parent link="sink_area"/>
     <child link="sink_area_left_upper_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     <!--
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="0" velocity="1"/>
 -->
   </joint>
   <joint name="sink_area_left_upper_drawer_handle_joint" type="fixed">
@@ -342,7 +342,7 @@
     <parent link="sink_area_left_upper_drawer_main"/>
     <child link="sink_area_left_upper_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
   </joint>
   <link name="sink_area_left_middle_drawer_main">
     <inertial>
@@ -387,9 +387,9 @@
     <parent link="sink_area"/>
     <child link="sink_area_left_middle_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     <!--
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="0" velocity="1"/>
 -->
   </joint>
   <joint name="sink_area_left_middle_drawer_handle_joint" type="fixed">
@@ -397,7 +397,7 @@
     <parent link="sink_area_left_middle_drawer_main"/>
     <child link="sink_area_left_middle_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
   </joint>
   <link name="sink_area_left_bottom_drawer_main">
     <inertial>
@@ -442,9 +442,9 @@
     <parent link="sink_area"/>
     <child link="sink_area_left_bottom_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     <!--
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="0" velocity="1"/>
 -->
   </joint>
   <joint name="sink_area_left_bottom_drawer_handle_joint" type="fixed">
@@ -452,7 +452,7 @@
     <parent link="sink_area_left_bottom_drawer_main"/>
     <child link="sink_area_left_bottom_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
   </joint>
   <link name="sink_area_dish_washer_main">
     <inertial>
@@ -516,7 +516,7 @@
     -->
   <joint name="sink_area_dish_washer_main_joint" type="revolute">
     <axis xyz="1 0 0" />
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="0" velocity="1"/>
     <origin rpy="0 0 0" xyz="0.01 0.1 0.044 "/>
     <parent link="sink_area"/>
     <child link="sink_area_dish_washer_main"/>
@@ -527,7 +527,7 @@
     <child link="sink_area_dish_washer_door"/>
     <axis xyz="0 0 1"/>
     <!-- FIXME make closed position stable instead of forbidding opening... -->
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.5" velocity="1"/>
   </joint>
   <joint name="sink_area_dish_washer_door_handle_joint" type="fixed">
     <origin rpy="-1.57079632679 0 0" xyz="0.0625 -0.6325 0."/>
@@ -659,10 +659,10 @@
     <child link="oven_area_oven_door"/>
     <axis xyz="0 0 1"/>
     <!--
-        <limit lower="0" upper="${0.5*pi}" effort="300" velocity="10"/>
+        <limit lower="0" upper="${0.5*pi}" effort="300" velocity="1"/>
         -->
     <!-- FIXME make the closed position stable -->
-    <limit effort="0.03" lower="0" upper="0." velocity="10"/>
+    <limit effort="0.03" lower="0" upper="1.5" velocity="1"/>
     <dynamics damping="100.1"/>
   </joint>
   <gazebo reference="oven_area_oven_door_joint">
@@ -674,7 +674,7 @@
     <parent link="oven_area_oven_door"/>
     <child link="oven_area_oven_door_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
   </joint>
   <joint name="oven_area_oven_panel_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.27 0 0.2449"/>
@@ -706,7 +706,7 @@
     <parent link="oven_area_oven_panel"/>
     <child link="oven_area_oven_knob_stove_1"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="3.14159265359" velocity="10"/>
+    <limit effort="300" lower="0" upper="3.14159265359" velocity="1"/>
   </joint>
   <link name="oven_area_oven_knob_stove_2">
     <inertial>
@@ -732,7 +732,7 @@
     <parent link="oven_area_oven_panel"/>
     <child link="oven_area_oven_knob_stove_2"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="3.14159265359" velocity="10"/>
+    <limit effort="300" lower="0" upper="3.14159265359" velocity="1"/>
   </joint>
   <link name="oven_area_oven_knob_stove_3">
     <inertial>
@@ -758,7 +758,7 @@
     <parent link="oven_area_oven_panel"/>
     <child link="oven_area_oven_knob_stove_3"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="3.14159265359" velocity="10"/>
+    <limit effort="300" lower="0" upper="3.14159265359" velocity="1"/>
   </joint>
   <link name="oven_area_oven_knob_stove_4">
     <inertial>
@@ -784,7 +784,7 @@
     <parent link="oven_area_oven_panel"/>
     <child link="oven_area_oven_knob_stove_4"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="3.14159265359" velocity="10"/>
+    <limit effort="300" lower="0" upper="3.14159265359" velocity="1"/>
   </joint>
   <link name="oven_area_oven_knob_oven">
     <inertial>
@@ -810,7 +810,7 @@
     <parent link="oven_area_oven_panel"/>
     <child link="oven_area_oven_knob_oven"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="3.14159265359" velocity="10"/>
+    <limit effort="300" lower="0" upper="3.14159265359" velocity="1"/>
   </joint>
   <link name="oven_area_area_middle_upper_drawer_main">
     <inertial>
@@ -855,9 +855,9 @@
     <parent link="oven_area_area"/>
     <child link="oven_area_area_middle_upper_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     <!--
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="0" velocity="1"/>
 -->
   </joint>
   <joint name="oven_area_area_middle_upper_drawer_handle_joint" type="fixed">
@@ -865,7 +865,7 @@
     <parent link="oven_area_area_middle_upper_drawer_main"/>
     <child link="oven_area_area_middle_upper_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
   </joint>
   <link name="oven_area_area_middle_lower_drawer_main">
     <inertial>
@@ -910,9 +910,9 @@
     <parent link="oven_area_area"/>
     <child link="oven_area_area_middle_lower_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     <!--
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="0" velocity="1"/>
 -->
   </joint>
   <joint name="oven_area_area_middle_lower_drawer_handle_joint" type="fixed">
@@ -920,7 +920,7 @@
     <parent link="oven_area_area_middle_lower_drawer_main"/>
     <child link="oven_area_area_middle_lower_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
   </joint>
   <!-- This is the vertical drawer -->
   <link name="oven_area_area_left_drawer_main">
@@ -967,16 +967,16 @@
     <parent link="oven_area_area"/>
     <child link="oven_area_area_left_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
 
-        <limit effort="300" lower="0" upper="0" velocity="10"/>
+
   </joint>
   <joint name="oven_area_area_left_drawer_handle_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.3525 0 0"/>
     <parent link="oven_area_area_left_drawer_main"/>
     <child link="oven_area_area_left_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
 </joint>
 <!-- The inserted drawer -->
 
@@ -988,7 +988,7 @@
     <child link="oven_area_area_right_drawer_main"/>
     <axis xyz="0.999 0 0.044"/>
     <!--  the axis needs to be slightly tilted so that the drawers would stay closed in Gazebo-->
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
 
 </joint>
 
@@ -1007,7 +1007,7 @@
     <!--
     <axis xyz="0.999 0 0.044"/>
      the axis needs to be slightly tilted so that the drawers would stay closed in Gazebo
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     -->
 </joint>
 
@@ -1059,7 +1059,7 @@
     <!--
     <axis xyz="0.999 0 0.044"/>
      the axis needs to be slightly tilted so that the drawers would stay closed in Gazebo
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     -->
 
 </joint>
@@ -1451,9 +1451,9 @@
     <parent link="oven_area_area"/>
     <child link="oven_area_area_right_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
 
-        <limit effort="300" lower="0" upper="0" velocity="10"/>
+
 
   </joint>
 
@@ -1462,7 +1462,7 @@
     <parent link="oven_area_area_right_drawer_main"/>
     <child link="oven_area_area_right_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
 </joint>
 -->
   <link name="kitchen_island_footprint">
@@ -1610,9 +1610,9 @@
     <parent link="kitchen_island"/>
     <child link="kitchen_island_left_upper_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     <!--
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="0" velocity="1"/>
 -->
   </joint>
   <joint name="kitchen_island_left_upper_drawer_handle_joint" type="fixed">
@@ -1620,7 +1620,7 @@
     <parent link="kitchen_island_left_upper_drawer_main"/>
     <child link="kitchen_island_left_upper_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
   </joint>
   <link name="kitchen_island_left_lower_drawer_main">
     <inertial>
@@ -1665,9 +1665,9 @@
     <parent link="kitchen_island"/>
     <child link="kitchen_island_left_lower_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     <!--
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="0" velocity="1"/>
 -->
   </joint>
   <joint name="kitchen_island_left_lower_drawer_handle_joint" type="fixed">
@@ -1675,7 +1675,7 @@
     <parent link="kitchen_island_left_lower_drawer_main"/>
     <child link="kitchen_island_left_lower_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
   </joint>
   <link name="kitchen_island_middle_panel">
     <inertial>
@@ -1744,9 +1744,9 @@
     <parent link="kitchen_island"/>
     <child link="kitchen_island_middle_upper_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     <!--
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="0" velocity="1"/>
 -->
   </joint>
   <joint name="kitchen_island_middle_upper_drawer_handle_joint" type="fixed">
@@ -1754,7 +1754,7 @@
     <parent link="kitchen_island_middle_upper_drawer_main"/>
     <child link="kitchen_island_middle_upper_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
   </joint>
   <link name="kitchen_island_middle_lower_drawer_main">
     <inertial>
@@ -1799,9 +1799,9 @@
     <parent link="kitchen_island"/>
     <child link="kitchen_island_middle_lower_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     <!--
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="0" velocity="1"/>
 -->
   </joint>
   <joint name="kitchen_island_middle_lower_drawer_handle_joint" type="fixed">
@@ -1809,7 +1809,7 @@
     <parent link="kitchen_island_middle_lower_drawer_main"/>
     <child link="kitchen_island_middle_lower_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
   </joint>
   <link name="kitchen_island_right_panel">
     <inertial>
@@ -1878,9 +1878,9 @@
     <parent link="kitchen_island"/>
     <child link="kitchen_island_right_upper_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     <!--
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="0" velocity="1"/>
 -->
   </joint>
   <joint name="kitchen_island_right_upper_drawer_handle_joint" type="fixed">
@@ -1888,7 +1888,7 @@
     <parent link="kitchen_island_right_upper_drawer_main"/>
     <child link="kitchen_island_right_upper_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
   </joint>
   <link name="kitchen_island_right_lower_drawer_main">
     <inertial>
@@ -1933,9 +1933,9 @@
     <parent link="kitchen_island"/>
     <child link="kitchen_island_right_lower_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     <!--
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="0" velocity="1"/>
 -->
   </joint>
   <joint name="kitchen_island_right_lower_drawer_handle_joint" type="fixed">
@@ -1943,7 +1943,7 @@
     <parent link="kitchen_island_right_lower_drawer_main"/>
     <child link="kitchen_island_right_lower_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
   </joint>
   <link name="fridge_area_footprint">
     <inertial>
@@ -2025,9 +2025,9 @@
     <parent link="fridge_area"/>
     <child link="fridge_area_lower_drawer_main"/>
     <axis xyz="1. 0. 0.0"/>
-    <limit effort="300" lower="0" upper="0.48" velocity="10"/>
+    <limit effort="300" lower="0" upper="0.48" velocity="1"/>
     <!--
-    <limit effort="300" lower="0" upper="0" velocity="10"/>
+    <limit effort="300" lower="0" upper="0" velocity="1"/>
 -->
   </joint>
   <joint name="fridge_area_lower_drawer_handle_joint" type="fixed">
@@ -2035,7 +2035,7 @@
     <parent link="fridge_area_lower_drawer_main"/>
     <child link="fridge_area_lower_drawer_handle"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
   </joint>
   <link name="iai_fridge_main">
     <inertial>
@@ -2104,9 +2104,9 @@
     <parent link="iai_fridge_main"/>
     <child link="iai_fridge_door"/>
     <axis xyz="0 0 1"/>
-    <limit effort="300" lower="0" upper="1.57079632679" velocity="10"/>
+    <limit effort="300" lower="0" upper="1.57079632679" velocity="1"/>
     <!--
-      <limit lower="0" upper="0" effort="300" velocity="10"/>
+      <limit lower="0" upper="0" effort="300" velocity="1"/>
 -->
   </joint>
   <joint name="iai_fridge_door_handle_joint" type="fixed">
