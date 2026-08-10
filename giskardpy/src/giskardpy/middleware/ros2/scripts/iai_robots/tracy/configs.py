@@ -6,6 +6,7 @@ from giskardpy.middleware.ros2.robot_interface_config import (
     RobotInterfaceConfig,
     StandAloneRobotInterfaceConfig,
 )
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.tracy import Tracy, TracyJoint
 

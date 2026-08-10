@@ -465,16 +465,6 @@ class SetDofHasHardwareInterface(SetDofFlag):
 
 
 @dataclass
-class SetDofAllowExternalStateUpdate(SetDofFlag):
-    """
-    Sets the ``allows_external_state_update`` flag on the given degrees of freedom.
-    """
-
-    def assign_flag(self, degree_of_freedom: DegreeOfFreedom) -> None:
-        degree_of_freedom.allows_external_state_update = self.value
-
-
-@dataclass
 class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
     """
     An update to one or more attributes of an entity in the world.

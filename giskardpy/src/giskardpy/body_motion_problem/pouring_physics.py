@@ -7,6 +7,7 @@ from giskardpy.body_motion_problem.giskard_physics_model import GiskardPhysicsMo
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.pouring import PouringTask
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.physics.equations.pouring_equations import PouringEquation
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -60,8 +61,8 @@ class PouringMSCModel(GiskardPhysicsModel):
         ``effect.goal_value`` as the fill level within ``effect.tolerance``.
         """
         if self.initial_tilt is not None:
-            world.set_positions_1DOF_connection(
-                {self.tilt_connection: self.initial_tilt}
+            JointState.from_mapping({self.tilt_connection: self.initial_tilt}).apply_to(
+                world
             )
         motion_statechart = MotionStatechart()
         pouring_task = PouringTask(

@@ -17,6 +17,9 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 
 import builtins
 import enum
+import giskardpy.body_motion_problem.container_physics
+import giskardpy.body_motion_problem.giskard_physics_model
+import giskardpy.body_motion_problem.pouring_physics
 import giskardpy.data_types.exceptions
 import giskardpy.executor
 import giskardpy.middleware.ros2.action_server
@@ -79,6 +82,7 @@ import giskardpy.motion_statechart.tasks.feature_functions
 import giskardpy.motion_statechart.tasks.grasp_bar
 import giskardpy.motion_statechart.tasks.joint_tasks
 import giskardpy.motion_statechart.tasks.pointing
+import giskardpy.motion_statechart.tasks.pouring
 import giskardpy.motion_statechart.tasks.weight_scaling_goals
 import giskardpy.motion_statechart.tasks.wiggle_insert
 import giskardpy.qp.constraint
@@ -92,6 +96,7 @@ import giskardpy.qp.qp_data
 import giskardpy.qp.qp_data_factories
 import giskardpy.qp.qp_data_symbolic
 import giskardpy.qp.qp_debugger
+import giskardpy.qp.terminal_state_prediction_strategy
 import giskardpy.ros2_tools.force_torque_filter_node
 import giskardpy.ros_executor
 import krrood.adapters.json_serializer
@@ -154,6 +159,9 @@ import semantic_digital_twin.exceptions
 import semantic_digital_twin.mixin
 import semantic_digital_twin.orm.exceptions
 import semantic_digital_twin.orm.model
+import semantic_digital_twin.physics.equations.differential_equation
+import semantic_digital_twin.physics.equations.learned_pouring_equations
+import semantic_digital_twin.physics.equations.pouring_equations
 import semantic_digital_twin.pipeline.gltf_loader
 import semantic_digital_twin.pipeline.mesh_decomposition.base
 import semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer
@@ -162,6 +170,7 @@ import semantic_digital_twin.pipeline.mesh_decomposition.coacd
 import semantic_digital_twin.pipeline.mesh_decomposition.vhacd
 import semantic_digital_twin.pipeline.pipeline
 import semantic_digital_twin.predetermined_maps.apartment_environment
+import semantic_digital_twin.reasoning.bmp_predicates
 import semantic_digital_twin.reasoning.predicates
 import semantic_digital_twin.reasoning.reasoner
 import semantic_digital_twin.reasoning.world_reasoner
@@ -180,6 +189,7 @@ import semantic_digital_twin.robots.stretch
 import semantic_digital_twin.robots.tiago
 import semantic_digital_twin.robots.tracy
 import semantic_digital_twin.robots.unitree_g1
+import semantic_digital_twin.semantic_annotations.effects
 import semantic_digital_twin.semantic_annotations.mixins
 import semantic_digital_twin.semantic_annotations.natural_language
 import semantic_digital_twin.semantic_annotations.part_whole
@@ -193,6 +203,7 @@ import semantic_digital_twin.world
 import semantic_digital_twin.world_description.connection_properties
 import semantic_digital_twin.world_description.connections
 import semantic_digital_twin.world_description.degree_of_freedom
+import semantic_digital_twin.world_description.effects
 import semantic_digital_twin.world_description.geometry
 import semantic_digital_twin.world_description.graph_of_convex_sets.base
 import semantic_digital_twin.world_description.graph_of_convex_sets.boxes
@@ -200,6 +211,7 @@ import semantic_digital_twin.world_description.graph_of_convex_sets.exceptions
 import semantic_digital_twin.world_description.graph_of_convex_sets.polygons
 import semantic_digital_twin.world_description.inertial_properties
 import semantic_digital_twin.world_description.mesh_file_storage
+import semantic_digital_twin.world_description.motion
 import semantic_digital_twin.world_description.shape_collection
 import semantic_digital_twin.world_description.soft_connections
 import semantic_digital_twin.world_description.world_entity
@@ -1272,6 +1284,44 @@ class WorldModelManagerDAO_model_modification_blocks_association(
     target: Mapped[WorldModelModificationBlockDAO] = relationship(
         "WorldModelModificationBlockDAO",
         foreign_keys=[target_worldmodelmodificationblockdao_id],
+        lazy="selectin",
+    )
+
+
+class GraphOfConvexPolygonsDAO_obstacles_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_10097511437740384067152589240138880074945231015404257411712969"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_graphofconvexpolygonsdao_id: Mapped[int] = mapped_column(
+        ForeignKey("GraphOfConvexPolygonsDAO.database_id")
+    )
+    target__mockedconvexsetdao_id: Mapped[int] = mapped_column(
+        ForeignKey("_MockedConvexSetDAO.database_id")
+    )
+
+    target: Mapped[_MockedConvexSetDAO] = relationship(
+        "_MockedConvexSetDAO",
+        foreign_keys=[target__mockedconvexsetdao_id],
+        lazy="selectin",
+    )
+
+
+class GraphOfConvexPolygonsDAO_regions_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_21683303155680797721654562863218184758483517575191610116427927"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_graphofconvexpolygonsdao_id: Mapped[int] = mapped_column(
+        ForeignKey("GraphOfConvexPolygonsDAO.database_id")
+    )
+    target__mockedhpolyhedrondao_id: Mapped[int] = mapped_column(
+        ForeignKey("_MockedHPolyhedronDAO.database_id")
+    )
+
+    target: Mapped[_MockedHPolyhedronDAO] = relationship(
+        "_MockedHPolyhedronDAO",
+        foreign_keys=[target__mockedhpolyhedrondao_id],
         lazy="selectin",
     )
 
@@ -2703,6 +2753,161 @@ class FunctionMappingDAO(
     )
 
 
+class GiskardPhysicsModelDAO(
+    Base,
+    DataAccessObject[
+        giskardpy.body_motion_problem.giskard_physics_model.GiskardPhysicsModel
+    ],
+):
+    __tablename__ = "GiskardPhysicsModelDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    timeout: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    qp_controller_config_id: Mapped[int] = mapped_column(
+        ForeignKey("QPControllerConfigDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    qp_controller_config: Mapped[QPControllerConfigDAO] = relationship(
+        "QPControllerConfigDAO",
+        uselist=False,
+        foreign_keys=[qp_controller_config_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "GiskardPhysicsModelDAO",
+    }
+
+
+class ContainerManipulationPhysicsModelDAO(
+    GiskardPhysicsModelDAO,
+    DataAccessObject[
+        giskardpy.body_motion_problem.container_physics.ContainerManipulationPhysicsModel
+    ],
+):
+    __tablename__ = "ContainerManipulationPhysicsModelDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GiskardPhysicsModelDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    goal_joint_state: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    handle_id: Mapped[int] = mapped_column(
+        ForeignKey("BodyDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    actuator_id: Mapped[int] = mapped_column(
+        ForeignKey("ActiveConnection1DOFDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    handle: Mapped[BodyDAO] = relationship(
+        "BodyDAO", uselist=False, foreign_keys=[handle_id], post_update=True
+    )
+    actuator: Mapped[ActiveConnection1DOFDAO] = relationship(
+        "ActiveConnection1DOFDAO",
+        uselist=False,
+        foreign_keys=[actuator_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ContainerManipulationPhysicsModelDAO",
+        "inherit_condition": database_id == GiskardPhysicsModelDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PouringMSCModelDAO(
+    GiskardPhysicsModelDAO,
+    DataAccessObject[giskardpy.body_motion_problem.pouring_physics.PouringMSCModel],
+):
+    __tablename__ = "PouringMSCModelDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GiskardPhysicsModelDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    initial_tilt: Mapped[typing.Optional[builtins.float]] = mapped_column(
+        use_existing_column=True
+    )
+
+    fill_equation_id: Mapped[int] = mapped_column(
+        ForeignKey("PouringEquationDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    fill_connection_id: Mapped[int] = mapped_column(
+        ForeignKey("LiquidConnectionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    tilt_connection_id: Mapped[int] = mapped_column(
+        ForeignKey("ActiveConnection1DOFDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    root_link_id: Mapped[int] = mapped_column(
+        ForeignKey("BodyDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    tip_link_id: Mapped[int] = mapped_column(
+        ForeignKey("BodyDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    fill_equation: Mapped[PouringEquationDAO] = relationship(
+        "PouringEquationDAO",
+        uselist=False,
+        foreign_keys=[fill_equation_id],
+        post_update=True,
+    )
+    fill_connection: Mapped[LiquidConnectionDAO] = relationship(
+        "LiquidConnectionDAO",
+        uselist=False,
+        foreign_keys=[fill_connection_id],
+        post_update=True,
+    )
+    tilt_connection: Mapped[ActiveConnection1DOFDAO] = relationship(
+        "ActiveConnection1DOFDAO",
+        uselist=False,
+        foreign_keys=[tilt_connection_id],
+        post_update=True,
+    )
+    root_link: Mapped[BodyDAO] = relationship(
+        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+    )
+    tip_link: Mapped[BodyDAO] = relationship(
+        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PouringMSCModelDAO",
+        "inherit_condition": database_id == GiskardPhysicsModelDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class GiskardExceptionDAO(
     Base, DataAccessObject[giskardpy.data_types.exceptions.GiskardException]
 ):
@@ -2719,6 +2924,29 @@ class GiskardExceptionDAO(
     __mapper_args__ = {
         "polymorphic_on": "polymorphic_type",
         "polymorphic_identity": "GiskardExceptionDAO",
+    }
+
+
+class DegreeOfFreedomNotRecordedErrorDAO(
+    GiskardExceptionDAO,
+    DataAccessObject[giskardpy.data_types.exceptions.DegreeOfFreedomNotRecordedError],
+):
+    __tablename__ = "DegreeOfFreedomNotRecordedErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GiskardExceptionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    connection_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "DegreeOfFreedomNotRecordedErrorDAO",
+        "inherit_condition": database_id == GiskardExceptionDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2869,6 +3097,35 @@ class SetupExceptionDAO(
     }
 
 
+class HandleActuatorMismatchErrorDAO(
+    SetupExceptionDAO,
+    DataAccessObject[giskardpy.data_types.exceptions.HandleActuatorMismatchError],
+):
+    __tablename__ = "HandleActuatorMismatchErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SetupExceptionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    handle_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    actuator_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    handle_connection_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "HandleActuatorMismatchErrorDAO",
+        "inherit_condition": database_id == SetupExceptionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class JointRegistrationRequiresStandaloneModeErrorDAO(
     SetupExceptionDAO,
     DataAccessObject[
@@ -2925,6 +3182,29 @@ class NonPositiveRealTimeFactorErrorDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "NonPositiveRealTimeFactorErrorDAO",
+        "inherit_condition": database_id == SetupExceptionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class WorldNotEmptyErrorDAO(
+    SetupExceptionDAO,
+    DataAccessObject[giskardpy.data_types.exceptions.WorldNotEmptyError],
+):
+    __tablename__ = "WorldNotEmptyErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SetupExceptionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    config_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "WorldNotEmptyErrorDAO",
         "inherit_condition": database_id == SetupExceptionDAO.database_id,
         "polymorphic_load": "selectin",
     }
@@ -5209,11 +5489,6 @@ class WorldWithFixedRobotDAO(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
-    root_name_id: Mapped[int] = mapped_column(
-        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
     robot_name_id: Mapped[int] = mapped_column(
         ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
         nullable=True,
@@ -5225,9 +5500,6 @@ class WorldWithFixedRobotDAO(
         use_existing_column=True,
     )
 
-    root_name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[root_name_id], post_update=True
-    )
     robot_name: Mapped[PrefixedNameDAO] = relationship(
         "PrefixedNameDAO", uselist=False, foreign_keys=[robot_name_id], post_update=True
     )
@@ -5256,6 +5528,16 @@ class WorldWithDaisyConfigDAO(
         use_existing_column=True,
     )
 
+    root_name_id: Mapped[int] = mapped_column(
+        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    root_name: Mapped[PrefixedNameDAO] = relationship(
+        "PrefixedNameDAO", uselist=False, foreign_keys=[root_name_id], post_update=True
+    )
+
     __mapper_args__ = {
         "polymorphic_identity": "WorldWithDaisyConfigDAO",
         "inherit_condition": database_id == WorldWithFixedRobotDAO.database_id,
@@ -5275,6 +5557,16 @@ class WorldWithTracyConfigDAO(
         ForeignKey(WorldWithFixedRobotDAO.database_id),
         primary_key=True,
         use_existing_column=True,
+    )
+
+    root_name_id: Mapped[int] = mapped_column(
+        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    root_name: Mapped[PrefixedNameDAO] = relationship(
+        "PrefixedNameDAO", uselist=False, foreign_keys=[root_name_id], post_update=True
     )
 
     __mapper_args__ = {
@@ -5851,6 +6143,25 @@ class InvalidConstraintExpressionShapeErrorDAO(
     }
 
 
+class LocalMinimumReachedErrorDAO(
+    MotionStatechartErrorDAO,
+    DataAccessObject[giskardpy.motion_statechart.exceptions.LocalMinimumReachedError],
+):
+    __tablename__ = "LocalMinimumReachedErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MotionStatechartErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "LocalMinimumReachedErrorDAO",
+        "inherit_condition": database_id == MotionStatechartErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class MissingContextExtensionErrorDAO(
     MotionStatechartErrorDAO,
     DataAccessObject[
@@ -6010,6 +6321,44 @@ class GoalPointsReferenceFrameMismatchErrorDAO(
     }
 
 
+class MissingExitSpeedErrorDAO(
+    NodeInitializationErrorDAO,
+    DataAccessObject[giskardpy.motion_statechart.exceptions.MissingExitSpeedError],
+):
+    __tablename__ = "MissingExitSpeedErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(NodeInitializationErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MissingExitSpeedErrorDAO",
+        "inherit_condition": database_id == NodeInitializationErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MissingInflowEquationErrorDAO(
+    NodeInitializationErrorDAO,
+    DataAccessObject[giskardpy.motion_statechart.exceptions.MissingInflowEquationError],
+):
+    __tablename__ = "MissingInflowEquationErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(NodeInitializationErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MissingInflowEquationErrorDAO",
+        "inherit_condition": database_id == NodeInitializationErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class NodeAlreadyBelongsToDifferentNodeErrorDAO(
     NodeInitializationErrorDAO,
     DataAccessObject[
@@ -6088,6 +6437,27 @@ class NonObservationVariableErrorDAO(
     }
 
 
+class NonPositiveClearanceErrorDAO(
+    NodeInitializationErrorDAO,
+    DataAccessObject[giskardpy.motion_statechart.exceptions.NonPositiveClearanceError],
+):
+    __tablename__ = "NonPositiveClearanceErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(NodeInitializationErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    minimum_clearance: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NonPositiveClearanceErrorDAO",
+        "inherit_condition": database_id == NodeInitializationErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class NotInMotionStatechartErrorDAO(
     MotionStatechartErrorDAO,
     DataAccessObject[giskardpy.motion_statechart.exceptions.NotInMotionStatechartError],
@@ -6130,6 +6500,49 @@ class PlotterNotConfiguredErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PlotterNotConfiguredErrorDAO",
         "inherit_condition": database_id == MotionStatechartErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class RootLinkNotWorldRootErrorDAO(
+    NodeInitializationErrorDAO,
+    DataAccessObject[giskardpy.motion_statechart.exceptions.RootLinkNotWorldRootError],
+):
+    __tablename__ = "RootLinkNotWorldRootErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(NodeInitializationErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    root_link_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    world_root_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    root_link: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+    )
+    world_root: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[world_root_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "RootLinkNotWorldRootErrorDAO",
+        "inherit_condition": database_id == NodeInitializationErrorDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -9876,6 +10289,185 @@ class PointingConeDAO(
     }
 
 
+class KeepProjectileInReceiverDAO(
+    TaskDAO,
+    DataAccessObject[
+        giskardpy.motion_statechart.tasks.pouring.KeepProjectileInReceiver
+    ],
+):
+    __tablename__ = "KeepProjectileInReceiverDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(TaskDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    reference_velocity: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    threshold: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    receiver_id: Mapped[int] = mapped_column(
+        ForeignKey("HasFillLevelDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    receiver: Mapped[HasFillLevelDAO] = relationship(
+        "HasFillLevelDAO", uselist=False, foreign_keys=[receiver_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "KeepProjectileInReceiverDAO",
+        "inherit_condition": database_id == TaskDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class KeepSourceRimAboveReceiverRimDAO(
+    TaskDAO,
+    DataAccessObject[
+        giskardpy.motion_statechart.tasks.pouring.KeepSourceRimAboveReceiverRim
+    ],
+):
+    __tablename__ = "KeepSourceRimAboveReceiverRimDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(TaskDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    minimum_clearance: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    clearance_band: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    maximum_velocity: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    receiver_id: Mapped[int] = mapped_column(
+        ForeignKey("HasFillLevelDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    receiver: Mapped[HasFillLevelDAO] = relationship(
+        "HasFillLevelDAO", uselist=False, foreign_keys=[receiver_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "KeepSourceRimAboveReceiverRimDAO",
+        "inherit_condition": database_id == TaskDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class TerminalFillConstraintTaskDAO(
+    TaskDAO,
+    DataAccessObject[
+        giskardpy.motion_statechart.tasks.pouring.TerminalFillConstraintTask
+    ],
+):
+    __tablename__ = "TerminalFillConstraintTaskDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(TaskDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    goal_value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    fill_level_tolerance: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    outflow_tolerance: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    reference_velocity: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "TerminalFillConstraintTaskDAO",
+        "inherit_condition": database_id == TaskDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class FillByTransferTaskDAO(
+    TerminalFillConstraintTaskDAO,
+    DataAccessObject[giskardpy.motion_statechart.tasks.pouring.FillByTransferTask],
+):
+    __tablename__ = "FillByTransferTaskDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(TerminalFillConstraintTaskDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    receiver_id: Mapped[int] = mapped_column(
+        ForeignKey("HasFillLevelDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    receiver: Mapped[HasFillLevelDAO] = relationship(
+        "HasFillLevelDAO", uselist=False, foreign_keys=[receiver_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "FillByTransferTaskDAO",
+        "inherit_condition": database_id == TerminalFillConstraintTaskDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PouringTaskDAO(
+    TerminalFillConstraintTaskDAO,
+    DataAccessObject[giskardpy.motion_statechart.tasks.pouring.PouringTask],
+):
+    __tablename__ = "PouringTaskDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(TerminalFillConstraintTaskDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    fill_connection_id: Mapped[int] = mapped_column(
+        ForeignKey("LiquidConnectionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    fill_equation_id: Mapped[int] = mapped_column(
+        ForeignKey("PouringEquationDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    root_link_id: Mapped[int] = mapped_column(
+        ForeignKey("BodyDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    tip_link_id: Mapped[int] = mapped_column(
+        ForeignKey("BodyDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    fill_connection: Mapped[LiquidConnectionDAO] = relationship(
+        "LiquidConnectionDAO",
+        uselist=False,
+        foreign_keys=[fill_connection_id],
+        post_update=True,
+    )
+    fill_equation: Mapped[PouringEquationDAO] = relationship(
+        "PouringEquationDAO",
+        uselist=False,
+        foreign_keys=[fill_equation_id],
+        post_update=True,
+    )
+    root_link: Mapped[BodyDAO] = relationship(
+        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+    )
+    tip_link: Mapped[BodyDAO] = relationship(
+        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PouringTaskDAO",
+        "inherit_condition": database_id == TerminalFillConstraintTaskDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class MaxManipulabilityDAO(
     TaskDAO,
     DataAccessObject[
@@ -10373,6 +10965,29 @@ class HardConstraintsViolatedExceptionDAO(
     }
 
 
+class MultipleTerminalStateConstraintsErrorDAO(
+    QPSolverExceptionDAO,
+    DataAccessObject[giskardpy.qp.exceptions.MultipleTerminalStateConstraintsError],
+):
+    __tablename__ = "MultipleTerminalStateConstraintsErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(QPSolverExceptionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    constraint_names: Mapped[typing.List[builtins.str]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MultipleTerminalStateConstraintsErrorDAO",
+        "inherit_condition": database_id == QPSolverExceptionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class NoFactoryForQPDataTypeErrorDAO(
     QPSolverExceptionDAO,
     DataAccessObject[giskardpy.qp.exceptions.NoFactoryForQPDataTypeError],
@@ -10767,6 +11382,66 @@ class QuadraticProgramDebuggerDAO(
         foreign_keys=[qp_data_symbolic_id],
         post_update=True,
     )
+
+
+class LinearizedScalarStateModelDAO(
+    Base,
+    DataAccessObject[
+        giskardpy.qp.terminal_state_prediction_strategy.LinearizedScalarStateModel
+    ],
+):
+    __tablename__ = "LinearizedScalarStateModelDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    time_step: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    control_horizon: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+
+class TerminalStatePredictionConstraintDAO(
+    GiskardEqualityConstraintDAO,
+    DataAccessObject[
+        giskardpy.qp.terminal_state_prediction_strategy.TerminalStatePredictionConstraint
+    ],
+):
+    __tablename__ = "TerminalStatePredictionConstraintDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GiskardEqualityConstraintDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    goal_value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "TerminalStatePredictionConstraintDAO",
+        "inherit_condition": database_id == GiskardEqualityConstraintDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class TerminalStatePredictionStrategyDAO(
+    IntegralStrategyDAO,
+    DataAccessObject[
+        giskardpy.qp.terminal_state_prediction_strategy.TerminalStatePredictionStrategy
+    ],
+):
+    __tablename__ = "TerminalStatePredictionStrategyDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(IntegralStrategyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "TerminalStatePredictionStrategyDAO",
+        "inherit_condition": database_id == IntegralStrategyDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
 
 
 class DerivativeEstimatorDAO(
@@ -17215,6 +17890,25 @@ class ExerciseVerificationFailedDAO(
     }
 
 
+class FillLevelAlreadyInitializedErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.FillLevelAlreadyInitializedError],
+):
+    __tablename__ = "FillLevelAlreadyInitializedErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "FillLevelAlreadyInitializedErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class InvalidConnectionLimitsDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.InvalidConnectionLimits],
@@ -17301,6 +17995,40 @@ class InvalidPlaneDimensionsDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "InvalidPlaneDimensionsDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class LearnedModelGeometryMismatchErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.exceptions.LearnedModelGeometryMismatchError
+    ],
+):
+    __tablename__ = "LearnedModelGeometryMismatchErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    trained_container_height: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    trained_container_width: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    equation_container_height: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    equation_container_width: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "LearnedModelGeometryMismatchErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
         "polymorphic_load": "selectin",
     }
@@ -17400,6 +18128,25 @@ class MimicDofLimitOverwriteErrorDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "MimicDofLimitOverwriteErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MismatchedTrajectoryLengthsErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.MismatchedTrajectoryLengthsError],
+):
+    __tablename__ = "MismatchedTrajectoryLengthsErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MismatchedTrajectoryLengthsErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
         "polymorphic_load": "selectin",
     }
@@ -17544,6 +18291,111 @@ class MissingDefaultCameraErrorDAO(
     }
 
 
+class MissingFillEquationErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.MissingFillEquationError],
+):
+    __tablename__ = "MissingFillEquationErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MissingFillEquationErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MissingFillLevelLimitsErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.MissingFillLevelLimitsError],
+):
+    __tablename__ = "MissingFillLevelLimitsErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    connection_name_id: Mapped[int] = mapped_column(
+        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    connection_name: Mapped[PrefixedNameDAO] = relationship(
+        "PrefixedNameDAO",
+        uselist=False,
+        foreign_keys=[connection_name_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MissingFillLevelLimitsErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MissingLearnedModelCheckpointErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.exceptions.MissingLearnedModelCheckpointError
+    ],
+):
+    __tablename__ = "MissingLearnedModelCheckpointErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    checkpoint_path: Mapped[pathlib.Path] = mapped_column(
+        krrood.ormatic.custom_types.PathType, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MissingLearnedModelCheckpointErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MissingMotionTrajectoryErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.MissingMotionTrajectoryError],
+):
+    __tablename__ = "MissingMotionTrajectoryErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    motion_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("MotionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    motion: Mapped[MotionDAO] = relationship(
+        "MotionDAO", uselist=False, foreign_keys=[motion_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MissingMotionTrajectoryErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class MissingPublishChangesKWARGDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.MissingPublishChangesKWARG],
@@ -17628,6 +18480,59 @@ class MissingWorldModificationContextErrorDAO(
     }
 
 
+class NonArticulatedDrainErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.NonArticulatedDrainError],
+):
+    __tablename__ = "NonArticulatedDrainErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    drain_id: Mapped[int] = mapped_column(
+        ForeignKey("PouringEquationDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    drain: Mapped[PouringEquationDAO] = relationship(
+        "PouringEquationDAO", uselist=False, foreign_keys=[drain_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NonArticulatedDrainErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class NonPositiveContainerGeometryErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.exceptions.NonPositiveContainerGeometryError
+    ],
+):
+    __tablename__ = "NonPositiveContainerGeometryErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    container_height: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    container_width: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NonPositiveContainerGeometryErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class PartWholeCardinalityErrorDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.PartWholeCardinalityError],
@@ -17676,6 +18581,76 @@ class PartWholeFieldInAnnotationKwargsDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "PartWholeFieldInAnnotationKwargsDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class ReceiverAlreadyCoupledErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.ReceiverAlreadyCoupledError],
+):
+    __tablename__ = "ReceiverAlreadyCoupledErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ReceiverAlreadyCoupledErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class ReceiverNotInitializedErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.ReceiverNotInitializedError],
+):
+    __tablename__ = "ReceiverNotInitializedErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ReceiverNotInitializedErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class RobotAlreadyInWorldErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.RobotAlreadyInWorldError],
+):
+    __tablename__ = "RobotAlreadyInWorldErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    robot_root_id: Mapped[int] = mapped_column(
+        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    robot_root: Mapped[KinematicStructureEntityDAO] = relationship(
+        "KinematicStructureEntityDAO",
+        uselist=False,
+        foreign_keys=[robot_root_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "RobotAlreadyInWorldErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
         "polymorphic_load": "selectin",
     }
@@ -17743,6 +18718,25 @@ class SemanticAnnotationNotInWorldErrorDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "SemanticAnnotationNotInWorldErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class SourceAlreadyCoupledErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.SourceAlreadyCoupledError],
+):
+    __tablename__ = "SourceAlreadyCoupledErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SourceAlreadyCoupledErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
         "polymorphic_load": "selectin",
     }
@@ -18791,6 +19785,275 @@ class DatabaseNotAvailableErrorDAO(
     )
 
 
+class DifferentialEquationDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.differential_equation.DifferentialEquation
+    ],
+):
+    __tablename__ = "DifferentialEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "DifferentialEquationDAO",
+    }
+
+
+class LearnedHeadModelReferenceDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.learned_pouring_equations.LearnedHeadModelReference
+    ],
+):
+    __tablename__ = "LearnedHeadModelReferenceDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    checkpoint_path: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    trained_container_height: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    trained_container_width: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    hidden_width: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+
+class FillEquationDAO(
+    DifferentialEquationDAO,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.pouring_equations.FillEquation
+    ],
+):
+    __tablename__ = "FillEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(DifferentialEquationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "FillEquationDAO",
+        "inherit_condition": database_id == DifferentialEquationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class InflowEquationDAO(
+    FillEquationDAO,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.pouring_equations.InflowEquation
+    ],
+):
+    __tablename__ = "InflowEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(FillEquationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    container_height: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    container_width: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "InflowEquationDAO",
+        "inherit_condition": database_id == FillEquationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class GatedInflowEquationDAO(
+    InflowEquationDAO,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.pouring_equations.GatedInflowEquation
+    ],
+):
+    __tablename__ = "GatedInflowEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(InflowEquationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    exit_speed: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GatedInflowEquationDAO",
+        "inherit_condition": database_id == InflowEquationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PouringEquationDAO(
+    FillEquationDAO,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.pouring_equations.PouringEquation
+    ],
+):
+    __tablename__ = "PouringEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(FillEquationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    outflow_rate_constant: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PouringEquationDAO",
+        "inherit_condition": database_id == FillEquationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class ArticulatedPouringEquationDAO(
+    PouringEquationDAO,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.pouring_equations.ArticulatedPouringEquation
+    ],
+):
+    __tablename__ = "ArticulatedPouringEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(PouringEquationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    container_height: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    container_width: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    discharge_coefficient: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ArticulatedPouringEquationDAO",
+        "inherit_condition": database_id == PouringEquationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class LearnedPouringEquationDAO(
+    ArticulatedPouringEquationDAO,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.learned_pouring_equations.LearnedPouringEquation
+    ],
+):
+    __tablename__ = "LearnedPouringEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ArticulatedPouringEquationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    model_reference_id: Mapped[int] = mapped_column(
+        ForeignKey("LearnedHeadModelReferenceDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    model_reference: Mapped[LearnedHeadModelReferenceDAO] = relationship(
+        "LearnedHeadModelReferenceDAO",
+        uselist=False,
+        foreign_keys=[model_reference_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "LearnedPouringEquationDAO",
+        "inherit_condition": database_id == ArticulatedPouringEquationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class GatedArticulatedPouringEquationDAO(
+    ArticulatedPouringEquationDAO,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.pouring_equations.GatedArticulatedPouringEquation
+    ],
+):
+    __tablename__ = "GatedArticulatedPouringEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ArticulatedPouringEquationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GatedArticulatedPouringEquationDAO",
+        "inherit_condition": database_id == ArticulatedPouringEquationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class GatedLearnedPouringEquationDAO(
+    GatedArticulatedPouringEquationDAO,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.learned_pouring_equations.GatedLearnedPouringEquation
+    ],
+):
+    __tablename__ = "GatedLearnedPouringEquationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GatedArticulatedPouringEquationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    model_reference_id: Mapped[int] = mapped_column(
+        ForeignKey("LearnedHeadModelReferenceDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    model_reference: Mapped[LearnedHeadModelReferenceDAO] = relationship(
+        "LearnedHeadModelReferenceDAO",
+        uselist=False,
+        foreign_keys=[model_reference_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GatedLearnedPouringEquationDAO",
+        "inherit_condition": database_id
+        == GatedArticulatedPouringEquationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class SymbolicFillContextDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.physics.equations.pouring_equations.SymbolicFillContext
+    ],
+):
+    __tablename__ = "SymbolicFillContextDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
 class NodeProcessingResultDAO(
     Base,
     DataAccessObject[semantic_digital_twin.pipeline.gltf_loader.NodeProcessingResult],
@@ -19179,6 +20442,102 @@ class ApartmentEnvironmentDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class CanPerformDAO(
+    Base, DataAccessObject[semantic_digital_twin.reasoning.bmp_predicates.CanPerform]
+):
+    __tablename__ = "CanPerformDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    motion_id: Mapped[int] = mapped_column(
+        ForeignKey("MotionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    robot_id: Mapped[int] = mapped_column(
+        ForeignKey("AbstractRobotDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    motion: Mapped[MotionDAO] = relationship(
+        "MotionDAO", uselist=False, foreign_keys=[motion_id], post_update=True
+    )
+    robot: Mapped[AbstractRobotDAO] = relationship(
+        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+    )
+
+
+class CausesDAO(
+    Base, DataAccessObject[semantic_digital_twin.reasoning.bmp_predicates.Causes]
+):
+    __tablename__ = "CausesDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    effect_id: Mapped[int] = mapped_column(
+        ForeignKey("EffectDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    environment_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    motion_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("MotionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    effect: Mapped[EffectDAO] = relationship(
+        "EffectDAO", uselist=False, foreign_keys=[effect_id], post_update=True
+    )
+    environment: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[environment_id],
+        post_update=True,
+    )
+    motion: Mapped[MotionDAO] = relationship(
+        "MotionDAO", uselist=False, foreign_keys=[motion_id], post_update=True
+    )
+
+
+class SatisfiesRequestDAO(
+    Base,
+    DataAccessObject[semantic_digital_twin.reasoning.bmp_predicates.SatisfiesRequest],
+):
+    __tablename__ = "SatisfiesRequestDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    task_id: Mapped[int] = mapped_column(
+        ForeignKey("TaskRequestDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    effect_id: Mapped[int] = mapped_column(
+        ForeignKey("EffectDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    task: Mapped[TaskRequestDAO] = relationship(
+        "TaskRequestDAO", uselist=False, foreign_keys=[task_id], post_update=True
+    )
+    effect: Mapped[EffectDAO] = relationship(
+        "EffectDAO", uselist=False, foreign_keys=[effect_id], post_update=True
     )
 
 
@@ -20362,6 +21721,31 @@ class JointDynamicsDAO(
     damping: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
 
+class LiquidTransferCouplingDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.world_description.connections.LiquidTransferCoupling
+    ],
+):
+    __tablename__ = "LiquidTransferCouplingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    exit_speed: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    height_gate_sharpness: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    overlap_gate_sharpness: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+
+
 class AccelerationVariableDAO(
     Base,
     DataAccessObject[
@@ -20489,6 +21873,161 @@ class VelocityVariableDAO(
 
     dof: Mapped[DegreeOfFreedomDAO] = relationship(
         "DegreeOfFreedomDAO", uselist=False, foreign_keys=[dof_id], post_update=True
+    )
+
+
+class EffectDAO(
+    Base, DataAccessObject[semantic_digital_twin.world_description.effects.Effect]
+):
+    __tablename__ = "EffectDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    goal_value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    tolerance: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    target_object_id: Mapped[int] = mapped_column(
+        ForeignKey("SemanticAnnotationDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    target_object: Mapped[SemanticAnnotationDAO] = relationship(
+        "SemanticAnnotationDAO",
+        uselist=False,
+        foreign_keys=[target_object_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "EffectDAO",
+    }
+
+
+class MonotoneDecreasingEffectDAO(
+    EffectDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.effects.MonotoneDecreasingEffect
+    ],
+):
+    __tablename__ = "MonotoneDecreasingEffectDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(EffectDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MonotoneDecreasingEffectDAO",
+        "inherit_condition": database_id == EffectDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class ClosedEffectDAO(
+    MonotoneDecreasingEffectDAO,
+    DataAccessObject[semantic_digital_twin.semantic_annotations.effects.ClosedEffect],
+):
+    __tablename__ = "ClosedEffectDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MonotoneDecreasingEffectDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ClosedEffectDAO",
+        "inherit_condition": database_id == MonotoneDecreasingEffectDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PouringEffectDAO(
+    MonotoneDecreasingEffectDAO,
+    DataAccessObject[semantic_digital_twin.semantic_annotations.effects.PouringEffect],
+):
+    __tablename__ = "PouringEffectDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MonotoneDecreasingEffectDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PouringEffectDAO",
+        "inherit_condition": database_id == MonotoneDecreasingEffectDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MonotoneIncreasingEffectDAO(
+    EffectDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.effects.MonotoneIncreasingEffect
+    ],
+):
+    __tablename__ = "MonotoneIncreasingEffectDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(EffectDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MonotoneIncreasingEffectDAO",
+        "inherit_condition": database_id == EffectDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class OpenedEffectDAO(
+    MonotoneIncreasingEffectDAO,
+    DataAccessObject[semantic_digital_twin.semantic_annotations.effects.OpenedEffect],
+):
+    __tablename__ = "OpenedEffectDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MonotoneIncreasingEffectDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "OpenedEffectDAO",
+        "inherit_condition": database_id == MonotoneIncreasingEffectDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class TaskRequestDAO(
+    Base, DataAccessObject[semantic_digital_twin.world_description.effects.TaskRequest]
+):
+    __tablename__ = "TaskRequestDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    task_type: Mapped[semantic_digital_twin.world_description.effects.TaskType] = (
+        mapped_column(
+            krrood.ormatic.custom_types.PolymorphicEnumType,
+            nullable=False,
+            use_existing_column=True,
+        )
     )
 
 
@@ -20853,6 +22392,25 @@ class GraphOfConvexPolygonsDAO(
         use_existing_column=True,
     )
 
+    obstacles: Mapped[builtins.list[GraphOfConvexPolygonsDAO_obstacles_association]] = (
+        relationship(
+            "GraphOfConvexPolygonsDAO_obstacles_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[GraphOfConvexPolygonsDAO_obstacles_association.source_graphofconvexpolygonsdao_id]",
+            lazy="selectin",
+        )
+    )
+    regions: Mapped[builtins.list[GraphOfConvexPolygonsDAO_regions_association]] = (
+        relationship(
+            "GraphOfConvexPolygonsDAO_regions_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[GraphOfConvexPolygonsDAO_regions_association.source_graphofconvexpolygonsdao_id]",
+            lazy="selectin",
+        )
+    )
+
     __mapper_args__ = {
         "polymorphic_identity": "GraphOfConvexPolygonsDAO",
         "inherit_condition": database_id == GraphOfConvexSetsDAO.database_id,
@@ -20874,6 +22432,19 @@ class IrisSeedingSettingsDAO(
 
     grid_resolution: Mapped[builtins.int] = mapped_column(use_existing_column=True)
     max_regions: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+    iris_options_id: Mapped[int] = mapped_column(
+        ForeignKey("_MockedIrisOptionsDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    iris_options: Mapped[_MockedIrisOptionsDAO] = relationship(
+        "_MockedIrisOptionsDAO",
+        uselist=False,
+        foreign_keys=[iris_options_id],
+        post_update=True,
+    )
 
 
 class _MockedConvexSetDAO(
@@ -21131,6 +22702,56 @@ class RunningProcessLivenessDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class MotionDAO(
+    Base, DataAccessObject[semantic_digital_twin.world_description.motion.Motion]
+):
+    __tablename__ = "MotionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    time_step: Mapped[typing.Optional[builtins.float]] = mapped_column(
+        use_existing_column=True
+    )
+
+    connection_id: Mapped[int] = mapped_column(
+        ForeignKey("ConnectionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    motion_trajectory_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("MotionTrajectoryDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    connection: Mapped[ConnectionDAO] = relationship(
+        "ConnectionDAO", uselist=False, foreign_keys=[connection_id], post_update=True
+    )
+    motion_trajectory: Mapped[MotionTrajectoryDAO] = relationship(
+        "MotionTrajectoryDAO",
+        uselist=False,
+        foreign_keys=[motion_trajectory_id],
+        post_update=True,
+    )
+
+
+class MotionTrajectoryDAO(
+    Base,
+    DataAccessObject[semantic_digital_twin.world_description.motion.MotionTrajectory],
+):
+    __tablename__ = "MotionTrajectoryDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    converged: Mapped[typing.Optional[builtins.bool]] = mapped_column(
+        use_existing_column=True
     )
 
 
@@ -21497,6 +23118,27 @@ class PrismaticConnectionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PrismaticConnectionDAO",
         "inherit_condition": database_id == ActiveConnection1DOFDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class LiquidConnectionDAO(
+    PrismaticConnectionDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.connections.LiquidConnection
+    ],
+):
+    __tablename__ = "LiquidConnectionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(PrismaticConnectionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "LiquidConnectionDAO",
+        "inherit_condition": database_id == PrismaticConnectionDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -28970,6 +30612,71 @@ class UnitreeG1TorsoDAO(
     }
 
 
+class HasFillLevelDAO(
+    HasRootBodyDAO,
+    DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasFillLevel],
+):
+    __tablename__ = "HasFillLevelDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    fill_connection_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("LiquidConnectionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    fill_equation_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("PouringEquationDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    inflow_equation_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("InflowEquationDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    inflow_coupling_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("LiquidTransferCouplingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    fill_connection: Mapped[LiquidConnectionDAO] = relationship(
+        "LiquidConnectionDAO",
+        uselist=False,
+        foreign_keys=[fill_connection_id],
+        post_update=True,
+    )
+    fill_equation: Mapped[PouringEquationDAO] = relationship(
+        "PouringEquationDAO",
+        uselist=False,
+        foreign_keys=[fill_equation_id],
+        post_update=True,
+    )
+    inflow_equation: Mapped[InflowEquationDAO] = relationship(
+        "InflowEquationDAO",
+        uselist=False,
+        foreign_keys=[inflow_equation_id],
+        post_update=True,
+    )
+    inflow_coupling: Mapped[LiquidTransferCouplingDAO] = relationship(
+        "LiquidTransferCouplingDAO",
+        uselist=False,
+        foreign_keys=[inflow_coupling_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "HasFillLevelDAO",
+        "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class HasRootRegionDAO(
     HasRootKinematicStructureEntityDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasRootRegion],
@@ -32992,13 +34699,13 @@ class RemoveSemanticAnnotationModificationDAO(
     }
 
 
-class SetDofHasHardwareInterfaceDAO(
+class SetDofFlagDAO(
     WorldModificationDAO,
     DataAccessObject[
-        semantic_digital_twin.world_description.world_modification.SetDofHasHardwareInterface
+        semantic_digital_twin.world_description.world_modification.SetDofFlag
     ],
 ):
-    __tablename__ = "SetDofHasHardwareInterfaceDAO"
+    __tablename__ = "SetDofFlagDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(WorldModificationDAO.database_id),
@@ -33013,8 +34720,29 @@ class SetDofHasHardwareInterfaceDAO(
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "SetDofHasHardwareInterfaceDAO",
+        "polymorphic_identity": "SetDofFlagDAO",
         "inherit_condition": database_id == WorldModificationDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class SetDofHasHardwareInterfaceDAO(
+    SetDofFlagDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.world_modification.SetDofHasHardwareInterface
+    ],
+):
+    __tablename__ = "SetDofHasHardwareInterfaceDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SetDofFlagDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SetDofHasHardwareInterfaceDAO",
+        "inherit_condition": database_id == SetDofFlagDAO.database_id,
         "polymorphic_load": "selectin",
     }
 

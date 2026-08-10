@@ -102,7 +102,6 @@ from semantic_digital_twin.world_description.world_modification import (
     WorldModification,
     WorldModelModificationBlock,
     SetDofHasHardwareInterface,
-    SetDofAllowExternalStateUpdate,
     AddDegreeOfFreedomModification,
     RemoveDegreeOfFreedomModification,
     AddKinematicStructureEntityModification,
@@ -1249,25 +1248,6 @@ class World(HasSimulatorProperties):
         """
         for dof in dofs:
             dof.has_hardware_interface = value
-
-    @atomic_world_modification(modification=SetDofAllowExternalStateUpdate)
-    def set_dofs_allow_external_state_update(
-        self, dofs: Iterable[DegreeOfFreedom], value: bool
-    ) -> None:
-        """
-        Sets whether the specified degrees of freedom may be updated from an external
-        source.
-
-        Call this inside a :meth:`modify_world` block so the change is tracked and
-        synchronized to other processes.
-
-        :param dofs: The degrees of freedom whose ``allows_external_state_update`` flag
-            is set.
-        :param value: Whether the DOFs may be updated externally (``True``) or not
-            (``False``).
-        """
-        for dof in dofs:
-            dof.allows_external_state_update = value
 
     # %% Getter
     def get_connection(

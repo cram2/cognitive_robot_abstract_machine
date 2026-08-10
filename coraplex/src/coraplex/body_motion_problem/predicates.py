@@ -29,6 +29,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     CollisionRule,
 )
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.reasoning.bmp_predicates import CanPerform
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import (
@@ -146,7 +147,7 @@ class MotionStatechartCanPerform(CanPerform):
         for position in self.motion.motion_trajectory.positions_for(
             self.motion.connection
         ):
-            world.set_positions_1DOF_connection({self.motion.connection: position})
+            JointState.from_mapping({self.motion.connection: position}).apply_to(world)
             trajectory.append(target.global_pose)
         return trajectory
 

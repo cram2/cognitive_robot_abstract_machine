@@ -116,7 +116,7 @@ class GiskardPhysicsModel(PhysicsModel):
 
         Applies the connection's multiplier and offset to convert raw DOF state values
         to the same scale as ``connection.position``, ensuring compatibility with
-        :func:`~semantic_digital_twin.world.World.set_positions_1DOF_connection`.
+        :meth:`~semantic_digital_twin.datastructures.joint_state.JointState.apply_to`.
 
         The first entry in the trajectory (recorded during :meth:`Executor.compile` before
         any control commands have been applied) is excluded so the result only contains

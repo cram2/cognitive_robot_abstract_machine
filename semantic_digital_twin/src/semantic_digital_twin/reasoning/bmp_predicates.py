@@ -29,6 +29,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Verb,
 )
 
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.exceptions import MissingMotionTrajectoryError
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
@@ -111,9 +112,9 @@ class Causes(Predicate):
         if not actuator_positions:
             raise MissingMotionTrajectoryError(motion=self.motion)
         for step in range(len(actuator_positions)):
-            self.environment.set_positions_1DOF_connection(
+            JointState.from_mapping(
                 self.motion.motion_trajectory.position_updates_at(step)
-            )
+            ).apply_to(self.environment)
             time.sleep(step_delay)
 
     def _map_motion_to_effect(self) -> bool:
@@ -131,9 +132,9 @@ class Causes(Predicate):
 
         with self.environment.reset_state_context():
             for step in range(len(actuator_positions)):
-                self.environment.set_positions_1DOF_connection(
+                JointState.from_mapping(
                     self.motion.motion_trajectory.position_updates_at(step)
-                )
+                ).apply_to(self.environment)
                 if self.motion.time_step is not None:
                     self.environment.step_physics(self.motion.time_step)
 

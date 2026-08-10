@@ -5,7 +5,6 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import PrismaticConnection
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_modification import (
-    SetDofAllowExternalStateUpdate,
     SetDofHasHardwareInterface,
 )
 
@@ -42,25 +41,11 @@ def test_set_dof_has_hardware_interface_applies_flag():
     modification.apply(world)
 
     assert connection.raw_dof.has_hardware_interface is True
-    assert connection.raw_dof.allows_external_state_update is False
-
-
-def test_set_dof_allow_external_state_update_applies_flag():
-    world, connection = build_world_with_prismatic_connection()
-    assert connection.raw_dof.allows_external_state_update is False
-
-    modification = SetDofAllowExternalStateUpdate(
-        degree_of_freedom_ids=[connection.raw_dof.id], value=True
-    )
-    modification.apply(world)
-
-    assert connection.raw_dof.allows_external_state_update is True
-    assert connection.raw_dof.has_hardware_interface is False
 
 
 def test_set_dof_flag_json_round_trip():
     _, connection = build_world_with_prismatic_connection()
-    modification = SetDofAllowExternalStateUpdate(
+    modification = SetDofHasHardwareInterface(
         degree_of_freedom_ids=[connection.raw_dof.id], value=True
     )
     restored = from_json(to_json(modification))

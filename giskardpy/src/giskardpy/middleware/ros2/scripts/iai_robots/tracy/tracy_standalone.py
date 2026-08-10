@@ -26,7 +26,11 @@ def main():
             execution_mode=ExecutionMode.STANDALONE, debug_mode=True
         ),
         qp_controller_config=QPControllerConfig(
-            target_frequency=33, prediction_horizon=120
+            target_frequency=80,
+            # Calibrated against the terminal-state prediction row's scaling convention
+            # (mean-normalized lookahead weights, single time-step factor); see
+            # TerminalStatePredictionStrategy.create_matrix.
+            prediction_horizon=120,
         ),
     )
     giskard.live()
