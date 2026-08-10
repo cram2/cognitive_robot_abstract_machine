@@ -350,6 +350,45 @@ class InvalidConnectionLimits(UsageError):
 
 
 @dataclass
+class MismatchedTrajectoryLengthsError(UsageError):
+    """
+    Raised when the per-connection position sequences of a motion trajectory do not all
+    have the same length, breaking the lock-step replay invariant.
+    """
+
+    lengths_by_connection: Dict[PrefixedName, int]
+    """
+    The recorded sequence length for each tracked connection, by connection name.
+    """
+
+    def error_message(self) -> str:
+        return f"All position sequences of a motion trajectory must have the same length, got {self.lengths_by_connection}."
+
+    def suggest_correction(self) -> str:
+        return "record one position per connection for every simulation step."
+
+
+@dataclass
+class MissingFillLevelLimitsError(UsageError):
+    """
+    Raised when a liquid connection's fill degree of freedom has no position limits, so
+    the integrated fill level cannot be clamped.
+    """
+
+    connection_name: PrefixedName
+    """
+    The name of the liquid connection whose fill degree of freedom lacks position
+    limits.
+    """
+
+    def error_message(self) -> str:
+        return f"The fill degree of freedom of {self.connection_name} has no position limits to clamp the fill level to."
+
+    def suggest_correction(self) -> str:
+        return "create the connection via initialize_fill_level, or give its degree of freedom lower and upper position limits."
+
+
+@dataclass
 class MissingConnectionParentError(UsageError):
     """
     Raised when a connection is spawned without a parent kinematic structure entity.
