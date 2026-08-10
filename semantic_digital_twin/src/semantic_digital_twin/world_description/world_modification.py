@@ -24,15 +24,6 @@ from semantic_digital_twin.exceptions import (
     MissingWorldModificationContextError,
     MismatchingIDsInWorldModification,
 )
-from semantic_digital_twin.world_description.world_entity import (
-    WorldEntityWithID,
-    SemanticAnnotation,
-)
-
-if TYPE_CHECKING:
-    from semantic_digital_twin.world import World
-
-
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from uuid import UUID
@@ -40,12 +31,20 @@ from uuid import UUID
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-    Connection,
-    Actuator,
-)
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.world import World
+    from semantic_digital_twin.world_description.degree_of_freedom import (
+        DegreeOfFreedom,
+    )
+
+    from semantic_digital_twin.world_description.world_entity import (
+        KinematicStructureEntity,
+        Connection,
+        Actuator,
+        WorldEntityWithID,
+        SemanticAnnotation,
+    )
 
 
 @dataclass

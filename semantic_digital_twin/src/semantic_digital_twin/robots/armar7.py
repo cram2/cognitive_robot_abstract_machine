@@ -27,6 +27,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     TGenericFingerOtherThanThumb,
     HasSensors,
 )
+from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
@@ -516,7 +517,7 @@ class Armar7Torso(
 
 
 @dataclass(eq=False)
-class Armar7MobileBase(MobileBase, HasTorso[Armar7Torso]):
+class Armar7MobileBase(MobileBase[OmniDrive], HasTorso[Armar7Torso]):
 
     def setup_hardware_interfaces(self):
         pass

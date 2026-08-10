@@ -376,7 +376,14 @@ class PlanNode(PlanEntity):
 
 
 @dataclass(eq=False, repr=False)
-class UnderspecifiedNode(PlanNode):
+class ExecutionBoundaryNode(ABC, PlanNode):
+    """
+    A PlanNode that interrupts the merging of surrounding motions into one chart.
+    """
+
+
+@dataclass(eq=False, repr=False)
+class UnderspecifiedNode(ExecutionBoundaryNode):
     """
     An action or language expression that is described by an underspecified `an(...)`
     match statement.

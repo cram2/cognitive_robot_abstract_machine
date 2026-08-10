@@ -28,6 +28,20 @@ def test_load_environment_returns_world():
     assert world.root.name == PrefixedName("root")
 
 
+def test_load_environment_names_are_stringifiable():
+    """
+    Every entity name must hold a plain string local part.
+
+    The ``create_with_new_..._in_world`` factories take the name as a string and wrap it
+    into a :class:`PrefixedName` themselves. Handing them a ``PrefixedName`` nests it
+    inside another one, which breaks every consumer that stringifies the name.
+    """
+    world = KitchenEnvironment().get_world()
+    for entity in world.kinematic_structure_entities:
+        assert isinstance(entity.name.name, str)
+        str(entity.name)
+
+
 def test_world_reasoner_reason_returns_dicts():
     urdf_dir = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),

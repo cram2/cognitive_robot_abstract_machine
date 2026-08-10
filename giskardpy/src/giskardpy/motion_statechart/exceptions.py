@@ -198,6 +198,19 @@ class EmptyGoalStateError(NodeInitializationError):
 
 
 @dataclass
+class EmptyDegreesOfFreedomError(NodeInitializationError):
+    """
+    Raised when a node is explicitly given an empty list of degrees of freedom.
+    """
+
+    def error_message(self) -> str:
+        return "Degrees of freedom list is empty."
+
+    def suggest_correction(self) -> str:
+        return "Pass at least one degree of freedom, or leave it None to use every active degree of freedom in the world."
+
+
+@dataclass
 class GoalPointsReferenceFrameMismatchError(NodeInitializationError):
     reference_frame_a: KinematicStructureEntity
     reference_frame_b: KinematicStructureEntity
@@ -343,6 +356,39 @@ class DuplicateContextExtensionError(MotionStatechartError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class ActionClientTypeMismatchError(MotionStatechartError):
+    """
+    Raised when an action topic is requested with a different message type than the one
+    its cached action client was created with.
+    """
+
+    action_topic: str
+    """
+    The action topic that was requested with two different message types.
+    """
+
+    existing_message_type: Type
+    """
+    The message type the cached action client for this topic was created with.
+    """
+
+    requested_message_type: Type
+    """
+    The message type that was requested for this topic instead.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f'Action topic "{self.action_topic}" was already used with message type '
+            f'"{self.existing_message_type.__name__}", but is now requested with '
+            f'"{self.requested_message_type.__name__}".'
+        )
+
+    def suggest_correction(self) -> str:
+        return "Use a unique action_topic per message type."
 
 
 @dataclass

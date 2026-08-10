@@ -14,6 +14,8 @@ You may also find links to the quizzes below.
 - [](visualizing-worlds-quiz)
 - [](world-structure-manipulation-quiz)
 - [](semantic-annotations-quiz)
+- [](semantic-annotation-part-whole-quiz)
+- [](building-worlds-with-specifications-quiz)
 - [](world-state-manipulation-quiz)
 - [](regions-quiz)
 - [](semantic-annotation-factories-quiz)

@@ -1,7 +1,7 @@
 ---
 name: plan-dashboard
 description: Publish a live status dashboard Artifact for a multi-PR/multi-session initiative tracked under .claude/personal/plans/<plan-id>/plan.yaml on the personal-notes branch, cross-checked against live GitHub PR/CI/review state. Invoke as "/plan-dashboard <plan-id>" for one plan, or "/plan-dashboard" with no argument to publish the master index of every plan. Use when the user asks to see, refresh, or generate a plan dashboard, or asks "what's the status of <plan>".
-allowed-tools: Bash, Read, Write, Artifact, Skill
+allowed-tools: Bash, Read, Write, Artifact, AskUserQuestion, Skill
 ---
 
 # Plan Dashboard
@@ -11,8 +11,8 @@ specific plan's id, branches, or PRs. All plan data lives on the
 personal-notes branch (`claude/personal-notes` by default — see
 `resolve-personal-notes-config.sh` for how it's resolved) at
 `.claude/personal/plans/<plan-id>/plan.yaml` + `roadmap.md`, never on
-`main`; this skill only reads it. See `.claude/personal/plans/README.md`
-(on that branch) for the full `plan.yaml` schema reference — read it if
+`main`; this skill only reads it. See `plan-schema.md` (next to this file)
+for the full `plan.yaml` schema reference — read it if
 anything below is unclear about a field's meaning, rather than guessing.
 
 **Everything deterministic — schema validation, live-state classification,
@@ -33,6 +33,15 @@ One direction of drift (merged on GitHub but not marked `done`) gets
 corrected automatically, in the manifest itself, every run — see step 2;
 everything else stays a flag for a human to interpret, since GitHub's state
 alone can't tell you *why* an item is blocked, deferred, or still open.
+
+## 0. Check the setup is in place, and offer it if not
+
+Every step below reads the personal-notes branch and runs scripts that need
+`${PLAN_DASHBOARD_REQUIREMENTS_FILE}` installed — neither of which a user who
+hasn't done the one-time setup has. Follow
+`.claude/skills/setup-personal-notes/prerequisite-check.md` before step 1: run
+the check, and if it reports anything missing, offer `/setup-personal-notes`
+rather than failing later on a missing branch or an `ImportError`.
 
 ## 1. Resolve mode and fetch the plan data
 
@@ -88,7 +97,7 @@ If a plan has a `tracking_issue`, resolve its `html_url` (via
 `mcp__github__issue_read` `get`, falling back to
 `mcp__github__pull_request_read` `get` if that 404s — a repo with Issues
 disabled stores a PR number under the same field, see
-`plans/README.md`'s "Proposing structural changes" section). Use the
+`plan-schema.md`'s "Proposing structural changes" section). Use the
 returned `html_url` verbatim; don't construct `/issues/<n>` yourself, since
 guessing the path is exactly the kind of assumption that breaks silently
 when the fallback applies.

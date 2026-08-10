@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass, field
 from importlib.resources import files
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Any
 from typing import List, Tuple, Optional
 from uuid import UUID
 
@@ -13,7 +13,6 @@ import numpy as np
 import trimesh
 from giskardpy.utils.utils import create_path
 from krrood.utils import memoize, clear_memoization_cache
-from platformdirs import user_cache_dir
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionDetector,
     CollisionCheckingResult,
@@ -22,7 +21,7 @@ from semantic_digital_twin.collision_checking.collision_detector import (
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionMatrix
 from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
-from semantic_digital_twin.utils import suppress_stdout_stderr
+from semantic_digital_twin.utils import create_cache_dir, suppress_stdout_stderr
 from semantic_digital_twin.world_description.geometry import (
     Shape,
     Box,
@@ -36,16 +35,53 @@ from semantic_digital_twin.world_description.world_entity import Body
 logger = logging.getLogger(__name__)
 
 
-def create_cache_dir(folder_name: str) -> Path:
-    pkg_name = __package__.split(".", 1)[0]
-
-    cache_dir = Path(user_cache_dir(pkg_name)) / folder_name
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir
-
-
 CACHE_DIR = create_cache_dir("convex_decompositions")
 LOG_DIR = create_cache_dir("log")
+
+_shape_cache: Dict[Any, bullet.CollisionShape] = {}
+"""
+Process-wide cache of built Bullet collision shapes, keyed by geometry content (see
+:func:`_geometry_cache_key`). Shapes are immutable geometry definitions with no
+per-instance transform state, so a single shape can safely be referenced by many
+``bullet.CollisionObject``s across independent ``KineverseWorld`` instances (e.g. after
+``deepcopy`` of a ``World``). Persists for the life of the process rather than being
+scoped to a single ``BulletCollisionDetector``.
+"""
+
+
+def _geometry_cache_key(geometry: Shape) -> Any:
+    """
+    Builds a cheap, content-based cache key for a geometry's collision shape.
+
+    Only touches plain dataclass fields, never the lazily-loaded
+    :attr:`Mesh.mesh` property, so looking up the key never forces the expensive
+    mesh load the cache is meant to avoid.
+
+    :param geometry: the geometry to build a cache key for.
+    :return: a hashable key identifying the shape that would be built for this geometry.
+    """
+    match geometry:
+        case Box():
+            return (
+                "box",
+                round(geometry.scale.x, 6),
+                round(geometry.scale.y, 6),
+                round(geometry.scale.z, 6),
+            )
+        case Sphere():
+            return ("sphere", round(geometry.radius * 2, 6))
+        case Cylinder():
+            return ("cylinder", round(geometry.width, 6), round(geometry.height, 6))
+        case Mesh():
+            return (
+                "mesh",
+                geometry.filename,
+                round(geometry.scale.x, 6),
+                round(geometry.scale.y, 6),
+                round(geometry.scale.z, 6),
+            )
+        case _:
+            raise NotImplementedError()
 
 
 def trimesh_quantized_hash(
@@ -138,6 +174,11 @@ def create_shape_from_geometry(
     :param mesh_decomposer: optional decomposer used for non-convex meshes.
     :return: the bullet collision shape.
     """
+    cache_key = _geometry_cache_key(geometry)
+    cached_shape = _shape_cache.get(cache_key)
+    if cached_shape is not None:
+        return cached_shape
+
     match geometry:
         case Box():
             shape = create_cube_shape(
@@ -163,6 +204,7 @@ def create_shape_from_geometry(
         case _:
             raise NotImplementedError()
 
+    _shape_cache[cache_key] = shape
     return shape
 
 

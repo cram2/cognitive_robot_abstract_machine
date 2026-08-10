@@ -11,7 +11,7 @@ from dataclasses import dataclass, Field, MISSING
 from datetime import datetime
 from functools import cached_property, lru_cache
 from inspect import isclass
-from types import NoneType
+from types import NoneType, UnionType
 from typing import Generic, Any
 
 from typing_extensions import (
@@ -179,10 +179,16 @@ class WrappedField:
 
     @cached_property
     def is_optional(self):
+        """
+        :return: Whether the field holds an optional value.
+
+        ``Optional[X]`` and the PEP 604 spelling ``X | None`` denote the same type but
+        report different origins, so both are recognised here.
+        """
         origin = get_origin(self.resolved_type)
-        if origin not in [Union, Optional]:
+        if origin not in [Union, Optional, UnionType]:
             return False
-        if origin == Union:
+        if origin in [Union, UnionType]:
             args = get_args(self.resolved_type)
             return len(args) == 2 and NoneType in args
         return True

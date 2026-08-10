@@ -1,0 +1,36 @@
+schema_version: 1
+id: test-plan
+title: "A plan under test"
+description: >
+  One paragraph.
+default_repository: an-owner/a-repository
+tracking_issue: 7
+
+waves:
+  - id: immediate
+    name: "Immediate"
+
+tracks:
+  - id: a-track
+    name: "A track"
+    wave: immediate
+
+items:
+  - id: an-existing-item
+    branch: null
+    title: "An item that has not been started"
+    track: a-track
+    depends_on: []
+    status: not_started
+    notes: >
+      A folded note whose wrapping must survive untouched, because a full YAML
+      round trip re-flows it.
+
+  - id: a-second-item
+    branch: some/other-branch
+    title: "An item that is already underway"
+    pull_request_number: 12
+    track: a-track
+    depends_on: []
+    status: in_progress
+    session: https://example.invalid/session_second

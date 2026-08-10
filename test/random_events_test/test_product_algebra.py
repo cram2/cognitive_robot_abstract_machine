@@ -353,6 +353,53 @@ class EventTestCase(unittest.TestCase):
         e2 = e.update_variables({self.y: y2})
         self.assertEqual(e2.variables, SortedSet([self.x, y2]))
 
+    def test_size_multiplies_the_assignments(self):
+        box = SimpleEvent.from_data(
+            {self.x: closed(0, 2), self.y: closed(0, 3), self.z: closed(0, 0.5)}
+        )
+        self.assertEqual(box.size, 3)
+
+    def test_size_counts_the_states_of_a_symbolic_variable(self):
+        slab = SimpleEvent.from_data({self.x: closed(0, 2), self.a: str_set_domain})
+        self.assertEqual(slab.size, 6)
+
+    def test_size_of_an_event_without_extent(self):
+        singleton_in_x = SimpleEvent.from_data(
+            {self.x: singleton(1), self.y: closed(0, 3)}
+        )
+        self.assertEqual(singleton_in_x.size, 0)
+
+    def test_size_of_an_event_constraining_no_variable(self):
+        nothing = SimpleEvent.from_data({})
+        self.assertTrue(nothing.is_empty())
+        self.assertEqual(nothing.size, 0)
+
+    def test_size_of_an_event_assigning_a_variable_nothing(self):
+        nothing_in_x = SimpleEvent.from_data({self.x: Interval(), self.y: closed(0, 3)})
+        self.assertTrue(nothing_in_x.is_empty())
+        self.assertEqual(nothing_in_x.size, 0)
+
+    def test_size_of_an_unbounded_event(self):
+        slab = SimpleEvent.from_data({self.x: closed(0, 2), self.y: reals()})
+        self.assertEqual(slab.size, float("inf"))
+
+    def test_size_counts_overlapping_simple_events_once(self):
+        left = SimpleEvent.from_data({self.x: closed(0, 2), self.y: closed(0, 1)})
+        right = SimpleEvent.from_data({self.x: closed(1, 3), self.y: closed(0, 1)})
+        self.assertEqual(Event.from_simple_sets(left, right).size, 3)
+
+    def test_size_survives_being_made_disjoint(self):
+        left = SimpleEvent.from_data({self.x: closed(0, 2), self.y: closed(0, 1)})
+        right = SimpleEvent.from_data({self.x: closed(1, 3), self.y: closed(0, 1)})
+        event = Event.from_simple_sets(left, right)
+        self.assertEqual(event.make_disjoint().size, event.size)
+
+    def test_size_of_a_complement_is_unbounded(self):
+        box = SimpleEvent.from_data(
+            {self.x: closed(0, 1), self.y: closed(0, 1)}
+        ).as_composite_set()
+        self.assertEqual(box.complement().size, float("inf"))
+
 
 class IntegerVariablePlotTestCase(unittest.TestCase):
     count = Integer(name="count")

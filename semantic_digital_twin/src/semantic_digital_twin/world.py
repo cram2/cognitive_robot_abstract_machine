@@ -59,7 +59,6 @@ from semantic_digital_twin.exceptions import (
     MismatchingWorld,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_computations.forward_kinematics import (
     ForwardKinematicsManager,
 )
@@ -71,7 +70,6 @@ from semantic_digital_twin.spatial_types import (
     Point3,
 )
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
-from semantic_digital_twin.utils import IDGenerator
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     ActiveConnection1DOF,
@@ -122,10 +120,10 @@ from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDec
 
 if TYPE_CHECKING:
     from semantic_digital_twin.spatial_types import GenericSpatialType
+    from semantic_digital_twin.robots.robot_parts import AbstractRobot
+
 
 logger = logging.getLogger("semantic_digital_twin")
-
-id_generator = IDGenerator()
 
 GenericSemanticAnnotation = TypeVar(
     "GenericSemanticAnnotation", bound=SemanticAnnotation
@@ -548,6 +546,28 @@ class World(HasSimulatorProperties):
         )
         self.collision_manager.add_to_world(self)
 
+    @classmethod
+    def create_with_root_body(cls, root_body_name: str = "map") -> World:
+        """
+        Creates a new instance of the World class with a root body.
+
+        :param root_body_name: The unprefixed name of the root body.
+        """
+        root_body = Body(name=PrefixedName(root_body_name))
+        world = World()
+        with world.modify_world():
+            world.add_body(root_body)
+        return world
+
+    def force_root_name(self, name: PrefixedName) -> None:
+        """
+        Rename the world's root body.
+
+        :param name: The new name for the root body.
+        """
+        with self.modify_world():
+            self.root.update_name(name)
+
     def __hash__(self):
         return hash((id(self), self._model_manager.version))
 
@@ -637,6 +657,8 @@ class World(HasSimulatorProperties):
 
     @property
     def robot_bodies_with_collision(self) -> List[Body]:
+        from semantic_digital_twin.robots.robot_parts import AbstractRobot
+
         return [
             body
             for robot in self.get_semantic_annotations_by_type(AbstractRobot)
@@ -645,6 +667,8 @@ class World(HasSimulatorProperties):
 
     @property
     def robot_body_to_robot_mapping(self) -> dict[Body, AbstractRobot]:
+        from semantic_digital_twin.robots.robot_parts import AbstractRobot
+
         return {
             body: robot
             for robot in self.get_semantic_annotations_by_type(AbstractRobot)
@@ -1079,6 +1103,32 @@ class World(HasSimulatorProperties):
         """
         actuator.remove_from_world()
         self.actuators.remove(actuator)
+
+    def remove_branch_from_world(self, root: KinematicStructureEntity):
+        """
+        Removes the subtree rooted at ``root`` from the world.
+
+        Removes ``root`` together with all of its descendant kinematic structure
+        entities, every connection within the branch, and the branch's connection to its
+        parent. The removals are performed atomically.
+
+        :param root: The root entity of the branch to be removed.
+        """
+        kinematic_structure_entities = self.get_kinematic_structure_entities_of_branch(
+            root
+        )
+        connections = self.get_connections_of_branch(root)
+        parent_connection = root.parent_connection
+        connections = (
+            connections + [parent_connection]
+            if parent_connection is not None
+            else connections
+        )
+        with self.modify_world():
+            for connection in connections:
+                self.remove_connection(connection)
+            for kinematic_structure_entity in kinematic_structure_entities:
+                self.remove_kinematic_structure_entity(kinematic_structure_entity)
 
     # %% Other Atomic World Modifications
     @atomic_world_modification(modification=SetDofHasHardwareInterface)
@@ -1516,7 +1566,9 @@ class World(HasSimulatorProperties):
         root_connection = self.get_kinematic_structure_entity_by_id(
             other_root_id
         ).parent_connection
-        root_connection.origin = pose
+        root_connection.origin = pose.copy_with_new_reference_frames(
+            new_reference_frame=self.root, new_child_frame=root_connection.child
+        )
 
     def merge_world(
         self,
@@ -2168,7 +2220,9 @@ class World(HasSimulatorProperties):
             else self._manually_compute_world_root_T_self(entity_b)
         )
         return HomogeneousTransformationMatrix(
-            (root_T_reference.inverse() @ root_T_target).evaluate()
+            (root_T_reference.inverse() @ root_T_target).evaluate(),
+            reference_frame=entity_a,
+            child_frame=entity_b,
         )
 
     def _manually_compute_world_root_T_self(
@@ -2299,6 +2353,8 @@ class World(HasSimulatorProperties):
         """
         if spatial_object.reference_frame is None:
             raise MissingReferenceFrameError(spatial_object)
+        if spatial_object.reference_frame == target_frame:
+            return spatial_object
         target_frame_T_reference_frame = self.compute_forward_kinematics(
             root=target_frame, tip=spatial_object.reference_frame
         )

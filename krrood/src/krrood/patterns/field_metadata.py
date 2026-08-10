@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields, is_dataclass
 
-from typing_extensions import Dict, Optional, Self, Type
+from typing_extensions import Dict, Optional, Self, TYPE_CHECKING, Type
+
+if TYPE_CHECKING:
+    from krrood.class_diagrams.wrapped_field import WrappedField
 
 
 @dataclass
@@ -35,6 +38,17 @@ class FieldMetadata:
         if field_ is None:
             return None
         return field_.metadata.get(cls)
+
+    @classmethod
+    def of_wrapped_field(cls, wrapped_field: WrappedField) -> Optional[Self]:
+        """
+        :return: the instance of *cls* attached to the dataclass field behind
+            *wrapped_field*, or ``None`` when that field carries no metadata of type *cls*.
+
+        ..note:: The lookup goes through the dataclass field name, which may differ from
+            the public name under which the field is addressed.
+        """
+        return cls.of_field(wrapped_field.clazz.clazz, wrapped_field.field.name)
 
 
 @dataclass

@@ -15,15 +15,20 @@ from krrood.entity_query_language.core.base_expressions import (
     OperationResult,
     Selectable,
 )
-from krrood.entity_query_language.operators.set_operations import Union
+from krrood.entity_query_language.operators.set_operations import (
+    EvaluatesChildrenInSequence,
+)
 from krrood.entity_query_language.utils import T
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
 
 
 @dataclass(eq=False, repr=False)
-class Concatenation(Union, CanBehaveLikeAVariable[T]):
+class Concatenation(EvaluatesChildrenInSequence, CanBehaveLikeAVariable[T]):
     """
     Concatenation of two or more variables.
+
+    Selects the value each child selected, rather than claiming a truth about it, so a
+    falsy value is concatenated like any other.
     """
 
     _operation_children_: Tuple[Selectable, ...] = field(default_factory=tuple)

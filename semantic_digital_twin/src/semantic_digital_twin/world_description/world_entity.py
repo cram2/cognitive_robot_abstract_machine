@@ -9,8 +9,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from dataclasses import fields
 from functools import cached_property
-from functools import lru_cache, cached_property
-from typing import assert_never
+from functools import cached_property
 from uuid import UUID, uuid4
 
 import numpy as np
@@ -36,16 +35,8 @@ from krrood.adapters.json_serializer import (
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.entity_query_language.predicate import Symbol
 from krrood.symbolic_math.symbolic_math import Matrix
-from krrood.utils import get_full_class_name, memoize
-from semantic_digital_twin.datastructures.joint_state import JointState
-from semantic_digital_twin.world_description.geometry import Mesh
-from semantic_digital_twin.world_description.inertial_properties import Inertial
-from semantic_digital_twin.world_description.shape_collection import (
-    ShapeCollection,
-    BoundingBoxCollection,
-)
-from semantic_digital_twin.mixin import HasSimulatorProperties
 from krrood.utils import get_full_class_name
+from krrood.utils import memoize
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
@@ -53,8 +44,6 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     ReferenceFrameMismatchError,
-    WorldEntityWithIDNotInKwargs,
-    MissingWorldError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -62,12 +51,15 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Point3,
     Pose,
 )
-from semantic_digital_twin.utils import IDGenerator, camel_case_split
+from semantic_digital_twin.utils import camel_case_split
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import (
     ShapeCollection,
     BoundingBoxCollection,
+)
+from semantic_digital_twin.world_description.world_modification import (
+    synchronized_attribute_modification,
 )
 
 if TYPE_CHECKING:
@@ -75,8 +67,6 @@ if TYPE_CHECKING:
         DegreeOfFreedom,
     )
     from semantic_digital_twin.world import World, GenericSemanticAnnotation
-
-id_generator = IDGenerator()
 
 
 @dataclass(eq=False)
@@ -126,6 +116,15 @@ class WorldEntity(Symbol):
     def remove_from_world(self):
         self._world._world_entity_hash_table.pop(hash(self), None)
         self._world = None
+
+    @synchronized_attribute_modification
+    def update_name(self, name: PrefixedName) -> None:
+        """
+        Rename this world entity and record the change in the world's modification history.
+
+        :param name: The new name for this world entity.
+        """
+        self.name = name
 
 
 @dataclass(eq=False)
@@ -309,7 +308,7 @@ class WorldEntityWithSimulatorProperties(WorldEntityWithID, HasSimulatorProperti
 
 
 @dataclass(eq=False)
-class KinematicStructureEntity(WorldEntityWithSimulatorProperties, ABC):
+class KinematicStructureEntity(ABC, WorldEntityWithSimulatorProperties):
     """
     An entity that is part of the kinematic structure of the world.
     """
@@ -420,7 +419,7 @@ class KinematicStructureEntity(WorldEntityWithSimulatorProperties, ABC):
         name: PrefixedName,
         points_3d: List[Point3],
         minimum_thickness: float = 0.005,
-        sv_ratio_tol: float = 1e-7,
+        singular_value_ratio_tolerance: float = 1e-7,
     ) -> Self:
         """
         Constructs a Region from a list of 3D points by creating a convex hull around
@@ -431,14 +430,14 @@ class KinematicStructureEntity(WorldEntityWithSimulatorProperties, ABC):
         :param name: Prefixed name for the region.
         :param points_3d: List of 3D points.
         :param minimum_thickness: Minimum thickness to add if points are near-planar.
-        :param sv_ratio_tol: Tolerance for determining planarity based on singular value
-            ratio.
+        :param singular_value_ratio_tolerance: Tolerance for determining planarity based
+            on singular value ratio.
         :return: Region object.
         """
         area_mesh = Mesh.from_3d_points(
             points_3d,
             minimum_thickness=minimum_thickness,
-            sv_ratio_tol=sv_ratio_tol,
+            singular_value_ratio_tolerance=singular_value_ratio_tolerance,
         )
         return cls.from_shape_collection(name, ShapeCollection([area_mesh]))
 
@@ -478,7 +477,7 @@ class Body(KinematicStructureEntity):
 
     def __post_init__(self):
         if not self.name:
-            self.name = PrefixedName(f"body_{id_generator(self)}")
+            self.name = PrefixedName(f"body_{self.id}")
 
         self.visual.reference_frame = self
         self.collision.reference_frame = self
@@ -487,9 +486,17 @@ class Body(KinematicStructureEntity):
 
     @classmethod
     def from_shape_collection(
-        cls, name: PrefixedName, shape_collection: ShapeCollection
+        cls,
+        name: PrefixedName,
+        shape_collection: ShapeCollection,
+        *,
+        visuals_shape_collection: ShapeCollection | None = None,
     ) -> Self:
-        return cls(name=name, collision=shape_collection, visual=shape_collection)
+        if visuals_shape_collection is None:
+            visuals_shape_collection = shape_collection
+        return cls(
+            name=name, collision=shape_collection, visual=visuals_shape_collection
+        )
 
     @property
     def combined_mesh(self) -> Optional[trimesh.Trimesh]:
@@ -541,8 +548,8 @@ class Body(KinematicStructureEntity):
         return Body(
             name=self.name,
             id=self.id,
-            visual=self.visual.copy_for_world(new_world),
-            collision=self.collision.copy_for_world(new_world),
+            visual=self.visual.copy_without_reference_frame(),
+            collision=self.collision.copy_without_reference_frame(),
             inertial=deepcopy(self.inertial),
         )
 
@@ -594,7 +601,7 @@ class Region(KinematicStructureEntity):
         return Region(
             name=self.name,
             id=self.id,
-            area=self.area.copy_for_world(new_world),
+            area=self.area.copy_without_reference_frame(),
         )
 
 
@@ -1007,9 +1014,9 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer, AB
 
     def reference_origin_as_position_quaternion(self) -> Matrix:
         """
-        The reference-configuration origin (see :attr:`reference_origin_expression`)
-        as a stacked position and quaternion, so a simulator can place a body's
-        static frame independently of the current joint state.
+        The reference-configuration origin (see :attr:`reference_origin_expression`) as
+        a stacked position and quaternion, so a simulator can place a body's static
+        frame independently of the current joint state.
 
         :return: A 1x7 matrix of ``[x, y, z, qx, qy, qz, qw]``.
         """

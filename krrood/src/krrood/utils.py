@@ -74,7 +74,17 @@ def module_and_class_name(type_: Union[Type, _SpecialForm]) -> str:
     :param type_: A class or special form.
     :return: Its fully qualified ``"{module}.{name}"`` identifier.
     """
-    return f"{type_.__module__}.{type_.__name__}"
+    return f"{get_module_of_type(type_)}.{type_.__name__}"
+
+
+def get_module_of_type(type_: Union[Type, _SpecialForm]) -> str:
+    """
+    :param type_: The type of which the module is obtained.
+    :return: The module name of the given type_.
+    """
+    if type_ is types.NoneType:
+        return "types"
+    return type_.__module__
 
 
 def get_default_value(dataclass_type, field_name):
@@ -576,7 +586,10 @@ def _handle_import_node(
 
 @lru_cache(maxsize=None)
 def _warn_about_unresolvable_type_checking_import_once(
-    resolved_module_name: Optional[str], name: str, file_path: Optional[str], error_message: str
+    resolved_module_name: Optional[str],
+    name: str,
+    file_path: Optional[str],
+    error_message: str,
 ) -> None:
     """
     Log, at most once per process for a given ``(resolved_module_name, name, file_path)`` triple,
@@ -594,7 +607,7 @@ def _warn_about_unresolvable_type_checking_import_once(
     :param file_path: The path of the file whose imports were being extracted.
     :param error_message: The message of the ``AttributeError`` that was raised.
     """
-    logger.warning(
+    logger.debug(
         f"Could not import {resolved_module_name}: {error_message} while extracting imports from {file_path}"
     )
 

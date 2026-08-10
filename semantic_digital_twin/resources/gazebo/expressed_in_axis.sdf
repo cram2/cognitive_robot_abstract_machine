@@ -1,0 +1,16 @@
+<?xml version="1.0" ?>
+<sdf version="1.7">
+  <model name="expressed_axis">
+    <link name="base"/>
+    <link name="arm">
+      <pose>0 0 0.5 0 0 0</pose>
+    </link>
+    <joint name="lift" type="revolute">
+      <parent>base</parent>
+      <child>arm</child>
+      <axis>
+        <xyz expressed_in="__model__">0 0 1</xyz>
+      </axis>
+    </joint>
+  </model>
+</sdf>

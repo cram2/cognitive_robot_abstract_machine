@@ -48,6 +48,7 @@ from krrood.class_diagrams.attribute_introspector import (
 )
 from krrood.class_diagrams.method_classifier import factory_method_names
 from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.patterns.field_metadata import FieldMetadata
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from typing_extensions import Generic
 
@@ -274,6 +275,19 @@ class WrappedClass(Generic[T], SubClassSafeGeneric):
     """
     A mapping from field name to its WrappedField instance.
     """
+
+    def fields_with_metadata(
+        self, metadata_type: Type[FieldMetadata]
+    ) -> List[WrappedField]:
+        """
+        :return: the fields of this class carrying metadata of *metadata_type*, in
+            declaration order.
+        """
+        return [
+            wrapped_field
+            for wrapped_field in self.fields
+            if metadata_type.of_wrapped_field(wrapped_field) is not None
+        ]
 
     def _get_introspector(self) -> AttributeIntrospector:
         """

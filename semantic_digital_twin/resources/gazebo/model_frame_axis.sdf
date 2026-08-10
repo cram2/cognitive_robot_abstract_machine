@@ -1,0 +1,17 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <model name="legacy_axis">
+    <link name="base"/>
+    <link name="arm">
+      <pose frame="">0 0 0.5 0 0 0</pose>
+    </link>
+    <joint name="lift" type="revolute">
+      <parent>base</parent>
+      <child>arm</child>
+      <axis>
+        <use_parent_model_frame>1</use_parent_model_frame>
+        <xyz>0 0 1</xyz>
+      </axis>
+    </joint>
+  </model>
+</sdf>

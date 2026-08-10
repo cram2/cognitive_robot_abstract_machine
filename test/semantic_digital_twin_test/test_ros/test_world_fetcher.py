@@ -17,10 +17,16 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle, Door
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Door,
+    Handle,
+    Shelf,
+    ShelfLayer,
+)
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_modification import (
     WorldModelModificationBlock,
@@ -142,7 +148,9 @@ def test_service_callback_with_multiple_modifications(rclpy_node):
 def test_world_fetching(rclpy_node):
     world = create_dummy_world()
     world.get_body_by_name("body_2").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(1, 1, 1)
+        HomogeneousTransformationMatrix.from_xyz_rpy(
+            1, 1, 1, reference_frame=world.get_body_by_name("body_1")
+        )
     )
     fetcher = FetchWorldServer(node=rclpy_node, world=world)
 
@@ -191,6 +199,43 @@ def test_semantic_annotation_modifications(rclpy_node):
     assert [sa.name for sa in w1.semantic_annotations] == [
         sa.name for sa in w2.semantic_annotations
     ]
+
+
+def test_fetched_world_accepts_new_specification_spawns(rclpy_node):
+    """
+    A fetched world is replayed from modification blocks rather than parsed, so spawning
+    into it afterwards has to work exactly as it does in a directly built world.
+    """
+    shelf_scale = Scale(0.305, 0.85, 1.9)
+    FetchWorldServer(node=rclpy_node, world=create_dummy_world())
+
+    fetched_world = fetch_world_from_service(rclpy_node, timeout_seconds=30)
+
+    with fetched_world.modify_world():
+        shelf = Shelf.get_specification(
+            "shelf",
+            Shelf.get_default_root_specification(
+                scale=shelf_scale, wall_thickness=0.035
+            ),
+        ).spawn(
+            fetched_world,
+            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                1, 0, shelf_scale.z / 2, reference_frame=fetched_world.root
+            ),
+        )
+        shelf.add(
+            ShelfLayer.create_with_new_body_in_world(
+                world=fetched_world,
+                name="shelf_layer1",
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    1, 0, 0.283, reference_frame=fetched_world.root
+                ),
+                scale=Scale(0.305, 0.85, 0.018),
+            )
+        )
+
+    assert fetched_world.is_kinematic_structure_entity_in_world_by_name("shelf_layer1")
+    assert [layer.root.name.name for layer in shelf.shelf_layers] == ["shelf_layer1"]
 
 
 def test_get_payload_as_json(rclpy_node, pr2_world_state_reset):
@@ -254,3 +299,22 @@ def test_pr2_collision_rules(rclpy_node, pr2_world_state_reset):
     assert len(pr2_world_state_reset.collision_manager.rules) - 1 == len(
         pr2_world_copy.collision_manager.rules
     )
+
+
+def test_fetched_robot_parts_keep_their_joint_states(rclpy_node, pr2_world_state_reset):
+    """
+    Joint states are attached to robot parts after the parts themselves exist, so they
+    are recorded as their own modifications.
+
+    A fetched world must replay those too, not just the modifications that created the
+    kinematic structure.
+    """
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
+
+    pr2_world_copy = fetch_world_from_service(rclpy_node, timeout_seconds=10)
+
+    fetched_pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    assert [joint_state.name for joint_state in fetched_pr2.torso.joint_states] == [
+        joint_state.name for joint_state in pr2.torso.joint_states
+    ]

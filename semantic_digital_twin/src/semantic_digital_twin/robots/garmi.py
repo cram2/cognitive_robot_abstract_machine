@@ -38,7 +38,10 @@ from semantic_digital_twin.robots.robot_parts import (
     Torso,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
-from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.connections import (
+    FixedConnection,
+    OmniDrive,
+)
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -526,7 +529,7 @@ class GarmiTorso(
 
 
 @dataclass(eq=False)
-class GarmiMobileBase(MobileBase, HasTorso[GarmiTorso]):
+class GarmiMobileBase(MobileBase[OmniDrive], HasTorso[GarmiTorso]):
     """
     The mecanum mobile base of the GARMI robot.
     """

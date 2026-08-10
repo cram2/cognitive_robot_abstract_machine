@@ -48,7 +48,10 @@ from semantic_digital_twin.robots.robot_parts import (
 )
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
-from semantic_digital_twin.world_description.connections import ActiveConnection
+from semantic_digital_twin.world_description.connections import (
+    ActiveConnection,
+    OmniDrive,
+)
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -432,7 +435,7 @@ class PR2Torso(Torso, HasLeftRightArm[PR2LeftArm, PR2RightArm], HasNeck[PR2Neck]
 
 
 @dataclass(eq=False)
-class PR2MobileBase(MobileBase, HasTorso[PR2Torso]):
+class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso]):
 
     def setup_hardware_interfaces(self):
         pass

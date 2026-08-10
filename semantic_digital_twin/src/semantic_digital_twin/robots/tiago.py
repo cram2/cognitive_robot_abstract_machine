@@ -43,7 +43,10 @@ from semantic_digital_twin.robots.robot_parts import (
 )
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
-from semantic_digital_twin.world_description.connections import ActiveConnection
+from semantic_digital_twin.world_description.connections import (
+    ActiveConnection,
+    DifferentialDrive,
+)
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -433,7 +436,7 @@ class TiagoTorso(
 
 
 @dataclass(eq=False)
-class TiagoMobileBase(MobileBase, HasTorso[TiagoTorso]):
+class TiagoMobileBase(MobileBase[DifferentialDrive], HasTorso[TiagoTorso]):
 
     full_body_controlled: bool = field(default=True, kw_only=True)
 
@@ -792,7 +795,7 @@ class TiagoMujocoTorso(
 
 
 @dataclass(eq=False)
-class TiagoMujocoMobileBase(MobileBase, HasTorso[TiagoMujocoTorso]):
+class TiagoMujocoMobileBase(MobileBase[DifferentialDrive], HasTorso[TiagoMujocoTorso]):
 
     def setup_hardware_interfaces(self):
         pass

@@ -1,0 +1,57 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="mini_warehouse">
+    <gravity>0 0 -9.8</gravity>
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.001</max_step_size>
+    </physics>
+    <light name="sun" type="directional"/>
+    <scene>
+      <shadows>1</shadows>
+    </scene>
+
+    <model name='shelf_001'>
+      <include>
+        <uri>model://shelf</uri>
+      </include>
+      <pose frame="">2.5 -1.5 0 0 0 1.5707963267948966</pose>
+    </model>
+
+    <model name="shelf_002">
+      <include>
+        <uri>model://shelf</uri>
+        <pose>0 0 0.25 0 0 0</pose>
+      </include>
+      <pose frame="">-3 4 0 0 0 0</pose>
+    </model>
+
+    <include>
+      <uri>model://pallet</uri>
+      <name>pallet_canonical</name>
+      <pose>1 2 0.075 0 0 0</pose>
+    </include>
+
+    <model name="inline_crate">
+      <static>1</static>
+      <pose frame="">0 0 0.5 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.6 0.6 1.0</size>
+            </box>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+
+<!--
+    <model name="shelf_003">
+      <include>
+        <uri>model://shelf</uri>
+      </include>
+      <pose frame="">9 9 9 0 0 0</pose>
+    </model>
+-->
+  </world>
+</sdf>

@@ -21,6 +21,7 @@ from ..dataset.example_classes import (
     KRROODPhysicalObject,
     KRROODPosition4D,
     KRROODPosition5D,
+    KRROODPipeOptionalOrientation,
 )
 
 
@@ -52,6 +53,32 @@ def test_builtin_optional():
     assert not wrapped_field.is_container
     assert wrapped_field.is_builtin_type
     assert not wrapped_field.is_instantiation_of_generic_class
+
+
+def test_builtin_optional_written_with_a_pipe():
+    # `X | None` and `Optional[X]` denote the same type, so they must be introspected
+    # identically; otherwise a field spelled with a pipe silently loses its mapping.
+    wrapped_class = WrappedClass(clazz=KRROODPipeOptionalOrientation)
+    wrapped_field = WrappedField(
+        wrapped_class, get_field_by_name(KRROODPipeOptionalOrientation, "w")
+    )
+
+    assert wrapped_field.contained_type is float
+    assert wrapped_field.is_optional
+    assert not wrapped_field.is_container
+    assert wrapped_field.is_builtin_type
+    assert not wrapped_field.is_instantiation_of_generic_class
+
+
+def test_optional_relationship_written_with_a_pipe():
+    wrapped_class = WrappedClass(clazz=KRROODPipeOptionalOrientation)
+    wrapped_field = WrappedField(
+        wrapped_class, get_field_by_name(KRROODPipeOptionalOrientation, "position")
+    )
+
+    assert wrapped_field.is_optional
+    assert wrapped_field.contained_type is KRROODPosition
+    assert not wrapped_field.is_builtin_type
 
 
 def test_one_to_one_relationship():

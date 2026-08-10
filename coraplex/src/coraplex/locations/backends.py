@@ -190,7 +190,7 @@ class GiskardLocationBackend(PoseGeneratorBackend):
         )
 
         for pose_candidate in self.setup_costmap(target_pose):
-            self.robot.root.parent_connection.origin = pose_candidate
+            self.robot.set_root_pose(pose_candidate)
 
             try:
                 executor.tick_until_end(3_000)

@@ -136,6 +136,18 @@ def test_event_casting(pr2_apartment_state_reset):
     assert bb.max_x == 1
 
 
+def test_volume():
+    bb = BoundingBox(-0.5, -1, 0, 0.5, 1, 3, HomogeneousTransformationMatrix())
+
+    assert bb.volume == 6.0
+
+
+def test_volume_of_a_flat_bounding_box_vanishes():
+    bb = BoundingBox(-0.5, -1, 1, 0.5, 1, 1, HomogeneousTransformationMatrix())
+
+    assert bb.volume == 0.0
+
+
 def test_contains(pr2_apartment_state_reset):
     bb = BoundingBox(-0.5, -1, 0, 0.5, 1, 1, pr2_apartment_state_reset.root.global_pose)
 

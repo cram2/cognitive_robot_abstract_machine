@@ -68,6 +68,7 @@ class WorldDescriptor(BaseWorldDescriptor):
                     x=0.0,
                     y=0.0,
                     z=(table_thickness / 2.0) + (table_surface_region_thickness / 2.0),
+                    reference_frame=root,
                 ),
             )
         ]

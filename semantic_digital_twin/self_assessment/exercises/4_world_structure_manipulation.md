@@ -30,6 +30,7 @@ from semantic_digital_twin.world_description.connections import Connection6DoF, 
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.spatial_types import Vector3
+from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 from krrood.entity_query_language.factories import entity, variable, an, the
 ```
 
@@ -78,8 +79,8 @@ with world.modify_world():
 :tags: [verify-solution, remove-input]
 
 # Check that the world contains the expected entities
-assert len(world.bodies) == 3, "The world should contain exactly three bodies."
-assert len(world.connections) == 2, "The world should contain exactly two connections."
+if len(world.bodies) != 3: raise ExerciseVerificationFailed("The world should contain exactly three bodies.")
+if len(world.connections) != 2: raise ExerciseVerificationFailed("The world should contain exactly two connections.")
 ```
 ## 2. Remove a connection and its child
 Your goal:
@@ -107,6 +108,6 @@ with world.modify_world():
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 # After removal, the body must be gone and only one connection should remain
-assert all(b is not body for b in world.bodies), "The child body `body` should be removed."
-assert len(world.connections) == 1, "There should be exactly one connection left (root -> base)."
+if not all(b is not body for b in world.bodies): raise ExerciseVerificationFailed("The child body `body` should be removed.")
+if len(world.connections) != 1: raise ExerciseVerificationFailed("There should be exactly one connection left (root -> base).")
 ```

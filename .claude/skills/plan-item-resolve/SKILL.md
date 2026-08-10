@@ -1,7 +1,7 @@
 ---
 name: plan-item-resolve
 description: Gather everything available about one already-underway tracked plan item (its plan.yaml entry, roadmap.md history, the real state of its branch/PR - conflicts, CI, review comments - and any relevant discussion on its plan's tracking issue) and propose a concrete plan to resolve whatever is stalling it, via plan mode, without writing any code. Invoke as "/plan-item-resolve <plan-id> <item-id>". Use when resolving a blocked, in-progress, or deferred item from a plan-dashboard's "Resolve"/"Resume"/"Reconsider" link, or when the user asks to "resolve", "unblock", "resume", or "reconsider" a specific tracked item.
-allowed-tools: Bash, Read, Grep, Glob, Skill, EnterPlanMode, ExitPlanMode, mcp__github__list_pull_requests, mcp__github__pull_request_read, mcp__github__issue_read, mcp__github__get_file_contents, mcp__Claude_Code_Remote__subscribe_pr_activity
+allowed-tools: Bash, Read, Grep, Glob, AskUserQuestion, Skill, EnterPlanMode, ExitPlanMode, mcp__github__list_pull_requests, mcp__github__pull_request_read, mcp__github__issue_read, mcp__github__get_file_contents, mcp__Claude_Code_Remote__subscribe_pr_activity
 ---
 
 # Plan Item Resolve
@@ -14,6 +14,14 @@ understood before proposing what to do next. **This skill never writes
 code, creates a branch, or pushes anything** — it is a research-and-planning
 skill, not an implementation one. Every invocation starts fresh in the
 current session; it does not try to detect or resume any other session.
+
+## 0. Check the setup is in place, and offer it if not
+
+The item's manifest entry and roadmap live on the personal-notes branch, which
+the user may not have set up yet. Follow
+`.claude/skills/setup-personal-notes/prerequisite-check.md` before step 1: run
+the check, and if it reports anything missing, offer `/setup-personal-notes`
+rather than failing on a branch that isn't there.
 
 ## 1. Resolve the item
 

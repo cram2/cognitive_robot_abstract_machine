@@ -517,6 +517,18 @@
   .review-button:hover { background: var(--status-progress); color: var(--surface); }
 
   .notes { margin-top: 0.5rem; font-size: 0.86rem; color: var(--text-muted); white-space: pre-line; }
+  .notes-details { margin-top: 0.5rem; }
+  .notes-details summary {
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    list-style: none;
+  }
+  .notes-details summary::-webkit-details-marker { display: none; }
+  .notes-details summary::before { content: "▸ "; }
+  .notes-details[open] summary::before { content: "▾ "; }
+  .notes-details .notes { margin-top: 0.4rem; }
   .drift {
     margin-top: 0.5rem;
     font-size: 0.82rem;
@@ -537,6 +549,13 @@
     font-size: 0.74rem;
     color: var(--text-muted);
   }
+  .chip.chip-unmet {
+    background: var(--status-blocked-tint);
+    border-color: color-mix(in srgb, var(--status-blocked) 45%, transparent);
+    color: var(--status-blocked);
+    font-weight: 700;
+  }
+  .chip.chip-unmet::before { content: "⏳ "; }
   .blockers { margin-top: 0.5rem; }
   .blocker { font-size: 0.82rem; color: var(--status-blocked); }
 
@@ -554,7 +573,7 @@
 </style>
 
 {% macro dependency_chip(chip) %}
-<span class="chip" title="{{ chip.tooltip }}">{{ chip.identifier }}</span>
+<span class="chip{{ '' if chip.is_ready else ' chip-unmet' }}" title="{{ chip.tooltip }}{{ '' if chip.is_ready else ' (not ready yet — this item is blocked on it)' }}">{{ chip.identifier }}</span>
 {% endmacro %}
 
 {% macro action_button(item) %}
@@ -612,7 +631,10 @@
           <div class="drift">⚠ {{ item.drift_description }}</div>
           {% endif %}
           {% if item.notes %}
-          <div class="notes">{{ item.notes }}</div>
+          <details class="notes-details">
+            <summary>Notes</summary>
+            <div class="notes">{{ item.notes }}</div>
+          </details>
           {% endif %}
           {% if item.dependency_chips %}
           <div class="deps">

@@ -13,7 +13,6 @@ from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, an
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.variable import Continuous
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wall,
@@ -29,26 +28,22 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.geometry import Color, Scale
-from semantic_digital_twin.world_description.world_entity import Body
 
 
 @pytest.fixture
 def wall_door_handle_world():
-    world = World()
-    root = Body(name=PrefixedName("map"))
-    with world.modify_world():
-        world.add_body(root)
+    world = World.create_with_root_body("map")
 
     with world.modify_world():
         wall = Wall.create_with_new_body_in_world(
-            name=PrefixedName("wall"),
+            name="wall",
             world=world,
             scale=Scale(0.1, 4, 2),
         )
         wall.root.visual.dye_shapes(Color(R=0.6, G=0.6, B=0.6))
 
         door = Door.create_with_new_body_in_world(
-            name=PrefixedName("door"),
+            name="door",
             world=world,
             scale=Scale(0.11, 1, 2),
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=1.0),
@@ -60,7 +55,7 @@ def wall_door_handle_world():
 
     with world.modify_world():
         handle = Handle.create_with_new_body_in_world(
-            name=PrefixedName("handle"),
+            name="handle",
             world=world,
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 z=0.6,
@@ -76,13 +71,15 @@ def wall_door_handle_world():
     world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
     with world.modify_world():
         hinge = Hinge.create_with_new_body_in_world(
-            name=PrefixedName("hinge"),
+            name="hinge",
             world=world,
-            active_axis=Vector3.Z(),
             world_root_T_self=world_T_hinge,
-            connection_limits=DegreeOfFreedomLimits(
-                lower=DerivativeMap(position=0.0, velocity=0.0),
-                upper=DerivativeMap(position=np.pi / 2, velocity=1.0),
+            parent_connection_specification=Hinge.parent_connection_specification(
+                axis=Vector3.Z(),
+                dof_limits=DegreeOfFreedomLimits(
+                    lower=DerivativeMap(position=0.0, velocity=0.0),
+                    upper=DerivativeMap(position=np.pi / 2, velocity=1.0),
+                ),
             ),
         )
         door.add(hinge)
@@ -96,7 +93,9 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
     world.merge_world(hsr_copy)
     odom_combined = world.get_body_by_name("odom_combined")
     odom_combined.parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
+        HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=1, reference_frame=odom_combined.parent_kinematic_structure_entity
+        )
     )
 
     context = Context.from_world(world, query_backend=ProbabilisticBackend())
@@ -110,9 +109,11 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
 
 
 def test_translate_free_space_to_where_condition(wall_door_handle_world):
-    from semantic_digital_twin.world_description.graph_of_convex_sets import (
-        navigation_map_at_target,
+    from semantic_digital_twin.world_description.graph_of_convex_sets.base import (
         translate_free_space_to_where_condition,
+    )
+    from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
+        navigation_map_at_target,
     )
 
     world, wall, door, handle = wall_door_handle_world

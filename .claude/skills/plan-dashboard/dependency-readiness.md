@@ -37,6 +37,6 @@ A dependency the script reports `"is_ready": false` for (still not-started,
 only a draft pull request, or was ready and has since regressed to blocked
 or closed unmerged) is a real, common cause of a stall — flag it explicitly
 in the proposed plan's assumptions rather than quietly proceeding as if it
-were ready. See `plans/README.md` for why an open, non-draft pull request
+were ready. See `plan-schema.md` for why an open, non-draft pull request
 already counts as ready even though it hasn't merged yet — this repo's
 normal workflow stacks new work on it before it does.

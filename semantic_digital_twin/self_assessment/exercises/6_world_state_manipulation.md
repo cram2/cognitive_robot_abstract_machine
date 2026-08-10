@@ -32,6 +32,7 @@ from semantic_digital_twin.spatial_types.spatial_types import Vector3
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
+from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 ```
 
 ## 1. Create and move a prismatic connection
@@ -84,13 +85,13 @@ root_C_slider.position = 0.2
 
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
-assert world is not ..., "The world should be created."
-assert root is not ..., "The root body should be created."
-assert slider is not ..., "The slider body should be created."
-assert root_C_slider is not ..., "The prismatic connection should be created."
-assert isinstance(root, Body), "`root` must be a Body."
-assert isinstance(slider, Body), "`slider` must be a Body."
-assert isinstance(root_C_slider, PrismaticConnection), "`root_C_slider` must be a PrismaticConnection."
-assert abs(root_C_slider.position - 0.2) < 1e-6, "The slider should be at position 0.1 along X."
+if world is ...: raise ExerciseVerificationFailed("The world should be created.")
+if root is ...: raise ExerciseVerificationFailed("The root body should be created.")
+if slider is ...: raise ExerciseVerificationFailed("The slider body should be created.")
+if root_C_slider is ...: raise ExerciseVerificationFailed("The prismatic connection should be created.")
+if not isinstance(root, Body): raise ExerciseVerificationFailed("`root` must be a Body.")
+if not isinstance(slider, Body): raise ExerciseVerificationFailed("`slider` must be a Body.")
+if not isinstance(root_C_slider, PrismaticConnection): raise ExerciseVerificationFailed("`root_C_slider` must be a PrismaticConnection.")
+if not abs(root_C_slider.position - 0.2) < 1e-6: raise ExerciseVerificationFailed("The slider should be at position 0.1 along X.")
 rt = RayTracer(world); rt.update_scene(); rt.scene.show("jupyter")
 ```

@@ -876,15 +876,36 @@ class Application(QMainWindow):
             QApplication.quit()
 
 
+quit_requested = False
+"""
+Set when SIGINT arrives, so a signal that lands before the event loop starts is not lost.
+"""
+
+
 def handle_sigint(sig, frame):
     """Handler for the SIGINT signal.
 
-    Only requests the event loop to quit here -- rospy.shutdown() joins the spinner thread and
-    destroys the rclpy node, which is unsafe to run from a signal handler interrupting Qt's event
-    loop. The single rospy.shutdown() call after app.exec_() returns handles it instead, whether the
-    loop ended via this signal or a normal window close.
+    Only records the request and asks the event loop to quit -- rospy.shutdown() joins
+    the spinner thread and destroys the rclpy node, which is unsafe to run from a signal
+    handler interrupting Qt's event loop. The single rospy.shutdown() call after
+    app.exec_() returns handles it instead, whether the loop ended via this signal or a
+    normal window close.
+
+    Qt ignores a quit issued before ``exec_()`` starts, so the flag is what makes a
+    signal arriving during start-up take effect: :func:`quit_when_requested` delivers it
+    on the first tick of the running loop.
     """
+    global quit_requested
+    quit_requested = True
     QApplication.quit()
+
+
+def quit_when_requested():
+    """
+    Quit the application if SIGINT was received, including before the loop was running.
+    """
+    if quit_requested:
+        QApplication.quit()
 
 
 if __name__ == "__main__":
@@ -892,6 +913,12 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, handle_sigint)
 
     app = QApplication(sys.argv)
+    # Qt's event loop blocks the interpreter, so it has to surface periodically for
+    # Python to run signal handlers at all, and to pick up a SIGINT that preceded it.
+    signal_timer = QTimer()
+    signal_timer.timeout.connect(quit_when_requested)
+    signal_timer.start(100)
+
     window = Application()
     window.show()
     exit_code = app.exec_()

@@ -4,7 +4,7 @@ from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Region, Body
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.geometry import Color, Scale, Box
-from semantic_digital_twin.world_description.graph_of_convex_sets import (
+from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
     navigation_map_at_target,
 )
 from semantic_digital_twin.world import World
@@ -14,10 +14,7 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 @pytest.fixture
 def simple_world():
-    world = World()
-    root = Body(name=PrefixedName("map"))
-    with world.modify_world():
-        world.add_body(root)
+    world = World.create_with_root_body("map")
 
     # Add a target body
     target = Body(name=PrefixedName("target"))

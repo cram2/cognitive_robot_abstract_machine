@@ -45,7 +45,9 @@ from semantic_digital_twin.robots.robot_parts import (
 )
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
-from semantic_digital_twin.world_description.connections import ActiveConnection
+from semantic_digital_twin.world_description.connections import (
+    OmniDrive,
+)
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -384,7 +386,7 @@ class HSRBTorso(Torso, HasOneArm[HSRBArm], HasNeck[HSRBNeck]):
 
 
 @dataclass(eq=False)
-class HSRBMobileBase(MobileBase, HasTorso[HSRBTorso]):
+class HSRBMobileBase(MobileBase[OmniDrive], HasTorso[HSRBTorso]):
 
     full_body_controlled: bool = field(default=True, kw_only=True)
 

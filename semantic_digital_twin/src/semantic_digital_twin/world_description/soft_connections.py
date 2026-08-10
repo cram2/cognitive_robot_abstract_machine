@@ -21,19 +21,23 @@ class PiecewiseConstantCurvatureConnection(Connection):
     """
     A continuum connection based on the Piecewise Constant Curvature (PCC) model.
 
-    Models the segment as a perfect circular arc using a closed-form geometric
-    mapping. Assumes constant curvature throughout the segment length.
-    It is suitable for modeling soft robots where bending is approximately uniform.
+    Models the segment as a perfect circular arc using a closed-form geometric mapping.
+    Assumes constant curvature throughout the segment length. It is suitable for
+    modeling soft robots where bending is approximately uniform.
     """
 
     kappa_dof_id: UUID = field(kw_only=True)
     """UUID of the Degree of Freedom representing curvature (kappa = 1/radius)."""
 
     phi_dof_id: UUID = field(kw_only=True)
-    """UUID of the Degree of Freedom representing the plane of bending."""
+    """
+    UUID of the Degree of Freedom representing the plane of bending.
+    """
 
     segment_length: float = field(kw_only=True)
-    """The physical arc length of this specific segment."""
+    """
+    The physical arc length of this specific segment.
+    """
 
     @classmethod
     def create_with_dofs(
@@ -41,14 +45,48 @@ class PiecewiseConstantCurvatureConnection(Connection):
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
+        *,
         name: Optional[PrefixedName] = None,
-        *args,
-        **kwargs,
+        parent_T_connection_expression: Optional[
+            HomogeneousTransformationMatrix
+        ] = None,
+        connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
+        kappa_dof_id: UUID,
+        phi_dof_id: UUID,
+        segment_length: float,
     ) -> Self:
         """
-        Factory method to instantiate a PCC connection in the world.
+        Instantiate a PCC connection from degrees of freedom that already exist in
+        ``world``.
+
+        .. note:: The curvature and bending-plane degrees of freedom are shared by every
+            segment of a section, so they are created by the caller and referenced by id
+            here instead of being generated per segment.
+
+        :param world: The world holding the referenced degrees of freedom.
+        :param parent: Parent of the connection.
+        :param child: Child of the connection.
+        :param name: Name of the connection. If ``None``, a default is generated from
+            parent and child.
+        :param parent_T_connection_expression: Constant pose of the connection relative
+            to its parent.
+        :param connection_T_child_expression: Constant pose of the child relative to the
+            connection.
+        :param kappa_dof_id: Id of the degree of freedom representing curvature.
+        :param phi_dof_id: Id of the degree of freedom representing the plane of bending.
+        :param segment_length: The physical arc length of this segment.
+        :return: The created connection.
         """
-        return cls(parent=parent, child=child, name=name, **kwargs)
+        return cls(
+            parent=parent,
+            child=child,
+            name=name,
+            parent_T_connection_expression=parent_T_connection_expression,
+            connection_T_child_expression=connection_T_child_expression,
+            kappa_dof_id=kappa_dof_id,
+            phi_dof_id=phi_dof_id,
+            segment_length=segment_length,
+        )
 
     def add_to_world(self, world: World):
         """
@@ -104,7 +142,9 @@ class PiecewiseConstantCurvatureConnection(Connection):
 
     @property
     def active_dofs(self):
-        """Returns the list of degrees of freedom controlling this PCC segment."""
+        """
+        Returns the list of degrees of freedom controlling this PCC segment.
+        """
         return [
             self._world.get_degree_of_freedom_by_id(self.kappa_dof_id),
             self._world.get_degree_of_freedom_by_id(self.phi_dof_id),
@@ -116,25 +156,35 @@ class CosseratRodConnection(Connection):
     """
     A connection implementing Cosserat Rod Theory.
 
-    Treats the soft segment as an elastic rod that can bend, twist, and extend.
-    Unlike PCC, this model also supports torsion and non-circular bending shapes.
-    Kinematics are computed using 4th-order Runge-Kutta (RK4) numerical integration.
+    Treats the soft segment as an elastic rod that can bend, twist, and extend. Unlike
+    PCC, this model also supports torsion and non-circular bending shapes. Kinematics
+    are computed using 4th-order Runge-Kutta (RK4) numerical integration.
     """
 
     bending_x_dof_id: UUID = field(kw_only=True)
-    """UUID of the Degree of Freedom for the bending rate around the X-axis (ux)."""
+    """
+    UUID of the Degree of Freedom for the bending rate around the X-axis (ux).
+    """
 
     bending_y_dof_id: UUID = field(kw_only=True)
-    """UUID of the Degree of Freedom for the bending rate around the Y-axis (uy)."""
+    """
+    UUID of the Degree of Freedom for the bending rate around the Y-axis (uy).
+    """
 
     torsion_dof_id: UUID = field(kw_only=True)
-    """UUID of the Degree of Freedom for the twisting rate around the Z-axis (uz)."""
+    """
+    UUID of the Degree of Freedom for the twisting rate around the Z-axis (uz).
+    """
 
     extension_dof_id: UUID = field(kw_only=True)
-    """UUID of the Degree of Freedom for the linear stretching rate along the Z-axis (vz)."""
+    """
+    UUID of the Degree of Freedom for the linear stretching rate along the Z-axis (vz).
+    """
 
     segment_length: float = field(kw_only=True)
-    """The intrinsic rest length of the rod segment."""
+    """
+    The intrinsic rest length of the rod segment.
+    """
 
     @classmethod
     def create_with_dofs(
@@ -142,19 +192,63 @@ class CosseratRodConnection(Connection):
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
+        *,
         name: Optional[PrefixedName] = None,
-        *args,
-        **kwargs,
+        parent_T_connection_expression: Optional[
+            HomogeneousTransformationMatrix
+        ] = None,
+        connection_T_child_expression: Optional[HomogeneousTransformationMatrix] = None,
+        bending_x_dof_id: UUID,
+        bending_y_dof_id: UUID,
+        torsion_dof_id: UUID,
+        extension_dof_id: UUID,
+        segment_length: float,
     ) -> Self:
         """
-        Factory method to instantiate a Cosserat connection in the world.
+        Instantiate a Cosserat rod connection from degrees of freedom that already exist
+        in ``world``.
+
+        .. note:: The strain degrees of freedom are shared by every segment of a section,
+            so they are created by the caller and referenced by id here instead of being
+            generated per segment.
+
+        :param world: The world holding the referenced degrees of freedom.
+        :param parent: Parent of the connection.
+        :param child: Child of the connection.
+        :param name: Name of the connection. If ``None``, a default is generated from
+            parent and child.
+        :param parent_T_connection_expression: Constant pose of the connection relative
+            to its parent.
+        :param connection_T_child_expression: Constant pose of the child relative to the
+            connection.
+        :param bending_x_dof_id: Id of the degree of freedom for the bending rate around
+            the x axis.
+        :param bending_y_dof_id: Id of the degree of freedom for the bending rate around
+            the y axis.
+        :param torsion_dof_id: Id of the degree of freedom for the twisting rate around
+            the z axis.
+        :param extension_dof_id: Id of the degree of freedom for the stretching rate
+            along the z axis.
+        :param segment_length: The intrinsic rest length of this rod segment.
+        :return: The created connection.
         """
-        return cls(parent=parent, child=child, name=name, **kwargs)
+        return cls(
+            parent=parent,
+            child=child,
+            name=name,
+            parent_T_connection_expression=parent_T_connection_expression,
+            connection_T_child_expression=connection_T_child_expression,
+            bending_x_dof_id=bending_x_dof_id,
+            bending_y_dof_id=bending_y_dof_id,
+            torsion_dof_id=torsion_dof_id,
+            extension_dof_id=extension_dof_id,
+            segment_length=segment_length,
+        )
 
     def add_to_world(self, world: World):
         """
-        Integrates the Cosserat differential equations along the length of the
-        segment to compute the child's pose relative to the parent.
+        Integrates the Cosserat differential equations along the length of the segment
+        to compute the child's pose relative to the parent.
         """
         super().add_to_world(world)
 
@@ -174,8 +268,9 @@ class CosseratRodConnection(Connection):
         def hat_operator(strain_vector: sm.Vector) -> sm.Matrix:
             """
             Maps a 6D strain vector to a 4x4 se(3) Lie Algebra matrix.
-            This matrix represents the local derivative of the transformation
-            along the rod's length.
+
+            This matrix represents the local derivative of the transformation along the
+            rod's length.
             """
             angular_strain = strain_vector[:3]
             linear_strain = strain_vector[3:]
@@ -215,7 +310,9 @@ class CosseratRodConnection(Connection):
 
     @property
     def active_dofs(self):
-        """Returns the list of degrees of freedom controlling this rod segment."""
+        """
+        Returns the list of degrees of freedom controlling this rod segment.
+        """
         return [
             self._world.get_degree_of_freedom_by_id(self.bending_x_dof_id),
             self._world.get_degree_of_freedom_by_id(self.bending_y_dof_id),

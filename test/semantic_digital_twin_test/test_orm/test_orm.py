@@ -34,10 +34,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Slider,
 )
-from semantic_digital_twin.semantic_annotations.mixins import (
-    _wrapped_part_whole_relationship_fields,
+from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
 )
+from krrood.class_diagrams.class_diagram import WrappedClass
 from semantic_digital_twin.orm.ormatic_interface import *
 from krrood.ormatic.data_access_objects.helper import to_dao
 
@@ -183,19 +183,18 @@ def _is_part_whole_relationship(annotation_type, field_name):
 def test_part_whole_relationship_field_survives_deepcopy():
     copy_functions = [copy, deepcopy]
     for copy_function in copy_functions:
-        world = World()
-        root = Body(name=PrefixedName("root"))
-        with world.modify_world():
-            world.add_body(root)
+        world = World.create_with_root_body("root")
         with world.modify_world():
             drawer = Drawer.create_with_new_body_in_world(
-                name=PrefixedName("drawer"), scale=Scale(0.2, 0.3, 0.2), world=world
+                name="drawer", scale=Scale(0.2, 0.3, 0.2), world=world
             )
-            handle = Handle.create_with_new_body_in_world(
-                name=PrefixedName("handle"), world=world
-            )
+            handle = Handle.create_with_new_body_in_world(name="handle", world=world)
             slider = Slider.create_with_new_body_in_world(
-                name=PrefixedName("slider"), world=world, active_axis=Vector3.X()
+                name="slider",
+                world=world,
+                parent_connection_specification=Slider.parent_connection_specification(
+                    axis=Vector3.X()
+                ),
             )
             drawer.add(handle)
             drawer.add(slider)
@@ -214,7 +213,9 @@ def test_part_whole_relationship_field_survives_deepcopy():
         # The marked-field discovery still resolves the same part-whole relationship fields.
         discovered = {
             spec.field.name
-            for spec in _wrapped_part_whole_relationship_fields(type(copied_drawer))
+            for spec in WrappedClass(type(copied_drawer)).fields_with_metadata(
+                IsPartWholeRelationship
+            )
         }
         assert {"handle", "mechanical_joint"} <= discovered
 
@@ -266,19 +267,18 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
     type still carries the marker, the marked-field discovery must still find it, and
     the field *values* (handle, mechanical_joint) must survive the round trip.
     """
-    world = World()
-    root = Body(name=PrefixedName("root"))
-    with world.modify_world():
-        world.add_body(root)
+    world = World.create_with_root_body("root")
     with world.modify_world():
         drawer = Drawer.create_with_new_body_in_world(
-            name=PrefixedName("drawer"), scale=Scale(0.2, 0.3, 0.2), world=world
+            name="drawer", scale=Scale(0.2, 0.3, 0.2), world=world
         )
-        handle = Handle.create_with_new_body_in_world(
-            name=PrefixedName("handle"), world=world
-        )
+        handle = Handle.create_with_new_body_in_world(name="handle", world=world)
         slider = Slider.create_with_new_body_in_world(
-            name=PrefixedName("slider"), world=world, active_axis=Vector3.X()
+            name="slider",
+            world=world,
+            parent_connection_specification=Slider.parent_connection_specification(
+                axis=Vector3.X()
+            ),
         )
         drawer.add(handle)
         drawer.add(slider)
@@ -302,7 +302,9 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
     # The marked-field discovery still resolves the same part-whole relationship fields.
     discovered = {
         spec.field.name
-        for spec in _wrapped_part_whole_relationship_fields(type(reconstructed_drawer))
+        for spec in WrappedClass(type(reconstructed_drawer)).fields_with_metadata(
+            IsPartWholeRelationship
+        )
     }
     assert {"handle", "mechanical_joint"} <= discovered
 

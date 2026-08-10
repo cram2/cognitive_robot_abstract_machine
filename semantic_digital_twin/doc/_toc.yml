@@ -18,6 +18,7 @@ parts:
             - file: examples/semantic_annotations
             - file: examples/semantic_annotation_part_whole
             - file: examples/semantic_annotation_factories
+        - file: examples/building_worlds_with_specifications
         - file: examples/world_state_manipulation
         - file: examples/regions
         - file: examples/persistence_of_annotated_worlds
@@ -47,6 +48,8 @@ parts:
         - file: self_assessment/quizzes/visualizing_worlds_quiz
         - file: self_assessment/quizzes/world_structure_manipulation_quiz
         - file: self_assessment/quizzes/semantic_annotations_quiz
+        - file: self_assessment/quizzes/semantic_annotation_part_whole_quiz
+        - file: self_assessment/quizzes/building_worlds_with_specifications_quiz
         - file: self_assessment/quizzes/world_state_manipulation_quiz
         - file: self_assessment/quizzes/regions_quiz
         - file: self_assessment/quizzes/semantic_annotation_factories_quiz

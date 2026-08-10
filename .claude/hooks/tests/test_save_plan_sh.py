@@ -5,94 +5,60 @@ marker-block extraction, run against a local `git init --bare` fixture instead o
 real remote - no network access or real personal-notes branch involved.
 """
 
-import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
-import plan_manifest_tools
+from scratch_repository import NOTES_BRANCH, ScratchRepository
 
-HOOKS_SOURCE_DIRECTORY = Path(plan_manifest_tools.__file__).parent
 FIXTURES_DIRECTORY = Path(__file__).parent / "fixtures"
 
 PLAN_MANIFEST = (FIXTURES_DIRECTORY / "plan.yaml").read_text()
 PLAN_ROADMAP = (FIXTURES_DIRECTORY / "roadmap.md").read_text()
 
 
-def _run_git(*arguments: str, cwd: Path) -> subprocess.CompletedProcess[str]:
-    result = subprocess.run(
-        ["git", *arguments], cwd=cwd, capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
-    return result
-
-
 @pytest.fixture
-def scratch_repo(tmp_path: Path) -> Path:
+def save_plan_repository(scratch_repository: ScratchRepository) -> ScratchRepository:
     """
-    Build a scratch project root with the real save-plan.sh/ resolve-personal-notes-
-    config.sh/plan_manifest_tools.py, a local `git init --bare` fixture standing in for
-    the personal-notes remote (already carrying an empty `claude/personal-notes`
-    branch), and the notes remote pointed at that fixture via local git config.
+    A scratch repository carrying the real save-plan.sh, resolve-personal-notes-
+    config.sh and plan_manifest_tools.py, with a notes branch already published to its
+    notes remote.
 
-    :param tmp_path: pytest's per-test temporary directory.
-    :return: The scratch project root, checked out on a throwaway branch.
+    :param scratch_repository: The initialized scratch repository and notes remote.
+    :return: The same repository, ready to run save-plan.sh against.
     """
-    project_root = tmp_path / "project"
-    hooks_directory = project_root / ".claude" / "hooks"
-    hooks_directory.mkdir(parents=True)
-    for script in (
+    scratch_repository.install_hook_scripts(
         "resolve-personal-notes-config.sh",
         "save-plan.sh",
         "plan_manifest_tools.py",
-    ):
-        shutil.copy(HOOKS_SOURCE_DIRECTORY / script, hooks_directory / script)
-
-    _run_git("init", "--quiet", cwd=project_root)
-    # A CI runner has no ambient git identity configured - set one locally so
-    # the commits below don't depend on the environment already having one.
-    _run_git("config", "user.name", "Scratch Repo", cwd=project_root)
-    _run_git("config", "user.email", "scratch-repo@example.com", cwd=project_root)
-    (project_root / "README.md").write_text("scratch repo\n")
-    _run_git("add", ".", cwd=project_root)
-    _run_git("commit", "--quiet", "-m", "initial commit", cwd=project_root)
-
-    bare_repository_path = tmp_path / "personal-notes.git"
-    _run_git("init", "--quiet", "--bare", str(bare_repository_path), cwd=tmp_path)
-
-    _run_git("checkout", "--quiet", "-b", "claude/personal-notes", cwd=project_root)
-    (project_root / ".claude" / "personal").mkdir(parents=True)
-    (project_root / ".claude" / "personal" / "placeholder.md").write_text("notes\n")
-    _run_git("add", ".claude/personal/placeholder.md", cwd=project_root)
-    _run_git("commit", "--quiet", "-m", "bootstrap personal-notes", cwd=project_root)
-    _run_git(
-        "push", str(bare_repository_path), "claude/personal-notes", cwd=project_root
     )
-    _run_git("checkout", "--quiet", "-b", "some-work-branch", cwd=project_root)
-
-    _run_git(
-        "config",
-        "claude.personalNotesRemote",
-        str(bare_repository_path),
-        cwd=project_root,
+    scratch_repository.write("README.md", "scratch repo\n")
+    scratch_repository.commit_everything("initial commit")
+    scratch_repository.publish_notes_branch(
+        {".claude/personal/placeholder.md": "notes\n"}
     )
-    return project_root
+    scratch_repository.resolve_notes_remote_to()
+    return scratch_repository
 
 
 def run_save_plan(
-    scratch_repo: Path, *arguments: str
+    repository: ScratchRepository, *arguments: str
 ) -> subprocess.CompletedProcess[str]:
     """
     Run the scratch layout's save-plan.sh with *arguments*.
 
-    :param scratch_repo: A fixture-built scratch project root.
+    :param repository: A fixture-built scratch repository.
     :param arguments: CLI arguments to pass to save-plan.sh.
     :return: The finished subprocess.
     """
     return subprocess.run(
-        ["bash", str(scratch_repo / ".claude" / "hooks" / "save-plan.sh"), *arguments],
-        cwd=scratch_repo,
+        [
+            "bash",
+            str(repository.project_root / ".claude" / "hooks" / "save-plan.sh"),
+            *arguments,
+        ],
+        cwd=repository.project_root,
         capture_output=True,
         text=True,
     )
@@ -101,20 +67,22 @@ def run_save_plan(
 # %% --manifest/--roadmap pairing
 
 
-def test_manifest_without_roadmap_fails(scratch_repo: Path):
-    manifest_path = scratch_repo / "plan.yaml"
-    manifest_path.write_text(PLAN_MANIFEST)
-    result = run_save_plan(scratch_repo, "test-plan", "--manifest", str(manifest_path))
+def test_manifest_without_roadmap_fails(save_plan_repository: ScratchRepository):
+    manifest_path = save_plan_repository.write("plan.yaml", PLAN_MANIFEST)
+    result = run_save_plan(
+        save_plan_repository, "test-plan", "--manifest", str(manifest_path)
+    )
     assert result.returncode == 1
     assert result.stderr == (
         "--manifest was given without --roadmap - they must be passed together.\n"
     )
 
 
-def test_roadmap_without_manifest_fails(scratch_repo: Path):
-    roadmap_path = scratch_repo / "roadmap.md"
-    roadmap_path.write_text(PLAN_ROADMAP)
-    result = run_save_plan(scratch_repo, "test-plan", "--roadmap", str(roadmap_path))
+def test_roadmap_without_manifest_fails(save_plan_repository: ScratchRepository):
+    roadmap_path = save_plan_repository.write("roadmap.md", PLAN_ROADMAP)
+    result = run_save_plan(
+        save_plan_repository, "test-plan", "--roadmap", str(roadmap_path)
+    )
     assert result.returncode == 1
     assert result.stderr == (
         "--roadmap was given without --manifest - they must be passed together.\n"
@@ -125,33 +93,25 @@ def test_roadmap_without_manifest_fails(scratch_repo: Path):
 
 
 def test_saves_the_manifest_and_roadmap_extracted_from_claude_local_md_markers(
-    scratch_repo: Path,
+    save_plan_repository: ScratchRepository,
 ):
-    claude_local_md = scratch_repo / "CLAUDE.local.md"
-    claude_local_md.write_text(
+    save_plan_repository.write(
+        "CLAUDE.local.md",
         "<!-- BEGIN-PLAN-MANIFEST: test-plan -->\n"
         f"{PLAN_MANIFEST}"
         "<!-- END-PLAN-MANIFEST -->\n"
         "<!-- BEGIN-PLAN-ROADMAP: test-plan -->\n"
         f"{PLAN_ROADMAP}"
-        "<!-- END-PLAN-ROADMAP -->\n"
+        "<!-- END-PLAN-ROADMAP -->\n",
     )
 
-    result = run_save_plan(scratch_repo, "test-plan")
+    result = run_save_plan(save_plan_repository, "test-plan")
     assert result.returncode == 0, result.stderr
-    bare_repository_path = scratch_repo.parent / "personal-notes.git"
     assert "Saved plan 'test-plan'" in result.stdout
-    assert str(bare_repository_path) in result.stdout
+    assert str(save_plan_repository.notes_remote_path) in result.stdout
 
-    verify_checkout = scratch_repo.parent / "verify-checkout"
-    _run_git(
-        "clone",
-        "--quiet",
-        "--branch",
-        "claude/personal-notes",
-        str(scratch_repo.parent / "personal-notes.git"),
-        str(verify_checkout),
-        cwd=scratch_repo.parent,
+    verify_checkout = save_plan_repository.clone_notes_branch(
+        save_plan_repository.project_root.parent / "verify-checkout"
     )
     saved_manifest = (
         verify_checkout / ".claude" / "personal" / "plans" / "test-plan" / "plan.yaml"
@@ -173,9 +133,11 @@ def test_saves_the_manifest_and_roadmap_extracted_from_claude_local_md_markers(
     assert branch_index == "item-a-branch\ttest-plan\n"
 
 
-def test_missing_marker_pair_fails_with_a_clear_message(scratch_repo: Path):
-    (scratch_repo / "CLAUDE.local.md").write_text("no markers here\n")
-    result = run_save_plan(scratch_repo, "test-plan")
+def test_missing_marker_pair_fails_with_a_clear_message(
+    save_plan_repository: ScratchRepository,
+):
+    save_plan_repository.write("CLAUDE.local.md", "no markers here\n")
+    result = run_save_plan(save_plan_repository, "test-plan")
     assert result.returncode == 1
     assert result.stderr.startswith(
         "CLAUDE.local.md has no plan-manifest/plan-roadmap section to extract.\n"

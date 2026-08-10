@@ -61,7 +61,6 @@ doc = [
     "cvxopt",
     "treon",
     "jupytext",
-    "jupyterquiz",
 ]
 
 [tool.uv.workspace]

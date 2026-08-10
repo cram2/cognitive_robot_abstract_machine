@@ -38,7 +38,7 @@ questions = [
       "question": "Which class constructs free space from a world?",
       "type": "multiple_choice",
       "answers": [
-        {"answer": "GraphOfConvexSets.free_space_from_world(...)\n", "correct": True},
+        {"answer": "GraphOfBoundingBoxes.free_space_from_world(...)\n", "correct": True},
         {"answer": "URDFParser.from_file(...)\n", "correct": False},
         {"answer": "WorldState.make_free_space(...)\n", "correct": False},
         {"answer": "RayTracer.update_scene(...)\n", "correct": False}

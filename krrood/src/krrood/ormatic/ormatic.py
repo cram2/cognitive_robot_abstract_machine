@@ -5,7 +5,7 @@ import pathlib
 import uuid
 from dataclasses import dataclass, field, is_dataclass
 from enum import Enum
-from types import ModuleType
+from types import ModuleType, NoneType
 from typing import Set
 
 import rustworkx as rx
@@ -30,7 +30,7 @@ from krrood.ormatic.data_access_objects.dao import DataAccessObject
 from krrood.ormatic.sqlalchemy_generator import SQLAlchemyGenerator
 from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import InheritanceStrategy, classes_of_package
-from krrood.utils import module_and_class_name, recursive_subclasses
+from krrood.utils import module_and_class_name, recursive_subclasses, get_module_of_type
 from krrood.ormatic.wrapped_table import WrappedTable, AssociationObject
 from krrood.adapters.json_serializer import SubclassJSONSerializer, JSONData
 from krrood.class_diagrams.class_diagram import (
@@ -117,7 +117,7 @@ class ORMatic:
     """
 
     def __post_init__(self):
-        self.imported_modules.add(TypeDict.__module__)
+        self.imported_modules.add(get_module_of_type(TypeDict))
         self._fill_type_mappings()
         self._create_inheritance_graph()
         self._add_alternative_mappings_to_class_diagram()
@@ -125,7 +125,7 @@ class ORMatic:
         self.create_type_annotations_map()
 
         for wrapped_table in self.wrapped_tables.values():
-            self.imported_modules.add(wrapped_table.wrapped_clazz.clazz.__module__)
+            self.imported_modules.add(get_module_of_type(wrapped_table.wrapped_clazz.clazz))
 
     def _fill_type_mappings(self):
         """
@@ -138,9 +138,10 @@ class ORMatic:
         self.type_mappings[uuid.UUID] = sqlalchemy.UUID
         self.type_mappings[pathlib.Path] = PathType
         self.type_mappings[JSONData] = JSONDataType
+        self.type_mappings[NoneType] = TypeType
 
         for key in self.type_mappings.keys():
-            self.imported_modules.add(key.__module__)
+            self.imported_modules.add(get_module_of_type(key))
 
     def _create_wrapped_tables(self):
         for wrapped_clazz in self.wrapped_classes_in_topological_order:
@@ -211,8 +212,8 @@ class ORMatic:
             self.type_annotation_map[module_and_class_name(clazz)] = (
                 module_and_class_name(custom_type)
             )
-            self.imported_modules.add(clazz.__module__)
-            self.imported_modules.add(custom_type.__module__)
+            self.imported_modules.add(get_module_of_type(clazz))
+            self.imported_modules.add(get_module_of_type(custom_type))
 
     @property
     def wrapped_classes_in_topological_order(self) -> List[WrappedClass]:
@@ -321,7 +322,7 @@ class ORMatic:
             am
             for am in recursive_subclasses(AlternativeMapping)
             if not ignore_krrood_test_classes
-            or "krrood_test" not in am.original_class().__module__
+            or "krrood_test" not in get_module_of_type(am.original_class())
         )
 
         # keep only dataclasses that are not AlternativeMapping or DataAccessObject subclasses

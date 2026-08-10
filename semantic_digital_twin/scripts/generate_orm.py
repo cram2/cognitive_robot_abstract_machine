@@ -36,12 +36,14 @@ from semantic_digital_twin.world import (
     ResetStateContextManager,
     WorldModelUpdateContextManager,
 )
+from semantic_digital_twin.world_description.mesh_file_storage import MeshFileStorage
 
 # remove classes that should not be mapped
 ignore_classes = {
     ResetStateContextManager,
     WorldModelUpdateContextManager,
     ForwardKinematicsManager,
+    MeshFileStorage,
     semantic_digital_twin.adapters.procthor.procthor_resolver.ProcthorResolver,
     ContainsType,
     SemanticDirection,

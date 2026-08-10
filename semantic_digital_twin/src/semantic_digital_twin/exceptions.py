@@ -2,7 +2,7 @@ from __future__ import annotations, absolute_import
 
 from dataclasses import dataclass, field, Field
 from pathlib import Path
-from typing import Dict, Set, Any
+from typing import Dict, Set
 from uuid import UUID
 
 import mujoco
@@ -350,42 +350,45 @@ class InvalidConnectionLimits(UsageError):
 
 
 @dataclass
-class MismatchedTrajectoryLengthsError(UsageError):
+class MissingConnectionParentError(UsageError):
     """
-    Raised when the per-connection position sequences of a motion trajectory do not all
-    have the same length, breaking the lock-step replay invariant.
+    Raised when a connection is spawned without a parent kinematic structure entity.
     """
 
-    lengths_by_connection: Dict[PrefixedName, int]
+    connection_name: Optional[str]
     """
-    The recorded sequence length for each tracked connection, by connection name.
+    The name of the connection specification that was spawned without a parent.
     """
 
     def error_message(self) -> str:
-        return f"All position sequences of a motion trajectory must have the same length, got {self.lengths_by_connection}."
+        return (
+            f"Connecting the connection '{self.connection_name}' requires a parent kinematic structure entity, "
+            f"but None could be identified."
+        )
 
     def suggest_correction(self) -> str:
-        return "record one position per connection for every simulation step."
+        return (
+            "pass the parent entity via the 'parent' keyword argument of connect, or make sure that the current "
+            "world is not empty."
+        )
 
 
 @dataclass
-class MissingFillLevelLimitsError(UsageError):
+class MissingConnectionAxisError(UsageError):
     """
-    Raised when a liquid connection's fill degree of freedom has no position limits, so
-    the integrated fill level cannot be clamped.
+    Raised when an active connection is created without a movement axis.
     """
 
-    connection_name: PrefixedName
+    connection_type_name: str
     """
-    The name of the liquid connection whose fill degree of freedom lacks position
-    limits.
+    The name of the active connection type that was created without an axis.
     """
 
     def error_message(self) -> str:
-        return f"The fill degree of freedom of {self.connection_name} has no position limits to clamp the fill level to."
+        return f"'{self.connection_type_name}' is an active connection and requires an axis."
 
     def suggest_correction(self) -> str:
-        return "create the connection via initialize_fill_level, or give its degree of freedom lower and upper position limits."
+        return "pass a movement axis via the 'axis' keyword argument."
 
 
 @dataclass
@@ -512,9 +515,9 @@ class UnknownPartWholeRelationshipField(UsageError):
     relationship field of the annotation.
     """
 
-    annotation: HasRootBody
+    annotation: Type[HasRootBody]
     """
-    The annotation the part was being added to.
+    The annotation type the part was being added to.
     """
 
     field_name: str
@@ -530,7 +533,7 @@ class UnknownPartWholeRelationshipField(UsageError):
 
     def error_message(self) -> str:
         return (
-            f"{type(self.annotation).__name__} has no part-whole relationship field "
+            f"{self.annotation.__name__} has no part-whole relationship field "
             f"'{self.field_name}."
         )
 
@@ -539,6 +542,65 @@ class UnknownPartWholeRelationshipField(UsageError):
             f"the available fields are:"
             f" {', '.join(self.available_fields) or '(none)'}"
         )
+
+
+@dataclass
+class PartWholeCardinalityError(UsageError):
+    """
+    Raised when a part specification supplies a list of parts for a singular (non-to-
+    many) part-whole relationship field.
+    """
+
+    annotation_type_name: str
+    """
+    The name of the annotation type the parts were being mounted onto.
+    """
+
+    field_name: str
+    """
+    The singular part-whole relationship field that was given a list of parts.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The part-whole relationship field '{self.field_name}' of "
+            f"'{self.annotation_type_name}' is singular and accepts only one part, "
+            f"but a list of parts was supplied."
+        )
+
+    def suggest_correction(self) -> str:
+        return "supply a single part specification for this field instead of a list."
+
+
+@dataclass
+class PartWholeFieldInAnnotationKwargs(UsageError):
+    """
+    Raised when ``annotation_kwargs`` contains a key that names a part-whole
+    relationship field.
+
+    Such fields must be supplied via ``part_specifications`` on the annotation
+    specification factory so they are spawned and mounted, not passed straight to the
+    annotation constructor.
+    """
+
+    annotation_type_name: str
+    """
+    The name of the annotation type the keyword arguments were meant for.
+    """
+
+    field_names: List[str]
+    """
+    The offending ``annotation_kwargs`` keys that name part-whole relationship fields.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"annotation_kwargs for '{self.annotation_type_name}' contains part-whole relationship "
+            f"fields: {', '.join(self.field_names)}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "move these entries to part_specifications instead of annotation_kwargs."
 
 
 @dataclass
@@ -1729,3 +1791,52 @@ class InvalidVideoRecordingRateError(VideoRecordingError):
 
     def suggest_correction(self) -> str:
         return "use a positive integer."
+
+
+@dataclass
+class MergedRobotAnnotationNotFound(UsageError):
+    """
+    Raised when merging a robot into a world produced no semantic annotation for the
+    branch the robot was annotated on.
+    """
+
+    annotation_type_name: str
+    """
+    The name of the robot annotation type that was expected in the merged world.
+    """
+
+    annotation_root_id: UUID
+    """
+    The identifier of the annotated robot's root entity.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The merged world holds no '{self.annotation_type_name}' annotation rooted "
+            f"at the entity '{self.annotation_root_id}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "check that merging the robot world replays its semantic annotations into "
+            "the target world."
+        )
+
+
+@dataclass
+class ExerciseVerificationFailed(UsageError):
+    """
+    Raised when a solution written in a self-assessment exercise does not satisfy one of
+    the exercise's requirements.
+    """
+
+    requirement: str
+    """
+    The requirement that the solution failed to satisfy.
+    """
+
+    def error_message(self) -> str:
+        return f"Your solution does not satisfy this requirement: {self.requirement}"
+
+    def suggest_correction(self) -> str:
+        return "revisit the task description of this exercise and adjust your solution."

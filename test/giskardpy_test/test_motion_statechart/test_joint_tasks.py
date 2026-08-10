@@ -6,7 +6,7 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
-from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.motion_statechart.goals.templates import Parallel, Sequence
 from giskardpy.motion_statechart.graph_node import (
     EndMotion,
 )
@@ -17,7 +17,11 @@ from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
 )
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from giskardpy.motion_statechart.tasks.joint_tasks import (
+    JointPositionList,
+    JointState,
+    JointVelocityLimit,
+)
 from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstTrueNode,
 )
@@ -264,6 +268,46 @@ def test_revolute_joint(pr2_world_state_reset):
     kin_sim.tick_until_end()
     assert np.isclose(head_pan_joint.position, 0.042, atol=1e-3)
     assert np.isclose(head_tilt_joint.position, -0.37, atol=1e-2)
+
+
+def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
+    """
+    JointVelocityLimit must genuinely slow down a joint's approach towards a distant
+    target, unlike a reference/normalization velocity which is only a QP-optimization
+    hint -- the joint's velocity must stay within max_velocity on every single tick,
+    all the way until the goal is actually reached.
+    """
+    head_pan_joint = pr2_world_state_reset.get_connection_by_name("head_pan_joint")
+    max_velocity = 0.05
+
+    msc = MotionStatechart()
+    msc.add_nodes(
+        [
+            joint_goal := JointPositionList(
+                goal_state=JointState.from_mapping({head_pan_joint: 0.5}),
+            ),
+            JointVelocityLimit(connections=[head_pan_joint], max_velocity=max_velocity),
+        ]
+    )
+
+    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+    kin_sim.compile(motion_statechart=msc)
+
+    for i in range(400):
+        kin_sim.tick()
+        observed_velocity = abs(head_pan_joint.raw_dof.variables.velocity.resolve())
+        assert observed_velocity <= max_velocity + 1e-3, (
+            f"head_pan_joint's velocity {observed_velocity} exceeded the "
+            f"{max_velocity} rad/s cap on tick {i}"
+        )
+        if msc.observation_state[joint_goal] == ObservationStateValues.TRUE:
+            break
+    else:
+        raise TimeoutError(
+            "joint_goal never reached its target while under the velocity limit"
+        )
+
+    assert np.isclose(head_pan_joint.position, 0.5, atol=1e-2)
 
 
 def test_joint_sequence(pr2_world_state_reset):

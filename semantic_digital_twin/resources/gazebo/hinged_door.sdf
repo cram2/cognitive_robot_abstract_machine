@@ -1,0 +1,43 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <model name="hinged_door">
+    <link name="frame">
+      <pose frame="">0 0 0 0 0 0</pose>
+      <visual name="frame_visual">
+        <geometry>
+          <box>
+            <size>0.1 1.0 2.0</size>
+          </box>
+        </geometry>
+      </visual>
+    </link>
+    <link name="door">
+      <pose frame="">0 0.5 1.0 0 0 0</pose>
+      <visual name="door_visual">
+        <geometry>
+          <box>
+            <size>0.05 0.9 1.9</size>
+          </box>
+        </geometry>
+      </visual>
+    </link>
+    <joint name="hinge" type="revolute">
+      <parent>frame</parent>
+      <child>door</child>
+      <pose frame="">0 -0.45 0 0 1.5707963267948966 0</pose>
+      <axis>
+        <use_parent_model_frame>0</use_parent_model_frame>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.4</lower>
+          <upper>1.4</upper>
+          <velocity>2.5</velocity>
+        </limit>
+        <dynamics>
+          <damping>0.7</damping>
+          <friction>0.3</friction>
+        </dynamics>
+      </axis>
+    </joint>
+  </model>
+</sdf>

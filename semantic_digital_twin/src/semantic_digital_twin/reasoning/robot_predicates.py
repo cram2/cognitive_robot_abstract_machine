@@ -178,6 +178,23 @@ def is_body_in_gripper(
 
 
 @symbolic_function
+def is_body_gripped(
+    body: Body, gripper: EndEffector, threshold: float = 0.9, sample_size: int = 100
+) -> bool:
+    """
+    Check if the body is held by the gripper with at least the given confidence.
+
+    :param body: The body for which the check should be done.
+    :param gripper: The gripper for which the check should be done.
+    :param threshold: Minimum fraction of sampled rays that must hit ``body`` (see
+        :func:`is_body_in_gripper`) for it to count as held.
+    :param sample_size: The number of rays to sample.
+    :return: Whether ``body`` is held by ``gripper``.
+    """
+    return is_body_in_gripper(body, gripper, sample_size) > threshold
+
+
+@symbolic_function
 def is_gripper_holding_something(gripper: EndEffector) -> bool:
     """
     Check if the gripper is holding something.

@@ -4,6 +4,7 @@ import logging
 from abc import abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
+from typing import cast
 
 from typing_extensions import (
     Callable,
@@ -90,7 +91,9 @@ class Location(Iterable[Pose]):
 
     def __iter__(self) -> Iterator[Pose]:
         test_world = deepcopy(self.world)
-        test_robot = test_world.get_semantic_annotations_by_type(type(self.robot))[0]
+        test_robot = cast(
+            AbstractRobot, test_world.get_semantic_annotation_by_id(self.robot.id)
+        )
         for validator in self.validators:
             validator.context = Context(
                 world=test_world,
@@ -105,7 +108,7 @@ class Location(Iterable[Pose]):
 
         for pose_candidate in self.generator:
 
-            test_robot.root.parent_connection.origin = pose_candidate
+            test_robot.set_root_pose(pose_candidate)
 
             test_world.collision_manager.clear_temporary_rules()
             test_world.collision_manager.add_temporary_rule(

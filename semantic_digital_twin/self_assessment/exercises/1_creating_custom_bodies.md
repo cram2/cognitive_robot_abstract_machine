@@ -32,6 +32,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.geometry import Box, Sphere, Scale, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
+from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 
 world = World()
 ```
@@ -78,11 +79,11 @@ with world.modify_world():
 
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
-assert collision_box is not ... and isinstance(collision_box, Box), "Create a Box and assign it to the collision collection."
-assert visual_sphere is not ... and isinstance(visual_sphere, Sphere), "Create a Sphere and assign it to the visual collection."
-assert isinstance(body.collision, ShapeCollection), "Use a ShapeCollection for body.collision."
-assert isinstance(body.visual, ShapeCollection), "Use a ShapeCollection for body.visual."
-assert len(body.collision) == 1 and len(body.visual) == 1, "Each collection should contain exactly one shape."
-assert abs(collision_box.scale.x - 0.2) < 1e-6, "Collision box should have size 0.2 in x."
+if not (collision_box is not ... and isinstance(collision_box, Box)): raise ExerciseVerificationFailed("Create a Box and assign it to the collision collection.")
+if not (visual_sphere is not ... and isinstance(visual_sphere, Sphere)): raise ExerciseVerificationFailed("Create a Sphere and assign it to the visual collection.")
+if not isinstance(body.collision, ShapeCollection): raise ExerciseVerificationFailed("Use a ShapeCollection for body.collision.")
+if not isinstance(body.visual, ShapeCollection): raise ExerciseVerificationFailed("Use a ShapeCollection for body.visual.")
+if not (len(body.collision) == 1 and len(body.visual) == 1): raise ExerciseVerificationFailed("Each collection should contain exactly one shape.")
+if not abs(collision_box.scale.x - 0.2) < 1e-6: raise ExerciseVerificationFailed("Collision box should have size 0.2 in x.")
 rt = RayTracer(world); rt.update_scene(); rt.scene.show("jupyter")
 ```

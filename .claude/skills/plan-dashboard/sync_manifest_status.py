@@ -13,7 +13,7 @@ flag for a human to read, exactly as before. "merged on GitHub" has no such
 ambiguity, so leaving it as a standing drift flag would just mean the same
 fact gets reported forever until someone manually edits the manifest - this
 script is that edit, meant to run automatically as part of every
-/plan-dashboard refresh. See plans/README.md's "Why status is deliberately
+/plan-dashboard refresh. See plan-schema.md's "Why status is deliberately
 thin" section for the full design reasoning.
 
 Usage:

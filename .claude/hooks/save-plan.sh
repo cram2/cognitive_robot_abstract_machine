@@ -8,7 +8,7 @@ set -euo pipefail
 # (.claude/personal/plans/_generated/branch-index.tsv) in the same commit,
 # scanning every plan's plan.yaml so it can never drift out of sync with
 # the manifests it's derived from. See
-# .claude/personal/plans/README.md (on the personal-notes branch) for the
+# .claude/skills/plan-dashboard/plan-schema.md for the
 # full plan.yaml schema, and .claude/skills/plan-dashboard/SKILL.md for how
 # the manifest is consumed.
 #

@@ -133,9 +133,7 @@ class Variable(CanHaveDomainSource[T]):
         """
         for v in self._re_enterable_domain_generator_:
             bindings = sources.bindings | {self._id_: v}
-            yield self._build_operation_result_and_update_truth_value_(
-                bindings, sources
-            )
+            yield self._build_operation_result_(bindings, sources)
 
     def _replace_child_field_(
         self, old_child: SymbolicExpression, new_child: SymbolicExpression
@@ -289,9 +287,7 @@ class InstantiatedVariable(
             instance = bind(**kwargs)
 
             bindings = {self._id_: instance} | child_result.bindings
-            result = self._build_operation_result_and_update_truth_value_(
-                bindings, child_result
-            )
+            result = self._build_operation_result_(bindings, child_result)
             result.previous_operation_result = child_result
             yield result
 

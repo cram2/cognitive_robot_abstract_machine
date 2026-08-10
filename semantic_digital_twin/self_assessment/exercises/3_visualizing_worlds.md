@@ -26,9 +26,11 @@ You will:
 :tags: [remove-input]
 import os
 import logging
-from pkg_resources import resource_filename
+from importlib.resources import files
+from pathlib import Path
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
+from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 
 logging.disable(logging.CRITICAL)
 ```
@@ -40,7 +42,7 @@ Your goal:
 
 ```{code-cell} ipython3
 :tags: [exercise]
-root = resource_filename("semantic_digital_twin", "../../")
+root = Path(files("semantic_digital_twin")).parent.parent
 table_urdf = os.path.join(root, "resources", "urdf", "table.urdf")
 world = URDFParser.from_file(table_urdf).parse()
 
@@ -54,7 +56,7 @@ viz = ...
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-root = resource_filename("semantic_digital_twin", "../../")
+root = Path(files("semantic_digital_twin")).parent.parent
 table_urdf = os.path.join(root, "resources", "urdf", "table.urdf")
 world = URDFParser.from_file(table_urdf).parse()
 
@@ -75,7 +77,7 @@ viz = VizMarkerPublisher(_world=world, node=node)
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 
-assert viz is not ..., "Instantiate a VizMarkerPublisher and assign it to `viz`."
-assert isinstance(tf_publisher, TFPublisher), "Make sure you are using the TFPublisher"
-assert isinstance(viz, VizMarkerPublisher), "Make sure you are using the VizMarkerPublisher"
+if viz is ...: raise ExerciseVerificationFailed("Instantiate a VizMarkerPublisher and assign it to `viz`.")
+if not isinstance(tf_publisher, TFPublisher): raise ExerciseVerificationFailed("Make sure you are using the TFPublisher")
+if not isinstance(viz, VizMarkerPublisher): raise ExerciseVerificationFailed("Make sure you are using the VizMarkerPublisher")
 ```

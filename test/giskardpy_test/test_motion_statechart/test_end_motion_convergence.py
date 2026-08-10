@@ -17,7 +17,7 @@ def test_end_motion_abruptness(cylinder_bot_world: World):
         root_link=cylinder_bot_world.root,
         tip_link=tip,
         goal_pose=Pose.from_xyz_rpy(x=1, reference_frame=cylinder_bot_world.root),
-        threshold=0.01,
+        translation_threshold=0.01,
     )
     motion_statechart.add_node(goal)
     end = EndMotion.when_true(goal)

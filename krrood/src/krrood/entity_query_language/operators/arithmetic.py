@@ -88,7 +88,7 @@ class ArithmeticOperation(
             self.right._process_result_(child_result),
         )
         value = self.math_operator.function(*operands)
-        return self._build_operation_result_and_update_truth_value_(
+        return self._build_operation_result_(
             child_result.bindings | {self._id_: value}, child_result
         )
 
@@ -122,7 +122,7 @@ class UnaryArithmeticOperation(UnaryExpression, CanBehaveLikeAVariable[T]):
         Apply the operator to every value produced by the child expression.
         """
         yield from (
-            self._build_operation_result_and_update_truth_value_(
+            self._build_operation_result_(
                 child_result.bindings
                 | {self._id_: self._operation_value_(child_result)},
                 child_result,

@@ -367,11 +367,7 @@ class GiskardExecutable(Executable):
         Executes the motion state chart on the real robot via giskard while monitoring
         for interrupts.
         """
-        from giskardpy.middleware.ros2.python_interface import GiskardWrapper
-
-        giskard = GiskardWrapper(self.context.ros_node, world=self.context.world)
-
-        giskard.execute(self.motion_state_chart)
+        self.context.giskard_wrapper.execute(self.motion_state_chart)
 
 
 @dataclass
@@ -415,6 +411,18 @@ class ModelChangeExecutable(Executable):
     The body the moved body is attached to afterwards.
     """
 
+    giskard_idle_settle_delta: timedelta = field(
+        default=timedelta(seconds=0.3), kw_only=True
+    )
+    """
+    Time to wait after publishing the model change on the real robot.
+
+    Giskard only applies buffered world updates, and only republishes tf, while its
+    behavior tree is idle between goals (tree tick period is 50ms); this delay gives it
+    a few idle ticks to catch up before the next motion goal is sent, instead of relying
+    on however much idle time happens to fall out of the surrounding plan's timing.
+    """
+
     def execute(self) -> None:
         """
         Re-parent the body to ``new_parent`` while preserving its global pose.
@@ -436,6 +444,8 @@ class ModelChangeExecutable(Executable):
             # )
             self.context.world.add_connection(connection)
             # connection.origin = obj_transform
+        if GiskardExecutable.execution_type == ExecutionType.REAL:
+            time.sleep(self.giskard_idle_settle_delta.total_seconds())
 
 
 @dataclass

@@ -412,7 +412,9 @@ class Query(
         """
         self.build()
         expression = self._conditions_root_
-        SymbolicExpression._symbolic_expression_stack_.append(expression)
+        SymbolicExpression._symbolic_expression_stack_.append(
+            expression._rule_tree_context_()
+        )
         return expression
 
     def build(self) -> Self:
@@ -621,6 +623,17 @@ class Query(
         self.build()
         return self._expression_._result_transformers_
 
+    def _result_is_false_(self, result: OperationResult) -> bool:
+        """
+        :param result: A result this query produced.
+        :return: ``False`` always.
+
+        A query's own binding is its selection rather than a truth claim, so selecting a
+        falsy value says nothing about whether the query was satisfied. A query applies
+        its conditions internally and yields only the results that satisfied them.
+        """
+        return False
+
     def _get_operation_result_(self, child_result: OperationResult) -> OperationResult:
         """
         :param child_result: The child result to construct the operation result from.
@@ -628,7 +641,6 @@ class Query(
         """
         return OperationResult(
             {v._id_: child_result[v._id_] for v in self._selected_variables_},
-            child_result.is_false,
             self,
             child_result,
         )
@@ -810,11 +822,10 @@ class Query(
         """
         Resolve the root through the compiled product.
 
-        ``SatisfiedConditionTracker`` treats ``expression._conditions_root_ is expression._root_``
-        as "this query has no where/having condition" (both fall back to the same node when no
-        ``Filter`` exists). Since :attr:`_conditions_root_` already resolves within the compiled
-        product, :attr:`_root_` must too, or that comparison always sees two different objects (the
-        specification and its product) even when the product itself has no condition.
+        A specification and its compiled product are different objects, so root-relative
+        resolution — :attr:`_conditions_root_`'s Filter-less fallback among it — must reach the
+        tree that is actually evaluated, the same delegation :attr:`_all_expressions_` and
+        :attr:`_descendants_` make.
 
         :return: The root of the compiled product's tree.
         """
@@ -824,7 +835,7 @@ class Query(
         return SymbolicExpression._root_.fget(self)
 
     @property
-    def _conditions_root_(self) -> Optional[SymbolicExpression]:
+    def _conditions_root_(self) -> SymbolicExpression:
         """
         Resolve the conditions root within the compiled product, so rule definition (:meth:`__enter__`)
         and conclusions attach to the node that is actually evaluated.

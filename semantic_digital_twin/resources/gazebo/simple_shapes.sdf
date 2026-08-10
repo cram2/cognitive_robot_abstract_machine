@@ -1,0 +1,64 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <model name="simple_shapes">
+    <static>1</static>
+    <link name="link">
+      <inertial>
+        <pose frame="">0.1 0.2 0.3 0 0 0</pose>
+        <mass>2.5</mass>
+        <inertia>
+          <ixx>0.4</ixx>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyy>0.5</iyy>
+          <iyz>0.0</iyz>
+          <izz>0.6</izz>
+        </inertia>
+      </inertial>
+      <visual name="box_visual">
+        <pose frame="">1 0 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.2 0.4 0.6</size>
+          </box>
+        </geometry>
+        <material>
+          <diffuse>0.25 0.5 0.75 1.0</diffuse>
+        </material>
+        <meta>
+          <layer>1</layer>
+        </meta>
+      </visual>
+      <visual name="cylinder_visual">
+        <geometry>
+          <cylinder>
+            <radius>0.15</radius>
+            <length>0.8</length>
+          </cylinder>
+        </geometry>
+      </visual>
+      <visual name="sphere_visual">
+        <geometry>
+          <sphere>
+            <radius>0.35</radius>
+          </sphere>
+        </geometry>
+      </visual>
+      <collision name="box_collision">
+        <geometry>
+          <box>
+            <size>0.2 0.4 0.6</size>
+          </box>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.9</mu>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <sensor name="ignored_sensor" type="camera"/>
+    </link>
+  </model>
+</sdf>

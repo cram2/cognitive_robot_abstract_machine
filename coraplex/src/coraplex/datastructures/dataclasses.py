@@ -17,6 +17,7 @@ from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
 )
 from krrood.class_diagrams.mocking import MockedClass, MockedModule
+from krrood.utils import memoize
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_entity import PlanEntity
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -38,6 +39,30 @@ except ImportError as e:
 
 
 @dataclass
+class MotionToleranceConfig:
+    """
+    Default goal-achievement tolerances for motions that leave their own thresholds
+    unset.
+    """
+
+    default_tcp_position_threshold: float = 0.005
+    """
+    Default position tolerance in meters for tool-center-point poses, tighter than
+    Giskard's own task default so an approach doesn't stop short of a small object.
+    """
+
+    tool_orientation_threshold: float = 0.02
+    """
+    Default orientation tolerance in rad for tool-center-point poses.
+
+    .. note:: A physically simulated arm's PD-tracked joints settle with a small
+        residual orientation error, so reusing the (much tighter) position tolerance
+        as the rotation tolerance can leave the task perpetually unfinished, stalling
+        the rest of the plan behind it.
+    """
+
+
+@dataclass(eq=False)
 class Context(PlanEntity):
     """
     A dataclass for storing the context of a plan.
@@ -89,6 +114,17 @@ class Context(PlanEntity):
     Should debug information be printed or visualized.
     """
 
+    motion_tolerances: MotionToleranceConfig = field(
+        default_factory=MotionToleranceConfig
+    )
+    """
+    Default goal-achievement tolerances motions fall back to when they leave their own
+    thresholds unset.
+    """
+
+    def __post_init__(self):
+        self.debug = self._debug
+
     @property
     def debug(self):
         return self._debug
@@ -101,6 +137,27 @@ class Context(PlanEntity):
         logging.getLogger("coraplex").setLevel(
             logging.DEBUG if self.debug else logging.INFO
         )
+
+    def __eq__(self, other):
+        return self is other
+
+    def __hash__(self):
+        return hash(id(self))
+
+    @property
+    @memoize
+    def giskard_wrapper(self):
+        """
+        The Giskard wrapper used to communicate with a running Giskard instance.
+
+        Memoized (not ``functools.cached_property``) so the cached wrapper, which
+        holds a reference to :attr:`world`, can be invalidated explicitly via
+        :func:`krrood.utils.clear_memoization_cache` if the world it was built for is
+        ever replaced.
+        """
+        from giskardpy.middleware.ros2.python_interface import GiskardWrapper
+
+        return GiskardWrapper(self.ros_node, world=self.world)
 
     @classmethod
     def from_world(

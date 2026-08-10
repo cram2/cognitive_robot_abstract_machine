@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import pytest
+
 from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
@@ -12,6 +13,7 @@ from giskardpy.motion_statechart.data_types import (
 )
 from giskardpy.motion_statechart.exceptions import CollisionViolatedError
 from giskardpy.motion_statechart.goals.collision_avoidance import (
+    _CancelBecauseSelfCollisionViolated,
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
     ExternalCollisionDistanceMonitor,
@@ -65,6 +67,7 @@ from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.tracy import Tracy
+from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
@@ -505,6 +508,36 @@ def test_multiple_external_collision_avoidance_motions(cylinder_bot_world: World
     # Second motion
     run_motion(0.5)
     assert len(cylinder_bot_world.collision_manager.collision_consumers) == 0
+
+
+def test_cancel_node_without_tasks_never_starts():
+    msc = MotionStatechart()
+    msc.add_node(cancel := _CancelBecauseSelfCollisionViolated(name="cancel", tasks=[]))
+
+    cancel.build(MotionStatechartContext.empty())
+
+    assert cancel.start_condition.is_const_false()
+
+
+def test_self_collision_avoidance_without_checked_body_combinations(
+    cylinder_bot_world: World,
+):
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+
+    msc = MotionStatechart()
+    msc.add_nodes(
+        [
+            goal := SelfCollisionAvoidance(robot=robot),
+            local_min := LocalMinimumReached(),
+        ]
+    )
+    msc.add_node(EndMotion.when_true(local_min))
+
+    Executor(MotionStatechartContext(world=cylinder_bot_world)).compile(
+        motion_statechart=msc
+    )
+
+    assert goal.nodes == msc.get_nodes_by_type(CancelMotion)
 
 
 def test_self_collision_avoidance(self_collision_bot_world: World):
@@ -965,11 +998,20 @@ def test_hard_constraints_violated(cylinder_bot_world: World):
     assert len(exc_info.value.violated_collisions) == 2
 
 
-def test_collision_for_robot_with_static_base(tracy_world):
-    world = deepcopy(tracy_world)
-    robot = world.get_semantic_annotations_by_type(Tracy)[0]
+@pytest.mark.parametrize(
+    "fix_name, tool_frame_id, robot_type",
+    [
+        ("tracy_world", "r_gripper_tool_frame", Tracy),
+        ("daisy_world", "right_gripper_tool_frame", DAiSy),
+    ],
+)
+def test_collision_for_robot_with_static_base(
+    fix_name, tool_frame_id, robot_type, request, rclpy_node
+):
+    world = request.getfixturevalue(fix_name)
+    robot = world.get_semantic_annotations_by_type(robot_type)[0]
 
-    tool_frame = world.get_body_by_name("r_gripper_tool_frame")
+    tool_frame = world.get_body_by_name(tool_frame_id)
     with world.modify_world():
         obstacle = Body(
             name=PrefixedName("obstacle"),

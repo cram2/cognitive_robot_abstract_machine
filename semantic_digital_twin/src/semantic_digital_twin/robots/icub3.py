@@ -21,6 +21,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasSensors,
     TGenericFingerOtherThanThumb,
 )
+from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
@@ -520,7 +521,7 @@ class ICub3Torso(
 
 
 @dataclass(eq=False)
-class ICub3MobileBase(MobileBase):
+class ICub3MobileBase(MobileBase[OmniDrive]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(

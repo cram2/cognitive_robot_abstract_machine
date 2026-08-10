@@ -13,9 +13,11 @@ from coraplex.robot_plans.actions.core.misc import MoveToReach
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Door
 from semantic_digital_twin.spatial_types import Pose2D, Pose
-from semantic_digital_twin.world_description.graph_of_convex_sets import (
-    navigation_map_at_target,
+from semantic_digital_twin.world_description.graph_of_convex_sets.base import (
     translate_free_space_to_where_condition,
+)
+from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
+    navigation_map_at_target,
 )
 from semantic_digital_twin.exceptions import PointOccupiedError
 

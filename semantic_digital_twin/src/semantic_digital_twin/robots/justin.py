@@ -19,6 +19,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasFingers,
     TGenericFingerOtherThanThumb,
 )
+from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
@@ -418,7 +419,7 @@ class JustinTorso(
 
 
 @dataclass(eq=False)
-class JustinMobileBase(MobileBase, HasTorso[JustinTorso]):
+class JustinMobileBase(MobileBase[OmniDrive], HasTorso[JustinTorso]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(

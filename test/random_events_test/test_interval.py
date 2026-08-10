@@ -69,6 +69,19 @@ class SimpleIntervalTestCase(unittest.TestCase):
         b = SimpleInterval.from_data(0, 1)
         self.assertEqual(a, b)
 
+    def test_size(self):
+        self.assertEqual(SimpleInterval.from_data(0, 2.5).size, 2.5)
+        self.assertEqual(
+            SimpleInterval.from_data(1, 1, Bound.CLOSED, Bound.CLOSED).size, 0
+        )
+
+    def test_size_of_empty_interval(self):
+        self.assertEqual(SimpleInterval.from_data().size, 0)
+        self.assertEqual(SimpleInterval.from_data(3, 1).size, 0)
+
+    def test_size_of_unbounded_interval(self):
+        self.assertEqual(SimpleInterval.from_data(0, float("inf")).size, float("inf"))
+
 
 class IntervalTestCase(unittest.TestCase):
 
@@ -150,6 +163,19 @@ class IntervalTestCase(unittest.TestCase):
     def test_contained_integers(self):
         a = open(2, 4) | closed_open(4.5, 6)
         self.assertEqual(list(a.contained_integers()), [3, 5])
+
+    def test_size_sums_the_simple_intervals(self):
+        a = closed(0, 1) | closed(3, 4.5)
+        self.assertEqual(a.size, 2.5)
+
+    def test_size_counts_overlapping_intervals_once(self):
+        a = Interval.from_simple_sets(
+            SimpleInterval.from_data(0, 2), SimpleInterval.from_data(1, 3)
+        )
+        self.assertEqual(a.size, 3)
+
+    def test_size_of_the_reals(self):
+        self.assertEqual(reals().size, float("inf"))
 
 
 if __name__ == "__main__":

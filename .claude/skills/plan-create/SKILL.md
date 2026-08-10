@@ -9,8 +9,8 @@ allowed-tools: Bash, Read, Write, Grep, Glob, AskUserQuestion, Skill, mcp__githu
 Generic, plan-agnostic tooling — nothing in this file may hardcode a
 specific plan's id, branches, or PRs. This is the authoring half of the
 plan-dashboard system; `.claude/skills/plan-dashboard/SKILL.md` is the
-reading/publishing half. Read `.claude/personal/plans/README.md` (on the
-personal-notes branch) for the full `plan.yaml` schema before drafting
+reading/publishing half. Read `.claude/skills/plan-dashboard/plan-schema.md`
+for the full `plan.yaml` schema before drafting
 anything — this skill must produce manifests that pass the exact same
 validation `plan-dashboard` step 2 runs, not a close approximation.
 
@@ -20,6 +20,14 @@ comment — this skill just does that authoring for you, with the same
 rigor a careful session would: draft, validate, cross-check live state,
 confirm judgment calls with the user, then bootstrap and publish. It never
 takes a shortcut a hand-written manifest wouldn't also have to clear.
+
+## 0. Check the setup is in place, and offer it if not
+
+Everything below writes to the personal-notes branch, which the user may not
+have set up yet. Follow
+`.claude/skills/setup-personal-notes/prerequisite-check.md` before step 1:
+run the check, and if it reports anything missing, offer `/setup-personal-notes`
+rather than failing partway through drafting a plan.
 
 ## 1. Establish the plan id and refuse to silently overwrite
 
@@ -68,7 +76,7 @@ might draw on all three):
   has landed); a **track** is a parallel line of work within a wave — its
   items can proceed independently of other tracks in the same wave. Don't
   force a wave/track structure onto something that doesn't have one — an
-  over-modelled plan is worse than a flat one; see `plans/README.md` on
+  over-modelled plan is worse than a flat one; see `plan-schema.md` on
   why items are flat and tagged rather than nested.
 
 ## 3. Draft the structure, surfacing judgment calls rather than guessing
@@ -116,7 +124,7 @@ single session will obviously own it end to end). If yes:
 
 1. Create a GitHub **issue** titled `[plan-tracking] <plan-id>`, with a body
    explaining its purpose (not a work item — here's how proposals/replies
-   work; see `plans/README.md`'s "Proposing structural changes" section for
+   work; see `plan-schema.md`'s "Proposing structural changes" section for
    the convention to describe).
 2. Subscribe to it (the same PR-activity subscription tool also works on a
    plain issue number — confirmed empirically, not assumed; there is no
@@ -138,7 +146,7 @@ to it should check which kind it actually is rather than assuming
 
 ## 6. Write and validate `plan.yaml` + `roadmap.md`
 
-Follow the schema in `plans/README.md` exactly: `schema_version: 1`, `id`,
+Follow the schema in `plan-schema.md` exactly: `schema_version: 1`, `id`,
 `title`, `description`, `default_repository`, `tracking_issue` (if step 5 created
 one), `waves[]`, `tracks[]` (each tagged with a `wave`), `items[]` (flat,
 each tagged with a `track`, `status` from the thin enum `not_started |

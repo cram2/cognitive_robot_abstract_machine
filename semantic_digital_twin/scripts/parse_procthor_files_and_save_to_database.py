@@ -9,7 +9,7 @@ import tqdm
 from sqlalchemy.orm import Session
 
 from krrood.symbol_graph.symbol_graph import SymbolGraph
-from krrood.ormatic.dao import to_dao
+from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import drop_database, create_engine
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.world import World
@@ -119,7 +119,7 @@ def parse_fbx_file_to_world_mapping_daos(fbx_file_path: str) -> List[WorldMappin
         resolved = resolver.resolve(world.name)
         if resolved:
             with world.modify_world():
-                world.add_semantic_annotation(resolved(body=world.root))
+                world.add_semantic_annotation(resolved(root=world.root))
 
     return [to_dao(world) for world in worlds]
 

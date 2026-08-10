@@ -28,7 +28,8 @@ You will:
 import os
 import logging
 
-from pkg_resources import resource_filename
+from importlib.resources import files
+from pathlib import Path
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -36,9 +37,10 @@ from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransfo
 from semantic_digital_twin.world_description.connections import FixedConnection, Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.world_entity import Body, Region
+from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 
 logging.disable(logging.CRITICAL)
-root_path = resource_filename("semantic_digital_twin", "../../")
+root_path = Path(files("semantic_digital_twin")).parent.parent
 table_urdf = os.path.join(root_path, "resources", "urdf", "table.urdf")
 ```
 
@@ -109,5 +111,5 @@ with world.modify_world():
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 after_pos = surface_region.global_pose.to_position().to_np()[:3]
-assert (before_pos != after_pos).any(), "The region pose should change when the table moves."
+if not (before_pos != after_pos).any(): raise ExerciseVerificationFailed("The region pose should change when the table moves.")
 ```

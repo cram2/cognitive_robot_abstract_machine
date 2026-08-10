@@ -21,6 +21,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasEndEffector,
     HasSensors,
 )
+from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
@@ -208,7 +209,7 @@ class MMPDresdenTorso(Torso, HasOneArm[MMPDresdenArm], HasSensors[MMPDresdenCame
 
 
 @dataclass(eq=False)
-class MMPDresdenMobileBase(MobileBase, HasTorso[MMPDresdenTorso]):
+class MMPDresdenMobileBase(MobileBase[OmniDrive], HasTorso[MMPDresdenTorso]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(

@@ -83,8 +83,8 @@ class ActionServerTask(
         Creates the action client.
         """
         ros_context_extension = context.require_extension(RosContextExtension)
-        self._action_client = ActionClient(
-            ros_context_extension.ros_node, self.message_type, self.action_topic
+        self._action_client = ros_context_extension.get_or_create_action_client(
+            self.message_type, self.action_topic
         )
         self.build_msg(context)
         logger.info(f"Waiting for action server {self.action_topic}")

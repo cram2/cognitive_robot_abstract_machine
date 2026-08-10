@@ -105,10 +105,9 @@ class Having(Filter, BinaryExpression):
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
         yield from (
-            OperationResult(
+            self._build_operation_result_with_truth_(
+                annotated_result.is_true,
                 grouping_result.bindings | annotated_result.bindings,
-                annotated_result.is_false,
-                self,
             )
             for grouping_result in self.grouped_by._evaluate_(sources)
             for annotated_result in self._evaluate_child_as_condition_(
@@ -180,7 +179,7 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         :return: A tuple containing the dictionary of groups and the dictionary of group keys to their corresponding counts.
         """
 
-        groups = defaultdict(lambda: OperationResult({}, False, self))
+        groups = defaultdict(lambda: OperationResult({}, self))
         group_key_count = defaultdict(lambda: 0)
 
         for res in self._evaluate_product_(sources):

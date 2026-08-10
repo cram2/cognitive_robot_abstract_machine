@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass, field
 from time import sleep
 
+import pytest
 from rclpy.duration import Duration
 from rclpy.time import Time
 from visualization_msgs.msg import MarkerArray, Marker
@@ -19,8 +20,9 @@ from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     FixedConnection,
 )
-from semantic_digital_twin.world_description.geometry import Mesh
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.geometry import Mesh, Box, Color, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body, Region
 
 
 @dataclass
@@ -153,6 +155,51 @@ def test_visualization_marker_tracy(rclpy_node, tracy_world):
             assert marker.color.g == 0.0
             assert marker.color.b == 0.0
             assert marker.color.a == 0.0
+            break
+    else:
+        assert False, "Marker not found"
+
+
+def test_visualization_marker_regions_are_transparent(rclpy_node, cylinder_bot_world):
+    region = Region(
+        name=PrefixedName("region"),
+        area=ShapeCollection(
+            shapes=[Box(scale=Scale(0.1, 0.1, 0.1), color=Color(A=1.0))]
+        ),
+    )
+    connection = FixedConnection(parent=cylinder_bot_world.root, child=region)
+    with cylinder_bot_world.modify_world():
+        cylinder_bot_world.add_region(region)
+        cylinder_bot_world.add_connection(connection)
+
+    tf_wrapper = TFWrapper(node=rclpy_node)
+    tf_publisher = TFPublisher(node=rclpy_node, _world=cylinder_bot_world)
+    viz = VizMarkerPublisher(
+        _world=cylinder_bot_world,
+        node=rclpy_node,
+        shape_source=ShapeSource.COLLISION_ONLY,
+    )
+
+    callback = Callback()
+
+    sub = rclpy_node.create_subscription(
+        msg_type=MarkerArray,
+        topic=viz.topic_name,
+        callback=callback,
+        qos_profile=viz.qos_profile,
+    )
+    for i in range(30):
+        if callback.last_msg is not None:
+            break
+        sleep(0.1)
+    else:
+        assert False, "Callback timed out"
+
+    # the shape's own color is fully opaque, but region markers must always be
+    # forced transparent regardless of that
+    for marker in callback.last_msg.markers:
+        if marker.ns == str(region.name):
+            assert marker.color.a == pytest.approx(viz.region_alpha)
             break
     else:
         assert False, "Marker not found"

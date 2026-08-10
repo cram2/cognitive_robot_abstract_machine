@@ -66,6 +66,14 @@ set -euo pipefail
 # the BEGIN-PERSONAL-NOTES/END-PERSONAL-NOTES markers, then runs the save
 # script to push the change back.
 #
+# Personal settings: the same branch may also carry a
+# `.claude/personal/settings.local.json`, which is copied verbatim into this
+# clone's `.claude/settings.local.json` - the file Claude Code reads as local
+# settings, so personal permission rules, env vars and the like follow you into
+# every clone the same way your notes do. It is never merged (gitignored, exactly
+# like CLAUDE.local.md), and local edits to it are never overwritten - see the
+# settings block near the bottom of this script and ./save-personal-settings.sh.
+#
 # PR progress: on any branch with a sensible "current PR" (i.e. not the
 # default branch, a detached HEAD, or the personal-notes branch itself - see
 # pr_progress_path in ./resolve-personal-notes-config.sh), CLAUDE.local.md
@@ -77,9 +85,9 @@ set -euo pipefail
 # initialize and maintain it from the start. See ./save-pr-progress.sh.
 #
 # Plan auto-discovery: if the current branch appears as an item in some
-# multi-PR/multi-session plan (see .claude/personal/plans/README.md and
-# .claude/skills/plan-dashboard/SKILL.md, on the personal-notes branch and
-# main respectively), CLAUDE.local.md also gets that plan's manifest
+# multi-PR/multi-session plan (see .claude/skills/plan-dashboard/plan-schema.md
+# and .claude/skills/plan-dashboard/SKILL.md), CLAUDE.local.md also gets
+# that plan's manifest
 # (plan.yaml) and narrative (roadmap.md) pulled in - so a session picks up
 # the wider initiative its branch belongs to without anyone having to ask it
 # to go read a roadmap doc by hand. Looked up via the generated
@@ -96,8 +104,15 @@ set -euo pipefail
 # directly - any session may make structural changes, there is no
 # designated steward - and to subscribe to the tracking issue itself while
 # actively working an item, so another session's structural change reaches
-# it in real time - see plans/README.md's "Proposing structural changes"
+# it in real time - see plan-schema.md's "Proposing structural changes"
 # section for the full convention.
+#
+# Recheck stamp: every run also records the personal-notes commit this
+# clone just fetched (gitignored, see PLAN_STATE_SYNC_STAMP in
+# ./resolve-personal-notes-config.sh), regardless of whether this branch
+# tracks a plan. ./plan-updates-since.sh diffs from that stamp instead of a
+# session rereading whole plan files to answer "what changed since I last
+# looked" - see that script and cram-notes.md's recheck-deltas convention.
 #
 # How this script gets invoked (see ../settings.json): Claude Code registers it
 # as a SessionStart hook via `$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh`.
@@ -121,6 +136,15 @@ fetch_personal_notes_branch || exit 0
 # FETCH_HEAD, not "${ACTIVE_NOTES_REMOTE}/${NOTES_BRANCH}": a URL-form remote
 # creates no remote-tracking ref, but FETCH_HEAD always points at what was
 # just fetched, whether the serving remote was a name or a raw URL.
+
+# Stamp this run's baseline unconditionally - not only when the current
+# branch turns out to track a plan below. This is the whole branch's tip,
+# fetched regardless, so it's just as valid a "last time I looked" baseline
+# for a session working on a plan more broadly (e.g. a plan-item-kickoff
+# session on a branch that isn't itself a tracked item) as for one on a
+# tracked item's own branch. See ./plan-updates-since.sh, the recheck tool
+# this stamp exists for.
+record_plan_state_sync_stamp
 
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 # Sanitized copy for embedding into this script's <!-- ... --> HTML comment
@@ -204,7 +228,7 @@ if [ -n "${PLAN_ID}" ]; then
     # same dependency-free reasoning as plan_id_for_branch above. Empty if
     # the plan has no tracking_issue set (nothing to extract, not an error).
     # Named for the mailbox's role, not necessarily a literal GitHub Issue -
-    # see plans/README.md's PR-fallback note for repos with Issues disabled.
+    # see plan-schema.md's PR-fallback note for repos with Issues disabled.
     TRACKING_ISSUE="$(git show "FETCH_HEAD:${PLAN_MANIFEST_PATH}" 2>/dev/null \
       | grep -oE '^tracking_issue:[[:space:]]*[0-9]+' | head -1 | grep -oE '[0-9]+$')"
     if [ -n "${TRACKING_ISSUE}" ]; then
@@ -217,7 +241,7 @@ infer and apply silently just because editing the manifest directly is
 technically allowed. Once they confirm, make the edit and always also leave
 a comment on the tracking issue (#${TRACKING_ISSUE}) describing it, since
 the user reviews structural changes there and it is the shared record other
-sessions working this plan can check - see plans/README.md's 'Proposing
+sessions working this plan can check - see plan-schema.md's 'Proposing
 structural changes' section. If this session is actively working an item in
 this plan, also subscribe to the tracking issue itself (in addition to your
 own item's PR) so a structural change another session makes reaches you
@@ -231,7 +255,7 @@ mailbox for structural changes yet - edit the manifest directly as usual."
 Plan manifest for '${PLAN_ID}', synced from '${NOTES_BRANCH}'
 (${PLAN_MANIFEST_PATH}) on remote '${ACTIVE_NOTES_REMOTE}' by
 session-start.sh. This branch is tracked as an item in this plan - see
-.claude/personal/plans/README.md for the schema and
+.claude/skills/plan-dashboard/plan-schema.md for the schema and
 .claude/skills/plan-dashboard/SKILL.md for how it's used and refreshed.
 To edit: change the manifest between the markers below, then run
   "\$CLAUDE_PROJECT_DIR/.claude/hooks/save-plan.sh"
@@ -272,6 +296,29 @@ else
   rm -f "${OUTPUT_FILE}"
 fi
 
+# Personal settings: unlike everything above, these don't go into CLAUDE.local.md -
+# they are copied verbatim to .claude/settings.local.json, the file Claude Code
+# itself reads as this project's local settings (see PERSONAL_SETTINGS_PATH in
+# ./resolve-personal-notes-config.sh). No header or markers: it is strict JSON,
+# which has no comment syntax to carry them.
+#
+# Locally modified settings are never overwritten. Claude Code writes to this same
+# file whenever a permission is granted with "don't ask again", so a blind copy
+# every session start would silently drop those grants - see
+# personal_settings_are_locally_modified. Run ./save-personal-settings.sh to push
+# such edits up, which makes them the new baseline and lets syncing resume.
+SUMMARY_SETTINGS="none on '${NOTES_BRANCH}' (${PERSONAL_SETTINGS_PATH})"
+if git cat-file -e "FETCH_HEAD:${PERSONAL_SETTINGS_PATH}" 2>/dev/null; then
+  if personal_settings_are_locally_modified; then
+    SUMMARY_SETTINGS="kept local edits to ${LOCAL_SETTINGS_RELATIVE_PATH} - run save-personal-settings.sh to push them"
+  else
+    mkdir -p "$(dirname "${LOCAL_SETTINGS_JSON}")"
+    git show "FETCH_HEAD:${PERSONAL_SETTINGS_PATH}" > "${LOCAL_SETTINGS_JSON}"
+    record_personal_settings_sync
+    SUMMARY_SETTINGS="synced to ${LOCAL_SETTINGS_RELATIVE_PATH}"
+  fi
+fi
+
 # Deterministic session-start report: what this run found and wrote, printed
 # once by the script itself rather than left for a session to notice and
 # describe secondhand from CLAUDE.local.md's content. SessionStart hook
@@ -281,6 +328,8 @@ fi
 cat <<SUMMARY
 session-start.sh summary:
   personal notes:  ${SUMMARY_NOTES}
+  local settings:  ${SUMMARY_SETTINGS}
   PR progress:     ${SUMMARY_PROGRESS}
   plan:            ${SUMMARY_PLAN}
+  plan state SHA:  $(git rev-parse FETCH_HEAD) (run plan-updates-since.sh <plan-id> to recheck from here later)
 SUMMARY

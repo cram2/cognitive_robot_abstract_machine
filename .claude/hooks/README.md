@@ -1,353 +1,183 @@
 # Personal Claude Code notes hook
 
-An opt-in `SessionStart` hook that populates `CLAUDE.local.md` — which Claude Code already loads
-automatically as project memory, and which is gitignored — from a personal branch you name for
-yourself on a remote (`origin` by default), so your own workflow preferences ("always open my PRs
-as drafts," "never touch branch X directly," etc.) persist across sessions without ever being
+A `SessionStart` hook that writes your own workflow preferences into `CLAUDE.local.md` — which
+Claude Code already loads as project memory, and which is gitignored — from a branch on a remote
+you own. Your notes (e.g. "always open my PRs as drafts") follow you across sessions and are never
 committed to a shared branch.
 
-It works out of the box with no config at all: it reads from a branch named `claude/personal-notes`
-on `origin` unless you tell it otherwise. Run [`create-personal-notes-branch.sh`](./create-personal-notes-branch.sh)
-once to create that branch with an empty notes file, and every session from then on picks it up
-automatically. It is collision-free for multiple contributors sharing one remote if you each
-override the branch name via your own config instead of relying on the shared default.
+> **Rather see it in action than read about it?**
+> [`example-walkthrough.md`](../skills/plan-dashboard/example-walkthrough.md) is a short worked
+> example of the whole thing in use, from a plan-mode idea to a published dashboard. Or just run
+> `/setup-personal-notes` in a session and come back here when you want the details.
 
-## How it decides what to read
+Three kinds of content, stored the same way and never merged anywhere:
 
-`session-start.sh` looks for a remote in this order, first one found wins:
+| Section in `CLAUDE.local.md` | Holds | Stored on the notes branch at | Saved by |
+| --- | --- | --- | --- |
+| Personal notes | Your standing preferences | `.claude/personal/cram-notes.md` | [`save-personal-notes.sh`](./save-personal-notes.sh) |
+| PR progress | Plan, progress and next steps for the current branch's PR | `.claude/personal/pr-progress/<branch>.md` | [`save-pr-progress.sh`](./save-pr-progress.sh) |
+| Plan | A multi-PR initiative's manifest and roadmap | `.claude/personal/plans/<plan-id>/` | [`save-plan.sh`](./save-plan.sh) |
 
-1. **`git config claude.personalNotesRemote`** — local to one clone's `.git/config`.
-2. **`CLAUDE_PERSONAL_NOTES_REMOTE` environment variable** — used only if the git config isn't set.
-3. **`origin`** — the zero-config default, used if neither of the above is set.
+The PR-progress section appears on any branch that isn't the default branch, a detached `HEAD`, or
+the notes branch itself, as an empty scaffold even before anything has been saved.
 
-The branch name on that remote follows the same precedence (`claude.personalNotesBranch` git
-config, then `CLAUDE_PERSONAL_NOTES_BRANCH` env var, then the default `claude/personal-notes`), and
-so does the path on that branch (`claude.personalNotesPath` git config, then
-`CLAUDE_PERSONAL_NOTES_PATH` env var, then the default `.claude/personal/cram-notes.md`).
+Your local Claude Code settings ride along on the same branch too, as a whole file rather than a
+section — see [Syncing your local Claude Code settings](#syncing-your-local-claude-code-settings).
+Every run prints a summary of what it found and wrote, so a session never has to infer it.
 
-The hook is still a no-op in effect for anyone who never creates the branch it resolves to on
-*neither* the resolved remote *nor* the fallback below: `git fetch` finds nothing, so it exits
-without writing `CLAUDE.local.md`.
+## Quick start
 
-### Fallback: the current branch's own upstream remote
+1. Run `/setup-personal-notes` in any Claude Code session on this repo.
+2. Answer the one question it asks — which remote your notes live on — or accept the default.
+3. Done. Every session from now on writes `CLAUDE.local.md` automatically.
 
-If the resolved remote doesn't have the branch, `session-start.sh` and `save-personal-notes.sh` try
-one more thing before giving up: the remote your *currently checked-out branch* already tracks
-(i.e. what `git rev-parse --abbrev-ref --symbolic-full-name @{upstream}` reports), if it has one and
-it differs from the resolved remote. This covers a very common case with zero configuration at
-all — a clone whose checked-out branch already tracks your own fork under some remote name other
-than `origin` (e.g. a session environment where `origin` is the shared upstream repo and your fork
-is a differently-named remote) — the hook finds your notes there automatically.
+It is safe to re-run: on a clone that's already set up it reports what it found and asks nothing.
+You don't have to run it first either — `/plan-create`, `/plan-dashboard`, `/plan-item-kickoff` and
+`/plan-item-resolve` each offer it if something is missing.
 
-This fallback is read-only: it only ever changes where notes are *read* from, never where
-`create-personal-notes-branch.sh` *creates* them (that script still targets exactly the resolved
-remote, so creation stays a deliberate, unambiguous act — though it does refuse to create a second,
-divergent copy if the branch already exists on the fallback remote; see its own comments). When
-`save-personal-notes.sh` reads notes via the fallback, it also *writes* the edit back to that same
-fallback remote, not the resolved one, so a save always lands wherever the notes actually came from.
-The header `session-start.sh` writes always names whichever remote actually served the notes, so
-it's never ambiguous which one was used.
-
-### When you need to override the remote
-
-The remote only needs overriding when your own notes don't live on this clone's `origin` — for
-example, some session environments name the upstream repo `origin` and give your own fork a
-different remote name, or don't add your fork as a remote at all. The value can be either form,
-and `git fetch`/`git push` accept both identically:
-
-- **A remote name already configured in the clone** (e.g. `myfork`) — the natural choice for a
-  persistent local clone where you've already added your fork as a remote.
-- **A raw git URL** (e.g. `https://github.com/<you>/<repo>`) — needs no `git remote add` first, so
-  it works even in a clone that's never heard of your fork (a session environment that only added
-  the upstream repo, or a fresh clone every session). This is usually the right choice for
-  overriding the remote specifically, since it has no dependency on a particular remote alias
-  existing.
-
-Whether you need to override the default branch name depends on how your sessions start:
-
-- **A persistent local clone** (you `git clone` once and keep working in it) → the default just
-  works once you've run the setup script below. Only set git config if you want a different
-  branch/path than the shared default (e.g. to keep your notes separate from other contributors').
-- **A fresh clone every session** (e.g. a cloud/web session environment that clones the repo from
-  scratch each time) → the default still just works, since it needs no `.git/config` entry to
-  survive. Only set the environment variable if you want to override it — see Option A below.
-
-## Setup: quick start (works for both persistent and fresh-clone sessions)
-
-Once, from any clone with push access to `origin`:
+To do the same by hand:
 
 ```bash
-"$CLAUDE_PROJECT_DIR/.claude/hooks/create-personal-notes-branch.sh"
+"$CLAUDE_PROJECT_DIR/.claude/hooks/create-personal-notes-branch.sh"           # create the branch
+"$CLAUDE_PROJECT_DIR/.claude/hooks/check-setup.sh"                            # inspect, change nothing
+"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh" && cat CLAUDE.local.md   # verify
 ```
 
-This creates `claude/personal-notes` on `origin` with a single empty
-`.claude/personal/cram-notes.md`, without touching your current branch or working tree. Every new
-Claude Code session — local or fresh-clone — now runs the hook automatically and writes
-`CLAUDE.local.md` from that branch, with no further configuration needed.
+`check-setup.sh` prints one row per check and exits non-zero if anything still needs doing.
 
 ## Editing your notes
 
-Just ask Claude, in any session: *"add \<X\> to my personal notes"* or *"edit my personal notes."*
-No extra setup or explanation is needed — `session-start.sh` writes a short header at the top of
-`CLAUDE.local.md` every session (see below), and since Claude Code already loads `CLAUDE.local.md`
-as project memory, that header is always in context. It names the resolved branch/path and points
-at [`save-personal-notes.sh`](./save-personal-notes.sh), so Claude edits the notes below the header
-and runs that script to push the change back — deterministically, with no guessing at where notes
-live or how to persist them.
+- **Ask Claude** — *"add \<X\> to my personal notes"*, *"edit my personal notes"*. Nothing else to
+  explain: the header the hook writes into `CLAUDE.local.md` is always in context and names the
+  branch, the path, and the script that pushes changes back.
+- **By hand** — edit `CLAUDE.local.md` between that section's `BEGIN-`/`END-` markers, then run the
+  save script from the table above.
 
-The header looks like this (regenerated every session — editing it has no effect), naming whichever
-remote actually served the notes (the resolved one, or the fallback):
+Only content between the markers is ever saved. Headers and markers are regenerated every session,
+so editing them has no effect.
 
-```
-<!--
-Personal notes, synced from 'claude/personal-notes' (.claude/personal/cram-notes.md) on remote
-'origin' by session-start.sh.
-To edit: change the notes between the markers below, then run
-  "$CLAUDE_PROJECT_DIR/.claude/hooks/save-personal-notes.sh"
-to push the change back. This header and the markers are regenerated every
-session from git config/environment/default (plus a same-branch-upstream
-fallback) - editing them has no effect; only content between the markers is
-ever saved.
--->
-<!-- BEGIN-PERSONAL-NOTES -->
-<!-- END-PERSONAL-NOTES -->
-```
+## Syncing your local Claude Code settings
 
-To do it by hand instead: edit `CLAUDE.local.md` between those two marker lines, then run
+The same branch can carry your personal `.claude/settings.local.json` — the file Claude Code reads
+as this project's local settings (permission rules, environment variables, anything else in its
+settings schema). Store it on the notes branch at `.claude/personal/settings.local.json` and each
+session start copies it into the project root, so permissions you'd otherwise re-grant in every
+fresh clone follow you around. It is gitignored; the committed `.claude/settings.json` stays the
+shared, team-wide one.
+
+It gets no header or markers — strict JSON has nowhere to put them — so the file is copied whole.
+
+**Your local edits are never overwritten.** Claude Code writes to that same file whenever you grant
+a permission with "don't ask again", so the hook writes only when the file is missing or still
+identical to what it last synced (tracked in the gitignored `.claude/.personal-settings-sync-hash`).
+Otherwise it keeps your version and says so in its summary. To push your edits up and let syncing
+resume:
 
 ```bash
-"$CLAUDE_PROJECT_DIR/.claude/hooks/save-personal-notes.sh"
+"$CLAUDE_PROJECT_DIR/.claude/hooks/save-personal-settings.sh"
 ```
 
-It resolves the branch/path exactly like `session-start.sh` does, extracts only what's between the
-markers, and pushes just that — in a scratch worktree, so your current branch and working tree are
-untouched, and as a no-op if nothing actually changed.
+Or ask Claude — *"save my Claude settings"* — the same way as your notes.
 
-## Tracking a PR's plan and progress
+## Configuration
 
-On any branch with a sensible "current PR" — not the default branch, a detached `HEAD`, or the
-personal-notes branch itself — `CLAUDE.local.md` also gets a second section, keyed to that branch,
-for the plan/progress/next-steps of whatever you're working on. Like the notes above, it's stored
-only on the personal-notes branch (at `.claude/personal/pr-progress/<branch-name>.md`), so it can
-never end up committed to the PR branch, or merged when the PR merges — that's a property of where
-it's stored, not a rule anyone has to remember.
+Three independent settings, each resolved as **git config**, then **environment variable**, then
+**default**:
 
-It's always present on a qualifying branch, even before anything's been saved — as a scaffold
-prompting you (or Claude) to initialize it — so the section is there to nudge maintaining it from
-the first session on a new PR, not only once something already exists:
+| Setting | git config | Environment variable | Default |
+| --- | --- | --- | --- |
+| Remote | `claude.personalNotesRemote` | `CLAUDE_PERSONAL_NOTES_REMOTE` | `origin` |
+| Branch | `claude.personalNotesBranch` | `CLAUDE_PERSONAL_NOTES_BRANCH` | `claude/personal-notes` |
+| Path | `claude.personalNotesPath` | `CLAUDE_PERSONAL_NOTES_PATH` | `.claude/personal/cram-notes.md` |
 
-```
-<!--
-PR progress for branch 'my-feature-branch', synced from 'claude/personal-notes'
-(.claude/personal/pr-progress/my-feature-branch.md) on remote 'origin' by
-session-start.sh. Maintain the current plan, what's done, and what's next
-here throughout work on this PR. It is never merged: it lives only on
-'claude/personal-notes', never on this branch. A stale file left behind after the
-PR merges is harmless (just unread from then on) - delete it directly on
-'claude/personal-notes' if you want to tidy it up.
-To edit: change the notes between the markers below, then run
-  "$CLAUDE_PROJECT_DIR/.claude/hooks/save-pr-progress.sh"
-to push the change back. This header and the markers are regenerated every
-session - editing them has no effect; only content between the markers is
-ever saved.
--->
-<!-- BEGIN-PR-PROGRESS -->
-No progress recorded yet for this branch. Initialize it now: a short plan,
-what's done so far, and what's next. Keep it current as you work.
-<!-- END-PR-PROGRESS -->
-```
+Override only what you need:
 
-Ask Claude to keep it updated the same way as your notes: it edits between the `BEGIN-PR-PROGRESS`/
-`END-PR-PROGRESS` markers, then runs [`save-pr-progress.sh`](./save-pr-progress.sh) — which resolves
-the same remote/branch as everything else, derives the path from whichever branch is currently
-checked out (never configured directly, so one PR's progress can't accidentally get saved under
-another PR's key), extracts only what's between its own markers, and pushes just that. A good anchor
-for *when* to save: whenever the plan changes, and before ending any turn that changed it.
+- **Remote** — when your notes don't live on this clone's `origin` (commonly: `origin` is the shared
+  upstream and your fork is a differently-named remote, or isn't a remote at all). Takes a remote
+  name (`myfork`) or a raw URL (`https://github.com/<you>/<repo>`); the URL form needs no
+  `git remote add` first, so it works in a clone that has never heard of your fork.
+- **Branch** — when several people share one remote and you don't want to collide on the default.
+- **Path** — rarely needed.
 
-## Tracking a multi-PR/multi-session plan (plan dashboards)
+### Where to put them
 
-A single PR's progress note (above) doesn't scale to an initiative spanning many PRs across several
-branches — a stacked refactor, a multi-wave programme, anything you'd otherwise write up as a
-one-off master-roadmap doc. For that, a **plan** is a structured
-`.claude/personal/plans/<plan-id>/plan.yaml` (waves, tracks, and items — branch, PR number, status,
-dependencies) plus a sibling `roadmap.md` for the narrative ("why", history, design decisions) that
-doesn't belong in structured data. Both live only on the personal-notes branch, exactly like
-everything else in this document. See
-[`.claude/personal/plans/README.md`](../personal/plans/README.md) (on the personal-notes branch) for
-the full schema, and [`.claude/skills/plan-dashboard/SKILL.md`](../skills/plan-dashboard/SKILL.md)
-for how a plan gets turned into a live Artifact dashboard. New to this - want to see it end to end
-before diving into the schema reference? See
-[`plan-dashboard/example-walkthrough.md`](../skills/plan-dashboard/example-walkthrough.md): a short,
-worked example with screenshots, from a plan-mode idea to a published dashboard.
+- **A persistent local clone** → `git config <key> <value>`, once per clone. Never committed.
+- **A fresh clone every session** (cloud/web) → git config won't survive, so use the environment:
+  - Your environment has a **persistent environment-variable list**: paste the variables in, per
+    [`personal-notes.env.example`](./personal-notes.env.example). Nothing else to configure.
+  - Your environment has a **setup script**: export the variables there, then call
+    [`configure-personal-notes.sh`](./configure-personal-notes.sh) — it seeds the fresh clone's git
+    config from them, and is a no-op if none are set.
 
-**Auto-discovery.** If the branch you're on appears as an item in some plan, `CLAUDE.local.md` also
-gets that plan's `plan.yaml` and `roadmap.md` pulled in — the same idea as PR progress above, but for
-the wider initiative your branch belongs to, so you don't have to go find and read a roadmap doc by
-hand. This is looked up via a generated branch→plan-id reverse index
-(`.claude/personal/plans/_generated/branch-index.tsv`), never hand-maintained, so it can't drift out
-of sync with the plans it's derived from. Unlike PR progress, there's no scaffold for a branch with
-no plan — most branches don't belong to one, and `CLAUDE.local.md` simply gets no plan section that
-session.
+For Claude Code on the web, see <https://code.claude.com/docs/en/claude-code-on-the-web> for where
+either of those lives.
 
-**Editing.** Change the manifest/roadmap between the `BEGIN-PLAN-MANIFEST`/`END-PLAN-MANIFEST` and
-`BEGIN-PLAN-ROADMAP`/`END-PLAN-ROADMAP` markers, then run
-[`save-plan.sh`](./save-plan.sh) `[<plan-id>]` — it pushes both files back and regenerates the
-reverse index in the same commit (scanning every plan, so the index can't drift). The plan id is
-optional if the current branch already resolves to one; pass it explicitly to save a plan from a
-branch that isn't itself one of its tracked items, or to bootstrap a brand-new plan (see
-`save-plan.sh`'s own header comment for that flow — there is still no separate create-plan.sh, but
-see "Creating a new plan" below for the automated version of doing it by hand).
+### Fallback: your branch's own upstream
 
-**Publishing the dashboard.** `save-plan.sh` only pushes data — it can't call the `Artifact` tool
-itself (only a live Claude session can), so it prints a reminder to run `/plan-dashboard <plan-id>`
-afterward. That skill re-reads the manifest, cross-checks every item against live GitHub PR/CI/review
-state (so a manifest can never silently go stale the way a hand-maintained roadmap doc could), and
-publishes/updates the dashboard Artifact. Run `/plan-dashboard` with no argument to publish the
-master index listing every plan.
+If the resolved remote doesn't have the notes branch, the hook tries one more: the remote your
+currently checked-out branch already tracks. That covers the common case of a fork added under some
+name other than `origin`, with no configuration at all.
 
-**Pull request labels this tooling relies on.** These are the only labels
-[`build_dashboard.py`'s `PullRequestLabel`](../skills/plan-dashboard/build_dashboard.py) recognizes —
-every one of them is a label this repo's own convention applies by hand, never one GitHub sets
-itself:
+Reads use the fallback; `create-personal-notes-branch.sh` never creates there. `save-personal-notes.sh`
+writes back to whichever remote actually served the notes, and the header always names it.
 
-- `merged` — applied when a pull request's changes actually landed but GitHub's own merge API never
-  recorded it (its branch was pushed directly, then the pull request closed by hand rather than
-  through GitHub's merge button). `build_dashboard.py`'s drift/status logic treats this exactly like
-  `merged_at` being set — see `PullRequestRecord.was_merged`.
-- `in-review` and `bug` — established conventions (a pull request under active review; a bug-fix
-  pull request, per this file's personal PR-conventions precedent) that no script currently reads,
-  documented here so they're recognized (via `PullRequestRecord.identified_labels`) rather than
-  silently falling through as an arbitrary, unrecognized label.
+## Plan dashboards (multi-PR initiatives)
 
-Any other label a real pull request carries is preserved in `PullRequestRecord.labels` (GitHub's own
-label vocabulary is open-ended, and other automation on this repo may add labels this dashboard has
-no reason to know about) but isn't specially interpreted.
+When one PR's progress note isn't enough — a stacked refactor, a multi-wave programme, anything
+you'd otherwise write up as a one-off master-roadmap doc — a **plan** is a `plan.yaml` (waves,
+tracks, and items with branch, PR number, status and dependencies) plus a sibling `roadmap.md` for
+the narrative that doesn't belong in structured data.
 
-**Creating a new plan.** [`.claude/skills/plan-create/SKILL.md`](../skills/plan-create/SKILL.md)
-(`/plan-create <plan-id>`) automates the bootstrap flow above end to end: it gathers the plan's
-scope (from an existing freeform roadmap doc to migrate, from named branches/PRs to cross-check
-live, or from conversation), drafts a schema-conformant `plan.yaml`/`roadmap.md`, validates it the
-same way `plan-dashboard` does, surfaces any structural judgment calls to you via a question rather
-than guessing, then runs `save-plan.sh` and `/plan-dashboard` itself. Doing it by hand (the marker +
-`save-plan.sh` flow above) still works — the skill is a convenience over that same path, not a
-different one. It also creates a **tracking issue** as a coordination mailbox: any session can make
-a structural change (new phase, deferring a track, etc.) directly to `plan.yaml`, but should ask the
-user in the session first (e.g. via `AskUserQuestion`) rather than deciding unilaterally, and always
-also comments on the tracking issue describing it once confirmed — that's the shared record other
-sessions working the plan can check, and the user reviews structural changes there. (Falls back to an empty-commit,
-permanently-draft PR instead if a repo has Issues disabled.) See `.claude/personal/plans/README.md`'s
-"Proposing structural changes" section for the full convention. `session-start.sh`'s written header
-reminds a session actively working an item to subscribe to the tracking issue too, so a change
-another session makes reaches it in real time.
+- Worked example → [`example-walkthrough.md`](../skills/plan-dashboard/example-walkthrough.md).
+- Field reference → [`plan-schema.md`](../skills/plan-dashboard/plan-schema.md).
+- Create one → `/plan-create <plan-id>`.
+- Publish or refresh → `/plan-dashboard [<plan-id>]`; no argument publishes the master index of
+  every plan. It cross-checks every item against live GitHub PR/CI/review state, so a manifest
+  can't silently go stale the way a hand-maintained roadmap doc could.
+- Start or unblock one item → `/plan-item-kickoff <plan-id> <item-id>`,
+  `/plan-item-resolve <plan-id> <item-id>`. Kickoff opens the item's branch and draft PR and
+  marks it `in_progress` as soon as its plan is approved — via
+  [`plan_item_bootstrap.py`](./plan_item_bootstrap.py), which you can also run by hand — so the
+  manifest never says `not_started` while the work is underway.
+- Recheck one for updates, without rereading it →
+  [`plan-updates-since.sh`](./plan-updates-since.sh) `<plan-id> [--since <sha>]`. Every
+  `session-start.sh` run stamps the notes-branch commit it just fetched (gitignored, at
+  `.claude/.plan-state-sync-sha`), so this can diff the plan's directory from that stamp and print
+  only the tracking-issue comments newer than it. Needs no Claude Code session: it prefers the `gh`
+  CLI when installed, otherwise `GH_TOKEN`/`GITHUB_TOKEN` with `curl`.
 
-## Setup: overriding the default remote/branch/path
+**Auto-discovery.** If your branch is an item in some plan, that plan's `plan.yaml` and `roadmap.md`
+are pulled into `CLAUDE.local.md` too, via a generated branch-to-plan index that `save-plan.sh`
+regenerates from every manifest on each save, so it can't drift.
 
-Skip this section if the zero-config default above is all you need. The three settings are
-independent — override only the one(s) you actually need (e.g. just the remote, if your fork isn't
-this clone's `origin` but the default branch/path are fine).
+**Labels the dashboard reads**, all applied by this repo's convention rather than by GitHub itself:
 
-### Persistent local clone
+- `merged` — the changes landed but GitHub's merge API never recorded it (branch pushed directly,
+  PR then closed by hand). Treated exactly like a real merge.
+- `in-review`, `bug` — recognized so they don't read as unknown labels; no script acts on them yet.
 
-Once per clone, never committed:
-
-```bash
-git config claude.personalNotesRemote <remote-name-or-url>   # optional, defaults to origin
-git config claude.personalNotesBranch <your-branch-name>
-git config claude.personalNotesPath   <path-on-that-branch>   # optional, defaults to
-                                                                 # .claude/personal/cram-notes.md
-```
-
-Push your notes file to that branch on that remote (any branch name, any path — it never merges
-anywhere), e.g. by running the branch-creation script with overrides:
-
-```bash
-CLAUDE_PERSONAL_NOTES_REMOTE=<remote-name-or-url> \
-  CLAUDE_PERSONAL_NOTES_BRANCH=<your-branch-name> CLAUDE_PERSONAL_NOTES_PATH=<path-on-that-branch> \
-  "$CLAUDE_PROJECT_DIR/.claude/hooks/create-personal-notes-branch.sh"
-```
-
-### Cloud/web sessions (fresh clone every time)
-
-Push your notes file exactly as above first. Then wire the environment variables into your session
-environment's configuration — which of the two options below applies depends on what your specific
-environment offers:
-
-### Option A: your environment has a persistent environment-variable list
-
-Copy [`personal-notes.env.example`](./personal-notes.env.example) into that list, with your own
-values substituted:
-
-```
-CLAUDE_PERSONAL_NOTES_REMOTE=<remote-name-or-url>
-CLAUDE_PERSONAL_NOTES_BRANCH=<your-branch-name>
-CLAUDE_PERSONAL_NOTES_PATH=<path-on-that-branch>
-```
-
-`session-start.sh` reads these directly — nothing else to configure.
-
-### Option B: your environment has a "setup script" (arbitrary commands run on every fresh clone)
-
-Set the same variables however that setup script can see them (its own env-var mechanism, or
-literal `export` lines above the call), then run
-[`configure-personal-notes.sh`](./configure-personal-notes.sh), e.g.:
-
-```bash
-export CLAUDE_PERSONAL_NOTES_REMOTE=<remote-name-or-url>   # optional
-export CLAUDE_PERSONAL_NOTES_BRANCH=<your-branch-name>
-export CLAUDE_PERSONAL_NOTES_PATH=<path-on-that-branch>   # optional
-"$CLAUDE_PROJECT_DIR/.claude/hooks/configure-personal-notes.sh"
-```
-
-This seeds the fresh clone's git config from those variables, so `session-start.sh` finds them
-exactly as it would for a persistent local clone. It's a no-op if none of the three are set, so
-it's safe to include even before you've opted in.
-
-See your environment provider's docs for exactly where to paste a setup script or persistent
-environment variables (for Claude Code on the web: <https://code.claude.com/docs/en/claude-code-on-the-web>).
-
-## Verifying it worked
-
-Start a fresh session and check whether `CLAUDE.local.md` exists at the project root with your
-notes content. To check the mechanics without waiting for a real session boot, run the hook
-directly:
-
-```bash
-"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh" && cat CLAUDE.local.md
-```
+Any other label is preserved but not interpreted.
 
 ## Safety
 
-- No-op in effect for anyone who never creates the `claude/personal-notes` branch (or an override
-  target) on either the resolved remote or its upstream-tracking fallback: `git fetch` finds
-  nothing on either, so nothing gets written.
-- Never merges anything: the hook only ever *reads* the resolved branch, off `FETCH_HEAD` via `git
-  show` (not a `<remote>/<branch>` ref, since a URL-form remote creates no tracking ref for one). It
-  never checks the branch out or merges it into your working branch.
-- `create-personal-notes-branch.sh`, `save-personal-notes.sh` and `save-pr-progress.sh` never touch
-  your current branch or working tree either — all three do their work in a scratch worktree.
-  `create-personal-notes-branch.sh` refuses to run if the target branch already exists locally, on
-  the resolved remote, or on the upstream-tracking fallback remote (see above); the two save scripts
-  are each a no-op if there's nothing new to push.
-- The sync headers `session-start.sh` writes are never themselves pushed back: `save-personal-notes.sh`
-  and `save-pr-progress.sh` each extract only the content between their own markers
-  (`BEGIN-PERSONAL-NOTES`/`END-PERSONAL-NOTES` and `BEGIN-PR-PROGRESS`/`END-PR-PROGRESS`
-  respectively) before committing, so neither header, and neither script's section, can ever leak
-  into the other's saved content.
-- PR-progress content is never merged, by construction: it is written only to the branch-keyed path
-  on the personal-notes branch, never to any file tracked on the PR branch itself, so there is no
-  code path by which it could end up in a commit that gets merged.
-- `CLAUDE.local.md` is gitignored, so populated notes can't accidentally end up in a commit on any
-  branch, including this one.
-- All four scripts always operate on *this* repo's project root specifically, never wherever they
-  happen to be invoked from: a `SessionStart` hook's cwd isn't guaranteed to be the project root,
-  and these scripts are also meant to be run directly. Each resolves its own location on disk
-  (`resolve-personal-notes-config.sh`'s own path, not `$CLAUDE_PROJECT_DIR` or the caller's cwd,
-  since neither is guaranteed) to find the project root deterministically, then both `cd`s there for
-  every git operation and reads/writes `CLAUDE.local.md` at that exact path — so it's never created
-  in, or read from, some other directory, even one that's a subdirectory of a *different* repo.
-- Safe to re-run: `session-start.sh` only ever overwrites `CLAUDE.local.md`, and does nothing if
-  the resolved branch or path isn't reachable (e.g. a fresh clone, or a fork that never created
-  it).
-- Coexists with your own hooks: Claude Code merges `SessionStart` hook arrays across all settings
-  layers by concatenation, not override, so this hook runs alongside — never instead of — any
-  `SessionStart` hook you already have configured for yourself.
+- Does nothing until you create the notes branch: `git fetch` finds nothing, so `CLAUDE.local.md` is
+  never written.
+- Never merges and never checks anything out — the hook and `plan-updates-since.sh` only read the
+  branch off `FETCH_HEAD`.
+- Never touches your current branch or working tree: every script that writes works in a scratch
+  worktree.
+- `create-personal-notes-branch.sh` refuses to run if the branch already exists anywhere it can see,
+  so it can't overwrite notes you already have. The save scripts are no-ops when nothing changed.
+- Each save script extracts only its own markers, so neither the sync headers nor another section's
+  content can leak into what it pushes.
+- PR progress and plans can't be merged into a PR by construction: they're only ever written to the
+  notes branch, never to a file tracked on your branch.
+- Synced settings never silently replace local ones: `.claude/settings.local.json` is written only
+  when it's missing or unchanged since the last sync, so "don't ask again" grants survive until you
+  run `save-personal-settings.sh` yourself.
+- `CLAUDE.local.md`, `.claude/settings.local.json` and the recheck stamp
+  `.claude/.plan-state-sync-sha` are all gitignored.
+- Always operates on this repo's project root, resolved from the scripts' own location on disk —
+  not the caller's cwd, which a `SessionStart` hook can't rely on.
+- Coexists with your own `SessionStart` hooks: Claude Code concatenates hook arrays across settings
+  layers rather than overriding them.

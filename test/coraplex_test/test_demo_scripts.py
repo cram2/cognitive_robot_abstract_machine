@@ -9,6 +9,7 @@ DEMOS_ROOT = Path(__file__).resolve().parents[2] / "coraplex" / "demos"
 WRAPPER_PATHS = [
     DEMOS_ROOT / "coraplex_bullet_world_demo" / "test_demo.py",
     DEMOS_ROOT / "coraplex_real_tracy" / "test_demo.py",
+    DEMOS_ROOT / "coraplex_unitree_g1_warehouse_demo" / "test_demo.py",
 ]
 
 

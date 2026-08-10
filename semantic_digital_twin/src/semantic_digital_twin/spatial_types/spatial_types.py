@@ -497,6 +497,20 @@ class HomogeneousTransformationMatrix(
             child_frame=self.child_frame,
         )
 
+    def copy_with_new_reference_frames(
+        self,
+        new_reference_frame: KinematicStructureEntity,
+        new_child_frame: KinematicStructureEntity | None,
+    ) -> HomogeneousTransformationMatrix:
+        """
+        Copies the transformation matrix and changes the reference and child frames.
+        """
+        return HomogeneousTransformationMatrix(
+            data=deepcopy(self.casadi_sx),
+            reference_frame=new_reference_frame,
+            child_frame=new_child_frame,
+        )
+
     def __hash__(self):
         if self.is_constant():
             return hash(
