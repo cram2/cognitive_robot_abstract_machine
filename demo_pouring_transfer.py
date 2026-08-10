@@ -1,42 +1,28 @@
+import math
 import threading
 import time
-from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
 
-import math
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 
-from collision_checking.collision_rules import (
-    AllowAllCollisions,
-    AvoidCollisionBetweenGroups,
-    AvoidSelfCollisions,
-)
+from giskardpy.middleware.ros2.python_interface import GiskardWrapper
 from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.goals.collision_avoidance import (
-    UpdateTemporaryCollisionRules,
-    ExternalCollisionAvoidance,
-    SelfCollisionAvoidance,
-)
 from giskardpy.motion_statechart.goals.templates import Parallel
+from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
+from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_statechart.tasks.pouring import (
     FillByTransferTask,
     KeepProjectileInReceiver,
     KeepSourceRimAboveReceiverRim,
 )
-from robots.robot_parts import AbstractRobot
-from robots.tracy import Tracy
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.joint_state import JointState
-from giskardpy.motion_statechart.graph_node import EndMotion
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from giskardpy.motion_statechart.tasks.cartesian_tasks import (
-    CartesianPose,
-    CartesianPosition,
-)
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.physics.equations.learned_pouring_equations import (
     LearnedHeadModelReference,
     couple_source_with_learned_head,
@@ -49,7 +35,6 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from giskardpy.middleware.ros2.python_interface import GiskardWrapper
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
@@ -57,7 +42,6 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.geometry import Mesh, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
-from importlib.resources import files
 
 # ------ Constants ----
 _JEROEN_CUP_STL = str(
