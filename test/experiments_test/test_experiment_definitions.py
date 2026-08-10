@@ -19,13 +19,17 @@ import pytest
 from experiments.experiment_definitions import (
     ExperimentResult,
     ExperimentsTable,
+    IncompatibleUnitConversionError,
     MeanAndStandardDeviation,
     PercentageBound,
     RowIsNotAnExperimentResult,
     RowsOfDifferingTypes,
     TypstRenderer,
+    Unit,
     VolumeBound,
 )
+
+# %% rows the tests present
 
 
 class MeasuredQuality(enum.Enum):
@@ -94,6 +98,40 @@ def row(
     return MeasurementRow(
         quality=quality, score=score, unestablished_score=unestablished_score
     )
+
+
+# %% MeanAndStandardDeviation
+
+
+def test_str_has_no_suffix_for_an_untagged_unit():
+    value = MeanAndStandardDeviation.from_measurements([1.0, 3.0])
+
+    assert str(value) == "2.0 ± 1.41"
+
+
+def test_str_appends_the_unit_suffix():
+    value = MeanAndStandardDeviation.from_measurements([1.0, 3.0], unit=Unit.SECONDS)
+
+    assert str(value) == "2.0 ± 1.41 s"
+
+
+def test_converting_seconds_to_milliseconds_scales_by_a_thousand():
+    seconds = MeanAndStandardDeviation.from_measurements(
+        [0.01, 0.03], unit=Unit.SECONDS
+    )
+
+    milliseconds = seconds.to(Unit.MILLISECONDS)
+
+    assert milliseconds.mean == seconds.mean * 1000
+    assert milliseconds.standard_deviation == seconds.standard_deviation * 1000
+    assert milliseconds.unit is Unit.MILLISECONDS
+
+
+def test_converting_an_untagged_value_is_rejected():
+    value = MeanAndStandardDeviation.from_measurements([1.0, 3.0])
+
+    with pytest.raises(IncompatibleUnitConversionError):
+        value.to(Unit.MILLISECONDS)
 
 
 # %% PercentageBound
@@ -306,13 +344,19 @@ def test_manifest_records_a_measurement_reported_as_a_spread(tmp_path: pathlib.P
     manifest_path = ExperimentsTable(
         [
             SpreadRow(
-                duration=MeanAndStandardDeviation(mean=1.5, standard_deviation=0.25)
+                duration=MeanAndStandardDeviation(
+                    mean=1.5, standard_deviation=0.25, unit=Unit.SECONDS
+                )
             )
         ]
     ).write_manifest(tmp_path, "results.json")
 
     [recorded] = json.loads(manifest_path.read_text())
-    assert recorded["duration"] == {"mean": 1.5, "standard_deviation": 0.25}
+    assert recorded["duration"] == {
+        "mean": 1.5,
+        "standard_deviation": 0.25,
+        "unit": "SECONDS",
+    }
 
 
 def test_manifest_records_several_measurements_of_one_column(tmp_path: pathlib.Path):

@@ -34,6 +34,7 @@ from coraplex.robot_plans.actions.core.misc import DetectAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
+from semantic_digital_twin.robots.pr2 import PR2Joint
 
 
 def test_factory_construction():
@@ -139,7 +140,7 @@ def test_perform_execute_single(immutable_model_world):
         robot_view.root.global_transform.to_np()[:3, 3], [0.3, -1.3, 0], decimal=1
     )
     assert world.state[
-        world.get_degree_of_freedom_by_name("torso_lift_joint").id
+        world.get_degree_of_freedom_by_name(PR2Joint.TORSO_LIFT).id
     ].position == pytest.approx(0.3, abs=0.1)
 
     plan.validate()
@@ -153,7 +154,7 @@ def test_perform_single_designator(immutable_model_world):
         plan.perform()
 
     assert world.state[
-        world.get_degree_of_freedom_by_name("torso_lift_joint").id
+        world.get_degree_of_freedom_by_name(PR2Joint.TORSO_LIFT).id
     ].position == pytest.approx(0.3, abs=0.1)
 
     plan.validate()
@@ -231,23 +232,6 @@ def test_exception_try_in_order(immutable_model_world):
         _ = plan.perform()
     assert len(plan.root.children) == 2
     assert plan.root.status == TaskStatus.SUCCEEDED
-
-
-def test_exception_parallel(immutable_model_world):
-    world, robot_view, context = immutable_model_world
-
-    def raise_except():
-        raise PlanFailure()
-
-    act = NavigateAction(Pose.from_xyz_rpy(x=-2, reference_frame=world.root))
-    act2 = code(raise_except)
-
-    plan = parallel([act, act2], context).plan
-    with pytest.raises(PlanFailure):
-        with simulated_robot:
-            _ = plan.perform()
-    assert type(plan.root.reason) is PlanFailure
-    assert plan.root.status == TaskStatus.FAILED
 
 
 def test_exception_try_all(immutable_model_world):

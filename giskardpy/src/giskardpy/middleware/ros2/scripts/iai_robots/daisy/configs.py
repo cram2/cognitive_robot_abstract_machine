@@ -1,39 +1,44 @@
-from dataclasses import field
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import List, Optional
 
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
     RobotInterfaceConfig,
 )
 from giskardpy.model.world_config import WorldWithFixedRobot
-from semantic_digital_twin.robots.daisy import DAiSy
+from semantic_digital_twin.robots.daisy import DAiSy, DAiSyJoint
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 
+@dataclass
 class DAiSyVelocityInterface(RobotInterfaceConfig):
+    """
+    Commands both arms of DAiSy through their forward velocity controllers.
+    """
 
     def setup(self):
         self.sync_joint_state_topic("/joint_states")
         joints_left = [
-            "left_shoulder_pan_joint",
-            "left_shoulder_lift_joint",
-            "left_elbow_joint",
-            "left_wrist_1_joint",
-            "left_wrist_2_joint",
-            "left_wrist_3_joint",
+            DAiSyJoint.LEFT_SHOULDER_PAN,
+            DAiSyJoint.LEFT_SHOULDER_LIFT,
+            DAiSyJoint.LEFT_ELBOW,
+            DAiSyJoint.LEFT_WRIST_1,
+            DAiSyJoint.LEFT_WRIST_2,
+            DAiSyJoint.LEFT_WRIST_3,
         ]
         self.add_joint_velocity_group_controller(
             cmd_topic="/left_forward_velocity_controller/commands",
             connections=joints_left,
         )
         joints_right = [
-            "right_shoulder_pan_joint",
-            "right_shoulder_lift_joint",
-            "right_elbow_joint",
-            "right_wrist_1_joint",
-            "right_wrist_2_joint",
-            "right_wrist_3_joint",
+            DAiSyJoint.RIGHT_SHOULDER_PAN,
+            DAiSyJoint.RIGHT_SHOULDER_LIFT,
+            DAiSyJoint.RIGHT_ELBOW,
+            DAiSyJoint.RIGHT_WRIST_1,
+            DAiSyJoint.RIGHT_WRIST_2,
+            DAiSyJoint.RIGHT_WRIST_3,
         ]
         self.add_joint_velocity_group_controller(
             cmd_topic="/right_forward_velocity_controller/commands",
@@ -41,43 +46,54 @@ class DAiSyVelocityInterface(RobotInterfaceConfig):
         )
 
 
+@dataclass
 class WorldWithDaisyConfig(WorldWithFixedRobot):
-    """Minimal Tracy world config analogous to WorldWithPR2Config.
-
-    - Fixed-base robot (no drive joint)
-    - Accepts URDF via argument; if not provided, reads from ROS parameter server
-    - Applies conservative default motion limits
+    """
+    A world containing only DAiSy, whose base is fixed to the world root.
     """
 
-    def __init__(self, urdf: Optional[str] = None):
-        super().__init__(
-            urdf=urdf, root_name=PrefixedName(name="map2"), urdf_view=DAiSy
-        )
+    root_name: PrefixedName = field(default=PrefixedName(name="map2"))
+    """
+    Name of the body DAiSy is attached to.
+    """
+
+    urdf_view: AbstractRobot = field(kw_only=True, default=DAiSy, init=False)
+    """
+    Semantic view that is applied to the parsed urdf.
+    """
 
     def setup_world(self, robot_name: Optional[str] = None) -> None:
         super().setup_world()
         self.robot = self.world.get_semantic_annotations_by_type(DAiSy)[0]
 
 
+@dataclass
 class DaisyStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
-    def __init__(self):
-        super().__init__(
-            [
-                "left_shoulder_pan_joint",
-                "left_shoulder_lift_joint",
-                "left_elbow_joint",
-                "left_wrist_1_joint",
-                "left_wrist_2_joint",
-                "left_wrist_3_joint",
-                "right_shoulder_pan_joint",
-                "right_shoulder_lift_joint",
-                "right_elbow_joint",
-                "right_wrist_1_joint",
-                "right_wrist_2_joint",
-                "right_wrist_3_joint",
-                "left_gripper_finger_joint",
-                "left_gripper_right_finger_joint",
-                "right_gripper_finger_joint",
-                "right_gripper_right_finger_joint",
-            ]
-        )
+    """
+    Simulates both arms and both grippers of DAiSy without talking to hardware.
+    """
+
+    joint_names: List[str] = field(
+        init=False,
+        default_factory=lambda: [
+            DAiSyJoint.LEFT_SHOULDER_PAN,
+            DAiSyJoint.LEFT_SHOULDER_LIFT,
+            DAiSyJoint.LEFT_ELBOW,
+            DAiSyJoint.LEFT_WRIST_1,
+            DAiSyJoint.LEFT_WRIST_2,
+            DAiSyJoint.LEFT_WRIST_3,
+            DAiSyJoint.RIGHT_SHOULDER_PAN,
+            DAiSyJoint.RIGHT_SHOULDER_LIFT,
+            DAiSyJoint.RIGHT_ELBOW,
+            DAiSyJoint.RIGHT_WRIST_1,
+            DAiSyJoint.RIGHT_WRIST_2,
+            DAiSyJoint.RIGHT_WRIST_3,
+            DAiSyJoint.LEFT_GRIPPER_FINGER,
+            DAiSyJoint.LEFT_GRIPPER_RIGHT_FINGER,
+            DAiSyJoint.RIGHT_GRIPPER_FINGER,
+            DAiSyJoint.RIGHT_GRIPPER_RIGHT_FINGER,
+        ],
+    )
+    """
+    The arm and gripper joints of DAiSy.
+    """

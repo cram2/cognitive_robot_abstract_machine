@@ -1,20 +1,13 @@
 import logging
-import os
 from pathlib import Path
-from dataclasses import is_dataclass
 
-import numpy as np
-
-import giskardpy  # type: ignore
 import coraplex.locations.costmaps
-import semantic_digital_twin.orm.ormatic_interface
+import coraplex.orm.model
+import giskardpy.orm.ormatic_interface
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 
 from krrood.ormatic.ormatic import ORMatic
-from krrood.ormatic.utils import classes_of_package, classes_of_module
-from coraplex.orm.model import NumpyType
-import coraplex.orm.model
-import giskardpy.qp.solvers
+from krrood.ormatic.utils import classes_of_module
 
 # ----------------------------------------------------------------------------------------------------------------------
 # This script generates the ORM classes for the coraplex package
@@ -23,19 +16,18 @@ import giskardpy.qp.solvers
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-ignored_classes = set(classes_of_package(giskardpy.qp.solvers))
-ignored_classes |= set(classes_of_module(coraplex.locations.costmaps))
+ignored_classes = set(classes_of_module(coraplex.locations.costmaps))
+# profiling and benchmarking measure a running system instead of describing it
 ignored_classes |= {SubclassJSONSerializer}
 
-dependencies = [semantic_digital_twin.orm.ormatic_interface]
+dependencies = [giskardpy.orm.ormatic_interface]
 
-type_mappings = {np.ndarray: NumpyType}
+# numpy and trimesh arrive through the dependency's type mappings
+type_mappings = {}
 
 
 # Create an ORMatic object with the classes to be mapped
-ormatic = ORMatic.from_package(
-    [coraplex, giskardpy], dependencies, ignored_classes, type_mappings
-)
+ormatic = ORMatic.from_package([coraplex], dependencies, ignored_classes, type_mappings)
 logging.getLogger("krrood").setLevel(logging.DEBUG)
 
 

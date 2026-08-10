@@ -10,6 +10,7 @@ from giskardpy.qp.dof_limits import QuadraticProgramDegreeOfFreedomLimits
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection
+from semantic_digital_twin.robots.pr2 import PR2Joint
 
 TARGET_FREQUENCY = 20
 PREDICTION_HORIZON = 10
@@ -21,7 +22,7 @@ VELOCITY_LIMIT = 1.0
 
 
 def test_joint_goal_inside_limits_reached(pr2_world_state_reset):
-    connection = pr2_world_state_reset.get_connection_by_name("head_pan_joint")
+    connection = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
     dof = connection.dof
     lower = dof.limits.lower.position
     upper = dof.limits.upper.position
@@ -45,7 +46,7 @@ def test_joint_goal_inside_limits_reached(pr2_world_state_reset):
 
 
 def test_joint_goal_clamped_to_upper_limit(pr2_world_state_reset):
-    connection = pr2_world_state_reset.get_connection_by_name("head_pan_joint")
+    connection = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
     dof = connection.dof
     upper = dof.limits.upper.position
     goal_beyond_limit = upper + 2.0
@@ -67,7 +68,7 @@ def test_joint_goal_clamped_to_upper_limit(pr2_world_state_reset):
 
 
 def test_joint_goal_clamped_to_lower_limit(pr2_world_state_reset):
-    connection = pr2_world_state_reset.get_connection_by_name("head_pan_joint")
+    connection = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
     dof = connection.dof
     lower = dof.limits.lower.position
     goal_beyond_limit = lower - 2.0
@@ -89,7 +90,7 @@ def test_joint_goal_clamped_to_lower_limit(pr2_world_state_reset):
 
 
 def test_joint_above_upper_limit_recovers(pr2_world_state_reset):
-    connection = pr2_world_state_reset.get_connection_by_name("head_pan_joint")
+    connection = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
     dof = connection.dof
     lower = dof.limits.lower.position
     upper = dof.limits.upper.position
@@ -115,7 +116,7 @@ def test_joint_above_upper_limit_recovers(pr2_world_state_reset):
 
 
 def test_joint_below_lower_limit_recovers(pr2_world_state_reset):
-    connection = pr2_world_state_reset.get_connection_by_name("head_pan_joint")
+    connection = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
     dof = connection.dof
     lower = dof.limits.lower.position
     upper = dof.limits.upper.position
@@ -141,10 +142,10 @@ def test_joint_below_lower_limit_recovers(pr2_world_state_reset):
 
 
 def test_multiple_joints_outside_limits_recover(pr2_world_state_reset):
-    head_pan = pr2_world_state_reset.get_connection_by_name("head_pan_joint")
-    head_tilt = pr2_world_state_reset.get_connection_by_name("head_tilt_joint")
+    head_pan = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
+    head_tilt = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_TILT)
     upper_arm_roll = pr2_world_state_reset.get_connection_by_name(
-        "r_upper_arm_roll_joint"
+        PR2Joint.RIGHT_UPPER_ARM_ROLL
     )
 
     head_pan.position = head_pan.dof.limits.upper.position + 0.5

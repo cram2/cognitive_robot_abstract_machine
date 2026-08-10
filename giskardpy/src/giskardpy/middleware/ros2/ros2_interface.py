@@ -1,5 +1,6 @@
+import json
 import threading
-from typing import List, Optional, Tuple, Union, Any
+from typing import List, Tuple, Union, Any
 
 from action_msgs.msg import GoalStatus
 from rcl_interfaces.srv._get_parameters import (
@@ -21,6 +22,8 @@ from giskardpy.middleware.ros2.exceptions import (
 )
 from giskardpy.middleware.ros2 import rospy
 from giskardpy.middleware.ros2.event_loop_manager import get_event_loop
+from krrood.adapters.exceptions import JSONSerializationError
+from krrood.adapters.json_serializer import from_json
 
 
 def msg_type_as_str(msg_type) -> str:
@@ -133,7 +136,7 @@ def get_parameters(
 
 
 def _search_in_topic_list(
-    topic_list: List[Tuple[str, list]], topic_type: str, node_name: Optional[str] = None
+    topic_list: List[Tuple[str, list]], topic_type: str, node_name: str | None = None
 ) -> List[str]:
     matches = []
     for topic_name, topic_types in topic_list:
@@ -154,8 +157,8 @@ def wait_for_publisher(publisher):
 
 
 class MyActionClient:
-    _goal_handle: Optional[ClientGoalHandle]
-    _result_future: Optional[Future]
+    _goal_handle: ClientGoalHandle | None
+    _result_future: Future | None
     _goal_counter: int
 
     def __init__(self, node_handle: Node, action_type, action_name: str):
@@ -195,13 +198,34 @@ class MyActionClient:
         self.result = None
         match result.status:
             case GoalStatus.STATUS_ABORTED:
-                raise ExecutionAbortedException()
+                raise self.create_abort_exception(result)
             case GoalStatus.STATUS_SUCCEEDED:
                 return result
             case GoalStatus.STATUS_CANCELED:
                 raise ExecutionCanceledException(self._client._action_name, goal_id)
             case _:
                 raise Exception(f"Unexpected status {result.status}")
+
+    @staticmethod
+    def create_abort_exception(result: Any) -> Exception:
+        """
+        Rebuild the exception that made the server abort the goal.
+
+        The action status alone cannot tell a caller whether sending the goal again
+        would help, so the error itself travels in the result payload.
+
+        An error that cannot be rebuilt, because the client does not know its class or
+        cannot construct it, is reported as a plain abort; the original failure is worth
+        less than a caller that keeps working.
+        """
+        payload = json.loads(result.result.result)
+        error = payload.get("error")
+        if error is None:
+            return ExecutionAbortedException()
+        try:
+            return from_json(error)
+        except (JSONSerializationError, TypeError):
+            return ExecutionAbortedException()
 
     def __goal_accepted_cb(self, future: Future):
         goal_handle = future.result()

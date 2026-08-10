@@ -5,9 +5,12 @@ import json
 import pathlib
 import statistics
 from dataclasses import asdict, dataclass, is_dataclass
+from enum import StrEnum
+
 from typing_extensions import Any
 
 from krrood.class_diagrams.utils import get_type_hints_of_object
+from krrood.exceptions import DataclassException
 from semantic_digital_twin.world_description.geometry import Bounds
 
 
@@ -16,6 +19,49 @@ from krrood.class_diagrams.attribute_introspector import (
     AttributeIntrospector,
     DiscoveredAttribute,
 )
+
+
+class Unit(StrEnum):
+    """
+    The physical unit a :class:`MeanAndStandardDeviation` is expressed in.
+    """
+
+    NONE = ""
+    SECONDS = "s"
+    MILLISECONDS = "ms"
+
+
+_SECONDS_PER_UNIT: dict[Unit, float] = {
+    Unit.SECONDS: 1.0,
+    Unit.MILLISECONDS: 0.001,
+}
+
+
+@dataclass
+class IncompatibleUnitConversionError(DataclassException):
+    """
+    Raised when a :class:`MeanAndStandardDeviation` is converted to or from a unit that
+    has no known conversion factor.
+    """
+
+    source_unit: Unit
+    """
+    The unit the value was expressed in.
+    """
+
+    target_unit: Unit
+    """
+    The unit conversion was requested to.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Cannot convert a value from {self.source_unit} to {self.target_unit}: "
+            f"no conversion factor is known for one of these units."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Only convert between units that are both listed in _SECONDS_PER_UNIT."
 
 
 @dataclass
@@ -37,15 +83,43 @@ class MeanAndStandardDeviation:
     The standard deviation of the measurements.
     """
 
+    unit: Unit = Unit.NONE
+    """
+    The physical unit :attr:`mean` and :attr:`standard_deviation` are expressed in.
+    """
+
     def __str__(self) -> str:
-        return f"{round(self.mean, 2)} ± {round(self.standard_deviation, 2)}"
+        suffix = f" {self.unit.value}" if self.unit is not Unit.NONE else ""
+        return f"{round(self.mean, 2)} ± {round(self.standard_deviation, 2)}{suffix}"
 
     @classmethod
-    def from_measurements(cls, measurements: list[float]) -> MeanAndStandardDeviation:
+    def from_measurements(
+        cls, measurements: list[float], unit: Unit = Unit.NONE
+    ) -> MeanAndStandardDeviation:
         std = 0.0 if len(measurements) < 2 else statistics.stdev(measurements)
         return cls(
             mean=round(statistics.mean(measurements), 2),
             standard_deviation=round(std, 4),
+            unit=unit,
+        )
+
+    def to(self, unit: Unit) -> MeanAndStandardDeviation:
+        """
+        Convert this value to another unit.
+
+        :param unit: The unit to convert to.
+        :raises IncompatibleUnitConversionError: If either the current or the requested
+            unit has no known conversion factor.
+        """
+        if self.unit not in _SECONDS_PER_UNIT or unit not in _SECONDS_PER_UNIT:
+            raise IncompatibleUnitConversionError(
+                source_unit=self.unit, target_unit=unit
+            )
+        factor = _SECONDS_PER_UNIT[self.unit] / _SECONDS_PER_UNIT[unit]
+        return MeanAndStandardDeviation(
+            mean=round(self.mean * factor, 2),
+            standard_deviation=round(self.standard_deviation * factor, 4),
+            unit=unit,
         )
 
 

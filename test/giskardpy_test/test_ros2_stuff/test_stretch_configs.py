@@ -1,13 +1,12 @@
-from giskardpy.middleware.ros2.behavior_tree_config import ClosedLoopBTConfig
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
     StretchStandaloneInterface,
     StretchVelocityInterface,
     WorldWithStretchConfigDiffDrive,
 )
+from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
 from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -70,7 +69,7 @@ def test_velocity_interface_sets_up_against_the_robot_description(init_rospy):
             urdf=load_xacro(Stretch.get_ros_file_path())
         ),
         robot_interface_config=StretchVelocityInterface(),
-        behavior_tree_config=ClosedLoopBTConfig(),
+        server_config=GiskardServerConfig(execution_mode=ExecutionMode.CLOSED_LOOP),
         qp_controller_config=QPControllerConfig(
             target_frequency=25, prediction_horizon=30
         ),
@@ -78,7 +77,7 @@ def test_velocity_interface_sets_up_against_the_robot_description(init_rospy):
 
     giskard.setup()
 
-    world = GiskardBlackboard().executor.context.world
+    world = giskard.executor.context.world
     assert world.get_connections_by_type(DifferentialDrive)
     for joint_name in StretchVelocityInterface().velocity_controlled_joint_names():
         assert world.get_connection_by_name(joint_name) is not None

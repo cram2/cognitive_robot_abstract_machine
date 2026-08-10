@@ -282,6 +282,23 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
     def jerks(self) -> np.ndarray:
         return self.get_derivative(Derivatives.jerk)
 
+    def column_indices(self, dofs: List[DegreeOfFreedom]) -> List[int]:
+        """
+        Retrieve the columns of the given degrees of freedom in the state data.
+
+        Lets callers that repeatedly read the same degrees of freedom fetch a whole
+        derivative row and index into it, instead of looking every dof up by id.
+
+        ..note:: The columns are only valid until a degree of freedom is added to or
+            removed from the state, which re-lays-out the data.
+        :raises DofNotInWorldStateError: If a degree of freedom is not part of the state.
+        """
+        with self.world_lock:
+            for dof in dofs:
+                if dof.id not in self._index:
+                    raise DofNotInWorldStateError(dof.id)
+            return [self._index[dof.id] for dof in dofs]
+
     def get_derivative(self, derivative: Derivatives) -> np.ndarray:
         """
         Retrieve the data for a whole derivative row.
