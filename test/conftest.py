@@ -39,6 +39,9 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
+from semantic_digital_twin.predetermined_maps.apartment_environment import (
+    ApartmentEnvironment,
+)
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
@@ -513,6 +516,11 @@ def _stretch_world_setup():
     return world_with_urdf_factory(Stretch)
 
 
+@pytest.fixture(scope="function")
+def stretch_world_copy(_stretch_world_setup):
+    return deepcopy(_stretch_world_setup)
+
+
 @pytest.fixture(scope="session")
 def _tiago_world_setup():
     return world_with_urdf_factory(Tiago)
@@ -819,6 +827,27 @@ def kitchen_world():
     world = parser.parse()
     world.validate()
     return world
+
+
+@pytest.fixture(scope="session")
+def apartment_meshes():
+    """
+    Skip tests that need the visual meshes of the ``iai_apartment`` package.
+    """
+    try:
+        walls_mesh = ApartmentEnvironment.mesh_path("walls.dae")
+    except ParsingError as error:
+        pytest.skip(f"apartment meshes not available: {error}")
+    if not os.path.isfile(walls_mesh):
+        pytest.skip(f"apartment meshes not available: {walls_mesh} is missing")
+
+
+@pytest.fixture(scope="session")
+def apartment_environment_world(apartment_meshes):
+    """
+    A world holding nothing but the apartment of :class:`ApartmentEnvironment`.
+    """
+    return ApartmentEnvironment().get_world()
 
 
 @pytest.fixture(scope="session")

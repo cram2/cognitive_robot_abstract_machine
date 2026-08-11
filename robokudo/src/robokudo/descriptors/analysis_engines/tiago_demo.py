@@ -26,7 +26,7 @@ from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.annotators.query import QueryReply, GenerateQueryResult, QueryAnnotator
+from robokudo.annotators.query import GenerateQueryResult, QueryAnnotator
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
@@ -104,7 +104,6 @@ class AnalysisEngine(AnalysisEngineInterface):
                 # ClusterPoseBBAnnotator(),
                 ClusterPosePCAAnnotator(),
                 GenerateQueryResult(),
-                QueryReply(),
             ]
         )
         return seq

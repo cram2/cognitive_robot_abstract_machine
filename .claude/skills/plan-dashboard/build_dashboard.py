@@ -146,6 +146,7 @@ class PullRequestLabel(StrEnum):
     BUG = "bug"
 
 
+@dataclass
 class ValidationProblem(ABC):
     """A single problem found while validating a plan.yaml - see plan-schema.md.
 
@@ -160,8 +161,14 @@ class ValidationProblem(ABC):
     """
 
     @abstractmethod
-    def describe(self) -> str:
+    def error_message(self) -> str:
         """The human-readable description of this problem, shown to the user."""
+
+    def suggest_correction(self) -> str:
+        """
+        Default implementation for suggesting a correction for manifest validation problems.
+        """
+        return ""
 
 
 @dataclass
@@ -172,7 +179,7 @@ class InvalidManifestRoot(ValidationProblem):
     actual_value: Any
     """Whatever the manifest actually parsed to."""
 
-    def describe(self) -> str:
+    def error_message(self) -> str:
         """See :meth:`ValidationProblem.describe`."""
         return f"plan.yaml must parse to a mapping, got {type(self.actual_value).__name__}: {self.actual_value!r}"
 
@@ -184,7 +191,7 @@ class InvalidSchemaVersion(ValidationProblem):
     actual_value: Any
     """Whatever ``schema_version`` actually held."""
 
-    def describe(self) -> str:
+    def error_message(self) -> str:
         """See :meth:`ValidationProblem.describe`."""
         return f"schema_version must be 1, got {self.actual_value!r}"
 
@@ -196,7 +203,7 @@ class DuplicateItemId(ValidationProblem):
     duplicate_identifiers: list[str]
     """Every identifier that occurred more than once."""
 
-    def describe(self) -> str:
+    def error_message(self) -> str:
         """See :meth:`ValidationProblem.describe`."""
         return f"duplicate item id(s): {sorted(self.duplicate_identifiers)}"
 
@@ -211,7 +218,7 @@ class UnknownTrack(ValidationProblem):
     track: Any
     """Whatever ``track`` actually held."""
 
-    def describe(self) -> str:
+    def error_message(self) -> str:
         """See :meth:`ValidationProblem.describe`."""
         return f"item {self.item_identifier!r} has unknown track {self.track!r}"
 
@@ -226,7 +233,7 @@ class UnknownStatus(ValidationProblem):
     status: Any
     """Whatever ``status`` actually held."""
 
-    def describe(self) -> str:
+    def error_message(self) -> str:
         """See :meth:`ValidationProblem.describe`."""
         return f"item {self.item_identifier!r} has unknown status {self.status!r}"
 
@@ -246,9 +253,29 @@ class InvalidDependsOn(ValidationProblem):
     actual_type: type
     """The type ``depends_on`` actually held, instead of ``list``."""
 
-    def describe(self) -> str:
+    def error_message(self) -> str:
         """See :meth:`ValidationProblem.describe`."""
         return f"item {self.item_identifier!r} depends_on must be a list, got {self.actual_type.__name__}"
+
+
+@dataclass
+class InvalidBlockers(ValidationProblem):
+    """An item's ``blockers`` isn't a list.
+
+    A plain string is iterable character-by-character in Python, so without
+    this check a string ``blockers`` would silently be misread as one
+    blocker per character instead of failing loudly.
+    """
+
+    item_identifier: str
+    """The offending item's effective id."""
+
+    actual_type: type
+    """The type ``blockers`` actually held, instead of ``list``."""
+
+    def error_message(self) -> str:
+        """See :meth:`ValidationProblem.describe`."""
+        return f"item {self.item_identifier!r} blockers must be a list, got {self.actual_type.__name__}"
 
 
 @dataclass
@@ -261,7 +288,7 @@ class UnknownDependency(ValidationProblem):
     dependency_identifier: str
     """The unresolvable id named in ``depends_on``."""
 
-    def describe(self) -> str:
+    def error_message(self) -> str:
         """See :meth:`ValidationProblem.describe`."""
         return f"item {self.item_identifier!r} depends_on unknown id {self.dependency_identifier!r}"
 
@@ -276,7 +303,7 @@ class UnknownWave(ValidationProblem):
     wave: Any
     """Whatever ``wave`` actually held."""
 
-    def describe(self) -> str:
+    def error_message(self) -> str:
         """See :meth:`ValidationProblem.describe`."""
         return f"track {self.track_identifier!r} has unknown wave {self.wave!r}"
 
@@ -292,7 +319,7 @@ class DependencyCycle(ValidationProblem):
     """The item ids forming the cycle, in order, with the first id repeated
     at the end to show where it closes."""
 
-    def describe(self) -> str:
+    def error_message(self) -> str:
         """See :meth:`ValidationProblem.describe`."""
         return f"depends_on cycle: {' -> '.join(self.cycle_identifiers)}"
 
@@ -307,7 +334,7 @@ class PlanValidationError(Exception):
         instead of one-error-at-a-time: a broken manifest is itself
         something the user needs the full picture of, not a single
         symptom they have to rediscover the rest of by trial and error."""
-        super().__init__("; ".join(problem.describe() for problem in problems))
+        super().__init__("; ".join(problem.error_message() for problem in problems))
 
 
 def _find_dependency_cycle(
@@ -406,6 +433,10 @@ def validate_plan(plan: dict[str, Any]) -> None:
                     problems.append(
                         UnknownDependency(item_identifier, dependency_identifier)
                     )
+
+        blockers = item.get("blockers")
+        if blockers is not None and not isinstance(blockers, list):
+            problems.append(InvalidBlockers(item_identifier, type(blockers)))
 
     cycle = _find_dependency_cycle(item_identifiers, depends_on_by_identifier)
     if cycle is not None:
@@ -772,8 +803,7 @@ class Item:
 
     @property
     def has_open_pull_request(self) -> bool:
-        """Whether this item currently has an open (draft or ready) pull request -
-        used to decide whether a dependent's pull request is safe to review yet."""
+        """Whether this item currently has an open (draft or ready) pull request."""
         return self.live_state in (LiveState.OPEN_DRAFT, LiveState.OPEN_READY)
 
     @property
@@ -820,6 +850,19 @@ class Item:
         draft is the one state that isn't safe to build on top of, since it
         can still see heavy rework."""
         return self.is_effectively_done() or self.live_state is LiveState.OPEN_READY
+
+    def is_ready_for_dependent_review(self) -> bool:
+        """Whether a dependent's pull request is worth reviewing yet: this item's
+        own pull request exists and has reached review, whether it is still open
+        or has already landed. Having no pull request at all is the one state
+        that makes a dependent premature to review.
+
+        ..note:: Deliberately weaker than :meth:`is_ready_to_unblock_dependents`,
+            which additionally requires being out of draft: building a branch on
+            a dependency that can still see heavy rework is unsafe, while merely
+            reviewing the branch above it is not.
+        """
+        return self.has_open_pull_request or self.is_effectively_done()
 
 
 @dataclass
@@ -1215,10 +1258,11 @@ class DashboardRenderer:
 
     def _compute_ready_to_review(self) -> list[Item]:
         """Items with an open draft pull request that are actually reviewable right
-        now: not blocked, and every dependency (if any) already has its own
-        open pull request - reviewing a stacked pull request before its base even has one open
-        yet is premature, even though the base need not itself be past
-        review. A deferred item never reaches here in the first place -
+        now: not blocked, and every dependency (if any) has itself reached review
+        (:meth:`Item.is_ready_for_dependent_review`) - reviewing a stacked pull
+        request before its base even has one open yet is premature, even though
+        the base need not itself be past review, nor still be open once it has
+        landed. A deferred item never reaches here in the first place -
         :attr:`Item.needs_review` is already ``False`` for it."""
         ready_to_review: list[Item] = []
         for item in self.plan.items:
@@ -1229,7 +1273,10 @@ class DashboardRenderer:
                 for identifier in item.depends_on
                 if identifier in self.items_by_identifier
             ]
-            if all(dependency.has_open_pull_request for dependency in dependencies):
+            if all(
+                dependency.is_ready_for_dependent_review()
+                for dependency in dependencies
+            ):
                 ready_to_review.append(item)
         return ready_to_review
 

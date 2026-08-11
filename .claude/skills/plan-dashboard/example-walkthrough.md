@@ -144,7 +144,12 @@ A few things worth noticing in this one small example:
   cluster capacity, per its own `blockers` note), but its dependency is now
   ready too, so it's worth a look.
 - **"Ready to review"** — `retry-config-flag` has an open, still-draft pull
-  request with nothing blocking it from being reviewed right now.
+  request with nothing blocking it from being reviewed right now, and
+  `retry-circuit-breaker` joins it because its one dependency
+  (`retry-backoff-strategy`) has already merged. A dependency only holds its
+  dependent out of this list while it has no pull request at all — once one
+  exists, whether it is a draft, ready, or already landed, the branch stacked
+  on top is worth reviewing.
 - **Done items are hidden by default** — the sidebar's "Show done / merged
   items" checkbox reveals `retry-backoff-strategy` and `retry-fallback-queue`
   when you want them back.

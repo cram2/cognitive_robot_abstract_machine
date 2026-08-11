@@ -314,7 +314,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         )
 
     @classmethod
-    def get_default_root_specification(
+    def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: Optional[str] = None,
         scale: Optional[Scale] = None,

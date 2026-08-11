@@ -106,9 +106,13 @@ class ImageClusterExtractor(BaseAnnotator):
                     "hsv_min": (150, 130, 85),
                     "hsv_max": (200, 255, 255),
                 }
+                # Red sits at the hue wheel's 0/255 seam, so its hue wraps around rather
+                # than falling in one contiguous range: hsv_min's hue exceeding hsv_max's
+                # signals that to _threshold_hsv, which then matches [0, hsv_max hue] OR
+                # [hsv_min hue, 255] instead of a single contiguous range.
                 self.color_name_to_hsv_range["red"] = {
-                    "hsv_min": (215, 150, 95),
-                    "hsv_max": (280, 255, 255),
+                    "hsv_min": (245, 150, 95),
+                    "hsv_max": (15, 255, 255),
                 }
 
                 self.outlier_removal: bool = True
@@ -204,6 +208,39 @@ class ImageClusterExtractor(BaseAnnotator):
             self.descriptor.parameters.color_name_to_hsv_range[color]["hsv_max"]
         )
 
+    def _threshold_hsv(
+        self,
+        hsv_min: Tuple[int, int, int],
+        hsv_max: Tuple[int, int, int],
+    ) -> npt.NDArray:
+        """
+        Threshold ``self.hsv`` to the given bounds, wrapping the hue channel around the
+        0/255 seam when ``hsv_min``'s hue exceeds ``hsv_max``'s.
+
+        True red sits exactly at that seam, so a single contiguous hue range only ever
+        catches one side of it (confirmed live: a plain ``[215,255]`` range matched 124
+        of 101760 pixels on a red object; wrapping recovered 1748 by also matching the
+        pixels that wrapped to just above 0).
+
+        :param hsv_min: Lower HSV bound.
+        :param hsv_max: Upper HSV bound. A hue lower than ``hsv_min``'s signals wraparound.
+        :return: Binary mask of pixels within the (possibly wrapped) bounds.
+        """
+        if hsv_min[0] <= hsv_max[0]:
+            return cv2.inRange(self.hsv, hsv_min, hsv_max)
+
+        low = cv2.inRange(
+            self.hsv,
+            (0, hsv_min[1], hsv_min[2]),
+            (hsv_max[0], hsv_max[1], hsv_max[2]),
+        )
+        high = cv2.inRange(
+            self.hsv,
+            (hsv_min[0], hsv_min[1], hsv_min[2]),
+            (255, hsv_max[1], hsv_max[2]),
+        )
+        return cv2.bitwise_or(low, high)
+
     @catch_and_raise_to_blackboard
     def update(self) -> Status:
         """
@@ -247,8 +284,7 @@ class ImageClusterExtractor(BaseAnnotator):
         self.adjust_hsv_threshold_to_query()
 
         # Apply the HSV threshold on the image and find contours on the resultant binary image
-        hsv_mask = cv2.inRange(
-            self.hsv,
+        hsv_mask = self._threshold_hsv(
             self.descriptor.parameters.hsv_min,
             self.descriptor.parameters.hsv_max,
         )

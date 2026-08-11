@@ -37,6 +37,35 @@ def pr2_xml_parser():
     return MJCFParser(os.path.join(MJCF_DIR, "pr2_kinematic_tree.xml"))
 
 
+def test_from_file_carries_the_parsing_parameters():
+    file_path = os.path.join(MJCF_DIR, "table.xml")
+    parser = MJCFParser.from_file(
+        file_path, prefix="env", mimic_joints={"left": "right"}
+    )
+
+    assert parser.file_path == file_path
+    assert parser.prefix == "env"
+    assert parser.mimic_joints == {"left": "right"}
+
+
+def test_from_file_defaults_the_prefix_to_the_file_name():
+    parser = MJCFParser.from_file(os.path.join(MJCF_DIR, "table.xml"))
+
+    assert parser.prefix == "table"
+    assert parser.mimic_joints == {}
+
+
+def test_parsing_twice_yields_independent_worlds(table_xml_parser):
+    first = table_xml_parser.parse()
+    second = table_xml_parser.parse()
+
+    assert first is not second
+    first_ids = {body.id for body in first.bodies}
+    second_ids = {body.id for body in second.bodies}
+    assert len(first.bodies) == len(second.bodies)
+    assert first_ids.isdisjoint(second_ids)
+
+
 def test_table_parsing(table_xml_parser):
     body_num = 7
     world = table_xml_parser.parse()
@@ -118,10 +147,10 @@ LIT_WORLD_MJCF = """
 
 def test_light_is_parsed_and_attached_to_its_parent_body():
     """
-    Regression test: MJCFParser used to have no handling for <light> elements at all, so every
-    world built through the parser -> World -> MujocoBuilder round-trip silently lost all
-    lighting information, falling back to MuJoCo's minimal default camera headlight instead of
-    the scene's own intended lights.
+    Regression test: MJCFParser used to have no handling for <light> elements at all, so
+    every world built through the parser -> World -> MujocoBuilder round-trip silently
+    lost all lighting information, falling back to MuJoCo's minimal default camera
+    headlight instead of the scene's own intended lights.
     """
     world = MJCFParser.from_xml_string(LIT_WORLD_MJCF).parse()
 
@@ -158,10 +187,12 @@ TEXTURED_BOX_MJCF_TEMPLATE = """
 
 def test_primitive_box_geom_resolves_its_material_texture(tmp_path):
     """
-    Regression test: Box/Sphere/Cylinder shapes never carried any texture reference, only a
-    flat Color. RoboCasa's countertops and cabinet doors are actual MJCF box geoms whose
-    material references a marble/wood texture, so this reference was silently discarded on
-    every round-trip and they rendered flat-colored instead of textured.
+    Regression test: Box/Sphere/Cylinder shapes never carried any texture reference,
+    only a flat Color.
+
+    RoboCasa's countertops and cabinet doors are actual MJCF box geoms whose material
+    references a marble/wood texture, so this reference was silently discarded on every
+    round-trip and they rendered flat-colored instead of textured.
     """
     from PIL import Image
 

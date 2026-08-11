@@ -36,11 +36,15 @@ def goal_validator_world(immutable_model_world):
     robot_view.root.parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_quaternion(0, 0, 0)
     )
-    world.get_body_by_name("milk.stl").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_quaternion(2.2, 2, 1)
+    milk_connection = world.get_body_by_name("milk.stl").parent_connection
+    milk_connection.origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        2.2, 2, 1, reference_frame=milk_connection.parent
     )
-    world.get_body_by_name("breakfast_cereal.stl").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_quaternion(2.2, 1.8, 1)
+    cereal_connection = world.get_body_by_name(
+        "breakfast_cereal.stl"
+    ).parent_connection
+    cereal_connection.origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        2.2, 1.8, 1, reference_frame=cereal_connection.parent
     )
     world.notify_state_change()
     return world, robot_view, context

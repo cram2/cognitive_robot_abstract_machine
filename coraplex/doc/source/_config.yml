@@ -7,8 +7,8 @@
 # Book settings
 title                       : CoraPlex # The title of the doc. Will be placed in the left navbar.
 author                      : Jonas Dech  # The author of the doc
-copyright                   : "2025"  # Copyright year to be placed in the footer
-logo                        : "../images/coraplex_logo.png"  # A path to the doc logo
+copyright                   : "2026"  # Copyright year to be placed in the footer
+logo                        : "_static/images/cora-plex-dark.png"  # A path to the doc logo
 
 # Force re-execution of notebooks on each build.
 # See https://jupyterbook.org/content/execute.html

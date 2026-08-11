@@ -109,7 +109,7 @@ class StretchGripper(EndEffector, HasTwoFingers[StretchLeftFinger, StretchRightF
 
         gripper_close = JointState.from_mapping(
             name=PrefixedName("gripper_close", prefix=self.name.name),
-            mapping=dict(zip(gripper_joints, [0.0, 0.0])),
+            mapping=dict(zip(gripper_joints, [-0.067, -0.067])),
             state_type=GripperState.CLOSE,
         )
 
@@ -139,7 +139,13 @@ class StretchArm(Arm[StretchGripper]):
     def setup_joint_states(self) -> List[JointState]:
         arm_park = JointState.from_mapping(
             name=PrefixedName("arm_park", prefix=self.name.name),
-            mapping={self._world.get_connection_by_name("joint_lift"): 0.5},
+            mapping={
+                self._world.get_connection_by_name("joint_lift"): 0.7,
+                self._world.get_connection_by_name("joint_arm_l3"): 0.0,
+                self._world.get_connection_by_name("joint_arm_l2"): 0.0,
+                self._world.get_connection_by_name("joint_arm_l1"): 0.0,
+                self._world.get_connection_by_name("joint_arm_l0"): 0.0,
+            },
             state_type=StaticJointState.PARK,
         )
 
@@ -376,10 +382,10 @@ class Stretch(AbstractRobot, HasMobileBase[StretchMobileBase]):
     def _setup_velocity_limits(self):
         vel_limits = defaultdict(lambda: 0.1)
         vel_limits[self._world.get_connection_by_name("joint_gripper_finger_left")] = (
-            0.01
+            0.0067
         )
         vel_limits[self._world.get_connection_by_name("joint_gripper_finger_right")] = (
-            0.01
+            0.0067
         )
         vel_limits[self._world.get_connection_by_name("joint_wrist_yaw")] = 0.4
         vel_limits[self._world.get_connection_by_name("joint_head_tilt")] = 0.5

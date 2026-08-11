@@ -723,13 +723,32 @@ class Connection6DoF(Connection):
         return super().origin
 
     @origin.setter
-    def origin(
-        self, transformation: Union[NpMatrix4x4, HomogeneousTransformationMatrix]
-    ) -> None:
-        if not isinstance(transformation, HomogeneousTransformationMatrix):
-            transformation = HomogeneousTransformationMatrix(data=transformation)
-        position = transformation.to_position().to_np()
-        orientation = transformation.to_rotation_matrix().to_quaternion().to_np()
+    def origin(self, transformation: HomogeneousTransformationMatrix) -> None:
+        """
+        Set this connection's parent-to-child origin.
+
+        The origin is ``parent_T_connection_expression @ _kinematics @
+        connection_T_child_expression``, of which only ``_kinematics`` is DOF-backed;
+        the other two are fixed at connection creation. So ``transformation`` is first
+        converted into the parent frame and then un-composed with those constants, to
+        find the DOF state that makes the *resulting* origin equal ``transformation``,
+        rather than writing ``transformation`` in as ``_kinematics`` directly.
+
+        :param transformation: The desired parent-to-child origin. Must carry a
+            reference frame (:meth:`World.transform` raises
+            :class:`~semantic_digital_twin.exceptions.MissingReferenceFrameError`
+            otherwise); does not need to already be expressed in the parent frame. Other
+            spatial types (e.g. ``Pose``) must be converted with their own
+            ``to_homogeneous_matrix()`` before being assigned here.
+        """
+        parent_T_child = self._world.transform(transformation, self.parent)
+        local_kinematics = (
+            self.parent_T_connection_expression.inverse()
+            @ parent_T_child
+            @ self.connection_T_child_expression.inverse()
+        )
+        position = local_kinematics.to_position()
+        orientation = local_kinematics.to_rotation_matrix().to_quaternion()
         self._world.state[self.x.id].position = position[0]
         self._world.state[self.y.id].position = position[1]
         self._world.state[self.z.id].position = position[2]

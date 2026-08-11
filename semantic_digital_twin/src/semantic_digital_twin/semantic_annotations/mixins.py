@@ -88,6 +88,7 @@ if TYPE_CHECKING:
         MechanicalJoint,
         Leg,
         Sink,
+        ShelfLayer,
     )
     from semantic_digital_twin.world import World
 
@@ -115,6 +116,23 @@ class HasRootKinematicStructureEntity(
 ):
     """
     Base class for shared method for HasRootBody and HasRootRegion.
+
+    Building a specification takes two steps:
+    :meth:`get_default_root_kinematic_structure_entity_specification` describes the root entity's geometry,
+    and :meth:`get_annotation_specification` wraps that root into the spawnable
+    annotation specification.
+
+    .. code-block:: python
+
+        Handle.get_annotation_specification(
+            "handle",
+            Handle.get_default_root_kinematic_structure_entity_specification(
+                scale=Scale(0.1, 0.05, 0.05), thickness=0.01
+            ),
+        )
+
+    Every geometry parameter belongs to the first step, so a type's geometry is
+    described in exactly one place.
     """
 
     root: TKinematicStructureEntity = field(kw_only=True)
@@ -147,7 +165,7 @@ class HasRootKinematicStructureEntity(
         nothing else (e.g. :meth:`Slider.parent_connection_specification` takes an
         ``axis``, this one takes none).
 
-        :meth:`get_specification` calls this to fill in the connection
+        :meth:`get_annotation_specification` calls this to fill in the connection
         when the caller supplies none. To parameterize it, call this method yourself and
         hand the result to that factory.
 
@@ -163,20 +181,24 @@ class HasRootKinematicStructureEntity(
 
     @classmethod
     @abstractmethod
-    def get_default_root_specification(
+    def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: str | None = None,
         scale: Optional[Scale] = None,
         connection_specification: Optional[ConnectionSpecification] = None,
     ) -> KinematicStructureEntitySpecification:
         """
-        Build this type's default root entity specification.
+        Build this type's default root entity specification, the geometry only.
 
         Implemented once per root entity kind (:class:`HasRootBody` yields a body
         specification, :class:`HasRootRegion` a region one) and overridden by types
         whose geometry takes further parameters, such as a handle's ``thickness`` or a
         case's ``wall_thickness``. Those parameters live here and nowhere else, so a
         type's geometry is described in a single place.
+
+        .. warning:: The result carries no annotation. Spawning it directly puts a bare
+            body or region into the world; pass it to
+            :meth:`get_annotation_specification` to obtain the annotation.
 
         :param name: The name of entities created from the specification. ``None``
             leaves naming to the spawning annotation, which overrides it with its own
@@ -188,7 +210,7 @@ class HasRootKinematicStructureEntity(
         """
 
     @classmethod
-    def get_specification(
+    def get_annotation_specification(
         cls,
         name: str,
         root_specification: KinematicStructureEntitySpecification,
@@ -198,10 +220,11 @@ class HasRootKinematicStructureEntity(
         part_specifications: Optional[dict] = None,
     ) -> SemanticAnnotationWithRootSpecification[Self]:
         """
-        Build the annotation specification around a given root entity specification.
+        Wrap a root entity specification, typically from
+        :meth:`get_default_root_kinematic_structure_entity_specification`, into the spawnable annotation
+        specification.
 
-        The root geometry is always supplied by the caller, typically built with this
-        type's own :meth:`get_default_root_specification`. That builder owns every
+        The root geometry is always supplied by the caller. That builder owns every
         geometry parameter (a scale, a handle's ``thickness``, a case's
         ``wall_thickness``), so geometry is described in exactly one place.
 
@@ -324,14 +347,14 @@ class HasRootBody(HasRootKinematicStructureEntity[TBody]):
             the type's default geometry scale applies.
         :return: The created semantic annotation instance.
         """
-        return cls.get_specification(
+        return cls.get_annotation_specification(
             name,
-            cls.get_default_root_specification(scale=scale),
+            cls.get_default_root_kinematic_structure_entity_specification(scale=scale),
             parent_connection_specification=parent_connection_specification,
         ).spawn(world, parent_T_self=world_root_T_self)
 
     @classmethod
-    def get_default_root_specification(
+    def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: str | None = None,
         scale: Optional[Scale] = None,
@@ -343,6 +366,10 @@ class HasRootBody(HasRootKinematicStructureEntity[TBody]):
 
         This is the geometry-extraction counterpart of the factory: instead of
         mutating a world, it returns a reusable, world-independent specification.
+
+        .. warning:: The result carries no annotation. Spawning it directly puts a bare
+            body into the world; pass it to :meth:`get_annotation_specification` to
+            obtain the annotation.
 
         :param name: The name of bodies created from the specification. ``None`` leaves
             naming to the spawning annotation, which overrides it with its own name.
@@ -393,14 +420,14 @@ class HasRootRegion(HasRootKinematicStructureEntity[TRegion]):
         :param scale: The scale used to generate the region area geometry.
         :return: The created semantic annotation instance.
         """
-        return cls.get_specification(
+        return cls.get_annotation_specification(
             name,
-            cls.get_default_root_specification(scale=scale),
+            cls.get_default_root_kinematic_structure_entity_specification(scale=scale),
             parent_connection_specification=parent_connection_specification,
         ).spawn(world, parent_T_self=world_root_T_self)
 
     @classmethod
-    def get_default_root_specification(
+    def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: str | None = None,
         scale: Optional[Scale] = None,
@@ -409,6 +436,10 @@ class HasRootRegion(HasRootKinematicStructureEntity[TRegion]):
         """
         Build the default region specification whose geometry matches what
         :meth:`create_with_new_region_in_world` generates.
+
+        .. warning:: The result carries no annotation. Spawning it directly puts a bare
+            region into the world; pass it to :meth:`get_annotation_specification` to
+            obtain the annotation.
 
         :param name: The name of regions created from the specification. ``None`` leaves
             naming to the spawning annotation, which overrides it with its own name.
@@ -532,6 +563,37 @@ class HasMechanicalJoint(HasRootBody, PartWholeRelationship):
     The mechanical joint of the semantic annotation.
     """
 
+    def _mount_strategy(
+        self,
+        main_has_root_body_annotation: HasRootBody,
+        relationship: IsPartWholeRelationship,
+    ) -> None:
+        """
+        Mount this annotation onto the whole through its mechanical joint, so the joint
+        keeps carrying it.
+
+        Moving this annotation on its own would pull it out from under its joint and
+        leave a door or drawer rigidly attached to the whole, unable to move.
+
+        :param main_has_root_body_annotation: The annotation (the whole) this one is
+            being added to as a part.
+        :param relationship: The metadata of the part-whole relationship field being
+            mounted into, describing how the mount affects the whole.
+        """
+        if (
+            self.mechanical_joint is None
+            or self.root.parent_kinematic_structure_entity
+            is not self.mechanical_joint.root
+        ):
+            super()._mount_strategy(main_has_root_body_annotation, relationship)
+            return
+
+        main_has_root_body_annotation._world.move_branch(
+            self.mechanical_joint.root,
+            main_has_root_body_annotation.root,
+            enable_unsafe_inside_world_block=True,
+        )
+
     def _kinematic_structure_entities(
         self, visited: Set[int]
     ) -> list[KinematicStructureEntity]:
@@ -560,6 +622,23 @@ class HasDrawers(PartWholeRelationship):
     )
     """
     The drawers of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasShelfLayers(PartWholeRelationship):
+    """
+    A mixin class for semantic annotations that have shelf layers.
+    """
+
+    shelf_layers: List[ShelfLayer] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The shelf layers of the semantic annotation.
     """
 
 
@@ -1040,7 +1119,7 @@ class HasCaseAsRootBody(HasSupportingSurface):
         return container_event
 
     @classmethod
-    def get_default_root_specification(
+    def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: str | None = None,
         scale: Optional[Scale] = None,

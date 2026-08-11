@@ -184,7 +184,7 @@ def test_create_shape_from_geometry_shared_shape_does_not_leak_pose_between_worl
     baseline_distance_b = baseline_collision_b.distance
 
     box_a.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        5, 5, 5
+        5, 5, 5, reference_frame=box_a.parent_kinematic_structure_entity
     )
     world_a.notify_state_change()
 

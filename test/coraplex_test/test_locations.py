@@ -87,7 +87,7 @@ def _world_with_robots_behind_displaced_odoms(
     A world holding nothing but PR2s, each reached through its own displaced odom.
     """
     specification = WorldSpecification(
-        world=World.create_with_root_body("root"),
+        world_parser=None,
         robots=[
             RobotSpecification(semantic_annotation_type=PR2, world_T_odom=world_T_odom)
             for world_T_odom in world_T_odoms

@@ -7,14 +7,21 @@ from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.cartesian_goals import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.goals.open_close import Close
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
+from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from coraplex.datastructures.enums import ExecutionType
-from coraplex.robot_plans import MoveToolCenterPointMotion, MoveMotion, ClosingMotion
+from coraplex.robot_plans import (
+    MoveToolCenterPointMotion,
+    MoveMotion,
+    ClosingMotion,
+    MoveGripperMotion,
+)
 from coraplex.robot_plans.motions.base import AlternativeMotion
 from coraplex.view_manager import ViewManager
+from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
@@ -42,17 +49,36 @@ class StretchMoveToolCenterPoint(MoveToolCenterPointMotion, AlternativeMotion[St
         goal_point.z = 0
         return Sequence(
             [
-                Pointing(
-                    root_link=self.world.root,
-                    tip_link=self.robot.root,
-                    goal_point=goal_point,
-                    pointing_axis=Vector3(0, -1, 0, reference_frame=self.robot.root),
-                    binding_policy=GoalBindingPolicy.Bind_at_build,
+                # Due to its limited kinematics and bad tracking and joint delays, Stretch has better results in
+                # real demos when straightening the wrist joint and pointing at the goal first
+                Parallel(
+                    [
+                        Pointing(
+                            root_link=self.world.root,
+                            tip_link=self.robot.root,
+                            goal_point=goal_point,
+                            pointing_axis=Vector3(
+                                0, -1, 0, reference_frame=self.robot.root
+                            ),
+                            binding_policy=GoalBindingPolicy.Bind_at_build,
+                        ),
+                        JointPositionList(
+                            goal_state=JointState.from_str_dict(
+                                {"joint_wrist_yaw": 0.0}, world=self.world
+                            )
+                        ),
+                    ]
                 ),
-                CartesianPose(
-                    root_link=self.world.root,
-                    tip_link=tip,
-                    goal_pose=self.target,
+                Parallel(
+                    [
+                        CartesianPose(
+                            root_link=self.world.root,
+                            tip_link=tip,
+                            goal_pose=self.target,
+                        ),
+                        LocalMinimumReached(joint_convergence_threshold=0.025),
+                    ],
+                    minimum_success=1,
                 ),
             ]
         )
@@ -131,3 +157,38 @@ class StretchClose(ClosingMotion, AlternativeMotion[Stretch]):
         )
         close = Close(tip_link=tip, environment_link=self.object_part)
         return Parallel([cart, align, close])
+
+
+class StretchMoveGripperMotion(MoveGripperMotion, AlternativeMotion[Stretch]):
+    """
+    Gripper motion tuned for Stretch: forces convergence checks to hold for at
+    least one second so the local minimum isn't reported before the gripper
+    has actually moved.
+    """
+
+    execution_type = ExecutionType.SIMULATED, ExecutionType.REAL
+
+    def perform(self):
+        return
+
+    @property
+    def _motion_chart(self):
+        arm = ViewManager().get_end_effector_view(self.gripper, self.robot)
+
+        return Parallel(
+            [
+                JointPositionList(
+                    goal_state=arm.get_joint_state_by_type(self.motion),
+                    name=(
+                        "OpenGripper"
+                        if self.motion == GripperState.OPEN
+                        else "CloseGripper"
+                    ),
+                    threshold=0,
+                ),
+                LocalMinimumReached(
+                    joint_convergence_threshold=0.1, minimum_threshold=0.0
+                ),
+            ],
+            minimum_success=1,
+        )

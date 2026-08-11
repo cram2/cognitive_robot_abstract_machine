@@ -56,7 +56,10 @@ from giskardpy.motion_statechart.exceptions import (
     NonObservationVariableError,
     NodeAlreadyBelongsToDifferentNodeError,
 )
-from giskardpy.motion_statechart.plotters.plot_specs import NodePlotSpec
+from giskardpy.motion_statechart.plotters.plot_specs import (
+    NodePlotSpec,
+    plot_specification_field,
+)
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.utils.utils import string_shortener
@@ -444,9 +447,10 @@ class MotionStatechartNode:
     Decides when this transitions to NOT_STARTED.
     """
 
-    plot_specs: NodePlotSpec = field(
-        default_factory=NodePlotSpec.create_monitor_style, kw_only=True, init=False
-    )
+    plot_specifications: NodePlotSpec = plot_specification_field(NodePlotSpec.create_monitor_style)
+    """
+    Describes how this node is plotted during a MotionStatechart.draw call or in the MotionStatechartInspector.
+    """
 
     def __post_init__(self):
         if self.name is None:
@@ -910,7 +914,8 @@ def velocity_convergence_expression(
     :param maximum_threshold: Upper bound for the per-degree-of-freedom velocity
         threshold.
     :param degrees_of_freedom: Degrees of freedom to check for convergence. Defaults to
-        every active degree of freedom in the world when ``None``.
+        every active degree of freedom in the world when ``None``. Those without an
+        upper velocity limit are skipped, since no threshold can be derived for them.
     :param minimum_time: Minimum elapsed control time before the expression can become
         true.
     :param reference_cycle_variable: Cycle count elapsed time is measured from, instead
@@ -929,6 +934,11 @@ def velocity_convergence_expression(
     ref = []
     symbols = []
     for dof in degrees_of_freedom:
+        if dof.limits.upper.velocity is None:
+            # nothing to derive a threshold from, so this degree of freedom cannot
+            # converge by this measure; environment joints are routinely parsed
+            # without a velocity limit
+            continue
         velocity_limit = dof.limits.upper.velocity * joint_convergence_threshold
         velocity_limit = min(max(minimum_threshold, velocity_limit), maximum_threshold)
         ref.append(velocity_limit)
@@ -959,17 +969,13 @@ class Task(MotionStatechartNode):
     )
     """Task priority relative to other tasks."""
 
-    plot_specs: NodePlotSpec = field(
-        default_factory=NodePlotSpec.create_task_style, kw_only=True, init=False
-    )
+    plot_specs: NodePlotSpec = plot_specification_field(NodePlotSpec.create_task_style)
 
 
 @dataclass(eq=False, repr=False)
 class Goal(MotionStatechartNode):
     nodes: List[MotionStatechartNode] = field(default_factory=list, init=False)
-    plot_specs: NodePlotSpec = field(
-        default_factory=NodePlotSpec.create_goal_style, kw_only=True, init=False
-    )
+    plot_specifications: NodePlotSpec = plot_specification_field(NodePlotSpec.create_goal_style)
 
     def expand(self, context: MotionStatechartContext) -> None:
         """
@@ -1077,9 +1083,7 @@ class ThreadPayloadMonitor(MotionStatechartNode, ABC):
 @dataclass(eq=False, repr=False)
 class EndMotion(MotionStatechartNode):
 
-    plot_specs: NodePlotSpec = field(
-        default_factory=NodePlotSpec.create_end_style, kw_only=True, init=False
-    )
+    plot_specs: NodePlotSpec = plot_specification_field(NodePlotSpec.create_end_style)
 
     joint_convergence_threshold: float = field(default=0.01, kw_only=True)
     """
@@ -1163,9 +1167,7 @@ class CancelMotion(MotionStatechartNode):
         default_factory=Scalar.const_true, init=False
     )
 
-    plot_specs: NodePlotSpec = field(
-        default_factory=NodePlotSpec.create_cancel_style, kw_only=True, init=False
-    )
+    plot_specs: NodePlotSpec = plot_specification_field(NodePlotSpec.create_cancel_style)
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=Scalar.const_true())

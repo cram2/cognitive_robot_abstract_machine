@@ -7,7 +7,10 @@ from numpy.testing import assert_allclose
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood.utils import recursive_subclasses
-from semantic_digital_twin.exceptions import MissingConnectionAxisError
+from semantic_digital_twin.exceptions import (
+    MissingConnectionAxisError,
+    MissingReferenceFrameError,
+)
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
@@ -48,7 +51,86 @@ def test_create_with_dofs_threads_parent_T_connection_expression(world_with_two_
             parent_T_connection_expression=parent_T_connection,
         )
         world.add_connection(connection)
-    assert_allclose(connection.origin.to_np(), parent_T_connection.to_np(), atol=1e-9)
+    assert_allclose(connection.origin, parent_T_connection, atol=1e-9)
+
+
+def test_connection6dof_origin_setter_round_trips_with_non_identity_constants(
+    world_with_two_bodies,
+):
+    """
+    Assigning ``.origin`` must make a subsequent read return exactly what was assigned,
+    even when the connection carries non-identity ``parent_T_connection_expression``/
+    ``connection_T_child_expression`` constants (e.g. a body spawned with a prior
+    offset): the setter must un-compose those constants, not write the assigned
+    transform in as the DOF state directly.
+    """
+    world, parent, child = world_with_two_bodies
+    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=0.3, y=0.4, z=0.1
+    )
+    connection_T_child = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.05, yaw=0.2)
+    with world.modify_world():
+        connection = Connection6DoF.create_with_dofs(
+            world,
+            parent,
+            child,
+            parent_T_connection_expression=parent_T_connection,
+            connection_T_child_expression=connection_T_child,
+        )
+        world.add_connection(connection)
+
+    desired_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=1.0, y=-2.0, z=0.5, yaw=0.7, reference_frame=parent
+    )
+    connection.origin = desired_origin
+
+    assert_allclose(connection.origin, desired_origin, atol=1e-9)
+
+
+def test_connection6dof_origin_setter_requires_a_reference_frame(world_with_two_bodies):
+    world, parent, child = world_with_two_bodies
+    with world.modify_world():
+        connection = Connection6DoF.create_with_dofs(world, parent, child)
+        world.add_connection(connection)
+
+    transformation_without_reference_frame = (
+        HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)
+    )
+
+    with pytest.raises(MissingReferenceFrameError):
+        connection.origin = transformation_without_reference_frame
+
+
+def test_connection6dof_origin_setter_converts_from_a_non_parent_reference_frame(
+    world_with_two_bodies,
+):
+    """
+    The assigned transform does not need to already be expressed in the parent frame:
+    the setter must convert it via the world graph before un-composing the connection's
+    own constant offsets.
+    """
+    world, parent, child = world_with_two_bodies
+    grandparent = Body(name=PrefixedName("grandparent"))
+    grandparent_T_parent = HomogeneousTransformationMatrix.from_xyz_rpy(x=2.0, y=1.0)
+    with world.modify_world():
+        world.add_connection(
+            FixedConnection.create_with_dofs(
+                world,
+                grandparent,
+                parent,
+                parent_T_connection_expression=grandparent_T_parent,
+            )
+        )
+        connection = Connection6DoF.create_with_dofs(world, parent, child)
+        world.add_connection(connection)
+
+    desired_origin_in_grandparent = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=2.5, y=1.5, z=0.2, reference_frame=grandparent
+    )
+    connection.origin = desired_origin_in_grandparent
+
+    expected_origin_in_parent = world.transform(desired_origin_in_grandparent, parent)
+    assert_allclose(connection.origin, expected_origin_in_parent, atol=1e-9)
 
 
 def test_reference_origin_excludes_joint_state(world_with_two_bodies):

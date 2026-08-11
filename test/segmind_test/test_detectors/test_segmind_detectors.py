@@ -60,53 +60,53 @@ def test_contact_detector(_simple_apartment_setup):
 
     assert len(events_of(segmind_context, ContactEvent)) == 0
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1, reference_frame=milk.parent_connection.parent)
     segmind_executor.tick()
     assert len(events_of(segmind_context, LossOfContactEvent)) == 0
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box1.global_pose.x, box1.global_pose.y, box1.global_pose.z)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box1.global_pose.x, box1.global_pose.y, box1.global_pose.z, reference_frame=milk.parent_connection.parent)
     segmind_executor.tick()
     assert len(events_of(segmind_context, ContactEvent)) == 1
     assert len(events_of(segmind_context, LossOfContactEvent)) == 0
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box2.global_pose.x, box2.global_pose.y, box2.global_pose.z)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box2.global_pose.x, box2.global_pose.y, box2.global_pose.z, reference_frame=milk.parent_connection.parent)
     segmind_executor.tick()
     assert len(events_of(segmind_context, ContactEvent)) == 2
     assert len(events_of(segmind_context, LossOfContactEvent)) == 1
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1, reference_frame=milk.parent_connection.parent)
     segmind_executor.tick()
     assert len(events_of(segmind_context, LossOfContactEvent)) == 2
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 
 def test_support_detector(_simple_apartment_setup):
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(_simple_apartment_setup)
     statechart = SegmindStatechart().build_statechart([SupportDetector(), LossOfSupportDetector()])
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 0.93)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 0.93, reference_frame=milk.parent_connection.parent)
     segmind_executor.compile(statechart)
     segmind_executor.tick()
     assert len(events_of(segmind_context, SupportEvent)) == 1
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1, reference_frame=milk.parent_connection.parent)
     segmind_executor.tick()
     assert len(events_of(segmind_context, LossOfSupportEvent)) == 1
 
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box1.global_pose.x, box1.global_pose.y,
-                                                                                 box1.global_pose.z + 0.56)
+                                                                                 box1.global_pose.z + 0.56, reference_frame=milk.parent_connection.parent)
     segmind_executor.tick()
     assert len(events_of(segmind_context, SupportEvent)) == 2
     assert len(events_of(segmind_context, LossOfSupportEvent)) == 1
 
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box2.global_pose.x, box2.global_pose.y,
-                                                                                 box2.global_pose.z + 0.56)
+                                                                                 box2.global_pose.z + 0.56, reference_frame=milk.parent_connection.parent)
     segmind_executor.tick()
     assert len(events_of(segmind_context, SupportEvent)) == 3
     assert len(events_of(segmind_context, LossOfSupportEvent)) == 2
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1, reference_frame=milk.parent_connection.parent)
     segmind_executor.tick()
     assert len(events_of(segmind_context, LossOfSupportEvent)) == 3
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 
 def test_containment_detector(_simple_apartment_setup):
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(_simple_apartment_setup)
@@ -117,25 +117,25 @@ def test_containment_detector(_simple_apartment_setup):
     assert len(events_of(segmind_context, ContainmentEvent)) == 0
 
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box1.global_pose.x, box1.global_pose.y,
-                                                                                 box1.global_pose.z)
+                                                                                 box1.global_pose.z, reference_frame=milk.parent_connection.parent)
     segmind_executor.tick()
     assert len(events_of(segmind_context, ContainmentEvent)) == 1
 
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box2.global_pose.x, box2.global_pose.y,
-                                                                                 box2.global_pose.z)
+                                                                                 box2.global_pose.z, reference_frame=milk.parent_connection.parent)
     segmind_executor.tick()
     assert len(events_of(segmind_context, ContainmentEvent)) == 2
     assert len(events_of(segmind_context, LossOfContainmentEvent)) == 1
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1, reference_frame=milk.parent_connection.parent)
     segmind_executor.tick()
     assert len(events_of(segmind_context, LossOfContainmentEvent)) == 2
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 
 def test_pickup(_simple_apartment_setup):
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(_simple_apartment_setup)
     statechart = SegmindStatechart().build_statechart([PickUpDetector(), SupportDetector(), TranslationDetector(), LossOfSupportDetector()])
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 0.93)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 0.93, reference_frame=milk.parent_connection.parent)
 
     segmind_executor.compile(statechart)
     segmind_executor.tick()
@@ -146,14 +146,13 @@ def test_pickup(_simple_apartment_setup):
         milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=box2.global_pose.x,
             y=box2.global_pose.y,
-            z=box2.global_pose.z + 0.56 + i * 0.1,
-        )
+            z=box2.global_pose.z + 0.56 + i * 0.1, reference_frame=milk.parent_connection.parent)
         segmind_executor.tick()
 
     assert len(events_of(segmind_context, TranslationEvent)) >= 1
     assert len(events_of(segmind_context, LossOfSupportEvent)) == 1
     assert len(events_of(segmind_context, PickUpEvent)) == 1
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 
 def test_placing(_simple_apartment_setup):
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(_simple_apartment_setup)
@@ -166,8 +165,7 @@ def test_placing(_simple_apartment_setup):
         milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=box2.global_pose.x,
             y=box2.global_pose.y,
-            z=box2.global_pose.z + 0.97 - i * 0.1,
-        )
+            z=box2.global_pose.z + 0.97 - i * 0.1, reference_frame=milk.parent_connection.parent)
         segmind_executor.tick()
 
     assert len(events_of(segmind_context, TranslationEvent)) >= 1
@@ -175,15 +173,14 @@ def test_placing(_simple_apartment_setup):
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=box2.global_pose.x,
         y=box2.global_pose.y,
-        z=box2.global_pose.z + 0.56,
-    )
+        z=box2.global_pose.z + 0.56, reference_frame=milk.parent_connection.parent)
     for _ in range(5):
         segmind_executor.tick()
 
     assert len(events_of(segmind_context, SupportEvent)) == 1
     assert len(events_of(segmind_context, StopTranslationEvent)) == 1
     assert len(events_of(segmind_context, PlacingEvent)) == 1
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 
 def test_pickup_then_place_back_on_same_surface(_simple_apartment_setup):
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(_simple_apartment_setup)
@@ -191,8 +188,7 @@ def test_pickup_then_place_back_on_same_surface(_simple_apartment_setup):
         [PickUpDetector(), PlacingDetector(), SupportDetector(), LossOfSupportDetector(),
          TranslationDetector(), StopTranslationDetector()])
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        x=box2.global_pose.x, y=box2.global_pose.y, z=box2.global_pose.z + 0.56,
-    )
+        x=box2.global_pose.x, y=box2.global_pose.y, z=box2.global_pose.z + 0.56, reference_frame=milk.parent_connection.parent)
 
     segmind_executor.compile(statechart)
     segmind_executor.tick()
@@ -204,8 +200,7 @@ def test_pickup_then_place_back_on_same_surface(_simple_apartment_setup):
         milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=box2.global_pose.x,
             y=box2.global_pose.y,
-            z=box2.global_pose.z + 0.56 + i * 0.1,
-        )
+            z=box2.global_pose.z + 0.56 + i * 0.1, reference_frame=milk.parent_connection.parent)
         segmind_executor.tick()
 
     assert len(events_of(segmind_context, LossOfSupportEvent)) == 1
@@ -219,21 +214,19 @@ def test_pickup_then_place_back_on_same_surface(_simple_apartment_setup):
         milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=box2.global_pose.x,
             y=box2.global_pose.y,
-            z=box2.global_pose.z + 0.97 - i * 0.1,
-        )
+            z=box2.global_pose.z + 0.97 - i * 0.1, reference_frame=milk.parent_connection.parent)
         segmind_executor.tick()
 
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=box2.global_pose.x,
         y=box2.global_pose.y,
-        z=box2.global_pose.z + 0.56,
-    )
+        z=box2.global_pose.z + 0.56, reference_frame=milk.parent_connection.parent)
     for _ in range(5):
         segmind_executor.tick()
 
     assert len(events_of(segmind_context, SupportEvent)) == 2
     assert len(events_of(segmind_context, PlacingEvent)) == 1
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 
 
 def test_translation(_simple_apartment_setup):
@@ -247,12 +240,11 @@ def test_translation(_simple_apartment_setup):
 
     for i in range(5):
         milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=1 + i * 0.1, y=-3, z=0.25
-        )
+            x=1 + i * 0.1, y=-3, z=0.25, reference_frame=milk.parent_connection.parent)
         segmind_executor.tick()
 
     assert len(events_of(segmind_context, TranslationEvent)) == 1
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 
 
 def test_stop_translation(_simple_apartment_setup):
@@ -264,8 +256,7 @@ def test_stop_translation(_simple_apartment_setup):
 
     for i in range(5):
         milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=1 + i * 0.1, y=-3, z=0.25
-        )
+            x=1 + i * 0.1, y=-3, z=0.25, reference_frame=milk.parent_connection.parent)
         segmind_executor.tick()
 
     assert len(events_of(segmind_context, TranslationEvent)) == 1
@@ -274,7 +265,7 @@ def test_stop_translation(_simple_apartment_setup):
         segmind_executor.tick()
 
     assert len(events_of(segmind_context, StopTranslationEvent)) == 1
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 
 
 def test_insertion(_simple_apartment_setup):
@@ -301,15 +292,15 @@ def test_insertion(_simple_apartment_setup):
 
     assert len(events_of(segmind_context, InsertionEvent)) == 0
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(hole.global_pose.x, hole.global_pose.y,
-                                                                                 hole.global_pose.z)
+                                                                                 hole.global_pose.z, reference_frame=milk.parent_connection.parent)
 
     segmind_executor.tick()
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box2.global_pose.x,box2.global_pose.y,box2.global_pose.z)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box2.global_pose.x,box2.global_pose.y,box2.global_pose.z, reference_frame=milk.parent_connection.parent)
     segmind_executor.tick()
 
     assert len(events_of(segmind_context, InsertionEvent)) == 1
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 
 
 def test_rotation(_simple_apartment_setup):
@@ -324,7 +315,9 @@ def test_rotation(_simple_apartment_setup):
 
     for i in range(5):
         milk.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(roll=i*0.1)
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                roll=i * 0.1, reference_frame=milk.parent_connection.parent
+            )
         )
         segmind_executor.tick()
 
@@ -342,7 +335,9 @@ def test_stop_rotation(_simple_apartment_setup):
 
     for i in range(5):
         milk.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(roll=i*0.1)
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                roll=i * 0.1, reference_frame=milk.parent_connection.parent
+            )
         )
         segmind_executor.tick()
     assert len([i for i in segmind_context.logger.get_events() if isinstance(i, RotationEvent)]) >= 1
@@ -369,7 +364,7 @@ def test_slow_motion_with_all_motion_detectors(_simple_apartment_setup):
 
     # Move the object to its start pose and let the pose windows settle, so that the events
     # triggered by that jump are not mistaken for the slow drift below.
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=-3, z=0.25)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=-3, z=0.25, reference_frame=milk.parent_connection.parent)
     for _ in range(8):
         segmind_executor.tick()
 
@@ -380,8 +375,7 @@ def test_slow_motion_with_all_motion_detectors(_simple_apartment_setup):
     # window it accumulates to more than 0.005m and 0.1rad, so it has to be reported.
     for i in range(1, 9):
         milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=1 + i * 0.002, y=-3, z=0.25, roll=i * 0.04
-        )
+            x=1 + i * 0.002, y=-3, z=0.25, roll=i * 0.04, reference_frame=milk.parent_connection.parent)
         segmind_executor.tick()
 
     assert len(events_of(segmind_context, TranslationEvent)) > translations
@@ -393,5 +387,5 @@ def test_slow_motion_with_all_motion_detectors(_simple_apartment_setup):
     assert len(events_of(segmind_context, StopTranslationEvent)) >= 1
     assert len(events_of(segmind_context, StopRotationEvent)) >= 1
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi, reference_frame=milk.parent_connection.parent)
 

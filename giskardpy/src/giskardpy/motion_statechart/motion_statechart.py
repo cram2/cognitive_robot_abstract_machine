@@ -458,15 +458,18 @@ class MotionStatechart(SubclassJSONSerializer):
         default_factory=list, init=False, repr=False
     )
     """
-    Cache of all nodes in index order, appended to in :meth:`add_node`. Reading this instead of
-    rebuilding the list from `rx_graph` on every access is what keeps :meth:`tick` cheap.
+    Cache of all nodes in index order, appended to in :meth:`add_node`.
+
+    Reading this instead of rebuilding the list from `rx_graph` on every access is what
+    keeps :meth:`tick` cheap.
     """
 
     _cancel_motion_nodes: List[CancelMotion] = field(
         default_factory=list, init=False, repr=False
     )
     """
-    Cache of all :class:`CancelMotion` nodes, checked every tick in :meth:`_raise_if_cancel_motion`.
+    Cache of all :class:`CancelMotion` nodes, checked every tick in
+    :meth:`_raise_if_cancel_motion`.
     """
 
     _end_motion_nodes: List[EndMotion] = field(
@@ -516,9 +519,10 @@ class MotionStatechart(SubclassJSONSerializer):
                 )
                 child_node_copy.parent_node_index = node.index
                 goal_copy.nodes.append(child_node_copy)
-        # copy conditions
+        # copy conditions and plot specs
         for node in self.nodes:
             node_copy = motion_statechart_copy.get_node_by_index(node.index)
+            node_copy.plot_specifications = deepcopy(node.plot_specifications)
             node_copy.start_condition = node.start_condition
             node_copy.pause_condition = node.pause_condition
             node_copy.end_condition = node.end_condition

@@ -65,6 +65,15 @@ class DetectAction(ActionDescription):
     The region in which the object should be detected.
     """
 
+    trust_detected_orientation: bool = True
+    """
+    Whether to trust the perception source's detected orientation.
+
+    When False, only the detected position corrects the object's pose in the world; its
+    existing orientation is kept. See
+    :attr:`~coraplex.perception.PerceptionQuery.trust_detected_orientation`.
+    """
+
     @property
     def _action_plan(self) -> PlanNode:
         return execute_single(DetectingMotion(query=self._build_query()))
@@ -97,7 +106,13 @@ class DetectAction(ActionDescription):
         object_sem_annotation = (
             self.object_sem_annotation or SemanticEnvironmentAnnotation
         )
-        return PerceptionQuery(object_sem_annotation, region_bb, self.robot, self.world)
+        return PerceptionQuery(
+            object_sem_annotation,
+            region_bb,
+            self.robot,
+            self.world,
+            trust_detected_orientation=self.trust_detected_orientation,
+        )
 
 
 @dataclass

@@ -348,15 +348,6 @@ class Scale:
     def to_np(self) -> np.ndarray:
         return np.array([self.x, self.y, self.z])
 
-    @property
-    def xy(self):
-        """
-        Returns the scale in the xy-plane with a zero for z.
-
-        :return: The scale in the xy-plane
-        """
-        return Scale(self.x, self.y, 0)
-
 
 @dataclass
 class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
@@ -552,8 +543,10 @@ class Mesh(Shape):
         return mesh
 
     def to_json(self) -> Dict[str, Any]:
-        # Serialize the raw (unscaled, unprocessed) mesh geometry and the scale separately
-        base_mesh = self._load_in_meters(self.filename, process=False)
+        # Serialize the unscaled geometry and the scale separately. This is the same
+        # mesh :attr:`mesh` exposes, so a deserialized mesh reproduces the original
+        # rather than a differently tessellated version of the same file.
+        base_mesh = self.unscaled_mesh
         # Bake materials/textures down to per-vertex colors so the mesh's color
         # survives serialization (e.g. across the ROS world synchronizer).
         if isinstance(base_mesh.visual, TextureVisuals):
@@ -628,12 +621,28 @@ class Mesh(Shape):
         copy_mesh.apply_scale(scale.to_np())
         return copy_mesh
 
+    @property
+    def unscaled_mesh(self) -> trimesh.Trimesh:
+        """
+        The mesh exactly as the file describes it, before this shape's scale is applied.
+        """
+        mesh = self._load_in_meters(self.filename, process=False)
+        if mesh.visual.kind != "vertex":
+            # Welding duplicate vertices is what makes a mesh watertight, which volume
+            # and boolean operations require; formats like STL give every face its own
+            # vertices, so unwelded nothing is a volume. Welding groups by position and
+            # UV only, so it silently merges vertices that differ just in color --
+            # hence it is skipped for per-vertex coloured meshes, whose vertices are
+            # already the ones that were serialized.
+            mesh.merge_vertices()
+        return mesh
+
     @cached_property
     def mesh(self) -> trimesh.Trimesh:
         """
         The mesh object.
         """
-        mesh = self._load_in_meters(self.filename)
+        mesh = self.unscaled_mesh
         mesh.apply_scale(self.scale.to_np())
         # Apply the shape's color only when it was explicitly set, so a mesh's own
         # materials or per-vertex colors (e.g. from a .dae or from serialization)

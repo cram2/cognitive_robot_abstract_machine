@@ -187,7 +187,7 @@ def test_is_object_reachable_by_copies_current_world_lazily(
 
     # Move the object *after* the predicate has been constructed.
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        2, 1.5, 0.7, 0, 0, 0
+        2, 1.5, 0.7, 0, 0, 0, reference_frame=milk.parent_connection.parent
     )
 
     assert predicate()
@@ -258,7 +258,7 @@ def test_is_object_reachable_by_single_grasp_delegates_to_is_reachable_by(
     )
 
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        2, 1.5, 0.7, 0, 0, 0
+        2, 1.5, 0.7, 0, 0, 0, reference_frame=milk.parent_connection.parent
     )
 
     assert IsObjectReachableBy(
@@ -287,7 +287,7 @@ def test_is_object_reachable_by_reachable(immutable_model_world):
     world, view, context = immutable_model_world
     milk = world.get_body_by_name("milk.stl")
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        2, 1.5, 0.7, 0, 0, 0
+        2, 1.5, 0.7, 0, 0, 0, reference_frame=milk.parent_connection.parent
     )
 
     assert IsObjectReachableBy(
@@ -308,7 +308,7 @@ def test_is_object_reachable_by_not_reachable(immutable_model_world):
     world, view, context = immutable_model_world
     milk = world.get_body_by_name("milk.stl")
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        5, 5, 0.7, 0, 0, 0
+        5, 5, 0.7, 0, 0, 0, reference_frame=milk.parent_connection.parent
     )
 
     assert not IsObjectReachableBy(

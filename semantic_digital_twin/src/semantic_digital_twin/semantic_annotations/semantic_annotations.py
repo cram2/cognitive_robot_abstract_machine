@@ -38,6 +38,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     IsStorageSpace,
     HasLegs,
     HasSink,
+    HasShelfLayers,
 )
 from semantic_digital_twin.spatial_types import (
     Point3,
@@ -114,7 +115,7 @@ class Handle(HasRootBody):
         )
 
     @classmethod
-    def get_default_root_specification(
+    def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: Optional[str] = None,
         scale: Optional[Scale] = None,
@@ -226,7 +227,7 @@ class Aperture(HasRootRegion):
         parent.root.visual = new_bounding_box_collection
 
     @classmethod
-    def get_default_root_specification(
+    def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: Optional[str] = None,
         scale: Optional[Scale] = None,
@@ -416,7 +417,7 @@ class EntryWay(Aperture):
     """
 
     @classmethod
-    def get_default_root_specification(
+    def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: Optional[str] = None,
         scale: Optional[Scale] = None,
@@ -469,7 +470,7 @@ class Door(HasHandle, HasMechanicalJoint):
         return Scale(0.03, 1, 2)
 
     @classmethod
-    def get_specification(
+    def get_annotation_specification(
         cls,
         name: str,
         root_specification: KinematicStructureEntitySpecification,
@@ -496,11 +497,13 @@ class Door(HasHandle, HasMechanicalJoint):
             relationship field name.
         :return: The annotation specification.
         """
-        entry_way_specification = EntryWay.get_specification(
+        entry_way_specification = EntryWay.get_annotation_specification(
             f"{name}_entry_way",
-            EntryWay.get_default_root_specification(scale=root_specification.scale),
+            EntryWay.get_default_root_kinematic_structure_entity_specification(
+                scale=root_specification.scale
+            ),
         )
-        return super().get_specification(
+        return super().get_annotation_specification(
             name,
             root_specification,
             parent_connection_specification=parent_connection_specification,
@@ -512,7 +515,7 @@ class Door(HasHandle, HasMechanicalJoint):
         )
 
     @classmethod
-    def get_default_root_specification(
+    def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: Optional[str] = None,
         scale: Optional[Scale] = None,
@@ -534,7 +537,7 @@ class Door(HasHandle, HasMechanicalJoint):
         scale = scale or cls.default_scale
         if not (scale.x < scale.y and scale.x < scale.z):
             raise InvalidPlaneDimensions(scale, clazz=Door)
-        return super().get_default_root_specification(
+        return super().get_default_root_kinematic_structure_entity_specification(
             name, scale, connection_specification
         )
 
@@ -733,13 +736,13 @@ class Floor(HasSupportingSurface):
         :param name: The name of the floor body.
         :param floor_polytope: A list of 3D points defining the floor poly
         """
-        return cls.get_specification(
+        return cls.get_annotation_specification(
             name,
             BodySpecification.from_3d_points(name, floor_polytope),
         ).spawn(world, parent_T_self=world_root_T_self)
 
     @classmethod
-    def get_default_root_specification(
+    def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: Optional[str] = None,
         scale: Optional[Scale] = None,
@@ -870,7 +873,7 @@ class Wall(HasApertures):
         )
 
     @classmethod
-    def get_default_root_specification(
+    def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: Optional[str] = None,
         scale: Optional[Scale] = None,
@@ -1028,7 +1031,7 @@ class Bread(Food):
 
 
 @dataclass(eq=False)
-class CheezeIt(Food):
+class CheezeIt(Food, IsPerceivable):
     """
     Some type of cracker.
     """
@@ -1230,9 +1233,12 @@ class TrashCan(HasCaseAsRootBody, Furniture):
 
 
 @dataclass(eq=False)
-class ShelvingUnit(Furniture):
+class Shelf(Cabinet, HasShelfLayers):
     """
-    A shelving unit.
+    A shelving unit whose storage surfaces are modelled as explicit shelf layers.
+
+    Each layer is a separate :class:`ShelfLayer` annotation, so objects can be placed on
+    and reasoned about per layer.
     """
 
 

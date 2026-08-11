@@ -46,7 +46,9 @@ def tracy_milk_world(tracy_world):
         )
         connection = Connection6DoF.create_with_dofs(tracy_copy, tracy_copy.root, box)
         tracy_copy.add_connection(connection)
-        connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1, 0, 1)
+        connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            1, 0, 1, reference_frame=tracy_copy.root
+        )
 
     return tracy_copy, tracy_copy.get_semantic_annotations_by_type(Tracy)[0]
 

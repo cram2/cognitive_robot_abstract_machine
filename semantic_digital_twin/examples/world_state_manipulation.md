@@ -132,7 +132,7 @@ from semantic_digital_twin.world_description.world_entity import Connection
 connection = variable(type_=Connection, domain=world.connections)
 free_connection = the(entity(connection).where(connection.parent == world.root)).first()
 with world.modify_world():
-    free_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1., 1., 0., 0., 0., 0.5 * np.pi)
+    free_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1., 1., 0., 0., 0., 0.5 * np.pi, reference_frame=world.root)
 rt = RayTracer(world)
 rt.update_scene()
 rt.scene.show("jupyter")

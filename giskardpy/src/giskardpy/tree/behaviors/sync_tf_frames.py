@@ -48,6 +48,8 @@ class SyncTfFrames(GiskardBehavior):
                 quat_x=parent_T_child.pose.orientation.x,
                 quat_y=parent_T_child.pose.orientation.y,
                 quat_z=parent_T_child.pose.orientation.z,
+                reference_frame=joint.parent,
+                child_frame=joint.child,
             )
 
         return Status.SUCCESS

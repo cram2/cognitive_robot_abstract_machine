@@ -1,13 +1,11 @@
 # CoraPlex — High‑level feature highlights
 
-[![Python Tests](https://github.com/cram2/coraplex/actions/workflows/new-coraplex-ci.yml/badge.svg)](https://github.com/cram2/coraplex/actions/workflows/new-coraplex-ci.yml/badge.svg)
-[![Example Tests](https://github.com/cram2/coraplex/actions/workflows/notebook-test-ci.yml/badge.svg)](https://github.com/cram2/coraplex/actions/workflows/notebook-test-ci.yml/badge.svg)
 
 ```{raw} html
 <div style="display: flex; flex-direction: row; align-items: center; gap: 30px;">
   <div style="flex: 1; max-width: 70%;">
-    <img src="_static/images/new_coraplex_logo_clean.svg" alt="Assimilation Icon" class="only-light" style="width: 100%; height: auto; object-fit: contain;">
-    <img src="_static/images/new_coraplex_logo_clean_dark.svg" alt="Assimilation Icon" class="only-dark" style="width: 100%; height: auto; object-fit: contain;">
+    <img src="_static/images/cora-plex-dark.png" alt="Coraplex Icon" class="only-light" style="width: 100%; height: auto; object-fit: contain;">
+    <img src="_static/images/cora-plex-dark.png" alt="Coraplex Icon" class="only-dark" style="width: 100%; height: auto; object-fit: contain;">
   </div>
 </div>
 ```

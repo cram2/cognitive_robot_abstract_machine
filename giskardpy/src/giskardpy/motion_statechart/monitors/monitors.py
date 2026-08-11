@@ -37,7 +37,7 @@ class ThreadedPayloadMonitor(MotionStatechartNode, ABC):
         pass
 
 
-@dataclass
+@dataclass(repr=False, eq=False)
 class LocalMinimumReached(MotionStatechartNode):
     """
     Checks if the robot has reached a local minimum in the trajectory, by checking if

@@ -219,9 +219,9 @@ def test_draw_with_invisible_node(tmp_path):
     )
     msc.add_node(EndMotion.when_all_true(msc.nodes))
 
-    sequence.plot_specs.visible = False
-    s1n2.plot_specs.visible = False
-    s2n2.plot_specs.visible = False
+    sequence.plot_specifications.visible = False
+    s1n2.plot_specifications.visible = False
+    s2n2.plot_specifications.visible = False
 
     kin_sim = Executor(MotionStatechartContext(world=World()))
     kin_sim.compile(motion_statechart=msc)

@@ -16,6 +16,7 @@ from semantic_digital_twin.adapters.package_resolver import (
     PathResolver,
     SearchPathFileResolver,
 )
+from semantic_digital_twin.adapters.world_model_parser import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     NegativeConnectionVelocity,
@@ -116,7 +117,7 @@ class JointDescription:
 
 
 @dataclass
-class GazeboParser:
+class GazeboParser(WorldModelParser):
     """
     Parses Gazebo SDF model and world descriptions into worlds.
 
