@@ -63,7 +63,7 @@ class ActionServerTask(
 
     message_type: Type[Action]
     """
-    Fully specified goal message that can be send out. 
+    Fully specified goal message that can be send out.
     """
 
     _action_client: ActionClient = field(init=False)
@@ -150,7 +150,7 @@ class NavigateActionServerTask(
 
     base_link: Body
     """
-    Base link of the robot, used for estimating the distance to the goal
+    Base link of the robot, used for estimating the distance to the goal.
     """
 
     def build_msg(self, context: MotionStatechartContext):
@@ -173,12 +173,10 @@ class NavigateActionServerTask(
         )
         self._msg = NavigateToPose.Goal(pose=pose_stamped)
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
-        Builds the motion state node this includes creating the action client and setting the observation expression.
-        The observation is true if the robot is within 1cm of the target pose.
+        Observes whether the robot is within 1cm of the target pose.
         """
-        super().build(context)
         artifacts = NodeArtifacts()
         root_T_goal = context.world.transform(
             target_frame=context.world.root, spatial_object=self.target_pose
@@ -276,25 +274,3 @@ class RobotiqGripperActionServerTask(
             f"Reached goal: {self._result.result.reached_goal}, "
             f"Stalled: {self._result.result.stalled}"
         )
-
-    def on_tick(self, context: MotionStatechartContext) -> ObservationStateValues:
-        """
-        Returns:
-            TRUE    -> Goal reached or gripper stalled while grasping.
-            FALSE   -> Action finished unsuccessfully.
-            UNKNOWN -> Action still running.
-        """
-
-        if self._result is None:
-            return ObservationStateValues.UNKNOWN
-
-        result = self._result.result
-
-        if result.reached_goal:
-            return ObservationStateValues.TRUE
-
-        if result.stalled:
-            # Stalled usually means the gripper contacted an object.
-            return ObservationStateValues.TRUE
-
-        return ObservationStateValues.FALSE
