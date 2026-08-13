@@ -1,5 +1,4 @@
-"""
-Analysis engine demonstrating parameter configuration.
+"""Analysis engine demonstrating parameter configuration.
 
 This module provides an analysis engine that demonstrates how to configure
 and use parameters in a pipeline. It implements a simple pipeline that uses
@@ -21,16 +20,13 @@ from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.testing import SlowAnnotator
-from robokudo.descriptors.factories.cr_descriptor_factory import (
-    CollectionReaderDescriptorFactory,
-)
+from robokudo.descriptors import CrDescriptorFactory
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """
-    Analysis engine demonstrating parameter configuration.
+    """Analysis engine demonstrating parameter configuration.
 
     This class implements a pipeline that shows how to configure annotator
     parameters using descriptors. It uses a custom depth truncation value
@@ -49,8 +45,7 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """
-        Get the name of the analysis engine.
+        """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
@@ -71,7 +66,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with custom parameters
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CrDescriptorFactory.create_descriptor("kinect")
 
         image_preprocessor_config = ImagePreprocessorAnnotator.Descriptor()
         image_preprocessor_config.parameters.depth_trunc = 4.5

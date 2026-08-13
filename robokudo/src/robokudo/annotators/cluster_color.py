@@ -1,5 +1,5 @@
 """
-Robokudo Color Analysis Module.
+Robokudo Color Analysis Module
 
 This module provides functionality for semantic color analysis of object hypotheses.
 It analyzes RGB regions of interest (ROIs) and masks to determine dominant colors
@@ -20,7 +20,7 @@ import numba
 import numpy as np
 import numpy.ma
 from py_trees.common import Status
-from typing_extensions import TYPE_CHECKING, Dict, List, Tuple, Type
+from typing_extensions import Type, Dict, Tuple, List, TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
@@ -34,8 +34,7 @@ if TYPE_CHECKING:
 
 
 class Color(Enum):
-    """
-    Enumeration of semantic colors used for classification.
+    """Enumeration of semantic colors used for classification.
 
     * Primary colors: RED, GREEN, BLUE
     * Secondary colors: YELLOW, CYAN, MAGENTA
@@ -55,9 +54,7 @@ class Color(Enum):
 
 
 class ClusterColorAnnotator(BaseAnnotator):
-    """
-    Calculate the semantic color for every Object Hypothesis (cluster) that has a RGB
-    ROI and a Mask.
+    """Calculate the semantic color for every Object Hypothesis (cluster) that has a RGB ROI and a Mask.
 
     This annotator analyzes object hypotheses by:
 
@@ -74,8 +71,7 @@ class ClusterColorAnnotator(BaseAnnotator):
     """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for the ClusterColorAnnotator.
+        """Configuration descriptor for the ClusterColorAnnotator.
 
         Defines parameters that control the color analysis behavior:
 
@@ -85,9 +81,7 @@ class ClusterColorAnnotator(BaseAnnotator):
         """
 
         class Parameters:
-            """
-            Parameters for color analysis configuration.
-            """
+            """Parameters for color analysis configuration."""
 
             def __init__(self) -> None:
                 self.num_of_colors: int = 6
@@ -121,14 +115,12 @@ class ClusterColorAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ClusterColorAnnotator",
-        descriptor: ClusterColorAnnotator.Descriptor | None = None,
+        descriptor: "ClusterColorAnnotator.Descriptor" = Descriptor(),
     ) -> None:
-        """
-        Default construction.
+        """Default construction. Minimal one-time init!
 
-        Minimal one-time init!
-        :param name: Name of the annotator instance
-        :param descriptor: Configuration descriptor
+        :param name: Name of the annotator instance, defaults to "ClusterColorAnnotator"
+        :param descriptor: Configuration descriptor, defaults to Descriptor()
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
@@ -167,17 +159,17 @@ class ClusterColorAnnotator(BaseAnnotator):
     def count_colors_numba(
         self, hsv_image: npt.NDArray, mask: npt.NDArray
     ) -> Tuple[int, Dict[Color, int]]:
-        """
-        Wrapper function for the numba version of the count colors method.
+        """Wrapper function for the numba version of the count colors method.
 
-        The wrapper handles the pythonic/object style data and prepares everything for
-        the requirements of the numba method.
+        The wrapper handles the pythonic/object style data and prepares everything for the requirements
+        of the numba method.
 
         :param hsv_image: Image in HSV color space
         :param mask: Binary mask indicating pixels to analyze
-        :return: A tuple with the number of analyzed pixels (given by the mask) as well
-            as a dict with the counted colors. The key is a Color enum from this module.
+        :return: A tuple with the number of analyzed pixels (given by the mask) as well as a dict with the counted
+                colors. The key is a Color enum from this module.
         """
+
         counted_pixel_sum, color_count = ClusterColorAnnotator.count_colors_numba_impl(
             hsv_image,
             mask,
@@ -209,10 +201,9 @@ class ClusterColorAnnotator(BaseAnnotator):
         number_of_colors: int,
         color_range: float,
     ) -> Tuple[int, npt.NDArray]:
-        """
-        Iterate over the masked pixels on a given hsv image to count how many pixels can
-        be assigned to the defined color ranges. Requires the numba library and passes
-        the required parameters to avoid class access and object-mode from numba.
+        """Iterate over the masked pixels on a given hsv image to count how many pixels can be assigned
+        to the defined color ranges. Requires the numba library and passes the required parameters to avoid
+        class access and object-mode from numba.
 
         :param hsv_image: Image in HSV color space.
         :param mask: Binary mask indicating pixels to analyze.
@@ -223,9 +214,8 @@ class ClusterColorAnnotator(BaseAnnotator):
         :param min_value_white: Minimum value for white classification.
         :param number_of_colors: Number of hue divisions.
         :param color_range: Size of each hue division.
-        :return: A tuple with the number of analyzed pixels (given by the mask) as well
-            as a numpy array with the counted colors. The id refers the indices of the
-            Color enum from this module.
+        :return: A tuple with the number of analyzed pixels (given by the mask) as well as a numpy array with the counted
+                colors. The id refers the indices of the Color enum from this module.
         """
         width, height, channels = hsv_image.shape
         counted_pixel_sum = 0
@@ -270,9 +260,7 @@ class ClusterColorAnnotator(BaseAnnotator):
     def count_colors(
         self, hsv_image: npt.NDArray, mask: npt.NDArray
     ) -> Tuple[int, dict]:
-        """
-        Non-numba version of the count_colors_numba_impl method.
-
+        """Non-numba version of the count_colors_numba_impl method.
         Use only if you can't use numba.
 
         .. warning::
@@ -355,8 +343,7 @@ class ClusterColorAnnotator(BaseAnnotator):
         return len(all_image_pixel_values_in_mask), color_count
 
     def update(self) -> Status:
-        """
-        Process current scene to analyze colors of object hypotheses.
+        """Process current scene to analyze colors of object hypotheses.
 
         Steps:
 
@@ -394,8 +381,7 @@ class ClusterColorAnnotator(BaseAnnotator):
         return Status.SUCCESS
 
     def create_color_annotations(self, color: npt.NDArray) -> None:
-        """
-        Create color annotations for all object hypotheses.
+        """Create color annotations for all object hypotheses.
 
         For each object hypothesis with a valid ROI mask:
 
@@ -483,8 +469,7 @@ class ClusterColorAnnotator(BaseAnnotator):
             self.cluster_rois.append(roi)
 
     def draw_visualization(self, visualization_img: npt.NDArray) -> npt.NDArray:
-        """
-        Draw visualization of detected colors on the image.
+        """Draw visualization of detected colors on the image.
 
         For each ROI:
 

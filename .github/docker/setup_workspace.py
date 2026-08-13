@@ -18,54 +18,6 @@ class bcolors:
 
 
 @dataclass
-class FileEdit:
-    """
-    A literal replacement applied to a file of a cloned repository.
-
-    Lets a dependency that does not build as published be adjusted in place, without
-    maintaining a fork of it.
-    """
-
-    path: str
-    """
-    The path of the file, relative to the repository root.
-    """
-
-    original: str
-    """
-    The text to replace, which must occur in the file.
-    """
-
-    replacement: str
-    """
-    The text to put in its place.
-    """
-
-    def apply_to(self, repository_path: str):
-        """
-        Rewrite the file, leaving it untouched if the replacement is already in place.
-
-        :param repository_path: The path of the checked out repository.
-        :raises RuntimeError: If neither the original nor the replacement is present, as
-            that means the file changed and the edit no longer describes it.
-        """
-        file_path = os.path.join(repository_path, self.path)
-        with open(file_path) as file:
-            content = file.read()
-
-        if self.original not in content:
-            if self.replacement in content:
-                return
-            raise RuntimeError(
-                f"Cannot patch {file_path}: it contains neither "
-                f"{self.original!r} nor {self.replacement!r}."
-            )
-
-        with open(file_path, "w") as file:
-            file.write(content.replace(self.original, self.replacement))
-
-
-@dataclass
 class Repository:
     """
     Data representation of a Git repository to be included in the workspace.
@@ -75,10 +27,6 @@ class Repository:
     branch: str
     name: str
     cleanup_dirs: List[str] = field(default_factory=list)
-    edits: List[FileEdit] = field(default_factory=list)
-    """
-    Changes applied to the checkout after cloning it.
-    """
 
 
 class SystemDependencyManager:
@@ -122,12 +70,6 @@ class GitManager:
 
         if os.path.exists(repo_path):
             print(f"{bcolors.OKGREEN}Updating {repo.name}...{bcolors.ENDC}")
-            # Restore the files this script patched, so the pull cannot conflict with
-            # them. They are re-applied below.
-            for edit in repo.edits:
-                subprocess.run(
-                    ["git", "-C", repo_path, "checkout", "--", edit.path], check=True
-                )
             subprocess.run(["git", "-C", repo_path, "pull"], check=True)
         else:
             print(f"{bcolors.OKGREEN}Cloning {repo.name}...{bcolors.ENDC}")
@@ -151,10 +93,6 @@ class GitManager:
                     f"{bcolors.WARNING}Removing unwanted subdirectory: {full_sub_path}{bcolors.ENDC}"
                 )
                 shutil.rmtree(full_sub_path)
-
-        for edit in repo.edits:
-            print(f"{bcolors.WARNING}Patching {repo.name}/{edit.path}{bcolors.ENDC}")
-            edit.apply_to(repo_path)
 
 
 class WorkspaceManager:
@@ -236,9 +174,6 @@ def main():
         "ros-jazzy-ament-lint-auto",
         "ros-jazzy-ament-cmake-ros",
         "ros-jazzy-launch-testing-ament-cmake",
-        "ros-jazzy-rviz2",
-        "ros-jazzy-ur-robot-driver",
-        "ros-jazzy-ur-client-library",
     ]
     manager.dep_manager.install_packages(packages)
 
@@ -304,11 +239,6 @@ def main():
             "iai_tiago_description",
         ),
         Repository(
-            "https://github.com/geriatronics/garmi_description.git",
-            "main",
-            "garmi_description",
-        ),
-        Repository(
             "https://github.com/pal-robotics/pmb2_robot.git",
             "humble-devel",
             "pmb2_robot",
@@ -340,21 +270,6 @@ def main():
             "main",
             "iai_weiss_wpg_300-120-gripper",
             ["griplink"],
-        ),
-        Repository(
-            "https://github.com/aws-robotics/aws-robomaker-small-warehouse-world.git",
-            "ros2",
-            "aws_robomaker_small_warehouse_world",
-            edits=[
-                # The package installs data files only and never uses gazebo_ros, yet
-                # requires it. Gazebo Classic is end-of-life and has no Jazzy release, so
-                # demanding it would leave the package unbuildable.
-                FileEdit(
-                    "CMakeLists.txt",
-                    "find_package(gazebo_ros REQUIRED)",
-                    "find_package(gazebo_ros)",
-                ),
-            ],
         ),
     ]
 

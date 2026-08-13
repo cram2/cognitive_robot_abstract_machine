@@ -622,23 +622,6 @@ def test_json_integration(session, database):
     assert reconstructed == obj
 
 
-def test_custom_type_from_foreign_package(session, database):
-    """
-    Regression test for a bug where a JSON-mapped field whose type lives in a package
-    nothing else in the generated interface imports (here, ``random_events``) tripped a
-    ``MappedAnnotationError`` at class-definition time, because
-    ``WrappedTable.create_custom_type`` never registered that module as an import.
-    """
-    obj = HolderOfSimpleInterval()
-    dao = to_dao(obj)
-    session.add(dao)
-    session.commit()
-
-    queried = session.scalars(select(HolderOfSimpleIntervalDAO)).one()
-    reconstructed = queried.from_dao()
-    assert reconstructed == obj
-
-
 def test_many_to_many_with_same_type(session, database):
 
     state = ToDataAccessObjectState()
@@ -889,8 +872,8 @@ def test_path_custom_type(session, database):
 def test_selectin_loading_preloads_relationships(session, database):
     """
     Relationship attributes are loaded eagerly (the generated relationships use
-    lazy='selectin') and remain accessible after the instance is detached from the
-    session, with or without the selectin_loading() context manager.
+    lazy='selectin') and remain accessible after the instance is detached from
+    the session, with or without the selectin_loading() context manager.
     """
     p1 = KRROODPosition(1, 2, 3)
     p2 = KRROODPosition(2, 3, 4)
@@ -916,9 +899,9 @@ def test_selectin_loading_preloads_relationships(session, database):
 
 def test_selectin_loading_reduces_queries_during_from_dao(session, database):
     """
-    All relationships are bulk-fetched in O(1) queries during the initial read (mapper-
-    level lazy='selectin'), so from_dao() makes zero additional DB round-trips, with or
-    without the selectin_loading() context manager.
+    All relationships are bulk-fetched in O(1) queries during the initial read
+    (mapper-level lazy='selectin'), so from_dao() makes zero additional DB
+    round-trips, with or without the selectin_loading() context manager.
     """
     N = 30
     positions = KRROODPositions(
@@ -957,9 +940,9 @@ def test_selectin_loading_reduces_queries_during_from_dao(session, database):
         sa_event.remove(engine, "after_cursor_execute", _count)
 
     # from_dao() must issue no queries at all in either case.
-    assert (
-        queries_without == 0
-    ), f"Expected 0 queries without selectin_loading but got {queries_without}"
-    assert (
-        queries_with == 0
-    ), f"Expected 0 queries with selectin_loading but got {queries_with}"
+    assert queries_without == 0, (
+        f"Expected 0 queries without selectin_loading but got {queries_without}"
+    )
+    assert queries_with == 0, (
+        f"Expected 0 queries with selectin_loading but got {queries_with}"
+    )

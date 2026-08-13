@@ -12,14 +12,8 @@ from krrood.symbolic_math.symbolic_math import (
     VariableParameters,
     CompiledFunction,
 )
-from semantic_digital_twin.collision_checking.collision_matrix import (
-    CollisionMatrix,
-    CollisionCheck,
-)
-from semantic_digital_twin.callbacks.callback import (
-    ModelChangeCallback,
-    StateChangeCallback,
-)
+from semantic_digital_twin.collision_checking.collision_matrix import CollisionMatrix, CollisionCheck
+from semantic_digital_twin.callbacks.callback import ModelChangeCallback, StateChangeCallback
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -42,7 +36,6 @@ class CollisionCheckingResult:
     def any(self) -> bool:
         """
         Check if there are any contacts in the result.
-
         :return: True if there are contacts, False otherwise.
         """
         return len(self.contacts) > 0
@@ -51,15 +44,13 @@ class CollisionCheckingResult:
 @dataclass
 class ClosestPoints:
     """
-    Encapsulates the closest points data between two bodies returned by the collision
-    detector.
+    Encapsulates the closest points data between two bodies returned by the collision detector.
     """
 
     body_a: Body
     """
     First body in the collision.
     """
-
     body_b: Body
     """
     Second body in the collision.
@@ -69,22 +60,17 @@ class ClosestPoints:
     """
     Closest distance between the two bodies.
     """
-
     root_P_point_on_body_a: np.ndarray
     """
     Closest point on body_a with respect to the worlds root.
     """
-
     root_P_point_on_body_b: np.ndarray
     """
     Closest point on body_b with respect to the worlds root.
     """
-
     root_V_contact_normal_from_b_to_a: np.ndarray
     """
-    Normal vector of the contact plane from body_b to body_a with respect to the worlds
-    root.
-
+    Normal vector of the contact plane from body_b to body_a with respect to the worlds root.
     The contact normal points from body_a to body_b.
     """
 
@@ -102,8 +88,7 @@ class ClosestPoints:
 
     def reverse(self):
         """
-        Returns a new ClosestPoints object with the same data but with body_a and body_b
-        swapped.
+        Returns a new ClosestPoints object with the same data but with body_a and body_b swapped.
         """
         return ClosestPoints(
             body_a=self.body_b,
@@ -118,15 +103,13 @@ class ClosestPoints:
 @dataclass(eq=False)
 class CollisionDetectorModelUpdater(ModelChangeCallback):
     """
-    Updates and compiles the collision detector's collision forward kinematics
-    expressions when the world model changes.
+    Updates and compiles the collision detector's collision forward kinematics expressions when the world model changes.
     """
 
     collision_detector: CollisionDetector = field(kw_only=True)
     """
     Reference to the collision detector.
     """
-
     compiled_collision_fks: CompiledFunction = field(init=False)
     """
     Compiled collision FK function.
@@ -222,13 +205,13 @@ class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
     @abc.abstractmethod
     def sync_world_model(self) -> None:
         """
-        Synchronize the collision checker with the current world model.
+        Synchronize the collision checker with the current world model
         """
 
     @abc.abstractmethod
     def sync_world_state(self) -> None:
         """
-        Synchronize the collision checker with the current world state.
+        Synchronize the collision checker with the current world state
         """
 
     @abc.abstractmethod
@@ -237,7 +220,6 @@ class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
     ) -> CollisionCheckingResult:
         """
         Computes the collisions for all checks in the collision matrix.
-
         If collision_matrix is None, checks all collisions.
         :param collision_matrix:
         :return: A list of detected collisions.
@@ -248,12 +230,10 @@ class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
     ) -> ClosestPoints | None:
         """
         Checks for collisions between two bodies.
-
         :param body_a: The first body to check for collisions.
         :param body_b: The second body to check for collisions.
         :param distance: The distance threshold for collision detection.
-        :return: The closest points of contact if a collision is detected, otherwise
-            None.
+        :return: The closest points of contact if a collision is detected, otherwise None.
         """
         collision = self.check_collisions(
             CollisionMatrix(

@@ -1,21 +1,15 @@
 from dataclasses import dataclass
 
-from typing_extensions import Optional
-
 from krrood.entity_query_language.predicate import Symbol
+from typing_extensions import Optional, Dict, Any, Self
+
+from krrood.adapters.json_serializer import SubclassJSONSerializer
 
 
 @dataclass
 class PrefixedName(Symbol):
     name: str
-    """
-    The local name identifying the entity.
-    """
-
     prefix: Optional[str] = None
-    """
-    Optional namespace that disambiguates the name from equally named entities in other scopes.
-    """
 
     def __hash__(self):
         return hash((self.prefix, self.name))

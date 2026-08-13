@@ -31,10 +31,7 @@ class UnsupportedOperationError(SymbolicMathError, TypeError):
     operation: str
     """The name of the operation that was attempted (e.g., '+', '-', etc.)."""
     left: Any
-    """
-    The first argument involved in the operation.
-    """
-
+    """The first argument involved in the operation."""
     right: Any
     """The second argument involved in the operation."""
 
@@ -88,21 +85,10 @@ class NotScalerError(WrongDimensionsError):
 @dataclass
 class NotSquareMatrixError(WrongDimensionsError):
     """
-    Represents an error raised when an operation requires a square matrix but the input
-    is not.
+    Represents an error raised when an operation requires a square matrix but the input is not.
     """
 
     expected_dimensions: Tuple[int, int] = field(default="square", init=False)
-    actual_dimensions: Tuple[int, int]
-
-
-@dataclass
-class NotColumnVectorError(WrongDimensionsError):
-    """
-    Raised when data that is expected to describe a vector has more than one column.
-    """
-
-    expected_dimensions: str = field(default="(n, 1)", init=False)
     actual_dimensions: Tuple[int, int]
 
 
@@ -128,7 +114,9 @@ class NoFreeVariablesError(SymbolicMathError):
     """
 
     def error_message(self) -> str:
-        return f"Operation can't be performed on expression with NO free variables."
+        return (
+            f"Operation can't be performed on expression with NO free variables."
+        )
 
     def suggest_correction(self) -> str:
         return ""
@@ -136,16 +124,15 @@ class NoFreeVariablesError(SymbolicMathError):
 
 class ExpressionEvaluationError(SymbolicMathError):
     """
-    Represents an exception raised during the evaluation of a symbolic mathematical
-    expression.
+    Represents an exception raised during the evaluation of a symbolic mathematical expression.
     """
 
 
 @dataclass
 class WrongNumberOfArgsError(ExpressionEvaluationError):
     """
-    This error is specifically used in expression evaluation scenarios where a certain
-    number of arguments are required and the actual number provided is incorrect.
+    This error is specifically used in expression evaluation scenarios where a certain number of arguments
+    are required and the actual number provided is incorrect.
     """
 
     expected_number_of_args: int
@@ -159,36 +146,9 @@ class WrongNumberOfArgsError(ExpressionEvaluationError):
 
 
 @dataclass
-class NotEnoughArgumentsError(SymbolicMathError):
-    """
-    Raised when an operation is called with fewer arguments than it requires.
-    """
-
-    minimum_number_of_arguments: int
-    """
-    The smallest number of arguments the operation accepts.
-    """
-
-    actual_number_of_arguments: int
-    """
-    The number of arguments the operation was called with.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"Expected at least {self.minimum_number_of_arguments} arguments, "
-            f"but got {self.actual_number_of_arguments}."
-        )
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
 class DuplicateVariablesError(SymbolicMathError):
     """
-    Raised when duplicate variables are found in an operation that requires unique
-    variables.
+    Raised when duplicate variables are found in an operation that requires unique variables.
     """
 
     variables: List[FloatVariable]
@@ -211,9 +171,7 @@ class FloatVariableDataError(DataclassException):
 class FloatVariableAlreadyHasResolveError(FloatVariableDataError):
     """
     Raised when the float variables of an expression already have a resolver.
-
-    This indicates that the variable is managed by something else, e.g., the world's
-    state of semantic digital twin.
+    This indicates that the variable is managed by something else, e.g., the world's state of semantic digital twin.
     """
 
     variable: FloatVariable
@@ -228,8 +186,7 @@ class FloatVariableAlreadyHasResolveError(FloatVariableDataError):
 @dataclass
 class SymbolicMathExpressionNotRegisteredError(FloatVariableDataError):
     """
-    Raised when a symbolic math expression is not registered at this `FloatVariableData`
-    for evaluation.
+    Raised when a symbolic math expression is not registered at this `FloatVariableData` for evaluation.
     """
 
     expression: SymbolicMathType
@@ -244,8 +201,7 @@ class SymbolicMathExpressionNotRegisteredError(FloatVariableDataError):
 @dataclass
 class SymbolicMathExpressionAlreadyRegisteredError(FloatVariableDataError):
     """
-    Raised when a symbolic math expression is already registered at a different
-    `FloatVariableData`.
+    Raised when a symbolic math expression is already registered at a different `FloatVariableData`.
     """
 
     expression: SymbolicMathType

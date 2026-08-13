@@ -13,13 +13,12 @@ The types support 3D point clouds, image ROIs, and nested annotations.
 """
 
 from __future__ import annotations
-
 from dataclasses import dataclass, field
 
 import open3d as o3d
-from typing_extensions import TYPE_CHECKING, Any, List
+from typing_extensions import TYPE_CHECKING, List, Any
 
-from robokudo.types.core import Annotation, IdentifiableAnnotation, Nameable
+from robokudo.types.core import IdentifiableAnnotation, Nameable, Annotation
 from robokudo.types.cv import ImageROI
 
 if TYPE_CHECKING:

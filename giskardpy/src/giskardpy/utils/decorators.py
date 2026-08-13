@@ -1,8 +1,10 @@
 from __future__ import division
 
+from collections import defaultdict
 from copy import deepcopy
 from dataclasses import fields, dataclass
 from functools import wraps
+from time import time
 from typing import Any, TypeVar
 from typing import Callable, get_type_hints, get_origin, Union, get_args
 
@@ -54,10 +56,53 @@ def memoize_with_counter(reset_after: int):
     return memoize
 
 
+def record_time(function: T) -> T:
+    # return function
+    function_name = function.__name__
+
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        self = args[0]
+        if not hasattr(self, "__times"):
+            setattr(self, "__times", defaultdict(list))
+        start_time = time()
+        result = function(*args, **kwargs)
+        time_delta = time() - start_time
+        self.__times[function_name].append(time_delta)
+        return result
+
+    return wrapper
+
+
+# %% these two decorators automatically add a state variable to an object that prevents multiple calls for off on pairs
+def toggle_on(state_var: str):
+    def decorator(func: T) -> T:
+        def wrapper(self, *args, **kwargs) -> T:
+            if getattr(self, state_var, False):
+                return
+            setattr(self, state_var, True)
+            return func(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def toggle_off(state_var: str):
+    def decorator(func: T) -> T:
+        def wrapper(self, *args, **kwargs) -> T:
+            if not getattr(self, state_var, True):
+                return
+            setattr(self, state_var, False)
+            return func(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 def _check_type(value, expected_type):
-    """
-    Check if value matches expected_type, handling Union, List, etc.
-    """
+    """Check if value matches expected_type, handling Union, List, etc."""
     # Handle None case
     if value is None:
         return expected_type is type(None) or (
@@ -124,9 +169,7 @@ def _check_type(value, expected_type):
 
 
 def validate_types(cls):
-    """
-    Class decorator that adds type validation to dataclasses.
-    """
+    """Class decorator that adds type validation to dataclasses."""
     original_post_init = getattr(cls, "__post_init__", None)
 
     def __post_init__(self):
@@ -159,7 +202,5 @@ def validate_types(cls):
 
 
 def validated_dataclass(cls):
-    """
-    Combines @dataclass and @validate_types for convenience.
-    """
+    """Combines @dataclass and @validate_types for convenience."""
     return validate_types(dataclass(cls))

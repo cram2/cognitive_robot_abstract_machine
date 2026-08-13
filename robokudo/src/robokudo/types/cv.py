@@ -16,18 +16,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-import cv2
+import numpy as np
 import open3d as o3d
 from typing_extensions import TYPE_CHECKING, Tuple
 
-from robokudo.types.core import Type
+from robokudo.types.core import Type, Annotation
 from robokudo.types.tf import Pose
 
 if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-@dataclass(kw_only=True)
+@dataclass
 class Point2D(Type):
     """2D point representation.
 
@@ -45,7 +45,7 @@ class Point2D(Type):
     """
 
 
-@dataclass(kw_only=True)
+@dataclass
 class Points3D(Type):
     """3D point cloud container.
 
@@ -58,7 +58,7 @@ class Points3D(Type):
     """
 
 
-@dataclass(kw_only=True)
+@dataclass
 class Rect(Type):
     """2D rectangle representation.
 
@@ -89,7 +89,7 @@ class Rect(Type):
         return self.pos.x, self.pos.y, self.width, self.height
 
 
-@dataclass(kw_only=True)
+@dataclass
 class ImageROI(Type):
     """Image region of interest.
 
@@ -109,7 +109,7 @@ class ImageROI(Type):
     """
 
 
-@dataclass(kw_only=True)
+@dataclass
 class BoundingBox3D(Type):
     """3D oriented bounding box.
 
@@ -139,52 +139,35 @@ class BoundingBox3D(Type):
     """
 
 
-@dataclass(kw_only=True)
-class KeyPoint(Point2D):
-    """A key point in an image."""
+class TSDFAnnotation(Annotation):
+    """A TSDF Volume annotation."""
 
-    size: float
-    """Diameter of the keypoint."""
+    volume: o3d.pipelines.integration.ScalableTSDFVolume
+    """The Open3D TSDF Volume object."""
 
-    angle: float
-    """Orientation of the keypoint."""
+    transform: npt.NDArray[np.float64]
+    """The transform from the reference frame to the object frame."""
 
-    response: float
-    """Strength of the keypoint."""
+    def get_coordinate_frame(self) -> o3d.geometry.TriangleMesh:
+        """Get the coordinate frame of the TSDF volume."""
+        frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.25)
+        frame.transform(self.transform)
+        return frame
 
-    octave: int
-    """Pyramid octave the keypoint was detected in."""
+    def get_mesh(self) -> o3d.geometry.TriangleMesh:
+        """Get the mesh representation of the TSDF volume."""
+        mesh = self.volume.extract_triangle_mesh()
+        mesh.transform(self.transform)
+        return mesh
 
-    class_id: int
-    """Object class ID."""
+    def get_point_cloud(self) -> o3d.geometry.PointCloud:
+        """Get the point cloud representation of the TSDF volume."""
+        pcd = self.volume.extract_point_cloud()
+        pcd.transform(self.transform)
+        return pcd
 
-    @classmethod
-    def from_cv(cls, keypoint: cv2.KeyPoint) -> KeyPoint:
-        """Create a keypoint from an OpenCV keypoint.
-
-        :return: The created keypoint.
-        """
-        return cls(
-            x=keypoint.pt[0],
-            y=keypoint.pt[1],
-            size=keypoint.size,
-            angle=keypoint.angle,
-            response=keypoint.response,
-            octave=keypoint.octave,
-            class_id=keypoint.class_id,
-        )
-
-    def to_cv(self) -> cv2.KeyPoint:
-        """Convert the RoboKudo keypoint to an OpenCV keypoint.
-
-        :return: The cv2 equivalent of the keypoint.
-        """
-        return cv2.KeyPoint(
-            x=self.x,
-            y=self.y,
-            size=self.size,
-            angle=self.angle,
-            response=self.response,
-            octave=self.octave,
-            class_id=self.class_id,
-        )
+    def get_voxel_point_cloud(self) -> o3d.geometry.PointCloud:
+        """Get the voxel point cloud representation of the TSDF volume."""
+        pcd = self.volume.extract_voxel_point_cloud()
+        pcd.transform(self.transform)
+        return pcd

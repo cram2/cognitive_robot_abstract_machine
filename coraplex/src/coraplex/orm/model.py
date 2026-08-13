@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from typing import List, Self
 
+import numpy as np
 from krrood.ormatic.data_access_objects.alternative_mappings import (
     AlternativeMapping,
     T,
 )
+from sqlalchemy import TypeDecorator, types
 from typing_extensions import Optional
 
 from coraplex.datastructures.dataclasses import Context
@@ -42,15 +44,6 @@ class PlanMapping(AlternativeMapping[Plan]):
 
     @classmethod
     def from_domain_object(cls, obj: Plan):
-        # During execution the context is shared with sub-plans created via the
-        # plan factories, each of which claims the context's `plan` back-reference
-        # for itself. After the sub-plans are migrated into this plan the
-        # back-reference is left dangling at a now-stale (and partially emptied)
-        # sub-plan. Reclaim the context for the plan being serialized so its
-        # `plan` relationship resolves to this plan -- which is already registered
-        # in the conversion memo -- instead of recursing into the stale sub-plan.
-        if obj.context is not None:
-            obj.add_plan_entity(obj.context)
         return cls(
             root=obj.root,
             nodes=obj.nodes,
@@ -96,3 +89,27 @@ class GrasPoseMapping(PoseMapping, AlternativeMapping[GraspPose]):
             grasp_description=self.grasp_description,
             arm=self.arm,
         )
+
+
+class NumpyType(TypeDecorator):
+    """
+    Type that casts field which are of numpy nd array type
+    """
+
+    impl = types.LargeBinary(4 * 1024 * 1024 * 1024 - 1)  # 4 GB max
+    cache_ok = True  # SQLAlchemy 1.4/2.x type caching hint
+
+    def process_bind_param(self, value, dialect):
+        # Allow NULLs
+        if value is None:
+            return None
+        # Accept lists/tuples and ensure float64 dtype without copying if possible
+        arr = np.asarray(value, dtype=np.float64)
+        return arr.tobytes(order="C")
+
+    def process_result_value(self, value, dialect):
+        # Propagate NULLs
+        if value is None:
+            return None
+        # Recreate as 1-D float64 array; shape information is not stored
+        return np.frombuffer(value, dtype=np.float64)

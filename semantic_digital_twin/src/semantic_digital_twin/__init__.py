@@ -1,9 +1,11 @@
-import logging
-from krrood.symbol_graph.symbol_graph import SymbolGraph
+__version__ = "0.0.6"
 
-from ._version import __version__
+
+import logging
 
 logger = logging.getLogger("semantic_digital_twin")
 logger.setLevel(logging.INFO)
+
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 
 SymbolGraph()

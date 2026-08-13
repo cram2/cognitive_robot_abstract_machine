@@ -71,9 +71,7 @@ class ProbabilisticCostmap:
 
     size: Quantity
     """
-    The side length of the locations.
-
-    The locations is a square.
+    The side length of the locations. The locations is a square.
     """
 
     distribution: Optional[ProbabilisticCircuit] = None

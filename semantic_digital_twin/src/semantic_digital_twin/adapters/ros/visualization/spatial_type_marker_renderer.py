@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
@@ -13,7 +12,7 @@ from geometry_msgs.msg import (
     Vector3 as RosVector3,
 )
 from std_msgs.msg import ColorRGBA, Header
-from typing_extensions import ClassVar, TypeVar, Generic
+from typing_extensions import ClassVar, TypeVar
 from visualization_msgs.msg import Marker
 
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -49,12 +48,8 @@ class SpatialTypeVisualization:
     color: Color = field(default_factory=Color)
     """The color of the markers. Ignored for the fixed RGB axes of pose-like spatial types."""
 
-    namespace: str = field(default_factory=lambda: f"spatial_type_{uuid.uuid4().hex}")
-    """The marker namespace. RViz scopes marker ids per namespace, so it must be unique per request.
-
-    Defaults to a random value so unrelated requests don't silently collide; pass an explicit,
-    stable namespace when a request's markers should be updated in place across republishes.
-    """
+    namespace: str = "spatial_type"
+    """The marker namespace. RViz scopes marker ids per namespace, so it must be unique per request."""
 
     marker_id_offset: int = 0
     """The offset added to each marker's local id. The first marker of a request uses it directly, further markers add small increments."""
@@ -73,7 +68,7 @@ class SpatialTypeVisualization:
 
 
 @dataclass
-class SpatialTypeMarkerRenderer(Generic[SpatialTypeInput], SubClassSafeGeneric, ABC):
+class SpatialTypeMarkerRenderer(SubClassSafeGeneric[SpatialTypeInput], ABC):
     """
     Renders a single category of spatial type into one or more RViz markers.
 
@@ -84,7 +79,7 @@ class SpatialTypeMarkerRenderer(Generic[SpatialTypeInput], SubClassSafeGeneric, 
     @classmethod
     def input_type(cls) -> type[SpatialTypeInput]:
         """The spatial type category handled by this renderer."""
-        return cls.get_generic_type_parameters()[0]
+        return cls.get_generic_type()
 
     @classmethod
     def can_render(cls, spatial_type: SpatialType) -> bool:

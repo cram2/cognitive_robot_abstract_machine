@@ -34,10 +34,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Slider,
 )
-from semantic_digital_twin.semantic_annotations.part_whole import (
-    IsPartWholeRelationship,
+from semantic_digital_twin.semantic_annotations.mixins import (
+    _wrapped_part_whole_relationship_fields,
+    PartWholeRelationshipField,
 )
-from krrood.class_diagrams.class_diagram import WrappedClass
 from semantic_digital_twin.orm.ormatic_interface import *
 from krrood.ormatic.data_access_objects.helper import to_dao
 
@@ -171,51 +171,53 @@ def test_pr2_semantic_annotation_and_safe_to_db(
     session.commit()
 
 
-def _is_part_whole_relationship(annotation_type, field_name):
-    """
-    Return whether ``field_name`` on ``annotation_type`` is marked as a part-whole
-    relationship.
-    """
-    metadata = IsPartWholeRelationship.of_field(annotation_type, field_name)
-    return metadata is not None
+def _field(annotation_type, field_name):
+    """Return the dataclass ``Field`` object for ``field_name`` on ``annotation_type``."""
+    return {f.name: f for f in dataclasses.fields(annotation_type)}[field_name]
 
 
 def test_part_whole_relationship_field_survives_deepcopy():
     copy_functions = [copy, deepcopy]
     for copy_function in copy_functions:
-        world = World.create_with_root_body("root")
+        world = World()
+        root = Body(name=PrefixedName("root"))
+        with world.modify_world():
+            world.add_body(root)
         with world.modify_world():
             drawer = Drawer.create_with_new_body_in_world(
-                name="drawer", scale=Scale(0.2, 0.3, 0.2), world=world
+                name=PrefixedName("drawer"), scale=Scale(0.2, 0.3, 0.2), world=world
             )
-            handle = Handle.create_with_new_body_in_world(name="handle", world=world)
+            handle = Handle.create_with_new_body_in_world(
+                name=PrefixedName("handle"), world=world
+            )
             slider = Slider.create_with_new_body_in_world(
-                name="slider",
-                world=world,
-                parent_connection_specification=Slider.parent_connection_specification(
-                    axis=Vector3.X()
-                ),
+                name=PrefixedName("slider"), world=world, active_axis=Vector3.X()
             )
             drawer.add(handle)
             drawer.add(slider)
 
         # The marker is present on the source class before persisting.
-        assert _is_part_whole_relationship(Drawer, "handle")
-        assert _is_part_whole_relationship(Drawer, "mechanical_joint")
+        assert isinstance(_field(Drawer, "handle"), PartWholeRelationshipField)
+        assert isinstance(
+            _field(Drawer, "mechanical_joint"), PartWholeRelationshipField
+        )
 
         copied_drawer = copy_function(drawer)
 
         # The reconstructed object is a real Drawer, so its fields still carry the marker.
         assert isinstance(copied_drawer, Drawer)
-        assert _is_part_whole_relationship(type(copied_drawer), "handle")
-        assert _is_part_whole_relationship(type(copied_drawer), "mechanical_joint")
+        assert isinstance(
+            _field(type(copied_drawer), "handle"), PartWholeRelationshipField
+        )
+        assert isinstance(
+            _field(type(copied_drawer), "mechanical_joint"),
+            PartWholeRelationshipField,
+        )
 
         # The marked-field discovery still resolves the same part-whole relationship fields.
         discovered = {
             spec.field.name
-            for spec in WrappedClass(type(copied_drawer)).fields_with_metadata(
-                IsPartWholeRelationship
-            )
+            for spec in _wrapped_part_whole_relationship_fields(type(copied_drawer))
         }
         assert {"handle", "mechanical_joint"} <= discovered
 
@@ -230,8 +232,8 @@ def hsr_world_state_reset(_hsr_world_setup):
     Single-HSRB world fixture that mirrors ``pr2_world_state_reset``.
 
     ``_hsr_world_setup`` already has HSRB annotations (added by
-    ``world_with_urdf_factory``), so we only deepcopy — no second ``from_world`` call —
-    and restore the joint-state vector afterwards.
+    ``world_with_urdf_factory``), so we only deepcopy — no second
+    ``from_world`` call — and restore the joint-state vector afterwards.
     """
     world = deepcopy(_hsr_world_setup)
     state = world.state._data.copy()
@@ -241,8 +243,8 @@ def hsr_world_state_reset(_hsr_world_setup):
 
 def test_hsrb_world(hsr_world_state_reset, session):
     """
-    Verify that an HSRB world can be serialised, inserted into a database, queried back,
-    and fully reconstructed — including the robot's mobile base.
+    Verify that an HSRB world can be serialised, inserted into a database,
+    queried back, and fully reconstructed — including the robot's mobile base.
     """
     dao: WorldMappingDAO = to_dao(hsr_world_state_reset)
     session.add(dao)
@@ -259,33 +261,32 @@ def test_hsrb_world(hsr_world_state_reset, session):
 
 def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session):
     """
-    The part-whole relationship marker is an ``IsPartWholeRelationship`` attached
-    directly to the field's ``metadata`` mapping and lives on the dataclass definition,
-    not in the persisted row (ORMatic never inspects the field metadata).
-
-    Reconstructing an annotation from its DAO must therefore yield an instance whose
-    type still carries the marker, the marked-field discovery must still find it, and
-    the field *values* (handle, mechanical_joint) must survive the round trip.
+    The part-whole relationship marker is the field's ``PartWholeRelationshipField`` type and lives
+    on the dataclass definition, not in the persisted row (ORMatic never inspects the field type).
+    Reconstructing an annotation from its DAO must therefore yield an instance whose type still
+    carries the marker, the marked-field discovery must still find it, and the field *values*
+    (handle, mechanical_joint) must survive the round trip.
     """
-    world = World.create_with_root_body("root")
+    world = World()
+    root = Body(name=PrefixedName("root"))
+    with world.modify_world():
+        world.add_body(root)
     with world.modify_world():
         drawer = Drawer.create_with_new_body_in_world(
-            name="drawer", scale=Scale(0.2, 0.3, 0.2), world=world
+            name=PrefixedName("drawer"), scale=Scale(0.2, 0.3, 0.2), world=world
         )
-        handle = Handle.create_with_new_body_in_world(name="handle", world=world)
+        handle = Handle.create_with_new_body_in_world(
+            name=PrefixedName("handle"), world=world
+        )
         slider = Slider.create_with_new_body_in_world(
-            name="slider",
-            world=world,
-            parent_connection_specification=Slider.parent_connection_specification(
-                axis=Vector3.X()
-            ),
+            name=PrefixedName("slider"), world=world, active_axis=Vector3.X()
         )
         drawer.add(handle)
         drawer.add(slider)
 
     # The marker is present on the source class before persisting.
-    assert _is_part_whole_relationship(Drawer, "handle")
-    assert _is_part_whole_relationship(Drawer, "mechanical_joint")
+    assert isinstance(_field(Drawer, "handle"), PartWholeRelationshipField)
+    assert isinstance(_field(Drawer, "mechanical_joint"), PartWholeRelationshipField)
 
     world_dao: WorldMappingDAO = to_dao(world)
     session.add(world_dao)
@@ -296,15 +297,18 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
 
     # The reconstructed object is a real Drawer, so its fields still carry the marker.
     assert isinstance(reconstructed_drawer, Drawer)
-    assert _is_part_whole_relationship(type(reconstructed_drawer), "handle")
-    assert _is_part_whole_relationship(type(reconstructed_drawer), "mechanical_joint")
+    assert isinstance(
+        _field(type(reconstructed_drawer), "handle"), PartWholeRelationshipField
+    )
+    assert isinstance(
+        _field(type(reconstructed_drawer), "mechanical_joint"),
+        PartWholeRelationshipField,
+    )
 
     # The marked-field discovery still resolves the same part-whole relationship fields.
     discovered = {
         spec.field.name
-        for spec in WrappedClass(type(reconstructed_drawer)).fields_with_metadata(
-            IsPartWholeRelationship
-        )
+        for spec in _wrapped_part_whole_relationship_fields(type(reconstructed_drawer))
     }
     assert {"handle", "mechanical_joint"} <= discovered
 

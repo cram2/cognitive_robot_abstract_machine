@@ -38,8 +38,7 @@ import math
 import os
 
 
-from importlib.resources import files
-from pathlib import Path
+from pkg_resources import resource_filename
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
@@ -48,9 +47,8 @@ from semantic_digital_twin.world_description.connections import Connection6DoF, 
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 
-root = Path(files("semantic_digital_twin")).parent.parent
+root = resource_filename("semantic_digital_twin", "../../")
 urdf_path = os.path.join(root, "resources", "urdf", "table.urdf")
 table_world = URDFParser.from_file(urdf_path).parse()
 
@@ -114,13 +112,13 @@ new_table_world_T_box = HomogeneousTransformationMatrix.from_xyz_rpy(
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 
-if new_table_world_T_box is ...: raise ExerciseVerificationFailed("Create and assign a HomogeneousTransformationMatrix to place the cube on the table.")
-if not isinstance(new_table_world_T_box, HomogeneousTransformationMatrix): raise ExerciseVerificationFailed("Use a HomogeneousTransformationMatrix for `T_root_cube_on_table`.")
+assert new_table_world_T_box is not ..., "Create and assign a HomogeneousTransformationMatrix to place the cube on the table."
+assert isinstance(new_table_world_T_box, HomogeneousTransformationMatrix), "Use a HomogeneousTransformationMatrix for `T_root_cube_on_table`."
 with table_world.modify_world():
     table_world_C_box.origin = new_table_world_T_box
-if not abs(new_table_world_T_box.x.to_np()) < 1e-5: raise ExerciseVerificationFailed("The cube should be at the middle of the table.")
-if not abs(new_table_world_T_box.y.to_np()) < 1e-5: raise ExerciseVerificationFailed("The cube should be at the middle of the table.")
-if not abs(new_table_world_T_box.z.to_np() - 0.72) < 1e-5: raise ExerciseVerificationFailed("The cube should be at z=0.72 on top of the table.")
+assert abs(new_table_world_T_box.x.to_np()) < 1e-5, "The cube should be at the middle of the table."
+assert abs(new_table_world_T_box.y.to_np()) < 1e-5, "The cube should be at the middle of the table."
+assert abs(new_table_world_T_box.z.to_np() - 0.72) < 1e-5, "The cube should be at z=0.72 on top of the table."
 rt = RayTracer(table_world); rt.update_scene(); rt.scene.show("jupyter")
 
 ```
@@ -162,15 +160,15 @@ table_world_T_moved_box = table_world_T_box @ box_T_moved_box
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 
-if table_world_T_moved_box is ...: raise ExerciseVerificationFailed("Craft a new transform to move and rotate the cube and assign it to `table_world_T_moved_box`.")
-if not isinstance(table_world_T_moved_box, HomogeneousTransformationMatrix): raise ExerciseVerificationFailed("`table_world_T_moved_box` must be a HomogeneousTransformationMatrix.")
+assert table_world_T_moved_box is not ..., "Craft a new transform to move and rotate the cube and assign it to `table_world_T_moved_box`."
+assert isinstance(table_world_T_moved_box, HomogeneousTransformationMatrix), "`table_world_T_moved_box` must be a HomogeneousTransformationMatrix."
 
 with table_world.modify_world():
     table_world_C_box.origin = table_world_T_moved_box
     
-if not abs(table_world_T_moved_box.x.to_np() - 0.3) < 1e-5: raise ExerciseVerificationFailed("The cube should be at x=0.3 after the move.")
-if not abs(table_world_T_moved_box.y.to_np() + 0.4) < 1e-5: raise ExerciseVerificationFailed("The cube should be at y=-0.4 after the move.")
-if not abs(table_world_T_moved_box.z.to_np() - new_table_world_T_box.z.to_np()) < 1e-5: raise ExerciseVerificationFailed("The cube should stay on top of the table after the move.")
+assert abs(table_world_T_moved_box.x.to_np() - 0.3) < 1e-5, "The cube should be at x=0.3 after the move."
+assert abs(table_world_T_moved_box.y.to_np() + 0.4) < 1e-5, "The cube should be at y=-0.4 after the move."
+assert abs(table_world_T_moved_box.z.to_np() - new_table_world_T_box.z.to_np()) < 1e-5, "The cube should stay on top of the table after the move."
 rt = RayTracer(table_world); rt.update_scene(); rt.scene.show("jupyter")
 ```
 

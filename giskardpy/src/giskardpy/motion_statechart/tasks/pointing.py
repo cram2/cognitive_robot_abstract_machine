@@ -1,9 +1,8 @@
-from __future__ import annotations
+from __future__ import division
 
 from dataclasses import dataclass, field
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.error_signals import SymbolicErrorSignal
 from giskardpy.motion_statechart.graph_node import NodeArtifacts
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
 from semantic_digital_twin.spatial_types import Point3, Vector3
@@ -19,20 +18,11 @@ class Pointing(CartesianTask):
     """
 
     goal_point: Point3 = field(kw_only=True)
-    """
-    Where to point pointing_axis at.
-    """
-
+    """where to point pointing_axis at."""
     pointing_axis: Vector3 = field(kw_only=True)
-    """
-    The axis of tip_link that will be used for pointing.
-    """
+    """the axis of tip_link that will be used for pointing"""
 
     max_velocity: float = field(default=0.3, kw_only=True)
-    """
-    Reference angular velocity for normalization in rad/s.
-    """
-
     threshold: float = field(default=0.01, kw_only=True)
     """
     Observation is true if the pointing angle is below this threshold.
@@ -42,15 +32,9 @@ class Pointing(CartesianTask):
     def goal_reference_frame(self) -> KinematicStructureEntity:
         return self.goal_point.reference_frame
 
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        """
-        Build motion constraints that swing the pointing axis onto the goal point.
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        artifacts = super().build(context)
 
-        :param context: Provides access to world model and kinematic expressions.
-        :return: The artifacts of this task, whose error is the angle between the
-            pointing axis and the goal direction.
-        """
-        artifacts = NodeArtifacts()
         goal_reference_frame_P_goal_point = self.goal_point
 
         tip_V_pointing_axis = context.world.transform(
@@ -78,13 +62,14 @@ class Pointing(CartesianTask):
             reference_velocity=self.max_velocity,
             quadratic_weight=self.weight,
         )
+        artifacts.observation = (
+            root_V_pointing_axis.angle_between(root_V_goal_axis) <= self.threshold
+        )
+
         self.add_goal_and_current_debug_expressions(
             artifacts, goal=root_V_goal_axis, current=root_V_pointing_axis
         )
 
-        artifacts.error = SymbolicErrorSignal(
-            root_V_pointing_axis.angle_between(root_V_goal_axis)
-        )
         return artifacts
 
 
@@ -95,25 +80,13 @@ class PointingCone(CartesianTask):
     """
 
     goal_point: Point3 = field(kw_only=True)
-    """
-    Where to point pointing_axis at.
-    """
-
+    """where to point pointing_axis at."""
     pointing_axis: Vector3 = field(kw_only=True)
-    """
-    The axis of tip_link that will be used for pointing.
-    """
+    """the axis of tip_link that will be used for pointing"""
 
     cone_theta: float = field(default=0.0, kw_only=True)
-    """
-    Slack cone region in radians.
-    """
-
+    """Slack cone region in radians"""
     max_velocity: float = field(default=0.3, kw_only=True)
-    """
-    Reference angular velocity for normalization in rad/s.
-    """
-
     threshold: float = field(default=0.01, kw_only=True)
     """
     Observation is true if the pointing angle is below this threshold.
@@ -123,15 +96,9 @@ class PointingCone(CartesianTask):
     def goal_reference_frame(self) -> KinematicStructureEntity:
         return self.goal_point.reference_frame
 
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        """
-        Build motion constraints that swing the pointing axis into the goal cone.
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        artifacts = super().build(context)
 
-        :param context: Provides access to world model and kinematic expressions.
-        :return: The artifacts of this task, whose error is the angle between the
-            pointing axis and the nearest direction inside the cone.
-        """
-        artifacts = NodeArtifacts()
         tip_V_pointing_axis = context.world.transform(
             target_frame=self.tip_link, spatial_object=self.pointing_axis
         )
@@ -161,11 +128,12 @@ class PointingCone(CartesianTask):
             reference_velocity=self.max_velocity,
             quadratic_weight=self.weight,
         )
+        artifacts.observation = (
+            root_V_pointing_axis.angle_between(root_V_goal_axis_proj) <= self.threshold
+        )
+
         self.add_goal_and_current_debug_expressions(
             artifacts, goal=root_V_goal_axis_proj, current=root_V_pointing_axis
         )
 
-        artifacts.error = SymbolicErrorSignal(
-            root_V_pointing_axis.angle_between(root_V_goal_axis_proj)
-        )
         return artifacts

@@ -2,36 +2,23 @@ from __future__ import annotations
 
 import itertools
 import logging
-import math
 import os
 import shutil
+import tempfile
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from functools import cached_property
-from pathlib import Path
 
+from plyfile import PlyData
 import numpy as np
-import numpy.typing as npt
 import trimesh
 import trimesh.exchange.stl
 from PIL import Image
-from plyfile import PlyData
 from trimesh.visual.texture import TextureVisuals, SimpleMaterial
-from typing_extensions import (
-    Optional,
-    List,
-    Dict,
-    Any,
-    Self,
-    Tuple,
-    TYPE_CHECKING,
-    Generic,
-    TypeVar,
-)
+from typing_extensions import Optional, List, Dict, Any, Self, Tuple, TYPE_CHECKING
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
-from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from random_events.interval import SimpleInterval, Bound, closed
 from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
@@ -41,7 +28,7 @@ from semantic_digital_twin.spatial_types import (
     Point3,
     Vector3,
 )
-from semantic_digital_twin.world_description.mesh_file_storage import MeshFileStorage
+from semantic_digital_twin.utils import IDGenerator
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import (
@@ -50,9 +37,8 @@ if TYPE_CHECKING:
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
-    from semantic_digital_twin.world_description.shape_collection import (
-        ShapeCollection,
-    )
+
+id_generator = IDGenerator()
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +47,8 @@ logger = logging.getLogger(__name__)
 class Color:
     """
     Dataclass for storing rgba_color as an RGBA value.
-
-    The values are stored as floats between 0 and 1. The default rgba_color is white.
+    The values are stored as floats between 0 and 1.
+    The default rgba_color is white.
     """
 
     R: float = 1.0
@@ -218,40 +204,6 @@ class Color:
 
 
 @dataclass
-class Texture:
-    """
-    A 2D image texture applied to a geometric primitive's surface (for example a MuJoCo
-    box/cylinder/sphere geom's ``material``).
-
-    Mesh shapes carry their own texture as part of their own trimesh visual instead, and
-    do not use this.
-    """
-
-    file_path: str
-    """
-    The texture image's file path.
-    """
-
-    repeat: Tuple[float, float] = (1.0, 1.0)
-    """
-    How many times the texture tiles across the surface, along each of its two axes.
-    """
-
-    uniform: bool = False
-    """
-    Whether the texture is scaled uniformly across the surface, independent of the
-    surface's own size, rather than scaled to fit it.
-    """
-
-    def __post_init__(self):
-        """
-        Normalize :attr:`repeat` to a tuple of floats so a texture stays equal to itself
-        across a serialization round-trip, which restores the pair as a list.
-        """
-        self.repeat = tuple(float(value) for value in self.repeat)
-
-
-@dataclass
 class Scale:
     """
     Dataclass for storing the scale of geometric objects.
@@ -307,8 +259,8 @@ class Scale:
         self, simple_event: SimpleEvent, direction: Vector3, amount: float
     ) -> SimpleEvent:
         """
-        Extend the inner event in the specified direction to create the container
-        opening in that direction.
+        Extend the inner event in the specified direction to create the container opening in that direction.
+
 
         :return: The modified inner event with the specified direction extended.
         """
@@ -361,31 +313,11 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
 
     color: Color = field(default_factory=Color)
 
-    texture: Optional[Texture] = None
-    """
-    A texture applied to this shape's surface, or ``None`` for a flat ``color``.
-
-    Only meaningful for primitive shapes (:class:`Box`, :class:`Cylinder`,
-    :class:`Sphere`); :class:`Mesh` shapes carry their own texture as part of their
-    trimesh visual instead.
-    """
-
-    @property
-    @abstractmethod
-    def volume(self) -> float:
-        """
-        :return: The volume this shape encloses.
-
-        ..note:: A primitive states the volume of the shape itself rather than of the
-            mesh standing in for it, since a mesh only approximates a curved surface
-            with a polygonal one and would report less than the shape holds.
-        """
-
     @property
     @abstractmethod
     def local_frame_bounding_box(self) -> BoundingBox:
         """
-        Returns the bounding box of the shape.
+        Returns the bounding box of the shape
         """
 
     @property
@@ -393,34 +325,18 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
     def mesh(self) -> trimesh.Trimesh:
         """
         The mesh object of the shape.
-
         This should be implemented by subclasses.
         """
-
-    def mesh_in_frame(self, target_frame: KinematicStructureEntity) -> trimesh.Trimesh:
-        """
-        :param target_frame: The kinematic structure entity to express the mesh
-            relative to.
-        :return: A copy of :attr:`mesh` transformed from this shape's own frame into
-            *target_frame*.
-        """
-        world = self.origin.reference_frame._world
-        world_mesh = self.mesh.copy()
-        world_mesh.apply_transform(world.transform(self.origin, target_frame).to_np())
-        return world_mesh
 
     def to_json(self) -> Dict[str, Any]:
         return {
             **super().to_json(),
             "origin": to_json(self.origin),
             "color": to_json(self.color),
-            "texture": to_json(self.texture) if self.texture is not None else None,
         }
 
     def __eq__(self, other: Shape) -> bool:
-        """
-        Custom equality comparison that handles TransformationMatrix equivalence.
-        """
+        """Custom equality comparison that handles TransformationMatrix equivalence"""
         if not isinstance(other, self.__class__):
             return False
 
@@ -439,9 +355,11 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
 
         return True
 
-    def copy_without_reference_frame(self) -> Self:
+    def copy_for_world(self, world: World) -> Self:
         """
-        Creates a copy of this shape without the reference frame.
+        Copies this shape with references to the given world.
+        :param world: The world to copy to.
+        :return: A copy of this shape with references to the given world.
         """
         new_origin = HomogeneousTransformationMatrix(
             self.origin.to_np(),
@@ -454,43 +372,11 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         }
         return self.__class__(origin=new_origin, **new_props)
 
-    def as_shape_collection(self) -> ShapeCollection:
-        """
-        Wraps this shape in a single-element shape collection anchored to its reference
-        frame.
-        """
-        from semantic_digital_twin.world_description.shape_collection import (
-            ShapeCollection,
-        )
-
-        return ShapeCollection(
-            shapes=[self], reference_frame=self.origin.reference_frame
-        )
-
-    def recenter_origin(self) -> None:
-        """
-        Moves the origin so the shape's local-frame bounding box is centered on it.
-
-        The translation is set to the negated bounding-box center while the origin's
-        existing rotation is preserved, leaving the shape's geometry symmetric about its
-        origin without re-orienting it.
-        """
-        bounding_box = self.local_frame_bounding_box
-        center_x = (bounding_box.min_x + bounding_box.max_x) / 2
-        center_y = (bounding_box.min_y + bounding_box.max_y) / 2
-        center_z = (bounding_box.min_z + bounding_box.max_z) / 2
-        self.origin = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=Point3(-center_x, -center_y, -center_z),
-            rotation_matrix=self.origin.to_rotation_matrix(),
-            reference_frame=self.origin.reference_frame,
-        )
-
 
 @dataclass(eq=False)
 class Mesh(Shape):
     """
     Abstract mesh class.
-
     Subclasses must provide a `mesh` property returning a trimesh.Trimesh.
     """
 
@@ -505,61 +391,20 @@ class Mesh(Shape):
     """
 
     @property
-    def volume(self) -> float:
-        """
-        :return: The volume the mesh's surface encloses, which is meaningful only for a
-            watertight mesh.
-        """
-        return self.mesh.volume
-
-    @property
     def local_frame_bounding_box(self) -> BoundingBox:
         """
         Returns the local bounding box of the mesh.
-
         The bounding box is axis-aligned and centered at the origin.
         """
         return BoundingBox.from_mesh(self.mesh, self.origin)
 
-    @staticmethod
-    def _load_in_meters(filename: str, process: bool = True) -> trimesh.Trimesh:
-        """
-        Load a mesh file, converting its coordinates to meters when the file declares
-        the unit they are written in.
-
-        A file that declares no unit is read as it is written, because there is nothing to
-        convert from.
-
-        ..note:: The scale a renderer applies on top of this must stay free of the
-            conversion. RViz is handed the file itself and converts its units again.
-
-        :param filename: The path of the mesh file.
-        :param process: Whether trimesh merges vertices and drops degenerate faces.
-        :return: The loaded mesh, measured in meters.
-        """
-        mesh = trimesh.load_mesh(filename, process=process)
-        if mesh.units is not None:
-            mesh.convert_units("meters")
-        return mesh
-
     def to_json(self) -> Dict[str, Any]:
-        # Serialize the unscaled geometry and the scale separately. This is the same
-        # mesh :attr:`mesh` exposes, so a deserialized mesh reproduces the original
-        # rather than a differently tessellated version of the same file.
-        base_mesh = self.unscaled_mesh
-        # Bake materials/textures down to per-vertex colors so the mesh's color
-        # survives serialization (e.g. across the ROS world synchronizer).
-        if isinstance(base_mesh.visual, TextureVisuals):
-            base_mesh.visual = base_mesh.visual.to_color()
-        mesh_dict = base_mesh.to_dict()
-        if base_mesh.visual.kind is not None:
-            mesh_dict["vertex_colors"] = np.asarray(
-                base_mesh.visual.vertex_colors
-            ).tolist()
+        # Serialize the raw (unscaled, unprocessed) mesh geometry and the scale separately
+        base_mesh = trimesh.load_mesh(self.filename, process=False)
         file_type = self.filename.split(".")[-1]
         return {
             **super().to_json(),
-            "mesh": mesh_dict,
+            "mesh": base_mesh.to_dict(),
             "scale": to_json(self.scale),
             "file_type": file_type,
         }
@@ -567,23 +412,20 @@ class Mesh(Shape):
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Mesh:
         # Recreate the trimesh without processing to preserve exact topology
-        vertex_colors = data["mesh"].get("vertex_colors")
         mesh = trimesh.Trimesh(
             vertices=data["mesh"]["vertices"],
             faces=data["mesh"]["faces"],
-            vertex_colors=vertex_colors,
             process=False,
         )
         origin = from_json(data["origin"], **kwargs)
         scale = from_json(data["scale"], **kwargs)
         file_type = data["file_type"]
-        # Export colored meshes as OBJ, which preserves per-vertex colors and is
-        # readable by the visualizer and the collision loader.
-        if vertex_colors is not None:
-            file_type = "obj"
-        return cls.from_trimesh(
+        color = from_json(data["color"], **kwargs)
+        instance = cls.from_trimesh(
             mesh=mesh, origin=origin, scale=scale, file_type=file_type
         )
+        instance.color = color
+        return instance
 
     @classmethod
     def add_uv(cls, mesh: trimesh.Trimesh, uv: np.ndarray) -> trimesh.Trimesh:
@@ -621,36 +463,15 @@ class Mesh(Shape):
         copy_mesh.apply_scale(scale.to_np())
         return copy_mesh
 
-    @property
-    def unscaled_mesh(self) -> trimesh.Trimesh:
-        """
-        The mesh exactly as the file describes it, before this shape's scale is applied.
-        """
-        mesh = self._load_in_meters(self.filename, process=False)
-        if mesh.visual.kind != "vertex":
-            # Welding duplicate vertices is what makes a mesh watertight, which volume
-            # and boolean operations require; formats like STL give every face its own
-            # vertices, so unwelded nothing is a volume. Welding groups by position and
-            # UV only, so it silently merges vertices that differ just in color --
-            # hence it is skipped for per-vertex coloured meshes, whose vertices are
-            # already the ones that were serialized.
-            mesh.merge_vertices()
-        return mesh
-
     @cached_property
     def mesh(self) -> trimesh.Trimesh:
         """
         The mesh object.
         """
-        mesh = self.unscaled_mesh
+        mesh = trimesh.load_mesh(self.filename)
         mesh.apply_scale(self.scale.to_np())
-        # Apply the shape's color only when it was explicitly set, so a mesh's own
-        # materials or per-vertex colors (e.g. from a .dae or from serialization)
-        # are preserved by default. dye_shapes still works as it sets a color.
-        if self.color != Color():
-            mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(
-                self.color.to_rgba()
-            )
+        if not isinstance(mesh.visual, TextureVisuals):
+            mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
         return mesh
 
     @classmethod
@@ -681,9 +502,7 @@ class Mesh(Shape):
     ) -> Mesh:
         """
         Create a Mesh from a PLY file path and an optional texture file path.
-
-        Ply files are not supported by RViz2, so we need to convert them to OBJ files
-        with the textures intact.
+        Ply files are not supported by RViz2, so we need to convert them to OBJ files with the textures intact.
         """
         texture_image = Image.open(texture_file_path)
         ply_file = PlyData.read(ply_file_path)
@@ -716,13 +535,7 @@ class Mesh(Shape):
             visual=trimesh.visual.TextureVisuals(uv=uv_unindexed, image=texture_image),
         )
 
-        return Mesh.from_trimesh(
-            mesh=mesh,
-            origin=origin,
-            scale=scale,
-            file_type="obj",
-            texture_file_path=texture_file_path,
-        )
+        return Mesh.from_trimesh(mesh=mesh, origin=origin, scale=scale, file_type="obj", texture_file_path=texture_file_path)
 
     @classmethod
     def from_trimesh(
@@ -732,28 +545,9 @@ class Mesh(Shape):
         scale: Optional[Scale] = None,
         uv: Optional[np.ndarray] = None,
         texture_file_path: Optional[str] = None,
-        directory: Optional[Path] = None,
+        dirname: str = "/tmp",
         file_type: str = "obj",
     ) -> "Mesh":
-        """
-        Create a Mesh by exporting a trimesh to a file.
-
-        The mesh is written into a directory of its own, so a material or texture written
-        beside it cannot collide with another export's.
-
-        ..warning:: Without an explicit directory the file lives only as long as this
-            process. Such a path must not be stored in anything that outlives it.
-
-        :param mesh: The mesh to export.
-        :param origin: Origin of the mesh.
-        :param scale: Scale of the mesh.
-        :param uv: UV coordinates to apply before exporting.
-        :param texture_file_path: Path of a texture to apply before exporting.
-        :param directory: Where to place the mesh's own directory inside of /tmp, defaulting to a root
-            that is removed when this process exits.
-        :param file_type: Format to export the mesh in.
-        :return: Mesh reading from the exported file.
-        """
         file_type = file_type.lower()
         if origin is None:
             origin = HomogeneousTransformationMatrix()
@@ -764,24 +558,37 @@ class Mesh(Shape):
         if texture_file_path is not None:
             mesh = cls.add_texture(mesh=mesh, texture_file_path=texture_file_path)
 
-        mesh_directory = (
-            MeshFileStorage().allocate_directory()
-            if directory is None
-            else MeshFileStorage.create_mesh_directory(Path(directory))
-        )
-        mesh_file_path = mesh_directory / f"{mesh_directory.name}.{file_type}"
+        # Each export gets its own subdir so material.mtl files never collide
+        subdir = tempfile.mkdtemp(dir=dirname)
+        tmp_path = os.path.join(subdir, f"{os.path.basename(subdir)}.{file_type}")
 
         try:
-            mesh.export(str(mesh_file_path), file_type=file_type)
+            mesh.export(tmp_path, file_type=file_type)
         except Exception:
-            shutil.rmtree(mesh_directory, ignore_errors=True)
+            shutil.rmtree(subdir, ignore_errors=True)
             raise
 
-        return cls(
+        instance = cls(
             origin=origin,
             scale=scale,
-            filename=str(mesh_file_path),
+            filename=tmp_path,
         )
+
+        # # Tie file lifetime to the Mesh instance TODO luca wants to find a way for this to work with rviz (atexit)
+        # weakref.finalize(instance, cls._cleanup_temp_dir, subdir)
+
+        return instance
+
+    @staticmethod
+    def _cleanup_temp_dir(subdir: str) -> None:
+        """
+        Clean up the temporary subdirectory created for the mesh.
+        """
+        logger.debug(f"Cleaning up temporary directory: {subdir}")
+        try:
+            shutil.rmtree(subdir, ignore_errors=True)
+        except OSError:
+            pass
 
     @classmethod
     def box(
@@ -839,20 +646,19 @@ class Mesh(Shape):
         points_3d: List[Point3],
         reference_frame: Optional[KinematicStructureEntity] = None,
         minimum_thickness: float = 0.005,
-        singular_value_ratio_tolerance: float = 1e-7,
+        sv_ratio_tol: float = 1e-7,
     ) -> Self:
         """
-        Constructs a Region from a list of 3D points by creating a convex hull around
-        them. The points are analyzed to determine if they are approximately planar. If
-        they are, a minimum thickness is added to ensure the region has a non-zero
-        volume.
+        Constructs a Region from a list of 3D points by creating a convex hull around them.
+        The points are analyzed to determine if they are approximately planar. If they are,
+        a minimum thickness is added to ensure the region has a non-zero volume.
 
         :param name: Prefixed name for the region.
         :param points_3d: List of 3D points.
         :param reference_frame: Optional reference frame.
         :param minimum_thickness: Minimum thickness to add if points are near-planar.
-        :param singular_value_ratio_tolerance: Tolerance for determining planarity based
-            on singular value ratio.
+        :param sv_ratio_tol: Tolerance for determining planarity based on singular value ratio.
+
         :return: Region object.
         """
         points = np.asarray([point.to_np()[:3] for point in points_3d], dtype=float)
@@ -879,10 +685,7 @@ class Mesh(Shape):
         # We compute the thickness, peak-to-peak (max - min), along the normal direction, to get the thickness of
         # the region.
         thickness_in_normal_direction = np.ptp(centered_points @ unit_vector_normal)
-        is_near_planar = (
-            variance[0] > 0
-            and variance[-1] / variance[0] < singular_value_ratio_tolerance
-        )
+        is_near_planar = variance[0] > 0 and variance[-1] / variance[0] < sv_ratio_tol
         thickness_padding = (
             minimum_thickness / 2
             if thickness_in_normal_direction < minimum_thickness or is_near_planar
@@ -959,10 +762,6 @@ class Sphere(Shape):
     """
 
     @property
-    def volume(self) -> float:
-        return 4.0 / 3.0 * math.pi * self.radius**3
-
-    @property
     def mesh(self) -> trimesh.Trimesh:
         """
         Returns a trimesh object representing the sphere.
@@ -991,12 +790,10 @@ class Sphere(Shape):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        texture = data.get("texture")
         return cls(
             radius=data["radius"],
             origin=from_json(data["origin"], **kwargs),
             color=from_json(data["color"], **kwargs),
-            texture=from_json(texture, **kwargs) if texture is not None else None,
         )
 
 
@@ -1010,23 +807,12 @@ class Cylinder(Shape):
     height: float = 0.5
 
     @property
-    def radius(self) -> float:
-        """
-        :return: Radius of the circle the cylinder's width spans.
-        """
-        return self.width / 2.0
-
-    @property
-    def volume(self) -> float:
-        return math.pi * self.radius**2 * self.height
-
-    @property
     def mesh(self) -> trimesh.Trimesh:
         """
         Returns a trimesh object representing the cylinder.
         """
         mesh = trimesh.creation.cylinder(
-            radius=self.radius, height=self.height, sections=16
+            radius=self.width / 2, height=self.height, sections=16
         )
         mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
         return mesh
@@ -1035,7 +821,6 @@ class Cylinder(Shape):
     def local_frame_bounding_box(self) -> BoundingBox:
         """
         Returns the bounding box of the cylinder.
-
         The bounding box is axis-aligned and centered at the origin.
         """
         half_width = self.width / 2
@@ -1055,35 +840,26 @@ class Cylinder(Shape):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        texture = data.get("texture")
         return cls(
             width=data["width"],
             height=data["height"],
             origin=from_json(data["origin"], **kwargs),
             color=from_json(data["color"], **kwargs),
-            texture=from_json(texture, **kwargs) if texture is not None else None,
         )
 
 
 @dataclass(eq=False)
 class Box(Shape):
     """
-    A box shape.
-
-    Pivot point is at the center of the box.
+    A box shape. Pivot point is at the center of the box.
     """
 
     scale: Scale = field(default_factory=Scale)
 
     @property
-    def volume(self) -> float:
-        return self.scale.x * self.scale.y * self.scale.z
-
-    @property
     def mesh(self) -> trimesh.Trimesh:
         """
         Returns a trimesh object representing the box.
-
         The box is centered at the origin and has the specified scale.
         """
         mesh = trimesh.creation.box(extents=(self.scale.x, self.scale.y, self.scale.z))
@@ -1094,7 +870,6 @@ class Box(Shape):
     def local_frame_bounding_box(self) -> BoundingBox:
         """
         Returns the local bounding box of the box.
-
         The bounding box is axis-aligned and centered at the origin.
         """
         half_x = self.scale.x / 2
@@ -1115,73 +890,11 @@ class Box(Shape):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        texture = data.get("texture")
         return cls(
             scale=from_json(data["scale"], **kwargs),
             origin=from_json(data["origin"], **kwargs),
             color=from_json(data["color"], **kwargs),
-            texture=from_json(texture, **kwargs) if texture is not None else None,
         )
-
-
-T = TypeVar("T")
-
-
-@dataclass
-class Bounds(Generic[T], SubClassSafeGeneric):
-    """
-    The lower and upper corner of an axis-aligned region.
-    """
-
-    lower: T
-    """
-    The corner with the smallest coordinate on every axis.
-    """
-
-    upper: T
-    """
-    The corner with the largest coordinate on every axis.
-    """
-
-    def clip_segment(
-        self, start: npt.NDArray[np.float64], direction: npt.NDArray[np.float64]
-    ) -> Optional[SimpleInterval]:
-        """
-        Clip the parametrized segment ``start + t * direction`` (``t`` in ``[0, 1]``)
-        against this region, using the slab method.
-
-        Assumes ``lower``/``upper`` are plain numeric arrays, as returned by
-        :meth:`BoundingBox.to_array_bounds`.
-
-        .. note::
-            ``start``/``direction`` are plain arrays rather than :class:`Point3`/
-            :class:`Vector3` on purpose: this runs once per graph node on every
-            collision check, and :class:`Point3`/:class:`Vector3` arithmetic pays a
-            symbolic (casadi) cost on every access. Callers should convert to arrays
-            once before looping, not per call.
-
-        :param start: The segment's start point.
-        :param direction: The vector from the segment's start to its end.
-        :return: The sub-interval of ``t`` for which the segment lies inside this
-            region, or None if the segment misses it entirely.
-        """
-        t_min, t_max = 0.0, 1.0
-        for coordinate, delta, lower, upper in zip(
-            start, direction, self.lower, self.upper
-        ):
-            if abs(delta) < 1e-12:
-                if coordinate < lower or coordinate > upper:
-                    return None
-                continue
-            t_enter = (lower - coordinate) / delta
-            t_exit = (upper - coordinate) / delta
-            if t_enter > t_exit:
-                t_enter, t_exit = t_exit, t_enter
-            t_min = max(t_min, t_enter)
-            t_max = min(t_max, t_exit)
-            if t_min > t_max:
-                return None
-        return SimpleInterval.from_data(t_min, t_max, Bound.CLOSED, Bound.CLOSED)
 
 
 @dataclass(eq=False)
@@ -1263,38 +976,6 @@ class BoundingBox:
             Bound.CLOSED,
         )
 
-    def to_array_bounds(self) -> Bounds[np.ndarray]:
-        """
-        Express this bounding box's lower and upper corners as plain-float 3-vectors.
-
-        :return: The corners, in the same frame as ``origin``.
-        """
-        x, y, z = self.x_interval, self.y_interval, self.z_interval
-        lower = np.array([x.lower, y.lower, z.lower])
-        upper = np.array([x.upper, y.upper, z.upper])
-        return Bounds(lower, upper)
-
-    def to_point3_bounds(self) -> Bounds[Point3]:
-        """
-        Express this bounding box's lower and upper corners as ``Point3`` instances.
-
-        :return: The corners, in the same frame as ``origin``.
-        """
-        x, y, z = self.x_interval, self.y_interval, self.z_interval
-        lower = Point3(
-            x.lower,
-            y.lower,
-            z.lower,
-            reference_frame=self.origin.reference_frame,
-        )
-        upper = Point3(
-            x.upper,
-            y.upper,
-            z.upper,
-            reference_frame=self.origin.reference_frame,
-        )
-        return Bounds(lower, upper)
-
     @property
     def scale(self) -> Scale:
         """
@@ -1328,30 +1009,11 @@ class BoundingBox:
         )
 
     @property
-    def volume(self) -> float:
-        """
-        :return: The volume the bounding box encloses.
-        """
-        return self.depth * self.width * self.height
-
-    @property
     def dimensions(self) -> List[float]:
         """
         :return: The dimensions of the bounding box as a list [width, depth, height].
         """
         return [self.depth, self.width, self.height]
-
-    @property
-    def center(self) -> Point3:
-        """
-        :return: The center point of the bounding box, in the same frame as ``origin``.
-        """
-        return Point3(
-            self.x_interval.center(),
-            self.y_interval.center(),
-            self.z_interval.center(),
-            reference_frame=self.origin.reference_frame,
-        )
 
     def bloat(
         self, x_amount: float = 0.0, y_amount: float = 0, z_amount: float = 0
@@ -1411,8 +1073,7 @@ class BoundingBox:
         Compute the intersection of two bounding boxes.
 
         :param other: The other bounding box.
-        :return: The intersection of the two bounding boxes or None if they do not
-            intersect.
+        :return: The intersection of the two bounding boxes or None if they do not intersect.
         """
         other_in_same_frame = other.transform_to_origin(self.origin)
         result = self.simple_event.intersection_with(other_in_same_frame.simple_event)
@@ -1431,7 +1092,6 @@ class BoundingBox:
     ):
         """
         Enlarge the axis-aligned bounding box by a given amount in-place.
-
         :param min_x: The amount to enlarge the minimum x-coordinate
         :param min_y: The amount to enlarge the minimum y-coordinate
         :param min_z: The amount to enlarge the minimum z-coordinate
@@ -1448,8 +1108,7 @@ class BoundingBox:
 
     def enlarge_all(self, amount: float):
         """
-        Enlarge the axis-aligned bounding box in all dimensions by a given amount in-
-        place.
+        Enlarge the axis-aligned bounding box in all dimensions by a given amount in-place.
 
         :param amount: The amount to enlarge the bounding box
         """
@@ -1463,11 +1122,11 @@ class BoundingBox:
     ) -> Self:
         """
         Create a bounding box from a trimesh object.
-
         :param mesh: The trimesh object.
         :param origin: The origin of the bounding box.
         :return: The bounding box.
         """
+
         bounds = mesh.bounds
         return cls(
             bounds[0][0],

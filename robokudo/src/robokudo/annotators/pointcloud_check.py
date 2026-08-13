@@ -18,8 +18,6 @@ The annotator supports:
    Point cloud must be available in CAS under CASViews.CLOUD.
 """
 
-from __future__ import annotations
-
 from timeit import default_timer
 
 import open3d as o3d
@@ -27,7 +25,6 @@ from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.exceptions import PointCloudThresholdError, PointCloudThresholdRelation
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
 
@@ -64,12 +61,12 @@ class PointcloudCheckAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "PointcloudcloudCheckAnnotator",
-        descriptor: PointcloudCheckAnnotator.Descriptor | None = None,
-    ) -> None:
+        descriptor: "PointcloudCheckAnnotator.Descriptor" = Descriptor(),
+    ):
         """Initialize the point cloud checker.
 
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
+        :param name: Name of this annotator instance, defaults to "PointcloudcloudCheckAnnotator"
+        :param descriptor: Configuration descriptor, defaults to Descriptor()
         """
         super().__init__(name, descriptor)
 
@@ -88,7 +85,7 @@ class PointcloudCheckAnnotator(BaseAnnotator):
         * Logs detailed check results
 
         :return: Configured status based on point count
-        :raises PointCloudThresholdError: If point count fails threshold and raise_on_failure is True
+        :raises Exception: If point count fails threshold and raise_on_failure is True
         """
         start_timer = default_timer()
 
@@ -97,13 +94,13 @@ class PointcloudCheckAnnotator(BaseAnnotator):
         point_count = len(cloud.points)
         if point_count < self.descriptor.parameters.point_threshold:
             if (
-                self.descriptor.parameters.status_below_threshold == Status.FAILURE
+                self.descriptor.parameters.status_below_threshold
+                == py_trees.Status.FAILURE
                 and self.descriptor.parameters.raise_on_failure
             ):
-                raise PointCloudThresholdError(
-                    point_count=point_count,
-                    threshold=self.descriptor.parameters.point_threshold,
-                    relation=PointCloudThresholdRelation.BELOW,
+                raise Exception(
+                    f"Scene Pointcloud size({point_count}) is below "
+                    f"threshold of {self.descriptor.parameters.point_threshold}"
                 )
 
             self.rk_logger.info(
@@ -115,13 +112,13 @@ class PointcloudCheckAnnotator(BaseAnnotator):
             return self.descriptor.parameters.status_below_threshold
         else:
             if (
-                self.descriptor.parameters.status_above_threshold == Status.FAILURE
+                self.descriptor.parameters.status_above_threshold
+                == py_trees.Status.FAILURE
                 and self.descriptor.parameters.raise_on_failure
             ):
-                raise PointCloudThresholdError(
-                    point_count=point_count,
-                    threshold=self.descriptor.parameters.point_threshold,
-                    relation=PointCloudThresholdRelation.ABOVE,
+                raise Exception(
+                    f"Scene Pointcloud size({point_count}) is above "
+                    f"threshold of {self.descriptor.parameters.point_threshold}"
                 )
 
             self.rk_logger.info(

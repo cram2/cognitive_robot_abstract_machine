@@ -1,4 +1,3 @@
-.direnv/
 tmp/
 *.mypy_cache/
 build/
@@ -18,11 +17,7 @@ msg/*Result.msg
 msg/_*.py
 *muh*
 *.txt
-# The hook tests' scratch clone needs a real requirements.txt at the path
-# check-setup.sh looks for, so this one fixture is checked in.
-!.claude/hooks/tests/fixtures/set-up-clone/**/*.txt
 *.png
-!.claude/skills/plan-dashboard/example/screenshots/*.png
 *.lprof
 tmp_data/
 tmp/
@@ -161,24 +156,4 @@ class_diagram.pdf
 *_evaluated_tree.svg
 *_rdr.dot
 *_rdr.svg
-
-# Personal, per-user Claude Code memory (populated by .claude/hooks/session-start.sh
-# from the claude/personal-notes branch). Never committed on any branch.
-CLAUDE.local.md
-
-# Personal, per-user Claude Code settings (populated by the same hook from the same
-# branch), plus the stamp recording what it last synced there. Never committed on any
-# branch - shared project settings live in the committed .claude/settings.json instead.
-.claude/settings.local.json
-.claude/.personal-settings-sync-hash
-
-# Stamp recording the personal-notes commit this clone last read plan state
-# at (written by session-start.sh, read/advanced by plan-updates-since.sh).
-# Never committed - it's a per-clone baseline, not shared state.
-.claude/.plan-state-sync-sha
-
-# The stacked-PR board snapshot, re-exported from GitHub by
-# `.claude/stack/maintenance.py board --write` at the start of every maintenance pass.
-# Scratch state, never committed: a stale copy read as current is a pass acting on a
-# stack that has since moved.
-.claude/stack/board.json
+/FastSAM-s.pt

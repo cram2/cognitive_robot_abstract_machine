@@ -1,5 +1,4 @@
-"""
-Analysis engine for demonstrating query processing with stored data.
+"""Analysis engine for demonstrating query processing with stored data.
 
 This module provides an analysis engine that demonstrates query-based processing
 using stored camera data from MongoDB. It implements a pipeline that combines
@@ -32,14 +31,11 @@ from robokudo.annotators.query import QueryAnnotator, QueryReply
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 from robokudo.behaviours.action_server_checks import ActionServerCheck
-from robokudo.descriptors.factories.cr_descriptor_factory import (
-    CollectionReaderDescriptorFactory,
-)
+from robokudo.descriptors import CrDescriptorFactory
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """
-    Analysis engine for query-based processing of stored data.
+    """Analysis engine for query-based processing of stored data.
 
     This class implements a pipeline that handles queries by processing stored
     camera data. It combines query handling with tabletop segmentation and
@@ -60,16 +56,14 @@ class AnalysisEngine(AnalysisEngineInterface):
     """
 
     def name(self) -> str:
-        """
-        Get the name of the analysis engine.
+        """Get the name of the analysis engine.
 
         :return: The name identifier of this analysis engine
         """
         return "query_demo_from_storage"
 
     def implementation(self) -> Pipeline:
-        """
-        Create a pipeline for query-based processing of stored data.
+        """Create a pipeline for query-based processing of stored data.
 
         This method constructs a processing pipeline that handles queries by
         analyzing stored camera data. The pipeline performs tabletop segmentation
@@ -90,7 +84,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for query processing
         """
-        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CrDescriptorFactory.create_descriptor("mongo")
 
         seq = Pipeline("StoragePipeline")
         seq.add_children(

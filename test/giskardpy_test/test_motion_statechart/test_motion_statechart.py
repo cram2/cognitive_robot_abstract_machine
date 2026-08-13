@@ -1,23 +1,16 @@
 import json
-import logging
-import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 import pytest
-
-import giskardpy.motion_statechart.graph_node as graph_node_module
-import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.data_types.exceptions import DuplicateNameException
 from giskardpy.executor import Executor
-from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
     DefaultWeights,
-    TransitionKind,
 )
 from giskardpy.motion_statechart.exceptions import (
     NotInMotionStatechartError,
@@ -26,21 +19,11 @@ from giskardpy.motion_statechart.exceptions import (
     SelfInStartConditionError,
     NonObservationVariableError,
     NodeAlreadyBelongsToDifferentNodeError,
-    ConditionScopeError,
-    TerminalNodeInConditionError,
-    EmptyDegreesOfFreedomError,
-    MissingErrorSignalError,
 )
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import (
-    ConvergingTask,
     EndMotion,
     CancelMotion,
-    Goal,
-    MotionStatechartNode,
-    NodeArtifacts,
-    TerminalNode,
-    TrinaryCondition,
 )
 from giskardpy.motion_statechart.graph_node import ThreadPayloadMonitor
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
@@ -49,13 +32,17 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
     Pulse,
     CountSeconds,
     CountControlCycles,
-    CountSimulationTimeSeconds,
-    ThreadedPredicateMonitor,
 )
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
 )
-from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
+from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPose,
+)
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability
+from giskardpy.motion_statechart.test_nodes.test_nodes import (
     ChangeStateOnEvents,
     ConstTrueNode,
     TestGoal,
@@ -66,15 +53,10 @@ from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     TestEndBeforeStart,
     TestUnpauseUnknownFromParentPause,
 )
-from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
-from giskardpy.motion_statechart.tasks.cartesian_tasks import (
-    CartesianPose,
-)
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
-from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability
+from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.qp.constraint import GiskardEqualityConstraint
-from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.enforcement_strategy import IntegralStrategy
+from giskardpy.qp.constraint_collection import ConstraintCollection
 from krrood.symbolic_math.symbolic_math import (
     trinary_logic_and,
     trinary_logic_not,
@@ -88,7 +70,6 @@ from semantic_digital_twin.spatial_types import (
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
-from semantic_digital_twin.robots.pr2 import PR2Joint
 
 
 def test_condition_to_str():
@@ -224,27 +205,16 @@ def test_draw_with_invisible_node(tmp_path):
     )
     msc.add_node(EndMotion.when_all_true(msc.nodes))
 
-    sequence.plot_specifications.visible = False
-    s1n2.plot_specifications.visible = False
-    s2n2.plot_specifications.visible = False
+    sequence.plot_specs.visible = False
+    s1n2.plot_specs.visible = False
+    s2n2.plot_specs.visible = False
 
     kin_sim = Executor(MotionStatechartContext(world=World()))
     kin_sim.compile(motion_statechart=msc)
     msc.draw(str(tmp_path / "muh.pdf"))
 
 
-@dataclass(eq=False, repr=False)
-class _NodeThatEndsTheMotion(TerminalNode):
-    """
-    A terminal node other than the two the statechart ships with.
-    """
-
-
 class TestConditions:
-    def test_trinary_condition_default_expression_is_scalar(self):
-        condition = TrinaryCondition(kind=TransitionKind.START)
-        assert isinstance(condition.expression, sm.Scalar)
-
     def test_InvalidConditionError(self):
         node = ConstTrueNode()
         with pytest.raises(InputNotExpressionError):
@@ -262,63 +232,6 @@ class TestConditions:
         msc.add_node(node := ConstTrueNode())
         with pytest.raises(NonObservationVariableError):
             node.start_condition = FloatVariable(name="muh")
-
-    def test_end_motion_cannot_gate_another_node(self):
-        """
-        The motion is over once an EndMotion is true, so no transition can depend on it.
-        """
-        msc = MotionStatechart()
-        msc.add_nodes([node := ConstTrueNode(), end := EndMotion()])
-        with pytest.raises(TerminalNodeInConditionError) as exception_info:
-            node.start_condition = end.observation_variable
-
-        assert exception_info.value.terminal_node is end
-
-    def test_cancel_motion_cannot_gate_another_node(self):
-        """
-        A CancelMotion ends the motion just like an EndMotion does.
-        """
-        msc = MotionStatechart()
-        cancel = CancelMotion(exception=Exception("cancelled"))
-        msc.add_nodes([node := ConstTrueNode(), cancel])
-        with pytest.raises(TerminalNodeInConditionError) as exception_info:
-            node.start_condition = cancel.observation_variable
-
-        assert exception_info.value.terminal_node is cancel
-
-    def test_terminal_nodes_are_rejected_in_every_condition_kind(self):
-        """
-        No transition of any kind can happen after the motion has ended.
-        """
-        msc = MotionStatechart()
-        msc.add_nodes([node := ConstTrueNode(), end := EndMotion()])
-        with pytest.raises(TerminalNodeInConditionError):
-            node.pause_condition = end.observation_variable
-        with pytest.raises(TerminalNodeInConditionError):
-            node.end_condition = end.observation_variable
-        with pytest.raises(TerminalNodeInConditionError):
-            node.reset_condition = end.observation_variable
-
-    def test_any_terminal_node_cannot_gate_another_node(self):
-        """
-        The rule follows from ending the motion, not from being one of the two nodes
-        that happen to do so today.
-        """
-        msc = MotionStatechart()
-        msc.add_nodes([node := ConstTrueNode(), terminal := _NodeThatEndsTheMotion()])
-        with pytest.raises(TerminalNodeInConditionError) as exception_info:
-            node.start_condition = terminal.observation_variable
-
-        assert exception_info.value.terminal_node is terminal
-
-    def test_a_terminal_node_cannot_reference_itself(self):
-        """
-        A terminal node's own transitions are as unreachable as everyone else's.
-        """
-        msc = MotionStatechart()
-        msc.add_node(end := EndMotion())
-        with pytest.raises(TerminalNodeInConditionError):
-            end.end_condition = end.observation_variable
 
     def test_add_node_to_multiple_goals(self):
         msc = MotionStatechart()
@@ -349,137 +262,10 @@ class TestConditions:
             kin_sim.compile(motion_statechart=msc)
 
 
-@dataclass(eq=False, repr=False)
-class _BuildCountingNode(MotionStatechartNode):
-    """
-    Node that records how often :meth:`build` is invoked.
-    """
-
-    build_count: int = field(default=0, init=False)
-    """
-    Number of times build() has run on this node.
-    """
-
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        self.build_count += 1
-        return NodeArtifacts(observation=sm.Scalar.const_true())
-
-
-@dataclass(eq=False, repr=False)
-class _BuildCountingGoal(Goal):
-    """
-    Goal that records its own build calls and owns a counting child node.
-    """
-
-    build_count: int = field(default=0, init=False)
-    """
-    Number of times build() has run on this goal.
-    """
-
-    child: _BuildCountingNode = field(default=None, init=False)
-    """
-    The child node expanded by this goal.
-    """
-
-    def expand(self, context: MotionStatechartContext) -> None:
-        self.child = _BuildCountingNode(name="counting_child")
-        self.add_node(self.child)
-
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        self.build_count += 1
-        return NodeArtifacts(observation=self.child.observation_variable)
-
-
-def _compile_msc(msc: MotionStatechart) -> Executor:
-    executor = Executor(MotionStatechartContext(world=World()))
-    executor.compile(motion_statechart=msc)
-    return executor
-
-
-def test_each_node_is_built_exactly_once():
-    msc = MotionStatechart()
-    goal = _BuildCountingGoal()
-    msc.add_node(goal)
-    msc.add_node(EndMotion.when_true(goal))
-
-    _compile_msc(msc)
-
-    assert goal.build_count == 1
-    assert goal.child.build_count == 1
-
-
-# %% build orchestration and artifact production
-
-
-@dataclass(eq=False, repr=False)
-class _SetupThenArtifactsNode(MotionStatechartNode):
-    """
-    Node that performs setup in :meth:`build` and describes itself in
-    :meth:`build_artifacts`.
-    """
-
-    hook_calls: list[str] = field(default_factory=list, init=False)
-    """
-    Names of the build hooks that ran, in the order they ran.
-    """
-
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
-        self.hook_calls.append("build")
-        return super().build(context)
-
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        self.hook_calls.append("build_artifacts")
-        return NodeArtifacts(observation=sm.Scalar.const_true())
-
-
-@dataclass(eq=False, repr=False)
-class _ConvergingTaskWithoutErrorSignal(ConvergingTask):
-    """
-    Converging task whose artifacts leave the error unset.
-    """
-
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        return NodeArtifacts()
-
-
-def test_build_delegates_to_build_artifacts():
-    msc = MotionStatechart()
-    node = _SetupThenArtifactsNode()
-    msc.add_node(node)
-    msc.add_node(EndMotion.when_true(node))
-
-    executor = _compile_msc(msc)
-
-    assert node.hook_calls == ["build", "build_artifacts"]
-    executor.tick()
-    assert node.observation_state == ObservationStateValues.TRUE
-
-
-def test_converging_task_without_error_signal_is_rejected():
-    msc = MotionStatechart()
-    task = _ConvergingTaskWithoutErrorSignal()
-    msc.add_node(task)
-    msc.add_node(EndMotion.when_true(task))
-
-    with pytest.raises(MissingErrorSignalError):
-        _compile_msc(msc)
-
-
-def test_state_iteration_yields_nodes():
-    msc = MotionStatechart()
-    node1 = ConstTrueNode()
-    node2 = ConstTrueNode()
-    msc.add_node(node1)
-    msc.add_node(node2)
-
-    assert list(iter(msc.life_cycle_state)) == msc.nodes
-    assert dict(msc.observation_state).keys() == {node1, node2}
-
-
 def test_two_goals(pr2_world_state_reset: World):
-    torso_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.TORSO_LIFT)
+    torso_joint = pr2_world_state_reset.get_connection_by_name("torso_lift_joint")
     r_wrist_roll_joint = pr2_world_state_reset.get_connection_by_name(
-        PR2Joint.RIGHT_WRIST_ROLL
+        "r_wrist_roll_joint"
     )
     msc = MotionStatechart()
     msc.add_nodes(
@@ -522,157 +308,6 @@ def test_two_goals(pr2_world_state_reset: World):
     assert np.allclose(pr2_world_state_reset.state.jerks, 0)
 
 
-def test_parallel_local_minimum_reached_tolerates_stall(pr2_world_state_reset: World):
-    """
-    A :class:`JointPositionList` goal and a :class:`LocalMinimumReached` monitor
-    combined via ``Parallel(..., minimum_success=1)`` must finish once the commanded
-    joint's velocity has settled near zero, even though the goal task itself never
-    reaches its nominal target -- simulating a joint that got physically stopped (e.g.
-    a gripper finger against a grasped object) before arriving. Capping the joint's own
-    velocity limit to a tiny value makes it provably unable to traverse the requested
-    distance within the tick budget, while its tracked velocity still settles below the
-    stall threshold almost immediately.
-
-    This is the pattern that replaces baking stall-tolerance into a task's own
-    observation: the goal's observation still means "goal reached", nothing else, and
-    the ``Parallel`` node is what tolerates the stall.
-    """
-    torso_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.TORSO_LIFT)
-    torso_joint.raw_dof.limits.lower.velocity = -1e-3
-    torso_joint.raw_dof.limits.upper.velocity = 1e-3
-
-    msc = MotionStatechart()
-    msc.add_node(
-        combined := Parallel(
-            [
-                joint_goal := JointPositionList(
-                    goal_state=JointState.from_mapping({torso_joint: 1.0}),
-                ),
-                LocalMinimumReached(
-                    degrees_of_freedom=[torso_joint.raw_dof],
-                    minimum_time=0.2,
-                    measure_from_own_start=True,
-                ),
-            ],
-            minimum_success=1,
-        )
-    )
-    msc.add_node(EndMotion.when_true(combined))
-
-    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
-    kin_sim.compile(motion_statechart=msc)
-    kin_sim.tick_until_end(timeout=1000)
-
-    assert not np.isclose(torso_joint.position, 1.0, atol=1e-2), (
-        "the joint should not have reached its nominal target -- its velocity "
-        "was capped far too low to traverse the distance within the timeout, "
-        "this test is only meaningful if it stayed far away"
-    )
-    assert msc.observation_state[joint_goal] == ObservationStateValues.FALSE, (
-        "the goal task's own observation must still mean 'goal reached' -- it must "
-        "not be the thing that turned true here, only the surrounding Parallel"
-    )
-
-
-def test_joint_position_list_alone_times_out_on_stall(
-    pr2_world_state_reset: World,
-):
-    """
-    Regression control for test_parallel_local_minimum_reached_tolerates_stall: a bare
-    :class:`JointPositionList`, without the surrounding ``Parallel`` +
-    :class:`LocalMinimumReached`, must never reach EndMotion in the same stalled
-    scenario -- proving the monitor is what unblocks it, not some unrelated change.
-    """
-    torso_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.TORSO_LIFT)
-    torso_joint.raw_dof.limits.lower.velocity = -1e-3
-    torso_joint.raw_dof.limits.upper.velocity = 1e-3
-
-    msc = MotionStatechart()
-    msc.add_node(
-        joint_goal := JointPositionList(
-            goal_state=JointState.from_mapping({torso_joint: 1.0}),
-        )
-    )
-    msc.add_node(EndMotion.when_true(joint_goal))
-
-    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
-    kin_sim.compile(motion_statechart=msc)
-
-    with pytest.raises(TimeoutError):
-        kin_sim.tick_until_end(timeout=200)
-
-
-def test_local_minimum_reached_only_depends_on_given_degrees_of_freedom(
-    pr2_world_state_reset: World,
-):
-    """
-    LocalMinimumReached(degrees_of_freedom=[...]) must only depend on the given subset
-    of degrees of freedom, not every active one in the world -- otherwise passing a
-    subset to tolerate a stall on one joint could be defeated by unrelated motion
-    elsewhere in the robot.
-    """
-    torso_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.TORSO_LIFT)
-    moving_joint = pr2_world_state_reset.get_connection_by_name(
-        PR2Joint.RIGHT_WRIST_ROLL
-    )
-
-    msc = MotionStatechart()
-    msc.add_nodes(
-        [
-            JointPositionList(goal_state=JointState.from_mapping({moving_joint: 2.0})),
-            local_min := LocalMinimumReached(
-                degrees_of_freedom=[torso_joint.raw_dof], minimum_time=0.1
-            ),
-        ]
-    )
-    msc.add_node(EndMotion.when_true(local_min))
-
-    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
-    kin_sim.compile(motion_statechart=msc)
-
-    # Checked directly against local_min's own observation state, not against
-    # is_end_motion()/tick_until_end(): EndMotion additionally waits for every active
-    # DOF's velocity to settle before actually ending the whole motion (see
-    # test_end_motion_waits_for_convergence), so it is no longer a reliable proxy for
-    # "when did this specific monitor become true".
-    for _ in range(10):
-        kin_sim.tick()
-    assert msc.observation_state[local_min] == ObservationStateValues.TRUE, (
-        "the scoped monitor should have settled almost immediately -- torso_joint "
-        "never moves"
-    )
-    assert not np.isclose(moving_joint.position, 2.0, atol=1e-2), (
-        "r_wrist_roll_joint should still be mid-motion at this point -- otherwise "
-        "this test doesn't prove the monitor ignored it"
-    )
-
-
-def test_local_minimum_reached_measures_minimum_time_from_own_start_by_default():
-    """
-    measure_from_own_start must default to True: LocalMinimumReached is normally used to
-    detect a stall on one specific, possibly late-starting motion (e.g. wrapped in a
-    Parallel around it), so minimum_time should count from when the monitor itself
-    started running, not from the start of the whole motion chart, even if the caller
-    never sets the flag explicitly.
-    """
-    assert LocalMinimumReached().measure_from_own_start is True
-
-
-def test_local_minimum_reached_raises_on_explicitly_empty_degrees_of_freedom(
-    pr2_world_state_reset,
-):
-    """
-    Passing an explicit empty degrees_of_freedom list is a caller misconfiguration (e.g.
-    an empty set of connections upstream) and must raise, rather than silently turning
-    the monitor into a constant-true observation that could mask the bug.
-    """
-    monitor = LocalMinimumReached(degrees_of_freedom=[])
-    context = MotionStatechartContext(world=pr2_world_state_reset)
-
-    with pytest.raises(EmptyDegreesOfFreedomError):
-        monitor.build(context)
-
-
 @dataclass(eq=False, repr=False)
 class _TestThreadMonitor(ThreadPayloadMonitor):
     delay: float = 0.05
@@ -681,26 +316,6 @@ class _TestThreadMonitor(ThreadPayloadMonitor):
     def _compute_observation(self):
         time.sleep(self.delay)
         return self.return_value
-
-
-@dataclass(eq=False, repr=False)
-class _RaisingThreadMonitor(ThreadPayloadMonitor):
-    """
-    Thread payload monitor whose observation computation always fails.
-    """
-
-    def _compute_observation(self) -> float:
-        raise RuntimeError("observation failure")
-
-
-@dataclass(eq=False, repr=False)
-class _SucceedingThreadMonitor(ThreadPayloadMonitor):
-    """
-    Thread payload monitor whose observation computation succeeds.
-    """
-
-    def _compute_observation(self) -> float:
-        return ObservationStateValues.TRUE
 
 
 def test_thread_payload_monitor_non_blocking_and_caching():
@@ -720,127 +335,6 @@ def test_thread_payload_monitor_non_blocking_and_caching():
     time.sleep(mon.delay * 2)
     val1 = mon.compute_observation()
     assert val1 == ObservationStateValues.TRUE
-
-
-def _tick_until(sim, predicate, timeout=2.0):
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        sim.tick()
-        if predicate():
-            return
-        time.sleep(0.005)
-    raise AssertionError("condition not reached within timeout")
-
-
-def test_threaded_predicate_monitor_unknown_then_true():
-    gate = threading.Event()
-    msc = MotionStatechart()
-    # predicate blocks on the gate, so we can observe the UNKNOWN phase
-    mon = ThreadedPredicateMonitor(predicate=lambda: gate.wait(2.0), name="cond")
-    msc.add_node(mon)
-    end = EndMotion.when_true(mon)
-    msc.add_node(end)
-
-    sim = Executor(MotionStatechartContext(world=World()))
-    sim.compile(motion_statechart=msc)
-
-    # while the predicate is blocked, the monitor stays UNKNOWN and ticking
-    # never blocks on the (slow) evaluation
-    for _ in range(3):
-        t0 = time.perf_counter()
-        sim.tick()
-        assert time.perf_counter() - t0 < 0.5
-        assert mon.observation_state == ObservationStateValues.UNKNOWN
-        assert not msc.is_end_motion()
-
-    gate.set()
-    _tick_until(sim, lambda: mon.observation_state == ObservationStateValues.TRUE)
-    assert mon.observation_state == ObservationStateValues.TRUE
-    sim.tick()
-    assert msc.is_end_motion()
-
-
-def test_threaded_predicate_monitor_false():
-    msc = MotionStatechart()
-    mon = ThreadedPredicateMonitor(predicate=lambda: False, name="cond")
-    msc.add_node(mon)
-    end = EndMotion.when_true(mon)
-    msc.add_node(end)
-
-    sim = Executor(MotionStatechartContext(world=World()))
-    sim.compile(motion_statechart=msc)
-
-    _tick_until(sim, lambda: mon.observation_state == ObservationStateValues.FALSE)
-    assert mon.observation_state == ObservationStateValues.FALSE
-    assert not msc.is_end_motion()
-
-
-def test_threaded_predicate_monitor_false_triggers_cancel():
-    msc = MotionStatechart()
-    mon = ThreadedPredicateMonitor(predicate=lambda: False, name="cond")
-    msc.add_node(mon)
-    cancel = CancelMotion(exception=Exception("condition is false"))
-    cancel.start_condition = trinary_logic_not(mon.observation_variable)
-    msc.add_node(cancel)
-
-    sim = Executor(MotionStatechartContext(world=World()))
-    sim.compile(motion_statechart=msc)
-
-    with pytest.raises(Exception, match="condition is false"):
-        _tick_until(sim, lambda: False)
-
-
-def test_threaded_predicate_monitor_exception_is_false():
-    def boom():
-        raise RuntimeError("query failed")
-
-    msc = MotionStatechart()
-    mon = ThreadedPredicateMonitor(predicate=boom, name="cond")
-    msc.add_node(mon)
-    end = EndMotion.when_true(mon)
-    msc.add_node(end)
-
-    sim = Executor(MotionStatechartContext(world=World()))
-    sim.compile(motion_statechart=msc)
-
-    # a raising predicate must not crash the control loop; it reports FALSE
-    try:
-        _tick_until(sim, lambda: mon.observation_state == ObservationStateValues.FALSE)
-    except RuntimeError:
-        pass
-    assert mon.observation_state == ObservationStateValues.UNKNOWN
-
-
-def test_thread_payload_monitor_cleanup_stops_worker():
-    monitor = _SucceedingThreadMonitor()
-    assert monitor._thread.is_alive()
-
-    monitor.cleanup(context=MotionStatechartContext.empty())
-
-    monitor._thread.join(timeout=1.0)
-    assert not monitor._thread.is_alive()
-
-
-def test_thread_payload_monitor_surfaces_compute_exception():
-    records: list[logging.LogRecord] = []
-
-    class _CapturingHandler(logging.Handler):
-        def emit(self, record: logging.LogRecord) -> None:
-            records.append(record)
-
-    handler = _CapturingHandler(level=logging.ERROR)
-    graph_node_module.logger.addHandler(handler)
-    monitor = _RaisingThreadMonitor()
-    try:
-        monitor.compute_observation()
-        for _ in range(100):
-            if any(record.levelno >= logging.ERROR for record in records):
-                break
-            time.sleep(0.02)
-        assert any(record.levelno >= logging.ERROR for record in records)
-    finally:
-        graph_node_module.logger.removeHandler(handler)
-        monitor.cleanup(context=MotionStatechartContext.empty())
 
 
 class TestMotionStatechartLogic:
@@ -904,21 +398,20 @@ class TestMotionStatechartLogic:
         assert changer.life_cycle_state == LifeCycleValues.NOT_STARTED
         assert changer.state == "on_reset"
 
-    def test_live_state_requires_motion_statechart_membership(self):
+    def test_not_not_in_motion_statechart(self):
         node = ConstTrueNode()
-        # State variables and conditions are available before the node is added.
-        assert node.observation_variable is not None
-        assert node.life_cycle_variable is not None
-        node.pause_condition = node.observation_variable
-        node.end_condition = node.observation_variable
-        node.reset_condition = node.observation_variable
-        # Reading the live state still requires membership in a motion statechart.
         with pytest.raises(NotInMotionStatechartError):
-            _ = node.motion_statechart
+            muh = node.observation_variable
         with pytest.raises(NotInMotionStatechartError):
-            _ = node.observation_state
+            muh = node.life_cycle_variable
         with pytest.raises(NotInMotionStatechartError):
-            _ = node.life_cycle_state
+            node.start_condition = node.observation_variable
+        with pytest.raises(NotInMotionStatechartError):
+            node.pause_condition = node.observation_variable
+        with pytest.raises(NotInMotionStatechartError):
+            node.end_condition = node.observation_variable
+        with pytest.raises(NotInMotionStatechartError):
+            node.reset_condition = node.observation_variable
 
     def test_cancel_motion(self, tmp_path):
         msc = MotionStatechart()
@@ -1378,23 +871,23 @@ def test_long_goal(pr2_world_state_reset: World):
             JointPositionList(
                 goal_state=JointState.from_str_dict(
                     {
-                        PR2Joint.TORSO_LIFT: 0.2999225173357618,
-                        PR2Joint.HEAD_PAN: 0.042,
-                        PR2Joint.HEAD_TILT: -0.37,
-                        PR2Joint.RIGHT_UPPER_ARM_ROLL: -0.9487714747527726,
-                        PR2Joint.RIGHT_SHOULDER_PAN: -1.0047307505973626,
-                        PR2Joint.RIGHT_SHOULDER_LIFT: 0.48736790658811985,
-                        PR2Joint.RIGHT_FOREARM_ROLL: -14.895833882874182,
-                        PR2Joint.RIGHT_ELBOW_FLEX: -1.392377908925028,
-                        PR2Joint.RIGHT_WRIST_FLEX: -0.4548695149411013,
-                        PR2Joint.RIGHT_WRIST_ROLL: 0.11426798984097819,
-                        PR2Joint.LEFT_UPPER_ARM_ROLL: 1.7383062350263658,
-                        PR2Joint.LEFT_SHOULDER_PAN: 1.8799810286792007,
-                        PR2Joint.LEFT_SHOULDER_LIFT: 0.011627231224188975,
-                        PR2Joint.LEFT_FOREARM_ROLL: 312.67276414458695,
-                        PR2Joint.LEFT_ELBOW_FLEX: -2.0300928925694675,
-                        PR2Joint.LEFT_WRIST_FLEX: -0.1,
-                        PR2Joint.LEFT_WRIST_ROLL: -6.062015047706399,
+                        "torso_lift_joint": 0.2999225173357618,
+                        "head_pan_joint": 0.042,
+                        "head_tilt_joint": -0.37,
+                        "r_upper_arm_roll_joint": -0.9487714747527726,
+                        "r_shoulder_pan_joint": -1.0047307505973626,
+                        "r_shoulder_lift_joint": 0.48736790658811985,
+                        "r_forearm_roll_joint": -14.895833882874182,
+                        "r_elbow_flex_joint": -1.392377908925028,
+                        "r_wrist_flex_joint": -0.4548695149411013,
+                        "r_wrist_roll_joint": 0.11426798984097819,
+                        "l_upper_arm_roll_joint": 1.7383062350263658,
+                        "l_shoulder_pan_joint": 1.8799810286792007,
+                        "l_shoulder_lift_joint": 0.011627231224188975,
+                        "l_forearm_roll_joint": 312.67276414458695,
+                        "l_elbow_flex_joint": -2.0300928925694675,
+                        "l_wrist_flex_joint": -0.1,
+                        "l_wrist_roll_joint": -6.062015047706399,
                     },
                     world=pr2_world_state_reset,
                 )
@@ -1476,51 +969,6 @@ def test_count_ticks():
     kin_sim.tick_until_end()
     # ending tacks 4 ticks, one to turn EndMotion to true
     assert kin_sim.control_cycles == 3 + 1
-
-
-def test_count_control_cycles_returns_false_until_target():
-    node = CountControlCycles(control_cycles=3)
-    context = MotionStatechartContext(world=World())
-    node.on_start(context)
-    assert node.on_tick(context) == ObservationStateValues.FALSE
-    assert node.on_tick(context) == ObservationStateValues.FALSE
-    assert node.on_tick(context) == ObservationStateValues.TRUE
-
-
-def test_count_simulation_time_seconds_reaches_target_on_exact_tick():
-    context = MotionStatechartContext(world=World())
-    ticks_until_true = 4
-    seconds = context.qp_controller_config.control_dt * ticks_until_true
-    node = CountSimulationTimeSeconds(seconds=seconds)
-    node.on_start(context)
-    for _ in range(ticks_until_true - 1):
-        assert node.on_tick(context) == ObservationStateValues.FALSE
-    assert node.on_tick(context) == ObservationStateValues.TRUE
-
-
-def test_count_simulation_time_seconds_on_start_resets_counter():
-    context = MotionStatechartContext(world=World())
-    seconds = context.qp_controller_config.control_dt * 2
-    node = CountSimulationTimeSeconds(seconds=seconds)
-    node.on_start(context)
-    node.on_tick(context)
-    node.on_tick(context)
-    node.on_start(context)
-    assert node.on_tick(context) == ObservationStateValues.FALSE
-
-
-def test_count_simulation_time_seconds_with_executor():
-    context = MotionStatechartContext(world=World())
-    ticks_until_true = 20
-    seconds = context.qp_controller_config.control_dt * ticks_until_true
-    msc = MotionStatechart()
-    msc.add_node(counter := CountSimulationTimeSeconds(seconds=seconds))
-    msc.add_node(EndMotion.when_true(counter))
-    kin_sim = Executor(context)
-    kin_sim.compile(motion_statechart=msc)
-    kin_sim.tick_until_end()
-    # +1 for EndMotion to turn True, as in test_count_ticks
-    assert kin_sim.control_cycles == ticks_until_true + 1
 
 
 class TestEndMotion:
@@ -1648,23 +1096,6 @@ class TestTemplates:
         assert msc.nodes[4].life_cycle_state == LifeCycleValues.DONE
         assert msc.nodes[5].life_cycle_state == LifeCycleValues.DONE
 
-    def test_sequence_gives_a_terminal_step_no_end_condition(self):
-        """
-        A sequence ends each step by its own observation, but a step that ends the whole
-        motion has nothing left to transition to.
-        """
-        msc = MotionStatechart()
-        cancel = CancelMotion(exception=Exception("cancelled"))
-        msc.add_node(
-            sequence := Sequence(nodes=[CountControlCycles(control_cycles=3), cancel])
-        )
-        msc.add_node(EndMotion.when_true(sequence))
-
-        kin_sim = Executor(MotionStatechartContext(world=World()))
-        kin_sim.compile(motion_statechart=msc)
-
-        assert cancel.end_condition.free_variables() == []
-
     def test_parallel(self):
         msc = MotionStatechart()
         msc.add_nodes(
@@ -1724,9 +1155,7 @@ class TestTemplates:
         kin_sim.tick_until_end()
 
     def test_parallel_minimum_success(self):
-        """
-        Test that Parallel completes when minimum_success nodes are True.
-        """
+        """Test that Parallel completes when minimum_success nodes are True"""
         msc = MotionStatechart()
         msc.add_nodes(
             [
@@ -1751,9 +1180,7 @@ class TestTemplates:
         assert kin_sim.control_cycles == 6
 
     def test_parallel_minimum_success_zero(self):
-        """
-        Test that Parallel completes when no node is True.
-        """
+        """Test that Parallel completes when no node is True"""
         msc = MotionStatechart()
         msc.add_nodes(
             [
@@ -1780,9 +1207,8 @@ class TestTemplates:
 
 def test_constraint_collection(pr2_world_state_reset: World):
     """
-    Test the constraint collection naming behavior.
-
-    Expected behavior is: - Not naming constraints should result in automatically generated unique names
+    Test the constraint collection naming behavior. Expected behavior is:
+    - Not naming constraints should result in automatically generated unique names
     - Manually naming constraints the same name should result in an Exception
     - Merging constraint collections should handle duplicates via prefix if they are in different collections
     - Merge raises an Exception if a collection contains duplicates in itself
@@ -1799,7 +1225,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
         frame_P_current=Point3(0, 0, 0, reference_frame=tip),
         frame_P_goal=Point3(0, 0, 0, reference_frame=tip),
         reference_velocity=0.1,
-        quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
     )
     assert len(col.equality_constraints) >= 3
 
@@ -1807,14 +1233,14 @@ def test_constraint_collection(pr2_world_state_reset: World):
         col.add_equality_constraint(
             reference_velocity=0.1 * i,
             equality_bound=0.0,
-            quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+            quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
             task_expression=expr,
         )
 
     col.add_inequality_constraint(
         name="same_name",
         reference_velocity=0.2,
-        quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         task_expression=expr,
         lower_error=0.1,
         upper_error=0.2,
@@ -1825,7 +1251,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
             name="same_name",
             reference_velocity=0.2,
             equality_bound=0.0,
-            quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+            quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
             task_expression=expr,
         )
 
@@ -1834,7 +1260,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
         name="same_name",
         reference_velocity=0.2,
         equality_bound=0.0,
-        quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         task_expression=expr,
     )
 
@@ -1849,14 +1275,14 @@ def test_constraint_collection(pr2_world_state_reset: World):
         name="same_name",
         reference_velocity=0.2,
         equality_bound=0.0,
-        quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         task_expression=expr,
     )
     constraint = GiskardEqualityConstraint(
         name="same_name",
         expression=expr,
         normalization_factor=0.1,
-        quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+        quadratic_weight=DefaultWeights.WEIGHT_BELOW_CA,
         lower_slack_limit=-float("inf"),
         upper_slack_limit=float("inf"),
         linear_weight=0,
@@ -1874,8 +1300,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
 
 class TestLifeCycleTransitions:
     """
-    Tests the LifeCycle transitions of nodes in various edge cases and intended
-    behavior.
+    Tests the LifeCycle transitions of nodes in various edge cases and intended behavior.
     """
 
     def test_run_after_stop(self):
@@ -1935,7 +1360,6 @@ class TestLifeCycleTransitions:
     def test_end_before_start(self):
         """
         Test for node to start even if it's end condition is met before start condition.
-
         Node3 should start and run for 1 tick before ending, instead of never starting.
         """
         msc = MotionStatechart()
@@ -2232,9 +1656,9 @@ class TestLifeCycleTransitions:
     def test_unpause_unknown_from_parent_pause(self):
         """
         Test for child node to unpause when parent node unpauses.
-
         Child node pause condition is unknown.
         """
+
         msc = MotionStatechart()
 
         pulse = Pulse()
@@ -2288,8 +1712,7 @@ class TestMaxManipulability:
             tip_link=tip,
             goal_pose=goal_pose,
         )
-        msc.add_nodes([cart_goal, manipulability := MaxManipulability(root_link=root, tip_link=tip)])
-        manipulability.end_condition = cart_goal.observation_variable
+        msc.add_nodes([cart_goal, MaxManipulability(root_link=root, tip_link=tip)])
         msc.add_node(EndMotion.when_true(cart_goal))
 
         kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
@@ -2299,168 +1722,4 @@ class TestMaxManipulability:
         fk = pr2_world_state_reset.compute_forward_kinematics_np(
             pr2_world_state_reset.root, tip
         )
-        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.translation_threshold)
-
-
-class TestEagerStateVariables:
-    """
-    A node's observation and life cycle variables are available right after
-    construction, before it is added to a motion statechart, so conditions can be wired
-    on nested nodes.
-    """
-
-    def test_state_variables_available_before_adding_to_statechart(self):
-        node = ConstTrueNode()
-        assert node.observation_variable is node.observation_variable
-        assert node.life_cycle_variable is node.life_cycle_variable
-
-    def test_nested_self_referential_end_condition_before_compile(self):
-        msc = MotionStatechart()
-        msc.add_node(
-            Sequence(
-                [
-                    ConstTrueNode(),
-                    barrier := Parallel(
-                        [ConstTrueNode(), ConstFalseNode()], minimum_success=1
-                    ),
-                ]
-            )
-        )
-        barrier.end_condition = barrier.observation_variable
-        msc._expand_goals(MotionStatechartContext.empty())
-        msc._add_transitions()
-        assert barrier in barrier._end_condition.node_dependencies
-
-    def test_nested_end_condition_survives_json_round_trip(self):
-        msc = MotionStatechart()
-        msc.add_node(
-            sequence := Sequence(
-                [
-                    ConstTrueNode(),
-                    barrier := Parallel(
-                        [ConstTrueNode(), ConstFalseNode()], minimum_success=1
-                    ),
-                ]
-            )
-        )
-        barrier.end_condition = barrier.observation_variable
-        msc.add_node(EndMotion.when_true(sequence))
-
-        msc._expand_goals(MotionStatechartContext.empty())
-        json_data = msc.create_structure_copy().to_json()
-        new_json_data = json.loads(json.dumps(json_data))
-        msc_copy = MotionStatechart.from_json(new_json_data)
-        msc_copy._add_transitions()
-
-        barrier_copy = msc_copy.get_node_by_index(barrier.index)
-        assert barrier_copy in barrier_copy._end_condition.node_dependencies
-        assert barrier_copy.unique_name in str(barrier_copy._end_condition)
-
-    def test_nodes_with_same_name_have_distinct_variable_names(self):
-        first = ConstTrueNode(name="same")
-        second = ConstTrueNode(name="same")
-        assert first.observation_variable.name != second.observation_variable.name
-
-    def test_self_referential_start_condition_raises_before_add(self):
-        node = ConstTrueNode()
-        with pytest.raises(SelfInStartConditionError):
-            node.start_condition = node.observation_variable
-
-
-class TestConditionScoping:
-    """
-    A condition may only reference the node itself or nodes sharing the same parent.
-
-    References across template levels raise :class:`ConditionScopeError` during
-    compilation.
-    """
-
-    def test_outside_node_cannot_reference_node_inside_template(self):
-        msc = MotionStatechart()
-        child = ConstTrueNode()
-        msc.add_node(Sequence([child]))
-        msc.add_node(EndMotion.when_true(child))
-
-        kin_sim = Executor(MotionStatechartContext(world=World()))
-        with pytest.raises(ConditionScopeError):
-            kin_sim.compile(motion_statechart=msc)
-
-    def test_template_node_cannot_reference_node_in_sibling_template(self):
-        msc = MotionStatechart()
-        node_a = ConstTrueNode()
-        node_b = ConstTrueNode()
-        msc.add_node(first := Parallel([node_a]))
-        msc.add_node(Parallel([node_b]))
-        node_b.start_condition = node_a.observation_variable
-        msc.add_node(EndMotion.when_true(first))
-
-        kin_sim = Executor(MotionStatechartContext(world=World()))
-        with pytest.raises(ConditionScopeError):
-            kin_sim.compile(motion_statechart=msc)
-
-    def test_nested_template_node_cannot_reference_outer_node(self):
-        msc = MotionStatechart()
-        node_a = ConstTrueNode()
-        node_b = ConstTrueNode()
-        msc.add_node(sequence := Sequence([node_a, Parallel([node_b])]))
-        node_b.pause_condition = node_a.observation_variable
-        msc.add_node(EndMotion.when_true(sequence))
-
-        kin_sim = Executor(MotionStatechartContext(world=World()))
-        with pytest.raises(ConditionScopeError):
-            kin_sim.compile(motion_statechart=msc)
-
-    def test_parent_cannot_reference_child(self):
-        msc = MotionStatechart()
-        child = ConstTrueNode()
-        parallel = Parallel([child])
-        parallel.end_condition = child.observation_variable
-        msc.add_node(parallel)
-        msc.add_node(EndMotion.when_true(parallel))
-
-        kin_sim = Executor(MotionStatechartContext(world=World()))
-        with pytest.raises(ConditionScopeError):
-            kin_sim.compile(motion_statechart=msc)
-
-    def test_child_cannot_reference_parent(self):
-        msc = MotionStatechart()
-        child = ConstTrueNode()
-        parallel = Parallel([child])
-        child.pause_condition = parallel.observation_variable
-        msc.add_node(parallel)
-        msc.add_node(EndMotion.when_true(parallel))
-
-        kin_sim = Executor(MotionStatechartContext(world=World()))
-        with pytest.raises(ConditionScopeError):
-            kin_sim.compile(motion_statechart=msc)
-
-    def test_siblings_inside_template_can_reference_each_other(self):
-        msc = MotionStatechart()
-        node_a = ConstTrueNode()
-        node_b = ConstTrueNode()
-        node_b.start_condition = node_a.observation_variable
-        msc.add_node(parallel := Parallel([node_a, node_b]))
-        msc.add_node(EndMotion.when_true(parallel))
-
-        kin_sim = Executor(MotionStatechartContext(world=World()))
-        kin_sim.compile(motion_statechart=msc)
-        kin_sim.tick_until_end()
-
-    def test_self_referential_end_condition_inside_template_compiles(self):
-        msc = MotionStatechart()
-        msc.add_node(
-            sequence := Sequence(
-                [
-                    ConstTrueNode(),
-                    barrier := Parallel(
-                        [ConstTrueNode(), ConstFalseNode()], minimum_success=1
-                    ),
-                ]
-            )
-        )
-        barrier.end_condition = barrier.observation_variable
-        msc.add_node(EndMotion.when_true(sequence))
-
-        kin_sim = Executor(MotionStatechartContext(world=World()))
-        kin_sim.compile(motion_statechart=msc)
-        kin_sim.tick_until_end()
+        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.threshold)

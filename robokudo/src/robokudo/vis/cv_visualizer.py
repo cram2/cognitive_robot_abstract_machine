@@ -1,5 +1,4 @@
-"""
-OpenCV-based visualization for RoboKudo pipelines.
+"""OpenCV-based visualization for RoboKudo pipelines.
 
 This module provides OpenCV-based visualization capabilities for RoboKudo pipelines.
 It handles:
@@ -10,8 +9,6 @@ It handles:
 * Window management
 * Pipeline state visualization
 """
-
-from __future__ import annotations
 
 import subprocess
 import sys
@@ -26,8 +23,7 @@ from robokudo.vis.visualizer import Visualizer
 
 
 class CVVisualizer(Visualizer, Visualizer.Observer):
-    """
-    OpenCV-based visualizer for 2D image data.
+    """OpenCV-based visualizer for 2D image data.
 
     This class provides visualization of 2D image data from pipeline annotators using
     OpenCV windows. It supports:
@@ -43,15 +39,12 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """
-        Initialize the OpenCV visualizer.
-        """
+        """Initialize the OpenCV visualizer."""
         super().__init__(*args, **kwargs)
         self.shared_visualizer_state.register_observer(self)
 
     def tick(self) -> None:
-        """
-        Update the visualization display.
+        """Update the visualization display.
 
         This method:
 
@@ -116,7 +109,6 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
     ) -> None:
         """
         Mouse callback for the 2D Visualizer.
-
         Prints double click events and forwards every event to the active annotator.
 
         :param event: OpenCV mouse event type
@@ -133,9 +125,7 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
         active_annotator_instance.mouse_callback(event, x, y, flags, param)
 
     def window_title(self) -> str:
-        """
-        Get the window title for this visualizer.
-        """
+        """Get the window title for this visualizer."""
         return self.identifier()
 
     def notify(
@@ -144,8 +134,7 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """
-        Handle notification of state changes.
+        """Handle notification of state changes.
 
         :param observable: The object that sent the notification
         """
@@ -153,8 +142,7 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
 
     @staticmethod
     def static_post_tick() -> None:
-        """
-        Handle keyboard input after visualization update.
+        """Handle keyboard input after visualization update.
 
         This method:
 
@@ -179,9 +167,8 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
             cv_visualizer_for_key.indicate_termination_var = True
 
     @staticmethod
-    def get_gui_handler_for_detected_key() -> Optional[CVVisualizer]:
-        """
-        Get the visualizer instance for the focused window.
+    def get_gui_handler_for_detected_key() -> Optional["CVVisualizer"]:
+        """Get the visualizer instance for the focused window.
 
         :returns: The visualizer instance for the focused window, or None if not found
         """
@@ -215,8 +202,7 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
         Handle a key-press that happened in the corresponding GUI of this GUIHandler.
 
         :param key: An ASCII char
-        :return: false if GUI reports abort (right now this only happens when ESC is
-            pressed)
+        :return: false if GUI reports abort (right now this only happens when ESC is pressed)
         """
         # print(f"Key pressed: {key}")
         vis_state: Visualizer.SharedState = self.shared_visualizer_state

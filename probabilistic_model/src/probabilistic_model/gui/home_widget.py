@@ -14,7 +14,6 @@ from typing import Optional
 class HomeWidget(QWidget):
     """
     The Home page widget of the GUI.
-
     Displays the model logo and a list of variables with their support.
     """
 

@@ -1,5 +1,4 @@
-"""
-RoboKudo visualization package.
+"""RoboKudo visualization package.
 
 This package provides visualization capabilities for RoboKudo pipelines:
 

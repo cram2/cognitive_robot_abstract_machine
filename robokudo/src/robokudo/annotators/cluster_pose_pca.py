@@ -1,5 +1,4 @@
-"""
-3D pose estimation using principal component analysis.
+"""3D pose estimation using principal component analysis.
 
 This module provides an annotator for:
 
@@ -38,8 +37,7 @@ from robokudo.utils.transform import (
 
 
 class ClusterPosePCAAnnotator(BaseAnnotator):
-    """
-    3D pose estimation using principal component analysis.
+    """3D pose estimation using principal component analysis.
 
     This annotator:
 
@@ -54,17 +52,15 @@ class ClusterPosePCAAnnotator(BaseAnnotator):
     """
 
     def __init__(self, name: str = "ClusterPosePCAAnnotator") -> None:
-        """
-        Initialize the PCA pose estimator.
+        """Initialize the PCA pose estimator.
 
-        :param name: Name of this annotator instance
+        :param name: Name of this annotator instance, defaults to "ClusterPosePCAAnnotator"
         """
         super().__init__(name)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
-        """
-        Process object hypotheses and estimate poses.
+        """Process object hypotheses and estimate poses.
 
         The method:
 

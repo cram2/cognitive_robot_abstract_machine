@@ -1,5 +1,4 @@
-"""
-Image-based object cluster extraction.
+"""Image-based object cluster extraction.
 
 This module provides functionality for extracting object clusters from color images using HSV color segmentation.
 The main class :class:`ImageClusterExtractor` implements color-based segmentation and contour detection to identify
@@ -15,8 +14,6 @@ Key features:
 * Visualization of detected clusters
 """
 
-from __future__ import annotations
-
 import copy
 from timeit import default_timer
 
@@ -24,13 +21,12 @@ import cv2
 import numpy as np
 import open3d as o3d
 from py_trees.common import Status
-from typing_extensions import TYPE_CHECKING, Dict, Optional, Tuple
+from typing_extensions import Optional, TYPE_CHECKING, Tuple, Dict
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.exceptions import ColorToDepthRatioMissing, ImageContourMissing
 from robokudo.types.scene import ObjectHypothesis
-from robokudo.utils.annotator_helper import scale_camera_intrinsics
+from robokudo.utils.annotator_helper import scale_cam_intrinsics
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
@@ -39,8 +35,7 @@ if TYPE_CHECKING:
 
 
 class ImageClusterExtractor(BaseAnnotator):
-    """
-    Extract object clusters from images using color segmentation.
+    """Extract object clusters from images using color segmentation.
 
     This annotator performs the following steps:
 
@@ -55,23 +50,16 @@ class ImageClusterExtractor(BaseAnnotator):
     """
 
     class ViewMode:
-        """
-        Visualization modes for the annotator output.
-        """
+        """Visualization modes for the annotator output."""
 
         masked_object: int = 1
-        """
-        Show masked RGB image of detected objects.
-        """
+        """Show masked RGB image of detected objects"""
 
         depth_mask: int = 2
-        """
-        Show depth mask of detected objects.
-        """
+        """Show depth mask of detected objects"""
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for ImageClusterExtractor.
+        """Configuration descriptor for ImageClusterExtractor.
 
         Parameters:
 
@@ -83,14 +71,10 @@ class ImageClusterExtractor(BaseAnnotator):
         """
 
         class Parameters:
-            """
-            Parameter class containing all configurable settings.
-            """
+            """Parameter class containing all configurable settings."""
 
             def __init__(self) -> None:
-                """
-                Initialize default parameter values.
-                """
+                """Initialize default parameter values."""
                 self.hsv_min: Tuple[int, int, int] = (150, 130, 85)
                 self.hsv_max: Tuple[int, int, int] = (200, 255, 255)
                 self.erosion_iterations: int = 2
@@ -106,13 +90,9 @@ class ImageClusterExtractor(BaseAnnotator):
                     "hsv_min": (150, 130, 85),
                     "hsv_max": (200, 255, 255),
                 }
-                # Red sits at the hue wheel's 0/255 seam, so its hue wraps around rather
-                # than falling in one contiguous range: hsv_min's hue exceeding hsv_max's
-                # signals that to _threshold_hsv, which then matches [0, hsv_max hue] OR
-                # [hsv_min hue, 255] instead of a single contiguous range.
                 self.color_name_to_hsv_range["red"] = {
-                    "hsv_min": (245, 150, 95),
-                    "hsv_max": (15, 255, 255),
+                    "hsv_min": (215, 150, 95),
+                    "hsv_max": (280, 255, 255),
                 }
 
                 self.outlier_removal: bool = True
@@ -140,14 +120,14 @@ class ImageClusterExtractor(BaseAnnotator):
     def __init__(
         self,
         name: str = "ImageClusterExtractor",
-        descriptor: ImageClusterExtractor.Descriptor | None = None,
+        descriptor: "ImageClusterExtractor.Descriptor" = Descriptor(),
     ) -> None:
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
         self.color: Optional[npt.NDArray] = None
         self.depth: Optional[npt.NDArray] = None
         self.query = None
-        self.camera_intrinsics = None
+        self.cam_intrinsics = None
 
         # TODO Refactor this to new RPC method without using ROS
         # Add variables (name, description, default value, min, max, edit_method)
@@ -180,8 +160,7 @@ class ImageClusterExtractor(BaseAnnotator):
         self.display_mode = self.ViewMode.masked_object
 
     def adjust_hsv_threshold_to_query(self) -> None:
-        """
-        Adjust HSV thresholds based on color query.
+        """Adjust HSV thresholds based on color query.
 
         Checks for a color query in the CAS and updates the HSV thresholding parameters
         if a matching color is found in the color_name_to_hsv_range mapping.
@@ -208,43 +187,9 @@ class ImageClusterExtractor(BaseAnnotator):
             self.descriptor.parameters.color_name_to_hsv_range[color]["hsv_max"]
         )
 
-    def _threshold_hsv(
-        self,
-        hsv_min: Tuple[int, int, int],
-        hsv_max: Tuple[int, int, int],
-    ) -> npt.NDArray:
-        """
-        Threshold ``self.hsv`` to the given bounds, wrapping the hue channel around the
-        0/255 seam when ``hsv_min``'s hue exceeds ``hsv_max``'s.
-
-        True red sits exactly at that seam, so a single contiguous hue range only ever
-        catches one side of it (confirmed live: a plain ``[215,255]`` range matched 124
-        of 101760 pixels on a red object; wrapping recovered 1748 by also matching the
-        pixels that wrapped to just above 0).
-
-        :param hsv_min: Lower HSV bound.
-        :param hsv_max: Upper HSV bound. A hue lower than ``hsv_min``'s signals wraparound.
-        :return: Binary mask of pixels within the (possibly wrapped) bounds.
-        """
-        if hsv_min[0] <= hsv_max[0]:
-            return cv2.inRange(self.hsv, hsv_min, hsv_max)
-
-        low = cv2.inRange(
-            self.hsv,
-            (0, hsv_min[1], hsv_min[2]),
-            (hsv_max[0], hsv_max[1], hsv_max[2]),
-        )
-        high = cv2.inRange(
-            self.hsv,
-            (hsv_min[0], hsv_min[1], hsv_min[2]),
-            (255, hsv_max[1], hsv_max[2]),
-        )
-        return cv2.bitwise_or(low, high)
-
     @catch_and_raise_to_blackboard
     def update(self) -> Status:
-        """
-        Process input images to detect and annotate object clusters.
+        """Process input images to detect and annotate object clusters.
 
         The method:
 
@@ -256,15 +201,13 @@ class ImageClusterExtractor(BaseAnnotator):
         * Generates visualization output
 
         :return: SUCCESS if clusters found, FAILURE if no clusters
-        :raises ImageContourMissing: If no contours are found
+        :raises Exception: If no contours found or processing fails
         """
         start_timer = default_timer()
 
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
         self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
-        self.camera_intrinsics = copy.deepcopy(
-            self.get_cas().get(CASViews.CAMERA_INTRINSIC)
-        )
+        self.cam_intrinsics = copy.deepcopy(self.get_cas().get(CASViews.CAM_INTRINSIC))
 
         # Scale the image down so that it matches the depth image size
         resized_color = None
@@ -272,19 +215,22 @@ class ImageClusterExtractor(BaseAnnotator):
             resized_color = get_scaled_color_image_for_depth_image(
                 self.get_cas(), self.color
             )
-            scale_camera_intrinsics(self)
-        except ColorToDepthRatioMissing:
+            scale_cam_intrinsics(self)
+        except RuntimeError as e:
             self.rk_logger.error(
                 "No color to depth ratio set by your camera driver! Can't scale image for Point Cloud creation."
             )
-            raise
+            raise Exception(
+                "No color to depth ratio set by your camera driver! Can't scale image for Point Cloud creation."
+            )
 
         self.hsv = cv2.cvtColor(resized_color, cv2.COLOR_BGR2HSV_FULL)
 
         self.adjust_hsv_threshold_to_query()
 
         # Apply the HSV threshold on the image and find contours on the resultant binary image
-        hsv_mask = self._threshold_hsv(
+        hsv_mask = cv2.inRange(
+            self.hsv,
             self.descriptor.parameters.hsv_min,
             self.descriptor.parameters.hsv_max,
         )
@@ -294,7 +240,7 @@ class ImageClusterExtractor(BaseAnnotator):
 
         if len(contours) == 0:
             # Fail if no contours have been found
-            raise ImageContourMissing(context="image cluster extraction")
+            raise Exception(f"Couldn't find contour")
 
         # Visualization purposes
         result = copy.deepcopy(resized_color)
@@ -366,7 +312,7 @@ class ImageClusterExtractor(BaseAnnotator):
             )
 
             cloud = o3d.geometry.PointCloud.create_from_rgbd_image(
-                rgbd_image, self.camera_intrinsics
+                rgbd_image, self.cam_intrinsics
             )
 
             if self.descriptor.parameters.outlier_removal:
@@ -442,8 +388,7 @@ class ImageClusterExtractor(BaseAnnotator):
         return Status.SUCCESS
 
     def key_callback(self, key: int) -> None:
-        """
-        Handle keyboard input to change visualization mode.
+        """Handle keyboard input to change visualization mode.
 
         :param key: ASCII value of pressed key
         """

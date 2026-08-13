@@ -2,12 +2,7 @@ from dataclasses import dataclass, field
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.error_signals import SymbolicErrorSignal
-from giskardpy.motion_statechart.graph_node import (
-    ConvergingTask,
-    NodeArtifacts,
-    DebugExpression,
-)
+from giskardpy.motion_statechart.graph_node import Task, NodeArtifacts, DebugExpression
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import (
@@ -16,59 +11,29 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 @dataclass(eq=False, repr=False)
-class AlignPlanes(ConvergingTask):
+class AlignPlanes(Task):
     """
     Will orient the tip plane to align with the goal plane.
-
     The planes are represented as normal vectors.
     """
 
     root_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    Root link of the kinematic chain.
-    """
-
+    """root link of the kinematic chain."""
     tip_link: KinematicStructureEntity = field(kw_only=True)
-    """
-    Tip link of the kinematic chain.
-    """
+    """tip link of the kinematic chain."""
 
     goal_normal: Vector3 = field(kw_only=True)
-    """
-    Normal vector of the goal plane.
-    """
-
+    """normal vector of the goal plane."""
     tip_normal: Vector3 = field(kw_only=True)
-    """
-    Normal vector of the tip plane.
-    """
+    """normal vector of the tip plane."""
 
     threshold: float = field(default=0.01, kw_only=True)
-    """
-    Angle in radians below which the planes are considered aligned.
-    """
-
     reference_velocity: float = field(default=0.5, kw_only=True)
-    """
-    Reference angular velocity for normalization in rad/s.
-    """
+    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
 
-    weight: float = field(
-        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
-    )
-    """
-    Priority weight relative to other tasks.
-    """
-
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        """
-        Build motion constraints that rotate the tip plane onto the goal plane.
-
-        :param context: Provides access to world model and kinematic expressions.
-        :return: The artifacts of this task, whose error is the angle between the two
-            plane normals.
-        """
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
+
         tip_V_tip_normal = context.world.transform(
             target_frame=self.tip_link, spatial_object=self.tip_normal
         )
@@ -104,7 +69,8 @@ class AlignPlanes(ConvergingTask):
             reference_velocity=self.reference_velocity,
             quadratic_weight=self.weight,
         )
-        artifacts.error = SymbolicErrorSignal(
-            root_V_tip_normal.angle_between(root_V_root_normal)
+        artifacts.observation = (
+            root_V_tip_normal.angle_between(root_V_root_normal) <= self.threshold
         )
+
         return artifacts

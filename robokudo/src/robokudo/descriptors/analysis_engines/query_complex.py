@@ -17,9 +17,7 @@ from robokudo.annotators.query import (
     GenerateQueryResult,
 )
 from robokudo.behaviours.action_server_checks import ActionServerNoPreemptRequest
-from robokudo.descriptors.factories.cr_descriptor_factory import (
-    CollectionReaderDescriptorFactory,
-)
+from robokudo.descriptors import CrDescriptorFactory
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -28,9 +26,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     def implementation(self) -> Pipeline:
         """
-        Create a pipeline which responds to a query.
+        Create a pipeline which responds to a query
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CrDescriptorFactory.create_descriptor("kinect")
 
         seq = Pipeline("RWPipeline")
 

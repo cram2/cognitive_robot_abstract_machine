@@ -3,7 +3,8 @@ from time import sleep
 
 import numpy as np
 import pytest
-from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
+from geometry_msgs.msg import PoseStamped, PointStamped
+from giskardpy.middleware.ros2.behavior_tree_config import StandAloneBTConfig
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.hsr.configs import (
     WorldWithHSRConfig,
@@ -24,8 +25,9 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from numpy import pi
-from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
+from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
@@ -41,13 +43,13 @@ from semantic_digital_twin.world_description.world_entity import (
 @pytest.fixture()
 def default_joint_state():
     return {
-        HSRBJoint.ARM_FLEX: -0.03,
-        HSRBJoint.ARM_LIFT: 0.01,
-        HSRBJoint.ARM_ROLL: 0.0,
-        HSRBJoint.HEAD_PAN: 0.0,
-        HSRBJoint.HEAD_TILT: 0.0,
-        HSRBJoint.WRIST_FLEX: 0.0,
-        HSRBJoint.WRIST_ROLL: 0.0,
+        "arm_flex_joint": -0.03,
+        "arm_lift_joint": 0.01,
+        "arm_roll_joint": 0.0,
+        "head_pan_joint": 0.0,
+        "head_tilt_joint": 0.0,
+        "wrist_flex_joint": 0.0,
+        "wrist_roll_joint": 0.0,
     }
 
 
@@ -60,7 +62,6 @@ def better_pose(default_joint_state):
 class HSRTester(GiskardTester):
     tip: KinematicStructureEntity = field(init=False)
     base_footprint: KinematicStructureEntity = field(init=False)
-    torso_lift_link: KinematicStructureEntity = field(init=False)
     map: KinematicStructureEntity = field(init=False)
 
     def __post_init__(self):
@@ -71,9 +72,6 @@ class HSRTester(GiskardTester):
         self.base_footprint = self.api.world.get_kinematic_structure_entity_by_name(
             "base_footprint"
         )
-        self.torso_lift_link = self.api.world.get_kinematic_structure_entity_by_name(
-            "torso_lift_link"
-        )
         self.map = self.api.world.root
 
     def setup_giskard(self) -> Giskard:
@@ -81,20 +79,22 @@ class HSRTester(GiskardTester):
         return Giskard(
             world_config=WorldWithHSRConfig(urdf=robot_desc),
             robot_interface_config=HSRStandaloneInterface(),
-            server_config=GiskardServerConfig(
-                execution_mode=ExecutionMode.STANDALONE,
+            behavior_tree_config=StandAloneBTConfig(
                 debug_mode=True,
-                plot_gantt_chart=True,
-                plot_trajectory=True,
+                add_debug_marker_publisher=True,
+                add_gantt_chart_plotter=True,
+                add_trajectory_plotter=True,
             ),
             qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
         )
 
     @property
     def robot(self) -> HSRB:
-        return self.giskard.executor.context.world.get_semantic_annotations_by_type(
-            HSRB
-        )[0]
+        return (
+            GiskardBlackboard().executor.context.world.get_semantic_annotations_by_type(
+                HSRB
+            )[0]
+        )
 
 
 @pytest.fixture()
@@ -104,7 +104,7 @@ def robot():
         yield c
     finally:
         print("tear down")
-        c.close()
+        c.print_stats()
 
 
 @pytest.fixture()
@@ -126,7 +126,7 @@ class TestJointGoals:
         msc.add_node(
             joint_goal := JointPositionList(
                 goal_state=JointState.from_str_dict(
-                    {HSRBJoint.TORSO_LIFT: 0.1, HSRBJoint.HAND_MOTOR: 1.23},
+                    {"torso_lift_joint": 0.1, "hand_motor_joint": 1.23},
                     giskard.api.world,
                 )
             ),
@@ -134,40 +134,41 @@ class TestJointGoals:
         msc.add_node(EndMotion.when_true(joint_goal))
         giskard.api.execute(msc)
 
-        arm_lift_joint: ActiveConnection1DOF = giskard.world.get_connection_by_name(
-            HSRBJoint.ARM_LIFT
+        arm_lift_joint: (
+            ActiveConnection1DOF
+        ) = GiskardBlackboard().giskard.world_config.world.get_connection_by_name(
+            "arm_lift_joint"
         )
-        hand_palm_link = giskard.world.get_kinematic_structure_entity_by_name(
-            "hand_palm_link"
+        hand_T_finger_current = giskard.compute_fk_pose(
+            "hand_palm_link", "hand_l_distal_link"
         )
-        hand_T_finger_current = giskard.world.compute_forward_kinematics(
-            root=hand_palm_link,
-            tip=giskard.world.get_kinematic_structure_entity_by_name(
-                "hand_l_distal_link"
-            ),
-        )
-        hand_T_finger_expected = HomogeneousTransformationMatrix.from_xyz_quaternion(
-            pos_x=-0.01675,
-            pos_y=-0.0907,
-            pos_z=0.0052,
-            quat_x=-0.0434,
-            quat_w=0.999,
-            reference_frame=hand_palm_link,
-        )
-        compare_poses(hand_T_finger_current, hand_T_finger_expected)
+        hand_T_finger_expected = PoseStamped()
+        hand_T_finger_expected.header.frame_id = "hand_palm_link"
+        hand_T_finger_expected.pose.position.x = -0.01675
+        hand_T_finger_expected.pose.position.y = -0.0907
+        hand_T_finger_expected.pose.position.z = 0.0052
+        hand_T_finger_expected.pose.orientation.x = -0.0434
+        hand_T_finger_expected.pose.orientation.y = 0.0
+        hand_T_finger_expected.pose.orientation.z = 0.0
+        hand_T_finger_expected.pose.orientation.w = 0.999
+        compare_poses(hand_T_finger_current.pose, hand_T_finger_expected.pose)
 
         np.testing.assert_almost_equal(
             arm_lift_joint.position,
             0.2,
             decimal=2,
         )
-        base_T_torso_expected = HomogeneousTransformationMatrix.from_xyz_rpy(
-            z=0.8518, reference_frame=giskard.base_footprint
-        )
-        base_T_torso_current = giskard.world.compute_forward_kinematics(
-            root=giskard.base_footprint, tip=giskard.torso_lift_link
-        )
-        compare_poses(base_T_torso_current, base_T_torso_expected)
+        base_T_torso = PoseStamped()
+        base_T_torso.header.frame_id = "base_footprint"
+        base_T_torso.pose.position.x = 0.0
+        base_T_torso.pose.position.y = 0.0
+        base_T_torso.pose.position.z = 0.8518
+        base_T_torso.pose.orientation.x = 0.0
+        base_T_torso.pose.orientation.y = 0.0
+        base_T_torso.pose.orientation.z = 0.0
+        base_T_torso.pose.orientation.w = 1.0
+        base_T_torso2 = giskard.compute_fk_pose("base_footprint", "torso_lift_link")
+        compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints2(self, giskard: HSRTester):
         msc = MotionStatechart()
@@ -185,21 +186,27 @@ class TestJointGoals:
 
         giskard.api.execute(msc)
 
-        arm_lift_joint: ActiveConnection1DOF = giskard.world.get_connection_by_name(
-            HSRBJoint.ARM_LIFT
+        arm_lift_joint: (
+            ActiveConnection1DOF
+        ) = GiskardBlackboard().giskard.world_config.world.get_connection_by_name(
+            "arm_lift_joint"
         )
         np.testing.assert_almost_equal(
             arm_lift_joint.position,
             0.2,
             decimal=2,
         )
-        base_T_torso_expected = HomogeneousTransformationMatrix.from_xyz_rpy(
-            z=0.8518, reference_frame=giskard.base_footprint
-        )
-        base_T_torso_current = giskard.world.compute_forward_kinematics(
-            root=giskard.base_footprint, tip=giskard.torso_lift_link
-        )
-        compare_poses(base_T_torso_current, base_T_torso_expected)
+        base_T_torso = PoseStamped()
+        base_T_torso.header.frame_id = "base_footprint"
+        base_T_torso.pose.position.x = 0.0
+        base_T_torso.pose.position.y = 0.0
+        base_T_torso.pose.position.z = 0.8518
+        base_T_torso.pose.orientation.x = 0.0
+        base_T_torso.pose.orientation.y = 0.0
+        base_T_torso.pose.orientation.z = 0.0
+        base_T_torso.pose.orientation.w = 1.0
+        base_T_torso2 = giskard.compute_fk_pose("base_footprint", "torso_lift_link")
+        compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints3(self, giskard: HSRTester):
         head = giskard.api.world.get_body_by_name("head_pan_link")
@@ -218,30 +225,36 @@ class TestJointGoals:
 
         giskard.api.execute(msc)
 
-        arm_lift_joint: ActiveConnection1DOF = giskard.world.get_connection_by_name(
-            HSRBJoint.ARM_LIFT
+        arm_lift_joint: (
+            ActiveConnection1DOF
+        ) = GiskardBlackboard().giskard.world_config.world.get_connection_by_name(
+            "arm_lift_joint"
         )
         np.testing.assert_almost_equal(
             arm_lift_joint.position,
             0.3,
             decimal=2,
         )
-        base_T_torso_expected = HomogeneousTransformationMatrix.from_xyz_rpy(
-            z=0.902, reference_frame=giskard.base_footprint
-        )
-        base_T_torso_current = giskard.world.compute_forward_kinematics(
-            root=giskard.base_footprint, tip=giskard.torso_lift_link
-        )
-        compare_poses(base_T_torso_current, base_T_torso_expected)
+        base_T_torso = PoseStamped()
+        base_T_torso.header.frame_id = "base_footprint"
+        base_T_torso.pose.position.x = 0.0
+        base_T_torso.pose.position.y = 0.0
+        base_T_torso.pose.position.z = 0.902
+        base_T_torso.pose.orientation.x = 0.0
+        base_T_torso.pose.orientation.y = 0.0
+        base_T_torso.pose.orientation.z = 0.0
+        base_T_torso.pose.orientation.w = 1.0
+        base_T_torso2 = giskard.compute_fk_pose("base_footprint", "torso_lift_link")
+        compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints4(self, giskard: HSRTester):
         arm_lift_joints: ActiveConnection1DOF = (
-            giskard.api.world.get_connection_by_name(HSRBJoint.ARM_LIFT)
+            giskard.api.world.get_connection_by_name("arm_lift_joint")
         )
         assert arm_lift_joints.dof.limits.lower.velocity == -0.15
         assert arm_lift_joints.dof.limits.upper.velocity == 0.15
         torso_lift_joints: ActiveConnection1DOF = (
-            giskard.api.world.get_connection_by_name(HSRBJoint.TORSO_LIFT)
+            giskard.api.world.get_connection_by_name("torso_lift_joint")
         )
         assert torso_lift_joints.dof.limits.lower.velocity == -0.075
         assert torso_lift_joints.dof.limits.upper.velocity == 0.075
@@ -249,7 +262,7 @@ class TestJointGoals:
         msc.add_node(
             joint_goal := JointPositionList(
                 goal_state=JointState.from_str_dict(
-                    {HSRBJoint.TORSO_LIFT: 0.25},
+                    {"torso_lift_joint": 0.25},
                     giskard.api.world,
                 )
             ),
@@ -402,13 +415,13 @@ class TestCartGoals:
     @pytest.mark.skip(reason="not yet fixed")
     def test_wiggle_insert(self, default_pose_giskard: HSRTester):
         goal_state = {
-            HSRBJoint.ARM_FLEX: -1.5,
-            HSRBJoint.ARM_LIFT: 0.5,
-            HSRBJoint.ARM_ROLL: 0.0,
-            HSRBJoint.HEAD_PAN: 0.0,
-            HSRBJoint.HEAD_TILT: 0.0,
-            HSRBJoint.WRIST_FLEX: -1.5,
-            HSRBJoint.WRIST_ROLL: 0.0,
+            "arm_flex_joint": -1.5,
+            "arm_lift_joint": 0.5,
+            "arm_roll_joint": 0.0,
+            "head_pan_joint": 0.0,
+            "head_tilt_joint": 0.0,
+            "wrist_flex_joint": -1.5,
+            "wrist_roll_joint": 0.0,
         }
 
         default_pose_giskard.api.monitors.add_set_seed_configuration(
@@ -422,7 +435,10 @@ class TestCartGoals:
             )
         )
         root_link = default_pose_giskard.api.world.search_for_link_name(link_name="map")
-        hole_point = Point3(x=0.5, z=0.3, reference_frame=default_pose_giskard.map)
+        hole_point = PointStamped()
+        hole_point.header.frame_id = "map"
+        hole_point.point.x = 0.5
+        hole_point.point.z = 0.3
         wiggle = "wiggle"
         default_pose_giskard.api.motion_goals.add_wiggle_insert(
             name=wiggle,
@@ -431,9 +447,10 @@ class TestCartGoals:
             hole_point=hole_point,
             end_condition=wiggle,
         )
-        resistence_point = Point3(
-            x=0.5, z=0.4, reference_frame=default_pose_giskard.map
-        )
+        resistence_point = PointStamped()
+        resistence_point.header.frame_id = "map"
+        resistence_point.point.x = 0.5
+        resistence_point.point.z = 0.4
         timer = default_pose_giskard.api.monitors.add_sleep(5)
         default_pose_giskard.api.motion_goals.add_cartesian_position(
             root_link=root_link,
@@ -545,13 +562,13 @@ class TestCollisionAvoidanceGoals:
                         SetSeedConfiguration(
                             seed_configuration=JointState.from_str_dict(
                                 {
-                                    HSRBJoint.ARM_FLEX: 0.0,
-                                    HSRBJoint.ARM_LIFT: 0.0,
-                                    HSRBJoint.ARM_ROLL: -1.52,
-                                    HSRBJoint.HEAD_PAN: -0.09,
-                                    HSRBJoint.HEAD_TILT: -0.62,
-                                    HSRBJoint.WRIST_FLEX: -1.55,
-                                    HSRBJoint.WRIST_ROLL: 0.11,
+                                    "arm_flex_joint": 0.0,
+                                    "arm_lift_joint": 0.0,
+                                    "arm_roll_joint": -1.52,
+                                    "head_pan_joint": -0.09,
+                                    "head_tilt_joint": -0.62,
+                                    "wrist_flex_joint": -1.55,
+                                    "wrist_roll_joint": 0.11,
                                 },
                                 giskard.api.world,
                             )
@@ -589,7 +606,7 @@ class TestAddObject:
         msc.add_node(
             joint_goal := JointPositionList(
                 goal_state=JointState.from_str_dict(
-                    {HSRBJoint.ARM_FLEX: -0.7},
+                    {"arm_flex_joint": -0.7},
                     giskard.api.world,
                 )
             ),

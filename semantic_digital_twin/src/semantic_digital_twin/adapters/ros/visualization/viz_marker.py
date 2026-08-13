@@ -73,12 +73,6 @@ class VizMarkerPublisher(ModelChangeCallback):
     Marker transparency in [0.0, 1.0]. 0.0 is fully transparent.
     """
 
-    region_alpha: float = field(kw_only=True, default=0.2)
-    """
-    Marker transparency forced onto every Region marker, in [0.0, 1.0]. Regions are
-    always rendered at this alpha, regardless of the color their shapes were assigned.
-    """
-
     markers: MarkerArray = field(init=False, default_factory=MarkerArray)
     """Maker message to be published."""
     qos_profile: QoSProfile = field(
@@ -154,22 +148,16 @@ class VizMarkerPublisher(ModelChangeCallback):
             self._add_markers_for_shapes(shapes, str(body.name))
 
         for region in self._world.regions:
-            self._add_markers_for_shapes(
-                region.area.shapes, str(region.name), force_alpha=self.region_alpha
-            )
+            self._add_markers_for_shapes(region.area.shapes, str(region.name))
 
         self.publisher.publish(self.markers)
 
-    def _add_markers_for_shapes(
-        self, shapes, marker_ns, force_alpha: Optional[float] = None
-    ):
+    def _add_markers_for_shapes(self, shapes, marker_ns):
         if not shapes:
             return
         for i, shape in enumerate(shapes):
             marker = SemDTToRos2Converter.convert(shape)
-            if force_alpha is not None:
-                marker.color.a = force_alpha
-            elif not marker.mesh_use_embedded_materials:
+            if not marker.mesh_use_embedded_materials:
                 marker.color.a *= self.alpha
             marker.frame_locked = True
             marker.id = i

@@ -1,11 +1,9 @@
 import json
 import time
 from copy import deepcopy
-from dataclasses import dataclass, field
 
 import numpy as np
 import pytest
-
 from giskardpy.executor import Executor, SimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
@@ -13,7 +11,6 @@ from giskardpy.motion_statechart.data_types import (
 )
 from giskardpy.motion_statechart.exceptions import CollisionViolatedError
 from giskardpy.motion_statechart.goals.collision_avoidance import (
-    _CancelBecauseSelfCollisionViolated,
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
     ExternalCollisionDistanceMonitor,
@@ -48,10 +45,6 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
-from semantic_digital_twin.collision_checking.collision_detector import (
-    CollisionCheckingResult,
-)
-from semantic_digital_twin.collision_checking.collision_manager import CollisionConsumer
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionBetweenGroups,
 )
@@ -64,10 +57,9 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
-from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
@@ -268,7 +260,7 @@ def test_external_collision_avoidance_battle():
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=1, reference_frame=weak
                 ),
-                weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+                weight=DefaultWeights.WEIGHT_BELOW_CA,
             ),
             ExternalCollisionAvoidance(robot=weak_robot_sa),
             ExternalCollisionAvoidance(robot=strong_robot_sa),
@@ -510,36 +502,6 @@ def test_multiple_external_collision_avoidance_motions(cylinder_bot_world: World
     assert len(cylinder_bot_world.collision_manager.collision_consumers) == 0
 
 
-def test_cancel_node_without_tasks_never_starts():
-    msc = MotionStatechart()
-    msc.add_node(cancel := _CancelBecauseSelfCollisionViolated(name="cancel", tasks=[]))
-
-    cancel.build(MotionStatechartContext.empty())
-
-    assert cancel.start_condition.is_const_false()
-
-
-def test_self_collision_avoidance_without_checked_body_combinations(
-    cylinder_bot_world: World,
-):
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
-
-    msc = MotionStatechart()
-    msc.add_nodes(
-        [
-            goal := SelfCollisionAvoidance(robot=robot),
-            local_min := LocalMinimumReached(),
-        ]
-    )
-    msc.add_node(EndMotion.when_true(local_min))
-
-    Executor(MotionStatechartContext(world=cylinder_bot_world)).compile(
-        motion_statechart=msc
-    )
-
-    assert goal.nodes == msc.get_nodes_by_type(CancelMotion)
-
-
 def test_self_collision_avoidance(self_collision_bot_world: World):
 
     robot = self_collision_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
@@ -609,25 +571,25 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
                 SetSeedConfiguration(
                     seed_configuration=JointState.from_str_dict(
                         {
-                            PR2Joint.RIGHT_ELBOW_FLEX: -1.29610152504,
-                            PR2Joint.RIGHT_FOREARM_ROLL: -0.0301682323805,
-                            PR2Joint.RIGHT_SHOULDER_LIFT: 1.20324921318,
-                            PR2Joint.RIGHT_SHOULDER_PAN: -0.73456435706,
-                            PR2Joint.RIGHT_UPPER_ARM_ROLL: -0.70790051778,
-                            PR2Joint.RIGHT_WRIST_FLEX: -0.10001,
-                            PR2Joint.RIGHT_WRIST_ROLL: 0.258268529825,
-                            PR2Joint.LEFT_ELBOW_FLEX: -1.29610152504,
-                            PR2Joint.LEFT_FOREARM_ROLL: 0.0301682323805,
-                            PR2Joint.LEFT_SHOULDER_LIFT: 1.20324921318,
-                            PR2Joint.LEFT_SHOULDER_PAN: 0.73456435706,
-                            PR2Joint.LEFT_UPPER_ARM_ROLL: 0.70790051778,
-                            PR2Joint.LEFT_WRIST_FLEX: -0.1001,
-                            PR2Joint.LEFT_WRIST_ROLL: -0.258268529825,
-                            PR2Joint.TORSO_LIFT: 0.2,
-                            PR2Joint.HEAD_PAN: 0,
-                            PR2Joint.HEAD_TILT: 0,
-                            PR2Joint.LEFT_GRIPPER_LEFT_FINGER: 0.55,
-                            PR2Joint.RIGHT_GRIPPER_LEFT_FINGER: 0.55,
+                            "r_elbow_flex_joint": -1.29610152504,
+                            "r_forearm_roll_joint": -0.0301682323805,
+                            "r_shoulder_lift_joint": 1.20324921318,
+                            "r_shoulder_pan_joint": -0.73456435706,
+                            "r_upper_arm_roll_joint": -0.70790051778,
+                            "r_wrist_flex_joint": -0.10001,
+                            "r_wrist_roll_joint": 0.258268529825,
+                            "l_elbow_flex_joint": -1.29610152504,
+                            "l_forearm_roll_joint": 0.0301682323805,
+                            "l_shoulder_lift_joint": 1.20324921318,
+                            "l_shoulder_pan_joint": 0.73456435706,
+                            "l_upper_arm_roll_joint": 0.70790051778,
+                            "l_wrist_flex_joint": -0.1001,
+                            "l_wrist_roll_joint": -0.258268529825,
+                            "torso_lift_joint": 0.2,
+                            "head_pan_joint": 0,
+                            "head_tilt_joint": 0,
+                            "l_gripper_l_finger_joint": 0.55,
+                            "r_gripper_l_finger_joint": 0.55,
                         },
                         world=pr2_with_box,
                     )
@@ -645,7 +607,7 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
                                 angle=np.pi / 2.0,
                                 reference_frame=pr2_with_box.root,
                             ),
-                            weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+                            weight=DefaultWeights.WEIGHT_BELOW_CA,
                         ),
                         ExternalCollisionAvoidance(robot=robot),
                     ]
@@ -671,10 +633,7 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
     kin_sim.tick_until_end(500)
 
 
-def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
-    VizMarkerPublisher(
-        _world=pr2_with_box, node=rclpy_node
-    ).with_tf_and_collision_visualization()
+def test_avoid_self_collision_with_l_arm(pr2_with_box):
     r_tip = pr2_with_box.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
     l_forearm_link = pr2_with_box.get_kinematic_structure_entity_by_name(
         "l_forearm_link"
@@ -694,20 +653,20 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
                 SetSeedConfiguration(
                     seed_configuration=JointState.from_str_dict(
                         {
-                            PR2Joint.RIGHT_ELBOW_FLEX: -1.43286344265,
-                            PR2Joint.RIGHT_FOREARM_ROLL: -1.26465060073,
-                            PR2Joint.RIGHT_SHOULDER_LIFT: 0.47990329056,
-                            PR2Joint.RIGHT_SHOULDER_PAN: -0.281272240139,
-                            PR2Joint.RIGHT_UPPER_ARM_ROLL: -0.528415402668,
-                            PR2Joint.RIGHT_WRIST_FLEX: -1.18811419869,
-                            PR2Joint.RIGHT_WRIST_ROLL: 2.26884630124,
-                            PR2Joint.LEFT_ELBOW_FLEX: 0.0,
-                            PR2Joint.LEFT_FOREARM_ROLL: 0.0,
-                            PR2Joint.LEFT_SHOULDER_LIFT: 0.0,
-                            PR2Joint.LEFT_SHOULDER_PAN: 0.0,
-                            PR2Joint.LEFT_UPPER_ARM_ROLL: 0.0,
-                            PR2Joint.LEFT_WRIST_FLEX: 0.0,
-                            PR2Joint.LEFT_WRIST_ROLL: 0.0,
+                            "r_elbow_flex_joint": -1.43286344265,
+                            "r_forearm_roll_joint": -1.26465060073,
+                            "r_shoulder_lift_joint": 0.47990329056,
+                            "r_shoulder_pan_joint": -0.281272240139,
+                            "r_upper_arm_roll_joint": -0.528415402668,
+                            "r_wrist_flex_joint": -1.18811419869,
+                            "r_wrist_roll_joint": 2.26884630124,
+                            "l_elbow_flex_joint": 0.0,
+                            "l_forearm_roll_joint": 0.0,
+                            "l_shoulder_lift_joint": 0.0,
+                            "l_shoulder_pan_joint": 0.0,
+                            "l_upper_arm_roll_joint": 0.0,
+                            "l_wrist_flex_joint": 0.0,
+                            "l_wrist_roll_joint": 0.0,
                         },
                         world=pr2_with_box,
                     )
@@ -720,7 +679,7 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
                             goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                                 0.2, reference_frame=r_tip
                             ),
-                            weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
+                            weight=DefaultWeights.WEIGHT_ABOVE_CA,
                         ),
                         SelfCollisionAvoidance(robot=robot),
                     ],
@@ -748,146 +707,9 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
     )
     kin_sim.compile(motion_statechart=msc)
 
-    assert len(msc.nodes) == 78
+    assert len(msc.nodes) == 76
 
     kin_sim.tick_until_end(500)
-
-
-# %% collision check counting
-
-
-@dataclass
-class CollisionCheckCountingObserver(CollisionConsumer):
-    """
-    Passive collision consumer that records how often collisions were computed.
-
-    Being passive, it never causes collision checking itself, so its count reflects only
-    the checks that other consumers required.
-    """
-
-    collision_check_count: int = field(init=False, default=0)
-    """
-    Number of collision computations observed while registered.
-    """
-
-    def on_compute_collisions(self, collision_results: CollisionCheckingResult):
-        self.collision_check_count += 1
-
-    def on_world_model_update(self, world: World):
-        pass
-
-    def on_collision_matrix_update(self):
-        pass
-
-
-def _build_arms_crossing_statechart(
-    world: World, collision_avoidance: bool
-) -> MotionStatechart:
-    """
-    Builds a statechart that drives the right gripper into the left arm.
-
-    :param world: The PR2 world the goal refers to.
-    :param collision_avoidance: Whether a self collision avoidance node is part of the
-        goal.
-    """
-    r_tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
-    base_footprint = world.get_kinematic_structure_entity_by_name("base_footprint")
-
-    msc = MotionStatechart()
-    msc.add_node(
-        goal := Sequence(
-            [
-                SetSeedConfiguration(
-                    seed_configuration=JointState.from_str_dict(
-                        {
-                            PR2Joint.RIGHT_ELBOW_FLEX: -1.43286344265,
-                            PR2Joint.RIGHT_FOREARM_ROLL: -1.26465060073,
-                            PR2Joint.RIGHT_SHOULDER_LIFT: 0.47990329056,
-                            PR2Joint.RIGHT_SHOULDER_PAN: -0.281272240139,
-                            PR2Joint.RIGHT_UPPER_ARM_ROLL: -0.528415402668,
-                            PR2Joint.RIGHT_WRIST_FLEX: -1.18811419869,
-                            PR2Joint.RIGHT_WRIST_ROLL: 2.26884630124,
-                            PR2Joint.LEFT_ELBOW_FLEX: 0.0,
-                            PR2Joint.LEFT_FOREARM_ROLL: 0.0,
-                            PR2Joint.LEFT_SHOULDER_LIFT: 0.0,
-                            PR2Joint.LEFT_SHOULDER_PAN: 0.0,
-                            PR2Joint.LEFT_UPPER_ARM_ROLL: 0.0,
-                            PR2Joint.LEFT_WRIST_FLEX: 0.0,
-                            PR2Joint.LEFT_WRIST_ROLL: 0.0,
-                        },
-                        world=world,
-                    )
-                ),
-                CartesianPose(
-                    root_link=base_footprint,
-                    tip_link=r_tip,
-                    goal_pose=Pose.from_xyz_rpy(0.2, reference_frame=r_tip),
-                    weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
-                ),
-            ],
-        ),
-    )
-    msc.add_node(EndMotion.when_true(goal))
-    if collision_avoidance:
-        robot = world.get_semantic_annotations_by_type(AbstractRobot)[0]
-        msc.add_node(SelfCollisionAvoidance(robot=robot))
-    return msc
-
-
-def _run_and_count_collision_checks(
-    world: World, msc: MotionStatechart
-) -> CollisionCheckCountingObserver:
-    """
-    Executes the statechart and returns the observer that counted the collision checks.
-    """
-    observer = CollisionCheckCountingObserver()
-    world.collision_manager.add_collision_consumer(observer)
-    executor = Executor(
-        MotionStatechartContext(
-            world=world,
-            qp_controller_config=QPControllerConfig(
-                target_frequency=100,
-                prediction_horizon=30,
-            ),
-        )
-    )
-    executor.compile(motion_statechart=msc)
-    executor.tick_until_end(500)
-    world.collision_manager.remove_collision_consumer(observer)
-    return observer
-
-
-def test_collisions_are_not_computed_without_collision_nodes(pr2_with_box):
-    msc = _build_arms_crossing_statechart(pr2_with_box, collision_avoidance=False)
-
-    for node in msc.nodes:
-        assert not isinstance(node, SelfCollisionAvoidance)
-        assert not isinstance(node, ExternalCollisionAvoidance)
-
-    observer = _run_and_count_collision_checks(pr2_with_box, msc)
-    assert observer.collision_check_count == 0
-
-
-def test_collisions_are_computed_with_collision_avoidance_node(pr2_with_box):
-    msc = _build_arms_crossing_statechart(pr2_with_box, collision_avoidance=True)
-
-    observer = _run_and_count_collision_checks(pr2_with_box, msc)
-    assert observer.collision_check_count > 0
-
-
-def test_collisions_are_computed_for_a_distance_monitor_alone(pr2_with_box):
-    msc = _build_arms_crossing_statechart(pr2_with_box, collision_avoidance=False)
-    msc.add_node(
-        ExternalCollisionDistanceMonitor(
-            body=pr2_with_box.get_kinematic_structure_entity_by_name(
-                "r_gripper_palm_link"
-            ),
-            threshold=0.0,
-        )
-    )
-
-    observer = _run_and_count_collision_checks(pr2_with_box, msc)
-    assert observer.collision_check_count > 0
 
 
 def test_hard_constraints_violated(cylinder_bot_world: World):
@@ -998,20 +820,11 @@ def test_hard_constraints_violated(cylinder_bot_world: World):
     assert len(exc_info.value.violated_collisions) == 2
 
 
-@pytest.mark.parametrize(
-    "fix_name, tool_frame_id, robot_type",
-    [
-        ("tracy_world", "r_gripper_tool_frame", Tracy),
-        ("daisy_world", "right_gripper_tool_frame", DAiSy),
-    ],
-)
-def test_collision_for_robot_with_static_base(
-    fix_name, tool_frame_id, robot_type, request, rclpy_node
-):
-    world = request.getfixturevalue(fix_name)
-    robot = world.get_semantic_annotations_by_type(robot_type)[0]
+def test_collision_for_robot_with_static_base(tracy_world):
+    world = deepcopy(tracy_world)
+    robot = world.get_semantic_annotations_by_type(Tracy)[0]
 
-    tool_frame = world.get_body_by_name(tool_frame_id)
+    tool_frame = world.get_body_by_name("r_gripper_tool_frame")
     with world.modify_world():
         obstacle = Body(
             name=PrefixedName("obstacle"),
@@ -1077,8 +890,8 @@ def test_repeated_collision_pr2_apartment_does_not_increase_execution_time(
 
     left_arm_park = robot.left_arm.get_joint_state_by_type(StaticJointState.PARK)
     right_arm_park = robot.right_arm.get_joint_state_by_type(StaticJointState.PARK)
-    left_arm_park.apply_to(world)
-    right_arm_park.apply_to(world)
+    world.set_positions_1DOF_connection(dict(left_arm_park.items()))
+    world.set_positions_1DOF_connection(dict(right_arm_park.items()))
 
     body = world.get_body_by_name("handle_cab11_t")
 

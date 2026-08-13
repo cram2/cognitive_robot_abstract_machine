@@ -6,36 +6,34 @@ root: index.md
 parts:
   - caption: Getting Started
     chapters:
-    - file: installation.md
-    - file: quickstart.md
-    - file: setup_env.md
+    - file: installation.rst
+    - file:  quickstart.rst
 
   - caption: Concepts
     chapters:
-    - file: plan.md
-    - file: designators.md
-    - file: orm_concept.md
-    - file: abstract_robot.md
-    - file: process_modules.md
+    - file: plan.rst
+    - file: designators.rst
+    - file: orm_concept.rst
+    - file: abstract_robot.rst
+    - file: process_modules.rst
     - file: locations.rst
-    - file: conditions.md
-    - file: notebooks.md
+    - file: conditions.rst
+    - file: notebooks.rst
   - caption: Adding a new Robot
     chapters:
-    - file: new_robot.md
+    - file: new_robot.rst
 
   - caption: Trouble Shooting
     chapters:
-    - file: troubleshooting.md
-    - file: remarks.md
+    - file: troubleshooting.rst
+    - file: remarks.rst
 
 
   - caption: Examples
     chapters:
       - file: notebooks/language
-      - file: designator_example.md
+      - file: designator_example.rst
         sections:
-        - file: notebooks/plan
         - file: notebooks/action_designator
         - file: notebooks/object_designator
         - file: notebooks/location_designator

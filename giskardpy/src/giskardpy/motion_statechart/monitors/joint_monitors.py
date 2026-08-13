@@ -19,18 +19,16 @@ class JointPositionReached(MotionStatechartNode):
     """
     Monitored joint connection.
     """
-
     position: float = field(kw_only=True)
     """
     Target position to monitor.
     """
-
     threshold: float = field(default=0.01, kw_only=True)
     """
     Threshold for position error.
     """
 
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         current = self.connection.dof.variables.position
         if (
             isinstance(self.connection, RevoluteConnection)

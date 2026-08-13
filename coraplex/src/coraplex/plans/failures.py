@@ -31,13 +31,6 @@ class PlanFailure(DataclassException):
 
 
 @dataclass
-class EmptyUnderspecified(PlanFailure):
-    """
-    Raised when a plan is empty.
-    """
-
-
-@dataclass
 class AllChildrenFailed(PlanFailure):
     """
     Thrown when all children of a plan node failed.
@@ -53,6 +46,16 @@ class AllChildrenFailed(PlanFailure):
 
     def suggest_correction(self) -> str:
         return ""
+
+#todo: rename when searchaction is refactored
+# @dataclass
+# class PerceptionObjectNotFound(PlanFailure):
+#     search_action: SearchAction
+#
+#     def __post_init__(self):
+#         self.message = (
+#             f"Perception object not found in search action {self.search_action}"
+#         )
 
 
 @dataclass
@@ -148,7 +151,9 @@ class EndEffectorDidNotReachTarget(PlanFailure):
     """
 
     def error_message(self) -> str:
-        return f"EndEffector {self.end_effector} did not reach target {self.target}"
+        return (
+            f"EndEffector {self.end_effector} did not reach target {self.target}"
+        )
 
     def suggest_correction(self) -> str:
         return ""

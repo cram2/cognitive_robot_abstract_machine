@@ -19,8 +19,6 @@ The module uses:
    Currently limited to refining against a single pre-loaded model.
 """
 
-from __future__ import annotations
-
 import copy
 import math
 from pathlib import Path
@@ -31,16 +29,16 @@ import open3d as o3d
 from py_trees.common import Status
 from typing_extensions import Optional
 
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from robokudo.annotators.core import ThreadedAnnotator, BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.annotation import PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.file_loader import FileLoader
 from robokudo.utils.transform import (
-    get_quaternion_from_transform_matrix,
-    get_transform_matrix_for_rotation_around_axis,
     get_transform_matrix_from_q,
+    get_transform_matrix_for_rotation_around_axis,
     get_translation_from_transform_matrix,
+    get_quaternion_from_transform_matrix,
 )
 
 
@@ -82,12 +80,12 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "ICPPoseRefinementAnnotator",
-        descriptor: ICPPoseRefinementAnnotator.Descriptor | None = None,
+        descriptor: "ICPPoseRefinementAnnotator.Descriptor" = Descriptor(),
     ) -> None:
         """Initialize the ICP pose refiner.
 
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
+        :param name: Name of this annotator instance, defaults to "ICPPoseRefinementAnnotator"
+        :param descriptor: Configuration descriptor, defaults to Descriptor()
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

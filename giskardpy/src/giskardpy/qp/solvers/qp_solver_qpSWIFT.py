@@ -23,9 +23,7 @@ class QPSolverQPSwift(QPSolver[QPDataExplicit]):
 
     big_ball_mode: bool = False
     """
-    QpSWIFT does not have infeasible detection and cannot differentiate suboptimal from
-    infeasible.
-
+    qpSWIFT does not have infeasible detection and cannot differentiate suboptimal from infeasible.
     If you know your QP is actually feasible, you can just ignore the failures and use the suboptimal solution.
     .. warning:: This is unsafe because it might lead to instability if the QP was actually infeasible. Only enable it
         when you are certain the problem is feasible.

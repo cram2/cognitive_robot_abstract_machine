@@ -10,24 +10,19 @@ This module provides an annotator for:
    Regions are defined in a shared semantic_digital_twin World.
 """
 
-from __future__ import annotations
-
 from timeit import default_timer
 
 import open3d as o3d
 from py_trees.common import Status
-from semantic_digital_twin.world_description.world_entity import Region
 
 import robokudo.world as rk_world
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from robokudo.annotators.core import ThreadedAnnotator, BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.scene import RegionHypothesis
-from robokudo.utils.annotator_helper import get_world_to_camera_transform_matrix
+from robokudo.utils.annotator_helper import get_world_to_cam_transform_matrix
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
-from robokudo.utils.region import (
-    region_obb_in_camera_coordinates,
-    region_pose_annotation,
-)
+from robokudo.utils.region import region_obb_in_cam_coordinates, region_pose_annotation
+from semantic_digital_twin.world_description.world_entity import Region
 
 
 class RegionFilter(ThreadedAnnotator):
@@ -56,12 +51,12 @@ class RegionFilter(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "RegionFilter",
-        descriptor: RegionFilter.Descriptor | None = None,
+        descriptor: "RegionFilter.Descriptor" = Descriptor(),
     ) -> None:
         """Initialize the region filter.
 
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
+        :param name: Name of this annotator instance, defaults to "RegionFilter"
+        :param descriptor: Configuration descriptor, defaults to Descriptor()
         """
         super().__init__(name=name, descriptor=descriptor)
 
@@ -123,9 +118,7 @@ class RegionFilter(ThreadedAnnotator):
         self.rk_logger.debug(f"Analyzing {len(active_regions.keys())}")
 
         try:
-            world_to_camera_transform = get_world_to_camera_transform_matrix(
-                self.get_cas()
-            )
+            world_to_cam_transform = get_world_to_cam_transform_matrix(self.get_cas())
         except KeyError as err:
             self.rk_logger.warning(f"Couldn't find viewpoint in the CAS: {err}")
             return Status.FAILURE
@@ -137,8 +130,8 @@ class RegionFilter(ThreadedAnnotator):
             # RegionHypothetis for this specific region
             region_hypothesis = RegionHypothesis()
 
-            obb = region_obb_in_camera_coordinates(
-                runtime_world, region, world_to_camera_transform
+            obb = region_obb_in_cam_coordinates(
+                runtime_world, region, world_to_cam_transform
             )
             region_hypothesis.annotations.append(region_pose_annotation(region))
 
@@ -170,7 +163,7 @@ class RegionFilter(ThreadedAnnotator):
         visualized_geometries.append(
             {
                 "name": "world_frame",
-                "geometry": world_frame.transform(world_to_camera_transform),
+                "geometry": world_frame.transform(world_to_cam_transform),
             }
         )
         self.get_annotator_output_struct().set_geometries(visualized_geometries)

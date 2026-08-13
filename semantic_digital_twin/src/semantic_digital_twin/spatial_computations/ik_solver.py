@@ -31,8 +31,7 @@ if TYPE_CHECKING:
 
 _large_value = np.inf
 """
-Used as bounds for slack variables.
-
+Used as bounds for slack variables. 
 Only needs to be changed when a different QP solver is used, as some can't handle inf.
 """
 
@@ -143,18 +142,15 @@ class InverseKinematicsSolver:
 
     _convergence_velocity_tolerance: float = field(default=1e-4)
     """
-    If the velocity of the active DOFs is below this threshold, the solver is considered
-    to have converged.
-
+    If the velocity of the active DOFs is below this threshold, the solver is considered to have converged.
     Unit depends on the DOF, e.g. rad/s for revolute joints or m/s for prismatic joints.
     """
 
     _convergence_slack_tolerance: float = field(default=1e-3)
     """
-    The slack variables describe how much the target is violated.
-
-    If all slack variables are below this threshold, the solver found a solution. Unit
-    is m for the position target or rad for the orientation target.
+    The slack variables describe how much the target is violated. 
+    If all slack variables are below this threshold, the solver found a solution.
+    Unit is m for the position target or rad for the orientation target.
     """
 
     def solve(
@@ -216,13 +212,11 @@ class InverseKinematicsSolver:
     ) -> np.ndarray:
         """
         Tries to solve the inverse kinematics problem iteratively.
-
         :param qp_problem: Problem definition.
         :param solver_state: Initial state.
-        :param dt: Step size per iteration. Unit is seconds. Too large values can lead
-            to instability, too small values can lead to slow convergence.
-        :param max_iterations: Maximum number of iterations. A lower dt requires more
-            iterations.
+        :param dt: Step size per iteration. Unit is seconds.
+                    Too large values can lead to instability, too small values can lead to slow convergence.
+        :param max_iterations: Maximum number of iterations. A lower dt requires more iterations.
         :return: The final state after max_iterations.
         """
         for self.iteration in range(max_iterations):
@@ -241,11 +235,11 @@ class InverseKinematicsSolver:
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Evaluate the QP matrices at the current state and solve the QP.
-
         :param qp_problem: Problem definition.
         :param solver_state: Current state
         :return: Velocities for the DOFs, and slack values.
         """
+
         # Evaluate QP matrices at current state
         qp_matrices = qp_problem.evaluate_at_state(solver_state)
 
@@ -346,7 +340,6 @@ class QPProblem:
     ]:
         """
         Extract active and passive DOFs from the kinematic chain.
-
         :return: Active Dofs, Passive Dofs, Active Variables, Passive Variables.
         """
         active_dofs_set = set()
@@ -371,9 +364,7 @@ class QPProblem:
         return active_dofs, passive_dofs, active_variables, passive_variables
 
     def _setup_constraints(self):
-        """
-        Setup all constraints for the QP problem.
-        """
+        """Setup all constraints for the QP problem."""
         self.constraint_builder = ConstraintBuilder(
             self.world,
             self.root,
@@ -401,9 +392,7 @@ class QPProblem:
         self.A = Matrix.vstack([self.box_constraint_matrix, self.neq_matrix])
 
     def _setup_weights(self):
-        """
-        Setup quadratic and linear weights for the QP problem.
-        """
+        """Setup quadratic and linear weights for the QP problem."""
         dof_weights = [
             0.001 * (1.0 / min(1.0, dof.limits.upper.velocity)) ** 2
             for dof in self.active_dofs
@@ -414,9 +403,7 @@ class QPProblem:
         self.linear_weights = Matrix.zeros(*self.quadratic_weights.shape)
 
     def _compile_functions(self):
-        """
-        Compile all symbolic expressions into functions.
-        """
+        """Compile all symbolic expressions into functions."""
         variable_args = [self.active_variables, self.passive_variables]
 
         self.l_f = self.l.compile(VariableParameters.from_lists(*variable_args))
@@ -430,9 +417,7 @@ class QPProblem:
         )
 
     def evaluate_at_state(self, solver_state) -> QPMatrices:
-        """
-        Evaluate QP matrices at the current solver state.
-        """
+        """Evaluate QP matrices at the current solver state."""
         return QPMatrices(
             H=np.diag(
                 self.quadratic_weights_f(
@@ -484,16 +469,13 @@ class ConstraintBuilder:
 
     maximum_velocity: float = field(default=1.0, init=False)
     """
-    Used to limit the velocity of the DOFs, because the default values defined in the
-    semantic digital twin are sometimes unreasonably high.
+    Used to limit the velocity of the DOFs, because the default values defined in the semantic digital twin are sometimes unreasonably high.
     """
 
     def build_box_constraints(
         self, active_dofs: List[DegreeOfFreedom]
     ) -> Tuple[Vector, Vector]:
-        """
-        Build position and velocity limit constraints for DOFs.
-        """
+        """Build position and velocity limit constraints for DOFs."""
         lower_constraints = []
         upper_constraints = []
 
@@ -522,9 +504,7 @@ class ConstraintBuilder:
     def build_goal_constraints(
         self, active_variables: List[FloatVariable]
     ) -> Tuple[Matrix, Matrix]:
-        """
-        Build position and rotation goal constraints.
-        """
+        """Build position and rotation goal constraints."""
         root_T_tip = self.world.compose_forward_kinematics_expression(
             self.root, self.tip
         )
@@ -547,7 +527,6 @@ class ConstraintBuilder:
     ) -> Tuple[Vector, Vector]:
         """
         Compute position error with velocity limits.
-
         :param root_T_tip: Forward kinematics expression.
         :return: Expression describing the position, and the error vector.
         """
@@ -570,7 +549,6 @@ class ConstraintBuilder:
     ) -> Tuple[Vector, Vector]:
         """
         Compute rotation error with velocity limits.
-
         :param root_T_tip: Forward kinematics expression.
         :return: Expression describing the rotation, and the error vector.
         """
@@ -611,14 +589,15 @@ class SolverState:
 class QPMatrices:
     """
     Container for QP problem matrices at a specific state.
+    min_{x} x^T H x + g^T x
+    subject to
+        l <= Ax <= u
 
-    min_{x} x^T H x + g^T x subject to l <= Ax <= u.
-
-    Find an x that minimizes the cost function, while satisfying the constraints. H (for
-    Hessian) describes a quadratic cost function and g (for gradient) a linear one. Ax
-    is the constraint space velocity, e.g. if A is the Jacobian, then Ax is the
-    Cartesian velocity. l and u are the lower and upper bounds of the constraint space,
-    e.g., translational or rotational velocity if l == u, we have equality constraints.
+    Find an x that minimizes the cost function, while satisfying the constraints.
+    H (for Hessian) describes a quadratic cost function and g (for gradient) a linear one.
+    Ax is the constraint space velocity, e.g. if A is the Jacobian, then Ax is the Cartesian velocity.
+    l and u are the lower and upper bounds of the constraint space, e.g., translational or rotational velocity
+    if l == u, we have equality constraints.
     """
 
     H: np.ndarray

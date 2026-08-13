@@ -6,7 +6,7 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
-from giskardpy.motion_statechart.goals.templates import Parallel, Sequence
+from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import (
     EndMotion,
 )
@@ -17,12 +17,8 @@ from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
 )
-from giskardpy.motion_statechart.tasks.joint_tasks import (
-    JointPositionList,
-    JointState,
-    JointVelocityLimit,
-)
-from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from giskardpy.motion_statechart.test_nodes.test_nodes import (
     ConstTrueNode,
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -48,7 +44,6 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 from semantic_digital_twin.world_description.world_entity import (
     Body,
 )
-from semantic_digital_twin.robots.pr2 import PR2Joint
 
 
 def test_set_seed_configuration(pr2_world_state_reset):
@@ -56,7 +51,7 @@ def test_set_seed_configuration(pr2_world_state_reset):
     goal = 0.1
 
     connection: ActiveConnection1DOF = pr2_world_state_reset.get_connection_by_name(
-        PR2Joint.TORSO_LIFT
+        "torso_lift_joint"
     )
 
     node1 = SetSeedConfiguration(
@@ -184,9 +179,7 @@ def test_joint_goal(tmp_path):
     msc.draw(str(tmp_path / "muh.pdf"))
     kin_sim.tick_until_end()
     msc.draw(str(tmp_path / "muh.pdf"))
-    # +1 compared to the tick count without a moving dof: EndMotion now waits for the
-    # dof's velocity to settle below its convergence threshold before observing True.
-    assert len(msc.history) == 7
+    assert len(msc.history) == 6
     assert (
         msc.history.get_observation_history_of_node(task1)[-1]
         == ObservationStateValues.TRUE
@@ -205,10 +198,10 @@ def test_joint_goal(tmp_path):
 
 def test_continuous_joint(pr2_world_state_reset):
     r_wrist_roll_joint = pr2_world_state_reset.get_connection_by_name(
-        PR2Joint.RIGHT_WRIST_ROLL
+        "r_wrist_roll_joint"
     )
     l_wrist_roll_joint = pr2_world_state_reset.get_connection_by_name(
-        PR2Joint.LEFT_WRIST_ROLL
+        "l_wrist_roll_joint"
     )
     msc = MotionStatechart()
     joint_goal = JointPositionList(
@@ -244,8 +237,8 @@ def test_continuous_joint(pr2_world_state_reset):
 
 
 def test_revolute_joint(pr2_world_state_reset):
-    head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
-    head_tilt_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_TILT)
+    head_pan_joint = pr2_world_state_reset.get_connection_by_name("head_pan_joint")
+    head_tilt_joint = pr2_world_state_reset.get_connection_by_name("head_tilt_joint")
     msc = MotionStatechart()
     joint_goal = JointPositionList(
         goal_state=JointState.from_mapping(
@@ -271,46 +264,6 @@ def test_revolute_joint(pr2_world_state_reset):
     assert np.isclose(head_tilt_joint.position, -0.37, atol=1e-2)
 
 
-def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
-    """
-    JointVelocityLimit must genuinely slow down a joint's approach towards a distant
-    target, unlike a reference/normalization velocity which is only a QP-optimization
-    hint -- the joint's velocity must stay within max_velocity on every single tick,
-    all the way until the goal is actually reached.
-    """
-    head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
-    max_velocity = 0.05
-
-    msc = MotionStatechart()
-    msc.add_nodes(
-        [
-            joint_goal := JointPositionList(
-                goal_state=JointState.from_mapping({head_pan_joint: 0.5}),
-            ),
-            JointVelocityLimit(connections=[head_pan_joint], max_velocity=max_velocity),
-        ]
-    )
-
-    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
-    kin_sim.compile(motion_statechart=msc)
-
-    for i in range(400):
-        kin_sim.tick()
-        observed_velocity = abs(head_pan_joint.raw_dof.variables.velocity.resolve())
-        assert observed_velocity <= max_velocity + 1e-3, (
-            f"head_pan_joint's velocity {observed_velocity} exceeded the "
-            f"{max_velocity} rad/s cap on tick {i}"
-        )
-        if msc.observation_state[joint_goal] == ObservationStateValues.TRUE:
-            break
-    else:
-        raise TimeoutError(
-            "joint_goal never reached its target while under the velocity limit"
-        )
-
-    assert np.isclose(head_pan_joint.position, 0.5, atol=1e-2)
-
-
 def test_joint_sequence(pr2_world_state_reset):
     msc = MotionStatechart()
     msc.add_node(
@@ -318,12 +271,12 @@ def test_joint_sequence(pr2_world_state_reset):
             [
                 JointPositionList(
                     goal_state=JointState.from_str_dict(
-                        {PR2Joint.TORSO_LIFT: 0.1}, world=pr2_world_state_reset
+                        {"torso_lift_joint": 0.1}, world=pr2_world_state_reset
                     )
                 ),
                 JointPositionList(
                     goal_state=JointState.from_str_dict(
-                        {PR2Joint.TORSO_LIFT: 0.2}, world=pr2_world_state_reset
+                        {"torso_lift_joint": 0.2}, world=pr2_world_state_reset
                     )
                 ),
             ]

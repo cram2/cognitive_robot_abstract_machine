@@ -39,7 +39,6 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
     interval: jax.Array = eqx.field(static=True)
     """
     The interval of the distribution as a array of shape (num_nodes, 2).
-
     The first column contains the lower bounds and the second column the upper bounds.
     The intervals are treated as open intervals (>/< comparator).
     """
@@ -59,7 +58,6 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
     def left_included_condition(self, x: jax.Array) -> jax.Array:
         """
         Check if x is included in the left bound of the intervals.
-
         :param x: The data
         :return: A boolean array of shape (#x, #nodes)
         """
@@ -68,7 +66,6 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
     def right_included_condition(self, x: jax.Array) -> jax.Array:
         """
         Check if x is included in the right bound of the intervals.
-
         :param x: The data
         :return: A boolean array of shape (#x, #nodes)
         """
@@ -77,7 +74,6 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
     def included_condition(self, x: jax.Array) -> jax.Array:
         """
         Check if x is included in the interval.
-
         :param x: The data
         :return: A boolean array of shape (#x, #nodes)
         """
@@ -112,7 +108,6 @@ class DiracDeltaLayer(ContinuousLayer):
     density_cap: jax.Array = eqx.field(static=True)
     """
     The density caps of the Dirac delta distributions.
-
     This value will be used to replace infinity in likelihoods.
     """
 
@@ -147,8 +142,7 @@ class DiracDeltaLayer(ContinuousLayer):
         progress_bar: bool = True,
     ) -> RustworkxLayerConverter:
         """
-        Create a DiracDeltaLayer from a list of UnivariateContinuousLeaf nodes that all
-        represent Dirac delta distributions over the same variable.
+        Create a DiracDeltaLayer from a list of UnivariateContinuousLeaf nodes that all represent Dirac delta distributions over the same variable.
         """
         hash_remap = {hash(node): index for index, node in enumerate(nodes)}
         locations = jnp.array(

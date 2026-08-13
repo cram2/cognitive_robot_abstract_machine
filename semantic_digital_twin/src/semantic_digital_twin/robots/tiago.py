@@ -4,7 +4,6 @@ import os
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
-from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
 from typing import Self, List
@@ -44,47 +43,10 @@ from semantic_digital_twin.robots.robot_parts import (
 )
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
-from semantic_digital_twin.world_description.connections import (
-    ActiveConnection,
-    DifferentialDrive,
-)
+from semantic_digital_twin.world_description.connections import ActiveConnection
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
-
-
-class TiagoJoint(StrEnum):
-    """
-    Names of the Tiago's commandable connections, as spelled in its URDF.
-
-    Members are usable wherever a connection name is expected, so a configuration keyed by
-    them stays a plain mapping of names to positions.
-
-    ..note:: Connections that no controller commands, such as the base wheels and the
-        gripper's coupled knuckle and inner finger joints, are left out.
-    """
-
-    TORSO_LIFT = "torso_lift_joint"
-    HEAD_1 = "head_1_joint"
-    HEAD_2 = "head_2_joint"
-
-    LEFT_ARM_1 = "arm_left_1_joint"
-    LEFT_ARM_2 = "arm_left_2_joint"
-    LEFT_ARM_3 = "arm_left_3_joint"
-    LEFT_ARM_4 = "arm_left_4_joint"
-    LEFT_ARM_5 = "arm_left_5_joint"
-    LEFT_ARM_6 = "arm_left_6_joint"
-    LEFT_ARM_7 = "arm_left_7_joint"
-    LEFT_GRIPPER_FINGER = "gripper_left_finger_joint"
-
-    RIGHT_ARM_1 = "arm_right_1_joint"
-    RIGHT_ARM_2 = "arm_right_2_joint"
-    RIGHT_ARM_3 = "arm_right_3_joint"
-    RIGHT_ARM_4 = "arm_right_4_joint"
-    RIGHT_ARM_5 = "arm_right_5_joint"
-    RIGHT_ARM_6 = "arm_right_6_joint"
-    RIGHT_ARM_7 = "arm_right_7_joint"
-    RIGHT_GRIPPER_FINGER = "gripper_right_finger_joint"
 
 
 @dataclass(eq=False)
@@ -186,7 +148,7 @@ class TiagoLeftGripper(
 
     def setup_hardware_interfaces(self):
         controlled_joints = [
-            TiagoJoint.LEFT_GRIPPER_FINGER,
+            "gripper_left_finger_joint",
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
@@ -233,7 +195,7 @@ class TiagoRightGripper(
 
     def setup_hardware_interfaces(self):
         controlled_joints = [
-            TiagoJoint.RIGHT_GRIPPER_FINGER,
+            "gripper_right_finger_joint",
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
@@ -278,13 +240,13 @@ class TiagoLeftArm(Arm[TiagoLeftGripper]):
 
     def setup_hardware_interfaces(self):
         controlled_joints = [
-            TiagoJoint.LEFT_ARM_1,
-            TiagoJoint.LEFT_ARM_2,
-            TiagoJoint.LEFT_ARM_3,
-            TiagoJoint.LEFT_ARM_4,
-            TiagoJoint.LEFT_ARM_5,
-            TiagoJoint.LEFT_ARM_6,
-            TiagoJoint.LEFT_ARM_7,
+            "arm_left_1_joint",
+            "arm_left_2_joint",
+            "arm_left_3_joint",
+            "arm_left_4_joint",
+            "arm_left_5_joint",
+            "arm_left_6_joint",
+            "arm_left_7_joint",
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
@@ -324,13 +286,13 @@ class TiagoRightArm(Arm[TiagoRightGripper]):
 
     def setup_hardware_interfaces(self):
         controlled_joints = [
-            TiagoJoint.RIGHT_ARM_1,
-            TiagoJoint.RIGHT_ARM_2,
-            TiagoJoint.RIGHT_ARM_3,
-            TiagoJoint.RIGHT_ARM_4,
-            TiagoJoint.RIGHT_ARM_5,
-            TiagoJoint.RIGHT_ARM_6,
-            TiagoJoint.RIGHT_ARM_7,
+            "arm_right_1_joint",
+            "arm_right_2_joint",
+            "arm_right_3_joint",
+            "arm_right_4_joint",
+            "arm_right_5_joint",
+            "arm_right_6_joint",
+            "arm_right_7_joint",
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
@@ -395,8 +357,8 @@ class TiagoNeck(Neck[TiagoCamera]):
 
     def setup_hardware_interfaces(self):
         controlled_joints = [
-            TiagoJoint.HEAD_1,
-            TiagoJoint.HEAD_2,
+            "head_1_joint",
+            "head_2_joint",
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
@@ -426,7 +388,7 @@ class TiagoTorso(
 
     def setup_hardware_interfaces(self):
         controlled_joints = [
-            TiagoJoint.TORSO_LIFT,
+            "torso_lift_joint",
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
@@ -471,7 +433,7 @@ class TiagoTorso(
 
 
 @dataclass(eq=False)
-class TiagoMobileBase(MobileBase[DifferentialDrive], HasTorso[TiagoTorso]):
+class TiagoMobileBase(MobileBase, HasTorso[TiagoTorso]):
 
     full_body_controlled: bool = field(default=True, kw_only=True)
 
@@ -494,9 +456,7 @@ class TiagoMobileBase(MobileBase[DifferentialDrive], HasTorso[TiagoTorso]):
 @dataclass(eq=False)
 class Tiago(AbstractRobot, HasMobileBase[TiagoMobileBase]):
     """
-    The Tiago++ robot by PAL Robotics with updated Robotiq grippers.
-
-    https://pal-robotics.com/blog/tiago-bi-manual-robot-research/
+    The Tiago++ robot by PAL Robotics with updated Robotiq grippers. https://pal-robotics.com/blog/tiago-bi-manual-robot-research/
     """
 
     @classmethod
@@ -830,7 +790,7 @@ class TiagoMujocoTorso(
 
 
 @dataclass(eq=False)
-class TiagoMujocoMobileBase(MobileBase[DifferentialDrive], HasTorso[TiagoMujocoTorso]):
+class TiagoMujocoMobileBase(MobileBase, HasTorso[TiagoMujocoTorso]):
 
     def setup_hardware_interfaces(self):
         pass
@@ -852,11 +812,8 @@ class TiagoMujocoMobileBase(MobileBase[DifferentialDrive], HasTorso[TiagoMujocoT
 @dataclass(eq=False)
 class TiagoMujoco(AbstractRobot, HasMobileBase[TiagoMujocoMobileBase]):
     """
-    Class that describes the Take It And Go Robot (TIAGo).
-
-    This version is based on the MuJoCo model, which contains less bodies and
-    connections than the URDF version, including missing some crucial links like the
-    camera etc.
+    Class that describes the Take It And Go Robot (TIAGo). This version is based on the MuJoCo model, which contains
+    less bodies and connections than the URDF version, including missing some crucial links like the camera etc.
     """
 
     @classmethod

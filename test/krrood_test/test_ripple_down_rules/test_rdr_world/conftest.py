@@ -1,7 +1,17 @@
+import sys
 from os.path import dirname
 
 import pytest
-from typing_extensions import Type
+from typing_extensions import Callable, Type
+
+from krrood.ripple_down_rules.utils import get_method_object_from_pytest_request
+
+try:
+    from PyQt6.QtWidgets import QApplication
+    from krrood.ripple_down_rules.user_interface.gui import RDRCaseViewer
+except ImportError as e:
+    QApplication = None
+    RDRCaseViewer = None
 
 from ..conf.world.handles_and_containers import HandlesAndContainersWorld
 from ..datasets import *
@@ -9,6 +19,14 @@ from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 from krrood.ripple_down_rules.experts import Human, Expert, AI
 from krrood.ripple_down_rules.helpers import is_matching
 from krrood.ripple_down_rules.rdr import GeneralRDR
+
+app: Optional[QApplication] = None
+viewer: Optional[RDRCaseViewer] = None
+use_gui: bool = False
+
+if RDRCaseViewer is not None and QApplication is not None and use_gui:
+    app = QApplication(sys.argv)
+    viewer = RDRCaseViewer(save_dir="./test_generated_rdrs")
 
 
 def handles_and_containers_world() -> World:
@@ -37,8 +55,10 @@ def drawer_case_queries() -> List[CaseQuery]:
             (bool,),
             True,
             default_value=False,
+            case_factory=get_possible_drawers,
+            case_factory_idx=i,
         )
-        for possible_drawer in get_possible_drawers()
+        for i, possible_drawer in enumerate(get_possible_drawers())
     ]
     return case_queries
 
@@ -109,6 +129,7 @@ def drawer_case_query() -> CaseQuery:
         "views",
         (Drawer,),
         False,
+        case_factory=handles_and_containers_world,
     )
 
 
@@ -132,20 +153,28 @@ def drawer_rdr(drawer_case_query, drawer_cabinet_human_expert) -> GeneralRDR:
 
 
 @pytest.fixture
-def drawer_cabinet_rdr(drawer_cabinet_human_expert) -> GeneralRDR:
+def drawer_cabinet_rdr(request, drawer_cabinet_human_expert) -> GeneralRDR:
     world = handles_and_containers_world()
-    rdr = get_drawer_cabinet_rdr(world, drawer_cabinet_human_expert)
+    rdr = get_drawer_cabinet_rdr(
+        world,
+        drawer_cabinet_human_expert,
+        get_method_object_from_pytest_request(request),
+    )
     return rdr
 
 
 @pytest.fixture
-def drawer_cabinet_ai_rdr(drawer_cabinet_ai_expert) -> GeneralRDR:
+def drawer_cabinet_ai_rdr(request, drawer_cabinet_ai_expert) -> GeneralRDR:
     world = handles_and_containers_world()
-    rdr = get_drawer_cabinet_rdr(world, drawer_cabinet_ai_expert)
+    rdr = get_drawer_cabinet_rdr(
+        world, drawer_cabinet_ai_expert, get_method_object_from_pytest_request(request)
+    )
     return rdr
 
 
-def get_drawer_cabinet_rdr(world: World, expert: Expert) -> GeneralRDR:
+def get_drawer_cabinet_rdr(
+    world: World, expert: Expert, scenario: Callable
+) -> GeneralRDR:
     """
     Fixture to create a GeneralRDR for drawer and cabinet views.
     """
@@ -157,8 +186,10 @@ def get_drawer_cabinet_rdr(world: World, expert: Expert) -> GeneralRDR:
                 "views",
                 (view,),
                 False,
+                case_factory=handles_and_containers_world,
             ),
             expert=expert,
+            scenario=scenario,
         )
     found_views = rdr.classify(world)
     for view in [Drawer, Cabinet]:

@@ -1,7 +1,8 @@
 import importlib.metadata
 import logging
 
-from ._version import __version__
+__version__ = "3.1.2"
+
 
 logger = logging.getLogger("krrood")
 logger.setLevel(logging.INFO)

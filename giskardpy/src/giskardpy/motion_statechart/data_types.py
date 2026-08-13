@@ -17,9 +17,7 @@ class LifeCycleValues(IntEnum):
 
 
 class FloatEnum(float, Enum):
-    """
-    Enum where members are also (and must be) floats.
-    """
+    """Enum where members are also (and must be) floats"""
 
 
 class ObservationStateValues(FloatEnum):
@@ -29,11 +27,11 @@ class ObservationStateValues(FloatEnum):
 
 
 class DefaultWeights(FloatEnum):
-    WEIGHT_MAXIMUM = 10000.0
-    WEIGHT_ABOVE_COLLISION_AVOIDANCE = 2500.0
+    WEIGHT_MAX = 10000.0
+    WEIGHT_ABOVE_CA = 2500.0
     WEIGHT_COLLISION_AVOIDANCE = 50.0
-    WEIGHT_BELOW_COLLISION_AVOIDANCE = 1.0
-    WEIGHT_MINIMUM = 0.0
+    WEIGHT_BELOW_CA = 1.0
+    WEIGHT_MIN = 0.0
 
 
 class TransitionKind(Enum):
@@ -41,17 +39,14 @@ class TransitionKind(Enum):
     """
     Transitions nodes from NOT_STARTED to RUNNING.
     """
-
     PAUSE = 2
     """
     Transitions nodes from RUNNING to PAUSED if True, or back if False.
     """
-
     END = 3
     """
     Transitions nodes from RUNNING or PAUSED to DONE.
     """
-
     RESET = 4
     """
     Transitions nodes from any state to NOT_STARTED.

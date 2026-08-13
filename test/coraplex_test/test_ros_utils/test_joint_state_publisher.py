@@ -7,7 +7,6 @@ import pytest
 import rclpy.publisher
 from sensor_msgs.msg import JointState
 from coraplex.ros_utils.joint_state_publisher import JointStatePublisher
-from semantic_digital_twin.robots.pr2 import PR2Joint
 
 
 class DummyRobot:
@@ -46,19 +45,19 @@ def test_publish_sends_joint_state(immutable_model_world, rclpy_node):
     assert mock_publisher.publish.called
     msg = mock_publisher.publish.call_args[0][0]
     assert isinstance(msg, JointState)
-    assert PR2Joint.TORSO_LIFT in msg.name
-    assert PR2Joint.RIGHT_SHOULDER_PAN in msg.name
+    assert "torso_lift_joint" in msg.name
+    assert "r_shoulder_pan_joint" in msg.name
     joint_to_position = dict(zip(msg.name, msg.position))
-    assert joint_to_position[PR2Joint.RIGHT_WRIST_ROLL] == pytest.approx(
+    assert joint_to_position["r_wrist_roll_joint"] == pytest.approx(
         world.state[
-            world.get_degree_of_freedom_by_name(PR2Joint.RIGHT_WRIST_ROLL).id
+            world.get_degree_of_freedom_by_name("r_wrist_roll_joint").id
         ].position,
         abs=0.01,
     )
 
-    assert joint_to_position[PR2Joint.RIGHT_SHOULDER_PAN] == pytest.approx(
+    assert joint_to_position["r_shoulder_pan_joint"] == pytest.approx(
         world.state[
-            world.get_degree_of_freedom_by_name(PR2Joint.RIGHT_SHOULDER_PAN).id
+            world.get_degree_of_freedom_by_name("r_shoulder_pan_joint").id
         ].position,
         abs=0.01,
     )

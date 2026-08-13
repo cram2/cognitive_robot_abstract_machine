@@ -27,19 +27,12 @@ jobs:
           submodules: recursive
 
       - name: Install dependencies
-        env:
-          # Keep uv's cache on the same filesystem as the target venv (/opt/ros/cram-env) so uv can
-          # hardlink packages into site-packages instead of full-copying them. The default cache
-          # (~/.cache/uv under the mounted /github/home volume) is a different filesystem, which
-          # forces a full copy of every wheel and stores each package twice -- exhausting the runner
-          # disk ("No space left on device") during install.
-          UV_CACHE_DIR: /opt/ros/.uv_cache
         run: |
           cd cognitive_robot_abstract_machine
           source /opt/ros/cram-env/bin/activate
           sudo apt-get update
           sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libegl1
-          uv sync --extra dev,doc --active
+          poetry install
 
       - name: Restore cache
         uses: actions/cache/restore@v4
@@ -52,23 +45,16 @@ jobs:
             ${{ runner.os }}-cache-
 
       - name: Build ORM
-        # ormatic_interface.py files are committed empty (see AGENTS.md), so the full
-        # dependency chain (semantic_digital_twin -> giskardpy -> coraplex -> segmind ->
-        # experiments, see scripts/regenerate_all_orm.py) must be regenerated before any
-        # example or demo that touches the database can run. Every script in this
-        # workflow's matrix lives under coraplex, semantic_digital_twin, or experiments,
-        # so this always applies.
+        if: ${{inputs.repo_lowercase == 'coraplex' || inputs.repo_lowercase == 'semantic_digital_twin'}}
         run: |
-          cd cognitive_robot_abstract_machine
+          cd cognitive_robot_abstract_machine/${{ inputs.lib }}/scripts/
           source /opt/ros/overlay_ws/install/setup.bash
           source /opt/ros/cram-env/bin/activate
-          python scripts/regenerate_all_orm.py
+          python generate_orm.py
 
       - name: Run Script
         run: |
           cd cognitive_robot_abstract_machine
           source /opt/ros/overlay_ws/install/setup.bash
           source /opt/ros/cram-env/bin/activate
-          export QT_QPA_PLATFORM=offscreen
-          export LIBGL_ALWAYS_SOFTWARE=1
           ./${{inputs.script}}

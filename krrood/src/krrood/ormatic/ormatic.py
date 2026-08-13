@@ -5,7 +5,7 @@ import pathlib
 import uuid
 from dataclasses import dataclass, field, is_dataclass
 from enum import Enum
-from types import ModuleType, NoneType
+from types import ModuleType
 from typing import Set
 
 import rustworkx as rx
@@ -30,7 +30,7 @@ from krrood.ormatic.data_access_objects.dao import DataAccessObject
 from krrood.ormatic.sqlalchemy_generator import SQLAlchemyGenerator
 from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import InheritanceStrategy, classes_of_package
-from krrood.utils import module_and_class_name, recursive_subclasses, get_module_of_type
+from krrood.utils import module_and_class_name, recursive_subclasses
 from krrood.ormatic.wrapped_table import WrappedTable, AssociationObject
 from krrood.adapters.json_serializer import SubclassJSONSerializer, JSONData
 from krrood.class_diagrams.class_diagram import (
@@ -45,10 +45,8 @@ logger = logging.getLogger(__name__)
 
 class AlternativelyMaps(ClassRelation):
     """
-    Edge type that says that the source alternativly maps the target, e.
-
-    g. `AlternativeMaps(source=PointMapping, target=Point)` means that PointMapping is
-    the mapping for Point.
+    Edge type that says that the source alternativly maps the target, e. g.
+    `AlternativeMaps(source=PointMapping, target=Point)` means that PointMapping is the mapping for Point.
     """
 
 
@@ -71,7 +69,6 @@ class ORMatic:
     type_mappings: TypeDict = field(default_factory=TypeDict)
     """
     A dict that maps classes to custom types that should be used to save the classes.
-
     They keys of the type mappings must be disjoint with the classes given..
     """
 
@@ -97,9 +94,7 @@ class ORMatic:
 
     inheritance_graph: rx.PyDiGraph[int] = field(default=None, init=False)
     """
-    A graph that represents the inheritance structure of the classes.
-
-    Extracted from the class dependency graph.
+    A graph that represents the inheritance structure of the classes. Extracted from the class dependency graph.
     """
 
     wrapped_tables: Dict[WrappedClass, WrappedTable] = field(
@@ -117,7 +112,7 @@ class ORMatic:
     """
 
     def __post_init__(self):
-        self.imported_modules.add(get_module_of_type(TypeDict))
+        self.imported_modules.add(TypeDict.__module__)
         self._fill_type_mappings()
         self._create_inheritance_graph()
         self._add_alternative_mappings_to_class_diagram()
@@ -125,11 +120,11 @@ class ORMatic:
         self.create_type_annotations_map()
 
         for wrapped_table in self.wrapped_tables.values():
-            self.imported_modules.add(get_module_of_type(wrapped_table.wrapped_clazz.clazz))
+            self.imported_modules.add(wrapped_table.wrapped_clazz.clazz.__module__)
 
     def _fill_type_mappings(self):
         """
-        Fill the type mappings of this with needed defaults.
+        Fill the type mappings of this with needed defaults
         """
         self.type_mappings[Type] = TypeType
         self.type_mappings[type] = TypeType
@@ -138,10 +133,9 @@ class ORMatic:
         self.type_mappings[uuid.UUID] = sqlalchemy.UUID
         self.type_mappings[pathlib.Path] = PathType
         self.type_mappings[JSONData] = JSONDataType
-        self.type_mappings[NoneType] = TypeType
 
         for key in self.type_mappings.keys():
-            self.imported_modules.add(get_module_of_type(key))
+            self.imported_modules.add(key.__module__)
 
     def _create_wrapped_tables(self):
         for wrapped_clazz in self.wrapped_classes_in_topological_order:
@@ -194,12 +188,14 @@ class ORMatic:
         self, wrapped_class: WrappedClass
     ) -> Optional[WrappedClass]:
         """
-        Finds and returns an alternative mapping for the given wrapped class, if one
-        exists, based on the relations specified in `alternatively_maps_relations`.
+        Finds and returns an alternative mapping for the given wrapped class,
+        if one exists, based on the relations specified in
+        `alternatively_maps_relations`.
 
-        :param wrapped_class: The wrapped class for which an alternative mapping is to
-            be searched.
-        :return: An alternate mapping of the type WrappedClass if found, otherwise None.
+        :param wrapped_class: The wrapped class for which an alternative
+            mapping is to be searched.
+        :return: An alternate mapping of the type WrappedClass if found,
+            otherwise None.
         """
         for rel in self.alternatively_maps_relations:
             if rel.target == wrapped_class:
@@ -212,8 +208,8 @@ class ORMatic:
             self.type_annotation_map[module_and_class_name(clazz)] = (
                 module_and_class_name(custom_type)
             )
-            self.imported_modules.add(get_module_of_type(clazz))
-            self.imported_modules.add(get_module_of_type(custom_type))
+            self.imported_modules.add(clazz.__module__)
+            self.imported_modules.add(custom_type.__module__)
 
     @property
     def wrapped_classes_in_topological_order(self) -> List[WrappedClass]:
@@ -272,8 +268,7 @@ class ORMatic:
 
     def to_sqlalchemy_file(self, file: TextIO):
         """
-        Generate a Python file with SQLAlchemy declarative mappings from the ORMatic
-        models.
+        Generate a Python file with SQLAlchemy declarative mappings from the ORMatic models.
 
         :param file: The file to write to
         """
@@ -292,14 +287,16 @@ class ORMatic:
         """
         Create an instance from a list of packages, dependencies, and ignored classes.
 
+
         :param packages: The packages that should be scanned for dataclasses.
         :param ormatic_interface_dependencies: The dependent ormatic_interfaces.
         :param ignored_classes: The classes that should be ignored.
         :param type_mappings: The type mappings that should be used.
-        :param ignore_krrood_test_classes: Rather to ignore classes from the krrood test
-            package.
+        :param ignore_krrood_test_classes: Rather to ignore classes from the krrood test package.
+
         :return: The ORMatic instance.
         """
+
         all_classes, all_alternative_mappings, all_type_mappings = set(), set(), {}
 
         # import classes from the existing interface
@@ -322,7 +319,7 @@ class ORMatic:
             am
             for am in recursive_subclasses(AlternativeMapping)
             if not ignore_krrood_test_classes
-            or "krrood_test" not in get_module_of_type(am.original_class())
+            or "krrood_test" not in am.original_class().__module__
         )
 
         # keep only dataclasses that are not AlternativeMapping or DataAccessObject subclasses

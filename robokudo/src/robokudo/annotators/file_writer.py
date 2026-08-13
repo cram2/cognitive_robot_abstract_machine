@@ -18,8 +18,6 @@ The module uses:
    Designed to work with robokudo.io.file_reader_interface.
 """
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 from timeit import default_timer
@@ -29,7 +27,7 @@ from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.utils.type_conversion import ros_camera_info_to_dict
+from robokudo.utils.type_conversion import ros_cam_info_to_dict
 
 
 class FileWriter(BaseAnnotator):
@@ -66,12 +64,12 @@ class FileWriter(BaseAnnotator):
     def __init__(
         self,
         name: str = "FileWriter",
-        descriptor: FileWriter.Descriptor | None = None,
+        descriptor: "FileWriter.Descriptor" = Descriptor(),
     ) -> None:
         """Initialize the file writer.
 
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
+        :param name: Name of this annotator instance, defaults to "FileWriter"
+        :param descriptor: Configuration descriptor, defaults to Descriptor()
         """
         super().__init__(name, descriptor)
         self.initialized = False
@@ -134,7 +132,7 @@ class FileWriter(BaseAnnotator):
 
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
         depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
-        camera_info = self.get_cas().get(CASViews.CAMERA_INFO)
+        cam_info = self.get_cas().get(CASViews.CAM_INFO)
 
         cv2.imwrite(
             self.generate_full_file_path_(
@@ -149,16 +147,16 @@ class FileWriter(BaseAnnotator):
             depth,
         )
 
-        camera_info_dict = ros_camera_info_to_dict(camera_info)
+        cam_info_dict = ros_cam_info_to_dict(cam_info)
         with open(
             str(
                 self.generate_full_file_path_(
-                    cas_view=CASViews.CAMERA_INFO, file_extension="json"
+                    cas_view=CASViews.CAM_INFO, file_extension="json"
                 )
             ),
             "w",
         ) as fp:
-            json.dump(camera_info_dict, fp)
+            json.dump(cam_info_dict, fp)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"

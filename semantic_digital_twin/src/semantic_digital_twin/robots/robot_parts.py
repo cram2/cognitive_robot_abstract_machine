@@ -14,24 +14,22 @@ from typing import (
     Set,
     List,
     DefaultDict,
-    Type,
     Union,
     Any,
-    cast,
 )
 from uuid import UUID
 
-from typing_extensions import get_origin, get_args, Generic, TypeVar, Unpack
+from typing_extensions import get_origin, get_args, Unpack
 
 from krrood.adapters.json_serializer import list_like_classes
 from krrood.class_diagrams.attribute_introspector import (
     DataclassOnlyIntrospector,
 )
 from krrood.entity_query_language.factories import variable, contains, a, entity
-from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     NoJointStateWithType,
     UselessConceptError,
@@ -40,7 +38,6 @@ from semantic_digital_twin.exceptions import (
 )
 from semantic_digital_twin.robots.robot_part_mixins import (
     HasEndEffector,
-    HasMobileBase,
     HasSensors,
     TGenericEndEffector,
     HasLeftRightArm,
@@ -55,14 +52,11 @@ from semantic_digital_twin.spatial_types import (
     RotationMatrix,
     HomogeneousTransformationMatrix,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
-    FixedConnection,
     WheeledDrive,
     ActiveConnection1DOF,
-    PrismaticConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -80,10 +74,6 @@ from semantic_digital_twin.world_description.world_modification import (
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
-    from semantic_digital_twin.api import (
-        BodySpecification,
-        ConnectionSpecification,
-    )
 else:
     World = Any
 
@@ -94,28 +84,21 @@ logger = logging.getLogger("semantic_digital_twin")
 class HasRobotParts(ABC):
     """
     Mixin for semantic annotations that have robot parts assigned to them.
-
-    Provides methods for robot part aggregation, as well as handling the automatic setup
-    of robot parts.
+    Provides methods for robot part aggregation, as well as handling the automatic setup of robot parts.
     """
 
     @property
     def _robot_parts(self) -> list[AbstractRobotPart]:
         """
-        Serves as a generic interface to access all robot parts assigned to a robot
-        part.
-
+        Serves as a generic interface to access all robot parts assigned to a robot part.
         Returns a list of all robot parts assigned directly to this robot part.
         """
         return self._aggregate_robot_parts(set())
 
     def _aggregate_robot_parts(self, seen: Set[UUID]) -> list[AbstractRobotPart]:
         """
-        Recursively aggregates all robot parts assigned to this robot part, including
-        itself if it is a robot part.
-
-        Uses a set of seen UUIDs to avoid infinite recursion in case of cyclic
-        references and duplicates.
+        Recursively aggregates all robot parts assigned to this robot part, including itself if it is a robot part.
+         Uses a set of seen UUIDs to avoid infinite recursion in case of cyclic references and duplicates.
         """
         introspector = DataclassOnlyIntrospector()
         robot_parts = []
@@ -141,8 +124,7 @@ class HasRobotParts(ABC):
 
     def setup_robot_part_semantic_annotations(self):
         """
-        Automatically discovers and initializes sub-parts by introspecting dataclass
-        fields.
+        Automatically discovers and initializes sub-parts by introspecting dataclass fields.
         """
         introspector = DataclassOnlyIntrospector()
 
@@ -175,8 +157,7 @@ class HasRobotParts(ABC):
 
     def _initialize_list_field(self, field_name: str, types_to_initialize: list[Any]):
         """
-        Helper to initialize all parts matching item_type and append them to a list
-        field.
+        Helper to initialize all parts matching item_type and append them to a list field.
 
         :param field_name: Name of the list field to initialize
         :param types_to_initialize: List of types to initialize in the field
@@ -213,10 +194,9 @@ class HasRobotParts(ABC):
 class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
     """
     Abstract base class for all robot parts.
-
-    A robot part is a part of a robot that can have its own kinematic structure and
-    hardware interfaces, such as arms, sensors, or the mobile base. The robot property
-    is computed lazily to avoid circular dependencies.
+    A robot part is a part of a robot that can have its own kinematic structure and hardware interfaces,
+    such as arms, sensors, or the mobile base.
+    The robot property is computed lazily to avoid circular dependencies.
     """
 
     joint_states: list[JointState] = field(default_factory=list)
@@ -230,29 +210,22 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         cls, robot_root: KinematicStructureEntity
     ) -> Self:
         """
-        Sets up a default configuration of this robot part in the world, below the given
-        robot root.
-
-        This is used to set up a default configuration of the robot part in the world
-        after parsing a URDF.
+        Sets up a default configuration of this robot part in the world, below the given robot root.
+        This is used to set up a default configuration of the robot part in the world after parsing a URDF.
         """
 
     @abstractmethod
     def setup_hardware_interfaces(self):
         """
-        Sets up a default hardware interface for this robot part by setting the
-        has_hardware_interface flag to True for relevant connections of this robot part.
-
-        Implement as "pass" if this robot part does not have any hardware interfaces.
+        Sets up a default hardware interface for this robot part by setting the has_hardware_interface flag to True for
+         relevant connections of this robot part. Implement as "pass" if this robot part does not have any hardware interfaces.
         """
 
     @abstractmethod
     def setup_joint_states(self) -> List[JointState]:
         """
-        Sets up default joint states for this robot part.
-
-        Implement as "return []" if this robot part does not have any important joint
-        states.
+        Sets up default joint states for this robot part. Implement as "return []" if this robot part does not have
+        any important joint states.
         """
 
     @synchronized_attribute_modification
@@ -273,7 +246,6 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
     def get_joint_state_by_type(self, state_type: JointStateType) -> JointState:
         """
         Returns a JointState for a given joint state type.
-
         :param state_type: The state type to search for
         :return: The joint state with the given type
         """
@@ -282,51 +254,19 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
                 return j
         raise NoJointStateWithType(state_type)
 
-    def has_joint_state_of_type(self, state_type: JointStateType) -> bool:
-        """
-        Whether this part can be commanded into the given joint state.
-
-        :param state_type: The state type to search for
-        :return: True if a joint state of that type is defined
-        """
-        return any(
-            joint_state.state_type == state_type for joint_state in self.joint_states
-        )
-
     @classmethod
     def create_with_new_body_in_world(
         cls,
-        name: str,
+        name: PrefixedName,
         world: World,
         world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
-        parent_connection_specification: Optional[ConnectionSpecification] = None,
-        scale: Optional[Scale] = None,
+        connection_limits: Optional[DegreeOfFreedomLimits] = None,
+        active_axis: Optional[Vector3] = None,
+        connection_multiplier: float = 1.0,
+        connection_offset: float = 0.0,
+        scale: Scale = None,
+        **kwargs,
     ) -> Self:
-        """
-        Robot-part bodies originate from the parsed URDF, so they cannot be spawned from
-        scratch.
-
-        :raises UselessConceptError: Always, since robot-part bodies must already exist
-            in the world.
-        """
-        raise UselessConceptError(
-            reason="The bodies needed for RobotParts should already exist in the world after parsing a URDF"
-        )
-
-    @classmethod
-    def get_default_root_kinematic_structure_entity_specification(
-        cls,
-        name: Optional[str] = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
-    ) -> BodySpecification:
-        """
-        Robot-part geometry comes from the parsed URDF, not from a scale, so a default
-        body specification cannot be derived.
-
-        :raises UselessConceptError: Always, since robot-part bodies must already exist
-            in the world.
-        """
         raise UselessConceptError(
             reason="The bodies needed for RobotParts should already exist in the world after parsing a URDF"
         )
@@ -350,9 +290,8 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
 
     def _setup_hardware_interfaces_for_active_connections(self):
         """
-        Sets up a default hardware interface for the robot part by setting the
-        has_hardware_interface flag to True for all active connections of all robot
-        parts in this robot part.
+        Sets up a default hardware interface for the robot part by setting the has_hardware_interface flag to True for
+         all active connections of all robot parts in this robot part
         """
         for robot_part in self._robot_parts:
             for connection in robot_part.active_connections:
@@ -370,11 +309,8 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
 @dataclass(eq=False)
 class KinematicChain(AbstractRobotPart, ABC):
     """
-    A kinematic chain is a robot part that consists of a chain of bodies and connections
-    between them.
-
-    It has a root body and a tip body, and the connections between them can be computed
-    using the world description.
+    A kinematic chain is a robot part that consists of a chain of bodies and connections between them.
+    It has a root body and a tip body, and the connections between them can be computed using the world description.
     """
 
     tip: Body = field(kw_only=True)
@@ -386,9 +322,9 @@ class KinematicChain(AbstractRobotPart, ABC):
         self, visited: Set[int]
     ) -> list[KinematicStructureEntity]:
         """
-        Computes the kinematic structure entities of this kinematic chain, which are the
-        bodies and connections that make up the kinematic chain, including the bodies of
-        any robot parts that are part of this kinematic chain.
+        Computes the kinematic structure entities of this kinematic chain, which are the bodies and connections that
+        make up the kinematic chain, including the bodies of any robot parts that are part of this kinematic chain.
+
         """
         if id(self) in visited:
             return []
@@ -411,42 +347,17 @@ class KinematicChain(AbstractRobotPart, ABC):
     def connections(self) -> list[Connection]:
         """
         Returns the connections of the kinematic chain.
-
         This is a list of connections between the bodies in the kinematic chain
         """
         if self.root == self.tip:
             return []
         return self._world.compute_chain_of_connections(self.root, self.tip)
 
-    def approximate_length(self) -> float:
-        """
-        Approximates the length of the kinematic chain by adding up  the distance
-        between each body pair along the chain. For Prismatic Connections the upper
-        limit of the connection is used, so the function returns the maximum length.
-
-        :return: the approximate length of the kinematic chain
-        """
-        length = 0
-        for connection in self.connections:
-            parent_pose = connection.parent.global_pose
-            child_pose = connection.child.global_pose
-            dist = (
-                connection.dof.limits.upper.position
-                if isinstance(connection, PrismaticConnection)
-                else parent_pose.to_position().euclidean_distance(
-                    child_pose.to_position()
-                )
-            )
-            length += dist
-        return length
-
 
 @dataclass(eq=False)
 class Sensor(AbstractRobotPart, ABC):
     """
-    Abstract base class for all sensors.
-
-    A sensor is a robot part that can perceive the environment.
+    Abstract base class for all sensors. A sensor is a robot part that can perceive the environment.
     """
 
 
@@ -463,15 +374,12 @@ class Camera(Sensor, ABC):
 
     field_of_view: FieldOfView = field(kw_only=True)
     """
-    The field of view of the camera, defined by the vertical and horizontal angles of
-    the camera's view.
+    The field of view of the camera, defined by the vertical and horizontal angles of the camera's view.
     """
 
     default_camera: bool = False
     """
-    Whether this camera is the default camera of the robot.
-
-    Used for quick access.
+    Whether this camera is the default camera of the robot. Used for quick access.
     """
 
     minimal_height: float = 0.0
@@ -493,31 +401,24 @@ class Finger(KinematicChain, ABC):
 
     finger_tip_frame: Optional[Body] = None
     """
-    The frame of the finger tip.
-
-    Could be used to align the finger with, for example, a button.
+    The frame of the finger tip. Could be used to align the finger with, for example, a button.
     """
 
 
 @dataclass(eq=False)
 class EndEffector(AbstractRobotPart, ABC):
     """
-    Abstract base class of robot end effector.
-
-    Always has a tool frame.
+    Abstract base class of robot end effector. Always has a tool frame.
     """
 
     tool_frame: Body = field(kw_only=True)
     """
-    The tool frame or tool center point of the end_effector.
-
-    Usually the point the robot tries to align with the object.
+    The tool frame or tool center point of the end_effector. Usually the point the robot tries to align with the object.
     """
 
     front_facing_orientation: Quaternion = field(kw_only=True)
     """
-    The orientation of the end_effector's tool frame, which is usually the front-facing
-    orientation.
+    The orientation of the end_effector's tool frame, which is usually the front-facing orientation.
     """
 
     front_facing_axis: Vector3 = field(init=False)
@@ -534,8 +435,8 @@ class EndEffector(AbstractRobotPart, ABC):
 @dataclass(eq=False)
 class Torso(KinematicChain, ABC):
     """
-    The torso of a robot, which is a kinematic chain providing additional shared degrees
-    of freedom to its attachments, such as arms or the neck.
+    The torso of a robot, which is a kinematic chain providing additional shared degrees of freedom to its
+    attachments, such as arms or the neck.
     """
 
 
@@ -557,38 +458,22 @@ class Neck(
     """
 
 
-TGenericDrive = TypeVar("TGenericDrive", bound=WheeledDrive)
-
-
 @dataclass(eq=False)
-class MobileBase(AbstractRobotPart, Generic[TGenericDrive], ABC):
+class MobileBase(AbstractRobotPart, ABC):
     """
-    The base of a robot.
-
-    The drive connection attaching the base to its ``odom`` frame is bound as the
-    generic parameter (e.g. ``MobileBase[OmniDrive]``) by each concrete mobile base.
+    The base of a robot
     """
 
     forward_axis: Vector3 = field(default_factory=Vector3.X)
     """
-    Axis along which the robot manipulates.
+    Axis along which the robot manipulates
     """
 
     full_body_controlled: bool = field(default=False, kw_only=True)
     """
-    If True, the robot can move its entire body during a motion.
-
+    If True, the robot can move its entire body during a motion. 
     If False, only the robot will always stand still when moving an arm.
     """
-
-    @classmethod
-    def get_drive_connection_type(cls) -> Type[TGenericDrive]:
-        """
-        The connection type attaching this mobile base to its ``odom`` frame.
-
-        Resolved from the generic drive parameter bound by the concrete mobile base.
-        """
-        return get_generic_type_parameters(cls, MobileBase)[0]
 
     @property
     def bounding_box(self) -> BoundingBox:
@@ -668,32 +553,16 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
     @abstractmethod
     def get_ros_file_path(cls) -> str:
         """
-        Returns a ROS file path pointing to the description of this robot, for example a
-        URDF file.
+        Returns a ROS file path pointing to the description of this robot, for example a URDF file.
         """
 
     @classmethod
     @abstractmethod
     def _get_root_body_name(cls) -> str:
         """
-        Returns the name of the root body of the robot in the world, which serves as the
-        entry point for traversing the robot's kinematic structure.
+        Returns the name of the root body of the robot in the world, which serves as the entry point for traversing the
+        robot's kinematic structure.
         """
-
-    @classmethod
-    def get_drive_connection_type(cls) -> Type[Connection]:
-        """
-        The connection type attaching this robot to its ``odom`` frame.
-
-        :return: The mobile base's drive connection type, or :class:`FixedConnection`
-            when the robot has no mobile base and is therefore rigidly attached.
-        """
-        if not issubclass(cls, HasMobileBase):
-            return FixedConnection
-        mobile_base_type = cast(
-            MobileBase, get_generic_type_parameters(cls, HasMobileBase)[0]
-        )
-        return mobile_base_type.get_drive_connection_type()
 
     def setup_robot_part_semantic_annotations(self):
         """
@@ -712,9 +581,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
     def from_branch_in_world(cls, branch_root: KinematicStructureEntity) -> Self:
         """
         Creates a robot from a branch in a world.
-
-        This is useful when you have multiple of the same robots in the same world,
-        which would normally cause naming conflicts.
+        This is useful when you have multiple of the same robots in the same world, which would normally cause naming conflicts.
         """
         world = branch_root._world
         robot_root = world.get_body_in_branch_by_name(
@@ -747,8 +614,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
     @property
     def degrees_of_freedom_with_hardware_interface(self) -> List[DegreeOfFreedom]:
         """
-        The number of degrees of freedom of the robot, which is the sum of the degrees
-        of freedom of all its end_effectors.
+        The number of degrees of freedom of the robot, which is the sum of the degrees of freedom of all its end_effectors.
         """
         dofs_with_hardware_interfaces = []
         for connection in self.connections:
@@ -812,33 +678,12 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         except AttributeError:
             pass
 
-    def set_root_pose(self, pose: Pose) -> None:
-        """
-        Place the robot's root at ``pose``.
-
-        A pose that is not already expressed in the root connection's parent frame is
-        converted into it, so the robot lands at ``pose`` no matter how many frames (an
-        ``odom``, for example) sit between that frame and the pose's own.
-
-        ..note:: A drive that cannot represent every degree of freedom applies only what
-            it can, so the root reaches ``pose`` only within the drive's own limits.
-
-        :param pose: The pose the robot's root should end up at.
-        """
-        connection = self.root.parent_connection
-        parent_kinematic_structure_entity = connection.parent
-        if pose.reference_frame is not parent_kinematic_structure_entity:
-            pose = self._world.transform(pose, parent_kinematic_structure_entity)
-
-        connection.origin = pose.to_homogeneous_matrix()
-
     @property
     def _one_dof_connections(self) -> list[ActiveConnection1DOF]:
         """
-        All 1-DOF active connections that belong to this robot.
-
-        Velocity limit adjustments must only touch the robot's own joints, never
-        unrelated environment joints (drawers, doors, ...) in the same world.
+        All 1-DOF active connections that belong to this robot. Velocity limit
+        adjustments must only touch the robot's own joints, never unrelated
+        environment joints (drawers, doors, ...) in the same world.
         """
         return [
             connection
@@ -851,12 +696,12 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         new_limits: DefaultDict[ActiveConnection1DOF, float],
     ):
         """
-        Convenience method for tightening the velocity limits of all one degree-of-
-        freedom (1DOF) active connections in the system.
+        Convenience method for tightening the velocity limits of all one degree-of-freedom (1DOF)
+        active connections in the system.
 
-        The method iterates through all connections of type `ActiveConnection1DOF` and
-        configures their velocity limits by overwriting the existing lower and upper
-        limit values with the provided ones.
+        The method iterates through all connections of type `ActiveConnection1DOF`
+        and configures their velocity limits by overwriting the existing
+        lower and upper limit values with the provided ones.
 
         :param new_limits: A dictionary linking 1DOF connections to their corresponding
             new velocity limits. The keys are of type `ActiveConnection1DOF`, and the
@@ -922,15 +767,6 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         [torso] = [p for p in self._robot_parts if isinstance(p, Torso)]
         return torso
 
-    def get_torso_if_specified(self) -> Optional[Torso]:
-        """
-        :return: The robot's torso, or None for a robot built without one.
-        """
-        for part in self._robot_parts:
-            if isinstance(part, Torso):
-                return part
-        return None
-
     def get_left_arm_if_specified(self) -> Optional[Arm]:
         if isinstance(self, HasLeftRightArm):
             return self.left_arm
@@ -959,5 +795,5 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
     @abstractmethod
     def _setup_collision_rules(self):
         """
-        Sets up collision rules for the robot.
+        Sets up collision rules for the robot
         """

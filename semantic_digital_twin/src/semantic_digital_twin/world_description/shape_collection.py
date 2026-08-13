@@ -13,7 +13,6 @@ from typing_extensions import Dict, Any, Self, Optional, List, Iterator
 from typing_extensions import TYPE_CHECKING
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
-from semantic_digital_twin.exceptions import MismatchingWorld
 from semantic_digital_twin.world_description.geometry import Shape, BoundingBox, Color
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
@@ -55,7 +54,6 @@ class ShapeCollection(SubclassJSONSerializer):
     def dye_shapes(self, color: Color):
         """
         Dye all shapes in this collection with the given color.
-
         :param color: The color to dye the shapes with.
         """
         for shape in self.shapes:
@@ -68,41 +66,29 @@ class ShapeCollection(SubclassJSONSerializer):
         if self.reference_frame is None:
             return
         for shape in self.shapes:
-            self._transform_shape_to_reference_frame(shape)
+            self._transform_to_own_frame(shape)
 
-    def _transform_shape_to_reference_frame(self, shape: Shape) -> None:
+    def _transform_to_own_frame(self, shape: Shape):
         """
-        Transform ``shape``'s origin into this collection's reference frame in-place.
-
-        A shape without a reference frame adopts the collection's frame. Cross-frame
-        transforms are logged; transforming across worlds raises
-        :class:`MismatchingWorld`.
+        Transform the shape to this collections' frame in-place.
+        :param shape: The shape to transform.
         """
-        origin_reference_frame = shape.origin.reference_frame
-        if origin_reference_frame is None:
+        if shape.origin.reference_frame is None:
+            # If we don’t have a world, fall back to the owning body/frame
             shape.origin.reference_frame = self.reference_frame
-            return
-
-        if origin_reference_frame == self.reference_frame:
-            return
-
-        if self.reference_frame is None or self.reference_frame._world is None:
-            return
-
-        if origin_reference_frame._world != self.reference_frame._world:
-            raise MismatchingWorld(
-                expected_world=origin_reference_frame._world,
-                given_world=self.reference_frame._world,
+        elif (
+            self.reference_frame is not None
+            and shape.origin.reference_frame != self.reference_frame
+            and self.reference_frame._world is not None
+        ):
+            logger.warning(
+                f"Transformed shape {shape} to {self.reference_frame} since it was in a different "
+                f"reference frame than the collection."
             )
-
-        logger.warning(
-            f"Transformed shape {shape} to {self.reference_frame} since it was in a different "
-            f"reference frame than the collection."
-        )
-        shape.origin = self.reference_frame._world.transform(
-            shape.origin,
-            self.reference_frame,
-        )
+            shape.origin = self.reference_frame._world.transform(
+                shape.origin,
+                self.reference_frame,
+            )
 
     def __getitem__(self, index: int) -> Shape:
         return self.shapes[index]
@@ -118,22 +104,15 @@ class ShapeCollection(SubclassJSONSerializer):
 
     def append(self, shape: Shape):
         if self.world is not None:
-            self._transform_shape_to_reference_frame(shape)
+            self._transform_to_own_frame(
+                shape,
+            )
         self.shapes.append(shape)
-
-    def copy_without_reference_frame(self) -> ShapeCollection:
-        """
-        Creates a copy of this shape collection without the reference frame.
-        """
-        return ShapeCollection(
-            shapes=[shape.copy_without_reference_frame() for shape in self.shapes]
-        )
 
     @cached_property
     def combined_mesh(self) -> Trimesh:
         """
         Combines all shapes into a single mesh, applying the respective transformations.
-
         :return: A single Trimesh representing the combined collision geometry.
         """
         transformed_meshes = []
@@ -148,9 +127,7 @@ class ShapeCollection(SubclassJSONSerializer):
         self, origin: HomogeneousTransformationMatrix
     ) -> BoundingBoxCollection:
         """
-        Provides the bounding box collection for this entity given a transformation
-        matrix as origin.
-
+        Provides the bounding box collection for this entity given a transformation matrix as origin.
         :param origin: The origin to express the bounding boxes from.
         :returns: A collection of bounding boxes in world-space coordinates.
         """
@@ -172,9 +149,7 @@ class ShapeCollection(SubclassJSONSerializer):
         self, reference_frame: KinematicStructureEntity
     ) -> BoundingBoxCollection:
         """
-        Provides the bounding box collection for this entity in the given reference
-        frame.
-
+        Provides the bounding box collection for this entity in the given reference frame.
         :param reference_frame: The reference frame to express the bounding boxes in.
         :returns: A collection of bounding boxes in world-space coordinates.
         """
@@ -207,6 +182,10 @@ class ShapeCollection(SubclassJSONSerializer):
         )
         return self.world.transform(com, self.world.root)
 
+    def copy_for_world(self, world: World) -> ShapeCollection:
+        new_shapes = [s.copy_for_world(world) for s in self.shapes]
+        return ShapeCollection(new_shapes)
+
     @property
     def scale(self):
         return (
@@ -219,13 +198,11 @@ class ShapeCollection(SubclassJSONSerializer):
 
     @property
     def min_point(self) -> Point3:
-        return Point3.from_iterable(
-            self.combined_mesh.bounds[0], reference_frame=self.reference_frame
-        )
+        return Point3.from_iterable(self.combined_mesh.bounds[0])
 
     @property
     def max_point(self) -> Point3:
-        return Point3.from_iterable(self.combined_mesh.bounds[1], self.reference_frame)
+        return Point3.from_iterable(self.combined_mesh.bounds[1])
 
 
 @dataclass
@@ -279,12 +256,12 @@ class BoundingBoxCollection(ShapeCollection):
         self, x_amount: float = 0.0, y_amount: float = 0, z_amount: float = 0
     ) -> BoundingBoxCollection:
         """
-        Enlarges all bounding boxes in the collection by a given amount in all
-        dimensions.
+        Enlarges all bounding boxes in the collection by a given amount in all dimensions.
 
         :param x_amount: The amount to adjust the x-coordinates
         :param y_amount: The amount to adjust the y-coordinates
         :param z_amount: The amount to adjust the z-coordinates
+
         :return: The enlarged bounding box collection
         """
         return BoundingBoxCollection(
@@ -388,8 +365,7 @@ class BoundingBoxCollection(ShapeCollection):
 
     def bounding_box(self) -> BoundingBox:
         """
-        Get the 8 corners of a bounding box that contains all bounding boxes in the
-        collection.
+        Get the 8 corners of a bounding box that contains all bounding boxes in the collection.
 
         :return: A list of Point3 objects representing the corners of the bounding box.
         """

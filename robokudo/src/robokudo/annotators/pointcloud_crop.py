@@ -12,19 +12,18 @@ This module provides an annotator for:
 """
 
 from __future__ import annotations
-
 from timeit import default_timer
 
 import cv2
 import open3d as o3d
 from py_trees.common import Status
-from typing_extensions import TYPE_CHECKING, Optional
+from typing_extensions import Optional, TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.utils.annotator_helper import (
-    transform_cloud_from_camera_to_world,
-    transform_cloud_from_world_to_camera,
+    transform_cloud_from_cam_to_world,
+    transform_cloud_from_world_to_cam,
 )
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.o3d_helper import get_mask_from_pointcloud
@@ -77,12 +76,12 @@ class PointcloudCropAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "PointcloudCropAnnotator",
-        descriptor: PointcloudCropAnnotator.Descriptor | None = None,
+        descriptor: "PointcloudCropAnnotator.Descriptor" = Descriptor(),
     ) -> None:
         """Initialize the point cloud cropper.
 
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
+        :param name: Name of this annotator instance, defaults to "PointcloudCropAnnotator"
+        :param descriptor: Configuration descriptor, defaults to Descriptor()
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
@@ -111,9 +110,7 @@ class PointcloudCropAnnotator(BaseAnnotator):
 
         cloud = self.get_cas().get(CASViews.CLOUD)
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
-        pointcloud_camera_intrinsics = self.get_cas().get(
-            CASViews.POINTCLOUD_CAMERA_INTRINSIC
-        )
+        pc_cam_intrinsics = self.get_cas().get(CASViews.PC_CAM_INTRINSIC)
         color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
 
         #
@@ -122,13 +119,13 @@ class PointcloudCropAnnotator(BaseAnnotator):
 
         if self.descriptor.parameters.relative_to_world:
             try:
-                cloud = transform_cloud_from_camera_to_world(self.get_cas(), cloud)
+                cloud = transform_cloud_from_cam_to_world(self.get_cas(), cloud)
             except Exception as e:
                 self.rk_logger.warning(
                     f"Couldn't find camera viewpoint in the CAS and relative_to_world is true. "
                     f"Fail. Error: {e}"
                 )
-                return Status.FAILURE
+            return Status.FAILURE
 
         #
         # Crop the point cloud
@@ -152,7 +149,7 @@ class PointcloudCropAnnotator(BaseAnnotator):
 
         # Transform cloud back to camera coordinates if it has been transformed to world before
         if self.descriptor.parameters.relative_to_world:
-            cropped_cloud_transformed = transform_cloud_from_world_to_camera(
+            cropped_cloud_transformed = transform_cloud_from_world_to_cam(
                 self.get_cas(), cropped_cloud
             )
             cropped_cloud = cropped_cloud_transformed
@@ -166,7 +163,7 @@ class PointcloudCropAnnotator(BaseAnnotator):
         mask = get_mask_from_pointcloud(
             cropped_cloud,
             self.color,
-            pointcloud_camera_intrinsics,
+            pc_cam_intrinsics,
             mask_scale_factor=mask_scale,
             crop_to_ref=True,
         )

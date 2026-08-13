@@ -1,22 +1,11 @@
-from __future__ import annotations
-
 import logging
 import os
-import signal
-import subprocess
-import sys
-import time
 import unittest
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Callable, List
 
 import numpy as np
-import pytest
 
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
 )
@@ -25,67 +14,19 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    FixedConnection,
-    OmniDrive,
-)
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.connections import OmniDrive
 
-from coraplex.datastructures.enums import Arms
-from coraplex.view_manager import ViewManager
 
 logger = logging.getLogger(__name__)
 
 try:
-    import rclpy
     from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
         VizMarkerPublisher,
     )
 except ImportError:
-    rclpy = None
-    VizMarkerPublisher = None
     logger.info(
         "Could not import VizMarkerPublisher. This is probably because you are not running ROS."
     )
-
-
-def start_visualization(world: World) -> None:
-    """
-    Publish the world to RViz.
-
-    Does nothing if ROS is not available.
-    """
-    if VizMarkerPublisher is None:
-        return
-    rclpy.init()
-    node = rclpy.create_node("viz_marker")
-    VizMarkerPublisher(_world=world, node=node).with_tf_publisher()
-
-
-def attach_tool(
-    world: World, robot: AbstractRobot, arm: Arms, tool_world: World, mount: dict
-) -> Body:
-    """
-    Rigidly attach a tool mesh to the arm's tool frame.
-
-    :param world: The world the robot lives in.
-    :param robot: The robot holding the tool.
-    :param arm: The arm the tool is mounted on.
-    :param tool_world: The world containing the parsed tool mesh.
-    :param mount: Keyword arguments describing the mount transform.
-    :return: The tool's root body inside ``world``.
-    """
-    tool_frame = ViewManager.get_end_effector_view(arm, robot).tool_frame
-    connection = FixedConnection(
-        parent=tool_frame,
-        child=tool_world.root,
-        parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-            reference_frame=tool_frame, **mount
-        ),
-    )
-    with world.modify_world():
-        world.merge_world(tool_world, connection)
-    return connection.child
 
 
 def setup_world() -> World:
@@ -244,101 +185,3 @@ def _make_sine_scan_poses(
                 )
             )
     return poses
-
-
-READY_TIMEOUT = 180.0
-SHUTDOWN_TIMEOUT = 60.0
-
-
-@dataclass
-class StandaloneProcess:
-    """
-    A component launched as its own process and stopped again when the test is done.
-    """
-
-    launcher_path: Path
-    """
-    Script to run.
-    """
-
-    is_ready: Callable[[], bool]
-    """
-    Whether the launched component is up yet.
-
-    Supplied by the caller because only it knows what the component announces and which
-    node to look from.
-    """
-
-    arguments: List[str] = field(default_factory=list)
-    """
-    Command-line arguments passed to the script.
-    """
-
-    ready_timeout: float = READY_TIMEOUT
-    """
-    How long to wait for :attr:`is_ready` to hold.
-    """
-
-    shutdown_timeout: float = SHUTDOWN_TIMEOUT
-    """
-    How long to let the process shut down after SIGINT before killing it.
-    """
-
-    process: subprocess.Popen | None = field(init=False, default=None)
-    """
-    The launched process, once started.
-    """
-
-    def start(self) -> None:
-        """
-        Launch the process and block until it is ready.
-        """
-        # Output is discarded rather than piped: an undrained pipe blocks the child once
-        # it fills. start_new_session gives the process its own group, so it can be
-        # signalled without hitting the test runner.
-        self.process = subprocess.Popen(
-            [sys.executable, str(self.launcher_path), *self.arguments],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-            env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)},
-        )
-        self.wait_until_ready()
-
-    def wait_until_ready(self) -> None:
-        """
-        Block until the launched component announces itself.
-
-        :raises TimeoutError: If it does not within :attr:`ready_timeout`.
-        """
-        deadline = time.monotonic() + self.ready_timeout
-        while time.monotonic() < deadline:
-            if self.process.poll() is not None:
-                pytest.fail(
-                    f"{self.launcher_path.name} died during start-up, "
-                    f"rc={self.process.returncode}"
-                )
-            if self.is_ready():
-                return
-            time.sleep(0.5)
-        raise TimeoutError(f"{self.launcher_path.name} never became ready")
-
-    def stop(self) -> None:
-        """
-        Interrupt the process, killing it if it outstays its shutdown budget.
-        """
-        if self.process.poll() is not None:
-            return
-        os.killpg(os.getpgid(self.process.pid), signal.SIGINT)
-        try:
-            self.process.wait(timeout=self.shutdown_timeout)
-        except subprocess.TimeoutExpired:
-            self.process.kill()
-            self.process.wait()
-
-    def __enter__(self) -> StandaloneProcess:
-        self.start()
-        return self
-
-    def __exit__(self, exception_type, exception, traceback) -> None:
-        self.stop()

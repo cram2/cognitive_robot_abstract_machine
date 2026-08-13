@@ -2,22 +2,19 @@ from dataclasses import dataclass
 
 import rustworkx
 
-from krrood.entity_query_language.factories import a, an, variable
+from krrood.entity_query_language.factories import underspecified, variable
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.plans.factories import sequential
-from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.misc import MoveToReach
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Door
 from semantic_digital_twin.spatial_types import Pose2D, Pose
-from semantic_digital_twin.world_description.graph_of_convex_sets.base import (
-    translate_free_space_to_where_condition,
-)
-from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
+from semantic_digital_twin.world_description.graph_of_convex_sets import (
     navigation_map_at_target,
+    translate_free_space_to_where_condition,
 )
 from semantic_digital_twin.exceptions import PointOccupiedError
 
@@ -28,19 +25,18 @@ class Sage10kOpenDoor(ActionDescription):
     Open a door.
 
     This action creates a Graph of Convex Sets (GCS) navigation map at the door handle.
-    Using this GCS, an underspecified move to reach plan is sequenced with an opening
-    action.
+    Using this GCS, an underspecified move to reach plan is mounted as subplan followed up by an
+    opening action is executed.
     """
 
     door: Door
 
-    @property
-    def _action_plan(self) -> PlanNode:
+    def execute(self) -> None:
         """
-        Build the plan for reaching the handle and opening the door.
+        Execute the action by mounting subplans for reaching and opening the door.
 
-        A navigation map is created around the door handle and used to constrain an
-        underspecified reach action, which is sequenced with an opening action.
+        This method creates a navigation map around the door handle and then
+        performs a sequential plan of reaching the handle and opening the door.
         """
         gcs = navigation_map_at_target(target=self.door.handle.root)
 
@@ -72,13 +68,13 @@ class Sage10kOpenDoor(ActionDescription):
             )
         )
 
-        reach_query = a(MoveToReach)(
-            target_pose_offset_robot=a(Pose2D)(
+        reach_query = underspecified(MoveToReach)(
+            target_pose_offset_robot=underspecified(Pose2D)(
                 x=..., y=..., yaw=..., reference_frame=None
             ),
             hip_rotation=0.0,
             target_pose_end_effector=pre_grasp_pose,
-            grasp_description=a(GraspDescription)(
+            grasp_description=underspecified(GraspDescription)(
                 approach_direction=ApproachDirection.FRONT,
                 vertical_alignment=VerticalAlignment.NoAlignment,
                 end_effector=variable(EndEffector, self.world.semantic_annotations),
@@ -97,4 +93,4 @@ class Sage10kOpenDoor(ActionDescription):
 
         open_action = OpenAction(object_designator=self.door.handle.root, arm=arm)
 
-        return sequential([reach_action, open_action])
+        self.add_subplan(sequential([reach_action, open_action])).perform()

@@ -21,6 +21,5 @@ class HasSimulatorProperties:
         default_factory=list, kw_only=True, repr=False
     )
     """
-    A list of additional properties for the simulator, it can contain properties of
-    multiple simulators.
+    A list of additional properties for the simulator, it can contain properties of multiple simulators.
     """

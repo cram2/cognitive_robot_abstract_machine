@@ -1,6 +1,6 @@
 """
-Enforcement strategies that turn high-level constraints into QP matrix rows, slack
-columns, and bounds (:class:`EnforcementStrategy` and subclasses).
+Enforcement strategies that turn high-level constraints into QP matrix rows, slack columns,
+and bounds (:class:`EnforcementStrategy` and subclasses).
 """
 
 from __future__ import annotations
@@ -35,7 +35,6 @@ def normalize_slack_weight(
 ) -> Scalar:
     """
     Scales a slack weight so constraints with different units become comparable.
-
     The control horizon spreads the weight over the time steps a constraint is active.
     """
     return weight * (1 / (sm.Scalar(normalization_factor) ** 2 * control_horizon))
@@ -44,11 +43,9 @@ def normalize_slack_weight(
 @dataclass
 class EnforcementStrategy(ABC):
     """
-    Turns a block of constraints into the QP building blocks that enforce them: the
-    constraint matrix over the free variables, the slack columns and their limits, the
-    bounds, and the row names.
-
-    Subclasses define how a constraint is mapped onto the prediction horizon.
+    Turns a block of constraints into the QP building blocks that enforce them: the constraint
+    matrix over the free variables, the slack columns and their limits, the bounds, and the row
+    names. Subclasses define how a constraint is mapped onto the prediction horizon.
     """
 
     degrees_of_freedom: list[DegreeOfFreedom]
@@ -69,8 +66,7 @@ class EnforcementStrategy(ABC):
     @abstractmethod
     def create_matrix(self) -> Matrix:
         """
-        Builds the constraint matrix mapping the free variables onto the constraint
-        rows.
+        Builds the constraint matrix mapping the free variables onto the constraint rows.
         """
 
     @abstractmethod
@@ -88,8 +84,7 @@ class EnforcementStrategy(ABC):
     @abstractmethod
     def create_slack_variables(self) -> DirectLimits:
         """
-        Creates the limits and weights of the slack variables introduced by this
-        strategy.
+        Creates the limits and weights of the slack variables introduced by this strategy.
         """
 
     @property
@@ -142,11 +137,9 @@ class EnforcementStrategy(ABC):
 @dataclass
 class ExpressionEnforcementStrategy(EnforcementStrategy, ABC):
     """
-    Base for strategies that map per-constraint expressions onto QP rows and read their
-    bounds through a getter.
-
-    Provides the inequality and equality bound builders shared by the expression-based
-    strategies.
+    Base for strategies that map per-constraint expressions onto QP rows and read their bounds
+    through a getter. Provides the inequality and equality bound builders shared by the
+    expression-based strategies.
     """
 
     @abstractmethod
@@ -154,8 +147,7 @@ class ExpressionEnforcementStrategy(EnforcementStrategy, ABC):
         self, bounds_getter: Callable[[GiskardConstraint], Scalar]
     ) -> Vector:
         """
-        Builds the constraint bounds, reading the relevant bound of each constraint via
-        the getter.
+        Builds the constraint bounds, reading the relevant bound of each constraint via the getter.
         """
 
     def create_lower_bounds(self) -> Vector:
@@ -220,8 +212,8 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
 
     def create_matrix(self) -> Matrix:
         """
-        Builds the constraint matrix by repeating the expression jacobian across the
-        velocity horizon and padding the jerk columns with zeros.
+        Builds the constraint matrix by repeating the expression jacobian across the velocity
+        horizon and padding the jerk columns with zeros.
         """
         if len(self.constraints) == 0:
             return sm.Matrix()
@@ -368,8 +360,8 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
 
     def create_matrix(self) -> Matrix:
         """
-        Builds the constraint matrix applying the expression jacobian at each velocity
-        step of the horizon, padding the jerk columns with zeros.
+        Builds the constraint matrix applying the expression jacobian at each velocity step of the
+        horizon, padding the jerk columns with zeros.
         """
         number_of_vel_rows = len(self.constraints) * (
             self.qp_controller_config.prediction_horizon - 2
@@ -399,8 +391,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
 
     def create_slack_matrix(self) -> Matrix:
         """
-        Builds the diagonal slack matrix with one slack variable per constraint and
-        velocity step.
+        Builds the diagonal slack matrix with one slack variable per constraint and velocity step.
         """
         if len(self.constraints) == 0:
             return sm.Matrix()
@@ -414,8 +405,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
 
     def create_slack_variables(self) -> DirectLimits:
         """
-        Creates one slack variable per constraint and velocity step with normalized
-        weights.
+        Creates one slack variable per constraint and velocity step with normalized weights.
         """
         lower_slack = []
         upper_slack = []
@@ -520,8 +510,8 @@ class SystemDynamicsStrategy(EnforcementStrategy):
 
     def create_matrix(self) -> Matrix:
         """
-        Builds the equality matrix encoding the velocity, acceleration, and jerk
-        integration over the horizon.
+        Builds the equality matrix encoding the velocity, acceleration, and jerk integration over
+        the horizon.
         """
         matrix = np.zeros(
             (

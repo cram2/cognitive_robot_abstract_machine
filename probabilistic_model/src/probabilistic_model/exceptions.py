@@ -11,7 +11,6 @@ if TYPE_CHECKING:
 class IntractableError(DataclassException):
     """
     Exception raised when an inference is intractable for a model.
-
     For instance, the mode of a non-deterministic model.
     """
 
@@ -28,7 +27,6 @@ class IntractableError(DataclassException):
 class UndefinedOperationError(DataclassException):
     """
     Exception raised when an operation is not defined for a model.
-
     For instance, invoking the CDF of a model that contains symbolic variables.
     """
 
@@ -39,7 +37,6 @@ class UndefinedOperationError(DataclassException):
 
     def suggest_correction(self) -> str:
         return ""
-
 
 @dataclass
 class ShapeMismatchError(DataclassException, ValueError):

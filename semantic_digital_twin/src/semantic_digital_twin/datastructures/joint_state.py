@@ -32,23 +32,22 @@ class JointState(SubclassJSONSerializer):
 
     connections: List[ActiveConnection1DOF] = field(default_factory=list)
     """
-    All connections in this state.
+    All connections in this state
     """
 
     target_values: List[float] = field(default_factory=list)
     """
-    All target values in this state, order has to correspond to the order of
-    connections.
+    All target values in this state, order has to correspond to the order of connections
     """
 
     state_type: Optional[JointStateType] = field(default=None)
     """
-    A type to better describe this state.
+    A type to better describe this state
     """
 
     name: PrefixedName = field(default=PrefixedName("JointState"))
     """
-    A Name for this JointState.
+    A Name for this JointState
     """
 
     _robot: AbstractRobot = field(init=False, default=None)
@@ -59,17 +58,14 @@ class JointState(SubclassJSONSerializer):
     def __hash__(self):
         """
         Returns the hash of the joint state, which is based on the joint state name.
-
         This allows for proper comparison and storage in sets or dictionaries.
         """
         return hash((self.connections, self.target_values))
 
     def assign_to_robot(self, robot: AbstractRobot):
         """
-        Assigns the joint state to the given robot.
-
-        This method ensures that the joint state is only assigned to one robot at a
-        time, and raises an error if it is already assigned to another robot.
+        Assigns the joint state to the given robot. This method ensures that the joint state is only assigned
+        to one robot at a time, and raises an error if it is already assigned to another robot.
         """
         if self._robot is not None and self._robot != robot:
             raise ValueError(
@@ -85,9 +81,7 @@ class JointState(SubclassJSONSerializer):
     def is_achieved(self) -> bool:
         """
         Checks if the defined joint state is achieved.
-
-        :return: True if all connections are in the specified target value, False
-            otherwise
+        :return: True if all connections are in the specified target value, False otherwise
         """
         return all(
             [
@@ -97,16 +91,6 @@ class JointState(SubclassJSONSerializer):
                 )
             ]
         )
-
-    def apply_to(self, world: World) -> None:
-        """
-        Write the target values of this joint state into the world.
-
-        The whole state is announced as a single change.
-        """
-        with world.batch_state_changes():
-            for connection, target_value in self.items():
-                connection.position = target_value
 
     @classmethod
     def from_str_dict(cls, mapping: Dict[str, float], world: World):
@@ -134,8 +118,8 @@ class JointState(SubclassJSONSerializer):
     def to_json(self) -> Dict[str, Any]:
         return {
             **super().to_json(),
-            "child_ids": [
-                to_json(connection.child.id) for connection in self.connections
+            "connections": [
+                to_json(connection.name) for connection in self.connections
             ],
             "target_values": self.target_values,
             "joint_state_type": to_json(self.state_type),
@@ -144,15 +128,15 @@ class JointState(SubclassJSONSerializer):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        # A connection carries no identifier of its own, so it is referenced the way
-        # Connection itself is serialized: through the entities it joins. Names would
-        # not do, since two instances of the same robot description name their joints
-        # identically.
         tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
-        connections = [
-            tracker.get_world_entity_with_id(from_json(child_id)).parent_connection
-            for child_id in data["child_ids"]
-        ]
+        world = tracker._world
+        if world:
+            connections = [
+                world.get_connection_by_name(from_json(name, **kwargs))
+                for name in data["connections"]
+            ]
+        else:
+            raise NotImplementedError("World is required to resolve connections")
         target_values = from_json(data["target_values"])
         state_type = from_json(data["joint_state_type"])
         name = from_json(data["name"])
@@ -160,10 +144,8 @@ class JointState(SubclassJSONSerializer):
 
     def copy_for_world(self, world: World):
         """
-        Creates a copy of this JointState for the given world.
-
-        This is necessary when copying a robot to another world, as the connections in
-        the new world will be different objects.
+        Creates a copy of this JointState for the given world. This is necessary when copying a robot to another world,
+        as the connections in the new world will be different objects.
         """
         return JointState(
             connections=[c.copy_for_world(world) for c in self.connections],

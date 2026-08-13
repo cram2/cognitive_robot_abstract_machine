@@ -1,26 +1,20 @@
 """
 Query builders for the Entity Query Language.
 
-This module defines builder classes that collect metadata and produce symbolic
-expressions for filtering,  grouping, ordering, and quantifying query results.
+This module defines builder classes that collect metadata and produce symbolic expressions for filtering,
+ grouping, ordering, and quantifying query results.
 """
 
 from __future__ import annotations
 
+import itertools
 import uuid
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cached_property, lru_cache
 
 from ordered_set import OrderedSet
-from typing_extensions import (
-    Tuple,
-    List,
-    Type,
-    Optional,
-    Callable,
-    TYPE_CHECKING,
-)
+from typing_extensions import Tuple, List, Type, Optional, Callable, TYPE_CHECKING
 
 from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
@@ -45,6 +39,7 @@ from krrood.entity_query_language.query.quantifiers import (
 from krrood.entity_query_language.query.operations import (
     Where,
     Having,
+    OrderedBy,
     GroupedBy,
 )
 from krrood.entity_query_language.operators.aggregators import Aggregator, CountAll
@@ -62,9 +57,8 @@ if TYPE_CHECKING:
 @dataclass
 class ExpressionBuilder(ABC):
     """
-    Base class for builder classes of symbolic expressions.
-
-    This class collects meta-data about expressions to finally build the expression.
+    Base class for builder classes of symbolic expressions. This class collects meta-data about expressions to finally
+    build the expression.
     """
 
     query: Query
@@ -143,11 +137,11 @@ class FilterBuilder(ExpressionBuilder, ABC):
                 # No need to traverse inside aggregators
                 return
             elif isinstance(expr, Selectable) and not isinstance(
-                expr, (Literal, Query)
+                expr, (Literal, ResultQuantifier, Query)
             ):
                 non_aggregators.append(expr)
 
-            if isinstance(expr, (Literal, Query)):
+            if isinstance(expr, (Literal, ResultQuantifier, Query)):
                 # Subqueries are a boundary, we don't need to traverse inside them.
                 return
 
@@ -177,8 +171,7 @@ class WhereBuilder(FilterBuilder):
         """
         Assert that the where conditions are correct.
 
-        :raises AggregatorInWhereConditionsError: If the where conditions contain any
-            aggregators.
+        :raises AggregatorInWhereConditionsError: If the where conditions contain any aggregators.
         """
         super().assert_correct_conditions()
         aggregators, non_aggregators = (
@@ -199,8 +192,8 @@ class HavingBuilder(FilterBuilder):
 
     grouped_by: GroupedBy = field(kw_only=True, default=None)
     """
-    The GroupedBy expression associated with the having Filter, as the having conditions
-    are applied on the aggregations of grouped results.
+    The GroupedBy expression associated with the having Filter, as the having conditions are applied on
+     the aggregations of grouped results.
     """
 
     def build(self) -> Having:
@@ -380,39 +373,53 @@ class GroupedByBuilder(ExpressionBuilder):
 @dataclass(eq=False)
 class QuantifierBuilder(ExpressionBuilder):
     """
-    Holds the result-quantifier specification (kind ``An``/``The`` and an optional constraint) that
-    the query's quantification pipeline stage enforces.
+    Builds a result quantifier (An/The) of the specified type with the given child and quantification constraint.
     """
 
     type: Type[ResultQuantifier] = An
     """
-    The kind of quantifier requested.
+    The type of the quantifier to be built.
     """
-
     quantification_constraint: Optional[ResultQuantificationConstraint] = None
     """
-    The quantification constraint that must be satisfied, if any.
+    The quantification constraint that must be satisfied by the result quantifier if present.
     """
+    child: Optional[Selectable] = None
+    """
+    The child expression of the quantifier.
+    """
+
+    def build(self) -> ResultQuantifier:
+        """
+        Builds a result quantifier of the specified type with the given child and quantification constraint.
+        """
+        if self.type is An:
+            return self.type(
+                self.child,
+                _quantification_constraint_=self.quantification_constraint,
+            )
+        else:
+            return self.type(self.child)
 
 
 @dataclass(eq=False)
 class OrderedByBuilder(ExpressionBuilder):
-    """
-    Holds the ordering specification (variable, direction, key) that the query's ordering pipeline
-    stage applies.
-    """
-
     variable: Selectable
     """
     The variable to order by.
     """
-
     descending: bool = False
     """
     Whether to order the results in descending order.
     """
-
     key: Optional[Callable] = None
     """
     A function to extract the key from the variable value.
     """
+    data_source: Optional[SymbolicExpression] = None
+    """
+    The data source that generates the results to be ordered.
+    """
+
+    def build(self) -> OrderedBy:
+        return OrderedBy(self.data_source, self.variable, self.descending, self.key)

@@ -51,20 +51,19 @@ class SpatialType:
     require spatial or kinematic context. The reference frame is represented by a
     `KinematicStructureEntity`, which provides the necessary structural and spatial
     information.
+
     """
 
     casadi_sx: ca.SX
     """
-    Implement Symbolic Math protocol.
+    Implement Symbolic Math protocol
     """
 
     reference_frame: Optional[KinematicStructureEntity] = field(
         kw_only=True, default=None
     )
     """
-    The reference frame associated with the object.
-
-    Can be None if no reference frame is required or applicable.
+    The reference frame associated with the object. Can be None if no reference frame is required or applicable.
     """
 
     @classmethod
@@ -73,15 +72,14 @@ class SpatialType:
     ) -> Optional[KinematicStructureEntity]:
         """
         Resolve an optional kinematic structure entity from JSON by key.
-
-        Raises KinematicStructureEntityNotInKwargs if the name cannot be resolved via
-        the tracker/world.
+        Raises KinematicStructureEntityNotInKwargs if the name cannot be resolved via the tracker/world.
 
         :param data: parsed JSON data
         :param key: name of the attribute in data that is a KinematicStructureEntity
         :param kwargs: addition kwargs of _from_json
         :return: None if the key is not present or its value is None.
         """
+
         frame_data = data.get(key, {})
         if not frame_data:
             return None
@@ -93,21 +91,20 @@ class SpatialType:
         spatial_objects: List[Optional[SpatialType]],
     ) -> Optional[KinematicStructureEntity]:
         """
-        Ensures that all provided spatial objects have a consistent reference frame.
+        Ensures that all provided spatial objects have a consistent reference frame. If a mismatch
+        in the reference frames is detected among the non-null spatial objects, an exception is
+        raised. If the list contains only null objects, None is returned.
 
-        If a mismatch in the reference frames is detected among the non-null spatial
-        objects, an exception is raised. If the list contains only null objects, None is
-        returned.
+        This method is primarily used to validate the reference frames of spatial objects before
+        proceeding with further operations.
 
-        This method is primarily used to validate the reference frames of spatial
-        objects before proceeding with further operations.
+        :param spatial_objects: A list containing zero or more spatial objects, which can either
+            be instances of ReferenceFrameMixin or None.
+        :return: The common reference frame of the spatial objects if consistent, or None if no
+            valid reference frame exists.
 
-        :param spatial_objects: A list containing zero or more spatial objects, which
-            can either be instances of ReferenceFrameMixin or None.
-        :return: The common reference frame of the spatial objects if consistent, or
-            None if no valid reference frame exists.
-        :raises SpatialTypesError: Raised when the reference frames of provided input
-            spatial objects are inconsistent.
+        :raises SpatialTypesError: Raised when the reference frames of provided input spatial
+            objects are inconsistent.
         """
         reference_frame = None
         for spatial_object in spatial_objects:
@@ -128,8 +125,8 @@ class SpatialType:
 
     def __deepcopy__(self, memo) -> Self:
         """
-        Even in a deep copy, we don't want to copy the reference and child frame, just
-        the matrix itself, because are just references to kinematic structure entities.
+        Even in a deep copy, we don't want to copy the reference and child frame, just the matrix itself,
+        because are just references to kinematic structure entities.
         """
         if id(self) in memo:
             return memo[id(self)]
@@ -139,8 +136,8 @@ class SpatialType:
 
     def __copy__(self, memo) -> Self:
         """
-        Even in a deep copy, we don't want to copy the reference and child frame, just
-        the matrix itself, because are just references to kinematic structure entities.
+        Even in a deep copy, we don't want to copy the reference and child frame, just the matrix itself,
+        because are just references to kinematic structure entities.
         """
         if id(self) in memo:
             return memo[id(self)]
@@ -158,8 +155,9 @@ class HomogeneousTransformationMatrix(
 
     A `TransformationMatrix` encapsulates relationships between a parent coordinate
     system (reference frame) and a child coordinate system through rotation and
-    translation. It provides utilities to derive transformations, compute dot products,
-    and create transformations from various inputs such as Euler angles or quaternions.
+    translation. It provides utilities to derive transformations, compute dot
+    products, and create transformations from various inputs such as Euler angles or
+    quaternions.
     """
 
     child_frame: Optional[KinematicStructureEntity] = field(kw_only=True, default=None)
@@ -219,12 +217,9 @@ class HomogeneousTransformationMatrix(
         cls, name: str, resolver: Callable[[], np.ndarray] | None = None
     ) -> Self:
         """
-        Creates a TransformationMatrix object with float variables variables in all
-        relevant entries.
-
+        Creates a TransformationMatrix object with float variables variables in all relevant entries.
         :param name: Name for the variables.
-        :param resolver: Callable that returns the actual transformation matrix when
-            called.
+        :param resolver: Callable that returns the actual transformation matrix when called.
         :return: TransformationMatrix object with float variables.
         """
         transformation_matrix = []
@@ -267,10 +262,10 @@ class HomogeneousTransformationMatrix(
 
         :param point: The 3D point used to set the translation part of the
             transformation matrix. If None, no translation is applied.
-        :param rotation_matrix: The rotation matrix defines the rotational component of
-            the transformation. If None, the identity matrix is assumed.
-        :param reference_frame: The reference frame for the transformation matrix. It
-            specifies the parent coordinate system.
+        :param rotation_matrix: The rotation matrix defines the rotational component
+            of the transformation. If None, the identity matrix is assumed.
+        :param reference_frame: The reference frame for the transformation matrix.
+            It specifies the parent coordinate system.
         :param child_frame: The child or target frame for the transformation. It
             specifies the target coordinate system.
         :return: A `TransformationMatrix` instance initialized with the provided
@@ -318,8 +313,8 @@ class HomogeneousTransformationMatrix(
         :param yaw: The rotation around the z-axis
         :param reference_frame: The reference frame for the transformation
         :param child_frame: The child frame associated with the transformation
-        :return: A TransformationMatrix object created using the provided position and
-            orientation values
+        :return: A TransformationMatrix object created using the provided
+            position and orientation values
         """
         p = Point3(x=x, y=y, z=z)
         r = RotationMatrix.from_rpy(roll, pitch, yaw)
@@ -341,11 +336,10 @@ class HomogeneousTransformationMatrix(
         child_frame: Optional[KinematicStructureEntity] = None,
     ) -> HomogeneousTransformationMatrix:
         """
-        Creates a `TransformationMatrix` instance from the provided position coordinates
-        and quaternion values representing rotation. This method constructs a 3D point
-        for the position and a rotation matrix derived from the quaternion, and
-        initializes the transformation matrix with these along with optional reference
-        and child frame entities.
+        Creates a `TransformationMatrix` instance from the provided position coordinates and quaternion
+        values representing rotation. This method constructs a 3D point for the position and a rotation
+        matrix derived from the quaternion, and initializes the transformation matrix with these along
+        with optional reference and child frame entities.
 
         :param pos_x: X coordinate of the position in space.
         :param pos_y: Y coordinate of the position in space.
@@ -381,14 +375,13 @@ class HomogeneousTransformationMatrix(
         Creates an instance of the class from x, y, z coordinates, axis and angle.
 
         This class method generates an object using provided spatial coordinates and a
-        rotation defined by an axis and angle. The resulting object is defined with a
-        specified reference frame and child frame.
+        rotation defined by an axis and angle. The resulting object is defined with
+        a specified reference frame and child frame.
 
         :param x: Initial x-coordinate.
         :param y: Initial y-coordinate.
         :param z: Initial z-coordinate.
-        :param axis: Vector defining the axis of rotation. Defaults to Vector3(0, 0, 1)
-            if not specified.
+        :param axis: Vector defining the axis of rotation. Defaults to Vector3(0, 0, 1) if not specified.
         :param angle: Angle of rotation around the specified axis, in radians.
         :param reference_frame: Reference frame entity to be associated with the object.
         :param child_frame: Child frame entity associated with the object.
@@ -486,8 +479,8 @@ class HomogeneousTransformationMatrix(
 
     def __deepcopy__(self, memo) -> HomogeneousTransformationMatrix:
         """
-        Even in a deep copy, we don't want to copy the reference and child frame, just
-        the matrix itself, because are just references to kinematic structure entities.
+        Even in a deep copy, we don't want to copy the reference and child frame, just the matrix itself,
+        because are just references to kinematic structure entities.
         """
         if id(self) in memo:
             return memo[id(self)]
@@ -495,20 +488,6 @@ class HomogeneousTransformationMatrix(
             data=deepcopy(self.casadi_sx),
             reference_frame=self.reference_frame,
             child_frame=self.child_frame,
-        )
-
-    def copy_with_new_reference_frames(
-        self,
-        new_reference_frame: KinematicStructureEntity,
-        new_child_frame: KinematicStructureEntity | None,
-    ) -> HomogeneousTransformationMatrix:
-        """
-        Copies the transformation matrix and changes the reference and child frames.
-        """
-        return HomogeneousTransformationMatrix(
-            data=deepcopy(self.casadi_sx),
-            reference_frame=new_reference_frame,
-            child_frame=new_child_frame,
         )
 
     def __hash__(self):
@@ -528,12 +507,11 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     """
     Class to represent a 4x4 symbolic rotation matrix tied to kinematic references.
 
-    This class provides methods for creating and manipulating rotation matrices within
-    the context of kinematic structures. It supports initialization using data such as
-    quaternions, axis-angle, other matrices, or directly through vector definitions. The
-    primary purpose is to facilitate rotational transformations and computations in a
-    symbolic context, particularly for applications like robotic kinematics or
-    mechanical engineering.
+    This class provides methods for creating and manipulating rotation matrices within the context
+    of kinematic structures. It supports initialization using data such as quaternions, axis-angle,
+    other matrices, or directly through vector definitions. The primary purpose is to facilitate
+    rotational transformations and computations in a symbolic context, particularly for applications
+    like robotic kinematics or mechanical engineering.
     """
 
     def __init__(
@@ -625,13 +603,14 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         Build a rotation matrix from a constant (fully numeric) quaternion.
 
-        Uses numpy arithmetic instead of the symbolic CasADi path.  The symbolic path in
-        :meth:`from_quaternion` constructs ~36 CasADi sub-expressions even for constant
-        inputs; evaluating them in numpy is an order of magnitude faster and covers the
-        common case for values loaded from a database.
+        Uses numpy arithmetic instead of the symbolic CasADi path.  The
+        symbolic path in :meth:`from_quaternion` constructs ~36 CasADi
+        sub-expressions even for constant inputs; evaluating them in numpy is
+        an order of magnitude faster and covers the common case for values
+        loaded from a database.
 
         :param quaternion: Quaternion whose underlying CasADi expression satisfies
-            ``quaternion.is_constant()``.
+                  ``quaternion.is_constant()``.
         :return: The corresponding rotation matrix.
         """
         x, y, z, w = quaternion.to_np().ravel()
@@ -797,7 +776,6 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     ) -> RotationMatrix:
         """
         Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
-
         https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
         """
         roll = 0 if roll is None else roll
@@ -856,9 +834,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return Quaternion.from_rotation_matrix(self)
 
     def normalize(self) -> None:
-        """
-        Scales each of the axes to the length of one.
-        """
+        """Scales each of the axes to the length of one."""
         scale_v = 1.0
         self[:3, 0] = self[:3, 0].scale(scale_v)
         self[:3, 1] = self[:3, 1].scale(scale_v)
@@ -872,8 +848,8 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         Calculate the rotational error between two rotation matrices.
 
-        This function computes the angular difference between two rotation matrices by
-        computing the dot product of the first matrix and the inverse of the second.
+        This function computes the angular difference between two rotation matrices
+        by computing the dot product of the first matrix and the inverse of the second.
         Subsequently, it generates the angle of the resulting rotation matrix.
 
         :param other: The second rotation matrix.
@@ -943,11 +919,11 @@ class Point3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :param data: The array-like data or object such as a list, tuple, or numpy array
             used to initialize the Point3 instance.
         :param reference_frame: A reference to a `KinematicStructureEntity` object,
-            representing the frame of reference for the Point3 instance. If the data has
-            a `reference_frame` attribute, and this parameter is not specified, it will
-            be taken from the data.
-        :return: Returns an instance of Point3 initialized with the processed data and
-            an optional reference frame.
+            representing the frame of reference for the Point3 instance. If the data
+            has a `reference_frame` attribute, and this parameter is not specified,
+            it will be taken from the data.
+        :return: Returns an instance of Point3 initialized with the processed data
+            and an optional reference frame.
         """
         if isinstance(data, SpatialType) and reference_frame is None:
             reference_frame = data.reference_frame
@@ -971,7 +947,6 @@ class Point3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     ) -> Self:
         """
         Creates a Vector3 object with float variables in all relevant entries.
-
         :param name: Name for the variables.
         :param resolver: Callable that returns the actual vector when called.
         :return: Vector3 object with float variables.
@@ -1061,14 +1036,11 @@ class Point3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     ) -> Tuple[Point3, sm.Scalar]:
         """
         Projects a point onto a plane defined by two vectors.
-
-        This function assumes that all parameters are defined with respect to the same
-        reference frame.
+        This function assumes that all parameters are defined with respect to the same reference frame.
 
         :param frame_V_plane_vector1: First vector defining the plane
         :param frame_V_plane_vector2: Second vector defining the plane
-        :return: Tuple of (projected point on the plane, signed distance from point to
-            plane)
+        :return: Tuple of (projected point on the plane, signed distance from point to plane)
         """
         normal = frame_V_plane_vector1.cross(frame_V_plane_vector2)
         normal.scale(1)
@@ -1101,7 +1073,6 @@ class Point3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     ) -> Tuple[sm.Scalar, Point3]:
         """
         All parameters must have the same reference frame as self.
-
         :param line_start: start of the approached line
         :param line_end: end of the approached line
         :return: distance to line, the nearest point on the line
@@ -1136,8 +1107,7 @@ class Point3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 @dataclass(eq=False, init=False, repr=False)
 class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     """
-    Representation of a 3D vector with reference frame support for homogenous
-    transformations.
+    Representation of a 3D vector with reference frame support for homogenous transformations.
 
     This class provides a structured representation of 3D vectors. It includes
     support for operations such as addition, subtraction, scaling, dot product,
@@ -1222,10 +1192,10 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             used to initialize the Vector3 instance.
         :param reference_frame: A reference to a `KinematicStructureEntity` object,
             representing the frame of reference for the Vector3 instance. If the data
-            has a `reference_frame` attribute, and this parameter is not specified, it
-            will be taken from the data.
-        :return: Returns an instance of Vector3 initialized with the processed data and
-            an optional reference frame.
+            has a `reference_frame` attribute, and this parameter is not specified,
+            it will be taken from the data.
+        :return: Returns an instance of Vector3 initialized with the processed data
+            and an optional reference frame.
         """
         if isinstance(data, SpatialType) and reference_frame is None:
             reference_frame = data.reference_frame
@@ -1287,7 +1257,6 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     ) -> Self:
         """
         Creates a Vector3 object with float variables in all relevant entries.
-
         :param name: Name for the variables.
         :param resolver: Callable that returns the actual vector when called.
         :return: Vector3 object with float variables.
@@ -1377,12 +1346,10 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         if_nan: Optional[Vector3] = None,
     ) -> sm.GenericSymbolicType:
         """
-        A version of division where no sub-expression is ever NaN.
-
-        The expression would evaluate to 'if_nan', but you should probably never work
-        with the 'if_nan' result. However, if one sub-expressions is NaN, the whole
-        expression evaluates to NaN, even if it is only in a branch of an if-else, that
-        is not returned. This method is a workaround for such cases.
+        A version of division where no sub-expression is ever NaN. The expression would evaluate to 'if_nan', but
+        you should probably never work with the 'if_nan' result. However, if one sub-expressions is NaN, the whole expression
+        evaluates to NaN, even if it is only in a branch of an if-else, that is not returned.
+        This method is a workaround for such cases.
         """
         if if_nan is None:
             if_nan = Vector3()
@@ -1427,17 +1394,15 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         cone_theta: sm.ScalarData,
     ) -> Vector3:
         """
-        Projects a given vector onto the boundary of a cone defined by its axis and
-        angle.
+        Projects a given vector onto the boundary of a cone defined by its axis and angle.
 
-        This function computes the projection of a vector onto the boundary of a cone
-        specified by its axis and half-angle. It handles special cases where the input
-        vector is collinear with the cone's axis. The projection ensures the resulting
-        vector lies within the cone's boundary.
+        This function computes the projection of a vector onto the boundary of a
+        cone specified by its axis and half-angle. It handles special cases where
+        the input vector is collinear with the cone's axis. The projection ensures
+        the resulting vector lies within the cone's boundary.
 
         :param frame_V_cone_axis: The axis of the cone.
-        :param cone_theta: The half-angle of the cone in radians. Can be a symbolic
-            value or a float.
+        :param cone_theta: The half-angle of the cone in radians. Can be a symbolic value or a float.
         :return: The projection of the input vector onto the cone's boundary.
         """
         frame_V_current = self
@@ -1505,14 +1470,15 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 @dataclass(eq=False, init=False, repr=False)
 class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     """
-    Represents a quaternion, which is a mathematical entity used to encode rotations in
-    three-dimensional space.
+    Represents a quaternion, which is a mathematical entity used to encode
+    rotations in three-dimensional space.
 
-    The Quaternion class provides methods for creating quaternion objects from various
-    representations, such as axis-angle, roll-pitch-yaw, and rotation matrices. It
-    supports operations to define and manipulate rotations in 3D space efficiently.
-    Quaternions are used extensively in physics, computer graphics, robotics, and
-    aerospace engineering to represent orientations and rotations.
+    The Quaternion class provides methods for creating quaternion objects
+    from various representations, such as axis-angle, roll-pitch-yaw,
+    and rotation matrices. It supports operations to define and manipulate
+    rotations in 3D space efficiently. Quaternions are used extensively
+    in physics, computer graphics, robotics, and aerospace engineering
+    to represent orientations and rotations.
     """
 
     def __init__(
@@ -1575,8 +1541,8 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         Creates an instance of Quaternion from provided iterable data.
 
-        This class method is used to construct a Quaternion object by processing the
-        given data and optionally assigning a reference frame. The data can represent
+        This class method is used to construct a Quaternion object by processing the given
+        data and optionally assigning a reference frame. The data can represent
         different array-like objects compatible with the desired format for a Quaternion
         instance. The provided iterable or array should follow a 1D structure to avoid
         raised errors.
@@ -1585,8 +1551,9 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             used to initialize the Quaternion instance.
         :param reference_frame: A reference to a `KinematicStructureEntity` object,
             representing the frame of reference for the Quaternion instance. If the data
-            has a `reference_frame` attribute, and this parameter is not specified, it
-            will be taken from the data.
+            has a `reference_frame` attribute, and this parameter is not specified,
+            it will be taken from the data.
+
         :return: Returns an instance of Quaternion initialized with the processed data
             and an optional reference frame.
         """
@@ -1642,16 +1609,17 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         Creates a quaternion from an axis-angle representation.
 
-        This method uses the axis of rotation and the rotation angle (in radians) to
-        construct a quaternion representation of the rotation. Optionally, a reference
-        frame can be specified to which the resulting quaternion is associated.
+        This method uses the axis of rotation and the rotation angle (in radians)
+        to construct a quaternion representation of the rotation. Optionally,
+        a reference frame can be specified to which the resulting quaternion is
+        associated.
 
         :param axis: A 3D vector representing the axis of rotation.
         :param angle: The rotation angle in radians.
-        :param reference_frame: An optional reference frame entity associated with the
-            quaternion, if applicable.
-        :return: A quaternion representing the rotation defined by the given axis and
-            angle.
+        :param reference_frame: An optional reference frame entity associated
+            with the quaternion, if applicable.
+        :return: A quaternion representing the rotation defined by
+            the given axis and angle.
         """
         half_angle = angle / 2
         return cls(
@@ -1673,15 +1641,15 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         Creates a Quaternion instance from specified roll, pitch, and yaw angles.
 
-        The method computes the quaternion representation of the given roll, pitch, and
-        yaw angles using trigonometric transformations based on their half-angle values
-        for efficient calculations.
+        The method computes the quaternion representation of the given roll, pitch,
+        and yaw angles using trigonometric transformations based on their
+        half-angle values for efficient calculations.
 
         :param roll: The roll angle in radians.
         :param pitch: The pitch angle in radians.
         :param yaw: The yaw angle in radians.
-        :param reference_frame: Optional reference frame entity associated with the
-            quaternion.
+        :param reference_frame: Optional reference frame entity associated with
+            the quaternion.
         :return: A Quaternion instance representing the rotation defined by the
             specified roll, pitch, and yaw angles.
         """
@@ -1718,17 +1686,14 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         Creates a Quaternion object initialized from a given rotation matrix.
 
-        This method constructs a quaternion representation of the provided rotation
-        matrix. It is designed to handle different cases of rotation matrix
-        configurations to ensure numerical stability during computation. The resultant
-        quaternion adheres to the expected mathematical relationship with the given
-        rotation matrix.
+        This method constructs a quaternion representation of the provided rotation matrix. It is designed to handle
+        different cases of rotation matrix configurations to ensure numerical stability during computation. The resultant
+        quaternion adheres to the expected mathematical relationship with the given rotation matrix.
 
-        :param r: The input matrix representing a rotation. It can be either a
-            `RotationMatrix` or `TransformationMatrix`. This matrix is expected to have
-            a valid mathematical structure typical for rotation matrices.
-        :return: A new instance of `Quaternion` corresponding to the given rotation
-            matrix `r`.
+        :param r: The input matrix representing a rotation. It can be either a `RotationMatrix` or `TransformationMatrix`.
+                  This matrix is expected to have a valid mathematical structure typical for rotation matrices.
+
+        :return: A new instance of `Quaternion` corresponding to the given rotation matrix `r`.
         """
         q = rotation_matrix_to_quaternion(r.to_generic_matrix())
         return cls.from_iterable(q, reference_frame=r.reference_frame)
@@ -1761,9 +1726,9 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         Normalize this quaternion in-place using numpy arithmetic.
 
-        Called by :meth:`normalize` when the quaternion is constant.  Using numpy avoids
-        constructing symbolic CasADi expressions, which is substantially faster for
-        values loaded from a database.
+        Called by :meth:`normalize` when the quaternion is constant.  Using
+        numpy avoids constructing symbolic CasADi expressions, which is
+        substantially faster for values loaded from a database.
         """
         values = self.to_np().ravel()
         self._casadi_sx = ca.SX(ca.DM(values / np.linalg.norm(values)))
@@ -1809,13 +1774,11 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def slerp(self, other: Quaternion, t: sm.ScalarData) -> Quaternion:
         """
-        Spherical linear interpolation that takes into account that q == -q t=0 will
-        return self and t=1 will return other.
-
+        Spherical linear interpolation that takes into account that q == -q
+        t=0 will return self and t=1 will return other.
         :param other: the other quaternion
         :param t: float, 0-1
-        :return: 4x1 Matrix; Return spherical linear interpolation between two
-            quaternions.
+        :return: 4x1 Matrix; Return spherical linear interpolation between two quaternions.
         """
         cos_half_theta = self.dot(other)
 
@@ -1859,16 +1822,15 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         reference_frame: Optional[KinematicStructureEntity] = None,
     ):
         """
-        Initialize a 3D point with orientation and a reference frame in a kinematic
-        structure.
+        Initialize a 3D point with orientation and a reference frame in a kinematic structure.
 
         :param position: The 3D position of the point, represented as a Point3 object.
-            If None, a default position is assumed.
-        :param orientation: The orientation of the point in 3D space represented as a
-            Quaternion. If None, default orientation is assumed.
-        :param reference_frame: The reference frame (kinematic structure entity)
-            relative to which this point is defined. This may be None if the point is
-            not tied to any specific reference frame.
+                        If None, a default position is assumed.
+        :param orientation: The orientation of the point in 3D space represented as a Quaternion.
+                            If None, default orientation is assumed.
+        :param reference_frame: The reference frame (kinematic structure entity) relative to which
+                                this point is defined. This may be None if the point is not tied
+                                to any specific reference frame.
         """
         if position is None:
             position = Point3()
@@ -1926,9 +1888,9 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         reference_frame: Optional[KinematicStructureEntity] = None,
     ) -> Self:
         """
-        Creates a Pose object from position (x, y, z) and Euler angles (roll, pitch,
-        yaw) values. The function also accepts optional reference and child frame
-        parameters.
+        Creates a Pose object from position (x, y, z) and Euler angles
+        (roll, pitch, yaw) values. The function also accepts optional reference and
+        child frame parameters.
 
         :param x: The x-coordinate of the position
         :param y: The y-coordinate of the position
@@ -1937,8 +1899,8 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :param pitch: The rotation around the y-axis
         :param yaw: The rotation around the z-axis
         :param reference_frame: The reference frame for the transformation
-        :return: A Pose object created using the provided position and orientation
-            values
+        :return: A Pose object created using the provided
+            position and orientation values
         """
         p = Point3(x=x, y=y, z=z)
         r = Quaternion.from_rpy(roll, pitch, yaw)
@@ -1958,10 +1920,9 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     ) -> Self:
         """
         Creates a `Pose` instance from the provided position coordinates and quaternion
-        values representing rotation. This method constructs a 3D point for the position
-        and a rotation matrix derived from the quaternion, and initializes the
-        transformation matrix with these along with optional reference and child frame
-        entities.
+        values representing rotation. This method constructs a 3D point for the position and a rotation
+        matrix derived from the quaternion, and initializes the transformation matrix with these along
+        with optional reference and child frame entities.
 
         :param pos_x: X coordinate of the position in space.
         :param pos_y: Y coordinate of the position in space.
@@ -1991,14 +1952,13 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         Creates an instance of the class from x, y, z coordinates, axis and angle.
 
         This class method generates an object using provided spatial coordinates and a
-        rotation defined by an axis and angle. The resulting object is defined with a
-        specified reference frame and child frame.
+        rotation defined by an axis and angle. The resulting object is defined with
+        a specified reference frame and child frame.
 
         :param x: Initial x-coordinate.
         :param y: Initial y-coordinate.
         :param z: Initial z-coordinate.
-        :param axis: Vector defining the axis of rotation. Defaults to Vector3(0, 0, 1)
-            if not specified.
+        :param axis: Vector defining the axis of rotation. Defaults to Vector3(0, 0, 1) if not specified.
         :param angle: Angle of rotation around the specified axis, in radians.
         :param reference_frame: Reference frame entity to be associated with the object.
         :return: An instance of the class with the specified transformations applied.
@@ -2091,10 +2051,10 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     """
     Represents a 2D pose consisting of an x coordinate, a y coordinate, and a yaw angle.
 
-    Internally stored as a 3×1 symbolic vector ``[x, y, yaw]``. Behaves similarly to
-    :class:`Pose`, but lives in the 2D plane (z=0, roll=0, pitch=0). Whenever 3D
-    calculations are required, use :meth:`to_pose` to obtain the equivalent 3D
-    :class:`Pose`.
+    Internally stored as a 3×1 symbolic vector ``[x, y, yaw]``.
+    Behaves similarly to :class:`Pose`, but lives in the 2D plane (z=0, roll=0, pitch=0).
+    Whenever 3D calculations are required, use :meth:`to_pose` to obtain the equivalent
+    3D :class:`Pose`.
     """
 
     def __init__(
@@ -2159,9 +2119,7 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     # ------------------------------------------------------------------
 
     def to_pose(self) -> Pose:
-        """
-        Convert to a 3D :class:`Pose` with z=0, roll=0, pitch=0.
-        """
+        """Convert to a 3D :class:`Pose` with z=0, roll=0, pitch=0."""
         return Pose.from_xyz_rpy(
             x=self.x,
             y=self.y,
@@ -2206,9 +2164,7 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         pose: Pose,
         reference_frame: Optional[KinematicStructureEntity] = None,
     ) -> Pose2D:
-        """
-        Extract a Pose2D from a 3D Pose by dropping z, roll, pitch.
-        """
+        """Extract a Pose2D from a 3D Pose by dropping z, roll, pitch."""
         _, _, yaw = pose.to_rotation_matrix().to_rpy()
         frame = reference_frame if reference_frame is not None else pose.reference_frame
         return cls(x=pose.x, y=pose.y, yaw=yaw, reference_frame=frame)
@@ -2247,9 +2203,8 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 @sm.substitution_cache
 def rotation_matrix_to_quaternion(r: Matrix):
     """
-    This method constructs a quaternion representation of the provided rotation matrix.
-
-    It is designed to handle different cases of rotation matrix configurations to ensure numerical stability during computation. The resultant
+    This method constructs a quaternion representation of the provided rotation matrix. It is designed to handle
+    different cases of rotation matrix configurations to ensure numerical stability during computation. The resultant
     quaternion adheres to the expected mathematical relationship with the given rotation matrix.
 
     .. note:: this method uses basic symbolic types and substitution caching, because it is building a large computational graph.

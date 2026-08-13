@@ -4,7 +4,7 @@ from typing import Union, Callable
 
 from typing_extensions import List, assert_never, Optional, TYPE_CHECKING, Type, TypeVar
 
-from krrood.entity_query_language.query.match import Match
+from krrood.entity_query_language.query.match import is_underspecified
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import MonitorBehavior
 from coraplex.fluent import Fluent
@@ -115,7 +115,7 @@ def _make_plan_from_type_and_children(
 
     for action_like in children:
         child = make_node(action_like)
-        if child.plan:
+        if isinstance(child, LanguageNode):
             root.mount_subplan(child)
         else:
             root.add_child(child)
@@ -135,7 +135,7 @@ def make_node(action_like: ActionLike) -> PlanNode:
 
     if isinstance(action_like, PlanNode):
         return action_like
-    elif isinstance(action_like, Match):
+    elif is_underspecified(action_like):
         underspecified_action = UnderspecifiedNode(underspecified_action=action_like)
         return underspecified_action
     elif isinstance(action_like, ActionDescription):

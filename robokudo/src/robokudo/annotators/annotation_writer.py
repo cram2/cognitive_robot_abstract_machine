@@ -3,11 +3,9 @@
 This module provides annotators for writing and publishing annotations.
 """
 
-from __future__ import annotations
-
-import json
 import os
 import shutil
+import json
 from timeit import default_timer
 
 from py_trees.common import Status
@@ -35,10 +33,10 @@ class AnnotationStorageWriter(BaseAnnotator):
 
             def __init__(self) -> None:
                 self.basic_path: str = "annotations"
-                """Base directory for storing annotations"""
+                """Base directory for storing annotations, defaults to "annotations"""
 
                 self.suffix: str = "json"
-                """File extension for annotation files"""
+                """File extension for annotation files, defaults to "json"""
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -46,12 +44,12 @@ class AnnotationStorageWriter(BaseAnnotator):
     def __init__(
         self,
         name: str = "AnnotationStorageWriter",
-        descriptor: AnnotationStorageWriter.Descriptor | None = None,
+        descriptor: "AnnotationStorageWriter.Descriptor" = Descriptor(),
     ) -> None:
         """Initialize the annotation storage writer. Minimal one-time init!
 
-        :param name: Name of the annotator instance
-        :param descriptor: Configuration descriptor
+        :param name: Name of the annotator instance, defaults to "AnnotationStorageWriter"
+        :param descriptor: Configuration descriptor, defaults to Descriptor()
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
@@ -108,7 +106,7 @@ class AnnotationPublisherWriter(BaseAnnotator):
 
             def __init__(self) -> None:
                 self.topic_name: str = "/annotations"
-                """Name of the ROS topic to publish on"""
+                """Name of the ROS topic to publish on, defaults to "/annotations"""
 
         # overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -116,12 +114,12 @@ class AnnotationPublisherWriter(BaseAnnotator):
     def __init__(
         self,
         name: str = "AnnotationPublisherWriter",
-        descriptor: AnnotationPublisherWriter.Descriptor | None = None,
+        descriptor: "AnnotationPublisherWriter.Descriptor" = Descriptor(),
     ) -> None:
         """Initialize the annotation publisher. Minimal one-time init!
 
-        :param name: Name of the annotator instance
-        :param descriptor: Configuration descriptor
+        :param name: Name of the annotator instance, defaults to "AnnotationPublisherWriter"
+        :param descriptor: Configuration descriptor, defaults to Descriptor()
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

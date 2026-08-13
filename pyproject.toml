@@ -4,10 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cognitive-robot-abstract-machine"
-description = "Meta-package that wires local subprojects together"
+version = "0.1.0"
 requires-python = ">=3.12,<3.13"
-license = "LGPL-3.0-only"
-dynamic = ["version"]
+description = "Meta-package that wires local subprojects together"
 readme = "README.md"
 authors = [{ name = "AICOR Institute", email = "you@example.com" }]
 
@@ -23,7 +22,6 @@ dependencies = [
   "robokudo",
   "physics_simulators",
   "experiments",
-  "segmind",
   "ipykernel>=7.2.0",
   "lark-parser>=0.12.0"
 ]
@@ -34,11 +32,13 @@ dev = [
     "pytest-asyncio>=0.23.0,<0.24.0",
     "pytest-xdist",
     "objgraph",
-    "treon",
-    "bokeh",
-    "mypy>=1.8",
+
 ]
 
+# Requirements for building the documentation of all sub-packages.
+# Collected from the doc/requirements.txt files of the workspace members
+# (coraplex, krrood, probabilistic_model, random_events, semantic_digital_twin).
+# Workspace packages (e.g. random-events) are omitted since they are core dependencies.
 doc = [
     "jupyter-book<2.0.0",
     "jupyter",
@@ -59,9 +59,7 @@ doc = [
     "graphviz",
     "polytope",
     "ortools",
-    "cvxopt",
-    "treon",
-    "jupytext",
+    "cvxopt"
 ]
 
 [tool.uv.workspace]
@@ -74,8 +72,7 @@ members = [
   "probabilistic_model",
   "physics_simulators",
   "robokudo",
-  "experiments",
-  "segmind"
+  "experiments"
 ]
 
 [tool.uv.sources]
@@ -87,7 +84,6 @@ probabilistic_model   = { workspace = true }
 random_events         = { workspace = true }
 robokudo              = { workspace = true }
 physics_simulators    = { workspace = true }
-segmind               = { workspace = true }
 experiments           = { workspace = true }
 
 [tool.poetry]
@@ -103,17 +99,11 @@ probabilistic_model = { path = "probabilistic_model", develop = true }
 robokudo = { path = "robokudo", develop = true }
 physics_simulators = { path = "physics_simulators", develop = true }
 experiments = { path = "experiments", develop = true }
-segmind = { path = "segmind", develop = true }
 
 [tool.setuptools]
-packages = ["cognitive_robot_abstract_machine"]
-package-dir = {"" = "."}
-
-[tool.setuptools.dynamic]
-version = {attr = "cognitive_robot_abstract_machine._version.__version__"}
+packages = []
 
 [tool.docformatter]
 make-summary-multi-line = true
 pre-summary-newline = true
 close-quotes-on-newline = true
-black = true

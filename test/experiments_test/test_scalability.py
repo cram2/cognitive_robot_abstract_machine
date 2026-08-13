@@ -1,3 +1,5 @@
+import statistics
+
 import plotly.graph_objects as go
 import pytest
 
@@ -10,6 +12,7 @@ from experiments.ormatic_experiments.scalability import (
     build_cram_class_sets,
     ormatic_scalability_experiment,
     plot_scalability,
+    run_scalability_experiment,
 )
 
 

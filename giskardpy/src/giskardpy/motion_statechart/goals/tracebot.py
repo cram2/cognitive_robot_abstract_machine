@@ -1,7 +1,7 @@
-from __future__ import annotations
+from __future__ import division
 
 from dataclasses import dataclass, field
-from typing_extensions import Optional
+from typing import Optional
 
 import numpy as np
 
@@ -40,7 +40,7 @@ class InsertCylinder(Goal):
             target_frame=self.root, spatial_object=self.up
         )
 
-        self.weight = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
+        self.weight = DefaultWeights.WEIGHT_ABOVE_CA
 
         root_P_hole = self.root_P_hole
         root_V_up = self.root_V_up

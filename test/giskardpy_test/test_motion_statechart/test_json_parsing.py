@@ -1,5 +1,4 @@
 import json
-from dataclasses import fields
 
 import numpy as np
 import pytest
@@ -27,12 +26,11 @@ from giskardpy.motion_statechart.motion_statechart import (
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
+from giskardpy.motion_statechart.test_nodes.test_nodes import (
     ConstTrueNode,
     TestNestedGoal,
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from krrood.adapters.json_serializer import to_json, from_json
 from krrood.symbolic_math.symbolic_math import (
     trinary_logic_and,
     trinary_logic_not,
@@ -58,10 +56,10 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 def test_TrueMonitor():
     node = ConstTrueNode()
-    json_data = to_json(node)
+    json_data = node.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
-    node_copy = from_json(new_json_data)
+    node_copy = ConstTrueNode.from_json(new_json_data)
     assert node_copy.name == node.name
 
 
@@ -96,11 +94,11 @@ def test_to_json_joint_position_list(mini_world):
         goal_state=JointState.from_mapping({connection: 0.5}),
         threshold=0.5,
     )
-    json_data = to_json(node)
+    json_data = node.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
     tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
-    node_copy = from_json(new_json_data, **tracker.create_kwargs())
+    node_copy = JointPositionList.from_json(new_json_data, **tracker.create_kwargs())
     assert node_copy.name == node.name
     assert node_copy.threshold == node.threshold
     assert node_copy.goal_state == node.goal_state
@@ -266,7 +264,7 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
     kin_sim.tick_until_end()
 
     fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
-    assert np.allclose(fk, tip_goal, atol=cart_goal.translation_threshold)
+    assert np.allclose(fk, tip_goal, atol=cart_goal.threshold)
 
 
 def test_compressed_copy_can_be_plotted(pr2_world_state_reset: World, tmp_path):
@@ -295,8 +293,8 @@ def test_compressed_copy_can_be_plotted(pr2_world_state_reset: World, tmp_path):
 
     msc_copy = MotionStatechart.from_json(new_json_data)
     msc_copy._add_transitions()
-    assert len(msc_copy.get_nodes_by_type(EndMotion)) == 1
-    assert len(msc_copy.get_nodes_by_type(CancelMotion)) == 1
+    assert isinstance(msc_copy.nodes[-2], EndMotion)
+    assert isinstance(msc_copy.nodes[-1], CancelMotion)
     msc.draw(str(tmp_path / "muh.pdf"))
 
 
@@ -330,22 +328,6 @@ def test_nested_goals(tmp_path):
             assert node_copy.parent_node_index is None
 
 
-def test_collapsed_goal_survives_json_round_trip():
-    msc = MotionStatechart()
-    msc.add_node(goal := TestNestedGoal())
-    goal.plot_specifications.collapse_children = True
-    msc.add_node(EndMotion.when_true(goal))
-
-    msc._expand_goals(MotionStatechartContext.empty())
-    json_data = msc.create_structure_copy().to_json()
-    json_str = json.dumps(json_data)
-    new_json_data = json.loads(json_str)
-
-    msc_copy = MotionStatechart.from_json(new_json_data)
-
-    assert msc_copy.get_node_by_index(goal.index).plot_specifications.collapse_children
-
-
 def test_cancel_motion():
     msc = MotionStatechart()
     msc.add_node(node := ConstTrueNode())
@@ -364,35 +346,6 @@ def test_cancel_motion():
 
     with pytest.raises(Exception):
         kin_sim.tick_until_end()
-
-
-def test_cancel_motion_to_json_does_not_mutate_dataclass_field():
-    exception_field = next(f for f in fields(CancelMotion) if f.name == "exception")
-    assert exception_field.init is True
-
-    cancel = CancelMotion(exception=Exception("boom"))
-    to_json(cancel)
-
-    assert exception_field.init is True
-    # The class must still be constructible with the exception keyword.
-    CancelMotion(exception=Exception("again"))
-
-
-def test_to_json_does_not_accumulate_edges():
-    msc = MotionStatechart()
-    node1 = ConstTrueNode()
-    node2 = ConstTrueNode()
-    msc.add_node(node1)
-    msc.add_node(node2)
-    node2.start_condition = node1.observation_variable
-
-    first = msc.to_json()
-    edges_after_first = len(msc.edges)
-    second = msc.to_json()
-    edges_after_second = len(msc.edges)
-
-    assert edges_after_first == edges_after_second
-    assert first["unique_edges"] == second["unique_edges"]
 
 
 def test_unreachable_cart_goal(pr2_world_state_reset):

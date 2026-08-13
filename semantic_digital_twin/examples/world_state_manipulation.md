@@ -46,30 +46,28 @@ with world.modify_world():
     world.add_body(root)
 with world.modify_world():
     drawer= Drawer.create_with_new_body_in_world(
-        name="drawer",
+        name=PrefixedName("drawer"),
         scale=Scale(0.3, 0.3, 0.2),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix(),
     )
     handle = Handle.create_with_new_body_in_world(
-        name="drawer_handle",
+        name=PrefixedName("drawer_handle"),
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.15),
         world=world,
     )
     drawer.add(handle)
 
     slider = Slider.create_with_new_body_in_world(
-        name="drawer_slider",
+        name=PrefixedName("drawer_slider"),
         world_root_T_self=HomogeneousTransformationMatrix(),
         world=world,
-        parent_connection_specification=Slider.parent_connection_specification(
-            axis=Vector3.X()
-        ),
+        active_axis=Vector3.X()
     )
     drawer.add(slider)
 
     dresser = Dresser.create_with_new_body_in_world(
-        name="dresser",
+        name=PrefixedName("dresser"),
         scale=Scale(0.31, 0.31, 0.21),
         world=world,
     )
@@ -132,7 +130,7 @@ from semantic_digital_twin.world_description.world_entity import Connection
 connection = variable(type_=Connection, domain=world.connections)
 free_connection = the(entity(connection).where(connection.parent == world.root)).first()
 with world.modify_world():
-    free_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1., 1., 0., 0., 0., 0.5 * np.pi, reference_frame=world.root)
+    free_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1., 1., 0., 0., 0., 0.5 * np.pi)
 rt = RayTracer(world)
 rt.update_scene()
 rt.scene.show("jupyter")

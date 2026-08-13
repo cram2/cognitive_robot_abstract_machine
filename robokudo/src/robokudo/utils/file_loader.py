@@ -1,5 +1,4 @@
-"""
-File path resolution utilities for RoboKudo.
+"""File path resolution utilities for RoboKudo.
 
 This module provides utilities for resolving file paths in ROS packages.
 

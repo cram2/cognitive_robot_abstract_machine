@@ -1,10 +1,12 @@
 import os
+from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass
-from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
 from typing import Self, List
+
+from typing_extensions import Type
 
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
@@ -14,13 +16,12 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AvoidSelfCollisions,
 )
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     GripperState,
     TorsoState,
 )
-from semantic_digital_twin.datastructures.field_of_view import FieldOfView
-from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_part_mixins import (
     HasNeck,
@@ -28,6 +29,12 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasTorso,
     HasMobileBase,
     HasTwoFingers,
+    HasSensors,
+    HasEndEffector,
+    TGenericLeftFinger,
+    TGenericRightFinger,
+    HasFingers,
+    TGenericFingerOtherThanThumb,
 )
 from semantic_digital_twin.robots.robot_parts import (
     MobileBase,
@@ -39,50 +46,12 @@ from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     EndEffector,
 )
+from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
-from semantic_digital_twin.world_description.connections import (
-    ActiveConnection,
-    OmniDrive,
-)
+from semantic_digital_twin.world_description.connections import ActiveConnection
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
-
-
-class PR2Joint(StrEnum):
-    """
-    Names of the PR2's commandable connections, as spelled in its URDF.
-
-    Members are usable wherever a connection name is expected, so a configuration keyed by
-    them stays a plain mapping of names to positions.
-
-    ..note:: Connections that no controller commands, such as the caster wheels and the
-        grippers' screw, slider and finger tip joints, are left out.
-    """
-
-    TORSO_LIFT = "torso_lift_joint"
-    HEAD_PAN = "head_pan_joint"
-    HEAD_TILT = "head_tilt_joint"
-
-    LEFT_SHOULDER_PAN = "l_shoulder_pan_joint"
-    LEFT_SHOULDER_LIFT = "l_shoulder_lift_joint"
-    LEFT_UPPER_ARM_ROLL = "l_upper_arm_roll_joint"
-    LEFT_ELBOW_FLEX = "l_elbow_flex_joint"
-    LEFT_FOREARM_ROLL = "l_forearm_roll_joint"
-    LEFT_WRIST_FLEX = "l_wrist_flex_joint"
-    LEFT_WRIST_ROLL = "l_wrist_roll_joint"
-    LEFT_GRIPPER_LEFT_FINGER = "l_gripper_l_finger_joint"
-    LEFT_GRIPPER_RIGHT_FINGER = "l_gripper_r_finger_joint"
-
-    RIGHT_SHOULDER_PAN = "r_shoulder_pan_joint"
-    RIGHT_SHOULDER_LIFT = "r_shoulder_lift_joint"
-    RIGHT_UPPER_ARM_ROLL = "r_upper_arm_roll_joint"
-    RIGHT_ELBOW_FLEX = "r_elbow_flex_joint"
-    RIGHT_FOREARM_ROLL = "r_forearm_roll_joint"
-    RIGHT_WRIST_FLEX = "r_wrist_flex_joint"
-    RIGHT_WRIST_ROLL = "r_wrist_roll_joint"
-    RIGHT_GRIPPER_LEFT_FINGER = "r_gripper_l_finger_joint"
-    RIGHT_GRIPPER_RIGHT_FINGER = "r_gripper_r_finger_joint"
 
 
 @dataclass(eq=False)
@@ -287,8 +256,8 @@ class PR2Neck(Neck[PR2KinectV1]):
     def setup_hardware_interfaces(self):
 
         controlled_joints = [
-            PR2Joint.HEAD_PAN,
-            PR2Joint.HEAD_TILT,
+            "head_pan_joint",
+            "head_tilt_joint",
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
@@ -318,13 +287,13 @@ class PR2LeftArm(Arm[PR2LeftGripper]):
 
     def setup_hardware_interfaces(self):
         controlled_joints = [
-            PR2Joint.LEFT_SHOULDER_PAN,
-            PR2Joint.LEFT_SHOULDER_LIFT,
-            PR2Joint.LEFT_UPPER_ARM_ROLL,
-            PR2Joint.LEFT_FOREARM_ROLL,
-            PR2Joint.LEFT_ELBOW_FLEX,
-            PR2Joint.LEFT_WRIST_FLEX,
-            PR2Joint.LEFT_WRIST_ROLL,
+            "l_shoulder_pan_joint",
+            "l_shoulder_lift_joint",
+            "l_upper_arm_roll_joint",
+            "l_forearm_roll_joint",
+            "l_elbow_flex_joint",
+            "l_wrist_flex_joint",
+            "l_wrist_roll_joint",
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
@@ -343,7 +312,7 @@ class PR2LeftArm(Arm[PR2LeftGripper]):
                         -0.264,
                         1.38,
                         -2.12,
-                        4.2,
+                        16.996 + 3.14159,
                         -0.073,
                         0.0,
                     ],
@@ -373,13 +342,13 @@ class PR2RightArm(Arm[PR2RightGripper]):
 
     def setup_hardware_interfaces(self):
         controlled_joints = [
-            PR2Joint.RIGHT_SHOULDER_PAN,
-            PR2Joint.RIGHT_SHOULDER_LIFT,
-            PR2Joint.RIGHT_UPPER_ARM_ROLL,
-            PR2Joint.RIGHT_FOREARM_ROLL,
-            PR2Joint.RIGHT_ELBOW_FLEX,
-            PR2Joint.RIGHT_WRIST_FLEX,
-            PR2Joint.RIGHT_WRIST_ROLL,
+            "r_shoulder_pan_joint",
+            "r_shoulder_lift_joint",
+            "r_upper_arm_roll_joint",
+            "r_forearm_roll_joint",
+            "r_elbow_flex_joint",
+            "r_wrist_flex_joint",
+            "r_wrist_roll_joint",
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
@@ -431,7 +400,7 @@ class PR2Torso(Torso, HasLeftRightArm[PR2LeftArm, PR2RightArm], HasNeck[PR2Neck]
 
     def setup_hardware_interfaces(self):
         controlled_joints = [
-            PR2Joint.TORSO_LIFT,
+            "torso_lift_joint",
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
@@ -463,7 +432,7 @@ class PR2Torso(Torso, HasLeftRightArm[PR2LeftArm, PR2RightArm], HasNeck[PR2Neck]
 
 
 @dataclass(eq=False)
-class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso]):
+class PR2MobileBase(MobileBase, HasTorso[PR2Torso]):
 
     def setup_hardware_interfaces(self):
         pass
@@ -483,9 +452,7 @@ class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso]):
 @dataclass(eq=False)
 class PR2(AbstractRobot, HasMobileBase[PR2MobileBase]):
     """
-    The PR2 robot built by Willow Garage.
-
-    https://robotsguide.com/robots/pr2
+    The PR2 robot built by Willow Garage. https://robotsguide.com/robots/pr2
     """
 
     @classmethod
@@ -500,11 +467,11 @@ class PR2(AbstractRobot, HasMobileBase[PR2MobileBase]):
         vel_limits = defaultdict(
             lambda: 1.0,
             {
-                self._world.get_connection_by_name(PR2Joint.HEAD_TILT): 3.5,
-                self._world.get_connection_by_name(PR2Joint.RIGHT_SHOULDER_PAN): 0.15,
-                self._world.get_connection_by_name(PR2Joint.LEFT_SHOULDER_PAN): 0.15,
-                self._world.get_connection_by_name(PR2Joint.LEFT_SHOULDER_LIFT): 0.2,
-                self._world.get_connection_by_name(PR2Joint.RIGHT_SHOULDER_LIFT): 0.2,
+                self._world.get_connection_by_name("head_tilt_joint"): 3.5,
+                self._world.get_connection_by_name("r_shoulder_pan_joint"): 0.15,
+                self._world.get_connection_by_name("l_shoulder_pan_joint"): 0.15,
+                self._world.get_connection_by_name("r_shoulder_lift_joint"): 0.2,
+                self._world.get_connection_by_name("l_shoulder_lift_joint"): 0.2,
             },
         )
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)

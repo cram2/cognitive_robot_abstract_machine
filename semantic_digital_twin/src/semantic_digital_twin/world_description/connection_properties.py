@@ -27,11 +27,8 @@ class JointDynamics:
 
     armature: float = 0.0
     """
-    Additional inertia associated with movement of the joint that is not due to body
-    mass.
-
-    This added inertia is usually due to a rotor (a.k.a armature) spinning faster than
-    the joint itself due to a geared transmission.
+    Additional inertia associated with movement of the joint that is not due to body mass. 
+    This added inertia is usually due to a rotor (a.k.a armature) spinning faster than the joint itself due to a geared transmission.
     """
 
     dry_friction: float = 0.0

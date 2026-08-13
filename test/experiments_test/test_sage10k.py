@@ -4,16 +4,21 @@ import numpy as np
 import pytest
 
 import experiments.orm.ormatic_interface  # type: ignore
+from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
+from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
+from coraplex.motion_executor import simulated_robot
 from coraplex.plans.factories import execute_single
 from coraplex.robot_plans.actions.core.misc import MoveToReach
-from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
-from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import a, an
-from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.variable import Continuous
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wall,
     Door,
@@ -21,29 +26,33 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Hinge,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Pose2D
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import Vector3
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.geometry import Color, Scale
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @pytest.fixture
 def wall_door_handle_world():
-    world = World.create_with_root_body("map")
+    world = World()
+    root = Body(name=PrefixedName("map"))
+    with world.modify_world():
+        world.add_body(root)
 
     with world.modify_world():
         wall = Wall.create_with_new_body_in_world(
-            name="wall",
+            name=PrefixedName("wall"),
             world=world,
             scale=Scale(0.1, 4, 2),
         )
         wall.root.visual.dye_shapes(Color(R=0.6, G=0.6, B=0.6))
 
         door = Door.create_with_new_body_in_world(
-            name="door",
+            name=PrefixedName("door"),
             world=world,
             scale=Scale(0.11, 1, 2),
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=1.0),
@@ -55,7 +64,7 @@ def wall_door_handle_world():
 
     with world.modify_world():
         handle = Handle.create_with_new_body_in_world(
-            name="handle",
+            name=PrefixedName("handle"),
             world=world,
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 z=0.6,
@@ -71,15 +80,13 @@ def wall_door_handle_world():
     world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
     with world.modify_world():
         hinge = Hinge.create_with_new_body_in_world(
-            name="hinge",
+            name=PrefixedName("hinge"),
             world=world,
+            active_axis=Vector3.Z(),
             world_root_T_self=world_T_hinge,
-            parent_connection_specification=Hinge.parent_connection_specification(
-                axis=Vector3.Z(),
-                dof_limits=DegreeOfFreedomLimits(
-                    lower=DerivativeMap(position=0.0, velocity=0.0),
-                    upper=DerivativeMap(position=np.pi / 2, velocity=1.0),
-                ),
+            connection_limits=DegreeOfFreedomLimits(
+                lower=DerivativeMap(position=0.0, velocity=0.0),
+                upper=DerivativeMap(position=np.pi / 2, velocity=1.0),
             ),
         )
         door.add(hinge)
@@ -93,10 +100,11 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
     world.merge_world(hsr_copy)
     odom_combined = world.get_body_by_name("odom_combined")
     odom_combined.parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=1, reference_frame=odom_combined.parent_kinematic_structure_entity
-        )
+        HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
     )
+
+    viz_marker_publisher = VizMarkerPublisher(node=rclpy_node, _world=world)
+    viz_marker_publisher.with_tf_publisher()
 
     context = Context.from_world(world, query_backend=ProbabilisticBackend())
 
@@ -109,11 +117,9 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
 
 
 def test_translate_free_space_to_where_condition(wall_door_handle_world):
-    from semantic_digital_twin.world_description.graph_of_convex_sets.base import (
-        translate_free_space_to_where_condition,
-    )
-    from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
+    from semantic_digital_twin.world_description.graph_of_convex_sets import (
         navigation_map_at_target,
+        translate_free_space_to_where_condition,
     )
 
     world, wall, door, handle = wall_door_handle_world
@@ -123,8 +129,10 @@ def test_translate_free_space_to_where_condition(wall_door_handle_world):
 
     # Create a variable for the robot
 
-    query = a(MoveToReach)(
-        target_pose_offset_robot=a(Pose2D)(x=..., y=..., yaw=..., reference_frame=None),
+    query = underspecified(MoveToReach)(
+        target_pose_offset_robot=underspecified(Pose2D)(
+            x=..., y=..., yaw=..., reference_frame=None
+        ),
     )
 
     # Translate free space to where condition

@@ -13,32 +13,24 @@ The module uses DBSCAN clustering and oriented bounding boxes (OBB) for object d
 """
 
 from __future__ import annotations
-
 import copy
 import logging
 from timeit import default_timer
-
 import cv2
 import numpy as np
 import open3d as o3d
 from matplotlib import pyplot as plt
-from py_trees.common import Status
 from scipy.spatial.transform import Rotation as R
-from typing_extensions import TYPE_CHECKING, List, Tuple
-
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from typing_extensions import Tuple, List, TYPE_CHECKING
+from py_trees.common import Status
+from robokudo.annotators.core import ThreadedAnnotator, BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.exceptions import (
-    EmptyPointCloud,
-    PlaneModelMissing,
-    PointCloudTooSmallForClustering,
-)
 from robokudo.types.annotation import Plane
 from robokudo.types.cv import ImageROI
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import draw_bounding_boxes_from_object_hypotheses
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
-from robokudo.utils.o3d_helper import concatenate_clouds, put_obb_on_target_obb
+from robokudo.utils.o3d_helper import put_obb_on_target_obb, concatenate_clouds
 from robokudo.utils.transform import get_transform_matrix
 
 if TYPE_CHECKING:
@@ -50,7 +42,7 @@ DILATION_KERNEL = np.ones((3, 3), np.uint8)
 def generate_roi_with_mask_from_points(
     image_height: int,
     image_width: int,
-    pointcloud_camera_intrinsics: o3d.camera.PinholeCameraIntrinsic,
+    pc_cam_intrinsics: o3d.camera.PinholeCameraIntrinsic,
     cloud: o3d.geometry.PointCloud,
     color2depth_ratio: Tuple[int, int] = (1, 1),
 ) -> Tuple[ImageROI, npt.NDArray]:
@@ -64,16 +56,16 @@ def generate_roi_with_mask_from_points(
 
     :param image_height: Height of the target image
     :param image_width: Width of the target image
-    :param pointcloud_camera_intrinsics: Camera intrinsic parameters
+    :param pc_cam_intrinsics: Camera intrinsic parameters
     :param cloud: Point cloud to project
-    :param color2depth_ratio: Scale ratio between color and depth images
+    :param color2depth_ratio: Scale ratio between color and depth images, defaults to (1, 1)
     :return: Tuple of (ROI with mask, full image mask)
     """
     # TODO: Use robokudo.utils.o3d_helper.get_mask_from_pointcloud
 
     # Project 3D points to image plane for ROI generation
     # This will project the matched points into the full-size input image
-    k = pointcloud_camera_intrinsics.intrinsic_matrix
+    k = pc_cam_intrinsics.intrinsic_matrix
     cropped_3d_points = np.asarray(cloud.points)
     uvd = cropped_3d_points @ k.T
     x = (uvd[:, 0] / uvd[:, 2]).astype(int)
@@ -168,7 +160,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
                 """Minimum total points for valid cluster"""
 
                 self.min_on_plane_point_count: int = 90
-                """Minimum points above plane"""
+                """Minimum points above plane, defaults to 90"""
 
                 self.eps: float = 0.04
                 """DBSCAN epsilon parameter (density threshold)"""
@@ -179,12 +171,12 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "PointCloudClusterExtractor",
-        descriptor: PointCloudClusterExtractor.Descriptor | None = None,
+        descriptor: "PointCloudClusterExtractor.Descriptor" = Descriptor(),
     ) -> None:
         """Initialize the cluster extractor.
 
-        :param name: The name of this annotator instance
-        :param descriptor: Configuration descriptor
+        :param name: The name of this annotator instance, defaults to "PointCloudClusterExtractor"
+        :param descriptor: Configuration descriptor, defaults to Descriptor()
         """
         super().__init__(name, descriptor)
 
@@ -212,7 +204,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
             on_plane_cloud = Points found in on_plane_obb
             on_plane_cloud_indices = Indices of Points found in on_plane_obb
             outlier_cloud = All points that do not belong to the plane/table itself.
-        :raises PointCloudTooSmallForClustering: If insufficient points are found above the plane
+        :raises Exception: If insufficient points found above plane
 
         .. note::
            The function ensures the plane normal points upward by rotating
@@ -264,16 +256,10 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         if on_plane_point_count < self.descriptor.parameters.min_on_plane_point_count:
             self.feedback_message = (
                 f"above plane point cloud has not enough "
-                f"points ({on_plane_point_count} "
+                f"points ({self.descriptor.parameters.on_plane_point_count} "
                 f"< {self.descriptor.parameters.min_on_plane_point_count}). Skipping"
             )
-            raise PointCloudTooSmallForClustering(
-                point_count=on_plane_point_count,
-                minimum_point_count=(
-                    self.descriptor.parameters.min_on_plane_point_count
-                ),
-                context="above-plane point cloud clustering",
-            )
+            raise Exception(self.feedback_message)
 
         return (
             plane_obb,
@@ -296,19 +282,14 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         * Visualizes clusters with unique colors
 
         :return: SUCCESS if clusters are found, FAILURE if no clusters or errors
-        :raises PlaneModelMissing: If no plane model exists in CAS
-        :raises PointCloudTooSmallForClustering: If insufficient points are found above the plane
+        :raises Exception: If no plane model in CAS or insufficient points
         """
         start_timer = default_timer()
         self.rk_logger.info("PCE Start")
         cloud = self.get_cas().get(CASViews.CLOUD)
         color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
-        pointcloud_camera_intrinsics = self.get_cas().get(
-            CASViews.POINTCLOUD_CAMERA_INTRINSIC
-        )
-        assert isinstance(
-            pointcloud_camera_intrinsics, o3d.camera.PinholeCameraIntrinsic
-        )
+        pc_cam_intrinsics = self.get_cas().get(CASViews.PC_CAM_INTRINSIC)
+        assert isinstance(pc_cam_intrinsics, o3d.camera.PinholeCameraIntrinsic)
 
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
         height, width, d = color.shape
@@ -316,7 +297,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         plane_models = self.get_cas().filter_annotations_by_type(Plane)
         if plane_models is None or plane_models == []:
             self.feedback_message = "No plane model in CAS. Aborting."
-            raise PlaneModelMissing(context="point cloud clustering")
+            raise Exception(self.feedback_message)
 
         plane_model: Plane = plane_models[0]
 
@@ -384,7 +365,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
                 generate_roi_with_mask_from_points(
                     image_height=height,
                     image_width=width,
-                    pointcloud_camera_intrinsics=pointcloud_camera_intrinsics,
+                    pc_cam_intrinsics=pc_cam_intrinsics,
                     cloud=cluster_cloud,
                     color2depth_ratio=color2depth_ratio,
                 )
@@ -472,12 +453,12 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "NaivePointCloudClusterExtractor",
-        descriptor: NaivePointCloudClusterExtractor.Descriptor | None = None,
+        descriptor: "NaivePointCloudClusterExtractor.Descriptor" = Descriptor(),
     ) -> None:
         """Initialize the naive cluster extractor.
 
-        :param name: The name of this annotator instance
-        :param descriptor: Configuration descriptor
+        :param name: The name of this annotator instance, defaults to "NaivePointCloudClusterExtractor"
+        :param descriptor: Configuration descriptor, defaults to Descriptor()
         """
         super().__init__(name, descriptor)
 
@@ -493,17 +474,13 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         * Visualizes clusters with unique colors
 
         :return: SUCCESS if clusters found, FAILURE if no clusters or errors
-        :raises EmptyPointCloud: If the input cloud is empty
+        :raises Exception: If insufficient points in clusters
         """
         start_timer = default_timer()
         cloud = self.get_cas().get(CASViews.CLOUD)
         color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
-        pointcloud_camera_intrinsics = self.get_cas().get(
-            CASViews.POINTCLOUD_CAMERA_INTRINSIC
-        )
-        assert isinstance(
-            pointcloud_camera_intrinsics, o3d.camera.PinholeCameraIntrinsic
-        )
+        pc_cam_intrinsics = self.get_cas().get(CASViews.PC_CAM_INTRINSIC)
+        assert isinstance(pc_cam_intrinsics, o3d.camera.PinholeCameraIntrinsic)
 
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
         height, width, d = color.shape
@@ -511,7 +488,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
 
         if len(cloud.points) == 0:
             self.feedback_message = "Input cloud is empty - Can't compute clustering"
-            raise EmptyPointCloud(context="point cloud clustering")
+            raise Exception("Input cloud is empty - Can't compute clustering")
 
         # Cluster the points above the plane to get a list of point indices for each cluster
         all_cluster_indices = cluster_points(
@@ -560,7 +537,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
                 generate_roi_with_mask_from_points(
                     image_height=height,
                     image_width=width,
-                    pointcloud_camera_intrinsics=pointcloud_camera_intrinsics,
+                    pc_cam_intrinsics=pc_cam_intrinsics,
                     cloud=cluster_cloud,
                     color2depth_ratio=color2depth_ratio,
                 )

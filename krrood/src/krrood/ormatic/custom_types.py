@@ -3,7 +3,6 @@ import importlib
 import json
 import pathlib
 
-import numpy as np
 from sqlalchemy import Dialect, TypeDecorator, types
 from typing_extensions import Optional, Type
 
@@ -13,8 +12,8 @@ from krrood.utils import module_and_class_name
 
 class TypeType(TypeDecorator):
     """
-    Type that casts fields that are of type `type` to their class name on serialization
-    and converts the name to the class itself through the globals on load.
+    Type that casts fields that are of type `type` to their class name on serialization and converts the name
+    to the class itself through the globals on load.
     """
 
     impl = types.String(256)
@@ -72,26 +71,22 @@ class JSONDataType(TypeDecorator):
     """
     Type decorator for JSONData that stores JSON without automatic deserialization.
 
-    Unlike regular JSON columns which use the engine's custom json_deserializer (that
-    calls from_json()), this type keeps the data as raw JSON dictionaries/lists. This is
-    necessary for fields that should be deserialized later in application code.
+    Unlike regular JSON columns which use the engine's custom json_deserializer
+    (that calls from_json()), this type keeps the data as raw JSON dictionaries/lists.
+    This is necessary for fields that should be deserialized later in application code.
     """
 
     impl = types.String
     cache_ok = True
 
     def process_bind_param(self, value: Optional[JSONData], dialect: Dialect):
-        """
-        Store the value as-is (already JSON-serializable).
-        """
+        """Store the value as-is (already JSON-serializable)."""
         if value is None:
             return None
         return json.dumps(value)
 
     def process_result_value(self, value: impl, dialect: Dialect):
-        """
-        Return the value as-is (raw JSON, not deserialized).
-        """
+        """Return the value as-is (raw JSON, not deserialized)."""
         if value is None:
             return None
         return json.loads(value)
@@ -118,29 +113,3 @@ class PathType(TypeDecorator):
         if value is not None:
             return pathlib.Path(value)
         return value
-
-
-class NumpyType(TypeDecorator):
-    """
-    Type decorator for numpy arrays, stored as raw float64 bytes.
-
-    ..note:: The shape is not stored, so arrays are read back as one-dimensional.
-    """
-
-    impl = types.LargeBinary(4 * 1024 * 1024 * 1024 - 1)
-    cache_ok = True
-
-    def process_bind_param(
-        self, value: Optional[np.ndarray], dialect: Dialect
-    ) -> Optional[bytes]:
-        if value is None:
-            return None
-        array = np.asarray(value, dtype=np.float64)
-        return array.tobytes(order="C")
-
-    def process_result_value(
-        self, value: Optional[bytes], dialect: Dialect
-    ) -> Optional[np.ndarray]:
-        if value is None:
-            return None
-        return np.frombuffer(value, dtype=np.float64)

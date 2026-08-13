@@ -18,11 +18,8 @@ The module is used for:
 * Debug visualization
 """
 
-from __future__ import annotations
-
 import copy
 import time
-import datetime
 
 import cv2
 import numpy as np
@@ -30,8 +27,8 @@ from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.composites import Sequence
 
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
-from robokudo.cas import CAS, CASViews
+from robokudo.annotators.core import ThreadedAnnotator, BaseAnnotator
+from robokudo.cas import CASViews, CAS
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
@@ -80,6 +77,8 @@ class SlowAnnotator(ThreadedAnnotator):
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
         vis = copy.deepcopy(self.color)
 
+        import datetime
+
         vis = cv2.putText(
             vis,
             str(datetime.datetime.now()),
@@ -113,8 +112,8 @@ class EmptyAnnotator(BaseAnnotator):
     def __init__(self, name: str = "EmptyAnnotator", sleep_in_s: float = 1) -> None:
         """Initialize the empty annotator.
 
-        :param name: Annotator name
-        :param sleep_in_s: Sleep duration in seconds
+        :param name: Annotator name, defaults to "EmptyAnnotator"
+        :param sleep_in_s: Sleep duration in seconds, defaults to 1
         """
         super().__init__(name)
 
@@ -143,7 +142,7 @@ class FailingAnnotator(ThreadedAnnotator):
     def __init__(self, name: str = "FailingAnnotator") -> None:
         """Initialize the failing annotator.
 
-        :param name: Annotator name
+        :param name: Annotator name, defaults to "FailingAnnotator"
         """
         super().__init__(name)
 
@@ -207,7 +206,7 @@ class FakeCollectionReaderAnnotator(BaseAnnotator):
         """
         Initialize the fake collection reader.
 
-        :param name: Name of the annotator instance
+        :param name: Name of the annotator instance, defaults to "FakeCollectionReader"
         """
         super().__init__(name)
         self.rk_logger.debug("%s.__init__()" % (self.__class__.__name__))
@@ -321,13 +320,13 @@ class ScopedAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ScopedAnnotator",
-        descriptor: ScopedAnnotator.Descriptor | None = None,
+        descriptor: "ScopedAnnotator.Descriptor" = Descriptor(),
     ) -> None:
         """
         Initialize the scoped annotator.
 
-        :param name: Name of the annotator instance
-        :param descriptor: Descriptor instance with parameters
+        :param name: Name of the annotator instance, defaults to "ScopedAnnotator"
+        :param descriptor: Descriptor instance with parameters, defaults to Descriptor()
         """
         super().__init__(name, descriptor)
 

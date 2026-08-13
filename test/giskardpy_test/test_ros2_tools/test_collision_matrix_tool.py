@@ -148,10 +148,7 @@ def test_script_launch_and_kill():
         ["python3", script_path],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        # start_new_session rather than preexec_fn=os.setsid: preexec_fn is documented
-        # as unsafe in the presence of threads, and the xdist workers this runs under
-        # are threaded.
-        start_new_session=True,
+        preexec_fn=os.setsid,
         env={
             **os.environ,
             "QT_QPA_PLATFORM": "offscreen",

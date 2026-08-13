@@ -46,9 +46,7 @@ def tracy_milk_world(tracy_world):
         )
         connection = Connection6DoF.create_with_dofs(tracy_copy, tracy_copy.root, box)
         tracy_copy.add_connection(connection)
-        connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            1, 0, 1, reference_frame=tracy_copy.root
-        )
+        connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1, 0, 1)
 
     return tracy_copy, tracy_copy.get_semantic_annotations_by_type(Tracy)[0]
 
@@ -481,7 +479,7 @@ def test_place_sequence(immutable_simple_pr2_holding_world):
         man,
     )
 
-    sequence = grasp_desc.pose_sequence(
+    sequence = grasp_desc._pose_sequence(
         Pose.from_xyz_quaternion(1, 1, 1, 0, 0, 0, 1, world.root),
         world.get_body_by_name("milk.stl"),
         reverse=True,
@@ -506,7 +504,7 @@ def test_place_sequence_right_tracy(tracy_milk_world):
         man,
     )
 
-    sequence = grasp_desc.pose_sequence(
+    sequence = grasp_desc._pose_sequence(
         Pose.from_xyz_quaternion(1, 1, 1, 0, 0, 0, 1, world.root),
         world.get_body_by_name("milk.stl"),
         reverse=True,
@@ -605,7 +603,7 @@ def test_pose_sequence_top_tracy_box(tracy_milk_world):
         VerticalAlignment.TOP,
         man,
     )
-    sequence = grasp_desc.pose_sequence(
+    sequence = grasp_desc._pose_sequence(
         Pose.from_xyz_quaternion(1, 0, 1, reference_frame=world.root),
         world.get_body_by_name("box"),
     )
@@ -640,7 +638,7 @@ def test_pose_sequence_180_flip(immutable_simple_pr2_world):
         VerticalAlignment.NoAlignment,
         man,
     )
-    sequence = grasp_desc.pose_sequence(
+    sequence = grasp_desc._pose_sequence(
         Pose.from_xyz_quaternion(1, 0, 1, 0, 0, 1, 0, reference_frame=world.root),
         world.get_body_by_name("milk.stl"),
     )

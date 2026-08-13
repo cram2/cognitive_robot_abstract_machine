@@ -111,7 +111,8 @@ class TestBaseSimulator:
         else:
             if constraints.max_number_of_steps is not None:
                 assert (
-                    simulator.current_number_of_steps <= constraints.max_number_of_steps
+                    simulator.current_number_of_steps
+                    <= constraints.max_number_of_steps
                 )
 
             if constraints.max_simulation_time is not None:

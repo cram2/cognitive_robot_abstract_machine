@@ -1,5 +1,4 @@
-"""
-Camera configuration module for various camera types and robots.
+"""Camera configuration module for various camera types and robots.
 
 This module provides configuration classes for different camera setups used in
 robotic systems. It includes configurations for:

@@ -4,32 +4,13 @@ import ast
 import types
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Type, Tuple, Protocol
+from typing import Type, Tuple
 
 from typing_extensions import Optional
 
 
 @dataclass
-class CanBehaveLikeDataclassException(Protocol):
-    """
-    A structural template that indicates the matching class is an exception or can be treated as one.
-    """
-
-    @abstractmethod
-    def error_message(self) -> str:
-        """
-        :return: A human-readable description of what went wrong.
-        """
-
-    @abstractmethod
-    def suggest_correction(self) -> str:
-        """
-        :return: Advice on how to fix the error, or an empty string if there is no specific advice.
-        """
-
-
-@dataclass
-class DataclassException(Exception, CanBehaveLikeDataclassException, ABC):
+class DataclassException(Exception, ABC):
     """
     A base exception class for dataclass-based exceptions.
     Subclasses implement error_message() and suggest_correction(); both are evaluated at
@@ -56,9 +37,21 @@ class DataclassException(Exception, CanBehaveLikeDataclassException, ABC):
         # plain message that __post_init__ baked into the args.
         return Exception.__str__(self)
 
+    @abstractmethod
+    def error_message(self) -> str:
+        """
+        :return: A human-readable description of what went wrong.
+        """
+
+    @abstractmethod
+    def suggest_correction(self) -> str:
+        """
+        :return: Advice on how to fix the error, or an empty string if there is no specific advice.
+        """
+
 
 @dataclass
-class InputError(DataclassException, ABC):
+class InputError(DataclassException):
     """
     Raised when there is an error with user input.
     """

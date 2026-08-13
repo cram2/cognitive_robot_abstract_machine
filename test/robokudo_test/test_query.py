@@ -1,6 +1,4 @@
-from robokudo.descriptors.factories.cr_descriptor_factory import (
-    CollectionReaderDescriptorFactory,
-)
+from robokudo.descriptors import CrDescriptorFactory
 import multiprocessing
 import queue
 import threading
@@ -49,7 +47,7 @@ class QueryWorkerThread(threading.Thread):
 
 
 def query_simple_pipeline(node):
-    cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
+    cr_fr_config = CrDescriptorFactory.create_descriptor(
         "file_reader",
         loop=True,
         target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),

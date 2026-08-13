@@ -47,6 +47,7 @@ def robot_in_collision(
     :param threshold: The threshold for contact detection
     :return: True if the robot collides with any object, False otherwise
     """
+
     if ignore_collision_with is None:
         ignore_collision_with = []
 
@@ -102,15 +103,12 @@ def blocking(
 ) -> List[ClosestPoints]:
     """
     Get the bodies that are blocking the robot from reaching a given position.
-
-    The blocking are all bodies that are in collision with the robot when reaching for
-    the pose.
+    The blocking are all bodies that are in collision with the robot when reaching for the pose.
 
     :param pose: The pose to reach
     :param root: The root of the kinematic chain.
     :param tip: The threshold between the end effector and the position.
-    :return: A list of bodies the robot is in collision with when reaching for the
-        specified object or None if the pose or object is not reachable.
+    :return: A list of bodies the robot is in collision with when reaching for the specified object or None if the pose or object is not reachable.
     """
     result = root._world.compute_inverse_kinematics(
         root=root, tip=tip, target=pose, max_iterations=1000
@@ -132,8 +130,7 @@ def blocking(
 def bodies_in_gripper(gripper: HasTwoFingers, sample_size: int = 100) -> List[Body]:
     """
     Gets all bodies which are between the finger of the gripper.
-
-    This method uses samples of rays which are cast between the finger.
+    This method uses samples of rays which are cast between the finger
 
     :param gripper: The gripper for which the check should be done.
     :param sample_size: The number of rays to sample.
@@ -165,33 +162,17 @@ def is_body_in_gripper(
     """
     Check if the body in the gripper.
 
-    This method samples random rays between the finger and the thumb and returns the
-    marginal probability that the rays intersect.
+    This method samples random rays between the finger and the thumb and returns the marginal probability that the rays
+    intersect.
 
     :param body: The body for which the check should be done.
     :param gripper: The gripper for which the check should be done.
     :param sample_size: The number of rays to sample.
+
     :return: The percentage of rays between the fingers that hit the body.
     """
     bodies = bodies_in_gripper(gripper, sample_size)
     return len([b for b in bodies if b == body]) / sample_size
-
-
-@symbolic_function
-def is_body_gripped(
-    body: Body, gripper: EndEffector, threshold: float = 0.9, sample_size: int = 100
-) -> bool:
-    """
-    Check if the body is held by the gripper with at least the given confidence.
-
-    :param body: The body for which the check should be done.
-    :param gripper: The gripper for which the check should be done.
-    :param threshold: Minimum fraction of sampled rays that must hit ``body`` (see
-        :func:`is_body_in_gripper`) for it to count as held.
-    :param sample_size: The number of rays to sample.
-    :return: Whether ``body`` is held by ``gripper``.
-    """
-    return is_body_in_gripper(body, gripper, sample_size) > threshold
 
 
 @symbolic_function

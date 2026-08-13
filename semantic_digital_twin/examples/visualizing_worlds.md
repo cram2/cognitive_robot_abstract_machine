@@ -23,13 +23,12 @@ Let's load a world first to get started.
 import logging
 import os
 
-from importlib.resources import files
-from pathlib import Path
+from pkg_resources import resource_filename
 
 from semantic_digital_twin.adapters.urdf import URDFParser 
 
 logging.disable(logging.CRITICAL)
-apartment = os.path.join(Path(files("semantic_digital_twin")).parent.parent, "resources", "urdf", "apartment.urdf")
+apartment = os.path.join(resource_filename("semantic_digital_twin", "../../"), "resources", "urdf", "apartment.urdf")
 world = URDFParser.from_file(apartment).parse()
 
 ```

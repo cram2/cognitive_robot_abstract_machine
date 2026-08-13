@@ -9,7 +9,7 @@ import tqdm
 from sqlalchemy.orm import Session
 
 from krrood.symbol_graph.symbol_graph import SymbolGraph
-from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.ormatic.dao import to_dao
 from krrood.ormatic.utils import drop_database, create_engine
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.world import World
@@ -38,13 +38,11 @@ from semantic_digital_twin.pipeline.pipeline import (
 def remove_root_and_move_children_into_new_worlds(world: World) -> List[World]:
     """
     Remove the root of the given world and move its children into new worlds.
+    Each child that has a parent with "grp" in its name and does not have "grp" in its own name
+    will be moved to a new world, (sometimes groups are nested).
+    The new world's name will be set to the child's name.
 
-    Each child that has a parent with "grp" in its name and does not have "grp" in its
-    own name will be moved to a new world, (sometimes groups are nested). The new
-    world's name will be set to the child's name.
-
-    :param world: The World object to process. This world will be unusable after this
-        operation.
+    :param world: The World object to process. This world will be unusable after this operation.
     :return: List of new World objects created from the root's children.
     """
     root_children = [
@@ -71,7 +69,6 @@ def replace_dresser_meshes_with_factories(
 ) -> List[World]:
     """
     Replace dresser meshes in the given worlds with dresser factories.
-
     A dresser is identified by its name matching the given dresser_pattern regex.
 
     :param worlds: List of World objects to process.
@@ -119,7 +116,7 @@ def parse_fbx_file_to_world_mapping_daos(fbx_file_path: str) -> List[WorldMappin
         resolved = resolver.resolve(world.name)
         if resolved:
             with world.modify_world():
-                world.add_semantic_annotation(resolved(root=world.root))
+                world.add_semantic_annotation(resolved(body=world.root))
 
     return [to_dao(world) for world in worlds]
 
@@ -129,9 +126,7 @@ def parse_procthor_files_and_save_to_database(
     drop_existing_database: bool = True,
 ):
     """
-    Parse all Procthor FBX files and store the resulting WorldMappingDAO objects in a
-    database.
-
+    Parse all Procthor FBX files and store the resulting WorldMappingDAO objects in a database.
     Currently, only grp files are parsed, and some files and names are excluded.
     TODO: Ensure all relevant files, even those not inside a grp, are parsed.
     """

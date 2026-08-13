@@ -9,9 +9,7 @@ from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterEx
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.annotators.semantic_world_connector import SemanticDigitalTwinConnector
 from robokudo.annotators.simple_yolo_annotator import SimpleYoloAnnotator
-from robokudo.descriptors.factories.cr_descriptor_factory import (
-    CollectionReaderDescriptorFactory,
-)
+from robokudo.descriptors import CrDescriptorFactory
 from robokudo.idioms import pipeline_init
 from robokudo.io.ros import get_node
 from robokudo.pipeline import Pipeline
@@ -26,10 +24,17 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     def implementation(self) -> Pipeline:
         """
-        Create a pipeline that does tabletop segmentation and integrates primary
-        navigation using a YOLO annotator.
+        Create a pipeline that does tabletop segmentation and integrates primary navigation
+        using a YOLO annotator.
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
+
+        sw_connector = SemanticDigitalTwinConnector()
+
+        viz = VizMarkerPublisher(
+            world=sw_connector.semdt_adapter.world, node=get_node()
+        )
+
+        kinect_config = CrDescriptorFactory.create_descriptor("kinect_wo_tf")
 
         seq = Pipeline("RWPipeline")
         seq.add_children(
@@ -43,7 +48,8 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ClusterColorAnnotator(),
                 ClusterColorHistogramAnnotator(),
                 ClusterPoseBBAnnotator(),
-                SemanticDigitalTwinConnector(),
+                SimpleYoloAnnotator(),
+                sw_connector,
                 # Additional annotators (e.g., QueryAnnotator, ActionServerCheck) can be added if needed.
             ]
         )

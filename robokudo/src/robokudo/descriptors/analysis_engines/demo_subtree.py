@@ -4,9 +4,7 @@ from robokudo.annotators.cluster_position import ClusterPositionAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.descriptors.factories.cr_descriptor_factory import (
-    CollectionReaderDescriptorFactory,
-)
+from robokudo.descriptors import CrDescriptorFactory
 from robokudo.descriptors.analysis_engines.subtree_tabletop_object_localization import (
     Subtree as TTLocalizationSubtree,
 )
@@ -23,9 +21,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         Create a pipeline that does tabletop segmentation.
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "kinect_wo_tf"
-        )
+        kinect_config = CrDescriptorFactory.create_descriptor("kinect_wo_tf")
 
         seq = Pipeline("RWPipeline")
         seq.add_children(

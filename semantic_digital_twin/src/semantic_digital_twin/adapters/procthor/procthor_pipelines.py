@@ -1,5 +1,6 @@
 import re
 
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.semantic_annotations.position_descriptions import (
     SemanticPositionDescription,
@@ -25,15 +26,14 @@ from semantic_digital_twin.world_description.world_entity import Body
 def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
     """
     Create a DrawerFactory from a drawer body.
-
-    This function assumes that the drawer body has a bounding box that can be used to
-    determine its scale and that a handle can be created with a standard size.
+    This function assumes that the drawer body has a bounding box that can be used to determine its
+    scale and that a handle can be created with a standard size.
     """
     drawer_scale = drawer_body.collision.scale
 
     with world.modify_world():
         drawer = Drawer.create_with_new_body_in_world(
-            name=drawer_body.name.name,
+            name=drawer_body.name,
             scale=drawer_scale,
             world=world,
         )
@@ -43,7 +43,9 @@ def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
         )
         world_T_handle = world_T_drawer @ drawer_T_handle
         handle = Handle.create_with_new_body_in_world(
-            name=drawer_body.name.name + "_handle",
+            name=PrefixedName(
+                drawer_body.name.name + "_handle", drawer_body.name.prefix
+            ),
             scale=Scale(0.05, 0.1, 0.02),
             world=world,
             world_root_T_self=world_T_handle,
@@ -56,10 +58,10 @@ def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
 def door_from_body_in_world(door_body: Body, world: World) -> Door:
     """
     Create a DoorFactory from a door body.
-
-    This function assumes that the door body has a bounding box that can be used to
-    determine its scale and that a handle can be created with a standard size.
+    This function assumes that the door body has a bounding box that can be used to determine its
+    scale and that a handle can be created with a standard size.
     """
+
     semantic_handle_position = SemanticPositionDescription(
         horizontal_direction_chain=[
             HorizontalSemanticDirection.RIGHT,
@@ -79,13 +81,13 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
 
     with world.modify_world():
         door = Door.create_with_new_body_in_world(
-            name=door_body.name.name,
+            name=door_body.name,
             scale=door_body.collision.scale,
             world=world,
         )
 
         handle = Handle.create_with_new_body_in_world(
-            name=door_body.name.name + "_handle",
+            name=PrefixedName(door_body.name.name + "_handle", door_body.name.prefix),
             scale=Scale(0.05, 0.1, 0.02),
             world=world,
             world_root_T_self=world_T_handle,
@@ -94,12 +96,10 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
     with world.modify_world():
         world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
         hinge = Hinge.create_with_new_body_in_world(
-            name=door_body.name.name + "_hinge",
+            name=PrefixedName(door_body.name.name + "_hinge", door_body.name.prefix),
             world=world,
             world_root_T_self=world_T_hinge,
-            parent_connection_specification=Hinge.parent_connection_specification(
-                axis=Vector3.Z()
-            ),
+            active_axis=Vector3.Z(),
         )
         door.add(hinge)
 
@@ -109,17 +109,16 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
 def dresser_from_body_in_world(dresser: Body, world: World) -> Dresser:
     """
     Replace a dresser body with a DresserFactory.
-
-    This function identifies drawers and doors in the dresser based on naming
-    conventions and creates corresponding factories for them. It assumes that drawer
-    bodies have names containing '_drawer_' and door bodies have names containing
-    '_door_'.
+    This function identifies drawers and doors in the dresser based on naming conventions
+    and creates corresponding factories for them.
+    It assumes that drawer bodies have names containing '_drawer_' and door bodies have names
+    containing '_door_'.
     """
     drawer_pattern = re.compile(r"^.*_drawer_.*$")
     door_pattern = re.compile(r"^.*_door_.*$")
     with world.modify_world():
         dresser = Dresser.create_with_new_body_in_world(
-            name=dresser.name.name,
+            name=dresser.name,
             scale=dresser.collision.scale,
             world=world,
         )

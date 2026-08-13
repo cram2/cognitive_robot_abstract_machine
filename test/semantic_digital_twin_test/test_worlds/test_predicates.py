@@ -358,7 +358,7 @@ def test_is_body_in_gripper(pr2_world_copy):
 
     assert is_body_in_gripper(test_box, left_gripper) > 0
     assert robot_holds_body(pr2, test_box)
-    connection.origin = HomogeneousTransformationMatrix(reference_frame=root)
+    connection.origin = HomogeneousTransformationMatrix()
     assert is_body_in_gripper(test_box, left_gripper) == 0
 
 
@@ -547,9 +547,7 @@ def test_empty_gripper_is_not_holding_something():
 
     @dataclass(eq=False)
     class ReviewEndEffector(EndEffector):
-        """
-        Minimal concrete EndEffector for predicate tests.
-        """
+        """Minimal concrete EndEffector for predicate tests."""
 
         def setup_hardware_interfaces(self):
             pass
@@ -592,9 +590,7 @@ def test_empty_gripper_is_not_holding_something():
 
 @dataclass(eq=False)
 class ReviewCamera(Camera):
-    """
-    Minimal concrete Camera for predicate tests.
-    """
+    """Minimal concrete Camera for predicate tests."""
 
     def setup_hardware_interfaces(self):
         pass

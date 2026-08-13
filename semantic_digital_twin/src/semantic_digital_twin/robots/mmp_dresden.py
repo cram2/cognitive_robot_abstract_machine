@@ -5,7 +5,6 @@ from abc import ABC
 import numpy as np
 from collections import defaultdict
 from dataclasses import dataclass, field
-from enum import StrEnum
 from typing import Self, List
 
 from semantic_digital_twin.datastructures.definitions import (
@@ -22,7 +21,6 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasEndEffector,
     HasSensors,
 )
-from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
@@ -37,26 +35,6 @@ from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
-
-
-class MMPDresdenJoint(StrEnum):
-    """
-    Names of the MMPDresden's commandable connections, as spelled in its URDF.
-
-    Members are usable wherever a connection name is expected, so a configuration keyed by
-    them stays a plain mapping of names to positions.
-
-    ..note:: Connections that no controller commands, such as the base wheels and the
-        gripper's coupled knuckle and finger tip joints, are left out.
-    """
-
-    SHOULDER_PAN = "arm_0_shoulder_pan_joint"
-    SHOULDER_LIFT = "arm_0_shoulder_lift_joint"
-    ELBOW = "arm_0_elbow_joint"
-    WRIST_1 = "arm_0_wrist_1_joint"
-    WRIST_2 = "arm_0_wrist_2_joint"
-    WRIST_3 = "arm_0_wrist_3_joint"
-    GRIPPER_LEFT_KNUCKLE = "arm_0_gripper_robotiq_85_left_knuckle_joint"
 
 
 @dataclass(eq=False)
@@ -230,7 +208,7 @@ class MMPDresdenTorso(Torso, HasOneArm[MMPDresdenArm], HasSensors[MMPDresdenCame
 
 
 @dataclass(eq=False)
-class MMPDresdenMobileBase(MobileBase[OmniDrive], HasTorso[MMPDresdenTorso]):
+class MMPDresdenMobileBase(MobileBase, HasTorso[MMPDresdenTorso]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -250,9 +228,7 @@ class MMPDresdenMobileBase(MobileBase[OmniDrive], HasTorso[MMPDresdenTorso]):
 @dataclass(eq=False)
 class MMPDresden(AbstractRobot, HasMobileBase[MMPDresdenMobileBase]):
     """
-    The  Mobile Manipulation Platform (MMP) Dresden version.
-
-    http://www.rp.mybotshop.de/projects/robot_mmp_ridgeback/html/mmp_dre.html
+    The  Mobile Manipulation Platform (MMP) Dresden version. http://www.rp.mybotshop.de/projects/robot_mmp_ridgeback/html/mmp_dre.html
     """
 
     def _setup_collision_rules(self):

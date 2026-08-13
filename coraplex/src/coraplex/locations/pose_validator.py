@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from copy import deepcopy
 from dataclasses import dataclass, field
 
 from typing_extensions import List
@@ -13,7 +12,6 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from coraplex.plans.plan_node import ActionNode, MotionNode
 from coraplex.alternative_motion_mapping import AlternativeMotion
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
@@ -26,6 +24,8 @@ from coraplex.robot_plans import MoveToolCenterPointMotion
 from coraplex.view_manager import ViewManager
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
+from semantic_digital_twin.robots.robot_parts import EndEffector
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -43,19 +43,18 @@ logger = logging.getLogger("coraplex")
 @dataclass
 class IsVisibleBy(PoseValidator):
     """
-    Validator for checking if either the given pose or body is visible for the robot.
-
-    One has to be given, if both are provided the body is prefered
+    Validator for checking if either the given pose or body is visible for the robot. One has to be given, if both are
+    provided the body is prefered
     """
 
     target_pose: Pose = field(default=None)
     """
-    Pose for which visibility should be checked.
+    Pose for which visibility should be checked
     """
 
     target_body: Body = field(default=None)
     """
-    Body for which visibility should be checked.
+    Body for which visibility should be checked
     """
 
     def __call__(self, *args, **kwargs) -> bool:
@@ -65,14 +64,13 @@ class IsVisibleBy(PoseValidator):
 
     def validate_pose(self) -> bool:
         """
-        Validates if the target_pose is visible for the robot by creating a temporary
-        body at the pose and performing a ray test to see if there is a viewing axis
-        between the robot and the target pose.
+        Validates if the target_pose is visible for the robot by creating a temporary body at the pose and performing
+        a ray test to see if there is a viewing axis between the robot and the target pose.
 
         :return: True if the target pose is visible for the robot, False otherwise
         """
         gen_body = Body(
-            name=PrefixedName("visibility_test_obj", "coraplex"),
+            name=PrefixedName("vist_test_obj", "coraplex"),
             collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
         )
         with self.world.modify_world():
@@ -98,21 +96,21 @@ class IsVisibleBy(PoseValidator):
 
     def _ray_test(self, target_body: Body) -> bool:
         """
-        Performs a ray test from the robot to check if the given body is visible, the
-        check filters out bodies of the ' robot form the hit list of the ray test.
+        Performs a ray test from the robot to check if the given body is visible, the check filters out bodies of the '
+        robot form the hit list of the ray test.
 
         :param target_body: The body for which the ray test is to be performed
         :return: True if the target body is visible for the robot, False otherwise
         """
-        ray_tracer = self.world.ray_tracer
+        r_t = self.world.ray_tracer
         camera = self.robot.get_default_camera()
-        ray = ray_tracer.ray_test(
+        ray = r_t.ray_test(
             camera.bodies[0].global_transform.to_position()[:3].to_np(),
             target_body.global_transform.to_position()[:3].to_np(),
             multiple_hits=True,
         )
 
-        hit_bodies = [body for body in ray[2] if body not in self.robot.bodies]
+        hit_bodies = [b for b in ray[2] if not b in self.robot.bodies]
 
         return hit_bodies[0] == target_body if len(hit_bodies) > 0 else False
 
@@ -125,17 +123,17 @@ class IsReachableBy(PoseValidator):
 
     pose: Pose
     """
-    Pose that should be reached with the tip_link.
+    Pose that should be reached with the tip_link
     """
 
     tip_link: KinematicStructureEntity
     """
-    Link that should be moved to the given pose.
+    Link that should be moved to the given pose
     """
 
     grasp_description: GraspDescription = field(default=None)
     """
-    The grasp description that should be used for validation.
+    The grasp description that should be used for validation
     """
 
     def __call__(self) -> bool:
@@ -150,33 +148,29 @@ class IsReachableBy(PoseValidator):
 @dataclass
 class AreReachableBy(PoseValidator):
     """
-    Validator that checks if a sequence of poses is reachable with the given robot link.
-
-    Poses are addressed in the order they are given.
+    Validator that checks if a sequence of poses is reachable with the given robot link. Poses are addressed in the
+    order they are given.
     """
 
     pose_sequence: List[Pose]
     """
-    Sequence of poses that should be reached.
+    Sequence of poses that should be reached
     """
 
     tip_link: KinematicStructureEntity
     """
-    Link of the robot which should be used for reachability checking.
+    Link of the robot which should be used for reachability checking
     """
 
     grasp_description: GraspDescription = field(default=None)
     """
-    The grasp description that should be used for validation.
+    The grasp description that should be used for validation
     """
 
     def create_msc(self) -> MotionStatechart:
         """
-        Creates the Motion state chart to reach the given pose sequence with the given
-        tip link.
-
-        Also takes into account if there are alternative motion mappings for moving the
-        end effector to the given pose.
+        Creates the Motion state chart to reach the given pose sequence with the given tip link. Also takes into account
+        if there are alternative motion mappings for moving the end effector to the given pose.
         """
         alternative_motion = AlternativeMotion.check_for_alternative(
             self.alternative_motion_mappings, self.robot, MoveToolCenterPointMotion
@@ -195,14 +189,14 @@ class AreReachableBy(PoseValidator):
             for pose in self.pose_sequence:
 
                 if self.grasp_description:
-                    pose = self.grasp_description.pose_sequence(pose)[1]
+                    pose = self.grasp_description._pose_sequence(pose)[1]
 
                 motion = alternative_motion(
                     pose,
                     correct_arm,
                     True,
                 )
-                node = MotionNode(designator=motion)
+                node = PlanNode()
                 # Imagine a plan for the motion node
                 plan = Plan(
                     Context(
@@ -228,7 +222,7 @@ class AreReachableBy(PoseValidator):
 
             sequence = (
                 [
-                    self.grasp_description.pose_sequence(pose)[1]
+                    self.grasp_description._pose_sequence(pose)[1]
                     for pose in self.pose_sequence
                 ]
                 if self.grasp_description
@@ -241,8 +235,8 @@ class AreReachableBy(PoseValidator):
             ]
 
         msc = MotionStatechart()
-        msc.add_node(sequence_node := Sequence(sequence))
-        msc.add_node(EndMotion.when_true(sequence_node))
+        msc.add_node(n := Sequence(sequence))
+        msc.add_node(EndMotion.when_true(n))
 
         return msc
 
@@ -268,101 +262,10 @@ class AreReachableBy(PoseValidator):
             try:
                 # TimeoutError from tick_until_end is an expected outcome (planner
                 # cannot find a path), not an illegal state — no non-raising API exists.
-                executor.tick_until_end(timeout=1500)
+                executor.tick_until_end()
             except TimeoutError:
                 logger.debug(
                     f"Timeout while executing pose sequence: {self.pose_sequence}"
                 )
                 return False
             return True
-
-
-@dataclass
-class IsObjectReachableBy(PoseValidator):
-    """
-    Reachability check that is evaluated against a *fresh* copy of the world.
-
-    Both the world copy and the grasp pose sequence are produced inside
-    :meth:`__call__`, i.e. when the surrounding condition/monitor is evaluated,
-    so the result reflects the current world state instead of the state at the
-    time the plan was parsed. The actual reachability simulation is delegated to
-    :class:`AreReachableBy` / :class:`IsReachableBy`, which run on the throwaway
-    copy so the live world is left untouched.
-    """
-
-    arm: Arms
-    """
-    The arm whose end effector should reach the object.
-    """
-
-    object_designator: Body
-    """
-    The object that should be reachable.
-    """
-
-    grasp_description: GraspDescription = field(default=None)
-    """
-    Grasp description used to build the pose sequence.
-
-    Required unless
-    ``as_single_grasp`` is set.
-    """
-
-    target_pose: Pose = field(default=None)
-    """
-    Optional explicit target pose.
-
-    If omitted, the object's own frame is used as the grasp target (as in
-    :meth:`GraspDescription.grasp_pose_sequence`).
-    """
-
-    reverse: bool = field(default=False)
-    """
-    Whether the grasp pose sequence should be reversed.
-    """
-
-    as_single_grasp: bool = field(default=False)
-    """
-    If set, check reachability of a single grasp pose at the object (used for grasping
-    handles of containers) instead of a full pick pose sequence.
-    """
-
-    def __call__(self, *args, **kwargs) -> bool:
-        world = deepcopy(self.world)
-        robot = world.get_semantic_annotation_by_id(self.robot.id)
-        end_effector = ViewManager.get_end_effector_view(self.arm, robot)
-
-        if self.as_single_grasp:
-            return IsReachableBy(
-                context=Context(
-                    world=world,
-                    robot=robot,
-                    alternative_motion_mappings=self.alternative_motion_mappings,
-                ),
-                pose=self.object_designator.global_pose,
-                tip_link=end_effector.tool_frame,
-                grasp_description=GraspDescription(
-                    ApproachDirection.FRONT,
-                    VerticalAlignment.NoAlignment,
-                    end_effector,
-                ),
-            ).__call__()
-
-        if self.target_pose is not None:
-            pose_sequence = self.grasp_description.pose_sequence(
-                self.target_pose, self.object_designator, reverse=self.reverse
-            )
-        else:
-            pose_sequence = self.grasp_description.grasp_pose_sequence(
-                self.object_designator
-            )
-
-        return AreReachableBy(
-            context=Context(
-                world=world,
-                robot=robot,
-                alternative_motion_mappings=self.alternative_motion_mappings,
-            ),
-            pose_sequence=pose_sequence,
-            tip_link=end_effector.tool_frame,
-        ).__call__()

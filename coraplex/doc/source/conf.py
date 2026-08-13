@@ -5,6 +5,7 @@
 # This file does only contain a selection of the most common options. For a
 # full list see the documentation:
 # http://www.sphinx-doc.org/en/master/config
+
 # -- Path setup --------------------------------------------------------------
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -13,7 +14,6 @@
 #
 import os
 import sys
-from datetime import datetime
 
 sys.path.insert(0, os.path.abspath(os.path.join("..", "src", "coraplex")))
 sys.path.append(os.path.abspath("./_pygments"))
@@ -23,7 +23,7 @@ sys.path.append(os.path.abspath("./_ext"))
 # -- Project information -----------------------------------------------------
 
 project = "coraplex"
-copyright = f"{datetime.now().year}, Jonas Dech, Vanessa Hassouna, Abdelrhman Bassiouny, Tom Schierenbeck, Luca Krohm, David Prüsser,"
+copyright = "2025, Jonas Dech"
 author = "Jonas Dech"
 
 # The short X.Y version

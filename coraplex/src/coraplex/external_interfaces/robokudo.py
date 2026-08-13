@@ -27,11 +27,10 @@ with robokudo_rlock:
 
 def thread_safe(func: Callable) -> Callable:
     """
-    Adds thread safety to a function via a decorator.
+    Adds thread safety to a function via a decorator. This uses the robokudo_lock
 
-    This uses the robokudo_lock
-        :param func: Function that should be thread safe
-        :return: A function with thread safety
+    :param func: Function that should be thread safe
+    :return: A function with thread safety
     """
 
     def wrapper(*args, **kwargs):
@@ -43,12 +42,11 @@ def thread_safe(func: Callable) -> Callable:
 
 def init_robokudo_interface(func: Callable) -> Callable:
     """
-    Checks if the ROS messages are available and if Robokudo is running, if that is the
-    case the interface will be initialized.
+    Checks if the ROS messages are available and if Robokudo is running, if that is the case the interface will be
+    initialized.
 
     :param func: Function this decorator should be wrapping
-    :return: A callable function which initializes the interface and then calls the
-        wrapped function
+    :return: A callable function which initializes the interface and then calls the wrapped function
     """
 
     def wrapper(*args, **kwargs):
@@ -103,9 +101,8 @@ def send_query(
     region: Optional[str] = None,
     attributes: Optional[List[str]] = None,
 ) -> Any:
-    """
-    Generic function to send a query to RoboKudo.
-    """
+    """Generic function to send a query to RoboKudo."""
+
     global client
     goal = QueryGoal()
 
@@ -144,9 +141,7 @@ def send_query(
 
 @init_robokudo_interface
 def query_all_objects() -> dict:
-    """
-    Query RoboKudo for all objects.
-    """
+    """Query RoboKudo for all objects."""
     result = send_query()
 
     return result
@@ -154,9 +149,7 @@ def query_all_objects() -> dict:
 
 @init_robokudo_interface
 def query_object(obj_desc: Any) -> dict:
-    """
-    Query RoboKudo for an object that fits the description.
-    """
+    """Query RoboKudo for an object that fits the description."""
     goal = QueryGoal()
     goal.obj.type = str(obj_desc.types[0])
 
@@ -167,9 +160,7 @@ def query_object(obj_desc: Any) -> dict:
 
 @init_robokudo_interface
 def query_human() -> "PointStamped":
-    """
-    Query RoboKudo for human detection and return the detected human's pose.
-    """
+    """Query RoboKudo for human detection and return the detected human's pose."""
     result = send_query(obj_type="human")
     if result:
         return result  # Assuming result is of type PointStamped or similar.
@@ -178,9 +169,7 @@ def query_human() -> "PointStamped":
 
 @init_robokudo_interface
 def stop_query():
-    """
-    Stop any ongoing query to RoboKudo.
-    """
+    """Stop any ongoing query to RoboKudo."""
     global client
     client.cancel_all_goals()
     info("Cancelled current RoboKudo query goal")
@@ -188,26 +177,19 @@ def stop_query():
 
 @init_robokudo_interface
 def query_specific_region(region: str) -> Any:
-    """
-    Query RoboKudo to scan a specific region.
-    """
+    """Query RoboKudo to scan a specific region."""
     return send_query(region=region)
 
 
 @init_robokudo_interface
 def query_human_attributes() -> Any:
-    """
-    Query RoboKudo for human attributes like brightness of clothes, headgear, and
-    gender.
-    """
+    """Query RoboKudo for human attributes like brightness of clothes, headgear, and gender."""
     return send_query(obj_type="human", attributes=["attributes"])
 
 
 @init_robokudo_interface
 def query_waving_human() -> Pose:
-    """
-    Query RoboKudo for detecting a waving human.
-    """
+    """Query RoboKudo for detecting a waving human."""
     result = send_query(obj_type="human")
     if result and result.res:
         try:

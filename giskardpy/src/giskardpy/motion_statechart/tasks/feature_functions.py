@@ -1,7 +1,8 @@
-from __future__ import annotations
+from __future__ import division
 
 from abc import ABC, abstractmethod
 from dataclasses import field, dataclass
+from typing import Union
 
 import krrood.symbolic_math.symbolic_math as sm
 from semantic_digital_twin.spatial_types import Point3, Vector3
@@ -12,16 +13,11 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.error_signals import SymbolicErrorSignal
-from giskardpy.motion_statechart.graph_node import (
-    ConvergingTask,
-    NodeArtifacts,
-    DebugExpression,
-)
+from giskardpy.motion_statechart.graph_node import Task, NodeArtifacts, DebugExpression
 
 
 @dataclass(eq=False, repr=False)
-class FeatureFunctionGoal(ConvergingTask, ABC):
+class FeatureFunctionGoal(Task, ABC):
     """
     Base for feature tasks operating on geometric features.
 
@@ -37,11 +33,11 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
     """
     The static reference link. Defines the fixed frame of reference.
     """
-    controlled_feature: Point3 | Vector3 = field(init=False)
+    controlled_feature: Union[Point3, Vector3] = field(init=False)
     """
     The geometric feature (point or vector) that is being controlled, expressed in the tip link frame.
     """
-    reference_feature: Point3 | Vector3 = field(init=False)
+    reference_feature: Union[Point3, Vector3] = field(init=False)
     """
     The geometric feature (point or vector) that serves as reference, expressed in the root link frame.
     """
@@ -49,7 +45,7 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
     @abstractmethod
     def get_controlled_and_reference_features(
         self,
-    ) -> tuple[Point3 | Vector3, Point3 | Vector3]:
+    ) -> tuple[Union[Point3, Vector3], Union[Point3, Vector3]]:
         """
         Return the controlled and reference features.
 
@@ -61,7 +57,7 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
         self.controlled_feature, self.reference_feature = (
             self.get_controlled_and_reference_features()
         )
-        feature_debug_expressions: list[DebugExpression] = []
+        artifacts = NodeArtifacts()
         root_reference_feature = context.world.transform(
             target_frame=self.root_link, spatial_object=self.reference_feature
         )
@@ -74,50 +70,44 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
         )
         if isinstance(self.controlled_feature, Point3):
             self.root_P_controlled_feature = root_T_tip @ tip_controlled_feature
-            feature_debug_expressions.append(
-                DebugExpression(
-                    name="root_P_controlled_feature",
-                    expression=self.root_P_controlled_feature,
-                    color=Color(1, 0, 0, 1),
-                )
+            dbg = DebugExpression(
+                name="root_P_controlled_feature",
+                expression=self.root_P_controlled_feature,
+                color=Color(1, 0, 0, 1),
             )
+            artifacts.debug_expressions.append(dbg)
         elif isinstance(self.controlled_feature, Vector3):
             self.root_V_controlled_feature = root_T_tip @ tip_controlled_feature
             self.root_V_controlled_feature.visualisation_frame = (
                 self.controlled_feature.visualisation_frame
             )
-            feature_debug_expressions.append(
-                DebugExpression(
-                    name="root_V_controlled_feature",
-                    expression=self.root_V_controlled_feature,
-                    color=Color(1, 0, 0, 1),
-                )
+            dbg = DebugExpression(
+                name="root_V_controlled_feature",
+                expression=self.root_V_controlled_feature,
+                color=Color(1, 0, 0, 1),
             )
+            artifacts.debug_expressions.append(dbg)
 
         if isinstance(self.reference_feature, Point3):
             self.root_P_reference_feature = root_reference_feature
-            feature_debug_expressions.append(
-                DebugExpression(
-                    name="root_P_reference_feature",
-                    expression=self.root_P_reference_feature,
-                    color=Color(0, 1, 0, 1),
-                )
+            dbg = DebugExpression(
+                name="root_P_reference_feature",
+                expression=self.root_P_reference_feature,
+                color=Color(0, 1, 0, 1),
             )
+            artifacts.debug_expressions.append(dbg)
         elif isinstance(self.reference_feature, Vector3):
             self.root_V_reference_feature = root_reference_feature
             self.root_V_reference_feature.visualisation_frame = (
                 self.reference_feature.visualisation_frame
             )
-            feature_debug_expressions.append(
-                DebugExpression(
-                    name="root_V_reference_feature",
-                    expression=self.root_V_reference_feature,
-                    color=Color(0, 1, 0, 1),
-                )
+            dbg = DebugExpression(
+                name="root_V_reference_feature",
+                expression=self.root_V_reference_feature,
+                color=Color(0, 1, 0, 1),
             )
+            artifacts.debug_expressions.append(dbg)
 
-        artifacts = super().build(context)
-        artifacts.debug_expressions.extend(feature_debug_expressions)
         return artifacts
 
 
@@ -138,9 +128,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
     """
     The reference normal vector to align against, defined in the root link frame.
     """
-    weight: float = field(
-        default=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE, kw_only=True
-    )
+    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
     """
     Priority weight for the alignment constraint in the optimization problem.
     """
@@ -157,14 +145,9 @@ class AlignPerpendicular(FeatureFunctionGoal):
     def get_controlled_and_reference_features(self):
         return self.tip_normal, self.reference_normal
 
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        """
-        Build a constraint that drives the two normals perpendicular.
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        artifacts = super().build(context)
 
-        :param context: Provides access to world model and kinematic expressions.
-        :return: The artifacts of this task, whose error is how far the dot product of the two normals is from zero.
-        """
-        artifacts = NodeArtifacts()
         expr = self.root_V_reference_feature @ self.root_V_controlled_feature
 
         artifacts.constraints.add_equality_constraint(
@@ -174,7 +157,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
             task_expression=expr,
             name=f"{self.name}_constraint",
         )
-        artifacts.error = SymbolicErrorSignal(sm.abs(expr))
+        artifacts.observation = sm.abs(0 - expr) < self.threshold
         return artifacts
 
 
@@ -201,9 +184,7 @@ class HeightGoal(FeatureFunctionGoal):
     """
     Upper limit to control the distance away from the `reference_point`.
     """
-    weight: float = field(
-        default=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE, kw_only=True
-    )
+    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
     """
     Priority weight for the height constraint in the optimization problem.
     """
@@ -211,22 +192,13 @@ class HeightGoal(FeatureFunctionGoal):
     """
     Maximum allowed velocity for the height motion in meters per second.
     """
-    threshold: float = field(default=0.0, kw_only=True)
-    """
-    How far outside the limits still counts as achieved.
-    """
 
     def get_controlled_and_reference_features(self):
         return self.tip_point, self.reference_point
 
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        """
-        Build a constraint that keeps the height difference within the limits.
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        artifacts = super().build(context)
 
-        :param context: Provides access to world model and kinematic expressions.
-        :return: The artifacts of this task, whose error is how far the height difference lies outside the limits.
-        """
-        artifacts = NodeArtifacts()
         expr = (
             self.root_P_controlled_feature - self.root_P_reference_feature
         ) @ Vector3.Z()
@@ -240,9 +212,11 @@ class HeightGoal(FeatureFunctionGoal):
             name=f"{self.name}_constraint",
         )
 
-        artifacts.error = SymbolicErrorSignal(
-            sm.max(self.lower_limit - expr, expr - self.upper_limit)
+        artifacts.observation = sm.logic_and(
+            sm.if_less_eq(expr, self.upper_limit, 1, 0),
+            sm.if_greater_eq(expr, self.lower_limit, 1, 0),
         )
+
         return artifacts
 
 
@@ -269,9 +243,7 @@ class DistanceGoal(FeatureFunctionGoal):
     """
     Upper limit to control the distance away from the `reference_point`.
     """
-    weight: float = field(
-        default=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE, kw_only=True
-    )
+    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
     """
     Priority weight for the distance constraint in the optimization problem.
     """
@@ -279,22 +251,13 @@ class DistanceGoal(FeatureFunctionGoal):
     """
     Maximum allowed velocity for the distance motion in meters per second.
     """
-    threshold: float = field(default=0.0, kw_only=True)
-    """
-    How far outside the limits still counts as achieved.
-    """
 
     def get_controlled_and_reference_features(self):
         return self.tip_point, self.reference_point
 
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        """
-        Build a constraint that keeps the planar distance within the limits.
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        artifacts = super().build(context)
 
-        :param context: Provides access to world model and kinematic expressions.
-        :return: The artifacts of this task, whose error is how far the planar distance lies outside the limits.
-        """
-        artifacts = NodeArtifacts()
         root_V_diff = self.root_P_controlled_feature - self.root_P_reference_feature
         root_V_diff[2] = 0.0
         expr = root_V_diff.norm()
@@ -319,9 +282,11 @@ class DistanceGoal(FeatureFunctionGoal):
                 name=f"{self.name}_extra_{axis_name}",
             )
 
-        artifacts.error = SymbolicErrorSignal(
-            sm.max(self.lower_limit - expr, expr - self.upper_limit)
+        artifacts.observation = sm.logic_and(
+            sm.if_less_eq(expr, self.upper_limit, sm.Scalar(1), sm.Scalar(0)),
+            sm.if_greater_eq(expr, self.lower_limit, sm.Scalar(1), sm.Scalar(0)),
         )
+
         return artifacts
 
 
@@ -348,9 +313,7 @@ class AngleGoal(FeatureFunctionGoal):
     """
     Upper limit to control the angle between the `tip_vector` and the `reference_vector`.
     """
-    weight: float = field(
-        default=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE, kw_only=True
-    )
+    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
     """
     Priority weight for the angle constraint in the optimization problem.
     """
@@ -358,22 +321,13 @@ class AngleGoal(FeatureFunctionGoal):
     """
     Maximum allowed angular velocity for the angle motion in radians per second.
     """
-    threshold: float = field(default=0.0, kw_only=True)
-    """
-    How far outside the limits still counts as achieved.
-    """
 
     def get_controlled_and_reference_features(self):
         return self.tip_vector, self.reference_vector
 
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
-        """
-        Build a constraint that keeps the angle between the vectors within the limits.
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        artifacts = super().build(context)
 
-        :param context: Provides access to world model and kinematic expressions.
-        :return: The artifacts of this task, whose error is how far the angle lies outside the limits.
-        """
-        artifacts = NodeArtifacts()
         expr = self.root_V_reference_feature.angle_between(
             self.root_V_controlled_feature
         )
@@ -387,7 +341,9 @@ class AngleGoal(FeatureFunctionGoal):
             name=f"{self.name}_constraint",
         )
 
-        artifacts.error = SymbolicErrorSignal(
-            sm.max(self.lower_angle - expr, expr - self.upper_angle)
+        artifacts.observation = sm.logic_and(
+            sm.if_less_eq(expr, self.upper_angle, 1, 0),
+            sm.if_greater_eq(expr, self.lower_angle, 1, 0),
         )
+
         return artifacts

@@ -1,3 +1,1 @@
-"""
-World descriptor modules.
-"""
+"""World descriptor modules."""
