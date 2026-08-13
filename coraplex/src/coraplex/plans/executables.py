@@ -352,7 +352,11 @@ class GiskardExecutable(Executable):
 
         :param statechart: The statechart the executor is ticking.
         """
-        for plan in {motion_node.plan for motion_node in self.motion_mappings or {}}:
+        plans_by_identity = {
+            id(motion_node.plan): motion_node.plan
+            for motion_node in self.motion_mappings or {}
+        }
+        for plan in plans_by_identity.values():
             plan.notify_motion_tick(statechart)
 
     def _execute_simulation(self) -> None:
