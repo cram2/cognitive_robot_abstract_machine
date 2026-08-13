@@ -85,6 +85,29 @@ class ExecutionType(Enum):
     NO_EXECUTION = auto()
 
 
+class VisualizationBackend(Enum):
+    """
+    Enum for the renderer a world is visualized with.
+    """
+
+    NONE = auto()
+    """
+    No visualization.
+    """
+    RERUN = auto()
+    """
+    The Rerun viewer; needs no ROS.
+    """
+    RVIZ = auto()
+    """
+    RViz2 marker publishing; needs a ROS 2 environment.
+    """
+    CRAMERA = auto()
+    """
+    The cramera browser viewer; serves the world over HTTP, needs no ROS.
+    """
+
+
 class Arms(IntEnum):
     """
     Enum for Arms.

@@ -1,11 +1,17 @@
 import os
 
 from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+from coraplex.datastructures.enums import (
+    Arms,
+    ApproachDirection,
+    VerticalAlignment,
+    VisualizationBackend,
+)
 from coraplex.datastructures.grasp import GraspDescription
 
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
+from coraplex.visualization import WorldVisualization
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 
@@ -25,9 +31,15 @@ from semantic_digital_twin.spatial_types import (
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import Color
+from coraplex.datastructures.enums import VisualizationBackend
+from coraplex.visualization import WorldVisualization
 
 world = setup_world()
 
+visualization = WorldVisualization.from_environment(
+    world, default_backend=VisualizationBackend.CRAMERA
+).start()
 spoon = STLParser(
     os.path.join(
         os.path.dirname(__file__), "..", "..", "resources", "objects", "spoon.stl"
@@ -38,6 +50,11 @@ bowl = STLParser(
         os.path.dirname(__file__), "..", "..", "resources", "objects", "bowl.stl"
     )
 ).parse()
+
+# Distinct colors so the objects read clearly against the apartment.
+world.get_body_by_name("milk.stl").visual.shapes[0].color = Color(0.9, 0.93, 1.0)
+bowl.root.visual.shapes[0].color = Color(0.9, 0.75, 0.5)
+spoon.root.visual.shapes[0].color = Color(0.6, 0.6, 0.65)
 
 with world.modify_world():
     world.merge_world_at_pose(
@@ -56,21 +73,12 @@ with world.modify_world():
     world.merge_world(spoon, connection)
 
 
-try:
-    import rclpy
-
-    rclpy.init()
-    from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-        VizMarkerPublisher,
-    )
-
-    node = rclpy.create_node("viz_marker")
-    v = VizMarkerPublisher(_world=world, node=node).with_tf_publisher()
-except ImportError:
-    node = None
+visualization = WorldVisualization.from_environment(
+    world, default_backend=VisualizationBackend.CRAMERA
+).start()
 
 pr2 = PR2.from_world(world)
-context = Context(world=world, robot=pr2, _debug=False, ros_node=node)
+context = Context(world=world, robot=pr2, _debug=False, ros_node=visualization.ros_node)
 
 with world.modify_world():
     world_reasoner = WorldReasoner(world)
@@ -117,6 +125,8 @@ plan = sequential(
     ],
     context=context,
 ).plan
+visualization.attach_plan(plan)
 
 with simulated_robot:
     plan.perform()
+

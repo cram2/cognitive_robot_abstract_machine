@@ -24,6 +24,7 @@ dependencies = [
   "physics_simulators",
   "experiments",
   "segmind",
+  "cramera",
   "ipykernel>=7.2.0",
   "lark-parser>=0.12.0"
 ]
@@ -75,7 +76,8 @@ members = [
   "physics_simulators",
   "robokudo",
   "experiments",
-  "segmind"
+  "segmind",
+  "cramera"
 ]
 
 [tool.uv.sources]
@@ -89,6 +91,7 @@ robokudo              = { workspace = true }
 physics_simulators    = { workspace = true }
 segmind               = { workspace = true }
 experiments           = { workspace = true }
+cramera              = { workspace = true }
 
 [tool.poetry]
 package-mode = false

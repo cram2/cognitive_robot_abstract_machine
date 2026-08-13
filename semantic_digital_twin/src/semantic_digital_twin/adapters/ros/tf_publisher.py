@@ -242,6 +242,13 @@ class TFPublisher(StateChangeCallback):
         )
 
     def on_state_change(self, **kwargs):
+        # Ctrl+C reaches rclpy before it reaches the program: rclpy.init installs signal
+        # handlers by default, and its SIGINT handler shuts the context down from inside
+        # the handler. A thread that goes on changing world state -- a physics simulator
+        # stepping in the background drives this on every step -- would then publish into a
+        # context that is already gone, which rclpy answers with an RCLError.
+        if not self.node.context.ok():
+            return
         if self._world.state.version % self.throttle_state_updates != 0:
             return
         self.tf_model_callback.update_tf_message()

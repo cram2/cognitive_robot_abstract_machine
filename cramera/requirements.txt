@@ -1,0 +1,4 @@
+# The server and the live bridge are stdlib-only on purpose: the viewer must be
+# servable on machines without the full CRAM stack. krrood (EQL), coraplex and
+# giskardpy are imported lazily and only needed for the knowledge panel, the
+# onboarder and the live bridge hooks — inside this workspace they are present.

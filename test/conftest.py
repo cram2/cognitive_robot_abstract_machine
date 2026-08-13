@@ -497,6 +497,19 @@ def _garmi_world_setup():
 
 
 @pytest.fixture(scope="session")
+def _armar7_world_setup():
+    return world_with_urdf_factory(Armar7)
+
+
+@pytest.fixture(scope="function")
+def armar7_world_state_reset(_armar7_world_setup):
+    world = deepcopy(_armar7_world_setup)
+    state = world.state._data.copy()
+    yield world
+    world.state._data[:] = state
+
+
+@pytest.fixture(scope="session")
 def tracy_world():
     if not tracy_installed():
         pytest.skip("Tracy not installed")

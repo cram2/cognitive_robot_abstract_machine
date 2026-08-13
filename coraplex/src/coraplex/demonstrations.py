@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import rclpy
-from rclpy.executors import SingleThreadedExecutor
+from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
 from rclpy.node import Node
 from typing_extensions import ClassVar, List, Type
 
@@ -96,10 +96,28 @@ class RobotDemonstrationRosSession:
         executor.add_node(node)
         session = cls(node=node, executor=executor, owns_context=owns_context)
         session.spin_thread = threading.Thread(
-            target=executor.spin, daemon=True, name=f"{node_name}-executor"
+            target=session.spin_until_context_ends,
+            daemon=True,
+            name=f"{node_name}-executor",
         )
         session.spin_thread.start()
         return session
+
+    def spin_until_context_ends(self) -> None:
+        """
+        Deliver this node's callbacks until the executor or the ROS context stops.
+
+        Whoever owns a borrowed context may end it while this session is still spinning,
+        which rclpy reports to the spinning executor as
+        :class:`~rclpy.executors.ExternalShutdownException`. That is how this thread's work
+        ends rather than a failure, so it stops here instead of escaping the thread and
+        being printed as an unhandled exception. rclpy swallows the equivalent
+        :class:`~rclpy.executors.ShutdownException` for :meth:`Executor.shutdown` itself.
+        """
+        try:
+            self.executor.spin()
+        except ExternalShutdownException:
+            pass
 
     def fetch_world(
         self, timeout_seconds: float = WORLD_FETCH_TIMEOUT_SECONDS

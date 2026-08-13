@@ -6,19 +6,34 @@ which world a run acts on, whether it has to spawn its scene, and who owns the R
 context. None of it needs a controller.
 """
 
+import threading
+import time
 from dataclasses import dataclass, field
 
 import pytest
 import rclpy
+from typing_extensions import List
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import ExecutionType
 from coraplex.plans.executables import GiskardExecutable
 from coraplex.plans.factories import code
 from coraplex.plans.plan_node import PlanNode
-from coraplex.demonstrations import RobotDemonstration, RobotDemonstrationRosSession
+from coraplex.demonstrations import (
+    SPIN_THREAD_JOIN_TIMEOUT_SECONDS,
+    RobotDemonstration,
+    RobotDemonstrationRosSession,
+)
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.world import World
+
+SPIN_THREAD_REACHES_WAIT_SECONDS = 0.3
+"""
+How long to give a freshly started spin thread to reach rclpy's wait set.
+
+A thread shut down before it gets there never enters the wait and so never sees the
+external shutdown, which would make the test pass without the behaviour under test.
+"""
 
 
 class PlanDeliberatelyFailed(Exception):
@@ -225,3 +240,30 @@ def test_session_leaves_a_context_somebody_else_started(rclpy_node):
 
     session.stop()
     assert rclpy.ok()
+
+
+def test_spin_thread_ends_quietly_when_somebody_else_ends_the_context(monkeypatch):
+    """
+    A session borrowing somebody else's context is left running by
+    :meth:`RobotDemonstration.tear_down`, so its executor is still spinning when that
+    owner ends the context.
+
+    rclpy reports this to a spinning executor as
+    :class:`ExternalShutdownException`, and unlike the shutdown of the executor itself it
+    is not swallowed by ``spin_once``, so it escapes the spin thread and gets printed as
+    an unhandled exception -- in the middle of a run that otherwise succeeded.
+    """
+    assert not rclpy.ok(), "another test left a ROS context running"
+    rclpy.init()  # stands in for the owner: giskardpy's node, or an embedding application
+    session = RobotDemonstrationRosSession.start("external_shutdown_probe")
+    assert not session.owns_context
+    time.sleep(SPIN_THREAD_REACHES_WAIT_SECONDS)  # let it reach rclpy's wait set
+
+    escaped: List[threading.ExceptHookArgs] = []
+    monkeypatch.setattr(threading, "excepthook", escaped.append)
+
+    rclpy.shutdown()
+    session.spin_thread.join(timeout=SPIN_THREAD_JOIN_TIMEOUT_SECONDS)
+
+    assert not session.spin_thread.is_alive()
+    assert [type(entry.exc_value).__name__ for entry in escaped] == []

@@ -87,6 +87,12 @@ jobs:
           bazel build //test:test_all
           bazel test //test:test_all
 
+      - name: Install node
+        # cramera's frontend unit tests run under `node --test`; without node on PATH
+        # test_web_assets.py skips them instead of executing them.
+        if: ${{inputs.lib == 'cramera'}}
+        run: sudo apt-get install -y nodejs
+
       - name: Run tests
         run: |
           source /opt/ros/cram-env/bin/activate

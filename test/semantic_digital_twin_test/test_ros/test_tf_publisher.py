@@ -1,4 +1,6 @@
 from copy import deepcopy
+
+import rclpy
 from unittest.mock import MagicMock, patch
 import pytest
 from rclpy.duration import Duration
@@ -21,6 +23,41 @@ from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
 )
 from semantic_digital_twin.world_description.world_entity import Body, Region
+
+
+def test_a_state_change_after_the_context_died_publishes_nothing(monkeypatch):
+    """
+    Ctrl+C does not reach a program before it reaches rclpy: ``rclpy.init`` installs
+    signal handlers by default, and the SIGINT handler shuts the context down from
+    inside the handler.
+
+    Any thread that goes on changing world state -- a physics simulator stepping in the
+    background, which drives this callback on every step -- then reaches a publisher
+    whose context is already gone, and rclpy answers that with ``RCLError: Failed to
+    publish: publisher's context is invalid``. There is nothing left to publish to, so
+    the callback has to stop instead.
+    """
+    assert not rclpy.ok(), "another test left a ROS context running"
+    rclpy.init()
+    node = rclpy.create_node("tf_publisher_shutdown_probe")
+    world = World()
+    root = Body(name=PrefixedName("root"))
+    child = Body(name=PrefixedName("child"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(child)
+        world.add_connection(FixedConnection(parent=root, child=child))
+    publisher = TFPublisher(node=node, _world=world)
+
+    published = []
+    monkeypatch.setattr(publisher.tf_pub, "publish", published.append)
+    world.notify_state_change()
+    assert len(published) == 1, "the callback does not publish at all"
+
+    rclpy.shutdown()
+    world.notify_state_change()
+
+    assert len(published) == 1
 
 
 def test_tf_publisher(rclpy_node, pr2_world_state_reset):

@@ -77,6 +77,9 @@ class ExecutionEnvironment:
 
 
 # These are imported, so they don't have to be initialized when executing with
+simulated_robot_advanced = ExecutionEnvironment(
+    ExecutionType.SIMULATED, collision_avoidance=True
+)
 simulated_robot = ExecutionEnvironment(ExecutionType.SIMULATED)
 real_robot = ExecutionEnvironment(ExecutionType.REAL)
 semi_real_robot = ExecutionEnvironment(ExecutionType.SEMI_REAL)

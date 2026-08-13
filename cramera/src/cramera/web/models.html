@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CRAM Probabilistic Models</title>
+<link rel="stylesheet" href="app.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <img class="logo-img" src="img/aicor-logo.png" alt="AICOR — Artificial Intelligence Powered Cognition-Enabled Robotics" />
+  </div>
+  <nav class="page-tabs">
+    <a href="index.html">Scene</a>
+    <a href="models.html" class="active">Models</a>
+  </nav>
+  <div class="topbar-actions"></div>
+</header>
+
+<main class="models-page">
+  <aside class="panel models-side">
+    <div class="panel-head">
+      <h2>Probabilistic model</h2>
+      <span id="model-status" class="knowledge-status">no model loaded</span>
+    </div>
+    <div class="models-side-body">
+      <label class="play-btn upload-btn">⭱ Load model JSON
+        <input id="model-file" type="file" accept=".json,application/json" hidden />
+      </label>
+      <div class="lp-title">Variables</div>
+      <div id="variables" class="variable-list">
+        <div class="answer-empty">Load a probabilistic circuit (.json) to begin.</div>
+      </div>
+    </div>
+  </aside>
+
+  <section class="models-tools">
+    <div id="tool-query" class="panel tool">
+      <div class="panel-head"><h2>Query</h2></div>
+      <div class="tool-section">
+        <div class="lp-title">Query event</div>
+        <div id="query-rows" class="constraint-rows"></div>
+        <button class="row-add" data-rows="query-rows">+ constraint</button>
+      </div>
+      <div class="tool-section">
+        <div class="lp-title">Evidence</div>
+        <div id="query-evidence-rows" class="constraint-rows"></div>
+        <button class="row-add" data-rows="query-evidence-rows">+ constraint</button>
+      </div>
+      <button id="query-run" class="play-btn run-btn">Calculate probability</button>
+      <div id="query-result" class="tool-result"></div>
+    </div>
+
+    <div id="tool-posterior" class="panel tool">
+      <div class="panel-head"><h2>Posterior</h2></div>
+      <div class="tool-section">
+        <div class="lp-title">Query variables</div>
+        <div id="posterior-variables" class="posterior-variables"></div>
+      </div>
+      <div class="tool-section">
+        <div class="lp-title">Evidence</div>
+        <div id="posterior-evidence-rows" class="constraint-rows"></div>
+        <button class="row-add" data-rows="posterior-evidence-rows">+ constraint</button>
+      </div>
+      <button id="posterior-run" class="play-btn run-btn">Calculate posterior</button>
+      <div id="posterior-plots" class="posterior-plots"></div>
+    </div>
+
+    <div id="tool-mode" class="panel tool">
+      <div class="panel-head"><h2>Mode</h2></div>
+      <div class="tool-section">
+        <div class="lp-title">Evidence</div>
+        <div id="mode-evidence-rows" class="constraint-rows"></div>
+        <button class="row-add" data-rows="mode-evidence-rows">+ constraint</button>
+      </div>
+      <button id="mode-run" class="play-btn run-btn">Calculate mode</button>
+      <div id="mode-result" class="tool-result"></div>
+    </div>
+  </section>
+</main>
+
+<script src="vendor/plotly.min.js"></script>
+<script src="core/response.js"></script>
+<script src="core/model-constraints.js"></script>
+<script src="models_page.js"></script>
+</body>
+</html>

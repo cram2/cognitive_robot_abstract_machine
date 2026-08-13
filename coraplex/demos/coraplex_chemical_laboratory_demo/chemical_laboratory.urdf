@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<!--
+  A chemical laboratory, converted from a downloaded artist-made room model by
+  convert_environment.py: a long preparation bench along the west wall, a central
+  analysis island crowded with glassware under a shelf riser, two scientist desks by
+  the east wall, and fume hoods along the north and south walls.
+
+  The whole room is one visual mesh with its floor surface at z = 0. Only the three
+  work surfaces the robot picks from and places onto carry collision geometry, so
+  motion planning interacts with exactly the surfaces it works on; everything else is
+  visual dressing. The ceiling was removed in conversion so a viewer can look into
+  the room from above. All work surfaces are 0.9 meters high.
+-->
+<robot name="chemical_laboratory">
+
+  <link name="laboratory_root"/>
+
+  <!-- the room itself: floor, walls, furniture and glassware in one mesh -->
+  <link name="laboratory_room">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/chemical_laboratory.obj"/>
+      </geometry>
+    </visual>
+  </link>
+  <joint name="laboratory_room_joint" type="fixed">
+    <parent link="laboratory_root"/>
+    <child link="laboratory_room"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- preparation bench along the west wall, where samples wait for analysis -->
+  <link name="preparation_bench">
+    <collision>
+      <origin xyz="-2.45 0 0.45" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.5 4.2 0.9"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="preparation_bench_joint" type="fixed">
+    <parent link="laboratory_root"/>
+    <child link="preparation_bench"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- central analysis island, its shelf riser modeled so nothing is placed through it -->
+  <link name="analysis_island">
+    <collision>
+      <origin xyz="-0.075 0 0.45" rpy="0 0 0"/>
+      <geometry>
+        <box size="1.15 3.8 0.9"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.075 0 1.175" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.25 3.1 0.55"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="analysis_island_joint" type="fixed">
+    <parent link="laboratory_root"/>
+    <child link="analysis_island"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- the northern of the two scientist desks by the east wall -->
+  <link name="scientist_desk">
+    <collision>
+      <origin xyz="2.3 0.85 0.45" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.5 1.1 0.9"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="scientist_desk_joint" type="fixed">
+    <parent link="laboratory_root"/>
+    <child link="scientist_desk"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+</robot>

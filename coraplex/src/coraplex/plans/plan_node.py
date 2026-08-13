@@ -276,16 +276,18 @@ class PlanNode(PlanEntity):
                 return
 
         self.status = TaskStatus.RUNNING
+        self.plan.notify_node_started(self)
         try:
             self.notify()
             self.result = self.parse().execute()
+            self.status = TaskStatus.SUCCEEDED
         except PlanFailure as e:
             self.status = TaskStatus.FAILED
             self.reason = e
             raise e
         finally:
             self.end_time = datetime.now()
-        self.status = TaskStatus.SUCCEEDED
+            self.plan.notify_node_ended(self)
 
     def mount_subplan(self, root: PlanNode):
         """
