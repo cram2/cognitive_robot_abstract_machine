@@ -6,7 +6,7 @@ import mujoco
 import numpy
 import trimesh
 from scipy.spatial.transform import Rotation
-from typing_extensions import Optional, Dict, Self
+from typing_extensions import Optional, Dict, Self, Union
 from xml.etree import ElementTree as ET
 
 from semantic_digital_twin.adapters.multi_sim import (
@@ -162,6 +162,42 @@ class MJCFParser(WorldModelParser):
 
         return self.world
 
+    @staticmethod
+    def _compose_frame_chain(
+        entity: Union[mujoco.MjsBody, mujoco.MjsGeom],
+    ) -> HomogeneousTransformationMatrix:
+        """
+        Compose the transform from the entity's enclosing body down through any nested
+        MJCF ``<frame>`` wrappers to the entity's own local frame.
+
+        MJCF ``<frame>`` elements add an extra coordinate system between a body
+        and its children without creating a new body. ``mujoco.MjSpec`` preserves
+        them: ``geom.frame`` / ``body.frame`` is the immediate parent frame (or
+        ``None``), and ``geom.pos`` / ``body.pos`` are expressed relative to that
+        frame. The returned matrix is therefore ``body_T_leafFrame`` (identity if
+        the entity is not inside any frame).
+        """
+        chain = []
+        frame = entity.frame
+        while frame is not None:
+            chain.append(frame)
+            frame = frame.frame
+        result = HomogeneousTransformationMatrix()
+        for frame in reversed(chain):
+            frame_quat = numpy.asarray(frame.quat, dtype=float)
+            frame_quat = frame_quat / numpy.linalg.norm(frame_quat)
+            frame_transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
+                pos_x=frame.pos[0],
+                pos_y=frame.pos[1],
+                pos_z=frame.pos[2],
+                quat_w=frame_quat[0],
+                quat_x=frame_quat[1],
+                quat_y=frame_quat[2],
+                quat_z=frame_quat[3],
+            )
+            result = result @ frame_transform
+        return result
+
     def _apply_geoms_to_body(self, mujoco_body: mujoco.MjsBody, body: Body) -> None:
         """
         Parse geoms of a Mujoco body and attach them as visual/collision shapes to a
@@ -272,7 +308,7 @@ class MJCFParser(WorldModelParser):
             body_pos = mujoco_body.pos
             body_quat = mujoco_body.quat
             body_quat /= numpy.linalg.norm(body_quat)
-            parent_body_to_child_body_transform = (
+            frame_to_body_transform = (
                 HomogeneousTransformationMatrix.from_xyz_quaternion(
                     pos_x=body_pos[0],
                     pos_y=body_pos[1],
@@ -282,6 +318,9 @@ class MJCFParser(WorldModelParser):
                     quat_y=body_quat[2],
                     quat_z=body_quat[3],
                 )
+            )
+            parent_body_to_child_body_transform = (
+                self._compose_frame_chain(mujoco_body) @ frame_to_body_transform
             )
             parent_body = self.world.get_kinematic_structure_entity_by_name(
                 mujoco_body.parent.name
@@ -342,7 +381,7 @@ class MJCFParser(WorldModelParser):
         geom_pos = mujoco_geom.pos
         geom_quat = mujoco_geom.quat
         geom_quat /= numpy.linalg.norm(geom_quat)
-        origin_transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        frame_to_geom_transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=geom_pos[0],
             pos_y=geom_pos[1],
             pos_z=geom_pos[2],
@@ -350,6 +389,9 @@ class MJCFParser(WorldModelParser):
             quat_x=geom_quat[1],
             quat_y=geom_quat[2],
             quat_z=geom_quat[3],
+        )
+        origin_transform = (
+            self._compose_frame_chain(mujoco_geom) @ frame_to_geom_transform
         )
         size = mujoco_geom.size * 2
         for i in range(len(size)):
@@ -468,7 +510,7 @@ class MJCFParser(WorldModelParser):
             child_body_pos = mujoco_child_body.pos
             child_body_quat = mujoco_child_body.quat
             child_body_quat /= numpy.linalg.norm(child_body_quat)
-            parent_body_to_child_body_transform = (
+            frame_to_child_body_transform = (
                 HomogeneousTransformationMatrix.from_xyz_quaternion(
                     pos_x=child_body_pos[0],
                     pos_y=child_body_pos[1],
@@ -478,6 +520,10 @@ class MJCFParser(WorldModelParser):
                     quat_y=child_body_quat[2],
                     quat_z=child_body_quat[3],
                 )
+            )
+            parent_body_to_child_body_transform = (
+                self._compose_frame_chain(mujoco_child_body)
+                @ frame_to_child_body_transform
             )
             child_body_to_joint_transform = (
                 HomogeneousTransformationMatrix.from_xyz_quaternion(

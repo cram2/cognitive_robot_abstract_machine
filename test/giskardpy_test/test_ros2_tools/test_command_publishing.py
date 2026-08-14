@@ -5,15 +5,20 @@ from typing import Any, Dict, List, Optional, Type, Union
 
 import numpy as np
 import pytest
+from control_msgs.msg import MultiDOFCommand
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
+from std_msgs.msg import Float64MultiArray
 
 from giskardpy.middleware.ros2.command_publishing import (
     DriveVelocityCommandPublisher,
+    Float64MultiArrayFormat,
+    GroupCommandFormat,
     JointGroupVelocityCommandPublisher,
     JointVelocityCommandPublisher,
     JointMinimumVelocities,
     MinimumVelocity,
+    MultiDOFCommandFormat,
 )
 from giskardpy.middleware.ros2.exceptions import UnknownMinimumVelocityJointError
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -200,6 +205,7 @@ def build_group_publisher(
     specs: List[ConnectionSpec],
     minimum_valid_velocity: float = 0.0,
     minimum_velocity_overrides: Optional[Dict[str, float]] = None,
+    command_format: GroupCommandFormat = Float64MultiArrayFormat(),
 ) -> JointGroupVelocityCommandPublisher:
     """
     Build a group publisher over a chain of freshly created connections.
@@ -209,6 +215,7 @@ def build_group_publisher(
         specs,
         minimum_valid_velocity,
         minimum_velocity_overrides,
+        command_format,
     )
 
 
@@ -217,6 +224,7 @@ def group_publisher_for(
     specs: List[ConnectionSpec],
     minimum_valid_velocity: float = 0.0,
     minimum_velocity_overrides: Optional[Dict[str, float]] = None,
+    command_format: GroupCommandFormat = Float64MultiArrayFormat(),
 ) -> JointGroupVelocityCommandPublisher:
     """
     Build a group publisher over connections that already exist in a world.
@@ -228,17 +236,35 @@ def group_publisher_for(
         minimum_velocities=JointMinimumVelocities.from_magnitudes(
             minimum_valid_velocity, minimum_velocity_overrides
         ),
+        command_format=command_format,
     )
+
+
+def publish_group_message(controller: JointGroupVelocityCommandPublisher) -> Any:
+    """
+    Replace the publisher with a recorder, publish once, and return the message.
+    """
+    recorder = RecordingPublisher()
+    controller.command_publisher = recorder
+    controller.publish()
+    return recorder.published_message
+
+
+def stop_group_message(controller: JointGroupVelocityCommandPublisher) -> Any:
+    """
+    Replace the publisher with a recorder, stop the publisher, and return the message.
+    """
+    recorder = RecordingPublisher()
+    controller.command_publisher = recorder
+    controller.stop()
+    return recorder.published_message
 
 
 def publish_group(controller: JointGroupVelocityCommandPublisher) -> List[float]:
     """
     Replace the publisher with a recorder, publish once, and return the data.
     """
-    recorder = RecordingPublisher()
-    controller.command_publisher = recorder
-    controller.publish()
-    return list(recorder.published_message.data)
+    return list(publish_group_message(controller).data)
 
 
 def publish_drive(publisher: DriveVelocityCommandPublisher) -> RecordingPublisher:
@@ -461,6 +487,73 @@ def test_group_publisher_publishes_the_velocities_of_the_current_cycle(init_rosp
     recorded = [list(message.data) for message in recorder.published_messages]
     assert recorded[0] == pytest.approx([0.1])
     assert recorded[1] == pytest.approx([0.4])
+
+
+# %% group command message formats
+
+
+def test_default_format_publishes_a_float64_multi_array(init_rospy):
+    controller = build_group_publisher([ConnectionSpec(name="joint_a", velocity=0.1)])
+
+    message = publish_group_message(controller)
+
+    assert isinstance(message, Float64MultiArray)
+    assert list(message.data) == pytest.approx([0.1])
+
+
+def test_multi_dof_format_publishes_the_velocities_as_values(init_rospy):
+    specs = [
+        ConnectionSpec(name="joint_a", velocity=0.1),
+        ConnectionSpec(name="joint_b", velocity=0.2),
+    ]
+    controller = build_group_publisher(specs, command_format=MultiDOFCommandFormat())
+
+    message = publish_group_message(controller)
+
+    assert isinstance(message, MultiDOFCommand)
+    assert list(message.values) == pytest.approx([0.1, 0.2])
+
+
+def test_multi_dof_format_leaves_the_degree_of_freedom_names_empty(init_rospy):
+    specs = [ConnectionSpec(name="joint_a", velocity=0.1)]
+    controller = build_group_publisher(specs, command_format=MultiDOFCommandFormat())
+
+    assert list(publish_group_message(controller).dof_names) == []
+
+
+def test_minimum_velocity_is_raised_in_every_message_format(init_rospy):
+    specs = [ConnectionSpec(name="slow_positive", velocity=0.01)]
+    controller = build_group_publisher(
+        specs, minimum_valid_velocity=0.03, command_format=MultiDOFCommandFormat()
+    )
+
+    assert list(publish_group_message(controller).values) == pytest.approx([0.03])
+
+
+def test_stopping_publishes_zero_velocities_in_the_default_format(init_rospy):
+    specs = [
+        ConnectionSpec(name="joint_a", velocity=0.1),
+        ConnectionSpec(name="joint_b", velocity=0.2),
+    ]
+    controller = build_group_publisher(specs)
+
+    message = stop_group_message(controller)
+
+    assert isinstance(message, Float64MultiArray)
+    assert list(message.data) == pytest.approx([0.0, 0.0])
+
+
+def test_stopping_publishes_zero_velocities_in_the_configured_format(init_rospy):
+    specs = [
+        ConnectionSpec(name="joint_a", velocity=0.1),
+        ConnectionSpec(name="joint_b", velocity=0.2),
+    ]
+    controller = build_group_publisher(specs, command_format=MultiDOFCommandFormat())
+
+    message = stop_group_message(controller)
+
+    assert isinstance(message, MultiDOFCommand)
+    assert list(message.values) == pytest.approx([0.0, 0.0])
 
 
 # %% minimum velocity overrides that apply to nothing

@@ -1,5 +1,6 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
+from itertools import islice
 
 import numpy as np
 import pytest
@@ -10,6 +11,10 @@ from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlign
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.locations.backends import GiskardLocationBackend
 from coraplex.locations.base import Location, PoseGeneratorBackend, PoseValidator
+from coraplex.locations.factories import (
+    STANDING_DISTANCE_ARM_LENGTH_FRACTION,
+    reachability_location,
+)
 from coraplex.view_manager import ViewManager
 from semantic_digital_twin.api import RobotSpecification, WorldSpecification
 from semantic_digital_twin.exceptions import ParsingError
@@ -172,6 +177,66 @@ def test_location_evaluates_the_robot_of_its_context(two_robot_world):
     list(Location(context, candidate, FixedPoseGenerator([candidate]), [recorder]))
 
     assert recorder.evaluated_robots[0].id == second_robot.id
+
+
+# %% how far a reachability location stands from its target
+
+
+REACHABILITY_TARGET_POSITION = (2.0, 2.0, 0.9)
+"""
+Position of the target a reachability location is built around, clear of the robot.
+"""
+
+STANDING_DISTANCE_TOLERANCE = 0.05
+"""
+Tolerance of a sampled standing distance, in meter.
+
+Candidates land on the cell centres of a 0.02 m costmap grid, so a sample sits a
+fraction of a cell off the ring it was drawn from.
+"""
+
+CANDIDATES_TO_SAMPLE = 20
+"""
+Number of candidates whose distance to the target is asserted.
+"""
+
+
+def test_reachability_location_stands_at_the_arm_length_fraction_from_its_target(
+    single_robot_world,
+):
+    """
+    The standing distance follows the constant, so tuning it moves the robot.
+
+    Standing too close puts the arms inside whatever the target rests on, which the
+    collision check on candidate poses then rejects.
+    """
+    world, robot, context = single_robot_world
+    target = Pose.from_xyz_rpy(
+        *REACHABILITY_TARGET_POSITION, reference_frame=world.root
+    )
+    # approximate_length returns a symbolic scalar, which compares as unequal to a float
+    # under pytest.approx no matter the tolerance.
+    expected_distance = (
+        float(ViewManager.get_arm_view(Arms.RIGHT, robot).approximate_length())
+        * STANDING_DISTANCE_ARM_LENGTH_FRACTION
+    )
+    target_position = target.to_position().to_np()[:2]
+
+    candidates = list(
+        islice(
+            reachability_location(target, context, Arms.RIGHT).generator,
+            CANDIDATES_TO_SAMPLE,
+        )
+    )
+
+    assert len(candidates) == CANDIDATES_TO_SAMPLE
+    distances = [
+        np.linalg.norm(candidate.to_position().to_np()[:2] - target_position)
+        for candidate in candidates
+    ]
+    assert distances == pytest.approx(
+        [expected_distance] * len(distances), abs=STANDING_DISTANCE_TOLERANCE
+    )
 
 
 # %% the giskard backend reports the pose it placed the robot at

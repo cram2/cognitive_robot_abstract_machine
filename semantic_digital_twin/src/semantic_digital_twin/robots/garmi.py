@@ -298,7 +298,7 @@ class GarmiLeftGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "left_fr3_hand_tcp"
             ),
-            front_facing_orientation=Quaternion(0, 0.70710678, 0, 0.70710678),
+            front_facing_orientation=Quaternion(0, -0.70711, 0, -0.70711),
         )
 
 
@@ -352,7 +352,7 @@ class GarmiRightGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "right_fr3_hand_tcp"
             ),
-            front_facing_orientation=Quaternion(0, 0.70710678, 0, 0.70710678),
+            front_facing_orientation=Quaternion(0, -0.70711, 0, -0.70711),
         )
 
 

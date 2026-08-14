@@ -25,6 +25,17 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
+STANDING_DISTANCE_ARM_LENGTH_FRACTION = 0.80
+"""
+Fraction of an arm's length at which the robot stands from the target it reaches for.
+
+Standing closer leaves the arms inside whatever the target rests on, so every candidate
+pose is discarded by the collision check before its reachability is ever evaluated.
+
+..note:: This is an approximation of the reachable space of an arm, not a measurement of
+    it.
+"""
+
 
 def _get_object_in_hand(
     test_robot: AbstractRobot, test_world: World, arm: Arms
@@ -96,7 +107,7 @@ def reachability_location(
         height=200,
         std=15,
         distance=ViewManager.get_arm_view(arm, context.robot).approximate_length()
-        * 0.66,  # That needs to be replaced with an estimate of the reachability space of the robot arms
+        * STANDING_DISTANCE_ARM_LENGTH_FRACTION,
         world=context.world,
         origin=target_pose,
     )

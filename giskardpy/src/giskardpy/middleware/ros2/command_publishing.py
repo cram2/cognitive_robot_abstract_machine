@@ -13,8 +13,9 @@ from __future__ import annotations
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, List, Union
+from typing import Any, ClassVar, Dict, List, Union
 
+from control_msgs.msg import MultiDOFCommand
 from geometry_msgs.msg import Twist
 from rclpy.publisher import Publisher
 from std_msgs.msg import Float64, Float64MultiArray
@@ -256,6 +257,63 @@ class JointVelocityCommand:
         ]
 
 
+# %% message formats of group controllers
+
+
+@dataclass(frozen=True)
+class GroupCommandFormat(ABC):
+    """
+    Builds the message a joint group velocity controller consumes from the velocities of
+    the joints it commands.
+    """
+
+    message_type: ClassVar[type]
+    """
+    The ROS message type published on the command topic.
+    """
+
+    @abstractmethod
+    def create_message(self, velocities: List[float]) -> Any:
+        """
+        Pack the velocities into a fresh message of :attr:`message_type`.
+
+        :param velocities: The velocity of every commanded joint, in the order the
+            controller expects them.
+        :return: The message to publish.
+        """
+
+
+@dataclass(frozen=True)
+class Float64MultiArrayFormat(GroupCommandFormat):
+    """
+    Commands a controller that consumes :class:`std_msgs.msg.Float64MultiArray`.
+    """
+
+    message_type: ClassVar[type] = Float64MultiArray
+
+    def create_message(self, velocities: List[float]) -> Float64MultiArray:
+        message = Float64MultiArray()
+        message.data = velocities
+        return message
+
+
+@dataclass(frozen=True)
+class MultiDOFCommandFormat(GroupCommandFormat):
+    """
+    Commands a controller that consumes :class:`control_msgs.msg.MultiDOFCommand`.
+
+    ..note:: ``dof_names`` is left empty, so the controller applies the values in its own
+        joint order.
+    """
+
+    message_type: ClassVar[type] = MultiDOFCommand
+
+    def create_message(self, velocities: List[float]) -> MultiDOFCommand:
+        message = MultiDOFCommand()
+        message.values = velocities
+        return message
+
+
 # %% publishers
 
 
@@ -392,6 +450,11 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
     Minimum velocities of the commanded joints.
     """
 
+    command_format: GroupCommandFormat = field(default_factory=Float64MultiArrayFormat)
+    """
+    Message format the controller on ``command_topic`` consumes.
+    """
+
     commands: List[JointVelocityCommand] = field(init=False, default_factory=list)
     """
     What to send for every connection.
@@ -402,11 +465,6 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
     Reads the commanded velocities from the world state.
     """
 
-    message: Float64MultiArray = field(init=False, default_factory=Float64MultiArray)
-    """
-    The message reused for every publication.
-    """
-
     command_publisher: Publisher = field(init=False)
     """
     The publisher for ``cmd_topic``.
@@ -414,7 +472,7 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
 
     def __post_init__(self):
         self.command_publisher = rospy.node.create_publisher(
-            Float64MultiArray, self.command_topic, 10
+            self.command_format.message_type, self.command_topic, 10
         )
         for connection in self.connections:
             connection.has_hardware_interface = True
@@ -431,17 +489,18 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
         )
 
     def publish(self) -> None:
-        self.message.data = [
+        velocities = [
             command.from_state_velocity(state_velocity)
             for command, state_velocity in zip(
                 self.commands, self.velocity_reader.velocities()
             )
         ]
-        self.command_publisher.publish(self.message)
+        self.command_publisher.publish(self.command_format.create_message(velocities))
 
     def stop(self) -> None:
-        self.message.data = [0.0] * len(self.commands)
-        self.command_publisher.publish(self.message)
+        self.command_publisher.publish(
+            self.command_format.create_message([0.0] * len(self.commands))
+        )
 
 
 @dataclass

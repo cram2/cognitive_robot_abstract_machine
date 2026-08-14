@@ -37,6 +37,7 @@ import giskardpy.middleware.ros2.scripts.iai_robots.hsr.configs
 import giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs
 import giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs
 import giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs
+import giskardpy.middleware.ros2.scripts.other_robots.garmi.configs
 import giskardpy.middleware.ros2.scripts.tools.interactive_marker
 import giskardpy.middleware.ros2.server_config
 import giskardpy.middleware.ros2.utils.utils_for_tests
@@ -1313,6 +1314,44 @@ class WorldModelManagerDAO_model_modification_blocks_association(
     target: Mapped[WorldModelModificationBlockDAO] = relationship(
         "WorldModelModificationBlockDAO",
         foreign_keys=[target_worldmodelmodificationblockdao_id],
+        lazy="selectin",
+    )
+
+
+class GraphOfConvexPolygonsDAO_obstacles_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_10097511437740384067152589240138880074945231015404257411712969"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_graphofconvexpolygonsdao_id: Mapped[int] = mapped_column(
+        ForeignKey("GraphOfConvexPolygonsDAO.database_id")
+    )
+    target__mockedconvexsetdao_id: Mapped[int] = mapped_column(
+        ForeignKey("_MockedConvexSetDAO.database_id")
+    )
+
+    target: Mapped[_MockedConvexSetDAO] = relationship(
+        "_MockedConvexSetDAO",
+        foreign_keys=[target__mockedconvexsetdao_id],
+        lazy="selectin",
+    )
+
+
+class GraphOfConvexPolygonsDAO_regions_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_21683303155680797721654562863218184758483517575191610116427927"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_graphofconvexpolygonsdao_id: Mapped[int] = mapped_column(
+        ForeignKey("GraphOfConvexPolygonsDAO.database_id")
+    )
+    target__mockedhpolyhedrondao_id: Mapped[int] = mapped_column(
+        ForeignKey("_MockedHPolyhedronDAO.database_id")
+    )
+
+    target: Mapped[_MockedHPolyhedronDAO] = relationship(
+        "_MockedHPolyhedronDAO",
+        foreign_keys=[target__mockedhpolyhedrondao_id],
         lazy="selectin",
     )
 
@@ -2910,6 +2949,27 @@ class SetupExceptionDAO(
     }
 
 
+class IncompleteKinematicChainParametersErrorDAO(
+    SetupExceptionDAO,
+    DataAccessObject[
+        giskardpy.data_types.exceptions.IncompleteKinematicChainParametersError
+    ],
+):
+    __tablename__ = "IncompleteKinematicChainParametersErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SetupExceptionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "IncompleteKinematicChainParametersErrorDAO",
+        "inherit_condition": database_id == SetupExceptionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class JointRegistrationRequiresStandaloneModeErrorDAO(
     SetupExceptionDAO,
     DataAccessObject[
@@ -3215,6 +3275,47 @@ class DriveVelocityCommandPublisherDAO(
     }
 
 
+class GroupCommandFormatDAO(
+    Base,
+    DataAccessObject[giskardpy.middleware.ros2.command_publishing.GroupCommandFormat],
+):
+    __tablename__ = "GroupCommandFormatDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "GroupCommandFormatDAO",
+    }
+
+
+class Float64MultiArrayFormatDAO(
+    GroupCommandFormatDAO,
+    DataAccessObject[
+        giskardpy.middleware.ros2.command_publishing.Float64MultiArrayFormat
+    ],
+):
+    __tablename__ = "Float64MultiArrayFormatDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GroupCommandFormatDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Float64MultiArrayFormatDAO",
+        "inherit_condition": database_id == GroupCommandFormatDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class JointGroupVelocityCommandPublisherDAO(
     CommandPublisherDAO,
     DataAccessObject[
@@ -3243,6 +3344,11 @@ class JointGroupVelocityCommandPublisherDAO(
         nullable=True,
         use_existing_column=True,
     )
+    command_format_id: Mapped[int] = mapped_column(
+        ForeignKey("GroupCommandFormatDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
 
     world: Mapped[WorldMappingDAO] = relationship(
         "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
@@ -3260,6 +3366,12 @@ class JointGroupVelocityCommandPublisherDAO(
         "JointMinimumVelocitiesDAO",
         uselist=False,
         foreign_keys=[minimum_velocities_id],
+        post_update=True,
+    )
+    command_format: Mapped[GroupCommandFormatDAO] = relationship(
+        "GroupCommandFormatDAO",
+        uselist=False,
+        foreign_keys=[command_format_id],
         post_update=True,
     )
 
@@ -3423,6 +3535,27 @@ class JointMinimumVelocityDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JointMinimumVelocityDAO",
         "inherit_condition": database_id == MinimumVelocityDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class MultiDOFCommandFormatDAO(
+    GroupCommandFormatDAO,
+    DataAccessObject[
+        giskardpy.middleware.ros2.command_publishing.MultiDOFCommandFormat
+    ],
+):
+    __tablename__ = "MultiDOFCommandFormatDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GroupCommandFormatDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MultiDOFCommandFormatDAO",
+        "inherit_condition": database_id == GroupCommandFormatDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
@@ -4894,6 +5027,48 @@ class TracyVelocityInterfaceDAO(
     }
 
 
+class GarmiStandaloneInterfaceDAO(
+    RobotInterfaceConfigDAO,
+    DataAccessObject[
+        giskardpy.middleware.ros2.scripts.other_robots.garmi.configs.GarmiStandaloneInterface
+    ],
+):
+    __tablename__ = "GarmiStandaloneInterfaceDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RobotInterfaceConfigDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiStandaloneInterfaceDAO",
+        "inherit_condition": database_id == RobotInterfaceConfigDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class GarmiVelocityInterfaceDAO(
+    RobotInterfaceConfigDAO,
+    DataAccessObject[
+        giskardpy.middleware.ros2.scripts.other_robots.garmi.configs.GarmiVelocityInterface
+    ],
+):
+    __tablename__ = "GarmiVelocityInterfaceDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RobotInterfaceConfigDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiVelocityInterfaceDAO",
+        "inherit_condition": database_id == RobotInterfaceConfigDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class InteractiveMarkerNodeDAO(
     Base,
     DataAccessObject[
@@ -5443,6 +5618,27 @@ class WorldWithStretchConfigDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "WorldWithStretchConfigDAO",
+        "inherit_condition": database_id == WorldWithOmniDriveRobotDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class WorldWithGarmiConfigDAO(
+    WorldWithOmniDriveRobotDAO,
+    DataAccessObject[
+        giskardpy.middleware.ros2.scripts.other_robots.garmi.configs.WorldWithGarmiConfig
+    ],
+):
+    __tablename__ = "WorldWithGarmiConfigDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldWithOmniDriveRobotDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "WorldWithGarmiConfigDAO",
         "inherit_condition": database_id == WorldWithOmniDriveRobotDAO.database_id,
         "polymorphic_load": "selectin",
     }
@@ -15319,6 +15515,9 @@ class MJCFParserDAO(
     prefix: Mapped[typing.Optional[builtins.str]] = mapped_column(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
+    use_visual_as_collision: Mapped[builtins.bool] = mapped_column(
+        use_existing_column=True
+    )
 
     __mapper_args__ = {
         "polymorphic_identity": "MJCFParserDAO",
@@ -21388,6 +21587,25 @@ class GraphOfConvexPolygonsDAO(
         use_existing_column=True,
     )
 
+    obstacles: Mapped[builtins.list[GraphOfConvexPolygonsDAO_obstacles_association]] = (
+        relationship(
+            "GraphOfConvexPolygonsDAO_obstacles_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[GraphOfConvexPolygonsDAO_obstacles_association.source_graphofconvexpolygonsdao_id]",
+            lazy="selectin",
+        )
+    )
+    regions: Mapped[builtins.list[GraphOfConvexPolygonsDAO_regions_association]] = (
+        relationship(
+            "GraphOfConvexPolygonsDAO_regions_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[GraphOfConvexPolygonsDAO_regions_association.source_graphofconvexpolygonsdao_id]",
+            lazy="selectin",
+        )
+    )
+
     __mapper_args__ = {
         "polymorphic_identity": "GraphOfConvexPolygonsDAO",
         "inherit_condition": database_id == GraphOfConvexSetsDAO.database_id,
@@ -21409,6 +21627,19 @@ class IrisSeedingSettingsDAO(
 
     grid_resolution: Mapped[builtins.int] = mapped_column(use_existing_column=True)
     max_regions: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+    iris_options_id: Mapped[int] = mapped_column(
+        ForeignKey("_MockedIrisOptionsDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    iris_options: Mapped[_MockedIrisOptionsDAO] = relationship(
+        "_MockedIrisOptionsDAO",
+        uselist=False,
+        foreign_keys=[iris_options_id],
+        post_update=True,
+    )
 
 
 class _MockedConvexSetDAO(

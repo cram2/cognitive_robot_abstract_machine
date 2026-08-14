@@ -38,6 +38,8 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.spatial_types.spatial_types import Point3, Pose
+from coraplex.datastructures.enums import VisualizationBackend
+from coraplex.visualization import WorldVisualization
 
 SAMPLE_PLACE_POSES = False  # False → use hardcoded fallback poses instead
 
@@ -169,6 +171,9 @@ ros_thread = threading.Thread(
 )
 ros_thread.start()
 
+visualization = WorldVisualization.from_environment(
+    world, default_backend=VisualizationBackend.CRAMERA
+).start()
 # Execute plan with the simulated robot.
 context = Context.from_world(world)
 with simulated_robot:
@@ -178,34 +183,36 @@ with simulated_robot:
             # Note: always need TorsoState.HIGH or next(iter(self)) of CostmapLocation fails
             MoveTorsoAction(TorsoState.HIGH),
             # Transport is not working yet on the garmi
-            # TransportAction(
-            #     object_designator=world.get_body_by_name("bowl.stl"),
-            #     arm=Arms.RIGHT,
-            #     grasp_description=GraspDescription(
-            #         ApproachDirection.RIGHT,
-            #         VerticalAlignment.TOP,
-            #         garmi_robot.get_right_arm_if_specified().end_effector,
-            #     ),
-            #     target_location=bowl_target_pose,
-            # ),
-            # MoveTorsoAction(TorsoState.HIGH),
-            # TransportAction(
-            #     object_designator=world.get_body_by_name("spoon.stl"),
-            #     arm=Arms.RIGHT,
-            #     grasp_description=GraspDescription(
-            #         ApproachDirection.RIGHT,
-            #         VerticalAlignment.TOP,
-            #         garmi_robot.get_right_arm_if_specified().end_effector,
-            #     ),
-            #     target_location=spoon_target_pose,
-            # ),
+            TransportAction(
+                object_designator=world.get_body_by_name("bowl.stl"),
+                arm=Arms.RIGHT,
+                grasp_description=GraspDescription(
+                    ApproachDirection.RIGHT,
+                    VerticalAlignment.TOP,
+                    garmi_robot.get_right_arm_if_specified().end_effector,
+                ),
+                target_location=bowl_target_pose,
+            ),
+            MoveTorsoAction(TorsoState.HIGH),
+            TransportAction(
+                object_designator=world.get_body_by_name("spoon.stl"),
+                arm=Arms.RIGHT,
+                grasp_description=GraspDescription(
+                    ApproachDirection.RIGHT,
+                    VerticalAlignment.TOP,
+                    rotate_gripper=True,
+                    end_effector=garmi_robot.get_right_arm_if_specified().end_effector,
+                ),
+                target_location=spoon_target_pose,
+            ),
         ],
         context,
     ).perform()
+print("done")
 
 # Keep publishing markers only when run directly; an importing test run exits instead.
-if __name__ == "__main__":
-    try:
-        ros_thread.join()
-    except KeyboardInterrupt:
-        ros_executor.shutdown()
+# if __name__ == "__main__":
+#     try:
+#         ros_thread.join()
+#     except KeyboardInterrupt:
+#         ros_executor.shutdown()

@@ -2,13 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from giskardpy.middleware.ros2.robot_interface_config import (
-    RobotInterfaceConfig,
-    StandAloneRobotInterfaceConfig,
-)
-from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import (
-    MultiDOFVelocityCommand,
-)
+from giskardpy.middleware.ros2.command_publishing import MultiDOFCommandFormat
+from giskardpy.middleware.ros2.robot_interface_config import RobotInterfaceConfig
 from giskardpy.model.world_config import WorldWithOmniDriveRobot
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.garmi import Garmi
@@ -41,6 +36,26 @@ GARMI_RIGHT_ARM_JOINTS = [
 ]
 """
 Names of the seven right FR3 arm joints, ordered from base to tip.
+"""
+
+GARMI_FINGER_JOINTS = [
+    "left_fr3_finger_joint1",
+    "left_fr3_finger_joint2",
+    "right_fr3_finger_joint1",
+    "right_fr3_finger_joint2",
+]
+"""
+Names of the two finger joints of each FR3 gripper.
+"""
+
+GARMI_WHEEL_JOINTS = [
+    "front_left_wheel_joint",
+    "front_right_wheel_joint",
+    "rear_left_wheel_joint",
+    "rear_right_wheel_joint",
+]
+"""
+Names of the four mecanum wheel joints of the base.
 """
 
 GARMI_HEAD_JOINTS = ["o1_motor_1", "o1_motor_2"]
@@ -78,33 +93,28 @@ class WorldWithGarmiConfig(WorldWithOmniDriveRobot):
     urdf_view: Garmi = field(kw_only=True, default=Garmi)
 
 
-class GarmiStandaloneInterface(StandAloneRobotInterfaceConfig):
+@dataclass
+class GarmiStandaloneInterface(RobotInterfaceConfig):
     """
-    Robot interface configuration for running GARMI in standalone (simulation) mode.
-
-    Registers all hardware-controlled joints: mecanum wheels, lift, head, both FR3 arms, and grippers.
+    Simulates the mecanum wheels, lift, head, both FR3 arms, grippers and drive of GARMI
+    without talking to hardware.
     """
 
-    def __init__(self, drive_joint_name: str = "odom_combined_T_base_link"):
-        super().__init__(
+    def setup(self) -> None:
+        self.register_controlled_joints(
             [
-                "front_left_wheel_joint",
-                "front_right_wheel_joint",
-                "rear_left_wheel_joint",
-                "rear_right_wheel_joint",
+                *GARMI_WHEEL_JOINTS,
                 *GARMI_LIFT_JOINTS,
                 *GARMI_HEAD_JOINTS,
                 *GARMI_LEFT_ARM_JOINTS,
                 *GARMI_RIGHT_ARM_JOINTS,
-                "left_fr3_finger_joint1",
-                "left_fr3_finger_joint2",
-                "right_fr3_finger_joint1",
-                "right_fr3_finger_joint2",
-                drive_joint_name,
+                *GARMI_FINGER_JOINTS,
+                self.world.get_connections_by_type(OmniDrive)[0].name,
             ]
         )
 
 
+@dataclass
 class GarmiVelocityInterface(RobotInterfaceConfig):
     """
     Closed-loop velocity interface for the real GARMI robot.
@@ -136,12 +146,12 @@ class GarmiVelocityInterface(RobotInterfaceConfig):
         self.add_joint_velocity_group_controller(
             cmd_topic="/garmi/arms/left_arm_joint_velocity_controller/reference",
             connections=GARMI_LEFT_ARM_JOINTS,
-            velocity_command=MultiDOFVelocityCommand(),
+            command_format=MultiDOFCommandFormat(),
         )
         self.add_joint_velocity_group_controller(
             cmd_topic="/garmi/arms/right_arm_joint_velocity_controller/reference",
             connections=GARMI_RIGHT_ARM_JOINTS,
-            velocity_command=MultiDOFVelocityCommand(),
+            command_format=MultiDOFCommandFormat(),
         )
 
         # self.add_joint_velocity_group_controller(

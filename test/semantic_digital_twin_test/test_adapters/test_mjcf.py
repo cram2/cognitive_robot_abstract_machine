@@ -1,5 +1,6 @@
 import os.path
 
+import numpy
 import pytest
 
 from semantic_digital_twin.adapters.mjcf import MJCFParser
@@ -15,6 +16,8 @@ MJCF_DIR = os.path.join(
     "resources",
     "mjcf",
 )
+
+DATASET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dataset")
 
 
 @pytest.fixture
@@ -216,6 +219,73 @@ TEXTURED_BOX_MJCF_TEMPLATE = """
   </worldbody>
 </mujoco>
 """
+
+
+# %% frame tag parsing
+
+FRAME_ROTATION_ABOUT_Z = numpy.array(
+    [
+        [0.0, -1.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ]
+)
+"""
+Rotation matrix of the fixture frame's 90 degree rotation about the z axis.
+"""
+
+
+@pytest.fixture
+def frame_wrapped_world():
+    """
+    World parsed from a scene whose geom and child bodies are wrapped in an MJCF
+    ``<frame pos="1 2 3" quat="0.7071068 0 0 0.7071068">`` element.
+    """
+    return MJCFParser(os.path.join(DATASET_DIR, "frame_wrapped_scene.xml")).parse()
+
+
+def test_frame_transform_is_applied_to_the_geoms_it_wraps(frame_wrapped_world):
+    [base] = [
+        body
+        for body in frame_wrapped_world.kinematic_structure_entities
+        if body.name.name == "base"
+    ]
+    [geom] = base.visual.shapes
+
+    origin = geom.origin.to_np()
+
+    assert origin[:3, 3] == pytest.approx([1.0, 2.5, 3.0])
+    assert origin[:3, :3] == pytest.approx(FRAME_ROTATION_ABOUT_Z)
+
+
+def test_frame_transform_is_applied_to_a_fixed_child_body(frame_wrapped_world):
+    [shelf] = [
+        body
+        for body in frame_wrapped_world.kinematic_structure_entities
+        if body.name.name == "shelf"
+    ]
+
+    root_transform = frame_wrapped_world.compute_forward_kinematics_np(
+        frame_wrapped_world.root, shelf
+    )
+
+    assert root_transform[:3, 3] == pytest.approx([1.0, 2.5, 3.0])
+    assert root_transform[:3, :3] == pytest.approx(FRAME_ROTATION_ABOUT_Z)
+
+
+def test_frame_transform_is_applied_to_a_jointed_child_body(frame_wrapped_world):
+    [door] = [
+        body
+        for body in frame_wrapped_world.kinematic_structure_entities
+        if body.name.name == "door"
+    ]
+
+    root_transform = frame_wrapped_world.compute_forward_kinematics_np(
+        frame_wrapped_world.root, door
+    )
+
+    assert root_transform[:3, 3] == pytest.approx([0.5, 2.0, 3.0])
+    assert root_transform[:3, :3] == pytest.approx(FRAME_ROTATION_ABOUT_Z)
 
 
 def test_primitive_box_geom_resolves_its_material_texture(tmp_path):
