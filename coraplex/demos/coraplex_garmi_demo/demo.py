@@ -176,38 +176,43 @@ visualization = WorldVisualization.from_environment(
 ).start()
 # Execute plan with the simulated robot.
 context = Context.from_world(world)
+plan = sequential(
+    [
+        ParkArmsAction(arm=Arms.BOTH),
+        # Note: always need TorsoState.HIGH or next(iter(self)) of CostmapLocation fails
+        MoveTorsoAction(TorsoState.HIGH),
+        # Transport is not working yet on the garmi
+        TransportAction(
+            object_designator=world.get_body_by_name("bowl.stl"),
+            arm=Arms.RIGHT,
+            grasp_description=GraspDescription(
+                ApproachDirection.RIGHT,
+                VerticalAlignment.TOP,
+                garmi_robot.get_right_arm_if_specified().end_effector,
+            ),
+            target_location=bowl_target_pose,
+        ),
+        MoveTorsoAction(TorsoState.HIGH),
+        TransportAction(
+            object_designator=world.get_body_by_name("spoon.stl"),
+            arm=Arms.RIGHT,
+            grasp_description=GraspDescription(
+                ApproachDirection.RIGHT,
+                VerticalAlignment.TOP,
+                rotate_gripper=True,
+                end_effector=garmi_robot.get_right_arm_if_specified().end_effector,
+            ),
+            target_location=spoon_target_pose,
+        ),
+    ],
+    context,
+).plan
+# Publishes the plan to the viewer and lets the viewer write back: an object dragged in
+# the browser only reaches the world through this callback.
+visualization.attach_plan(plan)
+
 with simulated_robot:
-    sequential(
-        [
-            ParkArmsAction(arm=Arms.BOTH),
-            # Note: always need TorsoState.HIGH or next(iter(self)) of CostmapLocation fails
-            MoveTorsoAction(TorsoState.HIGH),
-            # Transport is not working yet on the garmi
-            TransportAction(
-                object_designator=world.get_body_by_name("bowl.stl"),
-                arm=Arms.RIGHT,
-                grasp_description=GraspDescription(
-                    ApproachDirection.RIGHT,
-                    VerticalAlignment.TOP,
-                    garmi_robot.get_right_arm_if_specified().end_effector,
-                ),
-                target_location=bowl_target_pose,
-            ),
-            MoveTorsoAction(TorsoState.HIGH),
-            TransportAction(
-                object_designator=world.get_body_by_name("spoon.stl"),
-                arm=Arms.RIGHT,
-                grasp_description=GraspDescription(
-                    ApproachDirection.RIGHT,
-                    VerticalAlignment.TOP,
-                    rotate_gripper=True,
-                    end_effector=garmi_robot.get_right_arm_if_specified().end_effector,
-                ),
-                target_location=spoon_target_pose,
-            ),
-        ],
-        context,
-    ).perform()
+    plan.perform()
 print("done")
 
 # Keep publishing markers only when run directly; an importing test run exits instead.

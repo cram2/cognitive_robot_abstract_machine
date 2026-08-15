@@ -811,13 +811,11 @@ class Bridge:
         """
         Publish everything one motion executor tick makes available.
 
-        Applies queued viewer moves first, because the executor tick runs on the only
-        thread allowed to write to the world; the world snapshot itself follows from
-        the state change the tick causes.
+        The world snapshot itself follows from the state change the tick causes; queued
+        viewer moves are written before the tick (see :meth:`apply_moves`).
 
         :param chart: The motion statechart the executor is ticking.
         """
-        self.apply_moves()
         self.observe_chart(chart)
         self._tick_count += 1
         if self._tick_count % self.plan_snapshot_tick_interval == 0:
@@ -1147,8 +1145,9 @@ class Bridge:
         """
         Apply queued object moves to the world.
 
-        Called from the tick hook — the simulation thread is the only place that may
-        write to the world.
+        Called before the executor computes a control cycle: the simulation thread is
+        the only place that may write to the world, and writing there is what makes the
+        drag part of the state that cycle runs on.
         """
         with self._moves_lock:
             moves, self._moves = self._moves, []

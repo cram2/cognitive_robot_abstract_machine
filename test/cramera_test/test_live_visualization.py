@@ -20,7 +20,7 @@ from coraplex.plans.plan_node import MotionNode
 
 from cramera import paths
 from cramera.live import visualization as visualization_module
-from cramera.live.bridge import Bridge, TaskStatusName
+from cramera.live.bridge import Bridge, MoveRequest, TaskStatusName
 from cramera.live.recording import Recording, RecordingState
 from cramera.live.visualization import (
     BridgePlanCallback,
@@ -173,6 +173,22 @@ class TestBridgePlanCallback:
         motion.status = ReportedStatus(name=TaskStatusName.CREATED)
 
         assert nodes_by_kind(bridge)["MotionNode"]["status"] == TaskStatusName.FAILED
+
+    def test_a_queued_move_is_applied_before_the_tick(self, world):
+        """
+        A drag queued while the demo was idle reaches the world before the control cycle
+        it precedes, so the object stays where the viewer put it instead of being
+        published back at its old pose.
+        """
+        bridge = Bridge()
+        bridge.attach(world)
+        callback = BridgePlanCallback(bridge=bridge)
+        bridge.queue_move(MoveRequest(object_key="milk.stl", position=[1.0, 2.0, 3.0]))
+
+        callback.before_motion_tick(make_chart())
+
+        moved = world.get_body_by_name("milk.stl")
+        assert moved.global_pose.to_position().to_np()[:3].tolist() == [1.0, 2.0, 3.0]
 
     def test_a_motion_tick_publishes_the_statechart(self):
         bridge = Bridge()

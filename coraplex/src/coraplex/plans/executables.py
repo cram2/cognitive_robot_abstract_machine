@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from coraplex.robot_plans.actions.base import ActionDescription
 
     from coraplex.plans.condition_nodes import ConditionNode
+    from coraplex.plans.plan import Plan
     from coraplex.plans.plan_node import MotionNode, UnderspecifiedNode, ActionNode
     from coraplex.datastructures.dataclasses import Context
 
@@ -346,17 +347,34 @@ class GiskardExecutable(Executable):
             case _:
                 raise UnknownExecutionType(GiskardExecutable.execution_type)
 
+    @property
+    def _plans(self) -> List[Plan]:
+        """
+        Every plan whose motions this executable realizes, each listed once.
+        """
+        plans_by_identity = {
+            id(motion_node.plan): motion_node.plan
+            for motion_node in self.motion_mappings or {}
+        }
+        return list(plans_by_identity.values())
+
+    def _notify_before_motion_tick(self, statechart: MotionStatechart) -> None:
+        """
+        Notify every plan this executable realizes that a control cycle is about to be
+        computed, so world writes made from a callback are part of the state it runs on.
+
+        :param statechart: The statechart the executor is about to tick.
+        """
+        for plan in self._plans:
+            plan.notify_before_motion_tick(statechart)
+
     def _notify_motion_tick(self, statechart: MotionStatechart) -> None:
         """
         Notify every plan whose motions this executable realizes of one executor tick.
 
         :param statechart: The statechart the executor is ticking.
         """
-        plans_by_identity = {
-            id(motion_node.plan): motion_node.plan
-            for motion_node in self.motion_mappings or {}
-        }
-        for plan in plans_by_identity.values():
+        for plan in self._plans:
             plan.notify_motion_tick(statechart)
 
     def _execute_simulation(self) -> None:
@@ -392,6 +410,7 @@ class GiskardExecutable(Executable):
                 time.sleep(0.01)
                 continue
 
+            self._notify_before_motion_tick(executor.motion_statechart)
             executor.tick()
             counter += 1
             life_cycle_tracker.emit_transitions()

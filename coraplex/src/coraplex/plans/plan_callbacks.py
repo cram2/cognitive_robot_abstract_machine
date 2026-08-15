@@ -24,4 +24,14 @@ class PlanCallback(PlanEntity):
 
     def on_end(self, node: PlanNode): ...
 
+    def before_motion_tick(self, statechart: MotionStatechart):
+        """
+        Notified before the motion executor computes a control cycle.
+
+        This is the moment a world write reaches the cycle it precedes; writing from
+        :meth:`on_motion_tick` instead only takes effect one cycle later.
+
+        :param statechart: The motion statechart the executor is about to tick.
+        """
+
     def on_motion_tick(self, statechart: MotionStatechart): ...

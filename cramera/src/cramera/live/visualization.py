@@ -78,7 +78,8 @@ class WorldModelSync(ModelChangeCallback):
 class BridgePlanCallback(PlanCallback):
     """
     Feeds a plan's execution into the live bridge: per-node progress as its nodes start
-    and end, and the executing motion statechart on every executor tick.
+    and end, the executing motion statechart on every executor tick, and the viewer's
+    queued drags into the world before each control cycle.
     """
 
     bridge: Bridge = field(kw_only=True)
@@ -97,6 +98,9 @@ class BridgePlanCallback(PlanCallback):
             self.bridge.observe_motion_ended(node)
             return
         self.bridge.snapshot_plan()
+
+    def before_motion_tick(self, statechart: MotionStatechart) -> None:
+        self.bridge.apply_moves()
 
     def on_motion_tick(self, statechart: MotionStatechart) -> None:
         self.bridge.observe_motion_tick(statechart)

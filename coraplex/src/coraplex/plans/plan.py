@@ -281,6 +281,16 @@ class Plan:
         for callback in self.node_callbacks:
             callback.on_end(node)
 
+    def notify_before_motion_tick(self, statechart: MotionStatechart) -> None:
+        """
+        Notify every registered callback that the motion executor is about to compute a
+        control cycle while realizing this plan's motions.
+
+        :param statechart: The motion statechart the executor is about to tick.
+        """
+        for callback in self.node_callbacks:
+            callback.before_motion_tick(statechart)
+
     def notify_motion_tick(self, statechart: MotionStatechart) -> None:
         """
         Notify every registered callback that the motion executor ticked once while
