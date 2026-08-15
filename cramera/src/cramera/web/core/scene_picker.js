@@ -56,10 +56,19 @@
     return match ? { robot: match.robot, environment: match.environment || null } : null;
   }
 
+  // every scene name in the index, alphabetically — sceneFor() only ever resolves a
+  // (robot, environment) pair to its *first* match, so this is what lets the user
+  // choose among several scenes that share one (e.g. multiple saved live recordings
+  // of the same demo, which all share the same robot and environment model name)
+  function names(scenes) {
+    return (scenes || []).map(function (s) { return s.name; }).sort();
+  }
+
   window.ScenePicker = {
     robots: robots,
     environments: environments,
     sceneFor: sceneFor,
     describe: describe,
+    names: names,
   };
 })();

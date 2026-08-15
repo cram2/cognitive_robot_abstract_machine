@@ -161,7 +161,11 @@ regenerates from every manifest on each save, so it can't drift.
 
 - `merged` — the changes landed but GitHub's merge API never recorded it (branch pushed directly,
   PR then closed by hand). Treated exactly like a real merge.
-- `in-review`, `bug` — recognized so they don't read as unknown labels; no script acts on them yet.
+- `bug` — marks the item with a `bug` chip in the dashboard's "What to do next" sidebar, in
+  whichever action group it already belongs to, and is what the sidebar's "Bug fixes only" filter
+  keeps. Being a bug fix is a property of the work, not a next action of its own, so it never
+  moves an item into a group or out of one.
+- `in-review` — recognized so it doesn't read as an unknown label; no script acts on it yet.
 
 Any other label is preserved but not interpreted.
 

@@ -18,8 +18,10 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 from coraplex.plans.plan_node import MotionNode
 
+from cramera import paths
 from cramera.live import visualization as visualization_module
 from cramera.live.bridge import Bridge, TaskStatusName
+from cramera.live.recording import Recording, RecordingState
 from cramera.live.visualization import (
     BridgePlanCallback,
     LiveVisualization,
@@ -84,6 +86,46 @@ class TestWorldSync:
         sync = WorldStateSync(_world=world, bridge=Bridge())
 
         assert sync in world.state.state_change_callbacks
+
+    def test_a_state_change_appends_to_an_active_recording(self, world):
+        bridge = Bridge()
+        bridge.attach(world)
+        bridge.recording = Recording()
+        bridge.recording.start()
+        sync = WorldStateSync(_world=world, bridge=bridge)
+
+        sync.on_state_change()
+
+        assert bridge.recording.frame_count() == 1
+
+    def test_a_recorded_tick_carries_the_action_the_plan_is_performing(self, world):
+        """
+        The tick's action is what names its stretch of the replay timeline, so it has to
+        be captured as the tick is buffered — afterwards the plan has moved on.
+        """
+        bridge = Bridge()
+        bridge.attach(world)
+        bridge.recording = Recording()
+        bridge.recording.start()
+        performing = "TransportAction"
+        bridge.running_step = lambda: performing
+        sync = WorldStateSync(_world=world, bridge=bridge)
+
+        sync.on_state_change()
+        performing = "ParkArmsAction"
+        sync.on_state_change()
+
+        assert [frame.step for frame in bridge.recording.stop()] == [
+            "TransportAction",
+            "ParkArmsAction",
+        ]
+
+    def test_a_state_change_without_a_recording_does_not_fail(self, world):
+        bridge = Bridge()
+        bridge.attach(world)
+        sync = WorldStateSync(_world=world, bridge=bridge)
+
+        sync.on_state_change()  # bridge.recording is None — must not raise
 
     def test_a_model_change_refreshes_the_bundle_signature(self, world):
         bridge = Bridge()
@@ -191,6 +233,85 @@ class TestLiveVisualization:
         assert bridge.world is world
         assert bridge.live_server is server
         assert live.state_sync in world.state.state_change_callbacks
+        assert bridge.recording.state is RecordingState.RECORDING
+
+    def test_start_replaces_an_earlier_unsaved_recording(self, world, monkeypatch):
+        """
+        Re-attaching (e.g. a rerun in the same process) starts a fresh capture — a
+        single in-flight slot, the same precedent the ``__live__`` throwaway bundle
+        already sets for a second attach.
+        """
+        bridge = Bridge()
+        monkeypatch.setattr(
+            visualization_module, "serve", lambda passed_bridge, port: ServerRecorder()
+        )
+        stale = Recording()
+        stale.start()
+        stale.stop()
+        bridge.recording = stale
+
+        LiveVisualization(world=world, bridge=bridge).start()
+
+        assert bridge.recording is not stale
+        assert bridge.recording.state is RecordingState.RECORDING
+
+    def test_start_registers_an_atexit_safety_net(self, world, monkeypatch, tmp_path):
+        """
+        A demo run directly (not through ``cramera-live``) has no long-lived process
+        left for the browser to send ``/recording/stop`` to — the interpreter exits the
+        moment the script's main body returns.
+
+        The registered callback must finalize whatever the bridge is currently recording
+        at that point.
+        """
+        monkeypatch.setenv("CRAMERA_DATA", str(tmp_path))
+        bridge = Bridge()
+        monkeypatch.setattr(
+            visualization_module, "serve", lambda passed_bridge, port: ServerRecorder()
+        )
+        registered = []
+        monkeypatch.setattr(
+            visualization_module.atexit,
+            "register",
+            lambda fn, *args: registered.append((fn, args)),
+        )
+
+        LiveVisualization(world=world, bridge=bridge).start()
+        bridge.recording.append(bridge.state)
+
+        [(callback, args)] = registered
+        callback(*args)
+
+        assert bridge.recording.scene_name == paths.RECORDING_SCENE_NAME
+        assert (
+            tmp_path / "scenes" / paths.RECORDING_SCENE_NAME / "scene.json"
+        ).is_file()
+
+    def test_the_atexit_safety_net_is_silent_with_nothing_to_finalize(
+        self, world, monkeypatch
+    ):
+        bridge = Bridge()  # never attached — bridge.recording is None
+        visualization_module._finalize_recording_at_exit(bridge)  # must not raise
+
+    def test_the_atexit_safety_net_swallows_a_bundling_failure(
+        self, world, monkeypatch, capsys
+    ):
+        """
+        The interpreter is already tearing down at this point; a bundling failure must
+        not surface as an unhandled exception on every ordinary demo exit.
+        """
+        bridge = Bridge()
+        bridge.attach(world)
+        bridge.recording = Recording()
+        bridge.recording.start()
+        bridge.recording.append(bridge.state)
+        monkeypatch.setattr(
+            visualization_module,
+            "finalize_recording",
+            lambda *a: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+
+        visualization_module._finalize_recording_at_exit(bridge)  # must not raise
 
     def test_start_reuses_a_running_server(self, world, monkeypatch):
         bridge = Bridge()

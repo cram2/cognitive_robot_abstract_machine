@@ -84,3 +84,27 @@ test('describe() is null for a name not in the index', function () {
   load();
   assert.strictEqual(window.ScenePicker.describe(SCENES, 'unknown_scene'), null);
 });
+
+test('names() lists every scene name, alphabetically', function () {
+  load();
+  assert.deepStrictEqual(
+    window.ScenePicker.names(SCENES),
+    ['garmi_apartment', 'pr2_kitchen', 'pr2_lab', 'tracy_lab']);
+});
+
+test('names() disambiguates scenes that share one (robot, environment) pair', function () {
+  // several saved live recordings of the same demo: sceneFor() alone could only ever
+  // resolve to the first one, so names() is what the picker falls back to
+  load();
+  const recordings = [
+    { name: 'run_1', robot: 'pr2', environment: 'environment' },
+    { name: 'run_2', robot: 'pr2', environment: 'environment' },
+  ];
+  assert.deepStrictEqual(window.ScenePicker.names(recordings), ['run_1', 'run_2']);
+});
+
+test('names() is empty without any scenes', function () {
+  load();
+  assert.deepStrictEqual(window.ScenePicker.names([]), []);
+  assert.deepStrictEqual(window.ScenePicker.names(undefined), []);
+});

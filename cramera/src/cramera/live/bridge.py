@@ -56,6 +56,7 @@ from semantic_digital_twin.world_description.connections import (
 from cramera.knowledge.enums import PlanNodeGroup
 from cramera.live.markers import MarkerEntry, MarkerStore
 from cramera.live.shape_catalog import ShapeEntry, served_mesh_file, shape_entry
+from cramera.live.transforms import TransformGraph, TransformSnapshot
 from cramera.mesh_format import MeshFormat
 from cramera.palette import ObjectPalette
 from cramera.robot_parts import RobotPartAnnotation
@@ -65,7 +66,9 @@ if TYPE_CHECKING:
     from coraplex.plans.plan_node import MotionNode, PlanNode
     from giskardpy.motion_statechart.motion_statechart import MotionStatechart
     from semantic_digital_twin.world import World
-    from semantic_digital_twin.world_description.world_entity import Body
+    from semantic_digital_twin.world_description.world_entity import Body, Connection
+
+    from cramera.live.recording import Recording
 
 logger = get_logger(__name__)
 
@@ -642,6 +645,21 @@ class Bridge:
     Actuated world connections whose positions are published as frames.
     """
 
+    transform_state: TransformSnapshot = field(default_factory=TransformSnapshot)
+    """
+    The newest transform-graph snapshot (see :mod:`cramera.live.transforms`).
+    """
+
+    _transforms: TransformGraph = field(default_factory=TransformGraph)
+    """
+    Tracks when each world connection last changed, across ticks.
+    """
+
+    _kinematic_connections: List[Connection] = field(default_factory=list)
+    """
+    Every world connection, of any kind, as the last bind discovered them.
+    """
+
     _bodies: Dict[str, Body] = field(default_factory=dict)
     """
     Published bodies by mesh key; :data:`ROBOT_BASE_KEY` is the robot root.
@@ -764,6 +782,12 @@ class Bridge:
     live_server: Optional[ThreadingHTTPServer] = None
     """
     The bridge's HTTP server once it is listening, so a second start reuses it.
+    """
+
+    recording: Optional[Recording] = None
+    """
+    The current live run's capture buffer, started alongside :meth:`attach` (see
+    :mod:`cramera.live.visualization`); None before anything has ever attached.
     """
 
     # %% what the visualization drives
@@ -1035,6 +1059,15 @@ class Bridge:
         with self._lock:
             return self._mesh_serve.get(key)
 
+    def object_body(self, key: str) -> Optional[Body]:
+        """
+        The published body behind an object-catalog key, or None if it is not published.
+
+        :param key: Mesh key of the object, as published in the geometry catalog.
+        """
+        with self._lock:
+            return self._bodies.get(key)
+
     def bundle_signature(self) -> str:
         """
         A digest of the bundled scene's content: the identity, parentage and connection
@@ -1181,6 +1214,7 @@ class Bridge:
         parent_T_object.reference_frame = connection.parent
         parent_T_object.child_frame = body
         connection.origin = parent_T_object
+        self._transforms.note_viewer_write(str(connection.name))
         logger.info(
             "moved %s -> world (%.3f, %.3f, %.3f) [final=%s]",
             move.object_key,
@@ -1204,7 +1238,8 @@ class Bridge:
         self._last_bind_time = time.time()
         robots = world.get_semantic_annotations_by_type(AbstractRobot)
         self.robot = robots[0] if robots else None
-        self._connections = self._actuated_connections(world)
+        self._kinematic_connections = list(world.connections)
+        self._connections = self._actuated_connections(self._kinematic_connections)
         bodies: Dict[str, Body] = {}
         if self.robot is not None:
             bodies[ROBOT_BASE_KEY] = self.robot.root
@@ -1256,15 +1291,17 @@ class Bridge:
         return []
 
     @staticmethod
-    def _actuated_connections(world: World) -> List[ActiveConnection1DOF]:
+    def _actuated_connections(
+        connections: List[Connection],
+    ) -> List[ActiveConnection1DOF]:
         """
         All 1-DOF connections — the joints published as trajectory frames.
 
-        :param world: The world to scan for actuated connections.
+        :param connections: The world's connections to pick the actuated ones from.
         """
         return [
             connection
-            for connection in world.connections
+            for connection in connections
             if isinstance(connection, ActiveConnection1DOF)
         ]
 
@@ -1368,7 +1405,11 @@ class Bridge:
             else:
                 object_poses[name] = rounded_pose(body)
         self._refresh_marker_state()
+        transforms = self._transforms.observe(
+            self._kinematic_connections, self.world, time.monotonic()
+        )
         with self._lock:
+            self.transform_state = transforms
             self.sequence_number += 1
             self.state = WorldStateSnapshot(
                 sequence_number=self.sequence_number,
@@ -1384,6 +1425,13 @@ class Bridge:
         """
         with self._lock:
             return self.state.to_payload()
+
+    def get_transforms(self) -> Dict[str, Any]:
+        """
+        The newest transform graph, aged as of now (safe to call from HTTP threads).
+        """
+        with self._lock:
+            return self.transform_state.to_payload(time.monotonic())
 
     # %% plan tree
     def _live_motion_status(self, node: PlanNode) -> Optional[str]:
@@ -1521,6 +1569,23 @@ class Bridge:
             if basename in keys_by_basename:
                 return keys_by_basename[basename]
         return None
+
+    def running_step(self) -> Optional[str]:
+        """
+        Label of the action the plan is performing right now, or None between actions.
+
+        The deepest running action wins: a ``Transport`` that is performing its
+        ``Pickup`` is reported as the pickup, which is the step a replay of this moment
+        should be labelled with.
+        """
+        with self._lock:
+            running = [
+                entry
+                for entry in self.plan_state.nodes
+                if entry.status == TaskStatusName.RUNNING
+                and entry.group is PlanNodeGroup.ACTION
+            ]
+        return running[-1].label if running else None
 
     def get_plan(self) -> Dict[str, Any]:
         """

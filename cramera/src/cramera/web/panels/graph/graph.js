@@ -46,6 +46,12 @@
     other_plan_node:  { color: '#7f8db0', ring: '#b6c0d8', size: 13, label: 'Other plan node' },
 
     // %% motion-statechart nodes, bucketed by the kind giskardpy compiled
+    // transform graph: a frame is coloured by how the connection above it holds it
+    world_frame:    { color: '#e8eefb', ring: '#ffffff', size: 20, label: 'World root' },
+    fixed_frame:    { color: '#7f8db0', ring: '#b6c0d8', size: 14, label: 'Fixed to its parent' },
+    actuated_frame: { color: '#ffb648', ring: '#ffd89a', size: 16, label: 'Actuated joint' },
+    free_frame:     { color: '#39d5c8', ring: '#8ff0e7', size: 16, label: 'Free-floating' },
+
     task:        { color: '#ff7a9c', ring: '#ffb3c6', size: 20, label: 'Task (motion constraint)' },
     monitor:     { color: '#4bd38a', ring: '#a6ecc6', size: 14, label: 'Monitor / observation' },
     motion_goal: { color: '#5b8cff', ring: '#a9c2ff', size: 15, label: 'Goal (contains nodes)' },
@@ -66,6 +72,11 @@
     PAUSED:      { c: '#5b8cff', w: 16, d: [9, 7], text: 'paused', legend: 'paused' },
     CREATED:     { c: '#46557a', w: 7, d: [4, 5], legend: 'not started' },
     NOT_STARTED: { c: '#46557a', w: 7, d: [4, 5], legend: 'not started' },
+    // transform freshness (cramera.live.transforms), on the frame a connection carries
+    MOVING:      { c: '#ffb648', w: 20, text: 'moving', legend: 'moving now' },
+    SETTLED:     { c: '#4bd38a', w: 16, text: 'settled', legend: 'moved just now' },
+    STALE:       { c: '#7f8db0', w: 10, d: [4, 5], legend: 'not written for a while' },
+    STATIC:      { c: '#46557a', w: 7, legend: 'cannot move (fixed)' },
   };
   const STATUS_LEGEND_ORDER = ['RUNNING', 'SUCCEEDED', 'FAILED', 'PAUSE', 'INTERRUPTED', 'CREATED'];
 
@@ -105,6 +116,10 @@
     prop:        { c: '#b98cff', o: 0.55, w: 1.4 },                          // object-property triple
     restriction: { c: '#ffb648', o: 0.5,  w: 1.3, d: [4, 3] },               // OWL restriction
     disjoint:    { c: '#ff6b8b', o: 0.4,  w: 1.2, d: [2, 3], noArrow: true },// owl:disjointWith (symmetric)
+    // world connections (cramera.live.transforms ConnectionKind)
+    fixed:       { c: '#3a4c6e', o: 0.5,  w: 1.2, d: [3, 3] },
+    actuated:    { c: '#ffb648', o: 0.65, w: 1.8 },
+    free:        { c: '#39d5c8', o: 0.6,  w: 1.6 },
     default:     { c: '#3a4c6e', o: 0.4,  w: 1 },
   };
 
@@ -261,9 +276,11 @@
     buildLegend(data);
   }
 
-  function statusLegend() {
+  // `order` names the statuses this view can actually show — a view with its own
+  // status vocabulary (transform freshness) passes it, the rest take the plan/chart one
+  function statusLegend(order) {
     // rings, not filled dots — that is exactly how a status reads on a node
-    STATUS_LEGEND_ORDER.forEach(function (key) {
+    (Array.isArray(order) ? order : STATUS_LEGEND_ORDER).forEach(function (key) {
       const st = STATUS_STYLE[key];
       const d = document.createElement('div');
       d.className = 'li';
@@ -286,7 +303,7 @@
         d.innerHTML = '<span class="dot" style="background:' + st.color + '"></span>' + row.label;
         legendEl.appendChild(d);
       });
-      if (data.statusLegend) statusLegend();
+      if (data.statusLegend) statusLegend(data.statusLegend);
       return;
     }
     const present = {};

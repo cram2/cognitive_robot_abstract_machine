@@ -45,10 +45,12 @@ response entirely, so a genuinely unmerged pull request comes back with no
 never asked for. Write the `null` in yourself for those; transcribing the
 response as-is is what the rejection above catches.
 
-`labels` matters even though most callers never look at it: a pull request
-merged out-of-band never gets `merged_at` set, and this repo's convention
-is to add a `"merged"` label by hand in that case - see
-`build_dashboard.py`'s `PullRequestLabel`/`was_merged`. That label is a
-fallback for a real merge GitHub never recorded, not a substitute for
-`merged_at` - only pull requests that happen to carry it survive a fetch
-that dropped the timestamp.
+`labels` carries two things this codebase reads. A pull request merged
+out-of-band never gets `merged_at` set, and this repo's convention is to add
+a `"merged"` label by hand in that case - see `build_dashboard.py`'s
+`PullRequestLabel`/`was_merged`. That label is a fallback for a real merge
+GitHub never recorded, not a substitute for `merged_at` - only pull requests
+that happen to carry it survive a fetch that dropped the timestamp. A
+`"bug"` label separately marks the item as a bug fix wherever it already
+appears in the sidebar, and is what its "Bug fixes only" filter keeps - see
+`Item.is_bug_fix`.

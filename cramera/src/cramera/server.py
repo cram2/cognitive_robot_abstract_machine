@@ -11,6 +11,14 @@ Serves three things from one port (default 8711):
       GET  /api/knowledge/view?name=   one graph tab (knowledge/kinematics/plan/chart)
       GET  /api/knowledge/expand?node= drill-down subgraph for one node
       POST /api/eql             run an EQL query string
+      GET  /api/recording/status       {state: finalized|idle} of the on-disk
+                                        __recording__ bundle (see
+                                        cramera.live.recording_storage) — a pure
+                                        filesystem check, so it answers correctly even
+                                        once the demo process that made it has exited
+      POST /api/recording/save         {name} -> promote that bundle to a permanent,
+                                        locally saved scene
+      POST /api/recording/discard      drop that bundle
 
 The API needs krrood (EQL). Without it the server still serves the viewer and
 answers API calls with ``{"ok": false, "error": ...}`` so the frontend can say
@@ -26,7 +34,6 @@ import http.server
 import json
 import logging
 import mimetypes
-import os
 import socketserver
 import sys
 import threading
@@ -38,12 +45,20 @@ from typing_extensions import Any, Callable, ClassVar, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 
 from cramera import paths
+from cramera.live.recording_storage import (
+    NoSavedRecording,
+    SceneNameTaken,
+    discard_recording_bundle,
+    has_saveable_recording,
+    save_recording_bundle,
+)
 from cramera.logging_setup import get_logger
 from cramera.models_workbench import (
     ModelWorkbench,
     NO_MODELS_MESSAGE,
     PROBABILISTIC_MODELS_AVAILABLE,
 )
+from cramera.onboard.scene_index import InvalidSceneName, merged_scene_index
 from cramera.payload import CrameraPayload
 
 logger = get_logger(__name__)
@@ -169,19 +184,33 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         """
         Serve one file of a scene bundle, with path-traversal protection.
 
+        ``index.json`` is special-cased: the viewer's pickers must see both the shared
+        scenes root and the local-only recordings root (see
+        :func:`cramera.onboard.scene_index.merged_scene_index`) as one list. Every other
+        file is looked up across both roots (local first), so a saved recording's
+        ``scene.json``/``trajectory.json``/meshes serve exactly like any onboarded scene.
+
         :param url_path: The request path, starting with ``/scenes/``.
         """
         relative_path = url_path[len("/scenes/") :]
-        base = paths.scenes_directory().resolve()
-        target = (base / relative_path).resolve()
-        if not str(target).startswith(str(base) + os.sep) and target != base:
-            self.send_response(403)
-            self.end_headers()
-            return
-        if not target.is_file():
-            self.send_response(404)
-            self.end_headers()
-            return
+        if relative_path == "index.json":
+            return self._send_json(merged_scene_index())
+        for root in paths.scene_roots():
+            base = root.resolve()
+            target = (base / relative_path).resolve()
+            if not target.is_relative_to(base):
+                continue  # path traversal (".." or an injected absolute path)
+            if target.is_file():
+                return self._send_file(target)
+        self.send_response(404)
+        self.end_headers()
+
+    def _send_file(self, target: Path) -> None:
+        """
+        Stream a resolved, existing file's bytes.
+
+        :param target: The file to serve, already resolved and confirmed to exist.
+        """
         content_type = (
             mimetypes.guess_type(str(target))[0] or "application/octet-stream"
         )
@@ -215,6 +244,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if not PROBABILISTIC_MODELS_AVAILABLE:
                 return self._send_error(NO_MODELS_MESSAGE)
             return self._guarded(lambda: ModelWorkbench.active().state())
+        if route == "/api/recording/status":
+            return self._send_json(
+                {"state": "finalized" if has_saveable_recording() else "idle"}
+            )
         return super().do_GET()
 
     @staticmethod
@@ -237,7 +270,35 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._run_eql()
         if route.startswith("/api/models/"):
             return self._run_models_request(route)
+        if route == "/api/recording/save":
+            return self._save_recording()
+        if route == "/api/recording/discard":
+            return self._discard_recording()
         return self._send_error("unknown endpoint", 404)
+
+    def _save_recording(self) -> None:
+        """
+        Promote the on-disk ``__recording__`` bundle to a permanent, locally saved
+        scene — independent of whether the demo process that made it is still running
+        (see :mod:`cramera.live.recording_storage`).
+        """
+        body = self._request_body()
+        try:
+            name = save_recording_bundle(str(body.get("name") or ""))
+        except InvalidSceneName as error:
+            return self._send_json({"ok": False, "error": str(error)}, 400)
+        except NoSavedRecording as error:
+            return self._send_json({"ok": False, "error": str(error)}, 400)
+        except SceneNameTaken as error:
+            return self._send_json({"ok": False, "error": str(error)}, 409)
+        self._send_json({"ok": True, "scene": name})
+
+    def _discard_recording(self) -> None:
+        """
+        Drop the on-disk ``__recording__`` bundle, if one exists.
+        """
+        discard_recording_bundle()
+        self._send_json({"ok": True})
 
     def _run_eql(self) -> None:
         """

@@ -22,9 +22,27 @@ from semantic_digital_twin.world_description.world_entity import Body
 from cramera import paths
 from cramera.live.bridge import Bridge
 from cramera.live.http import serve
+from cramera.live.recording import Recording
 
 from .test_live_bridge import shaped_body, world_with
 from .test_server import get, get_json
+
+
+def post(url, payload=None, timeout=10):
+    """
+    POST a JSON body (or none) and return ``(status, decoded json body)``.
+    """
+    request = urllib.request.Request(
+        url,
+        method="POST",
+        data=json.dumps(payload).encode() if payload is not None else b"{}",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.status, json.loads(response.read())
+    except urllib.error.HTTPError as error:
+        return error.code, json.loads(error.read())
 
 
 @pytest.fixture()
@@ -78,6 +96,21 @@ class TestReadOnlyEndpoints:
         chart = get_json(server + "/chart")
         assert chart["nodes"] == []
         assert chart["edges"] == []
+
+    def test_transforms_reflects_a_fresh_bridge(self, server):
+        assert get_json(server + "/transforms")["connections"] == []
+
+    def test_transforms_serves_the_attached_worlds_connection_graph(
+        self, server, bridge
+    ):
+        bridge.world = world_with(shaped_body("kitchen", "shelf"))
+        bridge.bind()
+        bridge.snapshot()
+
+        payload = get_json(server + "/transforms")
+
+        assert [entry["child"] for entry in payload["connections"]] == ["kitchen/shelf"]
+        assert payload["signature"] == bridge.transform_state.signature
 
     def test_objects_reflects_the_injected_bridges_catalog(
         self, server, bridge, tmp_path
@@ -160,6 +193,173 @@ class TestLiveScene:
         scene_directory = scenes / paths.LIVE_SCENE_NAME
         assert (scene_directory / "scene.json").is_file()
         assert (scene_directory / "environment.urdf").is_file()
+
+
+class TestRecordingEndpoints:
+    def start_recording(self, bridge, ticks=2) -> None:
+        """
+        Attach ``bridge`` to a real world, start a recording, and feed it a few ticks.
+        """
+        bridge.attach(world_with(shaped_body("laboratory", "bench")))
+        bridge.recording = Recording()
+        bridge.recording.start()
+        for _ in range(ticks):
+            bridge.snapshot()
+            bridge.recording.append(bridge.state)
+
+    def test_a_fresh_bridge_is_idle(self, server):
+        assert get_json(server + "/recording") == {
+            "state": "idle",
+            "frameCount": 0,
+            "durationSeconds": 0.0,
+            "sceneName": None,
+        }
+
+    def test_stop_without_a_recording_is_rejected(self, server):
+        status, body = post(server + "/recording/stop")
+        assert status == 400
+        assert body["ok"] is False
+
+    def test_stop_bundles_the_recording_under_the_local_data_directory_only(
+        self, server, bridge, tmp_path, monkeypatch
+    ):
+        shared = tmp_path / "shared"
+        monkeypatch.setenv("CRAMERA_SCENES", str(shared))
+        monkeypatch.setenv("CRAMERA_DATA", str(tmp_path / "data"))
+        self.start_recording(bridge)
+
+        status, body = post(server + "/recording/stop")
+
+        assert status == 200
+        assert body["ok"] is True
+        assert body["scene"] == paths.RECORDING_SCENE_NAME
+        local_bundle = tmp_path / "data" / "scenes" / paths.RECORDING_SCENE_NAME
+        assert (local_bundle / "scene.json").is_file()
+        assert not shared.exists()
+
+    def test_recording_status_reflects_the_finalized_bundle(
+        self, server, bridge, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("CRAMERA_DATA", str(tmp_path / "data"))
+        monkeypatch.delenv("CRAMERA_SCENES", raising=False)
+        self.start_recording(bridge)
+        post(server + "/recording/stop")
+
+        status = get_json(server + "/recording")
+
+        assert status["state"] == "finalized"
+        assert status["sceneName"] == paths.RECORDING_SCENE_NAME
+        assert status["frameCount"] == 2
+
+    def test_stopping_twice_does_not_rebundle(
+        self, server, bridge, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("CRAMERA_DATA", str(tmp_path / "data"))
+        monkeypatch.delenv("CRAMERA_SCENES", raising=False)
+        self.start_recording(bridge)
+        post(server + "/recording/stop")
+        local_bundle = tmp_path / "data" / "scenes" / paths.RECORDING_SCENE_NAME
+        marker = local_bundle / "marker"
+        marker.touch()
+
+        status, body = post(server + "/recording/stop")
+
+        assert status == 200
+        assert marker.exists()
+
+    def test_stopping_an_empty_recording_is_rejected(
+        self, server, bridge, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("CRAMERA_DATA", str(tmp_path / "data"))
+        monkeypatch.delenv("CRAMERA_SCENES", raising=False)
+        bridge.attach(world_with(shaped_body("laboratory", "bench")))
+        bridge.recording = Recording()
+        bridge.recording.start()  # no ticks appended
+
+        status, body = post(server + "/recording/stop")
+
+        assert status == 400
+        assert body["ok"] is False
+
+    def test_discard_removes_the_bundle_and_returns_to_idle(
+        self, server, bridge, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("CRAMERA_DATA", str(tmp_path / "data"))
+        monkeypatch.delenv("CRAMERA_SCENES", raising=False)
+        self.start_recording(bridge)
+        post(server + "/recording/stop")
+        local_bundle = tmp_path / "data" / "scenes" / paths.RECORDING_SCENE_NAME
+
+        status, body = post(server + "/recording/discard")
+
+        assert status == 200
+        assert body["ok"] is True
+        assert not local_bundle.exists()
+        assert get_json(server + "/recording")["state"] == "idle"
+
+    def test_discard_without_a_recording_is_harmless(self, server):
+        status, body = post(server + "/recording/discard")
+        assert status == 200
+        assert body["ok"] is True
+
+    def test_save_moves_the_bundle_and_updates_the_local_index(
+        self, server, bridge, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("CRAMERA_DATA", str(tmp_path / "data"))
+        monkeypatch.delenv("CRAMERA_SCENES", raising=False)
+        self.start_recording(bridge)
+        post(server + "/recording/stop")
+
+        status, body = post(server + "/recording/save", {"name": "my_run"})
+
+        assert status == 200
+        assert body == {"ok": True, "scene": "my_run"}
+        saved = tmp_path / "data" / "scenes" / "my_run"
+        assert json.loads((saved / "scene.json").read_text())["name"] == "my_run"
+        assert not (tmp_path / "data" / "scenes" / paths.RECORDING_SCENE_NAME).exists()
+        index = json.loads((tmp_path / "data" / "scenes" / "index.json").read_text())
+        assert any(entry["name"] == "my_run" for entry in index["scenes"])
+
+    def test_save_frees_the_slot_for_another_recording(
+        self, server, bridge, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("CRAMERA_DATA", str(tmp_path / "data"))
+        monkeypatch.delenv("CRAMERA_SCENES", raising=False)
+        self.start_recording(bridge)
+        post(server + "/recording/stop")
+        post(server + "/recording/save", {"name": "my_run"})
+
+        assert get_json(server + "/recording")["state"] == "idle"
+
+    def test_save_without_a_finalized_recording_is_rejected(self, server):
+        status, body = post(server + "/recording/save", {"name": "my_run"})
+        assert status == 400
+        assert body["ok"] is False
+
+    def test_save_rejects_an_unsafe_name(self, server, bridge, tmp_path, monkeypatch):
+        monkeypatch.setenv("CRAMERA_DATA", str(tmp_path / "data"))
+        monkeypatch.delenv("CRAMERA_SCENES", raising=False)
+        self.start_recording(bridge)
+        post(server + "/recording/stop")
+
+        status, body = post(server + "/recording/save", {"name": "../escape"})
+
+        assert status == 400
+        assert body["ok"] is False
+
+    def test_save_rejects_a_name_collision(self, server, bridge, tmp_path, monkeypatch):
+        shared = tmp_path / "shared"
+        (shared / "kitchen").mkdir(parents=True)
+        (shared / "kitchen" / "scene.json").write_text("{}")
+        monkeypatch.setenv("CRAMERA_SCENES", str(shared))
+        monkeypatch.setenv("CRAMERA_DATA", str(tmp_path / "data"))
+        self.start_recording(bridge)
+        post(server + "/recording/stop")
+
+        status, body = post(server + "/recording/save", {"name": "kitchen"})
+
+        assert status == 409
+        assert body["ok"] is False
 
 
 class TestMove:

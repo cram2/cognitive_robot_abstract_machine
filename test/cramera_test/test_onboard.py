@@ -48,7 +48,6 @@ from cramera.onboard.world_to_urdf import UrdfDocument
 from cramera.onboard.demo import (
     BundledModel,
     SceneBuilder,
-    SceneIndexEntry,
     Recorder,
     RecordingAnalysis,
     SpawnedBox,
@@ -414,71 +413,6 @@ class TestBundledModel:
             "links": len(report.links),
             "movableJoints": report.movable_joints,
         }
-
-
-class TestSceneIndexEntry:
-    def test_a_bundle_is_indexed_with_its_robot_and_environment(self, tmp_path):
-        """
-        The viewer's pickers resolve a (robot, environment) pair back to a bundle, so
-        the index has to carry both per scene.
-        """
-        bundle = tmp_path / "lab_scene"
-        bundle.mkdir()
-        (bundle / "scene.json").write_text(
-            json.dumps(
-                {
-                    "robot": {"name": "pr2"},
-                    "models": [
-                        {"name": "pr2", "robot": True},
-                        {"name": "kitchen", "robot": False},
-                        {"name": "table", "robot": False},
-                    ],
-                }
-            )
-        )
-
-        [entry] = SceneIndexEntry.of_directory(tmp_path)
-
-        assert entry.to_payload() == {
-            "name": "lab_scene",
-            "robot": "pr2",
-            "environment": "kitchen+table",
-        }
-
-    def test_a_bench_only_bundle_has_no_environment(self, tmp_path):
-        bundle = tmp_path / "bench"
-        bundle.mkdir()
-        (bundle / "scene.json").write_text(
-            json.dumps(
-                {
-                    "robot": {"name": "tracy"},
-                    "models": [{"name": "tracy", "robot": True}],
-                }
-            )
-        )
-
-        [entry] = SceneIndexEntry.of_directory(tmp_path)
-
-        assert entry.environment is None
-
-    def test_a_directory_without_a_scene_file_is_skipped(self, tmp_path):
-        (tmp_path / "not_a_bundle").mkdir()
-
-        assert SceneIndexEntry.of_directory(tmp_path) == []
-
-    def test_the_reserved_live_scene_name_is_skipped(self, tmp_path):
-        """
-        A live-attach snapshot (:mod:`cramera.live.live_bundle`) is a throwaway bundle
-        rebuilt on every attach, never something a user onboarded — it must never show
-        up as a robot/environment choice in the real picker.
-        """
-        bundle = tmp_path / paths.LIVE_SCENE_NAME
-        bundle.mkdir()
-        (bundle / "scene.json").write_text(
-            json.dumps({"robot": {"name": "pr2"}, "models": []})
-        )
-
-        assert SceneIndexEntry.of_directory(tmp_path) == []
 
 
 # %% bundling a parsed world

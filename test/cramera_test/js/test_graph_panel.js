@@ -68,7 +68,7 @@ function makeRoot() {
     '#graph-zoom-out': makeButton(),
     '#graph-zoom-fit': makeButton(),
   };
-  const buttons = ['knowledge', 'kinematics', 'plan', 'chart'].map(makeButton);
+  const buttons = ['knowledge', 'kinematics', 'plan', 'chart', 'transforms'].map(makeButton);
   byId['#graph-tabs'] = { querySelectorAll() { return buttons; } };
   return {
     innerHTML: '',
@@ -211,6 +211,125 @@ test('statechart nodes are grouped by the kind of node giskardpy compiled', asyn
   }
 });
 
+
+// %% live transform graph
+// the bridge sends connections; the panel turns them into frames, and rings each
+// frame with the freshness of the connection that carries it
+function loadTransformsPanel() {
+  return loadPanel({
+    '/api/knowledge': { ok: true, nodes: [], edges: [], details: {} },
+    '/api/knowledge/view?name=transforms': { ok: true, nodes: [], edges: [], details: {}, live: 'transforms' },
+    'http://bridge/transforms': {
+      signature: 't1',
+      connections: [
+        { name: 'root_T_drawer', parent: 'kitchen/root', child: 'kitchen/drawer',
+          kind: 'actuated', writer: 'demo', freshness: 'MOVING', ageSeconds: 0.1 },
+        { name: 'root_T_shelf', parent: 'kitchen/root', child: 'kitchen/shelf',
+          kind: 'fixed', writer: 'nobody', freshness: 'STATIC', ageSeconds: null },
+        { name: 'root_T_milk', parent: 'kitchen/root', child: 'milk.stl',
+          kind: 'free', writer: 'viewer', freshness: 'SETTLED', ageSeconds: 1.5 },
+      ],
+    },
+  });
+}
+
+async function showTransforms(panel) {
+  const root = makeRoot();
+  const bus = makeBus();
+  const instance = panel.factory(root, bus);
+  await flush();
+  root.buttons.find(function (b) { return b.dataset.view === 'transforms'; }).click();
+  await flush();
+  bus.emit('live:changed', { on: true, url: 'http://bridge' });
+  await flush();
+  return instance;
+}
+
+test('each frame is grouped by the kind of connection that carries it', async function () {
+  const panel = loadTransformsPanel();
+  const instance = await showTransforms(panel);
+  try {
+    const byId = {};
+    panel.lastBuild().nodes.forEach(function (n) { byId[n.id] = n; });
+    assert.strictEqual(byId['kitchen/drawer'].group, 'actuated_frame');
+    assert.strictEqual(byId['kitchen/shelf'].group, 'fixed_frame');
+    assert.strictEqual(byId['milk.stl'].group, 'free_frame');
+  } finally {
+    instance.destroy();
+  }
+});
+
+test('a frame is ringed with the freshness of its connection', async function () {
+  const panel = loadTransformsPanel();
+  const instance = await showTransforms(panel);
+  try {
+    const byId = {};
+    panel.lastBuild().nodes.forEach(function (n) { byId[n.id] = n; });
+    assert.strictEqual(byId['kitchen/drawer'].status, 'MOVING');
+    assert.strictEqual(byId['milk.stl'].status, 'SETTLED');
+  } finally {
+    instance.destroy();
+  }
+});
+
+test('the root frame no connection carries cannot go stale', async function () {
+  const panel = loadTransformsPanel();
+  const instance = await showTransforms(panel);
+  try {
+    const root = panel.lastBuild().nodes.find(function (n) { return n.id === 'kitchen/root'; });
+    assert.strictEqual(root.group, 'world_frame');
+    assert.strictEqual(root.status, 'STATIC');
+  } finally {
+    instance.destroy();
+  }
+});
+
+test('every connection is drawn as an edge from its parent frame to its child', async function () {
+  const panel = loadTransformsPanel();
+  const instance = await showTransforms(panel);
+  try {
+    assert.deepStrictEqual(panel.lastBuild().edges, [
+      { from: 'kitchen/root', to: 'kitchen/drawer', kind: 'actuated', label: 'root_T_drawer' },
+      { from: 'kitchen/root', to: 'kitchen/shelf', kind: 'fixed', label: 'root_T_shelf' },
+      { from: 'kitchen/root', to: 'milk.stl', kind: 'free', label: 'root_T_milk' },
+    ]);
+  } finally {
+    instance.destroy();
+  }
+});
+
+test('the transform view names the statuses its legend may list', async function () {
+  const panel = loadTransformsPanel();
+  const instance = await showTransforms(panel);
+  try {
+    assert.deepStrictEqual(panel.lastBuild().statusLegend, ['MOVING', 'SETTLED', 'STALE', 'STATIC']);
+  } finally {
+    instance.destroy();
+  }
+});
+
+test('a frame reports who last wrote it and how long ago', async function () {
+  const panel = loadTransformsPanel();
+  const instance = await showTransforms(panel);
+  try {
+    const milk = panel.lastBuild().nodes.find(function (n) { return n.id === 'milk.stl'; });
+    assert.match(milk.title, /last written by: viewer/);
+    assert.match(milk.title, /last changed: 1.5 s ago/);
+  } finally {
+    instance.destroy();
+  }
+});
+
+test('a frame nothing has written yet says so instead of reporting an age', async function () {
+  const panel = loadTransformsPanel();
+  const instance = await showTransforms(panel);
+  try {
+    const shelf = panel.lastBuild().nodes.find(function (n) { return n.id === 'kitchen/shelf'; });
+    assert.match(shelf.title, /never, since the bridge attached/);
+  } finally {
+    instance.destroy();
+  }
+});
 
 // %% a route with no backend
 test('a view whose route has no backend reports the status, not a JSON.parse error', async function () {

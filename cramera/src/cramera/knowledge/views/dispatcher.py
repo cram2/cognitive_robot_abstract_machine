@@ -14,6 +14,7 @@ from cramera.knowledge.views.architecture import SubgraphViewPayload
 from cramera.knowledge.views.chart import ChartViewPayload
 from cramera.knowledge.views.kinematics import UrdfViewPayload
 from cramera.knowledge.views.plan_tree import PlanViewPayload
+from cramera.knowledge.views.transforms import TransformViewPayload
 
 
 @dataclass(kw_only=True)

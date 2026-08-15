@@ -53,12 +53,13 @@ class SceneBundle:
     @classmethod
     def directory_of(cls, scene: Optional[str] = None) -> Optional[Path]:
         """
-        Directory of a scene bundle, or None when no scene is named or active.
+        Directory of a scene bundle, or None when no scene is named, active, or found in
+        any scenes root (see :func:`cramera.paths.resolve_scene_directory`).
 
         :param scene: Name of the scene, or None for the active one.
         """
         name = scene or cls.active_name()
-        return paths.scenes_directory() / name if name else None
+        return paths.resolve_scene_directory(name) if name else None
 
     @classmethod
     def of_active_scene(cls) -> SceneBundle:

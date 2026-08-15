@@ -1,14 +1,15 @@
 /* ============================================================================
- * panels/graph/panel.js — the graph view with four tabs.
+ * panels/graph/panel.js — the graph view with five tabs.
  *
  *   Knowledge   the entity graph + CRAM architecture (double-click drills in)
  *   Kinematics  the robot's URDF tree (links as nodes, joints as edges)
  *   Plan        the executed plan tree, node border = execution status
  *   Statechart  the giskardpy motion statechart of the running motion group
+ *   Transforms  the executing world's connection graph, node border = freshness
  *
- * Plan and Statechart additionally take LIVE node status from the cramera-live
- * bridge while it is attached: structure changes rebuild the graph, pure
- * status changes only re-colour the rings (no layout jumps).
+ * The tabs in LIVE_ENDPOINT take their node status from the cramera-live bridge
+ * while it is attached: structure changes rebuild the graph, pure status
+ * changes only re-colour the rings (no layout jumps).
  *
  * Bus events:
  *   emits    entity:select {id, detail, relations}   node clicked
@@ -26,6 +27,7 @@ Panels.define('graph', function (root, bus) {
     '    <button data-view="kinematics" title="the robot\'s kinematic structure — URDF links &amp; joints">Kinematics</button>' +
     '    <button data-view="plan" title="the plan tree, with the execution status of every node">Plan</button>' +
     '    <button data-view="chart" title="the giskardpy motion statechart of the running motion group">Statechart</button>' +
+    '    <button data-view="transforms" title="the world\'s connection graph — which frame hangs from which, and how recently it moved">Transforms</button>' +
     '    <span class="gt-live" id="gt-live" title="node status is streaming from the running demo">◉ live status</span>' +
     '  </div>' +
     '  <div id="graph"></div>' +
@@ -65,7 +67,10 @@ Panels.define('graph', function (root, bus) {
     kinematics: { url: '/api/knowledge/view?name=kinematics' },
     plan:       { url: '/api/knowledge/view?name=plan' },
     chart:      { url: '/api/knowledge/view?name=chart' },
+    transforms: { url: '/api/knowledge/view?name=transforms' },
   };
+  // the bridge endpoint each live view polls
+  const LIVE_ENDPOINT = { plan: '/plan', chart: '/chart', transforms: '/transforms' };
   let tab = 'knowledge';
   let view = null;            // the currently rendered payload
   const base = {};            // tab -> payload as loaded from the server
@@ -86,7 +91,9 @@ Panels.define('graph', function (root, bus) {
     }
     Graph.build({
       nodes: payload.nodes, edges: payload.edges, legend: payload.legend,
-      layout: payload.layout, arrows: !!payload.arrows, statusLegend: !!payload.statusLegend,
+      layout: payload.layout, arrows: !!payload.arrows,
+      // a view may name the statuses its legend lists, instead of taking the default
+      statusLegend: payload.statusLegend || false,
       key: (payload.key || tab) + '#' + stacks[tab].length,
     });
     updateNav();
@@ -195,7 +202,15 @@ Panels.define('graph', function (root, bus) {
     { group: 'motion_goal', label: 'Goal (contains nodes)' },
     { group: 'motion_end', label: 'End / cancel motion' },
   ];
-  const liveSig = { plan: '', chart: '' };
+  const TRANSFORM_LEGEND = [
+    { group: 'world_frame', label: 'World root' },
+    { group: 'actuated_frame', label: 'Actuated joint' },
+    { group: 'free_frame', label: 'Free-floating' },
+    { group: 'fixed_frame', label: 'Fixed to its parent' },
+  ];
+  const FRESHNESS_LEGEND = ['MOVING', 'SETTLED', 'STALE', 'STATIC'];
+  const FRAME_GROUP = { actuated: 'actuated_frame', free: 'free_frame', fixed: 'fixed_frame' };
+  const liveSig = { plan: '', chart: '', transforms: '' };
   let liveTimer = null;
   let liveState = { on: false, url: '' };
 
@@ -254,6 +269,46 @@ Panels.define('graph', function (root, bus) {
              empty: 'Attached, but no motion statechart is executing right now.' };
   }
 
+  // The world's connection graph: one node per frame, one edge per connection. A
+  // frame's ring is the freshness of the connection that carries it — the root frame,
+  // which no connection carries, cannot go stale.
+  function transformsPayload(live) {
+    const nodes = [], edges = [], details = {}, carried = {};
+    const connections = live.connections || [];
+    connections.forEach(function (c) { carried[c.child] = c; });
+    const frames = {};
+    connections.forEach(function (c) { frames[c.parent] = 1; frames[c.child] = 1; });
+    Object.keys(frames).forEach(function (frame) {
+      const connection = carried[frame];
+      const group = connection ? (FRAME_GROUP[connection.kind] || 'fixed_frame') : 'world_frame';
+      const status = connection ? connection.freshness : 'STATIC';
+      const lines = connection
+        ? ['a frame carried by ' + connection.name,
+           'connection: ' + connection.kind,
+           'last written by: ' + connection.writer,
+           'last changed: ' + (connection.ageSeconds === null || connection.ageSeconds === undefined
+             ? 'never, since the bridge attached'
+             : connection.ageSeconds + ' s ago')]
+        : ['the world root frame'];
+      nodes.push({ id: frame, label: frame, group: group,
+                   title: [frame].concat(lines).join('\n'), status: status });
+      details[frame] = { label: frame, group: group, lines: lines };
+    });
+    connections.forEach(function (c) {
+      edges.push({ from: c.parent, to: c.child, kind: c.kind, label: c.name });
+    });
+    return { ok: true, breadcrumb: 'transform graph', nodes: nodes, edges: edges,
+             details: details, legend: TRANSFORM_LEGEND, layout: 'hier', arrows: true,
+             statusLegend: FRESHNESS_LEGEND, live: 'transforms', key: 'transforms-live',
+             empty: 'Attached, but the demo has not published a world yet.' };
+  }
+
+  function livePayload(source, live) {
+    if (source === 'plan') return planPayload(live);
+    if (source === 'chart') return chartPayload(live);
+    return transformsPayload(live);
+  }
+
   async function liveRefresh(force) {
     const src = liveSource();
     const active = !!src && liveState.on;
@@ -262,11 +317,10 @@ Panels.define('graph', function (root, bus) {
     if (stacks[tab].length) return;              // inside a drill-down: leave it alone
     let live;
     try {
-      live = await fetch(liveState.url + (src === 'plan' ? '/plan' : '/chart'))
-        .then(ResponseUtil.parseJson);
+      live = await fetch(liveState.url + LIVE_ENDPOINT[src]).then(ResponseUtil.parseJson);
     } catch (err) { return; }                    // bridge gone — the 3D side handles it
-    if (!live || !live.nodes) return;
-    const payload = src === 'plan' ? planPayload(live) : chartPayload(live);
+    if (!live || !(live.nodes || live.connections)) return;
+    const payload = livePayload(src, live);
     if (force || live.signature !== liveSig[src]) {    // structure changed → rebuild
       liveSig[src] = live.signature;
       base[tab] = payload;
@@ -289,10 +343,11 @@ Panels.define('graph', function (root, bus) {
       liveRefresh(true);
     } else {
       liveBadge.classList.remove('on');
-      liveSig.plan = liveSig.chart = '';
-      // drop the live payloads so both tabs fall back to the recorded bundle
-      ['plan', 'chart'].forEach(function (t) { delete base[t]; delete shown[t]; stacks[t] = []; });
-      if (tab === 'plan' || tab === 'chart') showTab(tab);
+      liveSig.plan = liveSig.chart = liveSig.transforms = '';
+      // drop the live payloads so the live tabs fall back to the recorded bundle
+      const liveTabs = Object.keys(LIVE_ENDPOINT);
+      liveTabs.forEach(function (t) { delete base[t]; delete shown[t]; stacks[t] = []; });
+      if (liveTabs.indexOf(tab) >= 0) showTab(tab);
     }
   });
 

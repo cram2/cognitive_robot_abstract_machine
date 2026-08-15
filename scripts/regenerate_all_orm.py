@@ -11,6 +11,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from protect_generated_orm_interfaces import mark_skip_worktree
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -85,6 +87,11 @@ def main() -> None:
 
     for package in ORM_PACKAGES:
         package.regenerate()
+
+    # Regenerated interfaces have real, unreviewed content again; keep git from ever
+    # proposing to commit that content by ignoring local changes to these paths.
+    for package in ORM_PACKAGES:
+        mark_skip_worktree(str(package.interface.relative_to(REPOSITORY_ROOT)))
 
 
 if __name__ == "__main__":

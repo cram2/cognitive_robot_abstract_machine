@@ -434,6 +434,12 @@ class TestViewPayloads:
         assert payload.ok and rendered["nodes"] == []
         assert rendered["live"] == "chart" and rendered["empty"]
 
+    def test_transform_view_is_live_only(self, fixture_scene):
+        payload = GraphPanelViews.of_active_scene().for_tab("transforms")
+        rendered = payload.to_payload()
+        assert payload.ok and rendered["nodes"] == []
+        assert rendered["live"] == "transforms" and rendered["empty"]
+
     def test_unknown_view(self, fixture_scene):
         payload = GraphPanelViews.of_active_scene().for_tab("bogus")
         assert not payload.ok

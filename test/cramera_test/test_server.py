@@ -5,6 +5,7 @@ End-to-end tests of the HTTP server: static frontend, scenes and JSON API.
 import importlib
 import json
 import threading
+import urllib.error
 import urllib.request
 
 import pytest
@@ -34,6 +35,17 @@ def get_json(url):
     status, body = get(url)
     assert status == 200
     return json.loads(body)
+
+
+def post(url, payload=None, timeout=10):
+    request = urllib.request.Request(
+        url, method="POST", data=json.dumps(payload or {}).encode()
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.status, json.loads(response.read())
+    except urllib.error.HTTPError as error:
+        return error.code, json.loads(error.read())
 
 
 class TestStatic:
@@ -72,6 +84,126 @@ class TestStatic:
         assert status in (403, 404)
 
 
+class TestScenesTwoRoots:
+    """
+    A local recording saved under ``CRAMERA_DATA`` must serve exactly like a shared,
+    onboarded scene under ``CRAMERA_SCENES`` — the two directories differ here, unlike
+    the ``fixture_scene`` fixture where they coincide.
+    """
+
+    @pytest.fixture()
+    def two_root_server(self, tmp_path, monkeypatch):
+        shared = tmp_path / "shared"
+        local = tmp_path / "data" / "scenes"
+        for directory, name, robot in ((shared, "kitchen", "pr2"), (local, "my_run", "tracy")):
+            bundle = directory / name
+            bundle.mkdir(parents=True)
+            (bundle / "scene.json").write_text(
+                json.dumps({"name": name, "robot": {"name": robot}, "models": []})
+            )
+        (shared / "index.json").write_text(
+            json.dumps({"default": "kitchen", "scenes": []})
+        )
+        monkeypatch.setenv("CRAMERA_SCENES", str(shared))
+        monkeypatch.setenv("CRAMERA_DATA", str(tmp_path / "data"))
+        monkeypatch.delenv("CRAMERA_SCENE", raising=False)
+
+        from cramera import server as server_module
+
+        importlib.reload(server_module)
+        httpd = server_module.make_server(0)
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        yield "http://localhost:%d" % httpd.server_address[1]
+        httpd.shutdown()
+
+    def test_a_shared_scene_is_served(self, two_root_server):
+        scene = get_json(two_root_server + "/scenes/kitchen/scene.json")
+        assert scene["robot"]["name"] == "pr2"
+
+    def test_a_local_only_scene_is_served(self, two_root_server):
+        scene = get_json(two_root_server + "/scenes/my_run/scene.json")
+        assert scene["robot"]["name"] == "tracy"
+
+    def test_the_index_merges_both_roots(self, two_root_server):
+        index = get_json(two_root_server + "/scenes/index.json")
+        names = sorted(entry["name"] for entry in index["scenes"])
+        assert names == ["kitchen", "my_run"]
+
+    def test_traversal_across_either_root_is_blocked(self, two_root_server):
+        request = urllib.request.Request(two_root_server + "/scenes/../../etc/passwd")
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                status = response.status
+        except urllib.error.HTTPError as err:
+            status = err.code
+        assert status in (403, 404)
+
+
+class TestRecordingApi:
+    """
+    Saving/discarding a finalized recording must work through the always-on server
+    (this fixture never starts a live bridge at all), which is exactly the situation a
+    demo process that already exited leaves behind.
+    """
+
+    def finalize_on_disk(self, fixture_scene, name="__recording__"):
+        bundle = fixture_scene / "scenes" / name
+        bundle.mkdir(parents=True)
+        (bundle / "scene.json").write_text(
+            json.dumps({"name": name, "robot": {"name": "pr2"}, "models": []})
+        )
+        return bundle
+
+    def test_status_is_idle_without_a_finalized_recording(self, server):
+        assert get_json(server + "/api/recording/status") == {"state": "idle"}
+
+    def test_status_is_finalized_once_a_bundle_exists_on_disk(self, server, fixture_scene):
+        self.finalize_on_disk(fixture_scene)
+
+        assert get_json(server + "/api/recording/status") == {"state": "finalized"}
+
+    def test_save_works_with_no_bridge_involved_at_all(self, server, fixture_scene):
+        self.finalize_on_disk(fixture_scene)
+
+        status, body = post(server + "/api/recording/save", {"name": "my_run"})
+
+        assert status == 200
+        assert body == {"ok": True, "scene": "my_run"}
+        saved = fixture_scene / "scenes" / "my_run" / "scene.json"
+        assert json.loads(saved.read_text())["name"] == "my_run"
+
+    def test_discard_works_with_no_bridge_involved_at_all(self, server, fixture_scene):
+        bundle = self.finalize_on_disk(fixture_scene)
+
+        status, body = post(server + "/api/recording/discard")
+
+        assert status == 200
+        assert body == {"ok": True}
+        assert not bundle.exists()
+
+    def test_save_without_a_finalized_recording_is_rejected(self, server):
+        status, body = post(server + "/api/recording/save", {"name": "my_run"})
+        assert status == 400
+        assert body["ok"] is False
+
+    def test_save_rejects_an_unsafe_name(self, server, fixture_scene):
+        self.finalize_on_disk(fixture_scene)
+
+        status, body = post(server + "/api/recording/save", {"name": "../escape"})
+
+        assert status == 400
+        assert body["ok"] is False
+
+    def test_save_rejects_a_name_collision(self, server, fixture_scene):
+        self.finalize_on_disk(fixture_scene)
+
+        status, body = post(server + "/api/recording/save", {"name": "fixture"})
+
+        assert status == 409
+        assert body["ok"] is False
+
+
 class TestApi:
     def test_knowledge_overview(self, server):
         pytest.importorskip("krrood")
@@ -85,6 +217,7 @@ class TestApi:
             ("kinematics", None),
             ("plan", "plan"),
             ("chart", "chart"),
+            ("transforms", "transforms"),
         ):
             payload = get_json(server + "/api/knowledge/view?name=" + name)
             assert payload["ok"], name

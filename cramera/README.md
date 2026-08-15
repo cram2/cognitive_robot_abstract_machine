@@ -100,9 +100,9 @@ between the built-in panels:
 
 | panel         | shows                                                        |
 | ------------- | ------------------------------------------------------------ |
-| `robot-scene` | three.js scene: environment, robot, draggable objects, playback + live controls |
+| `robot-scene` | three.js scene: environment, robot, draggable objects, TF frame axes, playback with key-event marks + live controls |
 | `eql`         | EQL query console + entity answer panel                      |
-| `graph`       | four tabs: Knowledge / Kinematics / Plan / Statechart        |
+| `graph`       | five tabs: Knowledge / Kinematics / Plan / Statechart / Transforms |
 
 On the Plan and Statechart tabs the node border is its execution status —
 running (amber), succeeded/done (green), failed (red), paused (blue),
@@ -117,6 +117,34 @@ status from the statechart life cycle via `GiskardExecutable.motion_mappings`
 (`{MotionNode: Task}`) and propagates it up the tree; those nodes are flagged
 `derived`. Statecharts exist only during execution, so the Statechart tab is
 live-only.
+
+The replay scrubber marks the recording's key moments — every plan step, and the
+frame each transported object was picked up and let go. Those are the bundle's
+`segments`: an onboarded scene derives them from the recorded action list, a
+live recording from what each tick captured (see `live/recording_segments.py`,
+which reads the carry windows off the recorded poses and names each stretch
+after the action the plan reported performing at the time). Hovering a mark previews what the scene looks like
+there: the frame is rendered off-screen into a thumbnail, captioned with the
+moment and its run time, and clicking the mark jumps the playhead to it.
+
+The scene panel draws the same frames in 3D: the *TF frames* layer puts an axis
+triad (red X, green Y, blue Z) on every URDF link and every loose object. A
+triad is a child of the frame's own object, so it follows both recorded
+playback and the live world without any pose plumbing. Its gear opens the size
+slider, the frame-name toggle and the frame tree: a row per source (each loaded
+model, plus the loose objects) that drops down into the frames under it, so a
+whole model is ticked at once or single frames are picked out below it. A source
+whose frames are partly on reads as partly ticked. The choices are remembered
+between visits, and the arms ignore depth so a frame inside its own mesh stays
+visible.
+
+The Transforms tab is the world's connection graph — one node per frame, one
+edge per connection — and is live-only for the same reason: which frame hangs
+from which, and when each of those transforms was last written, only exists
+while a demo runs. A frame's ring is the freshness of the connection carrying
+it: moving now (amber), moved just now (green), not written for a while (dim,
+dashed) or fixed and unable to move at all. Each frame also reports who wrote
+it last, so a pose the demo drove is told apart from one dragged in the viewer.
 
 ## Layout
 
@@ -134,6 +162,8 @@ src/cramera/
     bridge.py      bridge state + serializers (runs on the sim thread)
     hooks.py       Executor/Plan/GiskardExecutable/mesh hooks
     http.py        the bridge's HTTP endpoints (port 8765)
+    recording_segments.py  the steps and manipulations a recording went through
+    transforms.py  the connection graph: what moved, when, and who wrote it
     __main__.py    cramera-live entry point
   onboard/         turn a demo run into a scene bundle
     demo.py        demo -> scene bundle (record + bundle, one command)
@@ -141,7 +171,8 @@ src/cramera/
   web/
     index.html     shell: topbar + slots + script includes
     config.js      which panels are shown where  ← edit this to swap panels
-    core/          bus, panel registry, split/resize helper
+    core/          bus, panel registry, split/resize helper, frame-axes display
+                   state, timeline key events
     panels/        robot_scene/, eql/, graph/
     vendor/        three.js, vis-network, … (all local, no CDN)
 ```

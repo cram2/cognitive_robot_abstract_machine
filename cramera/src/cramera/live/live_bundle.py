@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import shutil
 import threading
+from dataclasses import dataclass
 from pathlib import Path
 
 from typing_extensions import Any, Dict, List, Optional
@@ -52,6 +53,84 @@ MESH_SUBDIRECTORY = "live"
 """
 Directory bundled meshes nest under inside the scene's ``meshes/`` tree.
 """
+
+
+@dataclass(frozen=True)
+class WorldModelsBundle:
+    """
+    A live world's geometry, serialized into a scene bundle's ``models``/``robot``
+    fields.
+    """
+
+    models: List[Dict[str, Any]]
+    """
+    The scene's ``models`` entries: the environment (if any bodies remain outside the
+    robot and the object overlay) followed by the robot, when one is bound.
+    """
+
+    robot: Optional[Dict[str, Any]]
+    """
+    The scene's ``robot`` field, or None without a bound robot.
+    """
+
+    missing_assets: List[str]
+    """
+    Every asset a model referenced but could not resolve, across all models.
+    """
+
+
+def bundle_world_models(
+    world: World,
+    robot: Optional[AbstractRobot],
+    output_directory: Path,
+    mesh_subdirectory: str,
+) -> WorldModelsBundle:
+    """
+    Serialize a world's robot and environment bodies into URDF models on disk.
+
+    Shared between the throwaway ``__live__`` bundle and a finalized live recording
+    (:mod:`cramera.live.recording_bundle`) — both bundle the same live world through the
+    same :class:`~cramera.onboard.world_to_urdf.UrdfDocument` serializer, and would
+    otherwise duplicate the environment/robot split and the ``UrdfDocument.of_bodies``
+    wiring.
+
+    :param world: The world whose bodies are serialized.
+    :param robot: The world's robot annotation, or None to bundle everything as
+        environment.
+    :param output_directory: Directory the URDF and mesh files are written into.
+    :param mesh_subdirectory: Directory the meshes nest under inside
+        ``output_directory``.
+    """
+    robot_bodies = _robot_bodies(world, robot)
+    models: List[Dict[str, Any]] = []
+    environment_bodies = [
+        body
+        for body in world.bodies_topologically_sorted
+        if body not in set(robot_bodies) and not _is_overlay_body(body)
+    ]
+    if environment_bodies:
+        report = UrdfDocument.of_bodies(
+            environment_bodies,
+            ENVIRONMENT_MODEL_NAME,
+            str(output_directory),
+            mesh_subdirectory,
+        )
+        models.append(_model_payload(report, is_robot=False))
+    if robot_bodies:
+        report = UrdfDocument.of_bodies(
+            robot_bodies,
+            type(robot).__name__.lower(),
+            str(output_directory),
+            mesh_subdirectory,
+            identity_root=robot.root,
+        )
+        models.append(_model_payload(report, is_robot=True))
+    missing_assets = sorted(
+        {missing for model in models for missing in model.pop("missing")}
+    )
+    return WorldModelsBundle(
+        models=models, robot=_robot_payload(robot), missing_assets=missing_assets
+    )
 
 
 def build_live_scene(bridge: Bridge) -> Optional[str]:
@@ -98,41 +177,16 @@ def _write_bundle(bridge: Bridge, output_directory: Path, signature: str) -> str
     if output_directory.exists():
         shutil.rmtree(output_directory)
     output_directory.mkdir(parents=True)
-    world, robot = bridge.world, bridge.robot
-    robot_bodies = _robot_bodies(world, robot)
-    models: List[Dict[str, Any]] = []
-    environment_bodies = [
-        body
-        for body in world.bodies_topologically_sorted
-        if body not in set(robot_bodies) and not _is_overlay_body(body)
-    ]
-    if environment_bodies:
-        report = UrdfDocument.of_bodies(
-            environment_bodies,
-            ENVIRONMENT_MODEL_NAME,
-            str(output_directory),
-            MESH_SUBDIRECTORY,
-        )
-        models.append(_model_payload(report, is_robot=False))
-    if robot_bodies:
-        report = UrdfDocument.of_bodies(
-            robot_bodies,
-            type(robot).__name__.lower(),
-            str(output_directory),
-            MESH_SUBDIRECTORY,
-            identity_root=robot.root,
-        )
-        models.append(_model_payload(report, is_robot=True))
-    missing_assets = sorted(
-        {missing for model in models for missing in model.pop("missing")}
+    geometry = bundle_world_models(
+        bridge.world, bridge.robot, output_directory, MESH_SUBDIRECTORY
     )
     scene = {
         "name": paths.LIVE_SCENE_NAME,
-        "models": models,
-        "robot": _robot_payload(robot),
+        "models": geometry.models,
+        "robot": geometry.robot,
         "objects": [],
         "segments": [],
-        "missingAssets": missing_assets,
+        "missingAssets": geometry.missing_assets,
         # the world was attached before this bundle was built; kept for the viewer,
         # which rebuilds a bundle that reports False
         "worldBound": True,

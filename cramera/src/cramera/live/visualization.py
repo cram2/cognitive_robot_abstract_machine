@@ -10,6 +10,7 @@ shows.
 
 from __future__ import annotations
 
+import atexit
 from dataclasses import dataclass, field
 
 from typing_extensions import Optional, TYPE_CHECKING
@@ -24,7 +25,12 @@ from semantic_digital_twin.world import World
 
 from cramera.live.bridge import BRIDGE, Bridge
 from cramera.live.http import DEFAULT_PORT, serve
+from cramera.live.recording import Recording
+from cramera.live.recording_bundle import finalize_recording
 from cramera.live.ros_markers import RosMarkerListener
+from cramera.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from coraplex.plans.plan import Plan
@@ -46,6 +52,8 @@ class WorldStateSync(StateChangeCallback):
 
     def on_state_change(self, **kwargs) -> None:
         self.bridge.snapshot()
+        if self.bridge.recording is not None:
+            self.bridge.recording.append(self.bridge.state, self.bridge.running_step())
 
 
 @dataclass(eq=False)
@@ -92,6 +100,28 @@ class BridgePlanCallback(PlanCallback):
 
     def on_motion_tick(self, statechart: MotionStatechart) -> None:
         self.bridge.observe_motion_tick(statechart)
+
+
+def _finalize_recording_at_exit(bridge: Bridge) -> None:
+    """
+    Best-effort safety net: write the current recording to disk if the process is about
+    to exit without the viewer ever sending ``/recording/stop``.
+
+    A demo run directly (rather than through ``cramera-live``, which stays up for
+    inspection after the demo finishes) has no long-lived process left for the browser
+    to ask, so the recording would otherwise be lost the moment the script's main body
+    returns.
+
+    :param bridge: The live bridge whose current recording, if any, is finalized.
+    """
+    if bridge.recording is None:
+        return
+    try:
+        finalize_recording(bridge, bridge.recording)
+    except Exception:
+        # boundary guard: the interpreter is tearing down and the world may be in a
+        # partial state; losing the recording is better than a traceback on every exit
+        logger.exception("could not finalize the live recording at exit")
 
 
 # %% the backend
@@ -144,6 +174,9 @@ class LiveVisualization:
         :return: This visualization.
         """
         self.bridge.attach(self.world)
+        self.bridge.recording = Recording()
+        self.bridge.recording.start()
+        atexit.register(_finalize_recording_at_exit, self.bridge)
         self.bridge.snapshot()
         self.state_sync = WorldStateSync(_world=self.world, bridge=self.bridge)
         self.model_sync = WorldModelSync(_world=self.world, bridge=self.bridge)

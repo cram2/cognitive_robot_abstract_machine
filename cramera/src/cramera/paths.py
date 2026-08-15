@@ -21,7 +21,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from typing_extensions import Optional
+from typing_extensions import List, Optional
 
 WEB_ROOT = Path(__file__).resolve().parent / "web"
 """
@@ -33,6 +33,16 @@ LIVE_SCENE_NAME = "__live__"
 Reserved scene name a live-attach snapshot is bundled under (see
 :mod:`cramera.live.live_bundle`), rebuilt from the running demo's current world on every
 attach.
+
+Excluded from the real scene index — never a bundle a user onboarded.
+"""
+
+RECORDING_SCENE_NAME = "__recording__"
+"""
+Reserved scene name a captured live run is bundled under while unsaved (see
+:mod:`cramera.live.recording_bundle`), analogous to :data:`LIVE_SCENE_NAME`. Always
+written under :func:`local_scenes_directory`, never inside a shared scenes root, so
+saving or discarding it never touches a git-tracked ``cram-scenes`` checkout.
 
 Excluded from the real scene index — never a bundle a user onboarded.
 """
@@ -74,7 +84,45 @@ def scenes_directory() -> Path:
         return configured
     if (SCENES_SUBMODULE / "index.json").is_file():
         return SCENES_SUBMODULE
+    return local_scenes_directory()
+
+
+def local_scenes_directory() -> Path:
+    """
+    Writable, local-only root for live recordings (temporary and saved).
+
+    Deliberately ignores ``CRAMERA_SCENES`` and the cram-scenes submodule: a recording
+    must never land inside a shared, git-tracked scenes root, even when one is checked
+    out — saving a captured live run is a local action, not a contribution to it.
+    """
     return data_directory() / "scenes"
+
+
+def scene_roots() -> List[Path]:
+    """
+    Every directory a named scene may be bundled under, local root first.
+
+    A local recording shadows a shared scene of the same name. Returns one entry when
+    :func:`scenes_directory` already resolves to :func:`local_scenes_directory` (the
+    common case, no shared submodule checked out), else both.
+    """
+    shared = scenes_directory()
+    local = local_scenes_directory()
+    return [shared] if local == shared else [local, shared]
+
+
+def resolve_scene_directory(name: str) -> Optional[Path]:
+    """
+    The bundle directory a scene name resolves to, searched local-first, or None if no
+    root has it.
+
+    :param name: Name of the scene to look up.
+    """
+    for root in scene_roots():
+        candidate = root / name
+        if (candidate / "scene.json").is_file():
+            return candidate
+    return None
 
 
 def architecture_root() -> Path:

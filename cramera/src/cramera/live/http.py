@@ -18,7 +18,18 @@ HTTP endpoints of the live bridge (default port 8765).
     GET /chart   {signature, title,
                   nodes: [{id, parent, name, class_name, life_cycle, observation}],
                   edges: [{from, to, kind}]}
+    GET /transforms  {signature, connections: [{name, parent, child, kind, writer,
+                      freshness, ageSeconds}]}  the world's connection graph and how
+                      recently each connection moved (see
+                      :mod:`cramera.live.transforms`)
+    GET /recording  {state: idle|recording|finalized, frameCount, durationSeconds,
+                      sceneName}  see :mod:`cramera.live.recording`
     POST /move   queue an object move (applied on the simulation thread)
+    POST /recording/stop     finalize the current recording into a scene bundle under
+                              :func:`cramera.paths.local_scenes_directory`
+    POST /recording/discard  drop the current recording and its bundle, if any
+    POST /recording/save     {name} -> promote the finalized bundle to a permanent,
+                              locally saved scene
 
 Every ``pose`` above is ``[x, y, z, qx, qy, qz, qw]``.
 
@@ -42,7 +53,16 @@ from typing_extensions import Any, ClassVar, Dict, Optional, Tuple, Type
 
 from cramera.live.bridge import Bridge, MalformedMoveRequest, MoveRequest
 from cramera.live.live_bundle import build_live_scene
+from cramera.live.recording import Recording, RecordingState
+from cramera.live.recording_bundle import finalize_recording
+from cramera.live.recording_storage import (
+    NoSavedRecording,
+    SceneNameTaken,
+    discard_recording_bundle,
+    save_recording_bundle,
+)
 from cramera.logging_setup import get_logger
+from cramera.onboard.scene_index import InvalidSceneName
 
 logger = get_logger(__name__)
 
@@ -99,6 +119,8 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             return self._send_json(self.bridge.get_plan())
         if self.path.startswith("/chart"):
             return self._send_json(self.bridge.get_chart())
+        if self.path.startswith("/transforms"):
+            return self._send_json(self.bridge.get_transforms())
         if self.path.startswith("/objects"):
             return self._send_json({"objects": self.bridge.object_catalog()})
         if self.path.startswith("/mesh"):
@@ -109,8 +131,18 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             return self._send_json(self.bridge.get_markers())
         if self.path.startswith("/info"):
             return self._send_json(self.bridge.status())
+        if self.path.startswith("/recording"):
+            return self._send_json(self._recording_status())
         self.send_response(404)
         self.end_headers()
+
+    def _recording_status(self) -> Dict[str, Any]:
+        """
+        What the viewer polls to show recording/playback controls.
+        """
+        if self.bridge.recording is None:
+            return Recording().status_payload()
+        return self.bridge.recording.status_payload()
 
     def _query_value(self, name: str) -> Optional[str]:
         """
@@ -167,7 +199,63 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         """
         if self.path.startswith("/marker_topics"):
             return self.set_marker_topic()
+        if self.path == "/recording/stop":
+            return self._stop_recording()
+        if self.path == "/recording/discard":
+            return self._discard_recording()
+        if self.path == "/recording/save":
+            return self._save_recording()
         self.queue_requested_move()
+
+    def _stop_recording(self) -> None:
+        """
+        Finalize the current recording, bundling it on first stop.
+
+        Idempotent: stopping an already-finalized recording just re-reports it, so a
+        browser tab that already finalized a recording can ask again safely.
+        """
+        recording = self.bridge.recording
+        if recording is None or recording.state is RecordingState.IDLE:
+            return self._send_json({"ok": False, "error": "no active recording"}, 400)
+        scene_name = finalize_recording(self.bridge, recording)
+        if scene_name is None:
+            return self._send_json(
+                {"ok": False, "error": "the recording has no frames"}, 400
+            )
+        payload = recording.status_payload()
+        payload.update({"ok": True, "scene": scene_name})
+        self._send_json(payload)
+
+    def _discard_recording(self) -> None:
+        """
+        Drop the current recording and its unsaved bundle, if any.
+        """
+        if self.bridge.recording is not None:
+            self.bridge.recording.discard()
+        discard_recording_bundle()
+        self._send_json({"ok": True})
+
+    def _save_recording(self) -> None:
+        """
+        Promote the finalized recording to a permanent, locally saved scene.
+        """
+        length = int(self.headers.get("Content-Length") or 0)
+        payload = json.loads(self.rfile.read(length) or b"{}")
+        recording = self.bridge.recording
+        if recording is None or recording.state is not RecordingState.FINALIZED:
+            return self._send_json(
+                {"ok": False, "error": "nothing finalized to save"}, 400
+            )
+        try:
+            name = save_recording_bundle(str(payload.get("name") or ""))
+        except InvalidSceneName as error:
+            return self._send_json({"ok": False, "error": str(error)}, 400)
+        except NoSavedRecording as error:
+            return self._send_json({"ok": False, "error": str(error)}, 400)
+        except SceneNameTaken as error:
+            return self._send_json({"ok": False, "error": str(error)}, 409)
+        recording.discard()
+        self._send_json({"ok": True, "scene": name})
 
     def set_marker_topic(self) -> None:
         """

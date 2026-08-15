@@ -182,6 +182,51 @@ test('status views scale nodes, labels and spacing up so rings stay readable', f
   assert.ok(statusFont > lastOptions.groups.event.font.size);
 });
 
+// %% transform freshness
+// the transform view rings a frame with how recently its connection moved, and names
+// the statuses its legend may list — the plan vocabulary must not leak into it
+function makeLegendStub() {
+  const rows = [];
+  return { innerHTML: '', appendChild(row) { rows.push(row); }, rows: rows };
+}
+
+function transformFixture(Graph, legend) {
+  Graph.attach(makeCanvasStub(), legend);
+  Graph.build({
+    key: 'transforms',
+    layout: 'hier',
+    arrows: true,
+    statusLegend: ['MOVING', 'SETTLED', 'STALE', 'STATIC'],
+    legend: [{ group: 'actuated_frame', label: 'Actuated joint' }],
+    nodes: [
+      { id: 'root', label: 'root', group: 'world_frame', status: 'STATIC' },
+      { id: 'drawer', label: 'drawer', group: 'actuated_frame', status: 'MOVING' },
+      { id: 'shelf', label: 'shelf', group: 'fixed_frame', status: 'STALE' },
+    ],
+    edges: [
+      { from: 'root', to: 'drawer', kind: 'actuated' },
+      { from: 'root', to: 'shelf', kind: 'fixed' },
+    ],
+  });
+}
+
+test('a moving frame is ringed more heavily than a stale one', function () {
+  const Graph = evaluateGraphJs();
+  transformFixture(Graph, makeLegendStub());
+  assert.strictEqual(node('drawer').label, 'drawer\nmoving');
+  assert.ok(node('drawer').borderWidth > node('shelf').borderWidth);
+  assert.ok(Array.isArray(node('shelf').shapeProperties.borderDashes));
+});
+
+test('a view that names its statuses gets a legend of those and no others', function () {
+  const Graph = evaluateGraphJs();
+  const legend = makeLegendStub();
+  transformFixture(Graph, legend);
+  const rendered = legend.rows.map(function (row) { return row.innerHTML; }).join(' ');
+  assert.match(rendered, /moving now/);
+  assert.doesNotMatch(rendered, /succeeded/);
+});
+
 // %% zoom floor
 test('a big status graph is never fitted below the zoom floor', function () {
   const Graph = loadGraphJs();

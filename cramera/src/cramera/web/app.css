@@ -110,16 +110,55 @@ body{
   font:inherit;font-size:14px;font-weight:700;padding:11px 26px;border-radius:4px;cursor:pointer;transition:.15s
 }
 .play-btn:hover{background:rgba(57,213,200,.24)}
+.play-btn:disabled{opacity:.4;cursor:default}
 .play-btn.playing{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04121a;border-color:transparent}
 .wf-btns{display:flex;gap:10px;width:100%;justify-content:center}
 .play-btn.cram{color:#c9b3ff;border-color:var(--action);background:rgba(185,140,255,.16)}
 .play-btn.cram:hover{background:rgba(185,140,255,.26)}
 .play-btn.cram.playing{background:linear-gradient(135deg,var(--action),#8f6bff);color:#0b0518;border-color:transparent}
+.play-btn.record{color:#ffcf8a;border-color:#e0a94a;background:rgba(224,169,74,.14);padding:11px 18px}
+.play-btn.record:hover{background:rgba(224,169,74,.24)}
+.play-btn.record:disabled{opacity:.45;cursor:default;background:rgba(224,169,74,.14)}
 
 /* %% workflow */
 .workflow{border-top:1px solid var(--line);padding:12px 14px;background:var(--panel2)}
 .workflow-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px}
 .workflow-head span{font-size:13px;font-weight:600;color:var(--ink)}
+
+.playback-scrub-row{display:flex;align-items:center;gap:10px;margin-top:10px}
+.playback-scrubber{
+  flex:1;height:4px;border-radius:2px;background:var(--line2);appearance:none;cursor:pointer
+}
+.playback-scrubber::-webkit-slider-thumb{
+  appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 3px rgba(57,213,200,.2);cursor:pointer
+}
+.playback-scrubber::-moz-range-thumb{
+  width:14px;height:14px;border:none;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 3px rgba(57,213,200,.2);cursor:pointer
+}
+.playback-scrubber:disabled{opacity:.4;cursor:default}
+.playback-track{position:relative;flex:1;display:flex;align-items:center}
+.playback-track .playback-scrubber{width:100%}
+.timeline-events{position:absolute;left:0;right:0;top:50%;height:0;pointer-events:none}
+.timeline-mark{
+  position:absolute;transform:translate(-50%,-50%);width:9px;height:9px;border-radius:2px;
+  border:1px solid rgba(10,17,32,.85);cursor:pointer;pointer-events:auto;
+}
+.timeline-mark:hover{transform:translate(-50%,-50%) scale(1.35)}
+.timeline-preview{
+  position:absolute;bottom:18px;transform:translateX(-50%);z-index:6;width:184px;
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;
+  box-shadow:0 10px 26px rgba(0,0,0,.5);pointer-events:none;
+}
+.timeline-preview img{display:block;width:100%;border-radius:5px;background:#0c0e13}
+.timeline-preview .tp-loading{
+  height:104px;border-radius:5px;background:#0c0e13;display:flex;align-items:center;
+  justify-content:center;font-size:11px;color:var(--faint)
+}
+.timeline-preview .tp-label{font-size:11.5px;color:var(--ink);margin-top:5px}
+.timeline-preview .tp-time{font-size:10.5px;color:var(--faint)}
+.playback-time{font-size:12px;color:var(--muted);white-space:nowrap;min-width:72px;text-align:right}
 
 /* %% query box */
 .knowledge-status{font-size:12px;color:var(--faint)}
@@ -406,15 +445,21 @@ body.graph-full-open{overflow:hidden}
 }
 
 /* %% marker settings (inside the layers panel) */
-.marker-gear{
+.marker-gear,.layer-gear{
   margin-left:auto;background:transparent;border:none;color:var(--faint);
   cursor:pointer;font-size:13px;padding:0 2px;
 }
-.marker-gear:hover{color:var(--accent)}
-.marker-settings{
+.marker-gear:hover,.layer-gear:hover{color:var(--accent)}
+.marker-settings,.frame-settings{
   margin:4px 0 6px 22px;padding-left:9px;border-left:1px solid var(--line);
   display:flex;flex-direction:column;gap:1px;max-height:220px;overflow:auto;
 }
 .ms-title{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--faint);margin:6px 0 2px}
 .ms-row{font-size:11.5px;overflow-wrap:anywhere}
 .ms-note{font-size:11.5px;color:var(--faint);padding:4px 0}
+.ms-nested{margin-left:16px;padding-left:8px;border-left:1px solid var(--line)}
+.ms-disclosure{background:transparent;border:none;color:var(--faint);cursor:pointer;
+  font-size:9px;padding:0 3px 0 0;line-height:1}
+.ms-disclosure:hover{color:var(--accent)}
+.ms-slider{display:flex;align-items:center;gap:6px;font-size:11.5px;padding:2px 0}
+.ms-slider input[type=range]{flex:1;min-width:0}

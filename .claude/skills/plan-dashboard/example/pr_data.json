@@ -16,7 +16,7 @@
       "state": "open",
       "draft": false,
       "merged_at": null,
-      "labels": []
+      "labels": ["bug"]
     },
     "104": {
       "state": "open",

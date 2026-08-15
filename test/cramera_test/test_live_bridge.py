@@ -288,6 +288,51 @@ class TestPlanSnapshot:
 
 
 # %% viewer -> world
+class TestRunningStep:
+    """
+    What a recording labels each of its ticks with: the action the plan is performing
+    right now (see cramera.live.recording_segments).
+    """
+
+    def test_nothing_is_reported_before_anything_runs(self, plan_bridge):
+        bridge, _, _, _, _ = plan_bridge
+        bridge.snapshot_plan()
+
+        assert bridge.running_step() is None
+
+    def test_the_running_action_is_reported(self, plan_bridge):
+        bridge, _, _, _, motion = plan_bridge
+        bridge.observe_motion_started(motion)
+        bridge.snapshot_plan()
+
+        assert bridge.running_step() == nodes_by_kind(bridge)["ActionNode"]["label"]
+
+    def test_a_finished_action_is_no_longer_reported(self):
+        motion = make_plan_node("MotionNode")
+        action = make_plan_node("ActionNode", children=[motion])
+        bridge = Bridge()
+        bridge.begin_plan(PlanWithRoot(root=action))
+        bridge.observe_motion_started(motion)
+        bridge.snapshot_plan()
+        end_motion(bridge, motion, TaskStatusName.SUCCEEDED)
+        bridge.snapshot_plan()
+
+        assert bridge.running_step() is None
+
+    def test_a_running_motion_is_not_reported_as_the_step(self):
+        """
+        Only actions name a step; a motion node is one step's implementation, not a step
+        of its own.
+        """
+        bridge = Bridge()
+        motion = make_plan_node("MotionNode")
+        bridge.begin_plan(PlanWithRoot(root=motion))
+        bridge.observe_motion_started(motion)
+        bridge.snapshot_plan()
+
+        assert bridge.running_step() is None
+
+
 class TestMoveRequestValidation:
     def test_a_complete_payload_is_accepted(self):
         move = MoveRequest.from_payload(
@@ -452,6 +497,16 @@ class TestViewerAccessors:
 
     def test_an_unserved_mesh_has_no_path(self):
         assert Bridge().mesh_path("milk.stl") is None
+
+    def test_object_body_returns_the_published_body(self):
+        bridge = Bridge()
+        milk = PublishedBody(name="world/milk.stl")
+        bridge.publish_bodies({"milk.stl": milk})
+
+        assert bridge.object_body("milk.stl") is milk
+
+    def test_object_body_is_none_for_an_unpublished_key(self):
+        assert Bridge().object_body("milk.stl") is None
 
     def test_status_reports_no_demo_before_attaching(self):
         status = Bridge().status()
