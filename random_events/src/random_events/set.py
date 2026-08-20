@@ -92,6 +92,14 @@ class SetElement(AbstractSimpleSet):
     def contains(self, item: Self) -> bool:
         return self == item
 
+    @property
+    def size(self) -> float:
+        """
+        :return: The number of elements this set element holds, which is one unless it is
+            the empty set element.
+        """
+        return 0.0 if self.is_empty() else 1.0
+
     def non_empty_to_string(self) -> str:
         return str(self.element)
 

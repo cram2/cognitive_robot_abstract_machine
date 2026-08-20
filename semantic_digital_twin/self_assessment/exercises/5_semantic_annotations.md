@@ -171,7 +171,7 @@ with world.modify_world():
     
 z_offset = bottle_large_cylinder.height / 2.0 + cap_cylinder.height / 2.0
 cap_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
-    z=z_offset
+    z=z_offset, reference_frame=bottle_large_body
 )
 bottle_large_C_cap.origin = cap_pose
 ```

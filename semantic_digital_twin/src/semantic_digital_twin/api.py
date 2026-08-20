@@ -21,6 +21,7 @@ from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_parameters
 from random_events.product_algebra import Event
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.adapters.world_model_parser import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import (
     PrefixedName,
 )
@@ -1135,7 +1136,9 @@ class RobotSpecification:
 
         # Poses touch DoF state, so they are set after the modification block.
         if self.world_T_odom is not None:
-            root_C_odom.origin = self.world_T_odom
+            root_C_odom.origin = self.world_T_odom.copy_with_new_reference_frames(
+                new_reference_frame=world.root, new_child_frame=odom_body
+            )
         if is_active and self.odom_T_robot_start is not None:
             odom_C_robot.origin = self.odom_T_robot_start
 
@@ -1167,17 +1170,17 @@ class WorldSpecification:
     World-independent description of a world: an environment, the robots in it, and
     objects around them.
 
-    The environment is supplied as a concrete :class:`World` (build one from a model
-    file with :meth:`from_urdf` or :meth:`from_mjcf`). Applying it
-    (:meth:`to_domain_object`) merges every robot into the environment, then spawns all
-    starting objects, and returns the augmented environment world.
+    The environment is described by the parser that builds it (obtained from a model file
+    with :meth:`from_urdf`, :meth:`from_mjcf` or :meth:`from_gazebo`). Applying it
+    (:meth:`to_domain_object`) parses the environment anew, merges every robot into it,
+    then spawns all starting objects, and returns the augmented environment world.
     """
 
-    world: World
+    world_parser: WorldModelParser | None = None
     """
-    The environment world that the robots and starting objects are added to.
+    The parser building the environment the robots and starting objects are added to.
 
-    Its root is ``world.root``.
+    ``None`` describes an environment holding nothing but its root body.
     """
 
     robots: list[RobotSpecification] = field(default_factory=list)
@@ -1212,11 +1215,11 @@ class WorldSpecification:
         :param objects: Specifications spawned once the robots are in place.
         :return: The created specification.
         """
-        world = URDFParser.from_file(
+        world_parser = URDFParser.from_file(
             file_path, prefix=prefix, path_resolver=path_resolver
-        ).parse()
+        )
         return cls(
-            world=world,
+            world_parser=world_parser,
             robots=robots or [],
             objects=objects or [],
         )
@@ -1245,13 +1248,13 @@ class WorldSpecification:
         """
         from semantic_digital_twin.adapters.mjcf import MJCFParser
 
-        world = MJCFParser(
+        world_parser = MJCFParser(
             file_path=file_path,
             mimic_joints=mimic_joints or {},
             prefix=prefix,
-        ).parse()
+        )
         return cls(
-            world=world,
+            world_parser=world_parser,
             robots=robots or [],
             objects=objects or [],
         )
@@ -1281,11 +1284,11 @@ class WorldSpecification:
         """
         from semantic_digital_twin.adapters.gazebo import GazeboParser
 
-        world = GazeboParser.from_file(
+        world_parser = GazeboParser.from_file(
             file_path, prefix=prefix, path_resolver=path_resolver
-        ).parse()
+        )
         return cls(
-            world=world,
+            world_parser=world_parser,
             robots=robots or [],
             objects=objects or [],
         )
@@ -1294,14 +1297,16 @@ class WorldSpecification:
         """
         Materialize a new World from this specification.
 
-        A deep copy of :attr:`world` is augmented and returned, so the specification's
-        stored world is never mutated and the method can be applied repeatedly. Every
-        robot is merged into the world first, then all ``objects`` are spawned relative
-        to the world root.
+        The environment is parsed anew, so the method can be applied repeatedly and no
+        two results share an entity identifier. Every robot is merged into the world
+        first, then all ``objects`` are spawned relative to the world root.
 
         :return: The augmented environment world.
         """
-        world = deepcopy(self.world)
+        if self.world_parser is not None:
+            world = self.world_parser.parse()
+        else:
+            world = World.create_with_root_body()
         for robot_specification in self.robots:
             robot_specification.spawn(world)
 

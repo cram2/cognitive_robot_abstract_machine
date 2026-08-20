@@ -64,6 +64,19 @@ resolution_source() {
   fi
 }
 
+# git_identity_precedence_note: prints where to go looking when the identity a
+# commit would carry isn't the one recorded on the notes branch. Which of the
+# two answers applies is not guessable from the mismatch alone: the environment
+# variables outrank every git config file, so a clone whose config is exactly
+# right still commits as whatever they say.
+git_identity_precedence_note() {
+  if [ -n "${GIT_AUTHOR_NAME:-}" ] || [ -n "${GIT_AUTHOR_EMAIL:-}" ]; then
+    printf 'GIT_AUTHOR_NAME/GIT_AUTHOR_EMAIL are set in this environment, which outranks every git config file\n'
+  else
+    printf 'check user.name and user.email in git config --local and --global\n'
+  fi
+}
+
 # %% the tooling itself
 
 # Everything below assumes this checkout actually carries the agent tooling.
@@ -122,10 +135,38 @@ if fetch_personal_notes_branch; then
     report notes_file needs-setup \
       "'${NOTES_BRANCH}' exists but has no '${NOTES_PATH}' - session-start.sh will write no notes"
   fi
+
+  # %% who commits here would be authored as
+
+  # Reported in terms of the identity a commit would really carry (see
+  # effective_git_identity), never `git config --get user.name`: an agent
+  # session typically has the assistant's identity in global config and the
+  # contributor's in the environment, where the environment wins - so the
+  # config value can say one thing while every commit says another, and only
+  # the resolved one is worth reporting.
+  if ! EFFECTIVE_GIT_IDENTITY="$(effective_git_identity)"; then
+    report git_identity needs-setup \
+      "git cannot determine an author identity here at all - commits will fail until user.name and user.email are set"
+  else
+    IFS=$'\t' read -r EFFECTIVE_NAME EFFECTIVE_EMAIL <<< "${EFFECTIVE_GIT_IDENTITY}"
+    EFFECTIVE_DISPLAY="$(format_git_identity "${EFFECTIVE_NAME}" "${EFFECTIVE_EMAIL}")"
+    if ! RECORDED_GIT_IDENTITY="$(recorded_git_identity)"; then
+      report git_identity needs-setup \
+        "no complete '${PERSONAL_GIT_IDENTITY_PATH}' on '${NOTES_BRANCH}' - commits here are authored as ${EFFECTIVE_DISPLAY}, and a fresh clone gets no identity at all - run ./save-git-identity.sh --name <your name> --email <your email>"
+    elif [ "${RECORDED_GIT_IDENTITY}" = "${EFFECTIVE_GIT_IDENTITY}" ]; then
+      report git_identity ok \
+        "commits here are authored as ${EFFECTIVE_DISPLAY}, matching '${PERSONAL_GIT_IDENTITY_PATH}' on '${NOTES_BRANCH}'"
+    else
+      IFS=$'\t' read -r RECORDED_NAME RECORDED_EMAIL <<< "${RECORDED_GIT_IDENTITY}"
+      report git_identity needs-setup \
+        "'${PERSONAL_GIT_IDENTITY_PATH}' records $(format_git_identity "${RECORDED_NAME}" "${RECORDED_EMAIL}"), but commits here are authored as ${EFFECTIVE_DISPLAY} - $(git_identity_precedence_note)"
+    fi
+  fi
 else
   report notes_branch needs-setup \
     "no '${NOTES_BRANCH}' branch on any of: ${ATTEMPTED_NOTES_REMOTES} - run ./create-personal-notes-branch.sh (after pointing the remote at your own fork if it isn't already)"
   report notes_file needs-setup "not checked - the branch that would hold it doesn't exist yet"
+  report git_identity needs-setup "not checked - the branch that would record it doesn't exist yet"
 fi
 
 # %% plan-dashboard dependencies

@@ -17,6 +17,7 @@ from build_dashboard import (
     DashboardRenderer,
     DependencyCycle,
     DuplicateItemId,
+    InvalidBlockers,
     InvalidDependsOn,
     InvalidManifestRoot,
     InvalidSchemaVersion,
@@ -177,6 +178,24 @@ def test_validate_plan_rejects_depends_on_that_is_not_a_list():
     assert any(
         isinstance(problem, InvalidDependsOn) for problem in error.value.problems
     )
+
+
+def test_validate_plan_rejects_blockers_that_is_not_a_list():
+    # A plain string is iterable char-by-char - must be rejected outright,
+    # not silently misinterpreted as one blocker per character.
+    items = [
+        {
+            "id": "a",
+            "title": "A",
+            "branch": "a",
+            "track": "track-1",
+            "status": "not_started",
+            "blockers": "some prose describing the blocker",
+        }
+    ]
+    with pytest.raises(PlanValidationError) as error:
+        validate_plan(minimal_plan(items=items))
+    assert any(isinstance(problem, InvalidBlockers) for problem in error.value.problems)
 
 
 def test_validate_plan_rejects_unknown_status():
@@ -428,6 +447,34 @@ def test_is_ready_to_unblock_dependents_false_when_not_started():
         title="A", branch="a", track="track-1", status=ItemStatus.NOT_STARTED
     )
     assert not fresh_item.is_ready_to_unblock_dependents()
+
+
+def test_is_ready_for_dependent_review_true_while_still_a_draft():
+    draft_item = Item(
+        title="A", branch="a", track="track-1", status=ItemStatus.IN_PROGRESS
+    )
+    draft_item.live_state = LiveState.OPEN_DRAFT
+    assert draft_item.is_ready_for_dependent_review()
+
+
+def test_is_ready_for_dependent_review_true_when_merged():
+    merged_item = Item(
+        title="A", branch="a", track="track-1", status=ItemStatus.IN_PROGRESS
+    )
+    merged_item.live_state = LiveState.MERGED
+    assert merged_item.is_ready_for_dependent_review()
+
+
+def test_is_ready_for_dependent_review_true_when_done_without_a_pull_request():
+    done_item = Item(title="A", branch="a", track="track-1", status=ItemStatus.DONE)
+    assert done_item.is_ready_for_dependent_review()
+
+
+def test_is_ready_for_dependent_review_false_when_there_is_no_pull_request():
+    fresh_item = Item(
+        title="A", branch="a", track="track-1", status=ItemStatus.NOT_STARTED
+    )
+    assert not fresh_item.is_ready_for_dependent_review()
 
 
 def test_stacked_item_indent_style_exposes_both_indent_levels_as_css_variables():
@@ -972,6 +1019,225 @@ def test_item_ready_to_review_once_dependency_has_an_open_pull_request():
     assert summary.ready_to_review == ["a", "b"]
 
 
+def test_item_ready_to_review_once_its_dependency_has_merged():
+    pull_requests_by_repository = {
+        "owner/repo": {
+            "1": PullRequestRecord(
+                state=PullRequestState.CLOSED, merged_at=datetime(2026, 1, 1)
+            ),
+            "2": PullRequestRecord(state=PullRequestState.OPEN, draft=True),
+        }
+    }
+    items = [
+        item("a", ItemStatus.DONE, pull_request_number=1),
+        item("b", ItemStatus.IN_PROGRESS, pull_request_number=2, depends_on=["a"]),
+    ]
+    renderer = make_renderer(
+        items, pull_requests_by_repository=pull_requests_by_repository
+    )
+    _, summary = renderer.render()
+    assert summary.ready_to_review == ["b"]
+
+
+def test_item_ready_to_review_when_its_dependency_is_done_without_a_pull_request():
+    pull_requests_by_repository = {
+        "owner/repo": {"2": PullRequestRecord(state=PullRequestState.OPEN, draft=True)}
+    }
+    items = [
+        item("a", ItemStatus.DONE),
+        item("b", ItemStatus.IN_PROGRESS, pull_request_number=2, depends_on=["a"]),
+    ]
+    renderer = make_renderer(
+        items, pull_requests_by_repository=pull_requests_by_repository
+    )
+    _, summary = renderer.render()
+    assert summary.ready_to_review == ["b"]
+
+
+def test_item_not_ready_to_review_while_its_dependency_is_closed_unmerged():
+    pull_requests_by_repository = {
+        "owner/repo": {
+            "1": PullRequestRecord(state=PullRequestState.CLOSED),
+            "2": PullRequestRecord(state=PullRequestState.OPEN, draft=True),
+        }
+    }
+    items = [
+        item("a", ItemStatus.IN_PROGRESS, pull_request_number=1),
+        item("b", ItemStatus.IN_PROGRESS, pull_request_number=2, depends_on=["a"]),
+    ]
+    renderer = make_renderer(
+        items, pull_requests_by_repository=pull_requests_by_repository
+    )
+    _, summary = renderer.render()
+    assert summary.ready_to_review == []
+
+
+# %% DashboardRenderer - bug-fix marking
+
+
+def test_item_is_a_bug_fix_when_its_pull_request_carries_the_bug_label():
+    pull_requests_by_repository = {
+        "owner/repo": {
+            "1": PullRequestRecord(
+                state=PullRequestState.OPEN,
+                draft=True,
+                labels=[PullRequestLabel.BUG.value],
+            )
+        }
+    }
+    renderer = make_renderer(
+        [item("a", ItemStatus.IN_PROGRESS, pull_request_number=1)],
+        pull_requests_by_repository=pull_requests_by_repository,
+    )
+    renderer.render()
+    assert renderer.plan.items[0].is_bug_fix is True
+
+
+def test_item_is_not_a_bug_fix_when_its_pull_request_carries_other_labels():
+    pull_requests_by_repository = {
+        "owner/repo": {
+            "1": PullRequestRecord(
+                state=PullRequestState.OPEN,
+                draft=True,
+                labels=[PullRequestLabel.IN_REVIEW.value, "enhancement"],
+            )
+        }
+    }
+    renderer = make_renderer(
+        [item("a", ItemStatus.IN_PROGRESS, pull_request_number=1)],
+        pull_requests_by_repository=pull_requests_by_repository,
+    )
+    renderer.render()
+    assert renderer.plan.items[0].is_bug_fix is False
+
+
+def test_item_without_a_pull_request_is_not_a_bug_fix():
+    renderer = make_renderer([item("a", ItemStatus.NOT_STARTED)])
+    renderer.render()
+    assert renderer.plan.items[0].is_bug_fix is False
+
+
+def test_bug_fix_stays_in_its_ordinary_action_group():
+    # A bug fix is an attribute of an item, not an action of its own: it must
+    # not be lifted out of the action group it already belongs to.
+    pull_requests_by_repository = {
+        "owner/repo": {
+            "1": PullRequestRecord(
+                state=PullRequestState.OPEN,
+                draft=True,
+                labels=[PullRequestLabel.BUG.value],
+            )
+        }
+    }
+    renderer = make_renderer(
+        [item("a", ItemStatus.IN_PROGRESS, pull_request_number=1)],
+        pull_requests_by_repository=pull_requests_by_repository,
+    )
+    _, summary = renderer.render()
+    assert summary.ready_to_review == ["a"]
+
+
+def test_render_marks_a_bug_fix_sidebar_entry_with_a_bug_chip():
+    pull_requests_by_repository = {
+        "owner/repo": {
+            "1": PullRequestRecord(
+                state=PullRequestState.OPEN,
+                draft=True,
+                labels=[PullRequestLabel.BUG.value],
+            )
+        }
+    }
+    renderer = make_renderer(
+        [item("a", ItemStatus.IN_PROGRESS, pull_request_number=1)],
+        pull_requests_by_repository=pull_requests_by_repository,
+    )
+    output, _ = renderer.render()
+    assert '<span class="next-bug-chip">bug</span>' in output
+
+
+def test_render_leaves_a_non_bug_sidebar_entry_without_a_bug_chip():
+    pull_requests_by_repository = {
+        "owner/repo": {"1": PullRequestRecord(state=PullRequestState.OPEN, draft=True)}
+    }
+    renderer = make_renderer(
+        [item("a", ItemStatus.IN_PROGRESS, pull_request_number=1)],
+        pull_requests_by_repository=pull_requests_by_repository,
+    )
+    output, _ = renderer.render()
+    assert '<span class="next-bug-chip">bug</span>' not in output
+
+
+# %% DashboardRenderer - bug-fixes-only sidebar filter
+
+
+def _renderer_with_one_bug_fix_and_one_other_entry() -> DashboardRenderer:
+    """Build a renderer whose sidebar holds two entries in two different
+    groups, exactly one of which is a bug fix - the smallest input that
+    distinguishes the filter's per-entry and per-group behaviour."""
+    pull_requests_by_repository = {
+        "owner/repo": {
+            "1": PullRequestRecord(
+                state=PullRequestState.OPEN,
+                draft=True,
+                labels=[PullRequestLabel.BUG.value],
+            ),
+            "2": PullRequestRecord(state=PullRequestState.OPEN, draft=False),
+        }
+    }
+    return make_renderer(
+        [
+            item("a", ItemStatus.IN_PROGRESS, pull_request_number=1),
+            item("b", ItemStatus.DONE, pull_request_number=2),
+        ],
+        pull_requests_by_repository=pull_requests_by_repository,
+    )
+
+
+def test_bug_fixes_only_toggle_is_offered_when_a_sidebar_entry_is_a_bug_fix():
+    renderer = _renderer_with_one_bug_fix_and_one_other_entry()
+    output, _ = renderer.render()
+    assert 'id="bug-fixes-only-toggle"' in output
+
+
+def test_bug_fixes_only_toggle_is_omitted_when_no_sidebar_entry_is_a_bug_fix():
+    pull_requests_by_repository = {
+        "owner/repo": {"1": PullRequestRecord(state=PullRequestState.OPEN, draft=True)}
+    }
+    renderer = make_renderer(
+        [item("a", ItemStatus.IN_PROGRESS, pull_request_number=1)],
+        pull_requests_by_repository=pull_requests_by_repository,
+    )
+    output, _ = renderer.render()
+    assert 'id="bug-fixes-only-toggle"' not in output
+
+
+def test_bug_fix_entry_is_marked_so_the_filter_can_keep_it():
+    renderer = _renderer_with_one_bug_fix_and_one_other_entry()
+    output, _ = renderer.render()
+    assert '<li class="next-entry next-entry-bug">' in output
+    assert '<li class="next-entry">' in output
+
+
+def test_group_holding_a_bug_fix_is_marked_so_the_filter_can_keep_it():
+    renderer = _renderer_with_one_bug_fix_and_one_other_entry()
+    output, _ = renderer.render()
+    assert '<div class="next-group next-review next-group-has-bugs">' in output
+    assert '<div class="next-group next-drift">' in output
+
+
+def test_group_heading_carries_both_the_total_and_the_bug_fix_count():
+    renderer = _renderer_with_one_bug_fix_and_one_other_entry()
+    output, _ = renderer.render()
+    assert (
+        'Ready to review <span class="next-count-all">(1)</span>'
+        '<span class="next-count-bug">(1)</span>' in output
+    )
+    assert (
+        'Fix the manifest <span class="next-count-all">(1)</span>'
+        '<span class="next-count-bug">(0)</span>' in output
+    )
+
+
 # %% DashboardRenderer - item action button
 
 
@@ -1403,7 +1669,7 @@ def test_render_shows_ready_to_review_sidebar_section():
         tracking_url=None,
     )
     output, _ = renderer.render()
-    assert "Ready to review (1)" in output
+    assert '<div class="next-group next-review">' in output
     assert (
         'class="next-review-link" href="https://github.com/owner/repo/pull/5"' in output
     )
@@ -1852,4 +2118,17 @@ def test_example_plan_renders_the_counts_and_sections_the_walkthrough_describes(
     assert summary.blocker_maybe_cleared == [
         "Load-test the retry path under failure injection"
     ]
-    assert summary.ready_to_review == ["Feature flag for the new retry behavior"]
+    assert summary.ready_to_review == [
+        "Circuit breaker around the retry loop",
+        "Feature flag for the new retry behavior",
+    ]
+
+
+def test_example_plan_demonstrates_the_bug_chip_and_its_filter():
+    """The walkthrough's screenshots show both, so the sample data has to keep
+    producing them - and the chip must not disturb the grouping the test above
+    pins."""
+    output, _ = _render_example_plan()
+    assert output.count('<span class="next-bug-chip">bug</span>') == 1
+    assert 'id="bug-fixes-only-toggle"' in output
+    assert '<div class="next-group next-drift next-group-has-bugs">' in output

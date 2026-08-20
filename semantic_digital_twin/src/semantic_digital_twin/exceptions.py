@@ -17,8 +17,8 @@ from typing_extensions import (
 )
 
 from krrood.adapters.exceptions import JSONSerializationError
-from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from krrood.exceptions import DataclassException
+from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
@@ -773,18 +773,18 @@ class MissingWorldModificationContextError(UsageError):
 @dataclass
 class MismatchingPublishChangesAttribute(UsageError):
     """
-    Raised when trying to enter a world modification context with a different
-    publish_changes policy than the currently active world modification context.
+    Raised when trying to enter a nested world modification or state batch context with
+    a different publish_changes policy than the context it is nested in.
     """
 
     active_publish_changes: bool
     """
-    The publish_changes of the currently active world modification context.
+    The publish_changes of the currently active context.
     """
 
     proposed_publish_changes: bool
     """
-    The publish_changes of the world modification context that is being entered.
+    The publish_changes of the context that is being entered.
     """
 
     def error_message(self) -> str:
@@ -837,6 +837,52 @@ class StateUpdateContainsUnknownDegreesOfFreedomError(UsageError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class WorldHasNoSynchronizerError(UsageError):
+    """
+    Raised when the synchronizer of a world is asked for, but the world publishes its
+    changes nowhere.
+    """
+
+    world: World
+    """
+    The world without a synchronizer.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.world} does not publish its changes to other processes."
+
+    def suggest_correction(self) -> str:
+        return "Create a WorldSynchronizer for this world."
+
+
+@dataclass
+class WorldHasMultipleSynchronizersError(UsageError):
+    """
+    Raised when the synchronizer of a world is asked for, but several of them publish
+    its changes, leaving it undecided which stream a position would refer to.
+    """
+
+    world: World
+    """
+    The world with more than one synchronizer.
+    """
+
+    synchronizer_count: int
+    """
+    How many synchronizers publish the changes of the world.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.synchronizer_count} synchronizers publish the changes of "
+            f"{self.world}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Close all but one of them."
 
 
 @dataclass
@@ -1384,7 +1430,8 @@ class VideoRecordingError(MultiSimError):
 class VideoRecordingAlreadyStartedError(VideoRecordingError):
     """
     Raised when
-    :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder.start`
+    :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVide
+    oRecorder.start`
     is called on a recorder that is already recording.
     """
 
@@ -1404,7 +1451,8 @@ class VideoRecordingAlreadyStartedError(VideoRecordingError):
 class VideoRecordingNotStartedError(VideoRecordingError):
     """
     Raised when
-    :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder.stop`
+    :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVide
+    oRecorder.stop`
     is called on a recorder that was never started.
     """
 

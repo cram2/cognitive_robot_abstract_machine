@@ -4,6 +4,7 @@ import os
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
 from typing import Self, Union, List
@@ -48,6 +49,61 @@ from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+
+class UnitreeG1Joint(StrEnum):
+    """
+    Names of the UnitreeG1's commandable connections, as spelled in its URDF.
+
+    Members are usable wherever a connection name is expected, so a configuration keyed
+    by them stays a plain mapping of names to positions.
+    """
+
+    WAIST_YAW = "waist_yaw_joint"
+    WAIST_ROLL = "waist_roll_joint"
+    WAIST_PITCH = "waist_pitch_joint"
+
+    LEFT_SHOULDER_PITCH = "left_shoulder_pitch_joint"
+    LEFT_SHOULDER_ROLL = "left_shoulder_roll_joint"
+    LEFT_SHOULDER_YAW = "left_shoulder_yaw_joint"
+    LEFT_ELBOW = "left_elbow_joint"
+    LEFT_WRIST_ROLL = "left_wrist_roll_joint"
+    LEFT_WRIST_PITCH = "left_wrist_pitch_joint"
+    LEFT_WRIST_YAW = "left_wrist_yaw_joint"
+    LEFT_THUMB_0 = "left_hand_thumb_0_joint"
+    LEFT_THUMB_1 = "left_hand_thumb_1_joint"
+    LEFT_THUMB_2 = "left_hand_thumb_2_joint"
+    LEFT_INDEX_0 = "left_hand_index_0_joint"
+    LEFT_INDEX_1 = "left_hand_index_1_joint"
+    LEFT_MIDDLE_0 = "left_hand_middle_0_joint"
+    LEFT_MIDDLE_1 = "left_hand_middle_1_joint"
+    LEFT_HIP_PITCH = "left_hip_pitch_joint"
+    LEFT_HIP_ROLL = "left_hip_roll_joint"
+    LEFT_HIP_YAW = "left_hip_yaw_joint"
+    LEFT_KNEE = "left_knee_joint"
+    LEFT_ANKLE_PITCH = "left_ankle_pitch_joint"
+    LEFT_ANKLE_ROLL = "left_ankle_roll_joint"
+
+    RIGHT_SHOULDER_PITCH = "right_shoulder_pitch_joint"
+    RIGHT_SHOULDER_ROLL = "right_shoulder_roll_joint"
+    RIGHT_SHOULDER_YAW = "right_shoulder_yaw_joint"
+    RIGHT_ELBOW = "right_elbow_joint"
+    RIGHT_WRIST_ROLL = "right_wrist_roll_joint"
+    RIGHT_WRIST_PITCH = "right_wrist_pitch_joint"
+    RIGHT_WRIST_YAW = "right_wrist_yaw_joint"
+    RIGHT_THUMB_0 = "right_hand_thumb_0_joint"
+    RIGHT_THUMB_1 = "right_hand_thumb_1_joint"
+    RIGHT_THUMB_2 = "right_hand_thumb_2_joint"
+    RIGHT_INDEX_0 = "right_hand_index_0_joint"
+    RIGHT_INDEX_1 = "right_hand_index_1_joint"
+    RIGHT_MIDDLE_0 = "right_hand_middle_0_joint"
+    RIGHT_MIDDLE_1 = "right_hand_middle_1_joint"
+    RIGHT_HIP_PITCH = "right_hip_pitch_joint"
+    RIGHT_HIP_ROLL = "right_hip_roll_joint"
+    RIGHT_HIP_YAW = "right_hip_yaw_joint"
+    RIGHT_KNEE = "right_knee_joint"
+    RIGHT_ANKLE_PITCH = "right_ankle_pitch_joint"
+    RIGHT_ANKLE_ROLL = "right_ankle_roll_joint"
 
 
 @dataclass(eq=False)

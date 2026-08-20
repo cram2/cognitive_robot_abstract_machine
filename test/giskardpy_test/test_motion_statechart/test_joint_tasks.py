@@ -48,6 +48,7 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 from semantic_digital_twin.world_description.world_entity import (
     Body,
 )
+from semantic_digital_twin.robots.pr2 import PR2Joint
 
 
 def test_set_seed_configuration(pr2_world_state_reset):
@@ -55,7 +56,7 @@ def test_set_seed_configuration(pr2_world_state_reset):
     goal = 0.1
 
     connection: ActiveConnection1DOF = pr2_world_state_reset.get_connection_by_name(
-        "torso_lift_joint"
+        PR2Joint.TORSO_LIFT
     )
 
     node1 = SetSeedConfiguration(
@@ -204,10 +205,10 @@ def test_joint_goal(tmp_path):
 
 def test_continuous_joint(pr2_world_state_reset):
     r_wrist_roll_joint = pr2_world_state_reset.get_connection_by_name(
-        "r_wrist_roll_joint"
+        PR2Joint.RIGHT_WRIST_ROLL
     )
     l_wrist_roll_joint = pr2_world_state_reset.get_connection_by_name(
-        "l_wrist_roll_joint"
+        PR2Joint.LEFT_WRIST_ROLL
     )
     msc = MotionStatechart()
     joint_goal = JointPositionList(
@@ -243,8 +244,8 @@ def test_continuous_joint(pr2_world_state_reset):
 
 
 def test_revolute_joint(pr2_world_state_reset):
-    head_pan_joint = pr2_world_state_reset.get_connection_by_name("head_pan_joint")
-    head_tilt_joint = pr2_world_state_reset.get_connection_by_name("head_tilt_joint")
+    head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
+    head_tilt_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_TILT)
     msc = MotionStatechart()
     joint_goal = JointPositionList(
         goal_state=JointState.from_mapping(
@@ -277,7 +278,7 @@ def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
     hint -- the joint's velocity must stay within max_velocity on every single tick,
     all the way until the goal is actually reached.
     """
-    head_pan_joint = pr2_world_state_reset.get_connection_by_name("head_pan_joint")
+    head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
     max_velocity = 0.05
 
     msc = MotionStatechart()
@@ -317,12 +318,12 @@ def test_joint_sequence(pr2_world_state_reset):
             [
                 JointPositionList(
                     goal_state=JointState.from_str_dict(
-                        {"torso_lift_joint": 0.1}, world=pr2_world_state_reset
+                        {PR2Joint.TORSO_LIFT: 0.1}, world=pr2_world_state_reset
                     )
                 ),
                 JointPositionList(
                     goal_state=JointState.from_str_dict(
-                        {"torso_lift_joint": 0.2}, world=pr2_world_state_reset
+                        {PR2Joint.TORSO_LIFT: 0.2}, world=pr2_world_state_reset
                     )
                 ),
             ]

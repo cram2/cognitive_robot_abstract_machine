@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import pytest
 
@@ -9,6 +11,7 @@ from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     ObservationStateValues,
     DefaultWeights,
+    LifeCycleValues,
 )
 from giskardpy.motion_statechart.goals.cartesian_goals import (
     DifferentialDriveBaseGoal,
@@ -18,6 +21,7 @@ from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import (
     EndMotion,
     CancelMotion,
+    MotionStatechartNode,
 )
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
     SetSeedConfiguration,
@@ -73,6 +77,81 @@ from test.giskardpy_test.test_motion_statechart.debug_expression_helpers import 
     GOAL_COLOR,
     debug_expression_by_name,
 )
+from semantic_digital_twin.robots.pr2 import PR2Joint
+
+# %% straight line paths
+
+STRAIGHT_LINE_TOLERANCE = 0.02
+"""
+How far the tip may stray from the line it is supposed to travel along, in meters.
+
+Some deviation is unavoidable: the controller has to accelerate out of the pose the
+motion starts at, and it can only correct a lateral offset on the tick after it appeared.
+"""
+
+
+@dataclass
+class StraightLine:
+    """
+    The line a straight Cartesian motion is supposed to travel along.
+    """
+
+    start: np.ndarray
+    """Position the motion starts at."""
+
+    end: np.ndarray
+    """Position the motion ends at."""
+
+    def distance_from(self, position: np.ndarray) -> float:
+        """
+        :return: Distance between `position` and this line.
+        """
+        direction = self.end - self.start
+        direction = direction / np.linalg.norm(direction)
+        offset = position - self.start
+        return float(np.linalg.norm(offset - np.dot(offset, direction) * direction))
+
+    def maximum_distance_from(self, positions: list[np.ndarray]) -> float:
+        """
+        :return: Distance of the position that strayed furthest from this line.
+        """
+        return max(self.distance_from(position) for position in positions)
+
+
+def record_tip_path(
+    executor: Executor,
+    task: MotionStatechartNode,
+    root_link: KinematicStructureEntity,
+    tip_link: KinematicStructureEntity,
+    maximum_ticks: int = 2000,
+) -> list[np.ndarray]:
+    """
+    Tick until the motion ends and collect where the tip was while `task` was running.
+
+    The first entry is the position the tip had when `task` started, which is where a
+    straight motion is supposed to begin.
+
+    :raises TimeoutError: if the motion does not end within `maximum_ticks`.
+    """
+    world = executor.context.world
+    life_cycle_state = executor.motion_statechart.life_cycle_state
+
+    def tip_position() -> np.ndarray:
+        return world.compute_forward_kinematics_np(root_link, tip_link)[:3, 3].copy()
+
+    path = []
+    if life_cycle_state[task] == LifeCycleValues.RUNNING:
+        path.append(tip_position())
+    for _ in range(maximum_ticks):
+        position_before_tick = tip_position()
+        executor.tick()
+        if not path and life_cycle_state[task] == LifeCycleValues.RUNNING:
+            path.append(position_before_tick)
+        if path:
+            path.append(tip_position())
+        if executor.motion_statechart.is_end_motion():
+            return path
+    raise TimeoutError(f"{task.name} did not finish within {maximum_ticks} ticks")
 
 
 class TestCartesianPositionTrajectory:
@@ -331,6 +410,9 @@ class TestCartesianTasks:
         The goal pose here only differs from the start pose by a 0.05 rad yaw, so on the
         very first tick the position error is exactly zero while the rotation error is
         0.05 rad -- isolating the rotation half of the observation.
+
+        The orientation sub-tasks are inspected directly, because the observation of the
+        enclosing :class:`Parallel` only reflects its children on the following tick.
         """
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         goal_pose = Pose.from_xyz_rpy(yaw=0.05, reference_frame=cylinder_bot_world.root)
@@ -361,8 +443,14 @@ class TestCartesianTasks:
         executor.compile(motion_statechart=motion_statechart)
         executor.tick()
 
-        assert strict.observation_state == ObservationStateValues.FALSE
-        assert loose.observation_state == ObservationStateValues.TRUE
+        strict_orientation = next(
+            node for node in strict.nodes if isinstance(node, CartesianOrientation)
+        )
+        loose_orientation = next(
+            node for node in loose.nodes if isinstance(node, CartesianOrientation)
+        )
+        assert strict_orientation.observation_state == ObservationStateValues.FALSE
+        assert loose_orientation.observation_state == ObservationStateValues.TRUE
 
     def test_end_motion_waits_for_convergence(self, cylinder_bot_world: World):
         """
@@ -437,23 +525,23 @@ class TestCartesianTasks:
                 JointPositionList(
                     goal_state=JointState.from_str_dict(
                         {
-                            "torso_lift_joint": 0.2999225173357618,
-                            "head_pan_joint": 0.042,
-                            "head_tilt_joint": -0.37,
-                            "r_upper_arm_roll_joint": -0.9487714747527726,
-                            "r_shoulder_pan_joint": -1.0047307505973626,
-                            "r_shoulder_lift_joint": 0.48736790658811985,
-                            "r_forearm_roll_joint": -14.895833882874182,
-                            "r_elbow_flex_joint": -1.392377908925028,
-                            "r_wrist_flex_joint": -0.4548695149411013,
-                            "r_wrist_roll_joint": 0.11426798984097819,
-                            "l_upper_arm_roll_joint": 1.7383062350263658,
-                            "l_shoulder_pan_joint": 1.8799810286792007,
-                            "l_shoulder_lift_joint": 0.011627231224188975,
-                            "l_forearm_roll_joint": 312.67276414458695,
-                            "l_elbow_flex_joint": -2.0300928925694675,
-                            "l_wrist_flex_joint": -0.1,
-                            "l_wrist_roll_joint": -6.062015047706399,
+                            PR2Joint.TORSO_LIFT: 0.2999225173357618,
+                            PR2Joint.HEAD_PAN: 0.042,
+                            PR2Joint.HEAD_TILT: -0.37,
+                            PR2Joint.RIGHT_UPPER_ARM_ROLL: -0.9487714747527726,
+                            PR2Joint.RIGHT_SHOULDER_PAN: -1.0047307505973626,
+                            PR2Joint.RIGHT_SHOULDER_LIFT: 0.48736790658811985,
+                            PR2Joint.RIGHT_FOREARM_ROLL: -14.895833882874182,
+                            PR2Joint.RIGHT_ELBOW_FLEX: -1.392377908925028,
+                            PR2Joint.RIGHT_WRIST_FLEX: -0.4548695149411013,
+                            PR2Joint.RIGHT_WRIST_ROLL: 0.11426798984097819,
+                            PR2Joint.LEFT_UPPER_ARM_ROLL: 1.7383062350263658,
+                            PR2Joint.LEFT_SHOULDER_PAN: 1.8799810286792007,
+                            PR2Joint.LEFT_SHOULDER_LIFT: 0.011627231224188975,
+                            PR2Joint.LEFT_FOREARM_ROLL: 312.67276414458695,
+                            PR2Joint.LEFT_ELBOW_FLEX: -2.0300928925694675,
+                            PR2Joint.LEFT_WRIST_FLEX: -0.1,
+                            PR2Joint.LEFT_WRIST_ROLL: -6.062015047706399,
                         },
                         world=pr2_world_state_reset,
                     )
@@ -1045,6 +1133,93 @@ class TestCartesianTasks:
             cart_straight.goal_pose.to_np(), goal_pose.to_np(), atol=0.015
         )
 
+    def test_straight_path_while_the_orientation_changes(
+        self, pr2_world_state_reset: World
+    ):
+        """
+        The tip must stay on the line to the goal while the very same goal rotates it.
+
+        The orientation half of :class:`CartesianPoseStraight` runs in parallel with the
+        position half, so a goal that also reorients the tip turns the tip frame while
+        the straight line motion is under way.
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
+        start = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)[:3, 3]
+        goal_pose = Pose.from_xyz_rpy(
+            x=start[0] + 0.3,
+            y=start[1],
+            z=start[2],
+            pitch=np.pi / 2,
+            reference_frame=root,
+        )
+
+        motion_statechart = MotionStatechart()
+        goal = CartesianPoseStraight(
+            root_link=root,
+            tip_link=tip,
+            goal_pose=goal_pose,
+        )
+        motion_statechart.add_node(goal)
+        motion_statechart.add_node(EndMotion.when_true(goal))
+
+        executor = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        executor.compile(motion_statechart=motion_statechart)
+        straight = next(
+            node for node in goal.nodes if isinstance(node, CartesianPositionStraight)
+        )
+        path = record_tip_path(executor, straight, root, tip)
+
+        line = StraightLine(start=path[0], end=goal_pose.to_np()[:3, 3])
+        assert line.maximum_distance_from(path) <= STRAIGHT_LINE_TOLERANCE
+
+    def test_straight_line_starts_where_the_task_starts(
+        self, pr2_world_state_reset: World
+    ):
+        """
+        The line must start at the pose the tip has when the task starts running, not at
+        the pose it had when the statechart was compiled.
+
+        Every node is built during compilation, while a task that waits for another one
+        starts after that motion has moved the tip somewhere else.
+        """
+        tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "r_gripper_tool_frame"
+        )
+        root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+            "odom_combined"
+        )
+        start = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)[:3, 3]
+        goal_point = Point3(start[0] + 0.2, start[1], start[2], reference_frame=root)
+
+        motion_statechart = MotionStatechart()
+        wrist_goal = JointPositionList(
+            goal_state=JointState.from_str_dict(
+                {PR2Joint.RIGHT_WRIST_FLEX: -np.pi / 2},
+                world=pr2_world_state_reset,
+            )
+        )
+        straight = CartesianPositionStraight(
+            root_link=root,
+            tip_link=tip,
+            goal_point=goal_point,
+        )
+        motion_statechart.add_nodes([wrist_goal, straight])
+        wrist_goal.end_condition = wrist_goal.observation_variable
+        straight.start_condition = wrist_goal.observation_variable
+        motion_statechart.add_node(EndMotion.when_true(straight))
+
+        executor = Executor(MotionStatechartContext(world=pr2_world_state_reset))
+        executor.compile(motion_statechart=motion_statechart)
+        path = record_tip_path(executor, straight, root, tip)
+
+        line = StraightLine(start=path[0], end=goal_point.to_np()[:3])
+        assert line.maximum_distance_from(path) <= STRAIGHT_LINE_TOLERANCE
+
     def test_soft_trunk_cartesian_position(self):
         """
         Verifies that Giskardpy can solve and execute a CartesianPosition task for the
@@ -1428,6 +1603,11 @@ class TestDebugExpressions:
         assert current.color == CURRENT_COLOR
 
     def test_cartesian_pose_uses_prefixed_names(self, cylinder_bot_world: World):
+        """
+        CartesianPose is a Parallel over a position and an orientation task, so its
+        debug expressions are registered by those children, each prefixed with its own
+        name.
+        """
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = CartesianPose(
@@ -1436,17 +1616,21 @@ class TestDebugExpressions:
             goal_pose=Pose.from_xyz_rpy(x=1, reference_frame=root),
             name="pose",
         )
+        motion_statechart = MotionStatechart()
+        motion_statechart.add_node(task)
+        motion_statechart.add_node(EndMotion.when_true(task))
 
-        artifacts = task.build(MotionStatechartContext(world=cylinder_bot_world))
+        executor = Executor(MotionStatechartContext(world=cylinder_bot_world))
+        executor.compile(motion_statechart=motion_statechart)
 
-        goal = debug_expression_by_name(artifacts.debug_expressions, "pose/goal")
-        current = debug_expression_by_name(artifacts.debug_expressions, "pose/current")
         names = {
-            debug_expression.name for debug_expression in artifacts.debug_expressions
+            debug_expression.name
+            for child in task.nodes
+            for debug_expression in child.debug_expressions
         }
-        assert names == {"pose/goal", "pose/current"}
-        assert goal.color == GOAL_COLOR
-        assert current.color == CURRENT_COLOR
-        pose_like = (Pose, HomogeneousTransformationMatrix)
-        assert isinstance(goal.expression, pose_like)
-        assert isinstance(current.expression, pose_like)
+        assert names == {
+            "pose/position/goal",
+            "pose/position/current",
+            "pose/orientation/goal",
+            "pose/orientation/current",
+        }

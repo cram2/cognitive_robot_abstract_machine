@@ -36,9 +36,13 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AllowNeverInCollision,
     AllowCollisionForAdjacentPairs,
 )
+from semantic_digital_twin.collision_checking.collision_variable_managers import (
+    ExternalCollisionVariableManager,
+)
 from semantic_digital_twin.collision_checking.pybullet_collision_detector import (
     BulletCollisionDetector,
 )
+from krrood.symbolic_math.float_variable_data import FloatVariableData
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     BodyHasNoGeometryError,
@@ -641,6 +645,90 @@ class TestCollisionGroups:
             }
         )
         assert not root_matrix.is_collision_groups_combination_checked(group_a, group_b)
+
+    def test_hash_is_stable_under_membership_change(self):
+        """
+        A group is identified by its root, so gaining a body must not change its hash.
+
+        Groups are rebuilt whenever the world model changes, so a hash that depended on
+        the membership would strand every dict that is keyed by a group.
+        """
+        root = create_body_with_collision("group_root")
+        group = CollisionGroup(root=root)
+        hash_before_membership_change = hash(group)
+
+        group.add_body(create_body_with_collision("joined_later"))
+
+        assert hash(group) == hash_before_membership_change
+        assert hash(group) == hash(CollisionGroup(root=root))
+        assert group == CollisionGroup(root=root)
+
+    def test_group_membership_inspects_each_body_once(self, monkeypatch):
+        """
+        Restricting groups to bodies with collision geometry must inspect each body
+        once, not once per body already in a group.
+
+        Groups are rebuilt on every world model change, so an inspection per pair makes
+        each change quadratic in the size of the world.
+        """
+        world = World()
+        with world.modify_world():
+            root = create_body_with_collision("root")
+            world.add_body(root)
+            for index in range(5):
+                world.add_connection(
+                    FixedConnection(
+                        parent=root, child=create_body_with_collision(f"body_{index}")
+                    )
+                )
+        consumer = self.MockCollisionGroupConsumer()
+        counter = GeometryInspectionCounter()
+        counter.install(monkeypatch)
+
+        consumer.update_collision_groups(world)
+
+        # one pass over every body, plus the root of each group as it is created
+        assert counter.inspections == len(world.bodies) + len(consumer.collision_groups)
+
+    def test_registered_group_survives_membership_change(self):
+        """
+        A group registered for external collision avoidance stays registered when a body
+        is attached into it during a motion.
+
+        Attaching an object to a robot with a passive connection merges it into the
+        robot body's group, which rebuilds that group with a larger body set.
+        """
+        world = World()
+        with world.modify_world():
+            robot_base = create_body_with_collision("robot_base")
+            world.add_body(robot_base)
+            MinimalRobot.from_world(world)
+
+        with world.modify_world():
+            map_body = Body(name=PrefixedName("map"))
+            obstacle = create_body_with_collision("obstacle")
+            world.add_connection(FixedConnection(parent=map_body, child=robot_base))
+            world.add_connection(
+                Connection6DoF.create_with_dofs(
+                    world=world,
+                    parent=map_body,
+                    child=obstacle,
+                    name=PrefixedName("obstacle_conn"),
+                )
+            )
+
+        collision_manager = world.collision_manager
+        collision_manager.add_collision_consumer(
+            external_collisions := ExternalCollisionVariableManager(FloatVariableData())
+        )
+        external_collisions.register_group_of_body(robot_base)
+
+        with world.modify_world():
+            world.move_branch(obstacle, robot_base)
+
+        robot_base_group = external_collisions.get_collision_group(robot_base)
+        assert obstacle in robot_base_group.bodies
+        assert robot_base_group in external_collisions.registered_groups
 
 
 # %% constructing collision checks

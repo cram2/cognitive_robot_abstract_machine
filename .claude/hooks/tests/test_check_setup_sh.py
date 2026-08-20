@@ -7,7 +7,6 @@ personal-notes remote - no network access or real personal-notes branch involved
 
 from __future__ import annotations
 
-import os
 import subprocess
 from dataclasses import dataclass
 from enum import StrEnum
@@ -17,23 +16,12 @@ import pytest
 
 from scratch_repository import (
     NOTES_BRANCH,
+    PERSONAL_GIT_IDENTITY_PATH,
+    SCRATCH_IDENTITY,
     ScratchRepository,
+    SetupPrerequisiteFile,
     initialize_bare_repository,
 )
-
-# The files check-setup.sh's `tooling_files` check requires, relative to the
-# project root. Kept as literals rather than sourced from
-# resolve-personal-notes-config.sh so a rename that breaks the check has to be
-# made deliberately in both places, instead of the test silently following
-# along and asserting nothing.
-TOOLING_FILES = (
-    ".claude/skills/plan-dashboard/build_dashboard.py",
-    ".claude/skills/plan-dashboard/refresh_dashboard.sh",
-    ".claude/skills/plan-dashboard/requirements.txt",
-    ".claude/skills/plan-dashboard/plan-schema.md",
-)
-
-REQUIREMENTS_FILE = ".claude/skills/plan-dashboard/requirements.txt"
 
 NOTES_PATH = ".claude/personal/cram-notes.md"
 
@@ -55,6 +43,7 @@ class SetupCheck(StrEnum):
     NOTES_PATH = "notes_path"
     NOTES_BRANCH = "notes_branch"
     NOTES_FILE = "notes_file"
+    GIT_IDENTITY = "git_identity"
     DASHBOARD_DEPENDENCIES = "dashboard_dependencies"
     CLAUDE_LOCAL_MD = "claude_local_md"
 
@@ -131,7 +120,8 @@ def check_setup_repository(scratch_repository: ScratchRepository) -> ScratchRepo
     A scratch repository set up so every check-setup.sh check passes: the real check-
     setup.sh and resolve-personal-notes-config.sh, placeholder tooling files, a
     registered SessionStart hook, a gitignored CLAUDE.local.md, and a notes branch
-    carrying a notes file.
+    carrying a notes file and the identity this repository's own commits are authored
+    with.
 
     Individual tests break exactly one of those conditions to assert the matching check
     reports it.
@@ -143,22 +133,16 @@ def check_setup_repository(scratch_repository: ScratchRepository) -> ScratchRepo
         "resolve-personal-notes-config.sh", "check-setup.sh"
     )
 
-    for tooling_file in TOOLING_FILES:
-        scratch_repository.write(tooling_file, "placeholder\n")
-    # The dependency check reads this file rather than a hardcoded list, so a
-    # requirement that is certainly installed keeps the fixture's baseline green.
-    scratch_repository.write(REQUIREMENTS_FILE, "pytest>=1\n")
-
-    scratch_repository.write(
-        ".claude/settings.json",
-        '{"hooks": {"SessionStart": [{"hooks": [{"type": "command",'
-        ' "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"}]}]}}\n',
-    )
-    scratch_repository.write(".gitignore", "CLAUDE.local.md\n")
+    scratch_repository.write_setup_prerequisites()
     scratch_repository.write("CLAUDE.local.md", "notes\n")
 
     scratch_repository.commit_everything("initial commit")
-    scratch_repository.publish_notes_branch({NOTES_PATH: "my notes\n"})
+    scratch_repository.publish_notes_branch(
+        {
+            NOTES_PATH: "my notes\n",
+            PERSONAL_GIT_IDENTITY_PATH: SCRATCH_IDENTITY.as_git_config_file(),
+        }
+    )
     scratch_repository.resolve_notes_remote_to()
     return scratch_repository
 
@@ -169,32 +153,13 @@ def run_check_setup(
     """
     Run the scratch layout's check-setup.sh and parse its report.
 
-    Every ``CLAUDE_PERSONAL_NOTES_*`` variable is stripped from the inherited
-    environment first, so a value that happens to be set in whoever's shell is running
-    the tests can never change what they assert.
-
     :param repository: A fixture-built scratch repository.
-    :param environment_overrides: Personal-notes environment variables to set for this
-        run, for the tests that exercise resolution from the environment.
+    :param environment_overrides: Environment variables to set for this run, for the
+        tests that exercise resolution from the environment.
     :return: The parsed report.
     """
-    environment = {
-        name: value
-        for name, value in os.environ.items()
-        if not name.startswith("CLAUDE_PERSONAL_NOTES_")
-    }
-    environment.update(environment_overrides)
     return SetupReport.from_completed_process(
-        subprocess.run(
-            [
-                "bash",
-                str(repository.project_root / ".claude" / "hooks" / "check-setup.sh"),
-            ],
-            cwd=repository.project_root,
-            capture_output=True,
-            text=True,
-            env=environment,
-        )
+        repository.run_hook_script("check-setup.sh", **environment_overrides)
     )
 
 
@@ -265,6 +230,77 @@ def test_reports_a_notes_branch_that_exists_but_holds_no_notes_file(
     )
 
 
+# %% who commits here would be authored as
+
+
+def test_reports_a_recorded_identity_that_matches_this_clone(
+    check_setup_repository: ScratchRepository,
+):
+    report = run_check_setup(check_setup_repository)
+    assert report.results[SetupCheck.GIT_IDENTITY].status == CheckStatus.OK
+    assert (
+        f"{SCRATCH_IDENTITY.name} <{SCRATCH_IDENTITY.email}>"
+        in report.results[SetupCheck.GIT_IDENTITY].detail
+    )
+
+
+def test_reports_a_notes_branch_that_records_no_identity(
+    check_setup_repository: ScratchRepository,
+):
+    check_setup_repository.remove_from_notes_branch(PERSONAL_GIT_IDENTITY_PATH)
+
+    report = run_check_setup(check_setup_repository)
+    assert report.exit_code == 1
+    assert report.results[SetupCheck.GIT_IDENTITY].status == CheckStatus.NEEDS_SETUP
+    assert (
+        f"{SCRATCH_IDENTITY.name} <{SCRATCH_IDENTITY.email}>"
+        in report.results[SetupCheck.GIT_IDENTITY].detail
+    )
+
+
+def test_reports_a_recorded_identity_this_clone_does_not_commit_as(
+    check_setup_repository: ScratchRepository,
+):
+    check_setup_repository.run_git("config", "user.name", "Somebody Else")
+
+    report = run_check_setup(check_setup_repository)
+    assert report.exit_code == 1
+    assert report.results[SetupCheck.GIT_IDENTITY].status == CheckStatus.NEEDS_SETUP
+    detail = report.results[SetupCheck.GIT_IDENTITY].detail
+    assert f"{SCRATCH_IDENTITY.name} <{SCRATCH_IDENTITY.email}>" in detail
+    assert f"Somebody Else <{SCRATCH_IDENTITY.email}>" in detail
+
+
+def test_reads_the_identity_the_environment_overrides_config_with(
+    check_setup_repository: ScratchRepository,
+):
+    report = run_check_setup(
+        check_setup_repository,
+        GIT_AUTHOR_NAME="Environment Author",
+        GIT_AUTHOR_EMAIL="environment@example.com",
+    )
+    assert report.exit_code == 1
+    assert report.results[SetupCheck.GIT_IDENTITY].status == CheckStatus.NEEDS_SETUP
+    assert (
+        "Environment Author <environment@example.com>"
+        in report.results[SetupCheck.GIT_IDENTITY].detail
+    )
+
+
+def test_does_not_check_the_identity_when_the_notes_branch_is_missing(
+    check_setup_repository: ScratchRepository, tmp_path: Path
+):
+    check_setup_repository.resolve_notes_remote_to(
+        initialize_bare_repository(tmp_path / "empty-remote.git")
+    )
+
+    report = run_check_setup(check_setup_repository)
+    assert report.results[SetupCheck.GIT_IDENTITY].status == CheckStatus.NEEDS_SETUP
+    assert report.results[SetupCheck.GIT_IDENTITY].detail == (
+        "not checked - the branch that would record it doesn't exist yet"
+    )
+
+
 # %% how each setting was resolved
 
 
@@ -303,20 +339,17 @@ def test_reports_a_setting_resolved_from_the_environment(
 def test_reports_which_tooling_files_this_checkout_is_missing(
     check_setup_repository: ScratchRepository,
 ):
-    (
-        check_setup_repository.project_root
-        / ".claude/skills/plan-dashboard/plan-schema.md"
-    ).unlink()
+    (check_setup_repository.project_root / SetupPrerequisiteFile.PLAN_SCHEMA).unlink()
 
     report = run_check_setup(check_setup_repository)
     assert report.exit_code == 1
     assert report.results[SetupCheck.TOOLING_FILES].status == CheckStatus.NEEDS_SETUP
     assert (
-        ".claude/skills/plan-dashboard/plan-schema.md"
+        SetupPrerequisiteFile.PLAN_SCHEMA
         in report.results[SetupCheck.TOOLING_FILES].detail
     )
     assert (
-        ".claude/skills/plan-dashboard/build_dashboard.py"
+        SetupPrerequisiteFile.BUILD_DASHBOARD
         not in report.results[SetupCheck.TOOLING_FILES].detail
     )
 
@@ -353,7 +386,8 @@ def test_reports_dashboard_requirements_that_are_not_installed(
     check_setup_repository: ScratchRepository,
 ):
     check_setup_repository.write(
-        REQUIREMENTS_FILE, "pytest>=1\nno-such-distribution-exists>=2  # a comment\n"
+        SetupPrerequisiteFile.DASHBOARD_REQUIREMENTS,
+        "pytest>=1\nno-such-distribution-exists>=2  # a comment\n",
     )
 
     report = run_check_setup(check_setup_repository)

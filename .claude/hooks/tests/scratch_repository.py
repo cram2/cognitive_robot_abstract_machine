@@ -9,10 +9,12 @@ notes remote - so no test needs network access or a real personal-notes branch.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 import plan_manifest_tools
@@ -30,6 +32,129 @@ The personal-notes branch name the hooks resolve to by default.
 WORK_BRANCH = "some-work-branch"
 """
 The throwaway branch a scratch repository is left checked out on.
+"""
+
+PERSONAL_GIT_IDENTITY_PATH = ".claude/personal/git-identity"
+"""
+The path the hooks read a recorded git identity from, relative to the project root.
+
+Kept as a literal here for the same reason as :class:`SetupPrerequisiteFile` below.
+"""
+
+SCRUBBED_ENVIRONMENT_PREFIXES = (
+    "CLAUDE_PERSONAL_NOTES_",
+    "GIT_AUTHOR_",
+    "GIT_COMMITTER_",
+)
+"""
+Variable prefixes stripped from a hook's environment before running it.
+
+A value that happens to be set in whoever's shell is running the tests can otherwise
+change what they assert - the personal-notes variables by redirecting where a hook
+looks, and the git identity variables by outranking the repository's own git config in
+every commit and in ``git var GIT_AUTHOR_IDENT``.
+"""
+
+SET_UP_CLONE_FIXTURE = Path(__file__).parent / "fixtures" / "set-up-clone"
+"""
+A checked-in clone layout satisfying every check-setup.sh check that reads a file, laid
+out under the same relative paths it will occupy in a scratch project root.
+"""
+
+
+class SetupPrerequisiteFile(StrEnum):
+    """
+    The files check-setup.sh's ``tooling_files`` check requires, relative to the project
+    root.
+
+    Stated here as well as in the fixture tree deliberately. A rename that breaks the
+    check then has to be made in both places, rather than the fixture and the tests
+    following each other silently and asserting nothing.
+    """
+
+    BUILD_DASHBOARD = ".claude/skills/plan-dashboard/build_dashboard.py"
+    """
+    The dashboard builder the plan-dashboard skill runs.
+    """
+
+    REFRESH_DASHBOARD = ".claude/skills/plan-dashboard/refresh_dashboard.sh"
+    """
+    The refresh entry point the same skill runs.
+    """
+
+    DASHBOARD_REQUIREMENTS = ".claude/skills/plan-dashboard/requirements.txt"
+    """
+    The requirements file check-setup.sh also derives the dependency check from.
+    """
+
+    PLAN_SCHEMA = ".claude/skills/plan-dashboard/plan-schema.md"
+    """
+    The manifest field reference.
+    """
+
+
+@dataclass(frozen=True)
+class GitIdentity:
+    """
+    The name and email a commit is authored with.
+    """
+
+    name: str
+    """
+    The value of ``user.name``.
+    """
+
+    email: str
+    """
+    The value of ``user.email``.
+    """
+
+    def as_git_config_file(self) -> str:
+        """
+        Render this identity in the git-config format the hooks read it back from.
+
+        :return: The file's contents.
+        """
+        return f"[user]\n\tname = {self.name}\n\temail = {self.email}\n"
+
+    @classmethod
+    def from_git_config_file(cls, path: Path) -> GitIdentity:
+        """
+        Read an identity back through git itself, rather than by parsing the file, so a
+        test asserts what the hooks will actually resolve from it.
+
+        :param path: The git-config-format file to read.
+        :return: The identity it records.
+        """
+        return cls(
+            read_git_config_value(path, "user.name"),
+            read_git_config_value(path, "user.email"),
+        )
+
+
+def read_git_config_value(path: Path, key: str) -> str:
+    """
+    Read one key out of a git-config-format file.
+
+    :param path: The file to read.
+    :param key: The dotted config key, such as ``user.name``.
+    :return: The value, stripped of its trailing newline.
+    """
+    result = subprocess.run(
+        ["git", "config", "--file", str(path), "--get", key],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout.strip()
+
+
+SCRATCH_IDENTITY = GitIdentity("Scratch Repo", "scratch-repo@example.com")
+"""
+The repository-local identity every scratch repository is created with.
+
+A CI runner has no ambient git identity configured, so committing in the scratch layout
+has to depend on this rather than on the environment already having one.
 """
 
 
@@ -89,11 +214,31 @@ class ScratchRepository:
             initialize_bare_repository(parent_directory / "personal-notes.git"),
         )
         repository.run_git("init", "--quiet")
-        # A CI runner has no ambient git identity configured - set one locally so
-        # committing here doesn't depend on the environment already having one.
-        repository.run_git("config", "user.name", "Scratch Repo")
-        repository.run_git("config", "user.email", "scratch-repo@example.com")
+        repository.run_git("config", "user.name", SCRATCH_IDENTITY.name)
+        repository.run_git("config", "user.email", SCRATCH_IDENTITY.email)
         return repository
+
+    def clear_local_git_identity(self) -> None:
+        """
+        Remove the repository-local identity :meth:`create` sets, leaving the clone in
+        the state a fresh one is really in.
+        """
+        self.run_git("config", "--unset", "user.name")
+        self.run_git("config", "--unset", "user.email")
+
+    def local_git_identity(self) -> GitIdentity | None:
+        """
+        Read the identity configured in this repository's own config.
+
+        :return: The identity, or ``None`` if either half is unset.
+        """
+        values = []
+        for key in ("user.name", "user.email"):
+            result = self.run_git_allowing_failure("config", "--local", "--get", key)
+            if result.returncode != 0:
+                return None
+            values.append(result.stdout.strip())
+        return GitIdentity(*values)
 
     def run_git(
         self, *arguments: str, cwd: Path | None = None
@@ -105,14 +250,27 @@ class ScratchRepository:
         :param cwd: Where to run it, defaulting to the project root.
         :return: The finished subprocess.
         """
-        result = subprocess.run(
+        result = self.run_git_allowing_failure(*arguments, cwd=cwd)
+        assert result.returncode == 0, result.stderr
+        return result
+
+    def run_git_allowing_failure(
+        self, *arguments: str, cwd: Path | None = None
+    ) -> subprocess.CompletedProcess[str]:
+        """
+        Run git in the project root, for the queries whose failure is a valid answer
+        rather than a broken test.
+
+        :param arguments: The arguments to pass to git.
+        :param cwd: Where to run it, defaulting to the project root.
+        :return: The finished subprocess.
+        """
+        return subprocess.run(
             ["git", *arguments],
             cwd=cwd or self.project_root,
             capture_output=True,
             text=True,
         )
-        assert result.returncode == 0, result.stderr
-        return result
 
     def install_hook_scripts(self, *script_names: str) -> None:
         """
@@ -125,6 +283,55 @@ class ScratchRepository:
                 HOOKS_SOURCE_DIRECTORY / script_name,
                 self.project_root / ".claude" / "hooks" / script_name,
             )
+
+    def write_setup_prerequisites(self) -> None:
+        """
+        Write everything check-setup.sh requires of a set up clone, apart from the
+        personal-notes branch and CLAUDE.local.md.
+
+        Leaves CLAUDE.local.md out deliberately: session-start.sh writes it, so a test
+        of that script must not find it already there - which is why this is a named
+        step rather than part of building the repository.
+        """
+        shutil.copytree(SET_UP_CLONE_FIXTURE, self.project_root, dirs_exist_ok=True)
+
+    def run_hook_script(
+        self,
+        script_name: str,
+        *arguments: str,
+        **environment_overrides: str,
+    ) -> subprocess.CompletedProcess[str]:
+        """
+        Run one of the installed hook scripts from the project root, against an
+        environment scrubbed of everything that could change what a test asserts (see
+        :data:`SCRUBBED_ENVIRONMENT_PREFIXES`).
+
+        Returns the finished process rather than asserting on it, since a hook's exit
+        code and stderr are often what a test is about.
+
+        :param script_name: File name within the scratch layout's hooks directory.
+        :param arguments: The arguments to pass to the script.
+        :param environment_overrides: Variables to set for this run, for the tests that
+            exercise resolution from the environment.
+        :return: The finished subprocess.
+        """
+        environment = {
+            name: value
+            for name, value in os.environ.items()
+            if not name.startswith(SCRUBBED_ENVIRONMENT_PREFIXES)
+        }
+        environment.update(environment_overrides)
+        return subprocess.run(
+            [
+                "bash",
+                str(self.project_root / ".claude" / "hooks" / script_name),
+                *arguments,
+            ],
+            cwd=self.project_root,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
 
     def write(self, relative_path: str, content: str) -> Path:
         """
@@ -168,6 +375,19 @@ class ScratchRepository:
         for relative_path in files:
             (self.project_root / relative_path).unlink()
         self.commit_everything("drop the notes from the work branch")
+
+    def remove_from_notes_branch(self, relative_path: str) -> None:
+        """
+        Delete a file from the notes branch and push the deletion, for the tests whose
+        subject is a notes branch that carries everything except one thing.
+
+        :param relative_path: Path relative to the project root.
+        """
+        self.run_git("checkout", "--quiet", NOTES_BRANCH)
+        (self.project_root / relative_path).unlink()
+        self.commit_everything(f"drop {relative_path}")
+        self.run_git("push", "--quiet", str(self.notes_remote_path), NOTES_BRANCH)
+        self.run_git("checkout", "--quiet", WORK_BRANCH)
 
     def clone_notes_branch(self, destination: Path) -> Path:
         """

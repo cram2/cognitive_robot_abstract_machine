@@ -126,6 +126,16 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
             or (self.upper == item and self.right == Bound.CLOSED)
         )
 
+    @property
+    def size(self) -> float:
+        """
+        :return: The length this interval spans, which is zero for a singleton and
+            infinite when the interval is unbounded.
+        """
+        if self.is_empty():
+            return 0.0
+        return self.upper - self.lower
+
     def non_empty_to_string(self) -> str:
         left_bracket = "[" if self.left == Bound.CLOSED else "("
         right_bracket = "]" if self.right == Bound.CLOSED else ")"

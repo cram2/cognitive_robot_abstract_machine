@@ -3,6 +3,7 @@ import importlib
 import json
 import pathlib
 
+import numpy as np
 from sqlalchemy import Dialect, TypeDecorator, types
 from typing_extensions import Optional, Type
 
@@ -117,3 +118,29 @@ class PathType(TypeDecorator):
         if value is not None:
             return pathlib.Path(value)
         return value
+
+
+class NumpyType(TypeDecorator):
+    """
+    Type decorator for numpy arrays, stored as raw float64 bytes.
+
+    ..note:: The shape is not stored, so arrays are read back as one-dimensional.
+    """
+
+    impl = types.LargeBinary(4 * 1024 * 1024 * 1024 - 1)
+    cache_ok = True
+
+    def process_bind_param(
+        self, value: Optional[np.ndarray], dialect: Dialect
+    ) -> Optional[bytes]:
+        if value is None:
+            return None
+        array = np.asarray(value, dtype=np.float64)
+        return array.tobytes(order="C")
+
+    def process_result_value(
+        self, value: Optional[bytes], dialect: Dialect
+    ) -> Optional[np.ndarray]:
+        if value is None:
+            return None
+        return np.frombuffer(value, dtype=np.float64)

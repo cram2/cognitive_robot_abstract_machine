@@ -7,9 +7,10 @@ from functools import reduce
 from operator import or_
 
 import matplotlib.pyplot as plt
+import numpy as np
 import plotly.graph_objects as go
 import rustworkx as rx
-from random_events.interval import reals, closed
+from random_events.interval import reals, closed, Interval
 from random_events.product_algebra import Event
 from random_events.product_algebra import SimpleEvent
 from rtree import index
@@ -22,10 +23,13 @@ from semantic_digital_twin.exceptions import PointOccupiedError
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
-from semantic_digital_twin.world_description.geometry import BoundingBox, Color
+from semantic_digital_twin.world_description.geometry import BoundingBox, Bounds, Color
 from semantic_digital_twin.world_description.graph_of_convex_sets.base import (
     GraphOfConvexSets,
 )
@@ -42,6 +46,27 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class BoundingBoxAdjacency:
+    """
+    Edge payload connecting two adjacent bounding boxes in a
+    :class:`GraphOfBoundingBoxes`.
+    """
+
+    intersection: BoundingBox
+    """
+    The region where the two adjacent boxes overlap or touch.
+    """
+
+    distance: float
+    """
+    Euclidean distance between the centers of the two adjacent boxes.
+
+    Used as the edge cost for shortest-path search, so that the search minimizes
+    travelled distance instead of the number of boxes crossed.
+    """
+
+
+@dataclass
 class GraphOfBoundingBoxes(GraphOfConvexSets):
     """
     A graph of convex sets whose nodes are axis-aligned bounding boxes.
@@ -51,7 +76,7 @@ class GraphOfBoundingBoxes(GraphOfConvexSets):
     node is a box; every edge represents the adjacency between two boxes.
     """
 
-    graph: rx.PyGraph[BoundingBox] = field(
+    graph: rx.PyGraph[BoundingBox, BoundingBoxAdjacency] = field(
         default_factory=lambda: rx.PyGraph(multigraph=False)
     )
     """
@@ -84,7 +109,9 @@ class GraphOfBoundingBoxes(GraphOfConvexSets):
         """
         Calculate the connectivity of the graph by checking for intersections between
         the bounding boxes of the nodes. This uses an R-tree for efficient spatial
-        indexing and intersection queries.
+        indexing and intersection queries. Each edge is weighted by the Euclidean
+        distance between the centers of the two boxes it connects, for use by
+        :meth:`path_from_to`.
 
         :param tolerance: The tolerance for the intersection when calculating the
             connectivity.
@@ -117,7 +144,7 @@ class GraphOfBoundingBoxes(GraphOfConvexSets):
         rtree_idx = index.Index(properties=prop)
 
         node_list = list(self.graph.nodes())
-        orig_mins, orig_maxs, expanded = [], [], []
+        orig_mins, orig_maxs, expanded, centers = [], [], [], []
 
         # Record every node once, insert it into the index
         for n in node_list:
@@ -135,6 +162,7 @@ class GraphOfBoundingBoxes(GraphOfConvexSets):
             orig_mins.append(mn)
             orig_maxs.append(mx)
             expanded.append(ex)
+            centers.append(n.center)
             rtree_idx.insert(len(orig_mins) - 1, ex)
 
         # Query & link, skip self-loops and symmetric pairs
@@ -146,12 +174,13 @@ class GraphOfBoundingBoxes(GraphOfConvexSets):
                 if not _overlap(mn_i, mx_i, mn_j, mx_j):
                     continue  # no true overlap
                 box = _intersection_box(mn_i, mx_i, mn_j, mx_j)
+                distance = float(centers[i].euclidean_distance(centers[j]))
 
                 # Map from the local list positions back to the graph node indices
                 u = self.box_to_index_map[node_list[i]]
                 v = self.box_to_index_map[node_list[j]]
 
-                self.graph.add_edge(u, v, box)
+                self.graph.add_edge(u, v, BoundingBoxAdjacency(box, distance))
 
     def draw(self):
         import rustworkx.visualization
@@ -205,11 +234,17 @@ class GraphOfBoundingBoxes(GraphOfConvexSets):
         Calculate a connected path from a start pose to a goal pose.
 
         .. note::
-            Uses a single-source Dijkstra search (unweighted, i.e. hop-count shortest
-            path) rather than enumerating all shortest paths and picking the first one.
-            Free-space decompositions with thousands of nodes routinely have an
-            exponential number of equally-short paths, which makes enumerating all of
-            them intractable; finding just one is not.
+            Uses a single-source Dijkstra search, weighted by the Euclidean distance
+            between adjacent boxes' centers, rather than enumerating all shortest paths
+            and picking the first one. Free-space decompositions with thousands of
+            nodes routinely have an exponential number of equally-short (by hop count)
+            paths, which makes enumerating all of them intractable; finding the one
+            that minimizes travelled distance is not.
+
+        .. note::
+            The resulting waypoints are shortcut afterwards: any waypoint that a
+            straight line can bypass without leaving free space is dropped. See
+            :meth:`_shortcut_waypoints`.
 
         :param start: The start pose.
         :param goal: The goal pose.
@@ -232,7 +267,12 @@ class GraphOfBoundingBoxes(GraphOfConvexSets):
         start_index = self.box_to_index_map[start_node]
         goal_index = self.box_to_index_map[goal_node]
 
-        paths = rx.dijkstra_shortest_paths(self.graph, start_index, target=goal_index)
+        paths = rx.dijkstra_shortest_paths(
+            self.graph,
+            start_index,
+            target=goal_index,
+            weight_fn=lambda adjacency: adjacency.distance,
+        )
 
         # if it is not possible to find a path
         if goal_index not in paths:
@@ -241,18 +281,86 @@ class GraphOfBoundingBoxes(GraphOfConvexSets):
         path = paths[goal_index]
 
         # build the path
-        result = [start]
+        reference_frame = self.search_space.reference_frame
+        waypoints = [self.world.transform(start, reference_frame)]
 
         for source, target in zip(path, path[1:]):
+            intersection = self.graph.get_edge_data(source, target).intersection
+            waypoints.append(
+                Point3(
+                    intersection.x_interval.center(),
+                    intersection.y_interval.center(),
+                    intersection.z_interval.center(),
+                    reference_frame=reference_frame,
+                )
+            )
 
-            intersection: BoundingBox = self.graph.get_edge_data(source, target)
-            x_target = intersection.x_interval.center()
-            y_target = intersection.y_interval.center()
-            z_target = intersection.z_interval.center()
-            result.append(Point3(x_target, y_target, z_target))
+        waypoints.append(self.world.transform(goal, reference_frame))
+        waypoints = self._shortcut_waypoints(waypoints)
 
+        result = [start]
+        result.extend(waypoints[1:-1])
         result.append(goal)
         return result
+
+    def _shortcut_waypoints(self, waypoints: List[Point3]) -> List[Point3]:
+        """
+        Drop waypoints that a straight line can bypass without leaving free space.
+
+        Greedily extends the current anchor waypoint forward as far as a straight
+        line to it stays collision-free, then commits the farthest waypoint still
+        visible from it and continues from there (classic "string pulling"). Each
+        waypoint is tested against the current anchor at most once, so this is
+        linear in the number of waypoints rather than quadratic.
+
+        :param waypoints: The waypoints of a path, in the search space's reference
+            frame.
+        :return: The shortcut waypoints.
+        """
+        if len(waypoints) <= 2:
+            return list(waypoints)
+
+        # BoundingBox.x_interval/y_interval/z_interval recompute symbolic arithmetic
+        # on every access, so every node's bounds are read as plain floats exactly
+        # once here rather than once per collision check below.
+        node_bounds = [node.to_array_bounds() for node in self.graph.nodes()]
+
+        result = [waypoints[0]]
+        anchor_index = 0
+        for index in range(2, len(waypoints)):
+            if not self._segment_is_collision_free(
+                waypoints[anchor_index], waypoints[index], node_bounds
+            ):
+                result.append(waypoints[index - 1])
+                anchor_index = index - 1
+        result.append(waypoints[-1])
+        return result
+
+    def _segment_is_collision_free(
+        self, start: Point3, end: Point3, node_bounds: List[Bounds[np.ndarray]]
+    ) -> bool:
+        """
+        Check whether a straight-line segment stays entirely within free space.
+
+        :param start: The segment's start point, in the search space's reference frame.
+        :param end: The segment's end point, in the search space's reference frame.
+        :param node_bounds: The graph's nodes' bounds, in the same order
+            :meth:`_shortcut_waypoints` collected them.
+        :return: True if the segment never leaves the union of the graph's bounding-box
+            nodes.
+        """
+        direction = end - start
+        coordinates = np.array([float(start.x), float(start.y), float(start.z)])
+        deltas = np.array([float(direction.x), float(direction.y), float(direction.z)])
+        covered_intervals = [
+            interval
+            for bounds in node_bounds
+            if (interval := bounds.clip_segment(coordinates, deltas)) is not None
+        ]
+        if not covered_intervals:
+            return False
+        covered = Interval.from_simple_sets(*covered_intervals).make_disjoint()
+        return (closed(0.0, 1.0) - covered).is_empty()
 
     @classmethod
     def obstacles_from_semantic_annotations(

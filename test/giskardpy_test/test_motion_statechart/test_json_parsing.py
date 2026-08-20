@@ -295,8 +295,8 @@ def test_compressed_copy_can_be_plotted(pr2_world_state_reset: World, tmp_path):
 
     msc_copy = MotionStatechart.from_json(new_json_data)
     msc_copy._add_transitions()
-    assert isinstance(msc_copy.nodes[-2], EndMotion)
-    assert isinstance(msc_copy.nodes[-1], CancelMotion)
+    assert len(msc_copy.get_nodes_by_type(EndMotion)) == 1
+    assert len(msc_copy.get_nodes_by_type(CancelMotion)) == 1
     msc.draw(str(tmp_path / "muh.pdf"))
 
 
@@ -328,6 +328,22 @@ def test_nested_goals(tmp_path):
             assert node.parent_node.unique_name == node_copy.parent_node.unique_name
         else:
             assert node_copy.parent_node_index is None
+
+
+def test_collapsed_goal_survives_json_round_trip():
+    msc = MotionStatechart()
+    msc.add_node(goal := TestNestedGoal())
+    goal.plot_specifications.collapse_children = True
+    msc.add_node(EndMotion.when_true(goal))
+
+    msc._expand_goals(MotionStatechartContext.empty())
+    json_data = msc.create_structure_copy().to_json()
+    json_str = json.dumps(json_data)
+    new_json_data = json.loads(json_str)
+
+    msc_copy = MotionStatechart.from_json(new_json_data)
+
+    assert msc_copy.get_node_by_index(goal.index).plot_specifications.collapse_children
 
 
 def test_cancel_motion():

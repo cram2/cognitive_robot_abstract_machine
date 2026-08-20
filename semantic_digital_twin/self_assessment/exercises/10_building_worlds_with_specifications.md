@@ -126,7 +126,7 @@ if not isinstance(sliding_drawer.parent_connection, PrismaticConnection): raise 
 
 ## 3. Build an annotation specification with a nested part
 Your goal:
-- Use `Drawer.get_specification` with `Drawer.get_default_root_specification` for scale
+- Use `Drawer.get_annotation_specification` with `Drawer.get_default_root_kinematic_structure_entity_specification` for scale
   `Scale(0.4, 0.5, 0.6)` to build a drawer specification named `spec_drawer`
 - Mount a `Handle` specification named `spec_handle` (scale `Scale(0.1, 0.05, 0.05)`) onto the
   drawer's `handle` field through `part_specifications`
@@ -135,22 +135,22 @@ Your goal:
 ```{code-cell} ipython3
 :tags: [exercise]
 # TODO: compose the drawer specification with a nested handle part and spawn it
-# drawer_with_handle = Drawer.get_specification(
+# drawer_with_handle = Drawer.get_annotation_specification(
 #     "spec_drawer",
-#     Drawer.get_default_root_specification(scale=...),
+#     Drawer.get_default_root_kinematic_structure_entity_specification(scale=...),
 #     part_specifications={"handle": ...},
 # ).spawn(world)
 ```
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-drawer_with_handle = Drawer.get_specification(
+drawer_with_handle = Drawer.get_annotation_specification(
     "spec_drawer",
-    Drawer.get_default_root_specification(scale=Scale(0.4, 0.5, 0.6)),
+    Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.4, 0.5, 0.6)),
     part_specifications={
-        "handle": Handle.get_specification(
+        "handle": Handle.get_annotation_specification(
             "spec_handle",
-            Handle.get_default_root_specification(scale=Scale(0.1, 0.05, 0.05)),
+            Handle.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 0.05, 0.05)),
         ),
     },
 ).spawn(world)

@@ -19,6 +19,10 @@ from giskardpy.motion_statechart.graph_node import (
     CancelMotion,
 )
 from giskardpy.motion_statechart.graph_node import Task
+from giskardpy.motion_statechart.plotters.plot_specs import (
+    NodePlotSpec,
+    plot_specification_field,
+)
 from krrood.symbolic_math.symbolic_math import Scalar, FloatVariable
 from semantic_digital_twin.collision_checking.collision_groups import CollisionGroup
 from semantic_digital_twin.collision_checking.collision_matrix import (
@@ -49,30 +53,74 @@ class _CollisionAvoidanceTask(Task):
 
 
 @dataclass(eq=False, repr=False)
+class _CancelBecauseCollisionViolated(CancelMotion):
+    """
+    Cancels the motion when one of the collision avoidance tasks it watches is violated.
+    """
+
+    tasks: list[_CollisionAvoidanceTask] = field(kw_only=True)
+    """
+    The list of collision avoidance tasks to check for collisions.
+    """
+
+    exception: Exception = field(init=False, default=Exception)
+    """
+    Set to init=False, because this class creates its own exception.
+    """
+
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+        self.start_condition = self.create_violation_condition()
+        return NodeArtifacts()
+
+    def create_violation_condition(self) -> Scalar:
+        """
+        :return: An expression that is True as soon as one of :attr:`tasks` observes a
+            violated collision. Without tasks there is nothing to violate, so it stays False.
+        """
+        if len(self.tasks) == 0:
+            return Scalar.const_false()
+        if len(self.tasks) == 1:
+            return sm.trinary_logic_not(self.tasks[0].observation_variable)
+        return sm.trinary_logic_or(
+            *[sm.trinary_logic_not(node.observation_variable) for node in self.tasks]
+        )
+
+
+@dataclass(eq=False, repr=False)
 class _ExternalCollisionAvoidanceNode(_CollisionAvoidanceTask):
     """
-    Avoids external collisions between a collision group and its collision_index-closest object in the environment.
-    Moves `root_T_tip @ tip_P_contact` in `root_T_contact_normal` direction until the distance is larger than buffer_zone.
-    Limits the slack variables to prevent the tip from coming closer than violated_distance.
-    .. warning: Can result in insolvable QPs if multiple of these constraints are violated.
+    Avoids external collisions between a collision group and its collision_index-closest
+    object in the environment.
+
+    Moves `root_T_tip @ tip_P_contact` in `root_T_contact_normal` direction until the
+    distance is larger than buffer_zone. Limits the slack variables to prevent the tip
+    from coming closer than violated_distance.
+
+    .. warning:: Can result in insolvable QPs if multiple of these constraints are
+        violated.
     """
 
     collision_group: CollisionGroup = field(kw_only=True)
     """
     The collision group avoiding external collisions.
     """
+
     max_velocity: float = field(default=0.2, kw_only=True)
     """
     The maximum velocity for the collision avoidance task.
     """
+
     collision_index: int = field(default=0, kw_only=True)
     """
     The index of the closest object in the collision group.
+
     e.g. of collision_index=1 it will avoid the 2. closest contact.
     """
+
     external_collision_manager: ExternalCollisionVariableManager = field(kw_only=True)
     """
-    Reference to the external collision variable manager shared by other external collision avoidance nodes.
+    Reference to the external collision variable manager shared by other external
+    collision avoidance nodes.
     """
 
     @property
@@ -116,7 +164,7 @@ class _ExternalCollisionHasData(_ExternalCollisionAvoidanceNode):
     Monitors whether data was computed for the external collision avoidance task.
     """
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
         artifacts.observation = self.has_collision_data
@@ -127,10 +175,15 @@ class _ExternalCollisionHasData(_ExternalCollisionAvoidanceNode):
 @dataclass(eq=False, repr=False)
 class _ExternalCollisionAvoidanceTask(_ExternalCollisionAvoidanceNode):
     """
-    Avoids external collisions between a collision group and its collision_index-closest object in the environment.
-    Moves `root_T_tip @ tip_P_contact` in `root_T_contact_normal` direction until the distance is larger than buffer_zone.
-    Limits the slack variables to prevent the tip from coming closer than violated_distance.
-    .. warning: Can result in insolvable QPs if multiple of these constraints are violated.
+    Avoids external collisions between a collision group and its collision_index-closest
+    object in the environment.
+
+    Moves `root_T_tip @ tip_P_contact` in `root_T_contact_normal` direction until the
+    distance is larger than buffer_zone. Limits the slack variables to prevent the tip
+    from coming closer than violated_distance.
+
+    .. warning:: Can result in insolvable QPs if multiple of these constraints are
+        violated.
     """
 
     max_velocity: float = field(default=0.2, kw_only=True)
@@ -144,7 +197,8 @@ class _ExternalCollisionAvoidanceTask(_ExternalCollisionAvoidanceNode):
 
     def create_weight(self, context: MotionStatechartContext) -> sm.Scalar:
         """
-        Creates a weight expression for this task which is scaled by the number of external collisions.
+        Creates a weight expression for this task which is scaled by the number of
+        external collisions.
         """
         max_avoided_bodies = self.collision_group.get_max_avoided_bodies(
             context.collision_manager
@@ -174,7 +228,7 @@ class _ExternalCollisionAvoidanceTask(_ExternalCollisionAvoidanceNode):
             ]
         )
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
         root_T_group_a = context.world.compose_forward_kinematics_expression(
@@ -202,9 +256,10 @@ class _ExternalCollisionAvoidanceTask(_ExternalCollisionAvoidanceNode):
 
 
 @dataclass(eq=False, repr=False)
-class _CancelBecauseExternalCollisionViolated(CancelMotion):
+class _CancelBecauseExternalCollisionViolated(_CancelBecauseCollisionViolated):
     """
-    Cancels the motion by raising an exception detailing which external collision tasks were violated.
+    Cancels the motion by raising an exception detailing which external collision tasks
+    were violated.
     """
 
     tasks: list[_ExternalCollisionAvoidanceTask] = field(kw_only=True)
@@ -216,7 +271,7 @@ class _CancelBecauseExternalCollisionViolated(CancelMotion):
     Set to init=False, because this class creates its own exception.
     """
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         if len(self.tasks) == 1:
             self.start_condition = sm.trinary_logic_not(
                 self.tasks[0].observation_variable
@@ -258,7 +313,7 @@ class UpdateTemporaryCollisionRules(MotionStatechartNode):
     temporary_rules: list[CollisionRule] = field(kw_only=True)
     collision_matrix: CollisionMatrix = field(init=False)
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
         # safe old rules
         old_temporary_rules = context.collision_manager.temporary_rules
@@ -291,9 +346,11 @@ class SetInitialTemporaryCollisionRules(MotionStatechartNode):
     temporary_rules: list[CollisionRule] = field(kw_only=True)
     collision_matrix: CollisionMatrix = field(init=False)
     set_on_build: bool = field(default=True, kw_only=True)
-    """Whether to set the collision matrix on build."""
+    """
+    Whether to set the collision matrix on build.
+    """
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
         # safe old rules
         old_temporary_rules = context.collision_manager.temporary_rules
@@ -320,23 +377,33 @@ class SetInitialTemporaryCollisionRules(MotionStatechartNode):
 @dataclass(eq=False, repr=False)
 class ExternalCollisionAvoidance(Goal):
     """
-    A goal combining an ExternalCollisionDistanceMonitor and an ExternalCollisionAvoidanceTask.
-    One pair will be added for all collision groups of the robot.
-    The task will only be active if the monitor detects that a collision is close.
+    A goal combining an ExternalCollisionDistanceMonitor and an
+    ExternalCollisionAvoidanceTask. One pair will be added for all collision groups of
+    the robot. The task will only be active if the monitor detects that a collision is
+    close.
+
+    ..note:: This goal expands into one node pair per collision group, so its children are
+        left out of drawings. Set `plot_specs.collapse_children` to False to draw them.
     """
+
+    plot_specifications: NodePlotSpec = plot_specification_field(NodePlotSpec.create_collapsed_goal_style)
 
     robot: AbstractRobot = field(kw_only=True, default=None)
     """
     The robot for which the collision avoidance goal is defined.
     """
+
     max_velocity: float = field(default=0.2, kw_only=True)
     """
     The maximum velocity for the collision avoidance task.
     """
+
     external_collision_manager: ExternalCollisionVariableManager = field(init=False)
     """
-    Reference to the external collision variable manager shared by other external collision avoidance nodes.
+    Reference to the external collision variable manager shared by other external
+    collision avoidance nodes.
     """
+
     cancel_if_collision_violated: bool = field(default=True, kw_only=True)
     """
     If True, the motion will be canceled if a collision is violated.
@@ -399,20 +466,26 @@ class ExternalCollisionAvoidance(Goal):
 @dataclass(eq=False, repr=False)
 class ExternalCollisionDistanceMonitor(MotionStatechartNode):
     """
-    Monitors the distance to the closest external object for a specific collision group of a body.
-    Turns True if the distance falls below a given threshold.
+    Monitors the distance to the closest external object for a specific collision group
+    of a body. Turns True if the distance falls below a given threshold.
 
     .. note:: the input bodies are only used to look up the collision groups.
     """
 
     body: Body = field(kw_only=True)
-    """The robot body to monitor."""
+    """
+    The robot body to monitor.
+    """
+
     threshold: float = field(kw_only=True)
-    """Distance threshold in meters."""
+    """
+    Distance threshold in meters.
+    """
+
     collision_index: int = field(default=0, kw_only=True)
     """Index of the closest collision (0 = closest, 1 = second closest, etc.)."""
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         # 1. Access the shared external collision manager
         # This automatically registers the manager with the CollisionManager
         manager = context.external_collision_manager
@@ -435,25 +508,32 @@ class ExternalCollisionDistanceMonitor(MotionStatechartNode):
 class _SelfCollisionAvoidanceNode(_CollisionAvoidanceTask):
     """
     Avoids self collisions between two collision groups.
-    Moves `group_a_P_point_on_a @ group_b_P_point_on_b` in `group_a_T_group_b_contact_normal` direction until the distance is larger than buffer_zone.
-    Limits the slack variables to prevent the tip from coming closer than violated_distance.
+
+    Moves `group_a_P_point_on_a @ group_b_P_point_on_b` in
+    `group_a_T_group_b_contact_normal` direction until the distance is larger than
+    buffer_zone. Limits the slack variables to prevent the tip from coming closer than
+    violated_distance.
     """
 
     collision_group_a: CollisionGroup = field(kw_only=True)
     """
     The first collision group to avoid self collisions with.
     """
+
     collision_group_b: CollisionGroup = field(kw_only=True)
     """
     The second collision group to avoid self collisions with.
     """
+
     max_velocity: float = field(default=0.2, kw_only=True)
     """
     The maximum velocity for the collision avoidance task.
     """
+
     self_collision_manager: SelfCollisionVariableManager = field(kw_only=True)
     """
-    Reference to the self collision variable manager shared by other self collision avoidance nodes.
+    Reference to the self collision variable manager shared by other self collision
+    avoidance nodes.
     """
 
     @property
@@ -504,7 +584,7 @@ class _SelfCollisionHasData(_SelfCollisionAvoidanceNode):
     Monitors whether data was computed for the self collision avoidance task.
     """
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
         artifacts.observation = self.has_collision_data
@@ -516,8 +596,11 @@ class _SelfCollisionHasData(_SelfCollisionAvoidanceNode):
 class _SelfCollisionAvoidanceTask(_SelfCollisionAvoidanceNode):
     """
     Avoids self collisions between two collision groups.
-    Moves `group_a_P_point_on_a @ group_b_P_point_on_b` in `group_a_T_group_b_contact_normal` direction until the distance is larger than buffer_zone.
-    Limits the slack variables to prevent the tip from coming closer than violated_distance.
+
+    Moves `group_a_P_point_on_a @ group_b_P_point_on_b` in
+    `group_a_T_group_b_contact_normal` direction until the distance is larger than
+    buffer_zone. Limits the slack variables to prevent the tip from coming closer than
+    violated_distance.
     """
 
     max_velocity: float = field(default=0.2, kw_only=True)
@@ -528,7 +611,7 @@ class _SelfCollisionAvoidanceTask(_SelfCollisionAvoidanceNode):
     def is_collision_not_violated(self) -> Scalar:
         return self.contact_distance >= self.violated_distance
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
         group_b_T_group_a = context.world.compose_forward_kinematics_expression(
@@ -560,9 +643,10 @@ class _SelfCollisionAvoidanceTask(_SelfCollisionAvoidanceNode):
 
 
 @dataclass(eq=False, repr=False)
-class _CancelBecauseSelfCollisionViolated(CancelMotion):
+class _CancelBecauseSelfCollisionViolated(_CancelBecauseCollisionViolated):
     """
-    Cancels the motion by raising an exception detailing which self collision tasks were violated.
+    Cancels the motion by raising an exception detailing which self collision tasks were
+    violated.
     """
 
     tasks: list[_SelfCollisionAvoidanceTask] = field(kw_only=True)
@@ -574,7 +658,7 @@ class _CancelBecauseSelfCollisionViolated(CancelMotion):
     Set to init=False, because this class creates its own exception.
     """
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         if len(self.tasks) == 1:
             self.start_condition = sm.trinary_logic_not(
                 self.tasks[0].observation_variable
@@ -611,22 +695,32 @@ class _CancelBecauseSelfCollisionViolated(CancelMotion):
 class SelfCollisionAvoidance(Goal):
     """
     A goal combining a SelfCollisionDistanceMonitor and a SelfCollisionAvoidanceTask.
-    One pair will be added for all collision groups of the robot.
-    The task will only be active if the monitor detects that a collision is close.
+    One pair will be added for all collision groups of the robot. The task will only be
+    active if the monitor detects that a collision is close.
+
+    ..note:: This goal expands into one node pair per checked body combination, so its
+        children are left out of drawings. Set `plot_specs.collapse_children` to False to
+        draw them.
     """
+
+    plot_specs: NodePlotSpec = plot_specification_field(NodePlotSpec.create_collapsed_goal_style)
 
     robot: AbstractRobot = field(kw_only=True, default=None)
     """
     The robot for which the collision avoidance goal is defined.
     """
+
     max_velocity: float = field(default=0.2, kw_only=True)
     """
     The maximum velocity for the collision avoidance task.
     """
+
     self_collision_manager: SelfCollisionVariableManager = field(init=False)
     """
-    Reference to the self collision variable manager shared by other self collision avoidance nodes.
+    Reference to the self collision variable manager shared by other self collision
+    avoidance nodes.
     """
+
     cancel_if_collision_violated: bool = field(default=True, kw_only=True)
     """
     If True, the motion will be canceled if a collision is violated.
@@ -636,8 +730,11 @@ class SelfCollisionAvoidance(Goal):
         self, context: MotionStatechartContext
     ) -> CollisionMatrix:
         """
-        Creates a collision matrix that contains all body combinations except those that are always filtered.
-        We need this because we don't know how the collision matrix might change during the motion
+        Creates a collision matrix that contains all body combinations except those that
+        are always filtered.
+
+        We need this because we don't know how the collision matrix might change during
+        the motion
         """
         collision_matrix = CollisionMatrix()
         avoid_self_collisions = AvoidSelfCollisions(robot=self.robot)
@@ -718,18 +815,27 @@ class SelfCollisionAvoidance(Goal):
 class SelfCollisionDistanceMonitor(MotionStatechartNode):
     """
     Monitors the distance to the closest external object for the group of a body.
+
     Turns True if the distance falls below a given threshold.
     .. note:: the input bodies are only used to look up the collision groups.
     """
 
     body_a: Body = field(kw_only=True)
-    """First robot body to monitor."""
-    body_b: Body = field(kw_only=True)
-    """Second robot body to monitor."""
-    threshold: float = field(kw_only=True)
-    """Distance threshold in meters."""
+    """
+    First robot body to monitor.
+    """
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    body_b: Body = field(kw_only=True)
+    """
+    Second robot body to monitor.
+    """
+
+    threshold: float = field(kw_only=True)
+    """
+    Distance threshold in meters.
+    """
+
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         manager = context.self_collision_manager
 
         manager.register_groups_of_body_combination(self.body_a, self.body_b)

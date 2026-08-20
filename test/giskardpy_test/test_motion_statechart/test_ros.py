@@ -21,7 +21,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
-from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 
@@ -62,13 +62,13 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
                 SetSeedConfiguration(
                     seed_configuration=JointState.from_str_dict(
                         {
-                            "r_elbow_flex_joint": -1.43286344265,
-                            "r_forearm_roll_joint": -1.26465060073,
-                            "r_shoulder_lift_joint": 0.47990329056,
-                            "r_shoulder_pan_joint": -0.281272240139,
-                            "r_upper_arm_roll_joint": -0.528415402668,
-                            "r_wrist_flex_joint": -1.18811419869,
-                            "r_wrist_roll_joint": 2.26884630124,
+                            PR2Joint.RIGHT_ELBOW_FLEX: -1.43286344265,
+                            PR2Joint.RIGHT_FOREARM_ROLL: -1.26465060073,
+                            PR2Joint.RIGHT_SHOULDER_LIFT: 0.47990329056,
+                            PR2Joint.RIGHT_SHOULDER_PAN: -0.281272240139,
+                            PR2Joint.RIGHT_UPPER_ARM_ROLL: -0.528415402668,
+                            PR2Joint.RIGHT_WRIST_FLEX: -1.18811419869,
+                            PR2Joint.RIGHT_WRIST_ROLL: 2.26884630124,
                         },
                         world=pr2_world_state_reset,
                     )

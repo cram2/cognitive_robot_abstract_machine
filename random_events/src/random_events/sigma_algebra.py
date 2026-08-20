@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field, InitVar
 from typing import Tuple, Dict, Any, Optional
@@ -62,6 +63,18 @@ class AbstractSimpleSet(CPPWrapper, SubclassJSONSerializer, ABC):
 
         :param item: The item to check
         :return: Rather if the item is in the set or not
+        """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def size(self) -> float:
+        """
+        The size the algebra this set belongs to assigns it: the length of an interval,
+        the number of elements of a set of elements, and the product of those over the
+        variables of a set of tuples.
+
+        :return: The size of this set, which is infinite when it is unbounded.
         """
         raise NotImplementedError
 
@@ -244,6 +257,20 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
             if simple_set.contains(item):
                 return True
         return False
+
+    @property
+    def size(self) -> float:
+        """
+        The size of the union this set describes, which is additive over disjoint simple
+        sets.
+
+        The union is made disjoint first, so a part covered by several simple sets is
+        counted once.
+
+        :return: The size of this set, which is infinite when it is unbounded.
+        """
+        disjoint = self if self.is_disjoint() else self.make_disjoint()
+        return math.fsum(simple_set.size for simple_set in disjoint.simple_sets)
 
     def __contains__(self, item) -> bool:
         return self.contains(item)

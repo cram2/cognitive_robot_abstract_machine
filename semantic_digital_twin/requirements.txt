@@ -36,3 +36,4 @@ vhacdx
 rerun-sdk[datafusion]
 imageio
 imageio-ffmpeg
+psutil~=5.9.0

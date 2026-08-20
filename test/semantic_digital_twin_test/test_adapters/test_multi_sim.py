@@ -848,3 +848,104 @@ def test_world_sim_state_sync():
         )
     finally:
         stop_multisim_if_running(multi_sim)
+
+
+def test_prebuilt_world_multiple_free_bodies_start_at_authored_poses():
+    """
+    Several free-jointed bodies in a prebuilt World must each keep their own authored
+    ``parent_T_connection_expression`` pose when MujocoSim builds and starts the
+    simulation, rather than all collapsing to the world origin.
+
+    A single mis-set index in the keyframe qpos array (e.g. from an off-by-DOF-count
+    error) could still make one body land at the wrong spot while others happen to be
+    correct, so this checks four bodies at once.
+    """
+    box_half_size = 0.02
+    ground_z = box_half_size
+    offsets = {
+        "cube_pos_pos": numpy.array([0.3, 0.3, ground_z]),
+        "cube_neg_pos": numpy.array([-0.3, 0.3, ground_z]),
+        "cube_pos_neg": numpy.array([0.3, -0.3, ground_z]),
+        "cube_neg_neg": numpy.array([-0.3, -0.3, ground_z]),
+    }
+
+    world = World()
+    root = Body(name=PrefixedName("world"))
+    with world.modify_world():
+        world.add_body(root)
+
+        ground_plane = Body(name=PrefixedName("ground_plane"))
+        ground_plane.collision = ShapeCollection(
+            [
+                Box(
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        reference_frame=ground_plane
+                    ),
+                    scale=Scale(2.0, 2.0, 0.1),
+                    color=Color(1.0, 1.0, 0.0, 1.0),
+                )
+            ],
+            reference_frame=ground_plane,
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=root,
+                child=ground_plane,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    z=-0.05, reference_frame=root
+                ),
+            )
+        )
+
+        for cube_name, cube_offset in offsets.items():
+            cube = Body(name=PrefixedName(cube_name))
+            cube.collision = ShapeCollection(
+                [
+                    Box(
+                        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            reference_frame=cube
+                        ),
+                        scale=Scale(
+                            box_half_size * 2, box_half_size * 2, box_half_size * 2
+                        ),
+                        color=Color(0.9, 0.3, 0.3, 1.0),
+                    )
+                ],
+                reference_frame=cube,
+            )
+            world.add_connection(
+                Connection6DoF.create_with_dofs(
+                    world=world,
+                    parent=root,
+                    child=cube,
+                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=float(cube_offset[0]),
+                        y=float(cube_offset[1]),
+                        z=float(cube_offset[2]),
+                        reference_frame=root,
+                    ),
+                )
+            )
+
+    multi_sim = MujocoSim(world=world, headless=headless, step_size=STEP_SIZE)
+    try:
+        multi_sim.start_simulation()
+        time.sleep(1.0)
+
+        positions = {
+            cube_name: numpy.asarray(
+                multi_sim.simulator.get_body_position(cube_name).result[:3],
+                dtype=float,
+            )
+            for cube_name in offsets
+        }
+
+        multi_sim.stop_simulation()
+
+        for cube_name, cube_offset in offsets.items():
+            assert numpy.allclose(positions[cube_name], cube_offset, atol=1e-2), (
+                f"{cube_name} did not start/settle at its authored pose: "
+                f"got {positions[cube_name]}, expected {cube_offset}."
+            )
+    finally:
+        stop_multisim_if_running(multi_sim)

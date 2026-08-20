@@ -66,3 +66,16 @@ def test_the_skill_names_no_fork_of_its_own():
     for fork in candidate_forks():
         assert fork.owner not in skill
         assert str(fork) not in skill
+
+
+def test_the_skill_restores_the_tooling_without_writing_the_index():
+    """
+    ``git checkout <ref> -- <path>`` writes the index as well as the working tree, so on
+    a branch that does not carry the tooling the files end up staged - and the next
+    commit the pass makes on that branch is a restack merge, which would carry them into
+    somebody's feature branch. Only the working-tree restore may be handed to a pass.
+    """
+    skill = MAINTENANCE_SKILL_DOCUMENT.read_text()
+
+    assert "git restore --source=<ref> --worktree -- .claude/stack/" in skill
+    assert "git checkout <ref> -- .claude/stack/" not in skill

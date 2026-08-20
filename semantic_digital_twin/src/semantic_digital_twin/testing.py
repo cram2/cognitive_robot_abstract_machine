@@ -1,11 +1,13 @@
 import os
 
 import pytest
+from dataclasses import dataclass, field
 from importlib.resources import files
 from pathlib import Path
-from typing_extensions import Tuple
+from typing_extensions import Optional, Tuple
 
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
@@ -31,6 +33,36 @@ from semantic_digital_twin.world_description.geometry import (
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
+
+# %% callbacks
+
+# Every dataclass defined here must be listed in ``ignore_classes`` in
+# semantic_digital_twin/scripts/generate_orm.py, otherwise ormatic silently maps it into
+# a database table.
+
+
+@dataclass(eq=False)
+class StateChangeCounter(StateChangeCallback):
+    """
+    Counts how often the world announced a state change.
+    """
+
+    count: int = field(default=0, init=False)
+    """
+    Number of state changes announced since this callback was registered.
+    """
+
+    publish_changes_of_last_call: Optional[bool] = field(default=None, init=False)
+    """
+    The ``publish_changes`` the most recent announcement carried.
+    """
+
+    def on_state_change(self, **kwargs):
+        self.count += 1
+        self.publish_changes_of_last_call = kwargs.get("publish_changes")
+
+
+# %% fixtures
 
 
 @pytest.fixture

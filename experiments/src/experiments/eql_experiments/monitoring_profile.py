@@ -82,8 +82,8 @@ from experiments.experiment_definitions import (
     ExperimentsTable,
     MeanAndStandardDeviation,
     TypstRenderer,
+    Unit,
 )
-
 
 # %% Self-contained domain types
 
@@ -261,7 +261,7 @@ class MonitoringLevelResult(ExperimentResult):
 
     level: str
     """The :class:`MonitoringLevel` value this row reports."""
-    milliseconds_per_iteration: MeanAndStandardDeviation
+    duration_per_iteration: MeanAndStandardDeviation
     """Mean +- standard deviation of the wall-clock time for one pass over all workloads."""
     overhead_vs_baseline_ms: float
     """Mean milliseconds added relative to the ``both_off`` baseline (0.0 for the baseline)."""
@@ -282,18 +282,18 @@ def measure_level(
     :param workloads: The workloads to run, in order, once per iteration.
     :param iterations: Number of measured iterations.
     :param warmups: Number of leading iterations to discard before measuring.
-    :return: Per-iteration durations in milliseconds (length ``iterations``).
+    :return: Per-iteration durations in seconds (length ``iterations``).
     """
-    durations_ms: List[float] = []
+    durations_seconds: List[float] = []
     with apply_monitoring_level(level):
         for index in range(iterations + warmups):
             start = time.perf_counter()
             for workload in workloads:
                 workload.run()
-            elapsed_ms = (time.perf_counter() - start) * 1000.0
+            elapsed_seconds = time.perf_counter() - start
             if index >= warmups:
-                durations_ms.append(elapsed_ms)
-    return durations_ms
+                durations_seconds.append(elapsed_seconds)
+    return durations_seconds
 
 
 def run_ab_comparison(
@@ -317,8 +317,8 @@ def run_ab_comparison(
     ]
     stats = {
         level: MeanAndStandardDeviation.from_measurements(
-            measure_level(level, workloads, iterations, warmups)
-        )
+            measure_level(level, workloads, iterations, warmups), unit=Unit.SECONDS
+        ).to(Unit.MILLISECONDS)
         for level in ordered_levels
     }
     baseline_ms = stats[MonitoringLevel.BOTH_OFF].mean
@@ -333,7 +333,7 @@ def run_ab_comparison(
         rows.append(
             MonitoringLevelResult(
                 level=level.value,
-                milliseconds_per_iteration=stats[level],
+                duration_per_iteration=stats[level],
                 overhead_vs_baseline_ms=overhead_ms,
                 overhead_vs_baseline_percent=overhead_percent,
             )

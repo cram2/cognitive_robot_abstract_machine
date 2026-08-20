@@ -39,11 +39,20 @@ To do the same by hand:
 
 ```bash
 "$CLAUDE_PROJECT_DIR/.claude/hooks/create-personal-notes-branch.sh"           # create the branch
+"$CLAUDE_PROJECT_DIR/.claude/hooks/save-git-identity.sh" --name "Your Name" \
+  --email "you@example.com"                                                   # commit as yourself
 "$CLAUDE_PROJECT_DIR/.claude/hooks/check-setup.sh"                            # inspect, change nothing
 "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh" && cat CLAUDE.local.md   # verify
 ```
 
 `check-setup.sh` prints one row per check and exits non-zero if anything still needs doing.
+
+Every session start prints its own summary, so none of the three things below has to be
+remembered. Its `setup:` line runs `check-setup.sh` and names any check that still needs setup;
+its `plan:` line distinguishes *no plans are tracked here* from *plans exist and no item tracks
+this branch* — the second being the cue to add the item before starting work, not after; its
+`git identity:` line names whose commits this clone will author. All three lines appear only
+once a personal-notes branch exists, so a clone that uses none of this stays silent.
 
 ## Editing your notes
 
@@ -55,6 +64,35 @@ To do the same by hand:
 
 Only content between the markers is ever saved. Headers and markers are regenerated every session,
 so editing them has no effect.
+
+## Git identity
+
+A fresh clone inherits whatever global git config its environment provides. In an agent session
+that is the agent's own identity, so commits are attributed to it *by default* — not by anyone
+forgetting. Record yours once:
+
+```bash
+"$CLAUDE_PROJECT_DIR/.claude/hooks/save-git-identity.sh" --name "Your Name" --email "you@example.com"
+```
+
+It is stored at `.claude/personal/git-identity` on the notes branch, and every session start writes
+it into that clone's **repository-local** git config. A clone that already has one keeps it, and
+global config is never touched. Both arguments are required — the script will not read them from the
+clone's current config, since that is the thing that may be wrong.
+
+`check-setup.sh`'s `git_identity` row compares what a commit here would *actually* be authored as
+against what is recorded. It resolves that with `git var GIT_AUTHOR_IDENT` rather than
+`git config --get user.name`, because `GIT_AUTHOR_*`/`GIT_COMMITTER_*` outrank every config file
+when set — so the config value can say one thing while every commit says another.
+
+Setting those four variables in your environment does the same job with no hook at all, and applies
+from the session's first command rather than from when the hook runs. See
+[`personal-notes.env.example`](./personal-notes.env.example). Recording the identity on the notes
+branch is what covers environments where you can't set variables.
+
+Two things no local hook can reach: **commits made outside a session** (the GitHub merge button, a
+scheduled job) carry whatever identity that context has — set your GitHub account's commit email for
+those — and **global config stays wrong**, since only this repository is covered.
 
 ## Syncing your local Claude Code settings
 
@@ -154,7 +192,11 @@ regenerates from every manifest on each save, so it can't drift.
 
 - `merged` — the changes landed but GitHub's merge API never recorded it (branch pushed directly,
   PR then closed by hand). Treated exactly like a real merge.
-- `in-review`, `bug` — recognized so they don't read as unknown labels; no script acts on them yet.
+- `bug` — marks the item with a `bug` chip in the dashboard's "What to do next" sidebar, in
+  whichever action group it already belongs to, and is what the sidebar's "Bug fixes only" filter
+  keeps. Being a bug fix is a property of the work, not a next action of its own, so it never
+  moves an item into a group or out of one.
+- `in-review` — recognized so it doesn't read as an unknown label; no script acts on it yet.
 
 Any other label is preserved but not interpreted.
 
@@ -175,6 +217,8 @@ Any other label is preserved but not interpreted.
 - Synced settings never silently replace local ones: `.claude/settings.local.json` is written only
   when it's missing or unchanged since the last sync, so "don't ask again" grants survive until you
   run `save-personal-settings.sh` yourself.
+- The git identity sync only ever fills a gap: it writes repository-local config, and only when the
+  clone has none of its own. Global config is never written.
 - `CLAUDE.local.md`, `.claude/settings.local.json` and the recheck stamp
   `.claude/.plan-state-sync-sha` are all gitignored.
 - Always operates on this repo's project root, resolved from the scripts' own location on disk —

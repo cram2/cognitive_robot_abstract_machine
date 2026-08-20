@@ -7,7 +7,6 @@ from typing_extensions import List
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
-    DuplicateRobotAssignmentsError,
     BrokenWorldModificationHistoryError,
 )
 from semantic_digital_twin.orm.ormatic_interface import *  # noqa
@@ -15,6 +14,7 @@ from semantic_digital_twin.reasoning.predicates import LeftOf
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import (
     PR2,
+    PR2Joint,
     PR2MobileBase,
     PR2Torso,
     PR2Neck,
@@ -91,16 +91,16 @@ def test_compute_chain_of_connections_pr2(pr2_world_state_reset):
     real = [x.name for x in real]
     assert real == [
         PrefixedName(name="base_footprint_joint", prefix="pr2"),
-        PrefixedName(name="torso_lift_joint", prefix="pr2"),
-        PrefixedName(name="r_shoulder_pan_joint", prefix="pr2"),
-        PrefixedName(name="r_shoulder_lift_joint", prefix="pr2"),
-        PrefixedName(name="r_upper_arm_roll_joint", prefix="pr2"),
+        PrefixedName(name=PR2Joint.TORSO_LIFT, prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_SHOULDER_PAN, prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_SHOULDER_LIFT, prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_UPPER_ARM_ROLL, prefix="pr2"),
         PrefixedName(name="r_upper_arm_joint", prefix="pr2"),
-        PrefixedName(name="r_elbow_flex_joint", prefix="pr2"),
-        PrefixedName(name="r_forearm_roll_joint", prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_ELBOW_FLEX, prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_FOREARM_ROLL, prefix="pr2"),
         PrefixedName(name="r_forearm_joint", prefix="pr2"),
-        PrefixedName(name="r_wrist_flex_joint", prefix="pr2"),
-        PrefixedName(name="r_wrist_roll_joint", prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_WRIST_FLEX, prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_WRIST_ROLL, prefix="pr2"),
         PrefixedName(name="r_gripper_palm_joint", prefix="pr2"),
         PrefixedName(name="r_gripper_tool_joint", prefix="pr2"),
     ]
@@ -388,7 +388,7 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
 
     connections = pr2_world_state_reset.get_connections_by_type(PrismaticConnection)
     assert len(connections) == 5
-    assert connections[0].name == PrefixedName(name="torso_lift_joint", prefix="pr2")
+    assert connections[0].name == PrefixedName(name=PR2Joint.TORSO_LIFT, prefix="pr2")
     assert connections[
         0
     ].parent == pr2_world_state_reset.get_kinematic_structure_entity_by_name(
@@ -492,22 +492,22 @@ def test_pr2_tighten_dof_velocity_limits_of_1dof_connections(pr2_world_state_res
 
     # try spacial case for specific joint
     new_limits = defaultdict(
-        lambda: 0.5, {pr2._world.get_connection_by_name("head_pan_joint"): 23}
+        lambda: 0.5, {pr2._world.get_connection_by_name(PR2Joint.HEAD_PAN): 23}
     )
     pr2.tighten_dof_velocity_limits_of_1dof_connections(new_limits)
     # if spacial case triggers, but the new limit is above the old one, nothing happens
     assert (
-        pr2._world.get_connection_by_name("head_pan_joint").dof.limits.upper.velocity
+        pr2._world.get_connection_by_name(PR2Joint.HEAD_PAN).dof.limits.upper.velocity
         == 1
     )
     # new limit is applied to joint without spacial case
     assert (
-        pr2._world.get_connection_by_name("head_tilt_joint").dof.limits.upper.velocity
+        pr2._world.get_connection_by_name(PR2Joint.HEAD_TILT).dof.limits.upper.velocity
         == 0.5
     )
     # non-spacial case where the old limit is below 1
     assert (
-        pr2._world.get_connection_by_name("torso_lift_joint").dof.limits.upper.velocity
+        pr2._world.get_connection_by_name(PR2Joint.TORSO_LIFT).dof.limits.upper.velocity
         == 0.013
     )
 
@@ -613,33 +613,33 @@ def test_split_chain_of_connections(pr2_world_state_reset):
     result1_names = [c.name for c in result[0]]
     result2_names = [c.name for c in result[1]]
     chain1 = [
-        PrefixedName(name="r_gripper_r_finger_joint", prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_GRIPPER_RIGHT_FINGER, prefix="pr2"),
         PrefixedName(name="r_gripper_palm_joint", prefix="pr2"),
-        PrefixedName(name="r_wrist_roll_joint", prefix="pr2"),
-        PrefixedName(name="r_wrist_flex_joint", prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_WRIST_ROLL, prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_WRIST_FLEX, prefix="pr2"),
         PrefixedName(name="r_forearm_joint", prefix="pr2"),
-        PrefixedName(name="r_forearm_roll_joint", prefix="pr2"),
-        PrefixedName(name="r_elbow_flex_joint", prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_FOREARM_ROLL, prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_ELBOW_FLEX, prefix="pr2"),
         PrefixedName(name="r_upper_arm_joint", prefix="pr2"),
-        PrefixedName(name="r_upper_arm_roll_joint", prefix="pr2"),
-        PrefixedName(name="r_shoulder_lift_joint", prefix="pr2"),
-        PrefixedName(name="r_shoulder_pan_joint", prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_UPPER_ARM_ROLL, prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_SHOULDER_LIFT, prefix="pr2"),
+        PrefixedName(name=PR2Joint.RIGHT_SHOULDER_PAN, prefix="pr2"),
     ]
 
     chain2 = [
-        PrefixedName(name="l_shoulder_pan_joint", prefix="pr2"),
-        PrefixedName(name="l_shoulder_lift_joint", prefix="pr2"),
-        PrefixedName(name="l_upper_arm_roll_joint", prefix="pr2"),
+        PrefixedName(name=PR2Joint.LEFT_SHOULDER_PAN, prefix="pr2"),
+        PrefixedName(name=PR2Joint.LEFT_SHOULDER_LIFT, prefix="pr2"),
+        PrefixedName(name=PR2Joint.LEFT_UPPER_ARM_ROLL, prefix="pr2"),
         PrefixedName(name="l_upper_arm_joint", prefix="pr2"),
-        PrefixedName(name="l_elbow_flex_joint", prefix="pr2"),
-        PrefixedName(name="l_forearm_roll_joint", prefix="pr2"),
+        PrefixedName(name=PR2Joint.LEFT_ELBOW_FLEX, prefix="pr2"),
+        PrefixedName(name=PR2Joint.LEFT_FOREARM_ROLL, prefix="pr2"),
         PrefixedName(name="l_forearm_joint", prefix="pr2"),
-        PrefixedName(name="l_wrist_flex_joint", prefix="pr2"),
-        PrefixedName(name="l_wrist_roll_joint", prefix="pr2"),
+        PrefixedName(name=PR2Joint.LEFT_WRIST_FLEX, prefix="pr2"),
+        PrefixedName(name=PR2Joint.LEFT_WRIST_ROLL, prefix="pr2"),
         PrefixedName(name="l_force_torque_adapter_joint", prefix="pr2"),
         PrefixedName(name="l_force_torque_joint", prefix="pr2"),
         PrefixedName(name="l_gripper_palm_joint", prefix="pr2"),
-        PrefixedName(name="l_gripper_l_finger_joint", prefix="pr2"),
+        PrefixedName(name=PR2Joint.LEFT_GRIPPER_LEFT_FINGER, prefix="pr2"),
     ]
     assert result1_names == chain1
     assert result2_names == chain2
@@ -776,23 +776,23 @@ def test_pr2_degrees_of_freedom_with_hardware_interface(pr2_world_state_reset):
     # 1 DOF for the torso (lift)
     # Total = 17
     expected_dof_names = {
-        "l_shoulder_pan_joint",
-        "l_shoulder_lift_joint",
-        "l_upper_arm_roll_joint",
-        "l_elbow_flex_joint",
-        "l_forearm_roll_joint",
-        "l_wrist_flex_joint",
-        "l_wrist_roll_joint",
-        "r_shoulder_pan_joint",
-        "r_shoulder_lift_joint",
-        "r_upper_arm_roll_joint",
-        "r_elbow_flex_joint",
-        "r_forearm_roll_joint",
-        "r_wrist_flex_joint",
-        "r_wrist_roll_joint",
-        "torso_lift_joint",
-        "head_pan_joint",
-        "head_tilt_joint",
+        PR2Joint.LEFT_SHOULDER_PAN,
+        PR2Joint.LEFT_SHOULDER_LIFT,
+        PR2Joint.LEFT_UPPER_ARM_ROLL,
+        PR2Joint.LEFT_ELBOW_FLEX,
+        PR2Joint.LEFT_FOREARM_ROLL,
+        PR2Joint.LEFT_WRIST_FLEX,
+        PR2Joint.LEFT_WRIST_ROLL,
+        PR2Joint.RIGHT_SHOULDER_PAN,
+        PR2Joint.RIGHT_SHOULDER_LIFT,
+        PR2Joint.RIGHT_UPPER_ARM_ROLL,
+        PR2Joint.RIGHT_ELBOW_FLEX,
+        PR2Joint.RIGHT_FOREARM_ROLL,
+        PR2Joint.RIGHT_WRIST_FLEX,
+        PR2Joint.RIGHT_WRIST_ROLL,
+        PR2Joint.TORSO_LIFT,
+        PR2Joint.HEAD_PAN,
+        PR2Joint.HEAD_TILT,
     }
 
     actual_dof_names = {dof.name.name for dof in dofs}
@@ -804,3 +804,15 @@ def test_pr2_degrees_of_freedom_with_hardware_interface(pr2_world_state_reset):
     assert (
         actual_dof_names == expected_dof_names
     ), f"Missing DOFs: {expected_dof_names - actual_dof_names}, Extra DOFs: {actual_dof_names - expected_dof_names}"
+
+
+# %% joint name enum
+
+
+def test_pr2_joint_names_resolve_to_connections(pr2_world_state_reset):
+    resolved = {
+        joint: pr2_world_state_reset.get_connection_by_name(joint).name.name
+        for joint in PR2Joint
+    }
+
+    assert resolved == {joint: joint.value for joint in PR2Joint}

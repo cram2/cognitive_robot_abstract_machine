@@ -45,6 +45,7 @@ from semantic_digital_twin.robots.robot_parts import (
     EndEffector,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Pose
+from semantic_digital_twin.robots.pr2 import PR2Joint
 
 
 @pytest.fixture(scope="session")
@@ -397,7 +398,7 @@ def test_interrupt_plan(immutable_model_world):
         plan.perform()
 
     assert world.state[
-        world.get_degree_of_freedom_by_name("torso_lift_joint").id
+        world.get_degree_of_freedom_by_name(PR2Joint.TORSO_LIFT).id
     ].position == pytest.approx(0.3, abs=0.1)
 
 
@@ -410,14 +411,14 @@ def test_pause_plan(immutable_model_world):
     def pause_plan(node):
         node.pause()
         assert world.state[
-            world.get_degree_of_freedom_by_name("torso_lift_joint").id
+            world.get_degree_of_freedom_by_name(PR2Joint.TORSO_LIFT).id
         ].position == pytest.approx(0.0, abs=0.1)
         node.resume()
 
         time.sleep(3)
 
         assert world.state[
-            world.get_degree_of_freedom_by_name("torso_lift_joint").id
+            world.get_degree_of_freedom_by_name(PR2Joint.TORSO_LIFT).id
         ].position == pytest.approx(0.3, abs=0.1)
 
     code_node = code(function=lambda: None)
@@ -429,13 +430,13 @@ def test_pause_plan(immutable_model_world):
         plan.perform()
 
     assert world.state[
-        world.get_degree_of_freedom_by_name("torso_lift_joint").id
+        world.get_degree_of_freedom_by_name(PR2Joint.TORSO_LIFT).id
     ].position == pytest.approx(0.3, abs=0.1)
 
 
 def _torso_position(world):
     return world.state[
-        world.get_degree_of_freedom_by_name("torso_lift_joint").id
+        world.get_degree_of_freedom_by_name(PR2Joint.TORSO_LIFT).id
     ].position
 
 
@@ -697,7 +698,7 @@ def test_motion_order_place(mutable_model_world):
     milk_body = world.get_body_by_name("milk.stl")
     milk_body.parent_connection.origin = world.get_body_by_name(
         "l_gripper_tool_frame"
-    ).global_pose
+    ).global_pose.to_homogeneous_matrix()
 
     with world.modify_world():
 

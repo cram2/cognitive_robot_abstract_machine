@@ -23,6 +23,7 @@
     --status-notstarted-tint: #ECEFF0;
     --drift: #C43D4F;
     --drift-tint: #FBE7E9;
+    --bug: #D73A4A;
 
     color-scheme: light;
   }
@@ -51,6 +52,7 @@
       --status-notstarted-tint: #22292D;
       --drift: #F1717E;
       --drift-tint: #3A1418;
+      --bug: #F1707C;
       color-scheme: dark;
     }
   }
@@ -64,6 +66,7 @@
     --status-deferred: #B69BD6; --status-deferred-tint: #2A2038;
     --status-notstarted: #92A0A8; --status-notstarted-tint: #22292D;
     --drift: #F1717E; --drift-tint: #3A1418;
+    --bug: #F1707C;
     color-scheme: dark;
   }
   :root[data-theme="light"] {
@@ -76,6 +79,7 @@
     --status-deferred: #8A6FA8; --status-deferred-tint: #EEE7F5;
     --status-notstarted: #7C8A93; --status-notstarted-tint: #ECEFF0;
     --drift: #C43D4F; --drift-tint: #FBE7E9;
+    --bug: #D73A4A;
     color-scheme: light;
   }
 
@@ -299,6 +303,39 @@
   .next-ready li { border-color: var(--status-done); }
   .next-recheck li { border-color: var(--status-blocked); }
   .next-reason { color: var(--text-muted); font-size: 0.78rem; }
+
+  /* The bug-fixes-only filter. Both counts are rendered up front and swapped
+     here, rather than recomputed in script when the box is ticked - the same
+     approach the done-items toggle takes with its two indent levels. */
+  .bug-filter-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: -0.25rem 0 0.75rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .bug-filter-toggle input { accent-color: var(--bug); cursor: pointer; }
+  .next-count-bug { display: none; }
+  .bug-fixes-only .next-count-all { display: none; }
+  .bug-fixes-only .next-count-bug { display: inline; }
+  .bug-fixes-only .next-group:not(.next-group-has-bugs) { display: none; }
+  .bug-fixes-only .next-entry:not(.next-entry-bug) { display: none; }
+
+  .next-bug-chip {
+    display: inline-block;
+    margin-left: 0.35rem;
+    padding: 0 0.32rem;
+    border-radius: 0.6rem;
+    background: var(--bug);
+    color: var(--bg);
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    vertical-align: 0.06rem;
+  }
   .next-review-link {
     flex-shrink: 0;
     margin: 0.15rem 0.6rem 0 0;
@@ -722,52 +759,44 @@
         <div class="alert-banner clean-banner">No drift — every item's manual status agrees with live GitHub state.</div>
         {% endif %}
       </div>
-      <div class="sidebar-card">
-        <h3>What to do next</h3>
-        {% if drift_items or ready_to_review or ready_to_start or blocker_maybe_cleared %}
-          {% if drift_items %}
-          <div class="next-group next-drift">
-            <h4>Fix the manifest ({{ drift_items | length }})</h4>
+{#
+  One action group of the "What to do next" sidebar: its heading, and one
+  entry per item. The caller supplies each entry's reason line as the call
+  block's body, so a group whose reason is per-item (manifest drift) and one
+  whose reason is fixed for the whole group share this markup instead of
+  repeating it. Renders nothing at all for an empty group.
+#}
+{% macro next_step_group(group_class, heading, items, show_review_link=false) %}
+{%- if items %}
+{%- set bug_fixes = items | selectattr("is_bug_fix") | list %}
+          <div class="next-group {{ group_class }}{% if bug_fixes %} next-group-has-bugs{% endif %}">
+            <h4>{{ heading }} <span class="next-count-all">({{ items | length }})</span><span class="next-count-bug">({{ bug_fixes | length }})</span></h4>
             <ul>
-            {% for item in drift_items %}
-              <li><a class="next-item-link" href="#item-{{ item.identifier }}" data-item-identifier="{{ item.identifier }}" onclick="planDashboardHighlightItem(event, this)"><strong>{{ item.title }}</strong><br><span class="next-reason">{{ item.drift_description }}</span></a></li>
-            {% endfor %}
-            </ul>
-          </div>
-          {% endif %}
-          {% if ready_to_start %}
-          <div class="next-group next-ready">
-            <h4>Ready to start ({{ ready_to_start | length }})</h4>
-            <ul>
-            {% for item in ready_to_start %}
-              <li><a class="next-item-link" href="#item-{{ item.identifier }}" data-item-identifier="{{ item.identifier }}" onclick="planDashboardHighlightItem(event, this)"><strong>{{ item.title }}</strong><br><span class="next-reason">every dependency is at least ready for review — nothing structurally blocking it</span></a></li>
-            {% endfor %}
-            </ul>
-          </div>
-          {% endif %}
-          {% if blocker_maybe_cleared %}
-          <div class="next-group next-recheck">
-            <h4>Blocker may be cleared ({{ blocker_maybe_cleared | length }})</h4>
-            <ul>
-            {% for item in blocker_maybe_cleared %}
-              <li><a class="next-item-link" href="#item-{{ item.identifier }}" data-item-identifier="{{ item.identifier }}" onclick="planDashboardHighlightItem(event, this)"><strong>{{ item.title }}</strong><br><span class="next-reason">at least one dependency is now ready for review — worth resolving the blocker</span></a></li>
-            {% endfor %}
-            </ul>
-          </div>
-          {% endif %}
-          {% if ready_to_review %}
-          <div class="next-group next-review">
-            <h4>Ready to review ({{ ready_to_review | length }})</h4>
-            <ul>
-            {% for item in ready_to_review %}
-              <li>
-                <a class="next-item-link" href="#item-{{ item.identifier }}" data-item-identifier="{{ item.identifier }}" onclick="planDashboardHighlightItem(event, this)"><strong>{{ item.title }}</strong><br><span class="next-reason">open draft pull request, ready for your review</span></a>
+            {% for item in items %}
+              <li class="next-entry{% if item.is_bug_fix %} next-entry-bug{% endif %}">
+                <a class="next-item-link" href="#item-{{ item.identifier }}" data-item-identifier="{{ item.identifier }}" onclick="planDashboardHighlightItem(event, this)"><strong>{{ item.title }}</strong>{% if item.is_bug_fix %} <span class="next-bug-chip">bug</span>{% endif %}<br><span class="next-reason">{{ caller(item) }}</span></a>
+                {%- if show_review_link %}
                 <a class="next-review-link" href="{{ item.pull_request_url }}" target="_blank" rel="noopener">Review ↗</a>
+                {%- endif %}
               </li>
             {% endfor %}
             </ul>
           </div>
-          {% endif %}
+{% endif %}
+{%- endmacro %}
+      <div class="sidebar-card" id="next-steps-card">
+        <h3>What to do next</h3>
+        {% if has_bug_fix_next_steps %}
+        <label class="bug-filter-toggle">
+          <input type="checkbox" id="bug-fixes-only-toggle" onchange="document.getElementById('next-steps-card').classList.toggle('bug-fixes-only', this.checked)">
+          Bug fixes only
+        </label>
+        {% endif %}
+        {% if drift_items or ready_to_review or ready_to_start or blocker_maybe_cleared %}
+          {% call(item) next_step_group("next-drift", "Fix the manifest", drift_items) %}{{ item.drift_description }}{% endcall %}
+          {% call(item) next_step_group("next-ready", "Ready to start", ready_to_start) %}every dependency is at least ready for review — nothing structurally blocking it{% endcall %}
+          {% call(item) next_step_group("next-recheck", "Blocker may be cleared", blocker_maybe_cleared) %}at least one dependency is now ready for review — worth resolving the blocker{% endcall %}
+          {% call(item) next_step_group("next-review", "Ready to review", ready_to_review, show_review_link=true) %}open draft pull request, ready for your review{% endcall %}
         {% else %}
         <p class="next-empty">Nothing actionable right now — every item is either in progress, fully blocked, or done.</p>
         {% endif %}

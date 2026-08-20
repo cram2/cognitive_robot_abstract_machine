@@ -100,7 +100,9 @@ def test_reachability(graph_of_convex_sets_unit_box: GraphOfBoundingBoxesFixture
     path = graph_of_convex_sets_unit_box.graph_of_convex_sets.path_from_to(
         start_point, target_point
     )
-    assert len(path) == 4
+    # Shortcutting collapses the two waypoints hugging the box's corner into one,
+    # since a straight line from start_point to (0, 2, 0.5) already clears the box.
+    assert len(path) == 3
 
 
 def test_plot(graph_of_convex_sets_unit_box: GraphOfBoundingBoxesFixture):
@@ -260,6 +262,91 @@ def test_from_world_with_rotated_box():
         assert bounding_box_T_world.roll == 0
         assert bounding_box_T_world.pitch == 0
         assert allclose(bounding_box_T_world.yaw, rotated_box_body_pose.to_pose().yaw)
+
+
+def test_path_from_to_prefers_shorter_distance_over_fewer_hops():
+    """
+    A detour with many small hops that is geometrically short must be preferred over a
+    detour with few large hops that is geometrically long.
+
+    Regression test: ``path_from_to`` used to run an unweighted (hop-count) Dijkstra
+    search, so a four-hop detour through three huge boxes could beat an eleven-hop
+    detour through small boxes even though the four-hop detour is far longer in real
+    distance. There is no direct line of sight between start and goal (a "wall" blocks
+    it), so this keeps being true even after shortcutting simplifies whichever detour
+    was chosen.
+    """
+    world = World()
+    with world.modify_world():
+        world.add_kinematic_structure_entity(Body())
+
+    graph_of_convex_sets = GraphOfBoundingBoxes(world)
+
+    origin = world.root.global_pose
+    start_box = BoundingBox(0, 0, 0, 1, 1, 1, origin)
+    goal_box = BoundingBox(10, 0, 0, 11, 1, 1, origin)
+    # No boxes exist at y=[0, 1] between start_box and goal_box - a "wall" that rules
+    # out a direct line of sight, so reaching goal_box always requires a detour.
+
+    # Short way: hop over the wall through a chain of ten small boxes.
+    over_the_wall = [BoundingBox(i, 1, 0, i + 1, 2, 1, origin) for i in range(10)]
+
+    # Long way: dip far below the wall and back up through three huge boxes. Costs
+    # only four hops overall, but each hop's center-to-center distance is huge.
+    below_the_wall = [
+        BoundingBox(0, -100, 0, 1, 1, 1, origin),
+        BoundingBox(0, -100, 0, 11, -99, 1, origin),
+        BoundingBox(10, -100, 0, 11, 1, 1, origin),
+    ]
+
+    for box in [start_box, goal_box, *over_the_wall, *below_the_wall]:
+        graph_of_convex_sets.add_node(box)
+    graph_of_convex_sets.calculate_connectivity()
+
+    start = Point3(0.5, 0.5, 0.5, reference_frame=world.root)
+    goal = Point3(10.5, 0.5, 0.5, reference_frame=world.root)
+
+    path = graph_of_convex_sets.path_from_to(start, goal)
+
+    total_length = sum(
+        float(np.linalg.norm(a.to_np()[:3] - b.to_np()[:3]))
+        for a, b in zip(path, path[1:])
+    )
+    # The short way over the wall totals roughly 10-11 units; the long way below it
+    # totals roughly 200 (a ~100-unit dip, there and back). 30 comfortably separates
+    # the two, so this only passes if the short way was chosen.
+    assert total_length < 30
+
+
+def test_path_from_to_shortcuts_redundant_waypoints():
+    """
+    Waypoints that a straight line can bypass without leaving free space must be dropped
+    from the returned path.
+    """
+    world = World()
+    with world.modify_world():
+        world.add_kinematic_structure_entity(Body())
+
+    graph_of_convex_sets = GraphOfBoundingBoxes(world)
+
+    origin = world.root.global_pose
+    start_box = BoundingBox(0, 0, 0, 1, 1, 1, origin)
+    # Ten boxes tiling one straight, unobstructed corridor from start_box to goal_box.
+    chain = [BoundingBox(i, 0, 0, i + 1, 1, 1, origin) for i in range(1, 10)]
+    goal_box = BoundingBox(10, 0, 0, 11, 1, 1, origin)
+
+    for box in [start_box, *chain, goal_box]:
+        graph_of_convex_sets.add_node(box)
+    graph_of_convex_sets.calculate_connectivity()
+
+    start = Point3(0.5, 0.5, 0.5, reference_frame=world.root)
+    goal = Point3(10.5, 0.5, 0.5, reference_frame=world.root)
+
+    path = graph_of_convex_sets.path_from_to(start, goal)
+
+    # Every intermediate waypoint is redundant: the straight line from start to goal
+    # never leaves the corridor, so it should be shortcut down to just the endpoints.
+    assert path == [start, goal]
 
 
 def test_path_from_to_scales_to_a_real_apartment_scene():

@@ -1,8 +1,17 @@
 from dataclasses import is_dataclass, fields
+from types import NoneType
 
 from typing_extensions import Optional, Any, Type, TypeVar
 
-from krrood.symbolic_math.symbolic_math import Scalar as SymbolicScalar
+from krrood import logger
+
+try:
+    from krrood.symbolic_math.symbolic_math import Scalar as SymbolicScalar
+except ImportError as e:
+    # This was added because casadi (used by symbolic_math) has no distribution for Windows platform.
+    SymbolicScalar = NoneType
+    logger.debug(f"SymbolicScalar is not available, importing it raised an error : {e}")
+
 from krrood.class_diagrams.class_diagram import WrappedClass, ParseError
 from krrood.class_diagrams.exceptions import (
     ClassIsUnMappedInClassDiagram,
@@ -37,7 +46,8 @@ def get_field_type_endpoint(owner_class: Type, field_name: str) -> Optional[Type
         if return_type is None:
             return None
 
-        if return_type is SymbolicScalar or (
+        # TODO: Why do we have a special handling for this?
+        if (SymbolicScalar is not NoneType and return_type is SymbolicScalar) or (
             isinstance(return_type, type) and issubclass(return_type, SymbolicScalar)
         ):
             return float

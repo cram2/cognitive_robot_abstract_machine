@@ -15,7 +15,7 @@ kernelspec:
 # Factories
 
 This exercise demonstrates the annotation factories: `create_with_new_body_in_world` spawns an
-annotation together with a generated body, and `get_default_root_specification` returns the same
+annotation together with a generated body, and `get_default_root_kinematic_structure_entity_specification` returns the same
 geometry as a reusable, world-independent specification.
 
 You will:
@@ -85,20 +85,20 @@ if not len(drawer.root.collision.shapes) > 0: raise ExerciseVerificationFailed("
 ## 2. Extract the geometry as a specification
 Your goal:
 - Build the drawer's default root specification for the same scale `Scale(0.2, 0.4, 0.2)` with
-  `Drawer.get_default_root_specification` and store it in a variable named `specification`
+  `Drawer.get_default_root_kinematic_structure_entity_specification` and store it in a variable named `specification`
 - Materialize a free-standing body from it with `to_domain_object`, named `free_drawer_body`,
   and store it in a variable named `free_standing`
 
 ```{code-cell} ipython3
 :tags: [exercise]
 # TODO: build the default root specification and materialize a free-standing body
-# specification = Drawer.get_default_root_specification(...)
+# specification = Drawer.get_default_root_kinematic_structure_entity_specification(...)
 # free_standing = specification.to_domain_object("free_drawer_body")
 ```
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-specification = Drawer.get_default_root_specification(scale=Scale(0.2, 0.4, 0.2))
+specification = Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.2, 0.4, 0.2))
 free_standing = specification.to_domain_object("free_drawer_body")
 ```
 

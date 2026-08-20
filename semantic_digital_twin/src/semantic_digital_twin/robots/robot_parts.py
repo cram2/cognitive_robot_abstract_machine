@@ -55,6 +55,7 @@ from semantic_digital_twin.spatial_types import (
     RotationMatrix,
     HomogeneousTransformationMatrix,
 )
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
@@ -313,7 +314,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         )
 
     @classmethod
-    def get_default_root_specification(
+    def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: Optional[str] = None,
         scale: Optional[Scale] = None,
@@ -810,6 +811,26 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
                 return parent_connection
         except AttributeError:
             pass
+
+    def set_root_pose(self, pose: Pose) -> None:
+        """
+        Place the robot's root at ``pose``.
+
+        A pose that is not already expressed in the root connection's parent frame is
+        converted into it, so the robot lands at ``pose`` no matter how many frames (an
+        ``odom``, for example) sit between that frame and the pose's own.
+
+        ..note:: A drive that cannot represent every degree of freedom applies only what
+            it can, so the root reaches ``pose`` only within the drive's own limits.
+
+        :param pose: The pose the robot's root should end up at.
+        """
+        connection = self.root.parent_connection
+        parent_kinematic_structure_entity = connection.parent
+        if pose.reference_frame is not parent_kinematic_structure_entity:
+            pose = self._world.transform(pose, parent_kinematic_structure_entity)
+
+        connection.origin = pose.to_homogeneous_matrix()
 
     @property
     def _one_dof_connections(self) -> list[ActiveConnection1DOF]:

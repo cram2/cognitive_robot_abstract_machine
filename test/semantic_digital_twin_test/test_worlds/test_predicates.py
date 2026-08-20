@@ -358,7 +358,7 @@ def test_is_body_in_gripper(pr2_world_copy):
 
     assert is_body_in_gripper(test_box, left_gripper) > 0
     assert robot_holds_body(pr2, test_box)
-    connection.origin = HomogeneousTransformationMatrix()
+    connection.origin = HomogeneousTransformationMatrix(reference_frame=root)
     assert is_body_in_gripper(test_box, left_gripper) == 0
 
 

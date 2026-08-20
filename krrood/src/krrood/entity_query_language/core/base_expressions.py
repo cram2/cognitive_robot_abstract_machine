@@ -627,6 +627,20 @@ class SymbolicExpression(AbstractContextManager):
         return expression
 
     @property
+    def _evaluation_root_query_(self) -> SymbolicExpression:
+        """
+        :return: The root of the query currently evaluating this expression, or
+            :attr:`_root_` when no evaluation is active.
+        """
+        evaluation_context = get_evaluation_context()
+        if (
+            evaluation_context is None
+            or evaluation_context.outermost_query.node is None
+        ):
+            return self._root_
+        return evaluation_context.outermost_query.node
+
+    @property
     def _root_query_(self) -> Optional[Query]:
         """
         :return: The root query of the symbolic expression tree, or None if no query found.

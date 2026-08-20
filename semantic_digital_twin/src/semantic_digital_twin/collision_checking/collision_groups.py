@@ -40,6 +40,10 @@ class CollisionGroup:
     """
     All bodies belonging to the group.
 
+    Derived from the kinematic structure and therefore re-evaluated whenever the world
+    model changes. It is deliberately not part of the group's identity, so that a group
+    stays usable as a dict key across such a change.
+
     .. note: `root` is only in bodies, if it is itself a body.
     """
 
@@ -53,13 +57,15 @@ class CollisionGroup:
         return str(self.root.name)
 
     def __eq__(self, other) -> bool:
+        if not isinstance(other, CollisionGroup):
+            return NotImplemented
         return self.root == other.root
 
     def __contains__(self, item):
         return item == self.root or item in self.bodies
 
     def __hash__(self):
-        return hash((self.root, tuple(sorted(self.bodies, key=lambda b: b.id))))
+        return hash(self.root)
 
     def add_body(self, body: Body):
         if body.has_collision():
@@ -124,10 +130,10 @@ class CollisionGroupConsumer(CollisionConsumer, ABC):
                     collision_group = self.get_collision_group(parent)
                     collision_group.bodies.add(child)
 
+        # Inspecting a body's geometry is expensive, so ask the world once.
+        bodies_with_collision = set(world.bodies_with_collision)
         for group in self.collision_groups:
-            group.bodies = set(
-                b for b in group.bodies if b in world.bodies_with_collision
-            )
+            group.bodies = set(b for b in group.bodies if b in bodies_with_collision)
 
         self.collision_groups = [
             group for group in self.collision_groups if len(group.bodies) > 0

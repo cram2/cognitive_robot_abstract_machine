@@ -31,6 +31,8 @@ except ModuleNotFoundError:
     pass
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world_description.geometry import BoundingBox
 
 
 def pytest_configure(config):
@@ -103,12 +105,30 @@ def coraplex_testing_session():
 
 @pytest.fixture(scope="function")
 def immutable_stretch_apartment_world(stretch_apartment_world):
-    context = Context(
-        stretch_apartment_world,
-        Stretch.from_world(stretch_apartment_world),
-    )
+    robot = stretch_apartment_world.get_semantic_annotations_by_type(Stretch)[0]
+    context = Context(stretch_apartment_world, robot)
     state = deepcopy(stretch_apartment_world.state._data)
 
-    yield stretch_apartment_world, context.robot, context
+    yield stretch_apartment_world, robot, context
 
     stretch_apartment_world.state._data[:] = state
+    stretch_apartment_world.notify_state_change()
+
+
+@pytest.fixture
+def whole_scene_region(immutable_model_world) -> BoundingBox:
+    """
+    A region large enough to contain everything in the apartment fixture.
+
+    Lets a perception test say "look everywhere" without restating the extents.
+    """
+    world, _, _ = immutable_model_world
+    return BoundingBox(
+        origin=HomogeneousTransformationMatrix(reference_frame=world.root),
+        min_x=-10,
+        min_y=-10,
+        min_z=-10,
+        max_x=10,
+        max_y=10,
+        max_z=10,
+    )

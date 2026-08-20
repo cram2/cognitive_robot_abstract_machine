@@ -2,8 +2,14 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+import numpy as np
+
+from giskardpy.data_types.exceptions import NonPositiveRealTimeFactorError
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.exceptions import PlotterNotConfiguredError
+from giskardpy.motion_statechart.exceptions import (
+    PlotterNotConfiguredError,
+    WorldStateArrayReplacedError,
+)
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.plotters.debug_expression_trajectory_plotter import (
     DebugExpressionTrajectoryPlotter,
@@ -15,70 +21,100 @@ from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
     WorldStateTrajectoryPlotter,
 )
-from typing_extensions import Optional
 
 
 @dataclass
 class Pacer(ABC):
     """
-    Tries to achieve a specific frequency by adjusting the sleep time between calls.
+    Decides how long a loop waits between two cycles.
     """
 
-    target_frequency: float
+    target_frequency: float = field(init=False)
     """
-    Frequency of the loop in hertz.
+    Frequency of the loop in hertz, set by whoever runs the loop.
     """
 
     @abstractmethod
-    def sleep(self):
+    def sleep(self) -> None:
         """
-        Sleeps according to the pacer's logic to make a loop run at hz frequency.
+        Wait until the loop may start its next cycle.
         """
 
 
 @dataclass
-class SimulationPacer(Pacer):
-    target_frequency: float = field(init=False)
+class NoPacing(Pacer):
     """
-    How long a cycle should take in seconds with real_time_factor=1.0.
-    """
-
-    real_time_factor: Optional[float] = None
-    """
-    Allows you to adjust the simulation speed.
-
-    If None, the pacer will not sleep at all. If 1.0, the pacer will try to achieve the
-    control_dt frequency, as long as the other code in the loop allows it.
+    Lets a loop run as fast as the hardware allows.
     """
 
-    _next_target_time: Optional[float] = field(default=None, init=False)
+    def sleep(self) -> None:
+        pass
 
-    def sleep(self):
+
+@dataclass
+class ScheduledPacer(Pacer, ABC):
+    """
+    Holds a loop at a fixed cycle duration by sleeping until the next slot.
+
+    A cycle that overruns its slot is not compensated by a shorter following one; the
+    schedule simply skips to the next slot after the current time.
+    """
+
+    _next_target_time: float | None = field(default=None, init=False)
+    """
+    Point in time the next cycle may start at, None until the first sleep.
+    """
+
+    @property
+    @abstractmethod
+    def cycle_duration(self) -> float:
         """
-        Sleep to maintain a control loop pace defined by `control_dt` and
-        `real_time_factor`.
-
-        - If `real_time_factor` is None, return immediately (no pacing).
-        - Otherwise, target interval is `control_dt / real_time_factor`.
+        How many seconds one cycle should take.
         """
-        if self.real_time_factor is None:
-            return
-        if self.real_time_factor <= 0:
-            return
-        dt = 1 / (self.target_frequency * self.real_time_factor)
+
+    def sleep(self) -> None:
+        cycle_duration = self.cycle_duration
         now = time.monotonic()
         if self._next_target_time is None:
-            self._next_target_time = now + dt
+            self._next_target_time = now + cycle_duration
         sleep_time = self._next_target_time - now
         if sleep_time > 0:
             time.sleep(sleep_time)
             now = self._next_target_time
-        else:
-            # if we are behind schedule, catch up without sleeping and reschedule to the next slot after now
-            pass
-        # advance next target time to the next slot strictly after current time
-        while self._next_target_time is not None and self._next_target_time <= now:
-            self._next_target_time += dt
+        while self._next_target_time <= now:
+            self._next_target_time += cycle_duration
+
+
+@dataclass
+class RealTimePacer(ScheduledPacer):
+    """
+    Holds a loop at its target frequency in wall clock time.
+    """
+
+    @property
+    def cycle_duration(self) -> float:
+        return 1 / self.target_frequency
+
+
+@dataclass
+class SimulationPacer(ScheduledPacer):
+    """
+    Runs a loop at a multiple of its target frequency to speed up or slow down a
+    simulation.
+    """
+
+    real_time_factor: float = 1.0
+    """
+    How much faster than real time the loop runs; ``2.0`` is twice as fast.
+    """
+
+    def __post_init__(self):
+        if self.real_time_factor <= 0:
+            raise NonPositiveRealTimeFactorError(self.real_time_factor)
+
+    @property
+    def cycle_duration(self) -> float:
+        return 1 / (self.target_frequency * self.real_time_factor)
 
 
 @dataclass
@@ -102,28 +138,28 @@ class Executor:
     Records and plots how the debug expressions evolved during the motion.
     """
 
-    pacer: Pacer = field(default_factory=SimulationPacer)
+    pacer: Pacer = field(default_factory=NoPacing)
+    """
+    Paces the loop that ticks this executor.
+    """
 
     # %% init False
-    motion_statechart: MotionStatechart = field(init=False)
+    motion_statechart: MotionStatechart | None = field(init=False, default=None)
     """
-    The motion statechart describing the robot's motion logic.
+    The motion statechart describing the robot's motion logic, set by :meth:`compile`.
     """
 
-    qp_controller: Optional[QPController] = field(default=None, init=False)
+    qp_controller: QPController | None = field(default=None, init=False)
     """
     Optional quadratic programming controller used for motion control.
     """
 
-    _control_cycle_index: int = field(init=False)
+    _compiled_world_state_data: np.ndarray | None = field(default=None, init=False)
     """
-    Tracks the index of the current control cycle.
-    """
+    The world state array the motion statechart was compiled against.
 
-    _time_variable: FloatVariable = field(init=False)
-    """
-    Auxiliary variable representing the current time in seconds since the start of the
-    simulation.
+    The compiled updaters read it through a memory view, so it must stay the very same
+    array for as long as they are in use.
     """
 
     @property
@@ -142,7 +178,11 @@ class Executor:
 
     @property
     def control_cycles(self) -> float:
-        return float(self.context.control_cycle_variable.evaluate()[0])
+        return float(
+            self.context.float_variable_data.get_value(
+                self.context.control_cycle_variable
+            )
+        )
 
     @control_cycles.setter
     def control_cycles(self, value):
@@ -154,6 +194,7 @@ class Executor:
         self.motion_statechart = motion_statechart
         self.control_cycles = 0
         self.motion_statechart.compile(self.context)
+        self._compiled_world_state_data = self.context.world.state._data
         self._compile_qp_controller(self.context.qp_controller_config)
         if self.trajectory_plotter is not None:
             self.trajectory_plotter.reset(self.context.world.state, self.time)
@@ -167,6 +208,7 @@ class Executor:
         self.motion_statechart.tick(self.context)
 
     def tick(self):
+        self._raise_if_world_state_array_was_replaced()
         self.control_cycles += 1
         if self.context.requires_collision_checking:
             self.context.collision_manager.compute_collisions()
@@ -204,11 +246,31 @@ class Executor:
                     return
             raise TimeoutError("Timeout reached while waiting for end of motion.")
         finally:
-            self._set_velocity_acceleration_jerk_to_zero()
+            self.set_velocity_acceleration_jerk_to_zero()
             self.motion_statechart.cleanup_nodes(context=self.context)
             self.context.cleanup()
 
-    def _set_velocity_acceleration_jerk_to_zero(self):
+    def _raise_if_world_state_array_was_replaced(self):
+        """
+        Ensures the world still holds the state array the motion statechart compiled
+        against.
+
+        :raises WorldStateArrayReplacedError: If the world replaced its state array,
+            which leaves the compiled updaters reading a detached copy of the state.
+        """
+        if self._compiled_world_state_data is None:
+            return
+        if self.context.world.state._data is self._compiled_world_state_data:
+            return
+        raise WorldStateArrayReplacedError(
+            compiled_degrees_of_freedom=self._compiled_world_state_data.shape[1],
+            current_degrees_of_freedom=self.context.world.state._data.shape[1],
+        )
+
+    def set_velocity_acceleration_jerk_to_zero(self):
+        """
+        Clear all commanded derivatives of the world state.
+        """
         self.context.world.state.velocities[:] = 0
         self.context.world.state.accelerations[:] = 0
         self.context.world.state.jerks[:] = 0
@@ -235,9 +297,6 @@ class Executor:
         )
         if self.qp_controller.has_not_free_variables():
             raise EmptyProblemException()
-
-    def plot_trajectory(self, file_name: str = "./trajectory.pdf"):
-        self.trajectory_plotter.plot_trajectory(file_name)
 
     def plot_debug_expressions(self, file_name: str = "./debug_expressions.pdf"):
         """

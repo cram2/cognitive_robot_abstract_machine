@@ -144,10 +144,27 @@ A few things worth noticing in this one small example:
   cluster capacity, per its own `blockers` note), but its dependency is now
   ready too, so it's worth a look.
 - **"Ready to review"** — `retry-config-flag` has an open, still-draft pull
-  request with nothing blocking it from being reviewed right now.
+  request with nothing blocking it from being reviewed right now, and
+  `retry-circuit-breaker` joins it because its one dependency
+  (`retry-backoff-strategy`) has already merged. A dependency only holds its
+  dependent out of this list while it has no pull request at all — once one
+  exists, whether it is a draft, ready, or already landed, the branch stacked
+  on top is worth reviewing.
 - **Done items are hidden by default** — the sidebar's "Show done / merged
   items" checkbox reveals `retry-backoff-strategy` and `retry-fallback-queue`
   when you want them back.
+- **A `bug` chip** — `retry-fallback-queue`'s pull request carries the `bug`
+  label, so its sidebar entry is marked as a bug fix. The chip appears
+  wherever the item already sits; being a bug fix is a property of the work,
+  not a next action, so it never moves an item between groups.
+
+When you only care about the bug fixes, the "Bug fixes only" checkbox hides
+every other entry — and any group left with nothing in it:
+
+![The "What to do next" card with "Bug fixes only" ticked, leaving one entry](./example/screenshots/dashboard-bug-filter.png)
+
+The checkbox only appears when at least one entry is a bug fix, and each
+group's count switches to the number it is actually showing.
 
 ## 5. Kick off, resolve, or review a specific item
 

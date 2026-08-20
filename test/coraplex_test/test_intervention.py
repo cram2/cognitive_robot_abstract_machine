@@ -48,7 +48,7 @@ def test_diagnose_reports_no_fix_when_nothing_reproduces_success(
     world, view, context = immutable_model_world
     milk = world.get_body_by_name("milk.stl")
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        5, 5, 0.7, 0, 0, 0
+        5, 5, 0.7, 0, 0, 0, reference_frame=world.root
     )
     action = PickUpAction(milk, Arms.RIGHT, _right_front_grasp(view))
     execute_single(action_like=action, context=context)

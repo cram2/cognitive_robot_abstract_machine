@@ -1,4 +1,5 @@
-from typing import Optional, TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import List, Optional
 
 from giskardpy.model.world_config import WorldWithFixedRobot
 from giskardpy.middleware.ros2.robot_interface_config import (
@@ -6,13 +7,15 @@ from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.tracy import Tracy
-
-if TYPE_CHECKING:
-    pass
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.tracy import Tracy, TracyJoint
 
 
+@dataclass
 class TracyVelocityInterface(RobotInterfaceConfig):
+    """
+    Commands both arms of Tracy through their forward velocity controllers.
+    """
 
     def setup(self):
         self.sync_joint_state_topic("/left_arm/joint_states")
@@ -20,24 +23,24 @@ class TracyVelocityInterface(RobotInterfaceConfig):
         self.sync_joint_state_topic("/right_gripper/joint_states")
         self.sync_joint_state_topic("/left_gripper/joint_states")
         joints_left = [
-            "left_shoulder_pan_joint",
-            "left_shoulder_lift_joint",
-            "left_elbow_joint",
-            "left_wrist_1_joint",
-            "left_wrist_2_joint",
-            "left_wrist_3_joint",
+            TracyJoint.LEFT_SHOULDER_PAN,
+            TracyJoint.LEFT_SHOULDER_LIFT,
+            TracyJoint.LEFT_ELBOW,
+            TracyJoint.LEFT_WRIST_1,
+            TracyJoint.LEFT_WRIST_2,
+            TracyJoint.LEFT_WRIST_3,
         ]
         self.add_joint_velocity_group_controller(
             cmd_topic="/left_arm/forward_velocity_controller/commands",
             connections=joints_left,
         )
         joints_right = [
-            "right_shoulder_pan_joint",
-            "right_shoulder_lift_joint",
-            "right_elbow_joint",
-            "right_wrist_1_joint",
-            "right_wrist_2_joint",
-            "right_wrist_3_joint",
+            TracyJoint.RIGHT_SHOULDER_PAN,
+            TracyJoint.RIGHT_SHOULDER_LIFT,
+            TracyJoint.RIGHT_ELBOW,
+            TracyJoint.RIGHT_WRIST_1,
+            TracyJoint.RIGHT_WRIST_2,
+            TracyJoint.RIGHT_WRIST_3,
         ]
         self.add_joint_velocity_group_controller(
             cmd_topic="/right_arm/forward_velocity_controller/commands",
@@ -45,17 +48,21 @@ class TracyVelocityInterface(RobotInterfaceConfig):
         )
 
 
+@dataclass
 class WorldWithTracyConfig(WorldWithFixedRobot):
     """
-    Minimal Tracy world config analogous to WorldWithPR2Config.
-
-    - Fixed-base robot (no drive joint)
-    - Accepts URDF via argument; if not provided, reads from ROS parameter server
-    - Applies conservative default motion limits
+    A world containing only Tracy, whose base is fixed to the world root.
     """
 
-    def __init__(self, urdf: Optional[str] = None):
-        super().__init__(urdf=urdf, root_name=PrefixedName("map2"), urdf_view=Tracy)
+    root_name: PrefixedName = field(default=PrefixedName("map2"))
+    """
+    Name of the body Tracy is attached to.
+    """
+
+    urdf_view: AbstractRobot = field(kw_only=True, default=Tracy, init=False)
+    """
+    Semantic view that is applied to the parsed urdf.
+    """
 
     def setup_world(self, robot_name: Optional[str] = None) -> None:
         super().setup_world()
@@ -68,32 +75,29 @@ class WorldWithTracyConfig(WorldWithFixedRobot):
 #                          collision_checker)
 
 
-class TracyJointTrajServerMujocoInterface(RobotInterfaceConfig):
-    def setup(self):
-        self.sync_joint_state_topic("joint_states")
-        self.add_follow_joint_trajectory_server(
-            namespace="/left_arm/scaled_pos_joint_traj_controller_left"
-        )
-        self.add_follow_joint_trajectory_server(
-            namespace="/right_arm/scaled_pos_joint_traj_controller_right"
-        )
-
-
+@dataclass
 class TracyStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
-    def __init__(self):
-        super().__init__(
-            [
-                "left_shoulder_pan_joint",
-                "left_shoulder_lift_joint",
-                "left_elbow_joint",
-                "left_wrist_1_joint",
-                "left_wrist_2_joint",
-                "left_wrist_3_joint",
-                "right_shoulder_pan_joint",
-                "right_shoulder_lift_joint",
-                "right_elbow_joint",
-                "right_wrist_1_joint",
-                "right_wrist_2_joint",
-                "right_wrist_3_joint",
-            ]
-        )
+    """
+    Simulates both arms of Tracy without talking to hardware.
+    """
+
+    joint_names: List[str] = field(
+        init=False,
+        default_factory=lambda: [
+            TracyJoint.LEFT_SHOULDER_PAN,
+            TracyJoint.LEFT_SHOULDER_LIFT,
+            TracyJoint.LEFT_ELBOW,
+            TracyJoint.LEFT_WRIST_1,
+            TracyJoint.LEFT_WRIST_2,
+            TracyJoint.LEFT_WRIST_3,
+            TracyJoint.RIGHT_SHOULDER_PAN,
+            TracyJoint.RIGHT_SHOULDER_LIFT,
+            TracyJoint.RIGHT_ELBOW,
+            TracyJoint.RIGHT_WRIST_1,
+            TracyJoint.RIGHT_WRIST_2,
+            TracyJoint.RIGHT_WRIST_3,
+        ],
+    )
+    """
+    The arm joints of Tracy.
+    """

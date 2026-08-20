@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import glob
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -61,13 +62,78 @@ class ROSPackagePathLocator(PackageLocator):
 
 
 @dataclass
+class PrefixPathPackageLocator(PackageLocator):
+    """
+    Resolves packages by searching install prefixes directly on disk, without any ROS
+    tooling installed.
+    """
+
+    additional_prefixes: List[str] = field(default_factory=list)
+    """
+    Extra install prefixes to search before the environment and workspace prefixes.
+    """
+
+    def _environment_prefixes(self) -> List[str]:
+        """
+        :return: Prefixes named by ``AMENT_PREFIX_PATH`` and ``CMAKE_PREFIX_PATH``.
+        """
+        prefixes = []
+        for variable in ("AMENT_PREFIX_PATH", "CMAKE_PREFIX_PATH"):
+            prefixes += [
+                entry for entry in os.environ.get(variable, "").split(":") if entry
+            ]
+        return prefixes
+
+    def _workspace_prefixes(self) -> List[str]:
+        """
+        :return: Install directories of common workspace layouts under the home
+            directory and ``/opt/ros``.
+        """
+        home = os.path.expanduser("~")
+        return [
+            *glob.glob(os.path.join(home, "*_ws", "install")),
+            *glob.glob(os.path.join(home, "*", "install")),
+            *glob.glob("/opt/ros/*"),
+        ]
+
+    def search_prefixes(self) -> List[str]:
+        """
+        :return: Every install prefix searched, in order of precedence.
+        """
+        return [
+            *self.additional_prefixes,
+            *self._environment_prefixes(),
+            *self._workspace_prefixes(),
+        ]
+
+    def resolve(self, package_name: str) -> str:
+        prefixes = self.search_prefixes()
+        for prefix in prefixes:
+            for candidate in (
+                os.path.join(prefix, package_name, "share", package_name),
+                os.path.join(prefix, "share", package_name),
+                os.path.join(prefix, package_name),
+            ):
+                if os.path.isdir(candidate):
+                    return candidate
+        raise PackageResolutionError(
+            package_name=package_name,
+            details=f"not found in any of {len(prefixes)} install prefixes",
+        )
+
+
+@dataclass
 class ROSPackageLocator(PackageLocator):
     """
     Tries multiple package locators in order.
     """
 
     locators: List[PackageLocator] = field(
-        default_factory=lambda: [AmentPackageLocator(), ROSPackagePathLocator()]
+        default_factory=lambda: [
+            AmentPackageLocator(),
+            ROSPackagePathLocator(),
+            PrefixPathPackageLocator(),
+        ]
     )
 
     def resolve(self, package_name: str) -> str:

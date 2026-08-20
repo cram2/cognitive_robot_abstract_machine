@@ -93,7 +93,9 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
     world.merge_world(hsr_copy)
     odom_combined = world.get_body_by_name("odom_combined")
     odom_combined.parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
+        HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=1, reference_frame=odom_combined.parent_kinematic_structure_entity
+        )
     )
 
     context = Context.from_world(world, query_backend=ProbabilisticBackend())

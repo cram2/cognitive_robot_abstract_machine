@@ -41,6 +41,7 @@ def settings_repository(scratch_repository: ScratchRepository) -> ScratchReposit
     """
     scratch_repository.install_hook_scripts(
         "resolve-personal-notes-config.sh",
+        "session-start-messages.sh",
         "session-start.sh",
         "save-personal-settings.sh",
         "write-personal-notes-file.sh",

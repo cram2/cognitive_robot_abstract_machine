@@ -175,9 +175,8 @@ check. `/plan-create` creates the tracking issue (titled
 number as `tracking_issue` in `plan.yaml`.
 
 **Real-time awareness for sessions actively working an item.** A session
-working an item in a plan that has a `tracking_issue` should also subscribe to
-that issue (in addition to its own item's PR) — not just the session making a
-structural change. Since every structural change is posted there, subscribing
+working an item in a plan that has a `tracking_issue` should subscribe to that
+issue — not just the session making a structural change. Since every structural change is posted there, subscribing
 turns the tracking issue into a broadcast channel: a change lands in every
 actively subscribed session's conversation as it happens, not only picked up
 by `session-start.sh`'s auto-discovery on that session's *next* fresh start.

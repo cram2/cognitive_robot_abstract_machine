@@ -25,7 +25,7 @@ class FeatureFunctionMonitor(MotionStatechartNode):
     controlled_feature: Point3 | Vector3 = field(init=False)
     """Controlled feature, typically moved towards `reference_feature`."""
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
         Transform the controlled and reference features into the root link frame and store them on
         the node for use by subclasses.
@@ -69,10 +69,10 @@ class HeightMonitor(FeatureFunctionMonitor):
     upper_limit: float = field(kw_only=True)
     """Upper bound for the height difference in meters."""
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         self.reference_feature = self.reference_point
         self.controlled_feature = self.tip_point
-        artifacts = super().build(context)
+        artifacts = super().build_artifacts(context)
 
         distance = (
             self.root_P_controlled_feature - self.root_P_reference_feature
@@ -98,10 +98,10 @@ class PerpendicularMonitor(FeatureFunctionMonitor):
     threshold: float = field(default=0.01, kw_only=True)
     """Threshold on the dot product of the two normals."""
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         self.reference_feature = self.reference_normal
         self.controlled_feature = self.tip_normal
-        artifacts = super().build(context)
+        artifacts = super().build_artifacts(context)
 
         expr = self.root_V_reference_feature[:3] @ self.root_V_controlled_feature[:3]
         artifacts.observation = sm.abs(expr) <= self.threshold
@@ -124,10 +124,10 @@ class DistanceMonitor(FeatureFunctionMonitor):
     upper_limit: float = field(kw_only=True)
     """Upper bound for the distance in meters."""
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         self.reference_feature = self.reference_point
         self.controlled_feature = self.tip_point
-        artifacts = super().build(context)
+        artifacts = super().build_artifacts(context)
 
         root_V_diff = self.root_P_controlled_feature - self.root_P_reference_feature
         root_V_diff[2] = 0.0
@@ -155,10 +155,10 @@ class AngleMonitor(FeatureFunctionMonitor):
     upper_angle: float = field(kw_only=True)
     """Upper bound for the angle in radians."""
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         self.reference_feature = self.reference_vector
         self.controlled_feature = self.tip_vector
-        artifacts = super().build(context)
+        artifacts = super().build_artifacts(context)
 
         expr = self.root_V_reference_feature.angle_between(
             self.root_V_controlled_feature

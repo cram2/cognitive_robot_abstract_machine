@@ -24,10 +24,9 @@ It is *not* your job to do code review, to read, answer, resolve or act on the d
 comments, or to make code changes addressing review feedback - that is the developer's own
 session's work. Leave review threads untouched.
 
-**You do not write code.** The only file changes you ever make are conflict resolutions while
-restacking, and when you resolve one you say so in a comment on that branch's pull request, naming
-the files and what you took, so the author can check it. Anything you cannot resolve mechanically is
-reported, never fixed.
+**You do not write code, and you change no files at all** - not even to resolve a conflict. Every
+branch in this stack belongs to somebody else, so a conflict is reported to its owner and left
+exactly where it is.
 
 Do not use the Workflow tool - the multi-agent orchestration tool that fans work out to subagents.
 This pass is a short sequence of git and API calls; fanning it out multiplies the chance of two
@@ -35,7 +34,7 @@ agents pushing the same branch. Use plain git plus the GitHub MCP server. Never 
 that has an open upstream pull request unless it carries the `rebase` label.
 
 HARD RULES so you never drift into review work:
-- NEVER call `subscribe_pr_activity`, and never stay subscribed - you learn CI by POLLING (steps 3 and 4).
+- NEVER call `subscribe_pr_activity`, and never stay subscribed - you learn CI by POLLING (step 2).
 - If a review, review-comment, issue-comment, or any `<github-webhook-activity>` event is ever delivered
   to you, your ONLY valid action is to END THE TURN immediately: do not investigate it, do not draft or
   post a plan, do not reply, do not ask the developer to confirm anything. The one exception is a CI/check
@@ -53,10 +52,23 @@ whole run. Do not inspect, guess at, or rename remotes yourself - a remote's nam
 and a wrong guess points every push at the wrong repository.
 
 **a. Make the tooling present rather than assuming it.** Every step shells out to
-`.claude/stack/stack.py`, and a failure in a later step lands after an earlier one has already
-changed pull requests. If `ls .claude/stack/stack.py` fails, `git fetch` the ref you were told to
-resolve this document from and `git checkout <ref> -- .claude/stack/`. Once `.claude/stack/` is on
-the default branch this is a no-op on a fresh clone.
+`.claude/stack/`, and a failure in a later step lands after an earlier one has already changed pull
+requests. If `ls .claude/stack/maintenance.py` fails, `git fetch` the ref you were told to resolve
+this document from and restore it **into the working tree only**:
+
+```bash
+git restore --source=<ref> --worktree -- .claude/stack/
+```
+
+Never reach for `git checkout` with a ref and a path here. That form writes the index as well, so on
+a branch that does not carry the tooling the files end up staged - and the next commit made on that
+branch during a pass is a restack merge, which would commit the tooling into somebody's feature
+branch and from there into the upstream. `git restore --worktree` leaves them untracked, where
+nothing can pick them up.
+
+Once `.claude/stack/` is on the default branch this is a no-op on a fresh clone. The pass itself no
+longer takes the tooling away: `restack` switches branches in a worktree of its own, so the checkout
+you invoked it from keeps its branch and its files.
 
 **b. Take the fork and the upstream in this order, stopping at the first that answers:**
 
@@ -107,7 +119,16 @@ the request cannot get past it. If you see that 403 you
 used the wrong client, so switch rather than report it as a stuck reparent. The stacks endpoints
 below are the mirror image: they have no MCP tool, so they do need curl.
 
-Run:
+Export the board first - every step below derives from it, and this one is no exception:
+
+```bash
+python .claude/stack/maintenance.py board --write
+```
+
+Never assemble that file by hand - a fetch that drops a field produces a board that is wrong rather
+than obviously incomplete.
+
+Then run:
 
 ```bash
 python .claude/stack/stack.py reparents
@@ -133,7 +154,7 @@ with that version header. For exactly those children the reparent becomes:
 3. `update_pull_request` each orphaned child's base, which succeeds once the stack is gone. The child
    keeps its number, its labels and its review thread - never close it and open a replacement, which
    loses all three for a base change that is available to you.
-4. Restack normally (step 4's local merge/rebase plus push).
+4. Restack normally (step 2's local merge/rebase plus push).
 5. Re-create the stack: `POST /repos/{owner}/{repo}/stacks` with `{"pull_requests": [...]}` - the
    recorded list minus landed and closed members, bottom to top - then `GET` it back and confirm
    every member reports the stack.
@@ -144,136 +165,69 @@ stack's trunk, moving it desynchronises the stack's recorded `base.sha` from its
 call in this sequence fails or answers with something not described here, stop work on that stack,
 leave the rest untouched, and report it: this is a preview API, so never improvise around it.
 
-## Step 2 - update the fork's copy of the upstream base
+## Step 2 - run the pass
 
-This is what closes the landed pull requests, so it comes after the reparent above and needs nothing
-after it. GitHub marks a pull request **merged** - not merely closed - the moment its head becomes an
-ancestor of its base, so fast-forwarding the fork's base branch closes every pull request whose work
-has landed, in one operation and with no label to write:
+The rest of the pass is one command:
 
 ```bash
-git fetch <upstream-remote> <upstream-base> \
-  && git push <fork-remote> <upstream-remote>/<upstream-base>:<upstream-base>
+python .claude/stack/maintenance.py run-report --json
 ```
 
-This must be a fast-forward. If GitHub rejects it as non-fast-forward, stop and report - do not
-force. Keep that branch a pristine mirror of the upstream trunk: root branches base on it and the
-restack merges it into them, so anything added here flows into every branch and then into the
-upstream.
+It performs the fast-forward, the restack and the promotion, and emits the whole run as one
+document. Read that document and render it into the finish summary below. Do not re-derive any of
+it, and do not run the individual commands as well - that does the same work twice.
 
-`python .claude/stack/stack.py landed` reports which branches this accounted for, for the summary.
-Never label or close a pull request whose work has not landed - and you should not need to label or
-close anything at all: if a landed pull request is somehow still open afterwards, report it rather
-than closing it by hand.
+**Act on the status, which the document leads with and the process exits with:**
 
-## Step 3 - refresh the derived stack
+| status | what you do |
+|---|---|
+| `success` | render the summary |
+| `not-fast-forward` | report it - the fork's base is behind the upstream, which every branch is measured against |
+| `move-refused` | stop and look; the reasons are in the document |
+| `branch-needs-attention` | carry every branch it names into the summary |
 
-`git fetch <fork-remote>`, then refresh `.claude/stack/board.json` from the fork's **open** pull
-requests (number, head, base, isDraft, labels, statusCheckRollup and body) via the GitHub MCP, and
-run `python .claude/stack/stack.py status`. There is no live mode; state comes from `board.json` plus
-git.
+A non-zero run also prints its status in words, so you never have to look a number up.
 
-**CI is the validator - poll it, never subscribe.** When you need a branch's verdict, poll with
-`pull_request_read` → `get_check_runs` / `get_status` and read only the success/failure conclusion. A
-subscription delivers human review comments and review threads, not just CI, and turns on the
-per-event handler that makes you investigate, plan and reply - which is exactly how a maintenance run
-turns into review work.
+**Then read what it left you.** `reparents` is the only entry that asks anything of you: a base
+change is the one write this credential is refused, so step 1 of the next pass is where it gets
+made. Everything else - `fast_forward`, `landed`, `restacked`, `promoted`,
+`promotion_labels_cleared` - is what happened, for the summary. A `restacked` entry other than
+`pushed` or `up-to-date` is a branch the pass could not publish; the executor has already labelled
+and commented on it, so name it in the summary and move on.
 
-## Pre-flight - before every push, merge or restack, no exceptions
+The one exception is `integration-failed`: integrating the parent failed without conflicting on
+anything, so the branch is not what needs fixing and its owner was deliberately not told. Its
+`explanation` carries what git said - an untracked file in the way, unrelated histories, a
+reference that does not resolve. That is the pass's own environment to fix, so report it in the
+summary as yours rather than the branch owner's, and never label the branch for it.
 
-Never move commits from memory, and never judge the move yourself. Ask:
+If a landed pull request is somehow still open after the pass, report it rather than closing it
+yourself.
 
-```bash
-python .claude/stack/stack.py preflight \
-  --action push --source <branch> --destination <branch> --destination-remote <fork-remote>
-```
+## What this pass never does
 
-Exit 0 means the move is clear. Exit 5 means it must not be made, and every reason is on stderr,
-each tagged with which refusal it is: `not-checked-out`, `mismatched-branch-names`, `not-the-fork`, or
-`false-merge` - a push that would make a child branch an ancestor of its own parent, which GitHub
-reads as a merged pull request and closes. Fix the cause and ask again; never push past a refusal.
-
-Then say in one sentence what you are integrating and why it belongs on that destination.
-
-Step 2's fast-forward is the one push this cannot check: it deliberately maps one ref onto another
-and happens before the board exists, so it exits 3 rather than judging the move. GitHub's own
-non-fast-forward rejection is what guards that push instead, which is why step 2 stops rather than
-forcing.
-
-## Step 4 - restack and validate
-
-Run `python .claude/stack/stack.py restack-plan` for the bottom-up plan. For each entry whose parent
-moved, integrate the parent using its `strategy` (merge is the default and needs no force-push;
-rebase force-pushes with lease) **only if the merge is clean**, run pre-flight, then push. CI is the
-validator.
-
-**If you resolved any conflict while integrating**, comment on that branch's pull request saying so:
-which files conflicted, and what you took for each. A conflict resolution is a change to somebody
-else's branch that they did not make, so it is never allowed to be silent.
-
-**Do not block on CI.** After pushing a branch, move on to the next independent branch and keep
-restacking and promoting in parallel - never sit idle waiting on a long run. Poll the checks of the
-branches you pushed at the start of each pass, and react then.
-
-**A conflict you cannot merge cleanly, or a red check, is not yours to resolve.** You do not debug it
-and you do not fix it. Report it to the branch's owner and move on:
-
-1. Find the session: search the fork pull request body for a `https://claude.ai/code/session_...`
-   link.
-2. Post a comment on the fork pull request, prefixed `🔴 ROUTINE - NEEDS RESOLUTION:`, stating what
-   you were doing, what happened (the conflicting files, or the failing check and its conclusion),
-   and the ask - that they resolve and push, and you will pick the branch back up once it restacks
-   clean. This comment is the only channel available to you; if that session is still subscribed to
-   its own pull request, it arrives there as a live event rather than text sitting on GitHub.
-3. Label the pull request `needs-resolution` (via `stack.py labels`, so the rest of its labels
-   survive) so the state is visible even if no session is listening, and so you never re-attempt the
-   same failing restack every run.
-4. At the start of every restack pass, fetch each `needs-resolution` branch's `mergeable_state`
-   (`pull_request_read` → `get`). GitHub reports `dirty` when the branch has merge conflicts against
-   its base; anything else (`clean`, `unstable`, `blocked`, `behind`, `has_hooks`, `unknown`) means
-   there are no conflicts, whatever else may be true of it. So: clear the label and restack the
-   branch normally unless `mergeable_state` is `dirty`, and skip it only while it is.
-
-Record every branch you report on - the finish summary must list it, since a comment is not
-guaranteed to be seen.
-
-Keep restacking and promoting the other branches while CI works through the ones you pushed. Never
-disable a check to go green.
-
-## Step 5 - promote
-
-Housekeeping first: remove any `cram2-link-sent` label from a fork pull request that is now
-`in-review` or landed - its link has been acted on.
-
-Collect what to promote: `python .claude/stack/stack.py next --porcelain` prints one `name<TAB>pr`
-line per branch that is approved (out of draft), whose parent has reached in-review or landed, and
-that is not withheld by `needs-resolution`. There is no admission cap and no ordering beyond
-dependency order: every such branch promotes in the same run. Skip any already carrying
-`cram2-link-sent` when deciding whether to build a *new* link, but still process the others. If it
-prints nothing, promote nothing.
-
-For each collected pull request, build the compare-and-create link. Do **not** try to open the
-upstream pull request through the API first - the GitHub app has no write access to the upstream, so
-that call is a wasted round trip that fails every time:
-
-```bash
-python .claude/stack/stack.py promotion-link \
-  --branch <branch> --title <title> --body <one paragraph plus a link back to the fork PR>
-```
-
-It owns the URL encoding and the length limit, so the prefill cannot be silently lost - keep the body
-short anyway, and note that it warns on stderr when it had to shorten one.
-
-Then, for that branch:
-
-- **Put the link in the fork pull request's own description**, under a `## Promote` heading, replacing
-  any link already there. The summary is delivered once and then gone; the description persists, so
-  this is where the link is still findable a week later.
-- Add `cram2-link-sent` so later runs do not rebuild it.
-- Do **not** add `in-review`: the upstream pull request is not open until the developer clicks
-  Create, and they add the label then.
+- **It never resolves a conflict** - not the executor, and not you. A conflict is a change to
+  somebody else's branch, so it is reported to its owner and left exactly where it is.
+- **It never opens the upstream pull request.** Do not attempt that call: promotion builds the
+  compare-and-create link and stops there, and the developer clicks Create.
+- **It never debugs or fixes a red check.** Report it to the branch's owner the same way a conflict
+  is reported: find the session link in the fork pull request's description, post a comment prefixed
+  `🔴 ROUTINE - NEEDS RESOLUTION:` stating the failing check and its conclusion, and label the pull
+  request `needs-resolution` via `stack.py labels` so the rest of its labels survive. That comment is
+  the only channel available to you: no session subscribes to a pull request's activity, so it sits
+  on GitHub until the owner reads it - write it to stand alone. Never disable a check to go green.
+- **It never subscribes to learn CI.** Poll with `pull_request_read` → `get_check_runs` /
+  `get_status` and read only the success/failure conclusion. A subscription delivers human review
+  comments and review threads, not just CI, and turns on the per-event handler that makes you
+  investigate, plan and reply - which is exactly how a maintenance run turns into review work.
+- **It never blocks on CI.** Poll the checks of the branches pushed at the start of each pass and
+  react then; do not sit idle waiting on a long run.
+- **It never adds `in-review`.** That is the developer's, once they have clicked Create.
 
 ## Finish
+
+Record every branch reported on this run - the summary must list it, since a comment is not
+guaranteed to be seen.
 
 The **top** of the finish summary must list all pending upstream create-links: any built this run,
 and any fork pull request still carrying `cram2-link-sent` but not yet `in-review` (re-listed from
@@ -282,10 +236,40 @@ nothing new was built, as long as any are pending - a scheduled run is configure
 summary, so the summary *is* the delivery. List each pull request's number, title, branch and
 one-click link.
 
-Right after the links, list every branch you **reported on** this run: its number and branch, the
-conflicting files or failing check, the session link you addressed (or that the body had none), and a
-link to the comment you posted. Then list every pull request whose reparent you could **not**
-complete: its number, the base it is stuck on, the base it should have, and which step of the
-native-stack sequence stopped you - a stack left dissolved or half-rebuilt needs attention
-immediately and nothing else surfaces it. Then summarise what landed, what you restacked (naming any
-conflict you resolved), and what you promoted, plus anything you stopped on.
+Right after the links, list every branch reported on this run: its number and branch, the
+conflicting files or failing check, the session link addressed (or that the body had none), and a
+link to the comment posted. Then list every pull request whose reparent could **not** be completed:
+its number, the base it is stuck on, the base it should have, and which step of the native-stack
+sequence stopped you - a stack left dissolved or half-rebuilt needs attention immediately and
+nothing else surfaces it. Then summarise what landed, what was restacked, and what was promoted,
+plus anything you stopped on.
+
+## Command reference - resuming a partial run
+
+Step 2 performs all of these in order. Reach for one directly only when a run stopped partway, or
+when a single step has to be re-run:
+
+```bash
+python .claude/stack/maintenance.py board --write   # export the fork's open pull requests
+python .claude/stack/maintenance.py fast-forward    # move the fork's base onto the upstream
+python .claude/stack/maintenance.py restack         # integrate every moved parent, publish, report
+python .claude/stack/maintenance.py promote         # build and record every upstream link
+```
+
+Each prints what it did and exits with the same statuses as the whole pass. Run `--help` for a
+command's own flags rather than looking them up here.
+
+`run-report` deletes the board when it finishes, so a resumed run starts by exporting a fresh one.
+
+### Checking a move you make by hand
+
+Never move commits from memory, and never judge the move yourself. The executor checks every push
+it makes; you invoke this only for a push you are making yourself:
+
+```bash
+python .claude/stack/stack.py check-move \
+  --action push --source <branch> --destination <branch> --destination-remote <fork-remote>
+```
+
+Exit 0 means the move is clear. Exit 5 means it must not be made, and every reason is on stderr.
+Fix the cause and ask again; never push past a refusal.

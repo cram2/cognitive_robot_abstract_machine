@@ -26,9 +26,11 @@ personal notes" in any session, or change `CLAUDE.local.md` between the
 - Keep the PR description up to date: after pushing any change that alters
   what the PR does, update the description to match. Never leave it
   describing an earlier state of the PR.
-- Always subscribe to all events on every PR you open — including plain
-  conversation comments, not just inline review comments — and handle each
-  event with an explanation summary in the session chat.
+- Never subscribe to a pull request's activity, and never offer to watch,
+  monitor, babysit or autofix one. Opening a PR ends the session's obligation
+  to it: push it, report in the chat what you did and what is still
+  outstanding, and stop. Ask for a CI failure or a review comment to be
+  handled when you want it handled.
 
 ## Review comments
 

@@ -65,13 +65,13 @@ questions = [
       ],
     },
     {
-      "question": "How do get_specification and get_default_root_specification work together?",
+      "question": "How do get_annotation_specification and get_default_root_kinematic_structure_entity_specification work together?",
       "type": "multiple_choice",
       "answers": [
-        {"answer": "get_default_root_specification builds the root geometry; get_specification wraps it into the annotation specification", "correct": True},
-        {"answer": "get_specification builds the geometry; get_default_root_specification names it", "correct": False},
+        {"answer": "get_default_root_kinematic_structure_entity_specification builds the root geometry; get_annotation_specification wraps it into the annotation specification", "correct": True},
+        {"answer": "get_annotation_specification builds the geometry; get_default_root_kinematic_structure_entity_specification names it", "correct": False},
         {"answer": "They are alternatives: each returns a complete annotation specification", "correct": False},
-        {"answer": "get_default_root_specification spawns the root; get_specification registers the annotation", "correct": False}
+        {"answer": "get_default_root_kinematic_structure_entity_specification spawns the root; get_annotation_specification registers the annotation", "correct": False}
       ],
     },
     {

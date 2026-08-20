@@ -36,6 +36,8 @@ from robokudo.io.ros import init_node
 from robokudo.utils.logging_configuration import configure_logging
 from robokudo.utils.module_loader import ModuleLoader
 from robokudo.utils.tree import setup_with_descendants_rk
+from robokudo.vis.cv_visualizer import CVVisualizer
+from robokudo.vis.ros_visualizer import AllAnnotatorROSVisualizer, SharedROSVisualizer
 
 if TYPE_CHECKING:
     from py_trees_ros.trees import BehaviourTree
@@ -126,6 +128,16 @@ def main() -> None:
     )
     parser.set_defaults(headless=False)
     parser.add_argument(
+        "_no3d",
+        action="store_true",
+        help=(
+            "If set, runs the GUI without the Open3D viewer, keeping the OpenCV and "
+            "ROS visualizers. Use this if the Open3D viewer crashes in your display "
+            "environment."
+        ),
+    )
+    parser.set_defaults(no3d=False)
+    parser.add_argument(
         "_nodesuffix",
         dest="nodesuffix",
         type=str,
@@ -215,8 +227,18 @@ def main() -> None:
 
     # 8. Build your Behavior Tree from the loaded AE
     #    (Assuming loaded_ae.implementation() returns a py_trees root or something similar)
+    visualizer_types = None
+    if args.no3d:
+        visualizer_types = [
+            CVVisualizer,
+            SharedROSVisualizer,
+            AllAnnotatorROSVisualizer,
+        ]
     ae_root = grow_tree(
-        loaded_ae.implementation(), node=node1, include_gui=not args.headless
+        loaded_ae.implementation(),
+        node=node1,
+        include_gui=not args.headless,
+        visualizer_types=visualizer_types,
     )
 
     # If you have a custom version of `setup_with_descendants`, call it:

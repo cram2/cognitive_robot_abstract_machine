@@ -38,13 +38,13 @@ class TestNodeAssertionError(GiskardException):
 
 @dataclass(eq=False, repr=False)
 class ConstTrueNode(MotionStatechartNode):
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar.const_true())
 
 
 @dataclass(eq=False, repr=False)
 class ConstFalseNode(MotionStatechartNode):
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar.const_false())
 
 
@@ -81,7 +81,7 @@ class TestGoal(Goal):
         self.sub_node1.end_condition = self.sub_node1.observation_variable
         self.sub_node2.start_condition = self.sub_node1.observation_variable
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=self.sub_node2.observation_variable)
 
 
@@ -95,7 +95,7 @@ class TestNestedGoal(Goal):
         self.inner = TestGoal(name="inner")
         self.add_node(self.inner)
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar(self.inner.observation_variable))
 
 
@@ -131,7 +131,7 @@ class TestRunAfterStop(Goal):
         )
         self.cancel.start_condition = self.ticking1.observation_variable
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar(self.ticking2.observation_variable))
 
 
@@ -160,7 +160,7 @@ class TestEndBeforeStart(Goal):
         self.node3.start_condition = self.node1.observation_variable
         self.node3.end_condition = self.node2.observation_variable
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar(self.node3.observation_variable))
 
 
@@ -200,7 +200,7 @@ class TestRunAfterStopFromPause(Goal):
         self.ticking2.pause_condition = self.pulse.observation_variable
         self.cancel.start_condition = self.ticking2.observation_variable
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar(self.ticking1.observation_variable))
 
 
@@ -232,7 +232,7 @@ class TestUnpauseUnknownFromParentPause(Goal):
         self.count_ticks1.pause_condition = sm.Scalar.const_trinary_unknown()
         self.count_ticks1.end_condition = self.count_ticks1.observation_variable
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(
             observation=sm.Scalar(self.count_ticks1.observation_variable)
         )

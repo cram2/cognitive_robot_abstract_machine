@@ -60,6 +60,7 @@ from experiments.experiment_definitions import (
     MeanAndStandardDeviation,
     PercentageBound,
     TypstRenderer,
+    Unit,
     VolumeBound,
 )
 from experiments.free_space_volume_estimation import MonteCarloFreeSpaceSampler
@@ -114,7 +115,7 @@ class GraphOfConvexSetsFreespaceExperimentResult(ExperimentResult):
     Number of obstacle bounding boxes found in the world.
     """
 
-    free_space_computation_duration_milliseconds: MeanAndStandardDeviation
+    free_space_computation_duration: MeanAndStandardDeviation
     """
     Time to compute the free-space event via ``subtract_disjoint`` (mean ± standard
     deviation).
@@ -125,7 +126,7 @@ class GraphOfConvexSetsFreespaceExperimentResult(ExperimentResult):
     Number of simple sets (axis-aligned boxes) in the resulting free-space event.
     """
 
-    materialise_duration_milliseconds: MeanAndStandardDeviation
+    materialise_duration: MeanAndStandardDeviation
     """
     Time to convert the free-space event into a :class:`BoundingBoxCollection` (mean ±
     standard deviation).
@@ -136,7 +137,7 @@ class GraphOfConvexSetsFreespaceExperimentResult(ExperimentResult):
     Number of bounding boxes in the materialised free-space collection.
     """
 
-    connectivity_duration_milliseconds: MeanAndStandardDeviation
+    connectivity_duration: MeanAndStandardDeviation
     """
     Time to build the R-tree intersection graph (mean ± standard deviation).
     """
@@ -151,7 +152,7 @@ class GraphOfConvexSetsFreespaceExperimentResult(ExperimentResult):
     Number of edges (adjacencies) in the connectivity graph.
     """
 
-    box_construction_duration_milliseconds: MeanAndStandardDeviation
+    box_construction_duration: MeanAndStandardDeviation
     """
     Time to build a complete, query-ready :class:`GraphOfBoundingBoxes` from an already-
     loaded world via ``GraphOfBoundingBoxes.free_space_from_world`` (mean ± standard
@@ -159,7 +160,7 @@ class GraphOfConvexSetsFreespaceExperimentResult(ExperimentResult):
 
     World loading is excluded: by the time a navigation goal arrives, the world is
     already loaded, so this is the number directly comparable to
-    :attr:`graph_of_convex_polygons_construction_duration_milliseconds` for deciding
+    :attr:`graph_of_convex_polygons_construction_duration` for deciding
     which GCS implementation is faster to construct.
     """
 
@@ -194,15 +195,13 @@ class GraphOfConvexSetsFreespaceExperimentResult(ExperimentResult):
     meshes for the upper end.
     """
 
-    graph_of_convex_polygons_construction_duration_milliseconds: (
-        MeanAndStandardDeviation
-    )
+    graph_of_convex_polygons_construction_duration: MeanAndStandardDeviation
     """
     Time to grow the IRIS regions via ``GraphOfConvexPolygons.from_world`` on the
     already-loaded world (mean ± standard deviation).
 
-    Directly comparable to :attr:`box_construction_duration_milliseconds`, since both
-    measure construction from the same loaded world with world loading excluded.
+    Directly comparable to :attr:`box_construction_duration`, since both measure
+    construction from the same loaded world with world loading excluded.
     """
 
     graph_of_convex_polygons_region_count: int
@@ -465,28 +464,30 @@ class GraphOfConvexSetsFreespaceBenchmark:
                 world_loading_duration_milliseconds, 2
             ),
             obstacle_count=len(obstacle_bounding_boxes),
-            free_space_computation_duration_milliseconds=self._to_mean_and_standard_deviation_milliseconds(
-                free_space_elapsed
-            ),
+            free_space_computation_duration=MeanAndStandardDeviation.from_measurements(
+                free_space_elapsed, unit=Unit.SECONDS
+            ).to(Unit.MILLISECONDS),
             free_space_simple_set_count=free_space_simple_set_count,
-            materialise_duration_milliseconds=self._to_mean_and_standard_deviation_milliseconds(
-                materialise_elapsed
-            ),
+            materialise_duration=MeanAndStandardDeviation.from_measurements(
+                materialise_elapsed, unit=Unit.SECONDS
+            ).to(Unit.MILLISECONDS),
             free_space_bounding_box_count=len(free_space_collection),
-            connectivity_duration_milliseconds=self._to_mean_and_standard_deviation_milliseconds(
-                connectivity_elapsed
-            ),
+            connectivity_duration=MeanAndStandardDeviation.from_measurements(
+                connectivity_elapsed, unit=Unit.SECONDS
+            ).to(Unit.MILLISECONDS),
             graph_node_count=len(connectivity_graph.graph.nodes()),
             graph_edge_count=len(connectivity_graph.graph.edges()),
-            box_construction_duration_milliseconds=self._to_mean_and_standard_deviation_milliseconds(
-                box_construction_elapsed
-            ),
+            box_construction_duration=MeanAndStandardDeviation.from_measurements(
+                box_construction_elapsed, unit=Unit.SECONDS
+            ).to(Unit.MILLISECONDS),
             mesh_obstacle_volume_total=round(mesh_obstacle_volume_total, 4),
             naive_free_volume_lower_bound=round(naive_free_volume_lower_bound, 4),
             box_free_space_volume=round(box_free_space_volume, 4),
             true_free_volume_bound=true_free_volume_bound,
-            graph_of_convex_polygons_construction_duration_milliseconds=self._to_mean_and_standard_deviation_milliseconds(
-                polygon_construction_elapsed
+            graph_of_convex_polygons_construction_duration=MeanAndStandardDeviation.from_measurements(
+                polygon_construction_elapsed, unit=Unit.SECONDS
+            ).to(
+                Unit.MILLISECONDS
             ),
             graph_of_convex_polygons_region_count=graph_of_convex_polygons.region_count,
             graph_of_convex_polygons_region_volume_sum=round(region_volume_sum, 4),
@@ -520,23 +521,6 @@ class GraphOfConvexSetsFreespaceBenchmark:
             result = function_to_time()
             elapsed_times.append(time.perf_counter() - start)
         return result, elapsed_times
-
-    @staticmethod
-    def _to_mean_and_standard_deviation_milliseconds(
-        elapsed_seconds: List[float],
-    ) -> MeanAndStandardDeviation:
-        """
-        Convert a list of raw elapsed-seconds values to a
-        :class:`MeanAndStandardDeviation` in milliseconds.
-
-        :param elapsed_seconds: Raw timing samples in seconds, as returned by the second
-            element of :meth:`_measure`.
-        :type elapsed_seconds: list[float]
-        :returns: Mean and standard deviation of the samples converted to milliseconds.
-        """
-        return MeanAndStandardDeviation.from_measurements(
-            [seconds * 1000.0 for seconds in elapsed_seconds]
-        )
 
     @staticmethod
     def _collect_obstacles(world: World) -> List[BoundingBox]:

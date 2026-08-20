@@ -13,7 +13,6 @@ from krrood.symbolic_math.exceptions import (
 )
 from krrood.symbolic_math.symbolic_math import FloatVariable, SymbolicMathType
 
-
 hidden_index_name = "__FLOAT_VARIABLE_INDEX__"
 
 
@@ -91,6 +90,20 @@ class FloatVariableData:
             self.data[variable_index] = value
         else:
             self.data[variable_index : variable_index + len(value)] = value
+
+    def get_value(self, variable: FloatVariable) -> float:
+        """
+        Read the managed value of a single free variable.
+
+        Unlike :meth:`SymbolicMathType.evaluate`, this reads the stored value directly
+        instead of compiling and evaluating the expression.
+        :param variable: The variable to read the value of.
+        :return: The value currently stored for the variable.
+        """
+        if not hasattr(variable, hidden_index_name):
+            raise SymbolicMathExpressionNotRegisteredError(variable)
+
+        return self.data[getattr(variable, hidden_index_name)]
 
     @property
     def mapping(self) -> dict[FloatVariable, float]:

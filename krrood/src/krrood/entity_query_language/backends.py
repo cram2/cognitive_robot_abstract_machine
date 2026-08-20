@@ -1,11 +1,13 @@
 import enum
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
+from types import NoneType
 from typing import Iterable, TypeVar
 
 from sqlalchemy.orm import sessionmaker
 from typing_extensions import ClassVar, Dict, Optional
 
+from krrood import logger
 from krrood.entity_query_language.verbalization.vocabulary.english import Directive
 
 from krrood.entity_query_language.core.base_expressions import (
@@ -24,13 +26,19 @@ from krrood.entity_query_language.factories import entity, set_of, variable
 from krrood.entity_query_language.query.match import Match, AttributeMatch
 from krrood.entity_query_language.query.query import Query
 from krrood.ormatic.eql_interface import eql_to_sql
-from krrood.parametrization.model_registries import (
-    ModelRegistry,
-    FullyFactorizedRegistry,
-)
-from krrood.parametrization.parameterizer import (
-    UnderspecifiedParameters,
-)
+try:
+    from krrood.parametrization.model_registries import (
+        ModelRegistry,
+        FullyFactorizedRegistry,
+    )
+    from krrood.parametrization.parameterizer import (
+        UnderspecifiedParameters,
+    )
+except ImportError as e:
+    logger.debug(f"Couldn't import probabilistic model needed classes: {e}")
+    ModelRegistry = NoneType
+    FullyFactorizedRegistry = NoneType
+    UnderspecifiedParameters = NoneType
 
 T = TypeVar("T")
 

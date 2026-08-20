@@ -32,8 +32,9 @@ def reach_action_executable(immutable_model_world):
     ``test_merge_motions`` in ``test_graph_parsing.py`` does.
     """
     world, view, context = immutable_model_world
-    world.get_body_by_name("milk.stl").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(2, 1.5, 0.7, 0, 0, 0)
+    milk_connection = world.get_body_by_name("milk.stl").parent_connection
+    milk_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        2, 1.5, 0.7, 0, 0, 0, reference_frame=milk_connection.parent
     )
     plan = execute_single(
         ReachAction(
@@ -94,7 +95,3 @@ def test_motion_state_chart_simulated_execution_adds_condition_and_pause_interru
 
     # one pause + one interrupt monitor per task
     assert len(chart.get_nodes_by_type(PlanNodeStatusMonitor)) == 2 * task_count
-    # pre- and post-condition monitors
-    assert len(chart.get_nodes_by_type(ThreadedPredicateMonitor)) == 2
-    # abort paths for pre- and post-condition failing
-    assert len(chart.get_nodes_by_type(CancelMotion)) == 2

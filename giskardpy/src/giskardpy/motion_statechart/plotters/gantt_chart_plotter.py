@@ -6,7 +6,6 @@ from typing import Dict, TYPE_CHECKING, List
 
 import matplotlib.pyplot as plt
 import numpy as np
-from mpl_toolkits.axes_grid1 import make_axes_locatable, axes_size
 
 from giskardpy.motion_statechart.plotters.styles import (
     LiftCycleStateToColor,
@@ -62,6 +61,11 @@ class HistoryGanttChartPlotter:
     final_state_band_height_in_cm: float = 0.5
     """
     Height of the final state band in cm.
+    """
+
+    gap_between_axes_in_inches: float = 0.25
+    """
+    Horizontal gap between the main timeline and the final state column.
     """
 
     @property
@@ -150,9 +154,8 @@ class HistoryGanttChartPlotter:
         dimensions, padding, and margins to ensure proper alignment and display of node
         labels.
 
-        :param ordered_nodes: A list of MotionStatechartNode objects representing the
-            nodes to be plotted.
-        :type ordered_nodes: List[MotionStatechartNode]
+        :param ordered_nodes: The nodes to be plotted, in the order they appear on the
+            y-axis.
         :return: A tuple containing the main axis and the fixed-width final-state axis.
         """
         # Build node label list early so we can size the right margin adaptively
@@ -173,7 +176,6 @@ class HistoryGanttChartPlotter:
         final_w_inches = (
             self.final_state_band_height_in_cm * inches_per_unit
         )  # inches, fixed
-        pad_inches = 0.25
         # Base margins in inches
         left_margin_inches = 0.3
         bottom_margin_inches = 0.5
@@ -187,52 +189,39 @@ class HistoryGanttChartPlotter:
         fig_w_inches = (
             left_margin_inches
             + main_w_inches
-            + pad_inches
+            + self.gap_between_axes_in_inches
             + final_w_inches
             + right_margin_inches
         )
         fig_h_inches = self.figure_height
 
-        fig, ax_main = plt.subplots(
-            figsize=(fig_w_inches, fig_h_inches), constrained_layout=False
-        )
-        # Apply margins explicitly
-        fig.subplots_adjust(
-            left=left_margin_inches / fig_w_inches,
-            right=1 - right_margin_inches / fig_w_inches,
-            bottom=bottom_margin_inches / fig_h_inches,
-            top=1 - top_margin_inches / fig_h_inches,
-        )
+        fig = plt.figure(figsize=(fig_w_inches, fig_h_inches))
 
-        # Compute inner area (after margins) and set main axis position to exact width
-        inner_left = left_margin_inches / fig_w_inches
+        # Both axes are placed by hand so their widths stay fixed in inches,
+        # independent of the figure size the margins add up to.
         inner_bottom = bottom_margin_inches / fig_h_inches
         inner_top = 1 - top_margin_inches / fig_h_inches
-        inner_h_norm = inner_top - inner_bottom
-        # Pre-allocate extra width equal to (final width + pad). axes_grid1 will
-        # carve that space out from ax_main when appending the right axis, leaving
-        # the main axis with exactly main_w_inches of drawable width.
-        preallocated_main_w_inches = main_w_inches + final_w_inches + pad_inches
-        main_w_norm_of_fig = preallocated_main_w_inches / fig_w_inches
-        ax_main.set_position(
+        inner_height_in_figure_fraction = inner_top - inner_bottom
+
+        ax_main = fig.add_axes(
             [
-                inner_left,
+                left_margin_inches / fig_w_inches,
                 inner_bottom,
-                main_w_norm_of_fig,
-                inner_h_norm,
+                main_w_inches / fig_w_inches,
+                inner_height_in_figure_fraction,
             ]
         )
-
         ax_main.grid(True, axis="x", zorder=-1)
 
-        # Append a fixed-width final-state axis on the right with a fixed pad
-        divider = make_axes_locatable(ax_main)
-        ax_final = divider.append_axes(
-            "right",
-            size=axes_size.Fixed(final_w_inches),
-            pad=axes_size.Fixed(pad_inches),
+        ax_final = fig.add_axes(
+            [
+                (left_margin_inches + main_w_inches + self.gap_between_axes_in_inches)
+                / fig_w_inches,
+                inner_bottom,
+                final_w_inches / fig_w_inches,
+                inner_height_in_figure_fraction,
+            ],
             sharey=ax_main,
-            axes_class=ax_main.__class__,
         )
         return ax_main, ax_final
 

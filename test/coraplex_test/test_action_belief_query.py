@@ -197,7 +197,7 @@ def test_predict_feasible_matches_run_on_the_same_scenario(immutable_model_world
     world, view, context = immutable_model_world
     milk = world.get_body_by_name("milk.stl")
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        2, 1.5, 0.7, 0, 0, 0
+        2, 1.5, 0.7, 0, 0, 0, reference_frame=world.root
     )
     action = PickUpAction(milk, Arms.RIGHT, _right_front_grasp(view))
     execute_single(action_like=action, context=context)
@@ -228,7 +228,7 @@ def test_run_ranks_feasible_candidates_and_rejects_the_rest(immutable_model_worl
     world, view, context = immutable_model_world
     milk = world.get_body_by_name("milk.stl")
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        2, 1.5, 0.7, 0, 0, 0
+        2, 1.5, 0.7, 0, 0, 0, reference_frame=world.root
     )
 
     query = ActionBeliefQuery(
@@ -278,7 +278,7 @@ def test_run_reports_zero_posterior_when_nothing_is_feasible(immutable_model_wor
     world, view, context = immutable_model_world
     milk = world.get_body_by_name("milk.stl")
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        5, 5, 0.7, 0, 0, 0
+        5, 5, 0.7, 0, 0, 0, reference_frame=world.root
     )
 
     query = ActionBeliefQuery(
@@ -309,7 +309,7 @@ def test_prior_reweights_the_chosen_candidate(immutable_model_world):
     world, view, context = immutable_model_world
     milk = world.get_body_by_name("milk.stl")
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        2, 1.5, 0.7, 0, 0, 0
+        2, 1.5, 0.7, 0, 0, 0, reference_frame=world.root
     )
 
     favored_candidate = {

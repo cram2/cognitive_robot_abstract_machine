@@ -38,7 +38,6 @@ class MoveMotion(BaseMotion):
                 odom_connection=self.robot.root.parent_connection,
             )
             if GiskardExecutable.execution_type == ExecutionType.SIMULATED
-            and self.context.teleport_to_navigate_in_simulation
             else CartesianPose(
                 root_link=self.world.root,
                 tip_link=self.robot.root,

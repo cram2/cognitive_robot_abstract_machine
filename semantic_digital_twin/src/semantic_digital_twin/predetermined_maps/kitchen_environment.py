@@ -201,11 +201,21 @@ class KitchenEnvironment:
         """
         Adds furniture items and room layouts to the scene graph.
         """
+
+        # Angular velocity limit of a hinged door in rad/s.
+        # Taken from the revolute joint limits of the apartment description in ``iai_apartment``,
+        # which uses this value for every one of its hinged doors.
+        hinged_door_velocity_limit = np.pi / 2
+
+        # Linear velocity limit of a sliding drawer in m/s.
+        # Taken from the prismatic joint limits of the apartment description in ``iai_apartment``.
+        sliding_drawer_velocity_limit = 0.5
+
         with world.modify_world():
             # --- TRASH CAN ---
-            trash_can = TrashCan.get_specification(
+            trash_can = TrashCan.get_annotation_specification(
                 "trash_can",
-                TrashCan.get_default_root_specification(
+                TrashCan.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(x=0.30, y=0.30, z=0.40), wall_thickness=0.02
                 ),
             ).spawn(
@@ -223,9 +233,9 @@ class KitchenEnvironment:
                 x=0.537, y=-2.181, z=fridge_height / 2, yaw=-np.pi / 2
             )
 
-            refrigerator = Fridge.get_specification(
+            refrigerator = Fridge.get_annotation_specification(
                 "refrigerator",
-                Fridge.get_default_root_specification(
+                Fridge.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(x=fridge_length, y=fridge_width, z=fridge_height),
                     wall_thickness=0.02,
                 ),
@@ -247,8 +257,12 @@ class KitchenEnvironment:
                 parent_connection_specification=Hinge.parent_connection_specification(
                     axis=Vector3.Z(),
                     dof_limits=DegreeOfFreedomLimits(
-                        lower=DerivativeMap[float](position=0.0),
-                        upper=DerivativeMap[float](position=np.pi / 2),
+                        lower=DerivativeMap[float](
+                            position=0.0, velocity=-hinged_door_velocity_limit
+                        ),
+                        upper=DerivativeMap[float](
+                            position=np.pi / 2, velocity=hinged_door_velocity_limit
+                        ),
                     ),
                 ),
             )
@@ -287,8 +301,12 @@ class KitchenEnvironment:
                 parent_connection_specification=Slider.parent_connection_specification(
                     axis=Vector3.NEGATIVE_X(),
                     dof_limits=DegreeOfFreedomLimits(
-                        lower=DerivativeMap[float](position=0.0),
-                        upper=DerivativeMap[float](position=0.5),
+                        lower=DerivativeMap[float](
+                            position=0.0, velocity=-sliding_drawer_velocity_limit
+                        ),
+                        upper=DerivativeMap[float](
+                            position=0.5, velocity=sliding_drawer_velocity_limit
+                        ),
                     ),
                 ),
             )
@@ -306,9 +324,9 @@ class KitchenEnvironment:
                     x=-0.02, y=fridge_width / 2 - 0.03, roll=np.pi / 2
                 )
             )
-            fridge_door_handle = Handle.get_specification(
+            fridge_door_handle = Handle.get_annotation_specification(
                 "fridge_door_handle",
-                Handle.get_default_root_specification(
+                Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(x=handle_depth, y=0.5, z=handle_thickness),
                     thickness=handle_thickness,
                 ),
@@ -323,9 +341,9 @@ class KitchenEnvironment:
                     x=-0.26, z=drawer_height / 2 - 0.03
                 )
             )
-            fridge_drawer_handle = Handle.get_specification(
+            fridge_drawer_handle = Handle.get_annotation_specification(
                 "fridge_drawer_handle",
-                Handle.get_default_root_specification(
+                Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(x=0.04, y=0.5, z=0.02), thickness=0.02
                 ),
             ).spawn(world, parent_T_self=drawer_handle_world_pose)
@@ -378,9 +396,9 @@ class KitchenEnvironment:
                     y=-counter_top_length / 2 + module_1_width / 2
                 )
             )
-            module_1_cabinet = Cabinet.get_specification(
+            module_1_cabinet = Cabinet.get_annotation_specification(
                 "module_1_cabinet",
-                Cabinet.get_default_root_specification(
+                Cabinet.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
                         x=counter_top_depth, y=module_1_width, z=counter_top_height
                     ),
@@ -403,8 +421,12 @@ class KitchenEnvironment:
                 parent_connection_specification=Hinge.parent_connection_specification(
                     axis=Vector3.Z(),
                     dof_limits=DegreeOfFreedomLimits(
-                        lower=DerivativeMap[float](position=0.0),
-                        upper=DerivativeMap[float](position=np.pi / 2),
+                        lower=DerivativeMap[float](
+                            position=0.0, velocity=-hinged_door_velocity_limit
+                        ),
+                        upper=DerivativeMap[float](
+                            position=np.pi / 2, velocity=hinged_door_velocity_limit
+                        ),
                     ),
                 ),
             )
@@ -420,9 +442,9 @@ class KitchenEnvironment:
             module_1_door.add(module_1_hinge)
             module_1_cabinet.add(module_1_door)
 
-            module_1_handle = Handle.get_specification(
+            module_1_handle = Handle.get_annotation_specification(
                 "module_1_handle",
-                Handle.get_default_root_specification(
+                Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(x=0.04, y=module_1_width - 0.06, z=0.02),
                     thickness=0.02,
                 ),
@@ -444,9 +466,9 @@ class KitchenEnvironment:
                     y=-counter_top_length / 2 + module_1_width + module_2_width / 2
                 )
             )
-            dishwasher = Dishwasher.get_specification(
+            dishwasher = Dishwasher.get_annotation_specification(
                 "dishwasher",
-                Dishwasher.get_default_root_specification(
+                Dishwasher.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
                         x=counter_top_depth, y=module_2_width, z=counter_top_height
                     ),
@@ -469,8 +491,12 @@ class KitchenEnvironment:
                 parent_connection_specification=Hinge.parent_connection_specification(
                     axis=Vector3.NEGATIVE_Y(),
                     dof_limits=DegreeOfFreedomLimits(
-                        lower=DerivativeMap[float](position=0.0),
-                        upper=DerivativeMap[float](position=np.pi / 2),
+                        lower=DerivativeMap[float](
+                            position=0.0, velocity=-hinged_door_velocity_limit
+                        ),
+                        upper=DerivativeMap[float](
+                            position=np.pi / 2, velocity=hinged_door_velocity_limit
+                        ),
                     ),
                 ),
             )
@@ -488,9 +514,9 @@ class KitchenEnvironment:
             module_2_door.add(module_2_hinge)
             dishwasher.add(module_2_door)
 
-            module_2_handle = Handle.get_specification(
+            module_2_handle = Handle.get_annotation_specification(
                 "dishwasher_handle",
-                Handle.get_default_root_specification(
+                Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(x=0.04, y=module_2_width - 0.06, z=0.02),
                     thickness=0.02,
                 ),
@@ -512,9 +538,9 @@ class KitchenEnvironment:
                     y=counter_top_length / 2 - module_3_width / 2
                 )
             )
-            module_3_cabinet = Cabinet.get_specification(
+            module_3_cabinet = Cabinet.get_annotation_specification(
                 "module_3_cabinet",
-                Cabinet.get_default_root_specification(
+                Cabinet.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
                         x=counter_top_depth, y=module_3_width, z=counter_top_height
                     ),
@@ -554,8 +580,12 @@ class KitchenEnvironment:
                     parent_connection_specification=Slider.parent_connection_specification(
                         axis=Vector3.NEGATIVE_X(),
                         dof_limits=DegreeOfFreedomLimits(
-                            lower=DerivativeMap[float](position=0.0),
-                            upper=DerivativeMap[float](position=0.25),
+                            lower=DerivativeMap[float](
+                                position=0.0, velocity=-sliding_drawer_velocity_limit
+                            ),
+                            upper=DerivativeMap[float](
+                                position=0.25, velocity=sliding_drawer_velocity_limit
+                            ),
                         ),
                     ),
                 )
@@ -571,9 +601,9 @@ class KitchenEnvironment:
                         x=-0.16, z=height / 2 - 0.03
                     )
                 )
-                handle = Handle.get_specification(
+                handle = Handle.get_annotation_specification(
                     f"counter_drawer_{i}_handle",
-                    Handle.get_default_root_specification(
+                    Handle.get_default_root_kinematic_structure_entity_specification(
                         scale=Scale(x=0.04, y=module_3_width - 0.06, z=0.02),
                         thickness=0.02,
                     ),
@@ -587,9 +617,9 @@ class KitchenEnvironment:
             tower_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=3.51, y=-2.181, z=oven_height / 2, yaw=-np.pi / 2
             )
-            tower = Cupboard.get_specification(
+            tower = Cupboard.get_annotation_specification(
                 "oven_tower",
-                Cupboard.get_default_root_specification(
+                Cupboard.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(x=oven_depth, y=oven_width, z=oven_height),
                     wall_thickness=0.02,
                 ),
@@ -619,7 +649,15 @@ class KitchenEnvironment:
                     name=f"oven_side_drawer_{side_name}_slider",
                     world_root_T_self=drawer_pose,
                     parent_connection_specification=Slider.parent_connection_specification(
-                        axis=Vector3.NEGATIVE_X()
+                        axis=Vector3.NEGATIVE_X(),
+                        dof_limits=DegreeOfFreedomLimits(
+                            lower=DerivativeMap[float](
+                                velocity=-sliding_drawer_velocity_limit
+                            ),
+                            upper=DerivativeMap[float](
+                                velocity=sliding_drawer_velocity_limit
+                            ),
+                        ),
                     ),
                 )
                 drawer.add(slider)
@@ -634,9 +672,9 @@ class KitchenEnvironment:
                         x=-oven_depth / 2, roll=np.pi / 2
                     )
                 )
-                handle = Handle.get_specification(
+                handle = Handle.get_annotation_specification(
                     f"oven_side_handle_{side_name}",
-                    Handle.get_default_root_specification(
+                    Handle.get_default_root_kinematic_structure_entity_specification(
                         scale=Scale(x=0.04, y=oven_height - 0.08, z=0.02),
                         thickness=0.02,
                     ),
@@ -662,8 +700,12 @@ class KitchenEnvironment:
                 parent_connection_specification=Hinge.parent_connection_specification(
                     axis=Vector3.Z(),
                     dof_limits=DegreeOfFreedomLimits(
-                        lower=DerivativeMap[float](position=0.0),
-                        upper=DerivativeMap[float](position=np.pi / 2),
+                        lower=DerivativeMap[float](
+                            position=0.0, velocity=-hinged_door_velocity_limit
+                        ),
+                        upper=DerivativeMap[float](
+                            position=np.pi / 2, velocity=hinged_door_velocity_limit
+                        ),
                     ),
                 ),
             )
@@ -679,9 +721,9 @@ class KitchenEnvironment:
             oven_cabinet_door.add(oven_cabinet_hinge)
             tower.add(oven_cabinet_door)
 
-            oven_cabinet_handle = Handle.get_specification(
+            oven_cabinet_handle = Handle.get_annotation_specification(
                 "oven_cabinet_handle",
-                Handle.get_default_root_specification(
+                Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(x=0.04, y=center_width - 0.06, z=0.02),
                     thickness=0.02,
                 ),
@@ -715,8 +757,12 @@ class KitchenEnvironment:
                 parent_connection_specification=Slider.parent_connection_specification(
                     axis=Vector3.NEGATIVE_X(),
                     dof_limits=DegreeOfFreedomLimits(
-                        lower=DerivativeMap[float](position=0.0),
-                        upper=DerivativeMap[float](position=0.25),
+                        lower=DerivativeMap[float](
+                            position=0.0, velocity=-sliding_drawer_velocity_limit
+                        ),
+                        upper=DerivativeMap[float](
+                            position=0.25, velocity=sliding_drawer_velocity_limit
+                        ),
                     ),
                 ),
             )
@@ -753,8 +799,12 @@ class KitchenEnvironment:
                 parent_connection_specification=Hinge.parent_connection_specification(
                     axis=Vector3.NEGATIVE_Y(),
                     dof_limits=DegreeOfFreedomLimits(
-                        lower=DerivativeMap[float](position=0.0),
-                        upper=DerivativeMap[float](position=np.pi / 2),
+                        lower=DerivativeMap[float](
+                            position=0.0, velocity=-hinged_door_velocity_limit
+                        ),
+                        upper=DerivativeMap[float](
+                            position=np.pi / 2, velocity=hinged_door_velocity_limit
+                        ),
                     ),
                 ),
             )
@@ -773,9 +823,9 @@ class KitchenEnvironment:
             oven_door.add(oven_hinge)
             oven.add(oven_door)
 
-            oven_handle = Handle.get_specification(
+            oven_handle = Handle.get_annotation_specification(
                 "oven_handle",
-                Handle.get_default_root_specification(
+                Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(x=0.04, y=center_width - 0.06, z=0.02),
                     thickness=0.02,
                 ),
@@ -809,9 +859,9 @@ class KitchenEnvironment:
             for shape in sideboard.root.visual.shapes:
                 shape.color = Color.WHITE()
 
-            sideboard_cabinet = Cabinet.get_specification(
+            sideboard_cabinet = Cabinet.get_annotation_specification(
                 "sideboard_cabinet",
-                Cabinet.get_default_root_specification(
+                Cabinet.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(sideboard_width, sideboard_length, sideboard_height),
                     wall_thickness=0.02,
                 ),
@@ -873,8 +923,14 @@ class KitchenEnvironment:
                         parent_connection_specification=Slider.parent_connection_specification(
                             axis=Vector3.NEGATIVE_X(),
                             dof_limits=DegreeOfFreedomLimits(
-                                lower=DerivativeMap[float](position=0.0),
-                                upper=DerivativeMap[float](position=0.25),
+                                lower=DerivativeMap[float](
+                                    position=0.0,
+                                    velocity=-sliding_drawer_velocity_limit,
+                                ),
+                                upper=DerivativeMap[float](
+                                    position=0.25,
+                                    velocity=sliding_drawer_velocity_limit,
+                                ),
                             ),
                         ),
                     )
@@ -890,9 +946,9 @@ class KitchenEnvironment:
                             x=-0.2, z=sideboard_drawer_height / 2 - 0.05
                         )
                     )
-                    handle = Handle.get_specification(
+                    handle = Handle.get_annotation_specification(
                         f"{drawer_id}_handle",
-                        Handle.get_default_root_specification(
+                        Handle.get_default_root_kinematic_structure_entity_specification(
                             scale=Scale(0.04, width - 0.1, 0.02),
                             thickness=0.02,
                         ),
@@ -921,9 +977,9 @@ class KitchenEnvironment:
             cupboard_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=4.55, y=4.72, z=1.01
             )
-            cupboard = Cupboard.get_specification(
+            cupboard = Cupboard.get_annotation_specification(
                 "cupboard",
-                Cupboard.get_default_root_specification(
+                Cupboard.get_default_root_kinematic_structure_entity_specification(
                     scale=cupboard_scale, wall_thickness=0.02
                 ),
             ).spawn(world, parent_T_self=cupboard_pose)
@@ -964,8 +1020,14 @@ class KitchenEnvironment:
                     parent_connection_specification=Hinge.parent_connection_specification(
                         axis=Vector3.Z(),
                         dof_limits=DegreeOfFreedomLimits(
-                            lower=DerivativeMap[float](position=limits[0]),
-                            upper=DerivativeMap[float](position=limits[1]),
+                            lower=DerivativeMap[float](
+                                position=limits[0],
+                                velocity=-hinged_door_velocity_limit,
+                            ),
+                            upper=DerivativeMap[float](
+                                position=limits[1],
+                                velocity=hinged_door_velocity_limit,
+                            ),
                         ),
                     ),
                 )
@@ -983,9 +1045,9 @@ class KitchenEnvironment:
                 door.add(hinge)
                 cupboard.add(door)
 
-                handle = Handle.get_specification(
+                handle = Handle.get_annotation_specification(
                     f"cupboard_handle_{side}",
-                    Handle.get_default_root_specification(
+                    Handle.get_default_root_kinematic_structure_entity_specification(
                         scale=Scale(0.04, 0.04, 0.04),
                         thickness=0.02,
                     ),
@@ -1127,8 +1189,12 @@ class KitchenEnvironment:
                     parent_connection_specification=Slider.parent_connection_specification(
                         axis=Vector3.NEGATIVE_X(),
                         dof_limits=DegreeOfFreedomLimits(
-                            lower=DerivativeMap[float](position=0.0),
-                            upper=DerivativeMap[float](position=0.40),
+                            lower=DerivativeMap[float](
+                                position=0.0, velocity=-sliding_drawer_velocity_limit
+                            ),
+                            upper=DerivativeMap[float](
+                                position=0.40, velocity=sliding_drawer_velocity_limit
+                            ),
                         ),
                     ),
                 )
@@ -1144,9 +1210,9 @@ class KitchenEnvironment:
                         x=-module_width / 2 + 0.02
                     )
                 )
-                handle = Handle.get_specification(
+                handle = Handle.get_annotation_specification(
                     f"cooking_drawer_handle_{side_name}",
-                    Handle.get_default_root_specification(
+                    Handle.get_default_root_kinematic_structure_entity_specification(
                         scale=Scale(0.04, module_width / 3, 0.04),
                         thickness=0.02,
                     ),

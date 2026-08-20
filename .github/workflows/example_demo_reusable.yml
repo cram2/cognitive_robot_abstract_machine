@@ -52,12 +52,17 @@ jobs:
             ${{ runner.os }}-cache-
 
       - name: Build ORM
-        if: ${{inputs.repo_lowercase == 'coraplex' || inputs.repo_lowercase == 'semantic_digital_twin'}}
+        # ormatic_interface.py files are committed empty (see AGENTS.md), so the full
+        # dependency chain (semantic_digital_twin -> giskardpy -> coraplex -> segmind ->
+        # experiments, see scripts/regenerate_all_orm.py) must be regenerated before any
+        # example or demo that touches the database can run. Every script in this
+        # workflow's matrix lives under coraplex, semantic_digital_twin, or experiments,
+        # so this always applies.
         run: |
-          cd cognitive_robot_abstract_machine/${{ inputs.lib }}/scripts/
+          cd cognitive_robot_abstract_machine
           source /opt/ros/overlay_ws/install/setup.bash
           source /opt/ros/cram-env/bin/activate
-          python generate_orm.py
+          python scripts/regenerate_all_orm.py
 
       - name: Run Script
         run: |

@@ -182,6 +182,43 @@ def test_explain_inference_deeply_nested():
     assert "level_3" in explanation_with_trace
 
 
+def test_query_root_resolves_to_the_evaluating_query_for_a_variable_reused_across_two_queries():
+    """
+    An inference variable reused as the selected variable of two independent queries
+    must have its ``InferenceExplanation.query_root`` resolved to whichever query is
+    actually evaluating, not to whichever query first attached the variable to the DAG.
+
+    ``register_inference`` filled in ``query_root`` from ``variable_node._root_`` — a
+    walk up the variable's structural, first-attachment-wins ``_parent_`` chain. A
+    variable reused as the selected variable of a second, independent query gains an
+    extra parent, but its primary ``_parent_`` still points at whichever query embedded
+    it first, so the recorded ``query_root`` silently pointed at the stale, unrelated
+    first query instead of the query whose own evaluation actually produced the
+    instance.
+    """
+    person_var = inference(Person)(name="Alice")
+
+    first_query = entity(person_var)
+    first_results = list(first_query.evaluate())
+    assert len(first_results) == 1
+    assert (
+        len(person_var._parents_) >= 2
+    ), "person_var must already be multi-parented after the first query for this to exercise the bug"
+
+    second_query = entity(person_var)
+    second_results = list(second_query.evaluate())
+    assert len(second_results) == 1
+    alice = second_results[0]
+
+    explanation = explain_inference(alice)
+    assert explanation is not None
+    assert explanation.query_root is second_query._root_, (
+        "query_root must be resolved from the query that is actually evaluating "
+        "(second_query), not from whichever query first attached person_var to the DAG "
+        "(first_query)"
+    )
+
+
 def test_query_stack_tracking():
     """
     Test that Query objects automatically record their creation stack.
@@ -752,6 +789,46 @@ def test_query_graph_marks_a_shared_bare_condition_satisfied_from_its_own_query(
         "must be marked satisfied regardless of which query attached it to the DAG first"
     )
     assert not flag_node.faded
+
+
+def test_query_graph_marks_a_node_reused_at_two_positions_satisfied_regardless_of_visit_order():
+    """
+    A node reused at two positions within one query's own tree -- once as a bare
+    ``TruthValueOperator`` child, once as a ``Comparator`` operand -- is marked
+    satisfied whenever it is in ``satisfied_condition_ids``, whichever of the two
+    positions ``construct_graph`` visits first.
+
+    ``construct_graph`` memoizes exactly one ``QueryNode`` per expression
+    (``expression_node_map``), so any position-dependent term in the satisfaction check
+    would be computed at the first-visited position and then reused for every other one.
+    ``and_(flag == True, flag)`` reaches the ``Comparator`` operand position before the
+    bare ``AND`` child position, so it pins that the classification stays independent of
+    visit order.
+    """
+    flag = variable_from([True])
+    sink = variable_from([1])
+
+    query = entity(sink).where(and_(flag == True, flag))
+    assert (
+        len(flag._parents_) == 2
+    ), "flag must be a genuinely shared DAG node for this to exercise the behaviour"
+
+    true_results = _get_true_results(query)
+    result = true_results[0]
+    assert flag._id_ in result.satisfied_condition_ids, (
+        "flag is directly evaluated as a bare AND condition and is true, so it must be "
+        "recorded as satisfied"
+    )
+
+    query_graph = QueryGraph(
+        query, satisfied_condition_ids=result.satisfied_condition_ids
+    )
+    flag_node = query_graph.expression_node_map[flag]
+    assert flag_node.is_satisfied, (
+        "flag's own bare-condition position under AND must be classified as satisfied, "
+        "regardless of whichever position (Comparator operand or bare AND child) "
+        "construct_graph happened to visit first"
+    )
 
 
 def test_query_graph_satisfaction_colors():

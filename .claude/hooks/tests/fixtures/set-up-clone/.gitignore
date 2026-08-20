@@ -1,0 +1,4 @@
+# The rule check-setup.sh's claude_local_md_ignored check looks for. This file is
+# copied into a scratch clone, where it is that clone's whole .gitignore; inside the
+# fixture tree itself it matches nothing, since no CLAUDE.local.md is checked in here.
+CLAUDE.local.md

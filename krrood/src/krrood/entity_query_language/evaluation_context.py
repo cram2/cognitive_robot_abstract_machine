@@ -216,7 +216,7 @@ class EvaluatedExpressionIds:
 
 
 @dataclass
-class OutermostQueryClaim:
+class OutermostQuery:
     """
     Tracks which compiled query node is the outermost query for the current evaluation
     pass.
@@ -227,24 +227,24 @@ class OutermostQueryClaim:
     inside it.
     """
 
-    _query_id: Optional[uuid.UUID] = field(default=None, init=False)
+    node: Optional[SymbolicExpression] = field(default=None, init=False)
     """
-    Identifier of the query node that claimed the outermost role, or ``None`` before any
-    node has.
+    The compiled query node holding the outermost role, or ``None`` before any node
+    takes it.
     """
 
-    def is_nested(self, query_id: uuid.UUID) -> bool:
+    def is_nested(self, query: SymbolicExpression) -> bool:
         """
-        Claim *query_id* as the outermost query if none is claimed yet, then report
-        whether *query_id* is nested inside some other, already-claimed outermost query.
+        Record *query* as the outermost query if none is recorded yet, then report
+        whether *query* is nested inside some other, already-recorded outermost query.
 
-        :param query_id: The compiled query node's identifier.
-        :return: Whether *query_id* is a nested subquery (``True``) or the outermost
-            query (``False``).
+        :param query: The compiled query node.
+        :return: Whether *query* is a nested subquery (``True``) or the outermost query
+            (``False``).
         """
-        if self._query_id is None:
-            self._query_id = query_id
-        return self._query_id != query_id
+        if self.node is None:
+            self.node = query
+        return self.node._id_ != query._id_
 
 
 @dataclass
@@ -338,9 +338,7 @@ class EvaluationContext:
     ``None`` if unset.
     """
 
-    outermost_query_claim: OutermostQueryClaim = field(
-        default_factory=OutermostQueryClaim
-    )
+    outermost_query: OutermostQuery = field(default_factory=OutermostQuery)
     """
     Tracks which compiled query node is the outermost query for the current evaluation
     pass.

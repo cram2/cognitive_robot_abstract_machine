@@ -5,7 +5,6 @@ import unittest
 
 from random_events.sigma_algebra import AbstractSimpleSet
 
-
 str_set = {"a", "c", "b"}
 int_set = {1, 2, 3}
 float_set = {1.001, 2.3845, 3.4345345}
@@ -20,6 +19,10 @@ class SetElementTestCase(unittest.TestCase):
         intersection_a_b = a.intersection_with(b)
         self.assertTrue(intersection_a_b.is_empty())
         self.assertEqual(a.intersection_with(a), a)
+
+    def test_size_of_one_element(self):
+        self.assertEqual(SetElement.from_data("a", str_set).size, 1)
+        self.assertEqual(SetElement.from_data(None, str_set).size, 0)
 
     def test_complement(self):
         a = SetElement.from_data("a", str_set)
@@ -76,6 +79,12 @@ class SetTestCase(unittest.TestCase):
         c = SetElement.from_data("c", str_set)
         s = Set.from_simple_sets(a, b)
         self.assertEqual(s.complement(), Set.from_simple_sets(c))
+
+    def test_size_counts_the_elements(self):
+        a = SetElement.from_data("a", str_set)
+        b = SetElement.from_data("b", str_set)
+        self.assertEqual(Set.from_simple_sets(a, b).size, 2)
+        self.assertEqual(Set.from_iterable(str_set).size, 3)
 
     def test_to_json(self):
         a = SetElement.from_data("a", str_set)

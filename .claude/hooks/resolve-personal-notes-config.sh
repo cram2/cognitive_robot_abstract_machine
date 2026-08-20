@@ -174,6 +174,79 @@ pr_progress_path() {
   printf '.claude/personal/pr-progress/%s.md\n' "${branch}"
 }
 
+# PERSONAL_GIT_IDENTITY_PATH: where the human contributor's git identity is
+# recorded on the notes branch, so a fresh clone can be given one instead of
+# inheriting whatever the environment's global git config happens to be. Fixed
+# convention, never overridden - same reasoning as the plan paths below.
+#
+# Stored in git's own config format and read back with `git config --file`
+# rather than parsed here: the format already has a parser, and writing it
+# with the same tool that reads it means the two can never disagree.
+PERSONAL_GIT_IDENTITY_PATH=".claude/personal/git-identity"
+
+# format_git_identity: prints a name and email in the one form every message
+# about an identity uses, so the same pair can't be rendered two ways in two
+# different reports.
+format_git_identity() {
+  printf '%s <%s>\n' "$1" "$2"
+}
+
+# effective_git_identity: prints "<name><TAB><email>" for the identity a commit
+# made here right now would actually carry, and returns 0. Returns 1 (prints
+# nothing) if git cannot determine one at all.
+#
+# Resolved via `git var GIT_AUTHOR_IDENT`, which applies git's real precedence -
+# GIT_AUTHOR_NAME/GIT_AUTHOR_EMAIL, then repository-local config, then global.
+# `git config --get user.name` deliberately not used: it reports the global
+# value even in a clone whose commits are correctly authored from the
+# environment, which is the one wrong answer a check about commit authorship
+# must never give.
+effective_git_identity() {
+  local author_identity
+  author_identity="$(git var GIT_AUTHOR_IDENT 2>/dev/null)" || return 1
+  # GIT_AUTHOR_IDENT is "<name> <<email>> <timestamp> <timezone>"; the trailing
+  # two fields are when the commit would be made, not who by.
+  printf '%s\n' "${author_identity}" \
+    | sed -E 's/^(.*) <(.*)> [0-9]+ [-+][0-9]{4}$/\1\t\2/'
+}
+
+# repository_local_git_identity: prints "<name><TAB><email>" for the identity
+# configured in this clone's own config, and returns 0. Returns 1 (prints
+# nothing) unless both halves are set - half an identity cannot author a commit,
+# so it is not an identity.
+repository_local_git_identity() {
+  local name email
+  name="$(git config --local --get user.name || true)"
+  email="$(git config --local --get user.email || true)"
+  [ -n "${name}" ] && [ -n "${email}" ] || return 1
+  printf '%s\t%s\n' "${name}" "${email}"
+}
+
+# recorded_git_identity_exists / recorded_git_identity: whether the notes branch
+# carries a git identity at all, and what it records. Caller must have already
+# fetched NOTES_BRANCH successfully (see fetch_personal_notes_branch) - these
+# read FETCH_HEAD directly rather than fetching again themselves.
+#
+# Two functions rather than one for the same reason as plan_branch_index_exists
+# above: "nothing is recorded yet" and "what is recorded cannot be used" are
+# different answers needing different advice, and a single failing lookup
+# collapses them into one.
+recorded_git_identity_exists() {
+  git cat-file -e "FETCH_HEAD:${PERSONAL_GIT_IDENTITY_PATH}" 2>/dev/null
+}
+
+recorded_git_identity() {
+  recorded_git_identity_exists || return 1
+  local identity_file name email
+  identity_file="$(mktemp)"
+  git show "FETCH_HEAD:${PERSONAL_GIT_IDENTITY_PATH}" > "${identity_file}"
+  name="$(git config --file "${identity_file}" --get user.name || true)"
+  email="$(git config --file "${identity_file}" --get user.email || true)"
+  rm -f "${identity_file}"
+  [ -n "${name}" ] && [ -n "${email}" ] || return 1
+  printf '%s\t%s\n' "${name}" "${email}"
+}
+
 # PLANS_DIR / PLAN_MANIFEST_FILENAME / PLAN_ROADMAP_FILENAME: the one,
 # shared definition of where a plan's files live, so no caller re-derives
 # these path fragments itself (session-start.sh and save-plan.sh both used
@@ -353,6 +426,44 @@ plan_id_for_branch() {
   git cat-file -e "FETCH_HEAD:${PLAN_BRANCH_INDEX_PATH}" 2>/dev/null || return 1
   git show "FETCH_HEAD:${PLAN_BRANCH_INDEX_PATH}" 2>/dev/null \
     | awk -F'\t' -v branch="${branch}" '$1 == branch { print $2; exit }'
+}
+
+# branch_can_hold_plan_item: whether a plan item could ever track the given
+# branch. False for a detached HEAD, the repo's default branch, and the
+# personal-notes branch: none of the three is per-change work, so telling a
+# session "no item tracks this branch" there is noise rather than a prompt to
+# record one - work done from them is typically a personal-notes edit that
+# never becomes a pull request at all.
+#
+# Deliberately its own copy of the three cases pr_progress_path excludes,
+# rather than a shared helper: the two answer different questions and are
+# expected to diverge. A branch whose pull request targets the notes branch
+# still wants PR progress tracked, but still never wants a plan item.
+branch_can_hold_plan_item() {
+  local branch="$1"
+  case "${branch}" in
+    HEAD|"$(default_branch_name)"|"${NOTES_BRANCH}"|"") return 1 ;;
+  esac
+  return 0
+}
+
+# plan_branch_index_exists / tracked_plan_count: whether any plan is tracked on
+# the notes branch at all, and how many distinct ones there are. Same FETCH_HEAD
+# precondition as plan_id_for_branch above.
+#
+# These exist so a caller can tell apart the two situations plan_id_for_branch
+# collapses into a single "no": nobody tracks plans here, versus plans exist and
+# this branch is in none of them. Only the second is worth a word to a session,
+# and only these two functions know which is which, since the index path is
+# theirs alone to read.
+plan_branch_index_exists() {
+  git cat-file -e "FETCH_HEAD:${PLAN_BRANCH_INDEX_PATH}" 2>/dev/null
+}
+
+tracked_plan_count() {
+  plan_branch_index_exists || { printf '0\n'; return 0; }
+  git show "FETCH_HEAD:${PLAN_BRANCH_INDEX_PATH}" 2>/dev/null \
+    | awk -F'\t' 'NF >= 2 { seen[$2] = 1 } END { print length(seen) }'
 }
 
 # PLAN_STATE_SYNC_STAMP: gitignored file recording the personal-notes commit

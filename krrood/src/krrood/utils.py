@@ -74,7 +74,17 @@ def module_and_class_name(type_: Union[Type, _SpecialForm]) -> str:
     :param type_: A class or special form.
     :return: Its fully qualified ``"{module}.{name}"`` identifier.
     """
-    return f"{type_.__module__}.{type_.__name__}"
+    return f"{get_module_of_type(type_)}.{type_.__name__}"
+
+
+def get_module_of_type(type_: Union[Type, _SpecialForm]) -> str:
+    """
+    :param type_: The type of which the module is obtained.
+    :return: The module name of the given type_.
+    """
+    if type_ is types.NoneType:
+        return "types"
+    return type_.__module__
 
 
 def get_default_value(dataclass_type, field_name):

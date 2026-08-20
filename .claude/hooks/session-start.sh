@@ -98,6 +98,33 @@ set -euo pipefail
 # don't belong to one, and that's normal. See ./save-plan.sh to push edits
 # back (regenerating the reverse index too).
 #
+# What the summary's plan line says when there is no item for this branch
+# matters as much as the manifest it pulls in when there is one: "no plans
+# are tracked here" and "plans exist, and none of them has an item for this
+# branch" are different answers, and reporting both as one bare "none" is
+# what let a session read the second as the first and start work without
+# recording an item. They are reported separately, along with the case where
+# the index names a plan whose manifest has since gone missing, and the case
+# where no plan item could ever track this branch at all (the default branch,
+# the notes branch, a detached HEAD - see branch_can_hold_plan_item), where
+# the right answer is silence rather than a prompt.
+#
+# Git identity: the notes branch can also carry the contributor's own git
+# identity (.claude/personal/git-identity), which is written into this clone's
+# repository-local config so its commits are authored by the person working in
+# it. A fresh clone otherwise inherits whatever global git config the
+# environment provides, which in an agent session is the agent's own identity -
+# a default, not an oversight, and so not something discipline alone fixes.
+# Only ever fills a gap: a clone that already has a repository-local identity
+# keeps it, and global config is never touched. See ./save-git-identity.sh to
+# record one, and ./README.md for the two cases a hook cannot reach.
+#
+# Setup: the summary also carries ./check-setup.sh's verdict, naming any
+# check that still needs setup. It is reported rather than left to be run on
+# purpose because remembering to run it is the step that gets skipped - after
+# which the same gaps surface one failure at a time, during unrelated work.
+# Never fatal: a setup gap is reported, never allowed to fail this hook.
+#
 # If the plan has a `tracking_issue` set, the written header also reminds a
 # session to always comment there when it makes a structural change (new
 # phases, deferring a track, etc.) in addition to editing the manifest
@@ -130,6 +157,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/resolve-personal-notes-config.sh"
+source "${SCRIPT_DIR}/session-start-messages.sh"
 
 fetch_personal_notes_branch || exit 0
 
@@ -162,7 +190,10 @@ WROTE_ANYTHING=0
 # session to describe secondhand, in its own prose, what the hook did.
 SUMMARY_NOTES="not found"
 SUMMARY_PROGRESS="not applicable (no current PR on this branch)"
-SUMMARY_PLAN="none"
+# SUMMARY_PLAN, SUMMARY_GIT_IDENTITY and SUMMARY_SETUP get no default on
+# purpose: every path below
+# assigns one, so `set -u` turns a path that forgets into a loud failure rather
+# than the silently uninformative report this hook used to print.
 
 if git cat-file -e "FETCH_HEAD:${NOTES_PATH}" 2>/dev/null; then
   cat <<HEADER >> "${OUTPUT_FILE}"
@@ -219,9 +250,31 @@ SCAFFOLD
 fi
 
 PLAN_ID="$(plan_id_for_branch "${CURRENT_BRANCH}" || true)"
-if [ -n "${PLAN_ID}" ]; then
+
+# A branch with no plan item is several different situations, and reporting
+# them all as a bare "none" is what let a session read "the plan you were told
+# about has no item for this branch yet" as "no plan applies here" and start
+# work without recording an item. Each one now says which it is; the wording
+# is deliberately even-handed, because belonging to no plan is a perfectly
+# ordinary state for most branches and must not read as a reprimand.
+#
+# The first case answers a different question than the rest: on a branch no
+# plan item could ever track, there is nothing to prompt about at all.
+if [ -z "${PLAN_ID}" ]; then
+  if ! branch_can_hold_plan_item "${CURRENT_BRANCH}"; then
+    SUMMARY_PLAN="$(plan_line_not_applicable)"
+  elif plan_branch_index_exists; then
+    SUMMARY_PLAN="$(plan_line_no_item_tracks_branch "${CURRENT_BRANCH}" "$(tracked_plan_count)")"
+  else
+    SUMMARY_PLAN="$(plan_line_no_plans_tracked "${NOTES_BRANCH}")"
+  fi
+else
   PLAN_MANIFEST_PATH="$(plan_manifest_path "${PLAN_ID}")"
   PLAN_ROADMAP_PATH="$(plan_roadmap_path "${PLAN_ID}")"
+  # An index entry pointing at a manifest that isn't there means the index and
+  # the plan data have drifted apart - previously indistinguishable from having
+  # no plan at all, so it went unnoticed.
+  SUMMARY_PLAN="$(plan_line_manifest_missing "${PLAN_ID}" "${PLAN_MANIFEST_PATH}" "${NOTES_BRANCH}")"
   if git cat-file -e "FETCH_HEAD:${PLAN_MANIFEST_PATH}" 2>/dev/null; then
     [ "${WROTE_ANYTHING}" = "1" ] && printf '\n' >> "${OUTPUT_FILE}"
     # TRACKING_ISSUE: a plain top-level scalar, so grep/sed suffices here too -
@@ -229,8 +282,12 @@ if [ -n "${PLAN_ID}" ]; then
     # the plan has no tracking_issue set (nothing to extract, not an error).
     # Named for the mailbox's role, not necessarily a literal GitHub Issue -
     # see plan-schema.md's PR-fallback note for repos with Issues disabled.
+    # The `|| true` is load-bearing: under `set -o pipefail` a plan with no
+    # tracking_issue makes grep exit 1, which `set -e` turns into the whole
+    # hook dying here with no output at all.
     TRACKING_ISSUE="$(git show "FETCH_HEAD:${PLAN_MANIFEST_PATH}" 2>/dev/null \
-      | grep -oE '^tracking_issue:[[:space:]]*[0-9]+' | head -1 | grep -oE '[0-9]+$')"
+      | grep -oE '^tracking_issue:[[:space:]]*[0-9]+' | head -1 \
+      | grep -oE '[0-9]+$' || true)"
     if [ -n "${TRACKING_ISSUE}" ]; then
       TRACKING_ISSUE_NOTE="Structural changes (a new wave/phase, deferring a track, splitting an
 item, reprioritizing) can be made directly to the manifest by any session -
@@ -243,9 +300,9 @@ a comment on the tracking issue (#${TRACKING_ISSUE}) describing it, since
 the user reviews structural changes there and it is the shared record other
 sessions working this plan can check - see plan-schema.md's 'Proposing
 structural changes' section. If this session is actively working an item in
-this plan, also subscribe to the tracking issue itself (in addition to your
-own item's PR) so a structural change another session makes reaches you
-while you're still working, not just next session start."
+this plan, also subscribe to the tracking issue itself so a structural change
+another session makes reaches you while you're still working, not just next
+session start."
     else
       TRACKING_ISSUE_NOTE="This plan has no tracking_issue set, so there is no coordination
 mailbox for structural changes yet - edit the manifest directly as usual."
@@ -286,7 +343,7 @@ ROADMAP_HEADER
     fi
     echo "<!-- END-PLAN-ROADMAP -->" >> "${OUTPUT_FILE}"
     WROTE_ANYTHING=1
-    SUMMARY_PLAN="'${PLAN_ID}' (tracking issue: ${TRACKING_ISSUE:-none})"
+    SUMMARY_PLAN="$(plan_line_tracked "${PLAN_ID}" "${TRACKING_ISSUE:-none}")"
   fi
 fi
 
@@ -294,6 +351,33 @@ if [ "${WROTE_ANYTHING}" = "1" ]; then
   mv "${OUTPUT_FILE}" "${CLAUDE_LOCAL_MD}"
 else
   rm -f "${OUTPUT_FILE}"
+fi
+
+# Git identity, from the notes branch - so a fresh clone commits as the person
+# working in it rather than as whatever the environment's global git config
+# happens to be. Only ever fills a gap: a clone that already has its own
+# repository-local identity keeps it, and nothing here touches global config.
+#
+# Written before the setup check below, so check-setup.sh's git_identity row
+# reports on the identity this run has just set rather than the absence it was
+# about to fix - the same ordering, for the same reason, as CLAUDE.local.md.
+if ! recorded_git_identity_exists; then
+  SUMMARY_GIT_IDENTITY="$(git_identity_line_not_recorded \
+    "${NOTES_BRANCH}" "${PERSONAL_GIT_IDENTITY_PATH}")"
+elif ! RECORDED_GIT_IDENTITY="$(recorded_git_identity)"; then
+  SUMMARY_GIT_IDENTITY="$(git_identity_line_incomplete \
+    "${PERSONAL_GIT_IDENTITY_PATH}" "${NOTES_BRANCH}")"
+elif LOCAL_GIT_IDENTITY="$(repository_local_git_identity)"; then
+  IFS=$'\t' read -r LOCAL_NAME LOCAL_EMAIL <<< "${LOCAL_GIT_IDENTITY}"
+  SUMMARY_GIT_IDENTITY="$(git_identity_line_already_set \
+    "$(format_git_identity "${LOCAL_NAME}" "${LOCAL_EMAIL}")")"
+else
+  IFS=$'\t' read -r RECORDED_NAME RECORDED_EMAIL <<< "${RECORDED_GIT_IDENTITY}"
+  git config --local user.name "${RECORDED_NAME}"
+  git config --local user.email "${RECORDED_EMAIL}"
+  SUMMARY_GIT_IDENTITY="$(git_identity_line_written "${NOTES_BRANCH}" \
+    "${PERSONAL_GIT_IDENTITY_PATH}" \
+    "$(format_git_identity "${RECORDED_NAME}" "${RECORDED_EMAIL}")")"
 fi
 
 # Personal settings: unlike everything above, these don't go into CLAUDE.local.md -
@@ -319,6 +403,34 @@ if git cat-file -e "FETCH_HEAD:${PERSONAL_SETTINGS_PATH}" 2>/dev/null; then
   fi
 fi
 
+# Setup verdict, from ./check-setup.sh - the single read-only source of truth
+# for whether this clone is set up. Reported here because remembering to run it
+# is exactly what does not happen: a session that skips it discovers the same
+# gaps later, one failure at a time, in the middle of unrelated work.
+#
+# Run last, after everything this run writes: check-setup.sh's claude_local_md
+# check reports on the file this run has just created, so any other order would
+# report needs-setup on a correctly set up clone's first run.
+#
+# Run as a subprocess rather than sourced - it sources
+# resolve-personal-notes-config.sh, which cd's and reassigns every variable
+# already in use here - and captured with `|| true`, so a setup gap can never
+# turn into a session that starts with a broken hook.
+SUMMARY_SETUP="$(setup_line_not_checked "${CHECK_SETUP_SCRIPT}")"
+if [ -f "${PROJECT_ROOT}/${CHECK_SETUP_SCRIPT}" ]; then
+  # Only the needs-setup rows: the info rows are context for someone reading
+  # the full report, not a verdict, and this summary is not that report.
+  NEEDS_SETUP_ROWS="$(bash "${PROJECT_ROOT}/${CHECK_SETUP_SCRIPT}" 2>/dev/null \
+    | awk -F'\t' '$2 == "needs-setup" { printf "    %s: %s\n", $1, $3 }' || true)"
+  if [ -z "${NEEDS_SETUP_ROWS}" ]; then
+    SUMMARY_SETUP="$(setup_line_ok)"
+  else
+    SUMMARY_SETUP="$(printf '%s\n%s' \
+      "$(setup_line_needs_setup "$(printf '%s\n' "${NEEDS_SETUP_ROWS}" | wc -l | tr -d ' ')")" \
+      "${NEEDS_SETUP_ROWS}")"
+  fi
+fi
+
 # Deterministic session-start report: what this run found and wrote, printed
 # once by the script itself rather than left for a session to notice and
 # describe secondhand from CLAUDE.local.md's content. SessionStart hook
@@ -331,5 +443,7 @@ session-start.sh summary:
   local settings:  ${SUMMARY_SETTINGS}
   PR progress:     ${SUMMARY_PROGRESS}
   plan:            ${SUMMARY_PLAN}
+  git identity:    ${SUMMARY_GIT_IDENTITY}
+  setup:           ${SUMMARY_SETUP}
   plan state SHA:  $(git rev-parse FETCH_HEAD) (run plan-updates-since.sh <plan-id> to recheck from here later)
 SUMMARY

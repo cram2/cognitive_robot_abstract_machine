@@ -563,7 +563,7 @@ class Query(
             outermost query of the current evaluation. The first compiled query to evaluate claims the
             outermost role; any other is nested.
         """
-        return evaluation_context.outermost_query_claim.is_nested(self._id_)
+        return evaluation_context.outermost_query.is_nested(self)
 
     def _produce_results_(self, sources: OperationResult) -> Iterator[OperationResult]:
         """

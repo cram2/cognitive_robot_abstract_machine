@@ -402,24 +402,27 @@ print("Slider root is attached by a", type(slider.root.parent_connection).__name
 
 ### Default root specifications and nested parts
 
-Most annotation classes can build their own geometry from a `Scale`. `get_default_root_specification`
-returns a ready-made `BodySpecification` (or `RegionSpecification`) with that geometry filled
-in. This is the easy path: it hides the geometry construction — which for many annotations is a
+Most annotation classes can build their own geometry from a `Scale`.
+`get_default_root_kinematic_structure_entity_specification` returns a ready-made `BodySpecification` (or
+`RegionSpecification`) with that geometry filled in. This is the easy path: it hides the
+geometry construction — which for many annotations is a
 composite shape built from [random events](https://random-events.readthedocs.io/) (a hollow
 handle, a carved container case, a wall minus its apertures) — behind a single scale. Reach for
 it when a default shape is good enough, and build the root specification directly (previous
 section) when you need a custom root shape.
 
-`get_specification` then wraps any root specification into the type's
+`get_annotation_specification` then wraps any root specification into the type's
 `SemanticAnnotationWithRootSpecification`, so building an annotation specification is two
-composed calls. Geometry parameters beyond the scale — a handle's `thickness`, a container
-case's `wall_thickness` — live on `get_default_root_specification`, whose signature names them,
-so geometry is described in exactly one place:
+composed calls. Both halves are spawnable, so the wrapping step is easy to forget: spawning a
+root specification on its own yields a bare body or region, with none of the annotation's
+semantics attached. Geometry parameters beyond the scale — a handle's `thickness`, a container
+case's `wall_thickness` — live on `get_default_root_kinematic_structure_entity_specification`, whose signature
+names them, so geometry is described in exactly one place:
 
 ```python
-Drawer.get_specification(
+Drawer.get_annotation_specification(
     "drawer",
-    Drawer.get_default_root_specification(
+    Drawer.get_default_root_kinematic_structure_entity_specification(
         scale=Scale(0.4, 0.5, 0.6), wall_thickness=0.05
     ),
 )
@@ -430,7 +433,7 @@ does, so custom geometry and a custom attachment stay a single expression. Neith
 name for the root: a root specification built without one defers naming, and the annotation
 stamps its own name onto the root entity at spawn time.
 
-`get_specification`'s `part_specifications` argument mounts nested annotations onto part-whole
+`get_annotation_specification`'s `part_specifications` argument mounts nested annotations onto part-whole
 relationship fields, keyed by the field name — spelled out before anything touches a world.
 
 ```{code-cell} ipython3
@@ -438,12 +441,12 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Draw
 
 world = World.create_with_root_body()
 
-drawer = Drawer.get_specification(
+drawer = Drawer.get_annotation_specification(
     "drawer",
-    Drawer.get_default_root_specification(scale=Scale(0.4, 0.5, 0.6)),
+    Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.4, 0.5, 0.6)),
     part_specifications={
-        "handle": Handle.get_specification(
-            "handle", Handle.get_default_root_specification(scale=Scale(0.1, 0.05, 0.05))
+        "handle": Handle.get_annotation_specification(
+            "handle", Handle.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 0.05, 0.05))
         ),
     },
 ).spawn(world)
@@ -458,8 +461,8 @@ Annotation specifications take the same spawn-time overrides as entity specifica
 specification can produce many identically shaped annotations under different names and poses.
 
 ```{code-cell} ipython3
-handle_specification = Handle.get_specification(
-    "handle", Handle.get_default_root_specification(scale=Scale(0.1, 0.05, 0.05))
+handle_specification = Handle.get_annotation_specification(
+    "handle", Handle.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 0.05, 0.05))
 )
 left = handle_specification.spawn(
     world,
@@ -490,9 +493,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Tabl
 world = World.create_with_root_body()
 
 surface = RegionSpecification.box("surface", Scale(1, 1, 0.01)).spawn(world)
-table = Table.get_specification(
+table = Table.get_annotation_specification(
     "table",
-    Table.get_default_root_specification(scale=Scale(1, 1, 0.5)),
+    Table.get_default_root_kinematic_structure_entity_specification(scale=Scale(1, 1, 0.5)),
     annotation_kwargs={"supporting_surface": surface},
 ).spawn(world)
 
@@ -515,26 +518,26 @@ from semantic_digital_twin.world_description.world_entity import Region
 
 world = World.create_with_root_body()
 
-plain_wall = Wall.get_specification(
-    "plain_wall", Wall.get_default_root_specification(scale=Scale(0.1, 3, 3))
+plain_wall = Wall.get_annotation_specification(
+    "plain_wall", Wall.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 3, 3))
 ).spawn(world)
 
-window_left = Aperture.get_specification(
-    "window_left", Aperture.get_default_root_specification(scale=Scale(0.1, 0.5, 0.5))
+window_left = Aperture.get_annotation_specification(
+    "window_left", Aperture.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 0.5, 0.5))
 )
 window_left.root_specification.parent_T_self = (
     HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.8)
 )
-window_right = Aperture.get_specification(
-    "window_right", Aperture.get_default_root_specification(scale=Scale(0.1, 0.5, 0.5))
+window_right = Aperture.get_annotation_specification(
+    "window_right", Aperture.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 0.5, 0.5))
 )
 window_right.root_specification.parent_T_self = (
     HomogeneousTransformationMatrix.from_xyz_rpy(y=0.8)
 )
 
-wall = Wall.get_specification(
+wall = Wall.get_annotation_specification(
     "wall",
-    Wall.get_default_root_specification(scale=Scale(0.1, 3, 3)),
+    Wall.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 3, 3)),
     part_specifications={"apertures": [window_left, window_right]},
 ).spawn(world)
 
@@ -560,16 +563,16 @@ from semantic_digital_twin.world_description.connections import RevoluteConnecti
 
 world = World.create_with_root_body()
 
-hinge_part = Hinge.get_specification(
+hinge_part = Hinge.get_annotation_specification(
     "hinge",
-    Hinge.get_default_root_specification(scale=Scale(0.05, 0.05, 0.05)),
+    Hinge.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.05, 0.05, 0.05)),
     parent_connection_specification=Hinge.parent_connection_specification(
         axis=Vector3.Z()
     ),
 )
-flap = Drawer.get_specification(
+flap = Drawer.get_annotation_specification(
     "flap",
-    Drawer.get_default_root_specification(scale=Scale(0.4, 0.5, 0.2)),
+    Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.4, 0.5, 0.2)),
     part_specifications={"mechanical_joint": hinge_part},
 ).spawn(world)
 
@@ -587,10 +590,10 @@ field, a key that is not a part-whole field, or a part-whole field smuggled in t
 ## World specifications
 
 The largest building block is `WorldSpecification`, which describes an entire scene: an
-environment, an optional robot, and the objects placed around them. Its environment is a concrete
-`World` — usually parsed from a model file with the `from_urdf` or `from_mjcf` classmethods.
-Calling `to_domain_object` returns a fresh, augmented world every time; the stored environment is
-deep-copied and never mutated, so one specification can produce many independent worlds.
+environment, an optional robot, and the objects placed around them. Its environment is held as the
+parser that builds it — usually obtained from a model file with the `from_urdf` or `from_mjcf`
+classmethods. Calling `to_domain_object` re-parses the environment every time, so one specification
+can produce many independent worlds and no two of them share an entity identifier.
 
 ```{code-cell} ipython3
 import os
@@ -699,13 +702,13 @@ result. The milk's pose is baked into its root body specification through `paren
 world = WorldSpecification.from_urdf(
     file_path=table_urdf,
     objects=[
-        Drawer.get_specification(
+        Drawer.get_annotation_specification(
             "drawer",
-            Drawer.get_default_root_specification(scale=Scale(0.4, 0.5, 0.3)),
+            Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.4, 0.5, 0.3)),
             part_specifications={
-                "handle": Handle.get_specification(
+                "handle": Handle.get_annotation_specification(
                     "handle",
-                    Handle.get_default_root_specification(scale=Scale(0.1, 0.05, 0.05)),
+                    Handle.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 0.05, 0.05)),
                 ),
             },
         ),

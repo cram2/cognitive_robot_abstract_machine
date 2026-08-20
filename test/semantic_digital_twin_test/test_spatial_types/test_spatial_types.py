@@ -154,6 +154,33 @@ class TestRotationMatrix:
             RotationMatrix.from_vectors(x=x_unit, y=y_unit, z=z_unit), R_ref
         )
 
+    @pytest.mark.parametrize(
+        "direction",
+        [
+            np.array([1.0, 2, 3]),
+            np.array([1.0, 0, 0]),
+            np.array([0.0, 1, 0]),
+            np.array([0.0, 0, 1]),
+            np.array([1.0, 1, 0]),
+            np.array([0.0, 0, -5]),
+        ],
+    )
+    def test_from_x_axis(self, direction):
+        """
+        The x-axis of the result points along the given direction, whatever the
+        direction is, and the two axes completing the frame turn it into a proper
+        rotation matrix.
+        """
+        expected_x_axis = direction / np.linalg.norm(direction)
+
+        result = RotationMatrix.from_x_axis(Vector3.from_iterable(direction)).to_np()[
+            :3, :3
+        ]
+
+        assert np.allclose(result[:, 0], expected_x_axis)
+        assert np.allclose(result.T @ result, np.eye(3))
+        assert np.isclose(np.linalg.det(result), 1)
+
     @pytest.mark.parametrize("q", quaternions)
     def test_from_quaternion(self, q):
         actual = RotationMatrix.from_quaternion(Quaternion.from_iterable(q))

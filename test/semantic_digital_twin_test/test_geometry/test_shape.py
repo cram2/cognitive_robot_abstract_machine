@@ -20,6 +20,7 @@ from semantic_digital_twin.world_description.geometry import (
     Sphere,
     Texture,
 )
+from semantic_digital_twin.world_description.mesh_file_storage import MeshFileStorage
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -99,7 +100,7 @@ def test_mesh_color_survives_serialization(tmp_path):
     source = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
     source.visual.vertex_colors = np.tile([200, 50, 50, 255], (len(source.vertices), 1))
 
-    mesh = Mesh.from_trimesh(mesh=source, dirname=str(tmp_path), file_type="ply")
+    mesh = Mesh.from_trimesh(mesh=source, directory=tmp_path, file_type="ply")
     restored = Mesh.from_json(mesh.to_json())
 
     assert restored.filename.endswith(".obj")
@@ -116,9 +117,172 @@ def test_mesh_color_is_lost_without_color_preserving_format(tmp_path):
     source = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
     source.visual.vertex_colors = np.tile([200, 50, 50, 255], (len(source.vertices), 1))
 
-    mesh = Mesh.from_trimesh(mesh=source, dirname=str(tmp_path), file_type="stl")
+    mesh = Mesh.from_trimesh(mesh=source, directory=tmp_path, file_type="stl")
 
     assert not (mesh.mesh.visual.vertex_colors[:, :3] == [200, 50, 50]).all()
+
+
+# %% where an exported mesh file is written
+
+
+def test_exported_mesh_gets_a_directory_of_its_own():
+    """
+    An export writes into a directory holding nothing else, so the material file trimesh
+    writes beside the mesh belongs to that mesh alone and a consumer resolving the
+    material relative to the mesh finds the right one.
+    """
+    mesh = Mesh.from_ply_file(
+        ply_file_path=os.path.join(
+            Path(files("semantic_digital_twin")).parent.parent,
+            "resources",
+            "ply",
+            "chair.ply",
+        ),
+        texture_file_path=os.path.join(
+            Path(files("semantic_digital_twin")).parent.parent,
+            "resources",
+            "ply",
+            "chair_texture.png",
+        ),
+    )
+
+    mesh_directory = Path(mesh.filename).parent
+    assert mesh_directory.parent.name.startswith(MeshFileStorage.root_prefix)
+    assert {path.suffix for path in mesh_directory.iterdir()} == {
+        ".obj",
+        ".mtl",
+        ".png",
+    }
+
+
+def test_exported_mesh_basenames_are_unique(tmp_path):
+    """
+    Two exports never share a file name, because a consumer identifies a mesh by that
+    name and would otherwise treat the second mesh as the first.
+    """
+    first = Mesh.from_trimesh(
+        mesh=trimesh.creation.box(extents=(1.0, 1.0, 1.0)), directory=tmp_path
+    )
+    second = Mesh.from_trimesh(
+        mesh=trimesh.creation.box(extents=(2.0, 2.0, 2.0)), directory=tmp_path
+    )
+
+    assert Path(first.filename).stem != Path(second.filename).stem
+
+
+def test_explicit_directory_overrides_session_root(tmp_path):
+    mesh = Mesh.from_trimesh(
+        mesh=trimesh.creation.box(extents=(1.0, 1.0, 1.0)), directory=tmp_path
+    )
+
+    assert Path(mesh.filename).parent.parent == tmp_path
+    assert MeshFileStorage.root_prefix not in mesh.filename
+
+
+def coplanar_triangles_with_shared_positions() -> trimesh.Trimesh:
+    """
+    Two triangles that repeat two vertex positions, each triangle in its own color.
+
+    Welding the duplicate positions would merge vertices carrying different colors, so
+    this geometry distinguishes a faithful reload from a processed one.
+    """
+    vertices = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ]
+    )
+    mesh = trimesh.Trimesh(
+        vertices=vertices, faces=np.array([[0, 1, 2], [3, 4, 5]]), process=False
+    )
+    mesh.visual.vertex_colors = np.array(
+        [[200, 50, 50, 255]] * 3 + [[50, 50, 200, 255]] * 3
+    )
+    return mesh
+
+
+def test_vertices_sharing_a_position_keep_their_own_colors(tmp_path):
+    """
+    Reloading a mesh must not weld vertices that share a position, because welding
+    collapses their differing colors into one.
+    """
+    source = coplanar_triangles_with_shared_positions()
+
+    mesh = Mesh.from_trimesh(mesh=source, directory=tmp_path, file_type="obj")
+
+    np.testing.assert_array_equal(
+        np.asarray(mesh.mesh.visual.vertex_colors),
+        np.asarray(source.visual.vertex_colors),
+    )
+
+
+def test_per_vertex_colors_survive_serialization_unwelded(tmp_path):
+    """
+    Every per-vertex color survives ``to_json``/``from_json``, not just the subset that
+    happens to remain after duplicate positions are merged.
+    """
+    source = coplanar_triangles_with_shared_positions()
+    mesh = Mesh.from_trimesh(mesh=source, directory=tmp_path, file_type="obj")
+
+    restored = Mesh.from_json(mesh.to_json())
+
+    np.testing.assert_array_equal(
+        np.asarray(restored.mesh.visual.vertex_colors),
+        np.asarray(source.visual.vertex_colors),
+    )
+
+
+def test_serialization_reproduces_the_same_mesh():
+    """
+    A deserialized mesh is the mesh that was serialized, not a differently tessellated
+    reading of the same file: same vertices, same faces, and the same answer to whether
+    it bounds a volume.
+    """
+    original = Mesh(
+        filename=os.path.join(
+            Path(files("semantic_digital_twin")).parent.parent,
+            "resources",
+            "stl",
+            "milk.stl",
+        )
+    )
+
+    restored = Mesh.from_json(original.to_json())
+
+    np.testing.assert_allclose(
+        np.asarray(restored.mesh.vertices),
+        np.asarray(original.mesh.vertices),
+        atol=1e-6,
+    )
+    np.testing.assert_array_equal(
+        np.asarray(restored.mesh.faces), np.asarray(original.mesh.faces)
+    )
+    assert restored.mesh.is_volume == original.mesh.is_volume
+
+
+def test_serialization_preserves_watertightness_of_a_closed_mesh():
+    """
+    Volume and boolean operations need a watertight mesh, so a closed mesh must still
+    bound a volume after a round-trip.
+    """
+    original = Mesh(
+        filename=os.path.join(
+            Path(files("semantic_digital_twin")).parent.parent,
+            "resources",
+            "stl",
+            "milk.stl",
+        )
+    )
+    assert original.mesh.is_volume
+
+    restored = Mesh.from_json(original.to_json())
+
+    assert restored.mesh.is_volume
+    np.testing.assert_allclose(restored.mesh.volume, original.mesh.volume, rtol=1e-6)
 
 
 def test_texture_defaults():
@@ -180,7 +344,7 @@ def test_cylinder_volume():
 def test_mesh_volume(tmp_path):
     source = trimesh.creation.box(extents=(1.0, 2.0, 4.0))
 
-    mesh = Mesh.from_trimesh(mesh=source, dirname=str(tmp_path), file_type="stl")
+    mesh = Mesh.from_trimesh(mesh=source, directory=tmp_path, file_type="stl")
 
     assert mesh.volume == pytest.approx(8.0)
 
@@ -246,7 +410,7 @@ def test_stl_without_unit_metadata_loads_unchanged(tmp_path):
     """
     source = trimesh.creation.box(extents=(1.0, 2.0, 4.0))
 
-    mesh = Mesh.from_trimesh(mesh=source, dirname=str(tmp_path), file_type="stl")
+    mesh = Mesh.from_trimesh(mesh=source, directory=tmp_path, file_type="stl")
 
     assert mesh.mesh.extents == pytest.approx([1.0, 2.0, 4.0])
 

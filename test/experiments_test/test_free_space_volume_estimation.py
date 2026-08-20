@@ -81,7 +81,7 @@ def test_non_watertight_mesh_is_convex_decomposed_instead_of_using_its_bounding_
         world.add_connection(FixedConnection.create_with_dofs(world, root, obstacle))
         obstacle.collision.append(
             Mesh.from_trimesh(
-                mesh=_non_watertight_ring_mesh(), dirname=str(tmp_path), file_type="stl"
+                mesh=_non_watertight_ring_mesh(), directory=tmp_path, file_type="stl"
             )
         )
     shape = obstacle.collision.shapes[0]
@@ -113,7 +113,7 @@ def test_decomposition_yielding_no_pieces_falls_back_to_the_bounding_box(tmp_pat
         world.add_connection(FixedConnection.create_with_dofs(world, root, obstacle))
         obstacle.collision.append(
             Mesh.from_trimesh(
-                mesh=_non_watertight_ring_mesh(), dirname=str(tmp_path), file_type="stl"
+                mesh=_non_watertight_ring_mesh(), directory=tmp_path, file_type="stl"
             )
         )
     shape = obstacle.collision.shapes[0]

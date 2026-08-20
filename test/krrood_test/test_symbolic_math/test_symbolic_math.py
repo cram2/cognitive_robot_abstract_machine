@@ -9,6 +9,8 @@ import scipy.sparse as sp
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.symbolic_math.exceptions import (
     HasFreeVariablesError,
+    NotColumnVectorError,
+    NotEnoughArgumentsError,
     NotSquareMatrixError,
 )
 from krrood.symbolic_math.symbolic_math import VariableParameters
@@ -111,6 +113,18 @@ class TestLogic3:
                 assert expected == float(
                     actual
                 ), f"a={i}, b={j}, expected {expected}, actual {actual}"
+
+    def test_and3_with_too_few_arguments(self):
+        with pytest.raises(NotEnoughArgumentsError) as error:
+            sm.trinary_logic_and(sm.Scalar(TrinaryTrue))
+        assert error.value.minimum_number_of_arguments == 2
+        assert error.value.actual_number_of_arguments == 1
+
+    def test_or3_with_too_few_arguments(self):
+        with pytest.raises(NotEnoughArgumentsError) as error:
+            sm.trinary_logic_or(sm.Scalar(TrinaryTrue))
+        assert error.value.minimum_number_of_arguments == 2
+        assert error.value.actual_number_of_arguments == 1
 
     def test_not3(self):
         for i in self.values:
@@ -919,6 +933,11 @@ class TestVector:
         v = sm.Vector(data)
         assert v.to_list() == data.tolist()
 
+    def test_vector_from_multi_column_data(self):
+        with pytest.raises(NotColumnVectorError) as error:
+            sm.Vector(np.array([[1.0, 2.0], [3.0, 4.0]]))
+        assert error.value.actual_dimensions == (2, 2)
+
     def test_to_list_raises_on_variables(self):
         v = sm.Vector(vec := [sm.FloatVariable(name="a"), 2.0])
         with pytest.raises(HasFreeVariablesError):
@@ -1221,6 +1240,11 @@ class TestMatrix:
         mat = sm.Matrix(np_arr).reshape((2, 8))
         assert mat.shape == (2, 8)
         assert np.allclose(mat.to_np(), np_arr.reshape((2, 8)))
+
+    def test_inverse_of_non_square_matrix(self):
+        with pytest.raises(NotSquareMatrixError) as error:
+            sm.Matrix(np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])).inverse()
+        assert error.value.actual_dimensions == (2, 3)
 
     def test_trace(self):
         m = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])

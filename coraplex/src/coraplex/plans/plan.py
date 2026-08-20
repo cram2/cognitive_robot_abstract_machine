@@ -328,7 +328,7 @@ class Plan:
     def visualize(
         self,
         backend: GraphVisualizerBackend = GraphVisualizerBackend.CYTOSCAPE,
-        layout: GraphLayout = GraphLayout.PHYSICS,
+        layout: GraphLayout = GraphLayout.LAYERED,
     ) -> GraphVisualizerBase:
         """
         Open an interactive, real-time visualization of the plan graph.
@@ -343,8 +343,8 @@ class Plan:
         """
         visualizer = self._visualizer_classes[backend](
             graph=self.plan_graph,
-            label_getter=lambda node: node.__class__.__name__,
-            information_getter=self._node_details,
+            label_getter=lambda node: node.__node_label__(),
+            information_getter=lambda node: node.__node_info__(),
             color_getter=lambda node: node.status.color.replace("-", ""),
             layout=layout,
             title=repr(self),

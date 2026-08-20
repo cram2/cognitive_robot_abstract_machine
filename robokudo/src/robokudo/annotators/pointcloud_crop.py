@@ -128,7 +128,7 @@ class PointcloudCropAnnotator(BaseAnnotator):
                     f"Couldn't find camera viewpoint in the CAS and relative_to_world is true. "
                     f"Fail. Error: {e}"
                 )
-            return Status.FAILURE
+                return Status.FAILURE
 
         #
         # Crop the point cloud

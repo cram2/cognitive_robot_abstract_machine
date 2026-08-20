@@ -85,7 +85,7 @@ def non_convex_ring_world(tmp_path) -> World:
         ring_mesh = trimesh.creation.annulus(r_min=0.3, r_max=0.5, height=0.2)
         assert not ring_mesh.is_convex
         obstacle.collision.append(
-            Mesh.from_trimesh(mesh=ring_mesh, dirname=str(tmp_path), file_type="stl")
+            Mesh.from_trimesh(mesh=ring_mesh, directory=tmp_path, file_type="stl")
         )
     return world
 
