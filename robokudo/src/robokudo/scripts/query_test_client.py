@@ -10,10 +10,10 @@ import rclpy
 from action_msgs.msg import GoalStatus
 from rclpy import Context
 from rclpy.action import ActionClient
-from rclpy.executors import ExternalShutdownException
+from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
 from rclpy.node import Node
 from rosidl_runtime_py.convert import message_to_ordereddict
-from typing_extensions import TYPE_CHECKING, Optional, List, Dict, Any
+from typing_extensions import TYPE_CHECKING, Optional, List, Dict, Any, Protocol
 
 from robokudo_msgs.action import Query
 
@@ -24,6 +24,18 @@ if TYPE_CHECKING:
     from rclpy.task import Future
     from rclpy.timer import Timer
     from robokudo_msgs.action._query import Query_FeedbackMessage, Query_Result
+
+
+class ResultQueue(Protocol):
+    """
+    Queue-like object receiving the action client's final result dictionary.
+    """
+
+    def put(self, item: Dict[str, Any]) -> None:
+        """
+        Store one result dictionary.
+        """
+        ...
 
 
 class PrettyResultPrinter:
@@ -39,14 +51,19 @@ class RoboKudoActionClient(Node):
     Allows sending dynamic goals and handles feedback, result, and cancellation.
     """
 
-    def __init__(self, preempt_timer: Optional[float] = None) -> None:
+    def __init__(
+        self,
+        preempt_timer: Optional[float] = None,
+        context: Optional[Context] = None,
+    ) -> None:
         """
         Create a new RoboKudo action client.
 
         :param preempt_timer: Optional preempt timer to cancel the goal automatically
             after x seconds.
+        :param context: ROS context this client node belongs to.
         """
-        super().__init__("robokudo_query_test_client")
+        super().__init__("robokudo_query_test_client", context=context)
         self.rk_logger = logging.getLogger(PACKAGE_NAME)
         self._action_client: ActionClient = ActionClient(
             self, Query, "/robokudo/query"
@@ -236,11 +253,14 @@ def main_cli(args: Optional[List[str]] = None) -> None:
         action_client.destroy_node()
 
 
-def main(timeout_seconds: float = 20.0, result: Queue = Queue()) -> None:
+def main(timeout_seconds: float = 20.0, result: Optional[ResultQueue] = None) -> None:
     timeout_deadline = time.monotonic() + timeout_seconds
+    result_queue = result if result is not None else Queue()
     ctx = Context()
     rclpy.init(context=ctx)
-    action_client = RoboKudoActionClient(preempt_timer=None)
+    action_client = RoboKudoActionClient(preempt_timer=None, context=ctx)
+    executor = SingleThreadedExecutor(context=ctx)
+    executor.add_node(action_client)
     result_dict: Dict[str, Any] = dict()
     result_dict["timed_out"] = False
 
@@ -249,12 +269,12 @@ def main(timeout_seconds: float = 20.0, result: Queue = Queue()) -> None:
         action_client.send_goal(goal_type="test")
 
         # Keep the node alive until the action is done
-        while rclpy.ok() and not action_client.done:
+        while rclpy.ok(context=ctx) and not action_client.done:
             if not time.monotonic() < timeout_deadline:
                 result_dict["timed_out"] = True
                 break
 
-            rclpy.spin_once(action_client, timeout_sec=0.1)
+            executor.spin_once(timeout_sec=0.1)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
@@ -265,10 +285,12 @@ def main(timeout_seconds: float = 20.0, result: Queue = Queue()) -> None:
         result_dict["goal_status"] = action_client.goal_status
         result_dict["goal_result"] = action_client.goal_result
         result_dict["cancel_response"] = action_client.cancel_response
-        result.put(result_dict)
+        result_queue.put(result_dict)
+        executor.remove_node(action_client)
+        executor.shutdown()
+        action_client.destroy_node()
         if rclpy.ok(context=ctx):
             rclpy.shutdown(context=ctx)
-        action_client.destroy_node()
 
 
 if __name__ == "__main__":
