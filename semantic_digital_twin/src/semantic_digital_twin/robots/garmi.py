@@ -7,6 +7,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing import ClassVar, List, Self
 
+from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AvoidSelfCollisions,
@@ -533,6 +534,10 @@ class GarmiMobileBase(MobileBase[OmniDrive], HasTorso[GarmiTorso]):
     """
     The mecanum mobile base of the GARMI robot.
     """
+
+    @classproperty
+    def forward_axis(cls) -> Vector3:
+        return Vector3.X()
 
     def setup_hardware_interfaces(self):
         """

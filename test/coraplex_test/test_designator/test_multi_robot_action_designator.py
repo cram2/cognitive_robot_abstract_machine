@@ -240,12 +240,14 @@ def test_navigate_multi(immutable_multiple_robot_apartment, rclpy_node):
     with simulated_robot:
         plan.perform()
 
-    robot_base_pose = view.root.global_transform
-    robot_base_position = robot_base_pose.to_position().to_np()
-    robot_base_orientation = robot_base_pose.to_quaternion().to_np()
+    robot_base_position = view.root.global_transform.to_position().to_np()
+    # An identity heading points the robot's front along the world's x-axis, whatever
+    # the axes its own base happens to be modelled with.
+    world_R_base = view.mobile_base.root.global_transform.to_rotation_matrix()
+    world_V_forward = world_R_base @ view.mobile_base.forward_axis
 
     assert robot_base_position[:3] == pytest.approx(target_position, abs=0.01)
-    assert robot_base_orientation == pytest.approx([0, 0, 0, 1], abs=0.01)
+    assert world_V_forward.to_np()[:3].flatten() == pytest.approx([1, 0, 0], abs=0.01)
 
 
 def test_move_gripper_multi(immutable_multiple_robot_apartment):
@@ -654,12 +656,18 @@ def test_facing(immutable_multiple_robot_apartment):
         milk_pose = world.get_body_by_name("milk.stl").global_pose
         plan = execute_single(FaceAtAction(milk_pose, True), context)
         plan.perform()
-        milk_in_robot_frame = world.transform(
+        milk_in_base_frame = world.transform(
             world.get_body_by_name("milk.stl").global_transform,
-            robot.root,
+            robot.mobile_base.root,
         )
-        assert float(milk_in_robot_frame.to_position().y) == pytest.approx(
-            0.0, abs=0.01
+        # Facing the milk means it lies along the base's forward axis, which is the
+        # x-axis only for a base modelled that way. The base turns about the vertical,
+        # so only the horizontal direction to the milk is under test.
+        base_P_milk = milk_in_base_frame.to_position().to_np()[:2].flatten()
+        base_V_milk = base_P_milk / np.linalg.norm(base_P_milk)
+
+        assert base_V_milk == pytest.approx(
+            robot.mobile_base.forward_axis.to_np()[:2].flatten(), abs=0.01
         )
 
 

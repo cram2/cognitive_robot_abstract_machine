@@ -8,6 +8,8 @@ from typing_extensions import Any, Dict, Optional
 from coraplex.locations.pose_validator import AreReachableBy, IsObjectReachableBy
 from coraplex.plans.attachment_nodes import AttachNode
 from coraplex.plans.plan_node import PlanNode
+from coraplex.robot_plans.actions.core.misc import DetectAction
+from coraplex.robot_plans.actions.core.navigation import LookAtAction
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import (
     and_,
@@ -20,6 +22,7 @@ from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import (
     Arms,
     MovementType,
+    DetectionTechnique,
 )
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.plans.factories import sequential
@@ -39,6 +42,7 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.reasoning.predicates import allclose
 from semantic_digital_twin.reasoning.robot_predicates import is_body_gripped
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
+from semantic_digital_twin.semantic_annotations.semantic_annotations import CheezeIt
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -99,14 +103,21 @@ class ReachAction(ActionDescription, ReachTuningParameters, HasGraspDetectionThr
             children.append(
                 MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm)
             )
-        children.append(
-            MoveToolCenterPointMotion(
-                target_pose,
-                self.arm,
-                allow_gripper_collision=False,
-                movement_type=MovementType.CARTESIAN,
-                max_linear_velocity=self.final_approach_linear_velocity,
-            )
+        children.extend(
+            [
+                LookAtAction(target_pose),
+                DetectAction(
+                    DetectionTechnique.TYPES,
+                    object_sem_annotation=CheezeIt,
+                    accept_first_if_multiple=True,
+                ),
+                MoveToolCenterPointMotion(
+                    target_pose,
+                    self.arm,
+                    allow_gripper_collision=False,
+                    max_linear_velocity=self.final_approach_linear_velocity,
+                ),
+            ]
         )
         return sequential(children=children)
 

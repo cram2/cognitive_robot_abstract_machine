@@ -9,6 +9,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Self, List
 
+from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AvoidSelfCollisions,
@@ -473,6 +474,10 @@ class TiagoTorso(
 @dataclass(eq=False)
 class TiagoMobileBase(MobileBase[DifferentialDrive], HasTorso[TiagoTorso]):
 
+    @classproperty
+    def forward_axis(cls) -> Vector3:
+        return Vector3.X()
+
     full_body_controlled: bool = field(default=True, kw_only=True)
 
     def setup_hardware_interfaces(self):
@@ -487,7 +492,6 @@ class TiagoMobileBase(MobileBase[DifferentialDrive], HasTorso[TiagoTorso]):
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
-            forward_axis=Vector3.X(),
         )
 
 
@@ -832,6 +836,10 @@ class TiagoMujocoTorso(
 @dataclass(eq=False)
 class TiagoMujocoMobileBase(MobileBase[DifferentialDrive], HasTorso[TiagoMujocoTorso]):
 
+    @classproperty
+    def forward_axis(cls) -> Vector3:
+        return Vector3.X()
+
     def setup_hardware_interfaces(self):
         pass
 
@@ -844,7 +852,6 @@ class TiagoMujocoMobileBase(MobileBase[DifferentialDrive], HasTorso[TiagoMujocoT
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
-            forward_axis=Vector3.X(),
             full_body_controlled=False,
         )
 

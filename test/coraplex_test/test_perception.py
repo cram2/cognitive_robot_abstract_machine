@@ -277,6 +277,26 @@ def test_world_perception_reports_the_pose_the_world_holds(
     )
 
 
+def test_world_perception_follows_the_robots_head(
+    immutable_model_world, whole_scene_region
+):
+    """
+    The simulated source answers from the robot's camera, so turning the head away from
+    a body has to take it out of the answer.
+    """
+    world, view, context = immutable_model_world
+    milk_body = world.get_body_by_name("milk.stl")
+    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+
+    assert query.from_world() == [milk_body]
+
+    head_pan = world.get_degree_of_freedom_by_name("head_pan_joint")
+    world.state[head_pan.id].position = np.pi
+    world.notify_state_change()
+
+    assert query.from_world() == []
+
+
 def test_world_perception_reports_nothing_outside_the_queried_region(
     immutable_model_world,
 ):
@@ -295,7 +315,50 @@ def test_world_perception_reports_nothing_outside_the_queried_region(
     )
     query = PerceptionQuery(Milk, empty_region, view, world)
 
-    assert WorldPerception().detect(query) == []
+    with pytest.raises(NothingDetected):
+        WorldPerception().detect(query)
+
+
+def test_ambiguity_is_reported_with_the_number_of_candidates(
+    immutable_model_world, whole_scene_region
+):
+    """
+    What a source refuses to choose between is the candidates it saw, so that is the
+    number the failure carries, whatever else the world holds.
+    """
+    world, view, context = immutable_model_world
+    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    candidates = [
+        Detection(semantic_annotation=Milk, pose=world.root.global_pose),
+        Detection(semantic_annotation=Milk, pose=world.root.global_pose),
+    ]
+
+    with pytest.raises(UnidentifiedDetections) as raised:
+        PerceptionInterface.narrow_to_single_detection(
+            candidates, query, accept_first_if_multiple=False
+        )
+
+    assert raised.value.candidate_count == len(candidates)
+
+
+def test_accepting_the_first_candidate_answers_with_one_detection(
+    immutable_model_world, whole_scene_region
+):
+    """
+    A caller that has said it may take any of the candidates gets a single detection
+    instead of the ambiguity failure.
+    """
+    world, view, context = immutable_model_world
+    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    first = Detection(semantic_annotation=Milk, pose=world.root.global_pose)
+    candidates = [
+        first,
+        Detection(semantic_annotation=Milk, pose=world.root.global_pose),
+    ]
+
+    assert PerceptionInterface.narrow_to_single_detection(
+        candidates, query, accept_first_if_multiple=True
+    ) == [first]
 
 
 # %% perception correcting a grasp
@@ -579,6 +642,34 @@ def test_several_untyped_candidates_are_not_guessed_between(
         RoboKudoPerception(ros_node=rclpy_node).detect(query)
 
 
+def test_a_caller_that_accepts_any_candidate_gets_one_of_them(
+    immutable_model_world, whole_scene_region, rclpy_node, query_server_reporting
+):
+    """
+    Ambiguity is only refused for a caller that needs the right object; one that has
+    said any of them will do is answered with the first the pipeline reported.
+    """
+    world, view, context = immutable_model_world
+    query_server_reporting(
+        [
+            ReportedObject("", PERCEIVED_MILK_POSITION),
+            ReportedObject("", (1.0, 1.0, 1.0)),
+        ]
+    )
+    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+
+    detections = RoboKudoPerception(ros_node=rclpy_node).detect(
+        query, accept_first_if_multiple=True
+    )
+
+    assert [detection.semantic_annotation for detection in detections] == [Milk]
+    np.testing.assert_allclose(
+        detections[0].pose.to_position().to_np().flatten()[:3],
+        PERCEIVED_MILK_POSITION,
+        atol=1e-9,
+    )
+
+
 def test_labelled_candidates_are_narrowed_to_the_requested_type(
     immutable_model_world, whole_scene_region, rclpy_node, query_server_reporting
 ):
@@ -668,7 +759,9 @@ class UnanswerablePerception(PerceptionInterface):
     What answering the query raises.
     """
 
-    def detect(self, query: PerceptionQuery) -> List[Detection]:
+    def detect(
+        self, query: PerceptionQuery, accept_first_if_multiple: bool = False
+    ) -> List[Detection]:
         raise self.failure
 
 

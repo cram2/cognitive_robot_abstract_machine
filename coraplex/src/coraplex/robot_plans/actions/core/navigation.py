@@ -28,7 +28,8 @@ class NavigateAction(ActionDescription):
 
     target_location: Pose
     """
-    Location to which the robot should be navigated
+    Where the robot should stand, and which way it should face given as the pose's
+    x-axis.
     """
 
     keep_joint_states: bool = ActionConfig.navigate_keep_joint_states
@@ -38,7 +39,12 @@ class NavigateAction(ActionDescription):
 
     @property
     def _action_plan(self) -> PlanNode:
-        return execute_single(MoveMotion(self.target_location, self.keep_joint_states))
+        return execute_single(
+            MoveMotion(
+                self.robot.mobile_base.pose_facing(self.target_location),
+                self.keep_joint_states,
+            )
+        )
 
     @staticmethod
     def pre_condition(

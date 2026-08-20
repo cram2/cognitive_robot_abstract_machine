@@ -87,7 +87,7 @@ class ApartmentEnvironment:
                 world,
                 parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     0.455 + (0.85 / 2),
-                    -0.17,
+                    -0.15,
                     1.9 / 2,
                     yaw=-np.pi / 2,
                     reference_frame=world.root,
@@ -105,7 +105,7 @@ class ApartmentEnvironment:
                         name=layer_name,
                         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                             0.455 + (0.85 / 2),
-                            -0.17,
+                            -0.15,
                             layer_height,
                             yaw=-np.pi / 2,
                             reference_frame=world.root,
@@ -244,7 +244,7 @@ class ApartmentEnvironment:
                 "wardrobe.dae",
                 self.mesh_path("wardrobe.dae"),
                 parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=2, y=-0.17, yaw=-np.pi / 2
+                    x=2, y=-0.15, yaw=-np.pi / 2
                 ),
             ),
             part_specifications={"doors": doors},

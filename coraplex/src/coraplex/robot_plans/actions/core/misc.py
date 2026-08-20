@@ -74,9 +74,19 @@ class DetectAction(ActionDescription):
     :attr:`~coraplex.perception.PerceptionQuery.trust_detected_orientation`.
     """
 
+    accept_first_if_multiple: bool = False
+    """
+    If there are multiple results of the same type returned, accept the first one
+    """
+
     @property
     def _action_plan(self) -> PlanNode:
-        return execute_single(DetectingMotion(query=self._build_query()))
+        return execute_single(
+            DetectingMotion(
+                query=self._build_query(),
+                accept_first_if_multiple=self.accept_first_if_multiple,
+            )
+        )
 
     def _build_query(self) -> PerceptionQuery:
         """

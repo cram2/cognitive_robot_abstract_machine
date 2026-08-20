@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Self, Union, List
 
+from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
@@ -479,6 +480,10 @@ class JustinTorso(
 
 @dataclass(eq=False)
 class JustinMobileBase(MobileBase[OmniDrive], HasTorso[JustinTorso]):
+
+    @classproperty
+    def forward_axis(cls) -> Vector3:
+        return Vector3.X()
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(

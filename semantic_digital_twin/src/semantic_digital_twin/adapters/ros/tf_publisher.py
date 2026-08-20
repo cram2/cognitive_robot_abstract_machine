@@ -27,7 +27,7 @@ from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("semantic_digital_twin").setLevel(logging.DEBUG)
 
 
 @dataclass(eq=False)
@@ -213,23 +213,23 @@ class TFPublisher(StateChangeCallback):
         )
 
     @classmethod
-    def create_with_ignore_existing_tf(cls, world: World, node: Node) -> Self:
+    def create_with_ignore_existing_tf(
+        cls,
+        world: World,
+        node: Node,
+        wait_for_existing_tf: int = 5,
+    ) -> Self:
         """
         Checks if any kinematic structure entity is already published in tf and ignores
         them.
 
         :param world: The world for which to create the TF publisher.
         :param node: The ROS2 node used to create the publisher.
+        :param wait_for_existing_tf: The time to wait for existing tf to be published.
         """
         tf_wrapper = TFWrapper(node=node)
-        for i in range(20):
-            all_frames = set(tf_wrapper.get_tf_frames())
-            if len(all_frames) > 0:
-                break
-            sleep(0.1)
-        else:
-            all_frames = set()
-            logging.info("Could not find any tf frames, publishing all tf")
+        sleep(wait_for_existing_tf)
+        all_frames = set(tf_wrapper.get_tf_frames())
         ignored_bodies = set(
             kse
             for kse in world.kinematic_structure_entities

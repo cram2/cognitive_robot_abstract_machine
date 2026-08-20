@@ -55,6 +55,11 @@ class PerceptionTask(Task):
     Whether the query has already been answered and written into the world.
     """
 
+    accept_first_if_multiple: bool = False
+    """
+    If there are multiple results of the same type returned, accept the first one
+    """
+
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         self.perception_source = PerceptionInterface.for_execution_type(
             self.execution_type,
@@ -70,7 +75,9 @@ class PerceptionTask(Task):
     ) -> Optional[ObservationStateValues]:
         if self._detections_applied:
             return ObservationStateValues.TRUE
-        for detection in self.perception_source.detect(self.query):
+        for detection in self.perception_source.detect(
+            self.query, self.accept_first_if_multiple
+        ):
             detection.apply_to(
                 self.query.world,
                 trust_orientation=self.query.trust_detected_orientation,
@@ -93,8 +100,15 @@ class DetectingMotion(BaseMotion):
     Query for the perception system that should be answered.
     """
 
+    accept_first_if_multiple: bool = False
+    """
+    If there are multiple results of the same type returned, accept the first one
+    """
+
     @property
     def _motion_chart(self) -> Task:
         return PerceptionTask(
-            query=self.query, execution_type=GiskardExecutable.execution_type
+            query=self.query,
+            execution_type=GiskardExecutable.execution_type,
+            accept_first_if_multiple=self.accept_first_if_multiple,
         )

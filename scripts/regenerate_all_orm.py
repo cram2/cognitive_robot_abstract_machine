@@ -10,7 +10,6 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-
 from protect_generated_orm_interfaces import mark_skip_worktree
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]

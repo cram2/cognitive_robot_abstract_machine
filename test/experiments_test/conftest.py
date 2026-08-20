@@ -13,10 +13,7 @@ from rclpy.action import get_action_names_and_types
 
 from coraplex.demonstrations import RobotDemonstrationRosSession
 from coraplex.perception import ROBOKUDO_QUERY_ACTION_NAME
-from experiments.real_stretch_apartment_demo.demo import (
-    CEREAL_SHELF_LAYER_NAME,
-    CEREAL_SHELF_LAYER_T_CEREAL,
-)
+from experiments.real_stretch_apartment_demo.demo import CEREAL_NAME
 from semantic_digital_twin.semantic_annotations.semantic_annotations import CheezeIt
 
 from coraplex.testing import StandaloneProcess
@@ -105,15 +102,22 @@ def stretch_controller_process():
 # %% standalone perception pipeline
 
 
+CEREAL_ORIGIN = (0.0, 0.0, 0.0)
+"""
+Where the pipeline reports the cereal within the cereal's own frame.
+"""
+
+
 @pytest.fixture()
 def cereal_perception_process(stretch_controller_process):
     """
     A perception pipeline reporting the demonstration's cereal, in its own process.
 
     The demonstration detects before it grasps, so a real run needs a pipeline answering
-    queries. Reporting the cereal in its shelf layer's frame, at the offset the
-    demonstration itself spawns it with, keeps the perceived pose and the scene from
-    drifting apart as one or the other is retuned.
+    queries. The cereal is reported at the origin of its own frame, so the pipeline sees
+    it wherever it currently stands: a detection taken after the demonstration has
+    carried it somewhere else confirms that pose instead of pulling it back to the one it
+    was spawned at.
     """
     pytest.importorskip("robokudo_msgs")
     probe_node = stretch_controller_process.session.node
@@ -124,7 +128,6 @@ def cereal_perception_process(stretch_controller_process):
             for name, _ in get_action_names_and_types(probe_node)
         )
 
-    position = CEREAL_SHELF_LAYER_T_CEREAL.to_position().to_np().flatten()[:3]
     with StandaloneProcess(
         launcher_path=Path(__file__).parent.parent
         / "dataset"
@@ -134,9 +137,9 @@ def cereal_perception_process(stretch_controller_process):
             "--class-label",
             CheezeIt.__name__,
             "--frame-id",
-            CEREAL_SHELF_LAYER_NAME,
+            CEREAL_NAME,
             "--position",
-            *(str(coordinate) for coordinate in position),
+            *(str(coordinate) for coordinate in CEREAL_ORIGIN),
         ],
     ) as process:
         yield process

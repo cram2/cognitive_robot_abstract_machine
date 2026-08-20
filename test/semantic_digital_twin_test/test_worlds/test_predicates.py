@@ -189,6 +189,59 @@ def test_get_visible_objects(pr2_world_copy: World):
     assert visible(camera, body)
 
 
+def test_camera_view_frame_x_axis_is_the_forward_axis(pr2_world_copy: World):
+    """
+    The frame the ray tracer casts along must be the camera's own frame, turned so that
+    its x axis is the direction the camera looks.
+    """
+    camera = pr2_world_copy.get_semantic_annotations_by_type(Camera)[0]
+    root_T_camera = camera.root.global_transform
+
+    root_T_view = camera.root_T_forward_view.to_np()
+    root_V_forward = (
+        root_T_camera.to_rotation_matrix() @ camera.forward_facing_axis
+    ).to_np()
+
+    assert np.allclose(root_T_view[:3, 0], root_V_forward.flatten()[:3], atol=1e-9)
+    assert np.allclose(root_T_view[:3, 3], root_T_camera.to_np()[:3, 3], atol=1e-9)
+
+
+def test_visibility_follows_camera_orientation(pr2_world_copy: World):
+    """
+    A body off to the side is visible exactly when the head is turned towards it.
+    """
+    body = Body(name=PrefixedName("test_body"))
+    body.collision = ShapeCollection(
+        [
+            Box(
+                scale=Scale(1.0, 1.0, 1.0),
+                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    y=2.0, z=1.0, reference_frame=body
+                ),
+            )
+        ]
+    )
+
+    with pr2_world_copy.modify_world():
+        pr2_world_copy.add_connection(
+            Connection6DoF.create_with_dofs(
+                parent=pr2_world_copy.root,
+                child=body,
+                world=pr2_world_copy,
+            )
+        )
+
+    camera = pr2_world_copy.get_semantic_annotations_by_type(Camera)[0]
+    head_pan = pr2_world_copy.get_degree_of_freedom_by_name("head_pan_joint")
+
+    assert not visible(camera, body)
+
+    pr2_world_copy.state[head_pan.id].position = np.pi / 2
+    pr2_world_copy.notify_state_change()
+
+    assert visible(camera, body)
+
+
 def test_occluding_bodies(pr2_world_state_reset: World):
     world = deepcopy(pr2_world_state_reset)
     world.get_body_by_name("base_footprint").parent_connection.origin = (
@@ -232,6 +285,57 @@ def test_occluding_bodies(pr2_world_state_reset: World):
     assert obstacle in bodies
     assert camera not in bodies
     assert occluded_body not in bodies
+
+
+def test_occluding_bodies_follows_camera_orientation(pr2_world_state_reset: World):
+    """
+    Occlusion is judged along the direction the camera looks, not along a fixed world
+    axis, so a pair off to the side is only resolved once the head is turned towards it.
+    """
+    world = deepcopy(pr2_world_state_reset)
+    world.get_body_by_name("base_footprint").parent_connection.origin = (
+        HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0)
+    )
+
+    def make_body(name: str) -> Body:
+        result = Body(name=PrefixedName(name))
+        collision = Box(
+            scale=Scale(1.0, 1.0, 1.0),
+            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=result),
+        )
+        result.collision = ShapeCollection([collision])
+        return result
+
+    obstacle = make_body("obstacle")
+    occluded_body = make_body("occluded_body")
+
+    with world.modify_world():
+        root = world.root
+        world.add_connection(
+            FixedConnection(
+                parent=root,
+                child=obstacle,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    reference_frame=root, y=3, z=0.8
+                ),
+            )
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=root,
+                child=occluded_body,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    reference_frame=root, y=10, z=0.5
+                ),
+            )
+        )
+
+    camera = world.get_semantic_annotations_by_type(Camera)[0]
+    head_pan = world.get_degree_of_freedom_by_name("head_pan_joint")
+    world.state[head_pan.id].position = np.pi / 2
+    world.notify_state_change()
+
+    assert obstacle in occluding_bodies(camera, occluded_body)
 
 
 def test_above_and_below(two_block_world):

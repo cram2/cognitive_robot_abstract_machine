@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Self, List
 
+from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
@@ -31,6 +32,7 @@ from semantic_digital_twin.robots.robot_parts import (
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world_description.connections import OmniDrive
+from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -554,6 +556,10 @@ class Armar7Torso(
 @dataclass(eq=False)
 class Armar7MobileBase(MobileBase[OmniDrive], HasTorso[Armar7Torso]):
 
+    @classproperty
+    def forward_axis(cls) -> Vector3:
+        return Vector3.Y()
+
     def setup_hardware_interfaces(self):
         pass
 
@@ -568,7 +574,6 @@ class Armar7MobileBase(MobileBase[OmniDrive], HasTorso[Armar7Torso]):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "Dummy_Platform_link"
             ),
-            forward_axis=Vector3.Y(),
         )
 
 
@@ -586,7 +591,7 @@ class Armar7(AbstractRobot, HasMobileBase[Armar7MobileBase]):
 
     @classmethod
     def _get_root_body_name(cls) -> str:
-        return "Dummy_Platform_link"
+        return "root"
 
     def _setup_collision_rules(self):
         pass

@@ -2287,8 +2287,8 @@ def test_state_updates_are_applied_up_to_the_next_model_modification(rclpy_node)
 
     try:
         publish_position(publisher_world, 1.5)
-        # A fixed connection carries no degree of freedom, so this modification does not
-        # publish a state message of its own and the buffer stays predictable.
+        # A model modification republishes the full state after its model block, so the
+        # modification contributes a state message of its own.
         with publisher_world.modify_world():
             late_body = Body(name=PrefixedName("partial_drain_late_body"))
             publisher_world.add_body(late_body)
@@ -2297,8 +2297,11 @@ def test_state_updates_are_applied_up_to_the_next_model_modification(rclpy_node)
             )
         publish_position(publisher_world, 2.5)
         assert wait_for_condition(
-            lambda: len(receiver_synchronizer.missed_messages) == 3
-        ), "expected a state, a model and a second state message to be buffered"
+            lambda: len(receiver_synchronizer.missed_messages) == 4
+        ), (
+            "expected a state, a model, the model's state republish and a second state "
+            "message to be buffered"
+        )
 
         receiver_synchronizer.apply_missed_state_updates()
 
@@ -2306,7 +2309,7 @@ def test_state_updates_are_applied_up_to_the_next_model_modification(rclpy_node)
             0
         ].position == pytest.approx(1.5, abs=1e-9)
         assert len(receiver_world.kinematic_structure_entities) == 2
-        assert len(receiver_synchronizer.missed_messages) == 2
+        assert len(receiver_synchronizer.missed_messages) == 3
         assert receiver_synchronizer.has_buffered_model_modification
 
         receiver_synchronizer.apply_missed_messages()
@@ -2316,6 +2319,46 @@ def test_state_updates_are_applied_up_to_the_next_model_modification(rclpy_node)
             0
         ].position == pytest.approx(2.5, abs=1e-9)
         assert not receiver_synchronizer.has_buffered_model_modification
+    finally:
+        publisher_synchronizer.close()
+        receiver_synchronizer.close()
+
+
+def test_a_model_modification_republishes_the_whole_state(rclpy_node):
+    """
+    A receiver rebuilding itself from a model modification has no snapshot to fill the
+    gaps with, so the state that follows the modification carries every degree of
+    freedom rather than only the ones that moved since the last message.
+    """
+    (
+        publisher_world,
+        receiver_world,
+        publisher_synchronizer,
+        receiver_synchronizer,
+    ) = create_connected_worlds(rclpy_node, "model_change_republish")
+    receiver_synchronizer.defer_incoming_updates = True
+
+    try:
+        publish_position(publisher_world, 1.5)
+        # A fixed connection carries no degree of freedom, so nothing about the state
+        # changed and only the republish can account for a state message here.
+        with publisher_world.modify_world():
+            late_body = Body(name=PrefixedName("model_change_republish_late_body"))
+            publisher_world.add_body(late_body)
+            publisher_world.add_connection(
+                FixedConnection(parent=publisher_world.root, child=late_body)
+            )
+        assert wait_for_condition(
+            lambda: len(receiver_synchronizer.missed_messages) == 3
+        ), "expected a state, a model and the model's state republish to be buffered"
+
+        republished_state = receiver_synchronizer.missed_messages[-1].state_update
+
+        assert republished_state is not None
+        assert (
+            dict(zip(republished_state.ids, republished_state.states))
+            == publisher_world.state.to_uuid_position_dict()
+        )
     finally:
         publisher_synchronizer.close()
         receiver_synchronizer.close()
