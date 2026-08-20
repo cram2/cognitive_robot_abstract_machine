@@ -607,6 +607,44 @@ class HasMechanicalJoint(HasRootBody, PartWholeRelationship):
             kinematic_structure_entities.append(self.mechanical_joint.root)
         return kinematic_structure_entities
 
+    def create_default_mechanical_joint(
+        self, mechanical_joint_type: Type[MechanicalJoint]
+    ) -> None:
+        """
+        Give this annotation a mechanical joint of ``mechanical_joint_type`` when its
+        root is wired straight to its parent with a connection of the same kind that
+        joint type provides, and no mechanical joint carries it yet.
+
+        Formats like URDF often attach a door or drawer to its cabinet with a bare
+        active connection (e.g. revolute for a door, prismatic for a drawer) and no
+        dedicated joint body. This inserts one, carrying over the axis, multiplier,
+        offset and limits of the existing connection, so :attr:`mechanical_joint`
+        reflects the joint that already moves it.
+
+        :param mechanical_joint_type: The mechanical joint type to create, e.g.
+            ``Hinge`` for a door or ``Slider`` for a drawer.
+        """
+        if self.mechanical_joint is not None:
+            return
+        connection = self.root.parent_connection
+        connection_type = (
+            mechanical_joint_type.parent_connection_specification().connection_type
+        )
+        if not isinstance(connection, connection_type):
+            return
+        joint = mechanical_joint_type.create_with_new_body_in_world(
+            name=f"{self.root.name.name}_{mechanical_joint_type.__name__.lower()}",
+            world=self._world,
+            world_root_T_self=self.root.global_transform,
+            parent_connection_specification=mechanical_joint_type.parent_connection_specification(
+                axis=connection.axis,
+                multiplier=connection.multiplier,
+                offset=connection.offset,
+                dof_limits=connection.raw_dof.limits,
+            ),
+        )
+        self.add(joint)
+
 
 @dataclass(eq=False)
 class HasDrawers(PartWholeRelationship):

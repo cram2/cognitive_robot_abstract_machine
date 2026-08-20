@@ -3,6 +3,12 @@ from os.path import dirname
 
 from typing_extensions import Optional, List, Dict, Any, Type, ClassVar
 
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Door,
+    Drawer,
+    Hinge,
+    Slider,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 from semantic_digital_twin.reasoning.reasoner import CaseReasoner
@@ -81,6 +87,10 @@ class WorldReasoner:
             else:
                 for semantic_annotation in attr_value:
                     self.world.add_semantic_annotation_recursively(semantic_annotation)
+                    if isinstance(semantic_annotation, Door):
+                        semantic_annotation.create_default_mechanical_joint(Hinge)
+                    elif isinstance(semantic_annotation, Drawer):
+                        semantic_annotation.create_default_mechanical_joint(Slider)
 
     def fit_semantic_annotations(
         self,
