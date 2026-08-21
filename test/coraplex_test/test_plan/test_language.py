@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from coraplex.datastructures.enums import (
+    Arms,
     TaskStatus,
     MonitorBehavior,
     DetectionTechnique,
@@ -30,6 +31,7 @@ from coraplex.plans.factories import (
     code,
 )
 from coraplex.robot_plans import *
+from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.misc import DetectAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
@@ -273,3 +275,87 @@ def test_monitor_resume(immutable_model_world):
     assert len(plan.root.children) == 1
     assert isinstance(plan.root, MonitorNode)
     assert plan.root.status == TaskStatus.SUCCEEDED
+
+
+# %% action belief ranking
+
+
+def test_ranked_children_moves_the_infeasible_registered_action_last(
+    immutable_model_world,
+):
+    """
+    ``OpenAction`` is registered in ``ACTION_BELIEF_SPACES``; on this handle, only the
+    left arm is reachable (see test_action_belief_query.py), so ``_ranked_children``
+    must move the right-arm attempt after the left-arm one.
+    """
+    world, robot_view, context = immutable_model_world
+    handle = world.get_body_by_name("handle_cab10_m")
+
+    root = try_in_order(
+        [OpenAction(handle, Arms.RIGHT), OpenAction(handle, Arms.LEFT)], context
+    )
+
+    ranked = root._ranked_children()
+
+    assert [child.designator.arm for child in ranked] == [Arms.LEFT, Arms.RIGHT]
+
+
+def test_ranked_children_keeps_unregistered_and_non_designator_children_in_place(
+    immutable_model_world,
+):
+    """
+    ``ParkArmsAction`` is not registered in ``ACTION_BELIEF_SPACES``, so it must keep
+    its original position relative to the feasible ``OpenAction`` -- only the
+    infeasible, registered right-arm attempt is moved to the end.
+    """
+    world, robot_view, context = immutable_model_world
+    handle = world.get_body_by_name("handle_cab10_m")
+
+    root = try_in_order(
+        [
+            ParkArmsAction(Arms.BOTH),
+            OpenAction(handle, Arms.RIGHT),
+            OpenAction(handle, Arms.LEFT),
+        ],
+        context,
+    )
+    layer_indices_before = [child.layer_index for child in root.children]
+
+    ranked = root._ranked_children()
+
+    assert [child.designator for child in ranked] == [
+        root.children[0].designator,
+        root.children[2].designator,
+        root.children[1].designator,
+    ]
+    # _ranked_children only reorders the local list it returns; the graph's own
+    # layer_index (and everything derived from it: children, siblings, path) is
+    # untouched.
+    assert [child.layer_index for child in root.children] == layer_indices_before
+
+
+def test_try_in_order_notify_visits_ranked_children_in_order(immutable_model_world):
+    """
+    ``notify`` must drive execution from ``_ranked_children``, not the structural
+    ``children`` order.
+
+    Each child's own ``perform`` is stubbed to record visit order
+    instead of running a real motion: ``TryInOrderNode.parse`` separately merges
+    ``children`` (unranked) into one Giskard ``TryInOrder`` template, exercised on its
+    own in test_giskard_templates.py, so driving a full ``plan.perform()`` here would
+    also execute that unrelated path.
+    """
+    world, robot_view, context = immutable_model_world
+    handle = world.get_body_by_name("handle_cab10_m")
+
+    root = try_in_order(
+        [OpenAction(handle, Arms.RIGHT), OpenAction(handle, Arms.LEFT)], context
+    )
+
+    performed_arms = []
+    for child in root.children:
+        child.perform = lambda child=child: performed_arms.append(child.designator.arm)
+
+    root.notify()
+
+    assert performed_arms == [Arms.LEFT, Arms.RIGHT]

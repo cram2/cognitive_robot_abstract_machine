@@ -18,6 +18,7 @@ from typing_extensions import (
 
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import Goal
+from coraplex.action_belief.action_belief_query import ActionBeliefQuery
 from coraplex.language_giskard_templates import TryAll, TryInOrder
 from coraplex.plans.executables import (
     GiskardExecutable,
@@ -26,7 +27,11 @@ from coraplex.plans.executables import (
 from coraplex.datastructures.enums import TaskStatus, MonitorBehavior
 from coraplex.plans.failures import PlanFailure, AllChildrenFailed
 from coraplex.fluent import Fluent
-from coraplex.plans.plan_node import PlanNode, ExecutionBoundaryNode
+from coraplex.plans.plan_node import (
+    DesignatorNode,
+    ExecutionBoundaryNode,
+    PlanNode,
+)
 from coraplex.utils import split_list_by_type
 
 logger = logging.getLogger(__name__)
@@ -244,8 +249,34 @@ class TryInOrderNode(ExecutesSequentially):
 
     motion_state_chart_template = TryInOrder
 
+    def _ranked_children(self) -> List[PlanNode]:
+        """
+        :return: :attr:`children`, with any child whose designator is a registered
+            :data:`~coraplex.action_belief.action_belief_space.ACTION_BELIEF_SPACES`
+            action type predicted infeasible by
+            :class:`~coraplex.action_belief.action_belief_query.ActionBeliefQuery`
+            moved after every other child. Both groups keep their original relative
+            order; children that aren't a registered action type are never moved.
+
+        This only reorders the local list returned here, not :attr:`children` itself
+        -- ``layer_index`` and everything derived from it (:attr:`siblings`,
+        :attr:`path`, ...) are left untouched.
+        """
+
+        def predicted_infeasible(child: PlanNode) -> bool:
+            if not isinstance(child, DesignatorNode):
+                return False
+            query = ActionBeliefQuery.for_registered_type(
+                type(child.designator), self.plan.context
+            )
+            if query is None:
+                return False
+            return not query.predict_feasible(child.designator)
+
+        return sorted(self.children, key=predicted_infeasible)
+
     def notify(self):
-        for child in self.children:
+        for child in self._ranked_children():
             try:
                 child.perform()
             except PlanFailure:

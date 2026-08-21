@@ -1,6 +1,10 @@
 import logging
 from pathlib import Path
 
+import coraplex.action_belief.action_belief_query
+import coraplex.action_belief.action_belief_space
+import coraplex.action_belief.intervention
+import coraplex.action_belief.results
 import coraplex.locations.costmaps
 import coraplex.orm.model
 import giskardpy.orm.ormatic_interface
@@ -17,6 +21,10 @@ from krrood.ormatic.utils import classes_of_module
 
 
 ignored_classes = set(classes_of_module(coraplex.locations.costmaps))
+ignored_classes |= set(classes_of_module(coraplex.action_belief.action_belief_space))
+ignored_classes |= set(classes_of_module(coraplex.action_belief.action_belief_query))
+ignored_classes |= set(classes_of_module(coraplex.action_belief.intervention))
+ignored_classes |= set(classes_of_module(coraplex.action_belief.results))
 # profiling and benchmarking measure a running system instead of describing it
 ignored_classes |= {SubclassJSONSerializer}
 

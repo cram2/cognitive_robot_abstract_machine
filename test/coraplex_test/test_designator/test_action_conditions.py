@@ -5,6 +5,7 @@ from krrood.entity_query_language.factories import (
     evaluate_condition,
     ConditionType,
 )
+from coraplex.action_belief import intervention
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.exceptions import ConditionNotSatisfied, MotionDidNotFinish
@@ -147,3 +148,86 @@ def test_pick_up_post_condition(mutable_model_world):
     )
 
     assert _construct_and_evaluate_condition(pick_action, pick_action.post_condition)
+
+
+def test_pick_up_success_does_not_trigger_diagnosis(mutable_model_world, monkeypatch):
+    """
+    ``GiskardExecutable._condition_not_satisfied`` builds its ``ConditionNotSatisfied``
+    eagerly, at chart-compile time, before the condition is ever checked -- so it must
+    never set ``failed_action``, or ``intervention.diagnose()`` (a real world deep copy
+    plus ``pre_condition`` recheck) would run on every successful execution too, not
+    just failures.
+
+    Verified here by spying on the real ``diagnose()`` (still calling through to it),
+    not replacing it.
+    """
+    diagnosed_actions = []
+    original_diagnose = intervention.diagnose
+
+    def spying_diagnose(action):
+        diagnosed_actions.append(action)
+        return original_diagnose(action)
+
+    monkeypatch.setattr(intervention, "diagnose", spying_diagnose)
+
+    world, view, context = mutable_model_world
+    pick_action = PickUpAction(
+        world.get_body_by_name("milk.stl"),
+        Arms.LEFT,
+        GraspDescription(
+            ApproachDirection.FRONT,
+            VerticalAlignment.NoAlignment,
+            view.left_arm.end_effector,
+        ),
+    )
+    view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        1.8, 2, 0
+    )
+
+    plan = sequential([pick_action], context)
+
+    with simulated_robot:
+        plan.perform()
+
+    assert diagnosed_actions == []
+
+
+@pytest.mark.xfail(
+    reason=(
+        "Upstream commit 63f4f214a ('remove redundant condition monitor setup in "
+        "executables') deleted the only call to GiskardExecutable._add_condition_monitors, "
+        "so a simulated pre-condition failure no longer aborts the motion via CancelMotion "
+        "and instead runs to MotionDidNotFinish. Confirmed present on upstream/main itself, "
+        "unrelated to this branch. Restoring the call site fixes this test but breaks "
+        "several already-passing composite/underspecified-action tests elsewhere in this "
+        "suite, so it needs a real fix upstream rather than a local patch here."
+    ),
+    strict=True,
+)
+def test_context_evaluate_condition(mutable_model_world):
+    world, view, context = mutable_model_world
+
+    pick_action = PickUpAction(
+        world.get_body_by_name("milk.stl"),
+        Arms.LEFT,
+        GraspDescription(
+            ApproachDirection.FRONT,
+            VerticalAlignment.NoAlignment,
+            view.left_arm.end_effector,
+        ),
+    )
+    # Make action impossible
+    view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        1.0, 2, 0
+    )
+
+    plan = sequential([pick_action], context)
+    with pytest.raises(ConditionNotSatisfied):
+        with simulated_robot:
+            plan.perform()
+
+    context.evaluate_conditions = False
+
+    with pytest.raises(MotionDidNotFinish):
+        with simulated_robot:
+            plan.perform()
