@@ -5,7 +5,9 @@ import time
 import mujoco
 import pytest
 import numpy
+import trimesh
 from PIL import Image
+from trimesh.visual.material import SimpleMaterial
 
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -317,9 +319,11 @@ def test_mesh_scale_and_equality(test_mjcf_2_world):
 def _write_textured_tetrahedron(directory, texture_color) -> str:
     """
     Writes a minimal textured OBJ+MTL+PNG mesh (a tetrahedron, so its convex hull is
-    non-degenerate) into ``directory``, textured with a solid ``texture_color``, and returns
-    the OBJ file's path. Always named "tetra.obj"/"tetra.mtl"/"wood.png", so callers writing
-    into different directories can reproduce a texture basename collision between them.
+    non-degenerate) into ``directory``, textured with a solid ``texture_color``, and
+    returns the OBJ file's path.
+
+    Always named "tetra.obj"/"tetra.mtl"/"wood.png", so callers writing into different
+    directories can reproduce a texture basename collision between them.
     """
     directory.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (4, 4), color=texture_color).save(directory / "wood.png")
@@ -683,11 +687,12 @@ def test_spawn_body_with_connections():
 
 
 def test_body_frame_excludes_joint_state_at_build_time():
-    """A body's static frame must be built at the reference (zero-joint) pose.
+    """
+    A body's static frame must be built at the reference (zero-joint) pose.
 
-    The joint is non-zero while the simulator is built and is evaluated at a
-    different angle, so a frame that baked in the build-time angle would have it
-    applied twice and drift away from the world forward kinematics.
+    The joint is non-zero while the simulator is built and is evaluated at a different
+    angle, so a frame that baked in the build-time angle would have it applied twice and
+    drift away from the world forward kinematics.
     """
     world = World()
     base_body = Body(name=PrefixedName("base"))
@@ -848,6 +853,206 @@ def test_world_sim_state_sync():
         )
     finally:
         stop_multisim_if_running(multi_sim)
+
+
+def _write_thin_slab_mesh(directory) -> str:
+    """
+    Writes a minimal OBJ mesh for a closed box thin enough (1e-5 units) that MuJoCo's
+    default ("legacy") volume-based inertia estimator used to reject it as "mesh volume
+    is too small" (fixed upstream as of MuJoCo 3.11) - the shape of real CAD furniture
+    panels (a door slab, a backing panel), reproduced with an actual ArtVIP dataset
+    object.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    mesh_file = directory / "slab.obj"
+    thickness = 1e-5
+    mesh_file.write_text(
+        "o slab\n"
+        "v 0.0 0.0 0.0\n"
+        "v 1.0 0.0 0.0\n"
+        "v 1.0 1.0 0.0\n"
+        "v 0.0 1.0 0.0\n"
+        f"v 0.0 0.0 {thickness}\n"
+        f"v 1.0 0.0 {thickness}\n"
+        f"v 1.0 1.0 {thickness}\n"
+        f"v 0.0 1.0 {thickness}\n"
+        "f 1 2 3\nf 1 3 4\n"
+        "f 5 6 7\nf 5 7 8\n"
+        "f 1 2 6\nf 1 6 5\n"
+        "f 2 3 7\nf 2 7 6\n"
+        "f 3 4 8\nf 3 8 7\n"
+        "f 4 1 5\nf 4 5 8\n"
+    )
+    return str(mesh_file)
+
+
+def test_builder_compiles_a_body_with_thin_panel_geometry(tmp_path):
+    # Before MuJoCo 3.11, the default inertia estimator rejected a mesh this thin with
+    # "ValueError: mesh volume is too small", so this raised instead of compiling.
+    mesh_file = _write_thin_slab_mesh(tmp_path)
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
+        panel = Body(
+            name=PrefixedName("panel"),
+            visual=ShapeCollection([mesh_shape]),
+            collision=ShapeCollection([mesh_shape]),
+        )
+        world.add_kinematic_structure_entity(panel)
+        world.add_connection(FixedConnection(parent=root, child=panel))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [mesh_spec] = builder.spec.meshes
+    assert mesh_spec.name.startswith("slab")
+
+
+def _write_flat_quad_mesh(directory) -> str:
+    """
+    Writes a minimal OBJ mesh for a single-sided, exactly flat quad (zero thickness,
+    every vertex exactly coplanar) - the shape of a door or cover panel modelled as a
+    single sheet rather than a closed solid, reproduced with a real ArtVIP object.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    mesh_file = directory / "panel.obj"
+    mesh_file.write_text(
+        "o panel\n"
+        "v 0.0 0.0 0.0\n"
+        "v 1.0 0.0 0.0\n"
+        "v 1.0 1.0 0.0\n"
+        "v 0.0 1.0 0.0\n"
+        "f 1 2 3\nf 1 3 4\n"
+    )
+    return str(mesh_file)
+
+
+def test_builder_compiles_a_body_with_an_exactly_flat_panel(tmp_path):
+    # Before the fix, MuJoCo rejected a mesh with exactly coplanar vertices as
+    # "ValueError: mesh ... has coplanar vertices, cannot compute convex hull" - a
+    # different failure than a thin-but-closed mesh (test above), since there is no
+    # volume-based inertia estimate to fall back on at all: there is no volume.
+    mesh_file = _write_flat_quad_mesh(tmp_path)
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
+        panel = Body(
+            name=PrefixedName("panel"),
+            visual=ShapeCollection([mesh_shape]),
+            collision=ShapeCollection([mesh_shape]),
+        )
+        world.add_kinematic_structure_entity(panel)
+        world.add_connection(FixedConnection(parent=root, child=panel))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [mesh_spec] = builder.spec.meshes
+    assert mesh_spec.name == "panel_thickened"
+
+
+def _write_flat_quad_mesh_at_scale(directory, scale: float) -> str:
+    """
+    Writes a minimal OBJ mesh for a single-sided, exactly flat quad ``scale`` units
+    across - large enough that a fixed, furniture-scale thickening offset would be
+    below STL's float32 export precision at this magnitude and get rounded back to
+    exactly zero, reproduced with a real ArtVIP object (one ~24000-unit panel).
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    mesh_file = directory / "large_panel.obj"
+    mesh_file.write_text(
+        "o large_panel\n"
+        f"v 0.0 0.0 0.0\n"
+        f"v {scale} 0.0 0.0\n"
+        f"v {scale} {scale} 0.0\n"
+        f"v 0.0 {scale} 0.0\n"
+        "f 1 2 3\nf 1 3 4\n"
+    )
+    return str(mesh_file)
+
+
+def test_builder_compiles_a_body_with_a_large_flat_panel(tmp_path):
+    # Before scaling the thickening offset to the mesh's own extent, this reproduced
+    # "ValueError: mesh ... has coplanar vertices, cannot compute convex hull" even
+    # after the fixed-offset fix above: the fixed offset survived Python-side but was
+    # rounded back to exactly zero by STL's float32 precision at this magnitude.
+    mesh_file = _write_flat_quad_mesh_at_scale(tmp_path, scale=24000.0)
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
+        panel = Body(
+            name=PrefixedName("panel"),
+            visual=ShapeCollection([mesh_shape]),
+            collision=ShapeCollection([mesh_shape]),
+        )
+        world.add_kinematic_structure_entity(panel)
+        world.add_connection(FixedConnection(parent=root, child=panel))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [mesh_spec] = builder.spec.meshes
+    assert mesh_spec.name == "large_panel_thickened"
+
+
+def test_builder_compiles_a_body_with_a_flat_coloured_untextured_mesh(tmp_path):
+    # Before the fix, MujocoMeshConverter._resolve_texture_file_path assumed a
+    # TextureVisuals material always has a backing image and crashed with
+    # "AttributeError: 'NoneType' object has no attribute 'info'" on a material with
+    # only a flat diffuse colour and no image (e.g. a painted wall with no texture map).
+    flat_colour_mesh = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
+    flat_colour_mesh.visual = trimesh.visual.TextureVisuals(
+        material=SimpleMaterial(diffuse=(120, 80, 40, 255))
+    )
+    mesh_file = str(tmp_path / "painted_box.obj")
+    flat_colour_mesh.export(mesh_file)
+
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
+        panel = Body(
+            name=PrefixedName("panel"),
+            visual=ShapeCollection([mesh_shape]),
+            collision=ShapeCollection([mesh_shape]),
+        )
+        world.add_kinematic_structure_entity(panel)
+        world.add_connection(FixedConnection(parent=root, child=panel))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [mesh_spec] = builder.spec.meshes
+    assert mesh_spec.name == "painted_box"
+
+
+def test_thicken_if_near_planar_regenerates_instead_of_reusing_a_stale_file(tmp_path):
+    # Before the fix, the thickened output was only (re)written if it didn't already
+    # exist on disk, keyed by the source mesh's basename alone - two different meshes
+    # sharing a basename across builds into the same asset folder (e.g. two objects each
+    # containing a "cover.stl") silently reused whichever one happened to be written
+    # first, reproduced here with a stale file left directly in the asset folder.
+    mesh_file = _write_flat_quad_mesh(tmp_path)  # "panel.obj" -> "panel_thickened.stl"
+    builder = MujocoBuilder()
+    builder._asset_folder_path = str(tmp_path)
+
+    stale_triangle = trimesh.Trimesh(
+        vertices=[[0, 0, 0], [1, 0, 0], [0, 1, 0]], faces=[[0, 1, 2]], process=False
+    )
+    stale_triangle.export(str(tmp_path / "panel_thickened.stl"))
+
+    thickened_path = builder._thicken_if_near_planar(mesh_file)
+
+    # A correctly thickened quad has its 4 corners duplicated (front/back), not the
+    # stale triangle's 3.
+    assert len(trimesh.load(thickened_path, force="mesh").vertices) == 8
 
 
 def test_prebuilt_world_multiple_free_bodies_start_at_authored_poses():

@@ -13,6 +13,7 @@ from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, an
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.variable import Continuous
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wall,
@@ -32,7 +33,7 @@ from semantic_digital_twin.world_description.geometry import Color, Scale
 
 @pytest.fixture
 def wall_door_handle_world():
-    world = World.create_with_root_body("map")
+    world = World.create_with_root_body(PrefixedName("map"))
 
     with world.modify_world():
         wall = Wall.create_with_new_body_in_world(

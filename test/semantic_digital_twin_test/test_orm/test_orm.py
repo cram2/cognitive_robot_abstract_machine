@@ -183,7 +183,7 @@ def _is_part_whole_relationship(annotation_type, field_name):
 def test_part_whole_relationship_field_survives_deepcopy():
     copy_functions = [copy, deepcopy]
     for copy_function in copy_functions:
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(PrefixedName("root"))
         with world.modify_world():
             drawer = Drawer.create_with_new_body_in_world(
                 name="drawer", scale=Scale(0.2, 0.3, 0.2), world=world
@@ -267,7 +267,7 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
     type still carries the marker, the marked-field discovery must still find it, and
     the field *values* (handle, mechanical_joint) must survive the round trip.
     """
-    world = World.create_with_root_body("root")
+    world = World.create_with_root_body(PrefixedName("root"))
     with world.modify_world():
         drawer = Drawer.create_with_new_body_in_world(
             name="drawer", scale=Scale(0.2, 0.3, 0.2), world=world

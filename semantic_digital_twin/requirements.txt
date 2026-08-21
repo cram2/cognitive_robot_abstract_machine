@@ -32,6 +32,7 @@ pycollada
 psycopg
 plyfile
 huggingface-hub
+usd-core>=24.11
 vhacdx
 rerun-sdk[datafusion]
 imageio

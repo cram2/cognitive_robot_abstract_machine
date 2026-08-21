@@ -1376,10 +1376,13 @@ class MujocoMeshConverter(MujocoGeomConverter, MeshConverter):
 
         :param material: The trimesh material (``TextureVisuals.material``) to resolve.
         :param mesh_directory: Directory of the mesh file the material came from.
-        :return: The texture's file path, or ``None`` if the texture is a programmatically
-            generated image (for example a flat "glass" material) with no backing file.
+        :return: The texture's file path, or ``None`` if the material has no image at
+            all (a flat colour with no texture) or a programmatically generated image
+            with no backing file.
         """
         image = material.image
+        if image is None:
+            return None
         candidates = [material.name, image.info.get("file_path", "")]
         if isinstance(image, PIL.ImageFile.ImageFile):
             candidates.append(image.filename)
@@ -1765,10 +1768,26 @@ class MujocoBuilder(MultiSimBuilder):
 
     spec: mujoco.MjSpec = field(default=mujoco.MjSpec())
 
+    planar_thickness_epsilon: float = 1e-4
+    """
+    Below this thickness (in meters, measured along a mesh's own best-fit-plane
+    normal), a mesh is treated as near-planar for :meth:`_thicken_if_near_planar`.
+    """
+
+    _thickened_mesh_paths: Dict[str, str] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    Memoizes :meth:`_thicken_if_near_planar` by input path, so a mesh referenced by
+    many geoms (e.g. a screw reused across a whole object) is only loaded and checked
+    once instead of once per reference.
+    """
+
     def _start_build(self, file_path: str):
         self.spec = mujoco.MjSpec()
         self.spec.modelname = "scene"
         self.spec.compiler.degree = 0
+        self._thickened_mesh_paths = {}
 
     def _end_build(self, file_path: str):
         self._build_equalities()
@@ -1898,9 +1917,75 @@ class MujocoBuilder(MultiSimBuilder):
         logger.info(
             f"Converting Collada mesh to STL for MuJoCo: {original_mesh_file_path}"
         )
-        tm = trimesh.load(original_mesh_file_path, force="mesh")
+        trimesh_mesh = trimesh.load(original_mesh_file_path, force="mesh")
 
-        tm.export(stl_file_path)
+        trimesh_mesh.export(stl_file_path)
+
+    def _thicken_if_near_planar(self, mesh_file_path: str) -> str:
+        """
+        MuJoCo cannot compute a convex hull for a mesh whose vertices are (near-)
+        exactly coplanar - a flat, effectively two-dimensional panel with no enclosed
+        volume - and raises "mesh ... has coplanar vertices, cannot compute convex
+        hull" rather than compiling. Real CAD furniture sometimes ships geometry this
+        way (a door or cover modelled as a single-sided sheet).
+
+        MuJoCo hulls a mesh's vertex positions, not its exact topology, so the fix does
+        not need to close the mesh into a topological solid: duplicating every vertex
+        and offsetting the two copies apart by a small epsilon along the panel's own
+        normal already gives MuJoCo a non-degenerate point cloud to hull, invisibly
+        (the offset is a fraction of a millimeter for real furniture-scale meshes).
+
+        The offset is scaled to the mesh's own extent (floored at
+        ``planar_thickness_epsilon``): STL's float32 export loses precision at large
+        enough coordinate magnitudes, so a mesh authored at a much larger scale than
+        typical furniture (seen on one real ArtVIP object, tens of thousands of units
+        across) needs a correspondingly larger absolute offset to remain distinguishable
+        from zero once exported.
+
+        :param mesh_file_path: The mesh file to check.
+        :return: ``mesh_file_path`` unchanged if it already has meaningful thickness,
+            otherwise the path to a thickened copy written into the asset folder.
+        """
+        if mesh_file_path in self._thickened_mesh_paths:
+            return self._thickened_mesh_paths[mesh_file_path]
+
+        trimesh_mesh = trimesh.load(mesh_file_path, force="mesh")
+        centered_vertices = trimesh_mesh.vertices - trimesh_mesh.vertices.mean(axis=0)
+        _, _, principal_axes = numpy.linalg.svd(centered_vertices, full_matrices=False)
+        normal = principal_axes[-1]
+        projections = centered_vertices @ normal
+        thickness = projections.max() - projections.min()
+        if thickness > self.planar_thickness_epsilon:
+            self._thickened_mesh_paths[mesh_file_path] = mesh_file_path
+            return mesh_file_path
+
+        base_name = os.path.splitext(os.path.basename(mesh_file_path))[0]
+        thickened_file_path = os.path.join(
+            self.asset_folder_path, base_name + "_thickened.stl"
+        )
+        # Always (re)written rather than reused when already present on disk: two
+        # different source meshes can share a basename (e.g. two objects each
+        # containing a "cover.stl"), and an existence check keyed only on that name
+        # would silently reuse a stale, geometrically wrong thickened mesh left over
+        # from a previous build that wrote into the same asset folder.
+        extent = numpy.linalg.norm(
+            trimesh_mesh.vertices.max(axis=0) - trimesh_mesh.vertices.min(axis=0)
+        )
+        offset_magnitude = max(self.planar_thickness_epsilon, extent * 1e-5)
+        offset = normal * (offset_magnitude / 2.0)
+        vertex_count = len(trimesh_mesh.vertices)
+        thickened = trimesh.Trimesh(
+            vertices=numpy.concatenate(
+                [trimesh_mesh.vertices + offset, trimesh_mesh.vertices - offset]
+            ),
+            faces=numpy.concatenate(
+                [trimesh_mesh.faces, trimesh_mesh.faces[:, ::-1] + vertex_count]
+            ),
+            process=False,
+        )
+        thickened.export(thickened_file_path)
+        self._thickened_mesh_paths[mesh_file_path] = thickened_file_path
+        return thickened_file_path
 
     def _parse_geom(self, geom_props: Dict[str, Any]) -> bool:
         """
@@ -1928,6 +2013,8 @@ class MujocoBuilder(MultiSimBuilder):
                     original_mesh_file_path=mesh_file_path, stl_file_path=stl_file_path
                 )
             mesh_file_path = stl_file_path
+
+        mesh_file_path = self._thicken_if_near_planar(mesh_file_path)
 
         mesh_name = os.path.splitext(os.path.basename(mesh_file_path))[0]
         mesh_scale = [mesh_entity.scale.x, mesh_entity.scale.y, mesh_entity.scale.z]

@@ -95,7 +95,7 @@ def _fresh_world() -> World:
     """
     A world holding nothing but its root body.
     """
-    return World.create_with_root_body("root")
+    return World.create_with_root_body(PrefixedName("root"))
 
 
 @pytest.fixture

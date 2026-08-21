@@ -66,7 +66,7 @@ class KitchenEnvironment:
 
         :return: A new world instance with the initialized environment.
         """
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(PrefixedName("root"))
 
         self._build_environment_walls(world)
         self._build_environment_furniture(world)

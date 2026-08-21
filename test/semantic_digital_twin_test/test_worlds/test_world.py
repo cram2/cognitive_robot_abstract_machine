@@ -73,8 +73,8 @@ from semantic_digital_twin.world_description.world_state_trajectory_plotter impo
 )
 
 
-def test_create_with_root_body_names_the_root_from_a_plain_string():
-    world = World.create_with_root_body("kitchen")
+def test_create_with_root_body_names_the_root_from_a_given_prefixed_name():
+    world = World.create_with_root_body(PrefixedName("kitchen"))
     assert world.root.name == PrefixedName("kitchen")
 
 
@@ -84,7 +84,7 @@ def test_create_with_root_body_defaults_the_root_name_to_map():
 
 
 def test_force_root_name_renames_the_root_body():
-    world = World.create_with_root_body("map")
+    world = World.create_with_root_body(PrefixedName("map"))
     world.force_root_name(PrefixedName("odom"))
     assert world.root.name == PrefixedName("odom")
 
@@ -103,7 +103,7 @@ def test_force_root_name_preserves_root_identity_and_children(world_setup):
 
 
 def test_force_root_name_records_an_attribute_update_modification():
-    world = World.create_with_root_body("map")
+    world = World.create_with_root_body(PrefixedName("map"))
     root_id = world.root.id
 
     world.force_root_name(PrefixedName("odom"))

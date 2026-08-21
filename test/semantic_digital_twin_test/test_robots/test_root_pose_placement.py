@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from semantic_digital_twin.api import RobotSpecification
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -20,7 +21,7 @@ def _pr2_behind_an_odom(
     The specification path is what puts the odom between the world root and the robot,
     so the placement is exercised against the same chain a specification builds.
     """
-    world = World.create_with_root_body("root")
+    world = World.create_with_root_body(PrefixedName("root"))
     try:
         robot = RobotSpecification(
             semantic_annotation_type=PR2, world_T_odom=world_T_odom

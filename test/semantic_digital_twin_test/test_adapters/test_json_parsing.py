@@ -379,7 +379,7 @@ def _world_with_two_equally_named_connections() -> (
     Merging two instances of the same robot description produces exactly this, since
     every entity is named after the description it was parsed from.
     """
-    world = World.create_with_root_body("root")
+    world = World.create_with_root_body(PrefixedName("root"))
     connections = []
     for index in range(2):
         with world.modify_world():

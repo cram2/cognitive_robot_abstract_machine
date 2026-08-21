@@ -153,7 +153,7 @@ class TestSoftConnectionFactories:
     """
 
     def test_piecewise_constant_curvature_factory_applies_placement(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(PrefixedName("root"))
         limits = DegreeOfFreedomLimits(
             lower=DerivativeMap(position=-10.0, velocity=-10.0),
             upper=DerivativeMap(position=10.0, velocity=10.0),
@@ -185,7 +185,7 @@ class TestSoftConnectionFactories:
         assert connection.active_dofs == [kappa, phi]
 
     def test_cosserat_rod_factory_applies_placement(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(PrefixedName("root"))
         limits = DegreeOfFreedomLimits(
             lower=DerivativeMap(position=-10.0, velocity=-10.0),
             upper=DerivativeMap(position=10.0, velocity=10.0),
