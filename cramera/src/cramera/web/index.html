@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CRAM Visualization</title>
+<link rel="stylesheet" href="app.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <img class="logo-img" src="img/aicor-logo.png" alt="AICOR — Artificial Intelligence Powered Cognition-Enabled Robotics" />
+  </div>
+  <div class="topbar-actions">
+  </div>
+</header>
+
+<!-- panel slots — config.js decides which panels mount where -->
+<main class="split">
+  <div class="slot" data-slot="left"></div>
+  <div class="slot" data-slot="right"></div>
+</main>
+
+<!-- vendored libraries (all local, no CDN at runtime) -->
+<script src="vendor/three.min.js"></script>
+<script src="vendor/RoomEnvironment.js"></script>
+<script src="vendor/RGBELoader.js"></script>
+<script src="vendor/STLLoader.js"></script>
+<script src="vendor/ColladaLoader.js"></script>
+<script src="vendor/MTLLoader.js"></script>
+<script src="vendor/OBJLoader.js"></script>
+<script src="vendor/CopyShader.js"></script>
+<script src="vendor/SSAOShader.js"></script>
+<script src="vendor/SimplexNoise.js"></script>
+<script src="vendor/EffectComposer.js"></script>
+<script src="vendor/RenderPass.js"></script>
+<script src="vendor/ShaderPass.js"></script>
+<script src="vendor/SSAOPass.js"></script>
+<script src="vendor/OrbitControls.js"></script>
+<script src="vendor/URDFLoader.js"></script>
+<script src="vendor/vis-network.min.js"></script>
+
+<!-- core: event bus, panel registry, layout config -->
+<script src="core/bus.js"></script>
+<script src="core/registry.js"></script>
+<script src="config.js"></script>
+
+<!-- panels — each defines itself in the registry; config.js decides mounting -->
+<script src="panels/robot_scene/panel.js"></script>
+<script src="panels/eql/panel.js"></script>
+<script src="panels/graph/graph.js"></script>
+<script src="panels/graph/panel.js"></script>
+
+<script>Panels.boot();</script>
+<script src="core/split-resize.js"></script>
+</body>
+</html>

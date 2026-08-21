@@ -1709,6 +1709,17 @@ class TestTransformationMatrix:
         quaternion = t.to_quaternion()
         assert isinstance(quaternion, Quaternion)
 
+    def test_to_position_quaternion_list(self):
+        """
+        Position and orientation flatten into one 7-element list, via :class:`Pose`.
+        """
+        t = HomogeneousTransformationMatrix.from_xyz_quaternion(
+            1.0, 2.0, 3.0, 0.0, 0.0, 0.70710678, 0.70710678
+        )
+        assert t.to_position_quaternion_list() == pytest.approx(
+            [1.0, 2.0, 3.0, 0.0, 0.0, 0.70710678, 0.70710678]
+        )
+
     def test_frame_properties(self):
         """
         Test reference frame and child frame properties.
@@ -1923,6 +1934,17 @@ class TestTransformationMatrix:
         assert transform_np[3, 1] == 0
         assert transform_np[3, 2] == 0
         assert transform_np[3, 3] == 1
+
+
+class TestPose:
+    def test_to_position_quaternion_list(self):
+        """
+        Position and orientation flatten into one 7-element list.
+        """
+        p = Pose.from_xyz_quaternion(1.0, 2.0, 3.0, 0.0, 0.0, 0.70710678, 0.70710678)
+        assert p.to_position_quaternion_list() == pytest.approx(
+            [1.0, 2.0, 3.0, 0.0, 0.0, 0.70710678, 0.70710678]
+        )
 
 
 class TestQuaternion:
