@@ -26,6 +26,7 @@ from timeit import default_timer
 
 from py_trees.common import Status
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
+from typing_extensions import Any
 
 import robokudo.world
 from robokudo.annotators.core import BaseAnnotator
@@ -68,10 +69,23 @@ class StorageWriter(BaseAnnotator):
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
         self.storage = Storage(self.descriptor.parameters.db_name)
+        self.storage_preparation_completed: bool = False
+        """Whether storage setup has already run for this writer."""
 
-        # Wipe the database completely before recording data
+    def setup(self, **kwargs: Any) -> bool:
+        """Prepare the storage database before recording begins.
+        Guard it for executing it only once, since setup might be called multiple times
+        in the chosen tree executor."""
+        if not super().setup(**kwargs):
+            return False
+        if self.storage_preparation_completed:
+            return True
+
         if self.descriptor.parameters.drop_database_on_storage:
             self.storage.drop_database()
+
+        self.storage_preparation_completed = True
+        return True
 
     def update(self) -> Status:
         """Store current CAS data in MongoDB.

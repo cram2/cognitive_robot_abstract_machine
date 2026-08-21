@@ -33,9 +33,6 @@ from robokudo.pipeline import Pipeline
 
 import robokudo.scripts.query_test_client
 
-# def query_worker(fun):
-#     return fun()
-
 
 class QueryWorkerThread(threading.Thread):
     def __init__(self, node):
