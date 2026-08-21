@@ -19,15 +19,17 @@ from robokudo.descriptors.analysis_engines.stretch_demo import (
 )
 from test.robokudo_test.test_analysis_engine_query_composition import (
     bounded_build_time,
+    install_fake_collection_reader_descriptor,
 )
 
 
-def test_pointcloud_crop_is_narrowed_to_the_target_shelf_layer():
+def test_pointcloud_crop_is_narrowed_to_the_target_shelf_layer(monkeypatch):
     """
     Without a height-bounded, world-relative crop, the pipeline's wide RealSense field
     of view sees every shelf layer at once and answers a query with one untyped
     candidate per layer instead of just the object on the targeted one.
     """
+    install_fake_collection_reader_descriptor(monkeypatch)
     with bounded_build_time():
         pipeline = AnalysisEngine().implementation()
 
@@ -45,13 +47,16 @@ def test_pointcloud_crop_is_narrowed_to_the_target_shelf_layer():
     assert parameters.max_z == TARGET_SHELF_LAYER_MAX_WORLD_Z
 
 
-def test_pipeline_extracts_objects_by_color_not_depth_clustering():
+def test_pipeline_extracts_objects_by_color_not_depth_clustering(monkeypatch):
     """
     The target object is glossy enough that the RealSense returns no depth on its face,
-    which starves depth-based clustering of points to work with. Extracting by color
-    instead bounds the object's region from its RGB contour, so a depth hole just means
-    fewer 3D points survive within an already-correctly-shaped region.
+    which starves depth-based clustering of points to work with.
+
+    Extracting by color instead bounds the object's region from its RGB contour, so a
+    depth hole just means fewer 3D points survive within an already-correctly-shaped
+    region.
     """
+    install_fake_collection_reader_descriptor(monkeypatch)
     with bounded_build_time():
         pipeline = AnalysisEngine().implementation()
 

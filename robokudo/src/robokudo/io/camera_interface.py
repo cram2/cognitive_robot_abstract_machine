@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 import struct
 import warnings
-from threading import Lock, Thread
+from threading import Lock
 
 import builtin_interfaces.msg
 import cv2
@@ -44,6 +44,7 @@ from typing_extensions import Optional, List, Any, TYPE_CHECKING, Union, Tuple
 from robokudo.cas import CASViews, CAS
 from robokudo.defs import PACKAGE_NAME
 from robokudo.exceptions import CameraDataMissing
+from robokudo.io.ros import get_node
 from robokudo.io.tf_listener_proxy import TFListenerProxy
 from robokudo.types.tf import StampedTransform
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
@@ -188,7 +189,7 @@ class ROSCameraInterface(CameraInterface):
         """
         super().__init__(camera_config)
 
-        self.node = node if node is not None else Node("ros_camera_node")
+        self.node = node if node is not None else get_node()
         """
         ROS node for communication with ROS.
         """
@@ -420,7 +421,7 @@ class KinectCameraInterface(ROSCameraInterface):
 
         :param camera_config: Configuration for the Kinect camera
         """
-        super().__init__(camera_config, node=Node("kinect_camera_node"))
+        super().__init__(camera_config)
 
         self.color_subscriber: message_filters.Subscriber = Subscriber(
             self.node,
@@ -490,16 +491,6 @@ class KinectCameraInterface(ROSCameraInterface):
 
         self.bridge: CVBridgeWorkaround = CVBridgeWorkaround()
         """NumPy-compatible replacement for cv_bridge."""
-        # rclpy.spin_once(self.node)
-
-        Thread(
-            target=rclpy.spin,
-            args=(self.node,),
-            daemon=True,
-            name="Camera Interface Thread",
-        ).start()
-
-        # Thread(target=rclpy.spin_once(self.node), args=(self.node,), daemon=True).start()
 
     def compressed_depth_configured(self) -> bool:
         """

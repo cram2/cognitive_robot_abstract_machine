@@ -4,6 +4,7 @@ import rclpy
 from rclpy.node import Node
 
 import robokudo.defs
+import robokudo.io.ros
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -29,7 +30,9 @@ def ros_default():
 @pytest.fixture
 def node(ros_default):
     n = Node(robokudo.defs.TEST_ROS_NODE_NAME)
+    robokudo.io.ros.register_node(n)
     yield n
+    robokudo.io.ros.clear_node(n)
     n.destroy_node()
 
 
